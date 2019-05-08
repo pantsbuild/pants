@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!--
+  Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+  Licensed under the Apache License, Version 2.0 (see LICENSE).
+-->
+
+<head>
+  <meta charset="utf-8"/>
+  <title>Pants Developers Guide</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="shortcut icon" href="pants-logo.ico">
+  <!-- In case this is a "test publish", tell search engines where real version lives: -->
+  <link rel="canonical" href="http://pantsbuild.org/howto_develop.html">
+
+  <link rel="stylesheet" href="bootstrap-custom.min.css">
+  <link rel="stylesheet" href="bootstrap-custom-theme.min.css">
+  <link rel="stylesheet" href="docsite.css">
+</head>
+
+<body>
+
+<div class="header">
+  <nav class="navbar navbar-default navbar-static-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand navbar-brand-img" href="index.html">
+          <img src="pants-logo.ico" alt="[pantsbuild logo]">
+        </a>
+        <a class="navbar-brand" href="index.html">
+          Pants
+        </a>
+      </div>
+      <div id="navbar" class="navbar-collapse collapse">
+        <ul class="nav navbar-nav navbar-right">
+          <li><a href="/">Docs</a></li>
+          <li><a href="community.html">Community</a></li>
+          <li><a href="https://www.github.com/pantsbuild/pants">GitHub</a></li>
+          <li>
+            <form class="navbar-form navbar-left search" role="search" action="https://www.google.com/search">
+              <div class="form-group">
+                <input type="text" name="as_q" class="form-control query" placeholder="Search">
+                <input name="as_sitesearch" value="pantsbuild.org" type="hidden">
+              </div>
+            </form>
+          </li>
+        </ul>
+      </div><!--/.nav-collapse -->
+    </div>
+  </nav>
+</div>
+
+<div class="page">
+
+  <div class="container-fluid">
+    <div class="row">
+
+      <div class="col-md-1">
+      </div>
+
+      <div class="col-md-2">
+        <div class="site-toc">
+          <ul>
+                  <li class="toc-h1 toc-heading">
+                    Getting Started
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="install.html">Installing Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="setup_repo.html">Setting Up Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="first_tutorial.html">Tutorial</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="common_tasks.html">Common Tasks</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="orgs.html">Pants for Organizations</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Pants Basics
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="why_use_pants.html">Why Use Pants?</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="first_concepts.html">Pants Concepts</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="build_files.html">BUILD files</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="target_addresses.html">Target Addresses</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="3rdparty.html">Third-Party Dependencies</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="options.html">Pants Options</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="invoking.html">Invoking Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="reporting_server.html">Reporting Server</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="ide_support.html">IDE Support</a>
+                  </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#JVM-Support" aria-expanded="false" aria-controls="JVM-Support">JVM Support<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="JVM-Support">
+                        <li class="toc-h1 toc-link ">
+                          <a href="jvm_projects.html">JVM Projects with Pants</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="3rdparty_jvm.html">JVM Dependency Management</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="scala.html">Scala Support</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="publish.html">Publishing Artifacts</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="from_maven.html">Pants for Maven Experts</a>
+                        </li>
+                    </ul>
+                </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#Python-Support" aria-expanded="false" aria-controls="Python-Support">Python Support<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="Python-Support">
+                        <li class="toc-h1 toc-link ">
+                          <a href="python_readme.html">Python Projects with Pants</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="3rdparty_py.html">Python 3rdparty Pattern</a>
+                        </li>
+                    </ul>
+                </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="go_readme.html">Go support for Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="node_readme.html">Node.js Support</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Code &amp; Doc Generation
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="thrift_deps.html">Thrift</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="grpcio_gen.html">Python gRPC + protobufs</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="page.html">Markdown</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Getting Help
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="tshoot.html">Troubleshooting</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="community.html">Community</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Reference
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="build_dictionary.html">Pants BUILD Dictionary</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="options_reference.html">Pants Reference</a>
+                  </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#Release-Notes" aria-expanded="false" aria-controls="Release-Notes">Release Notes<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="Release-Notes">
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.16.x.html">1.16.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.15.x.html">1.15.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.14.x.html">1.14.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.13.x.html">1.13.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.12.x.html">1.12.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.11.x.html">1.11.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.10.x.html">1.10.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.9.x.html">1.9.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.8.x.html">1.8.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.7.x.html">1.7.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.6.x.html">1.6.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.5.x.html">1.5.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.4.x.html">1.4.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.3.x.html">1.3.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.2.x.html">1.2.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.1.x.html">1.1.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.0.x.html">1.0.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-master.html">Master Pre-Releases</a>
+                        </li>
+                    </ul>
+                </li>
+                  <li class="toc-h1 toc-heading">
+                    Developer
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="dev.html">Pants Developer Center</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="export.html">Export Format</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="architecture.html">Architecture</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Blogs
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="coursier_migration.html">Twitter&#x27;s Coursier Migration</a>
+                  </li>
+          </ul>
+        </div> <!-- site-toc -->
+      </div>
+
+      <div class="col-md-8">
+        <div class="content">
+
+          <div class="mainflow">
+              <nav class="pagetoc">
+                <ul>
+                    <li class="toc-h1"><a href="#running-from-sources">Running from sources</a></li>
+                    <li class="toc-h1"><a href="#building-pants-pex-for-production">Building Pants PEX for Production</a></li>
+                    <li class="toc-h1"><a href="#testing">Testing</a></li>
+                    <li class="toc-h2"><a href="#running-tests">Running Tests</a></li>
+                    <li class="toc-h1"><a href="#debugging">Debugging</a></li>
+                    <li class="toc-h1"><a href="#developing-and-debugging-a-jvm-tool">Developing and Debugging a JVM Tool</a></li>
+                    <li class="toc-h2"><a href="#jvm-tool-development-tips">JVM Tool Development Tips</a></li>
+                </ul>
+              </nav>
+
+            <!-- main content start -->
+            <!-- generated by pants! -->
+<style>
+.codehilite .hll { background-color: #ffffcc }
+.codehilite  { background: #f0f0f0; }
+.codehilite .c { color: #60a0b0; font-style: italic } /* Comment */
+.codehilite .err { border: 1px solid #FF0000 } /* Error */
+.codehilite .k { color: #007020; font-weight: bold } /* Keyword */
+.codehilite .o { color: #666666 } /* Operator */
+.codehilite .ch { color: #60a0b0; font-style: italic } /* Comment.Hashbang */
+.codehilite .cm { color: #60a0b0; font-style: italic } /* Comment.Multiline */
+.codehilite .cp { color: #007020 } /* Comment.Preproc */
+.codehilite .cpf { color: #60a0b0; font-style: italic } /* Comment.PreprocFile */
+.codehilite .c1 { color: #60a0b0; font-style: italic } /* Comment.Single */
+.codehilite .cs { color: #60a0b0; background-color: #fff0f0 } /* Comment.Special */
+.codehilite .gd { color: #A00000 } /* Generic.Deleted */
+.codehilite .ge { font-style: italic } /* Generic.Emph */
+.codehilite .gr { color: #FF0000 } /* Generic.Error */
+.codehilite .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.codehilite .gi { color: #00A000 } /* Generic.Inserted */
+.codehilite .go { color: #888888 } /* Generic.Output */
+.codehilite .gp { color: #c65d09; font-weight: bold } /* Generic.Prompt */
+.codehilite .gs { font-weight: bold } /* Generic.Strong */
+.codehilite .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.codehilite .gt { color: #0044DD } /* Generic.Traceback */
+.codehilite .kc { color: #007020; font-weight: bold } /* Keyword.Constant */
+.codehilite .kd { color: #007020; font-weight: bold } /* Keyword.Declaration */
+.codehilite .kn { color: #007020; font-weight: bold } /* Keyword.Namespace */
+.codehilite .kp { color: #007020 } /* Keyword.Pseudo */
+.codehilite .kr { color: #007020; font-weight: bold } /* Keyword.Reserved */
+.codehilite .kt { color: #902000 } /* Keyword.Type */
+.codehilite .m { color: #40a070 } /* Literal.Number */
+.codehilite .s { color: #4070a0 } /* Literal.String */
+.codehilite .na { color: #4070a0 } /* Name.Attribute */
+.codehilite .nb { color: #007020 } /* Name.Builtin */
+.codehilite .nc { color: #0e84b5; font-weight: bold } /* Name.Class */
+.codehilite .no { color: #60add5 } /* Name.Constant */
+.codehilite .nd { color: #555555; font-weight: bold } /* Name.Decorator */
+.codehilite .ni { color: #d55537; font-weight: bold } /* Name.Entity */
+.codehilite .ne { color: #007020 } /* Name.Exception */
+.codehilite .nf { color: #06287e } /* Name.Function */
+.codehilite .nl { color: #002070; font-weight: bold } /* Name.Label */
+.codehilite .nn { color: #0e84b5; font-weight: bold } /* Name.Namespace */
+.codehilite .nt { color: #062873; font-weight: bold } /* Name.Tag */
+.codehilite .nv { color: #bb60d5 } /* Name.Variable */
+.codehilite .ow { color: #007020; font-weight: bold } /* Operator.Word */
+.codehilite .w { color: #bbbbbb } /* Text.Whitespace */
+.codehilite .mb { color: #40a070 } /* Literal.Number.Bin */
+.codehilite .mf { color: #40a070 } /* Literal.Number.Float */
+.codehilite .mh { color: #40a070 } /* Literal.Number.Hex */
+.codehilite .mi { color: #40a070 } /* Literal.Number.Integer */
+.codehilite .mo { color: #40a070 } /* Literal.Number.Oct */
+.codehilite .sa { color: #4070a0 } /* Literal.String.Affix */
+.codehilite .sb { color: #4070a0 } /* Literal.String.Backtick */
+.codehilite .sc { color: #4070a0 } /* Literal.String.Char */
+.codehilite .dl { color: #4070a0 } /* Literal.String.Delimiter */
+.codehilite .sd { color: #4070a0; font-style: italic } /* Literal.String.Doc */
+.codehilite .s2 { color: #4070a0 } /* Literal.String.Double */
+.codehilite .se { color: #4070a0; font-weight: bold } /* Literal.String.Escape */
+.codehilite .sh { color: #4070a0 } /* Literal.String.Heredoc */
+.codehilite .si { color: #70a0d0; font-style: italic } /* Literal.String.Interpol */
+.codehilite .sx { color: #c65d09 } /* Literal.String.Other */
+.codehilite .sr { color: #235388 } /* Literal.String.Regex */
+.codehilite .s1 { color: #4070a0 } /* Literal.String.Single */
+.codehilite .ss { color: #517918 } /* Literal.String.Symbol */
+.codehilite .bp { color: #007020 } /* Name.Builtin.Pseudo */
+.codehilite .fm { color: #06287e } /* Name.Function.Magic */
+.codehilite .vc { color: #bb60d5 } /* Name.Variable.Class */
+.codehilite .vg { color: #bb60d5 } /* Name.Variable.Global */
+.codehilite .vi { color: #bb60d5 } /* Name.Variable.Instance */
+.codehilite .vm { color: #bb60d5 } /* Name.Variable.Magic */
+.codehilite .il { color: #40a070 } /* Literal.Number.Integer.Long */
+</style>
+<h1 id="pants-developers-guide">Pants Developers Guide</h1>
+<p>This page describes the developer workflow when changing Pants itself. (If you wanted
+instructions for using Pants to develop other programs, please see
+<a href="first_tutorial.html">First Tutorial</a>.)</p>
+<p>These instructions assume you've already
+<a href="howto_contribute.html#download_source_code" pantsref="download_source_code">downloaded the source code</a>.</p>
+<h2 id="running-from-sources">Running from sources</h2>
+<p>As pants is implemented in python it can be run directly from sources.</p>
+<div class="codehilite"><pre><span></span>$ ./pants goals
+&lt;remainder of output omitted <span class="k">for</span> brevity&gt;
+</pre></div>
+<p>If you want to run pants from sources, but in another repo to test changes before a release, you
+can run it like so:</p>
+<div class="codehilite"><pre><span></span><span class="o">(</span>other repo<span class="o">)</span> $ <span class="nv">PANTS_DEV</span><span class="o">=</span><span class="m">0</span> <span class="nv">PANTS_PLUGINS</span><span class="o">=</span><span class="s2">"[]"</span> <span class="se">\</span>
+  <span class="nv">PANTS_PYTHONPATH</span><span class="o">=</span><span class="s2">"+['/path/to/pants/repo/contrib/python/src/python']"</span> <span class="se">\</span>
+  <span class="nv">PANTS_BACKEND_PACKAGES</span><span class="o">=</span><span class="s2">"+['pants.contrib.python.checks']"</span> <span class="se">\</span>
+  <span class="nv">PANTS_VERSION</span><span class="o">=</span><span class="m">1</span>.2.0-dev0 <span class="se">\</span>
+  /path/to/pants/repo/pants compile ::
+</pre></div>
+<p>Here the environment variables are used to make sure any pants plugins your other repo uses will
+also be run from pants sources. Explaining each environment variable:</p>
+<ul>
+<li><code>PANTS_DEV</code>: The <code>./pants</code> runner script in this repo will set this to 1 and export it unless
+  explicitly set to 0 in the environment. When <code>PANTS_DEV=1</code>, pants will resolve certain packages
+  such as checkstyle checkers from paths to source targets instead of 3rdparty requirements, which
+  will most likely fail in another repo.</li>
+<li><code>PANTS_PLUGINS</code>: This should always be as-shown, ie: an empty list.</li>
+<li><code>PANTS_PYTHONPATH</code>: This is a comma-separated list of PYTHONPATH elements. Note the plus symbol
+  before the list - this indicates the given elements should be appended to the PYTHONPATH.
+  The values can be taken from the pants repo pants.ini. You'll need one path per plugin your other
+  repo uses.</li>
+<li><code>PANTS_BACKEND_PACKAGES</code>: This is a comma-separated list of plugin package names. Note the plus
+  symbol before the list - this indicates the given elements should be appended to the PYTHONPATH.
+  These values can also be taken from the pants repo pants.ini. You'll need one package name per
+  plugin your other repo uses.</li>
+<li><code>PANTS_VERSION</code>: The version of pants required by the repo.</li>
+</ul>
+<p>If your other repo uses plugins but you don't use this environment variable technique, or you do use
+it but miss one or more plugins, pants will still run, but the result can be confusing since the
+plugins not covered by the environment variable settings will run from a cached binary distribution
+and not from your local edits to pants.  It's worth adding temporary print statements to make sure
+you're hitting your code edits if you aren't using a debugger.</p>
+<h2 id="building-pants-pex-for-production">Building Pants PEX for Production</h2>
+<p>You will usually want to use an official published version of pants. But what if you want to
+let some of your internal users try out the latest and greatest unreleased code?
+What if you want to create a custom build of pants with some unpublished patches?
+In that case, you want to build a production ready version of pants including dependencies for
+all platforms, not just your development environment.</p>
+<p>In the following examples, you'll be using 2 local repos.  The path to the pantsbuild/pants clone
+will be <code>/tmp/pantsbuild</code> and the path to your repo <code>/your/repo</code> in all the examples below; make
+sure to substitute your own paths when adapting this recipe to your environment.</p>
+<p>You'll need to setup some files one-time in your own repo:</p>
+<div class="codehilite"><pre><span></span>$ cat pants-production.requirements.txt
+<span class="c1"># Replace this path with the path to your pantsbuild.pants clone.</span>
+-f /tmp/pantsbuild/dist/
+pantsbuild.pants
+
+$ cat BUILD.pants-production
+python_requirements<span class="o">(</span><span class="s1">'pants-production.requirements.txt'</span><span class="o">)</span>
+
+python_binary<span class="o">(</span>
+  <span class="nv">name</span><span class="o">=</span><span class="s1">'pants'</span>,
+  <span class="nv">entry_point</span><span class="o">=</span><span class="s1">'pants.bin.pants_loader:main'</span>,
+  <span class="c1"># You may want to tweak the list of supported platforms to match your environment.</span>
+  <span class="nv">platforms</span><span class="o">=[</span>
+    <span class="s1">'current'</span>,
+    <span class="s1">'linux-x86_64'</span>,
+    <span class="s1">'macosx-10.4-x86_64'</span>,
+  <span class="o">]</span>,
+  <span class="c1"># You may want to adjust the Python interpreter constraints. Note that Pants requires Python 2.7</span>
+  <span class="c1"># or 3.6+. Pex currently does not support flexible interpreter constraints (tracked by</span>
+  <span class="c1"># https://github.com/pantsbuild/pex/issues/690), so you must choose which version to target.</span>
+  <span class="nv">compatibility</span><span class="o">=[</span><span class="s1">'CPython==3.6.*'</span><span class="o">]</span>,
+  <span class="nv">dependencies</span><span class="o">=[</span>
+    <span class="s1">':pantsbuild.pants'</span>,
+    <span class="c1"># List any other pants backend local or remote deps here, ie:</span>
+    <span class="c1"># ':pantsbuild.pants.contrib.go' or 'src/python/your/pants/plugin'</span>
+  <span class="o">]</span>
+<span class="o">)</span>
+
+$ cat pants-production.ini
+<span class="o">[</span>python-repos<span class="o">]</span>
+<span class="c1"># You should replace these repos with your own housing pre-built eggs or wheels for the</span>
+<span class="c1"># platforms you support.</span>
+repos: <span class="o">[</span>
+    <span class="s2">"https://pantsbuild.github.io/cheeseshop/third_party/python/dist/index.html"</span>,
+    <span class="s2">"https://pantsbuild.github.io/cheeseshop/third_party/python/index.html"</span>
+  <span class="o">]</span>
+
+indexes: <span class="o">[</span><span class="s2">"https://pypi.org/simple/"</span><span class="o">]</span>
+</pre></div>
+<p>To (re-)generate a <code>pants.pex</code> you then run these 2 commands:</p>
+<ol>
+<li>
+<p>In your pantsbuild/pants clone, create a local pants release from master:</p>
+<div class="codehilite"><pre><span></span>$ rm -rf dist <span class="o">&amp;&amp;</span> ./build-support/bin/release.sh -n
+</pre></div>
+</li>
+<li>
+<p>In your own repo the following command will create a locally built <code>pants.pex</code> for all platforms:</p>
+<div class="codehilite"><pre><span></span>$ /tmp/pantsbuild/pants --pants-config-files<span class="o">=</span>pants-production.ini clean-all binary //:pants
+</pre></div>
+</li>
+</ol>
+<p>The resulting <code>pants.pex</code> will be in the <code>dist/</code> directory:</p>
+<div class="codehilite"><pre><span></span>$ ls -l dist/pants.pex
+-rwxr-xr-x  <span class="m">1</span> pantsdev  pantsdev  <span class="m">5561254</span> Oct  <span class="m">8</span> <span class="m">09</span>:52 dist/pants.pex
+</pre></div>
+<p>You can see that the pex contains bundled dependencies for both mac and linux:</p>
+<div class="codehilite"><pre><span></span>$ unzip -l dist/pants.pex <span class="p">|</span> grep -e <span class="s1">'macos\|linux'</span>
+</pre></div>
+<p>You can distribute the resulting <code>pants.pex</code> file to your users via your favorite method.
+A user can just copy this pex to the top of their Pants workspace and use it:</p>
+<div class="codehilite"><pre><span></span>$ cp /mnt/fd0/pants.pex .
+$ ./pants.pex goal <span class="nb">test</span> examples/tests/java/org/pantsbuild/example/hello/greet:
+</pre></div>
+<h2 id="testing">Testing</h2>
+<p><a id="dev_run_all_tests" pantsmark="dev_run_all_tests"> </a></p>
+<h3 id="running-tests">Running Tests</h3>
+<p>Pants has many tests. There are BUILD targets to run those tests. We try to keep them passing.
+<a href="https://travis-ci.org/pantsbuild/pants">A Travis-CI job</a> runs tests on each SHA pushed to
+origin on <code>github.com/pantsbuild/pants</code>.</p>
+<p>Most test are runnable as regular Pants test targets. To find tests that work with a particular
+feature, you might explore <code>tests/python/pants_tests/.../BUILD</code>.</p>
+<p>Before <a href="howto_contribute.html">contributing a change to Pants</a>,
+make sure it passes <strong>all</strong> of our continuous integration (CI) tests: everything builds,
+all tests pass. Our tests are hard and slow to run all of locally, so we recommend that you create
+a pull request, and allow travis to run them. You can reproduce failures by running</p>
+<div class="codehilite"><pre><span></span>$ ./build-support/bin/ci.sh
+</pre></div>
+<p>with whatever relevant flags reproduce the failure (<code>./build-support/bin/ci.sh -h</code> will list the
+available flags). The relevant flags are in the log for the shard on a line that looks something
+like <code>Executing ./build-support/bin/ci.sh "-c3 -i 0/6" ...</code>.</p>
+<p>To run just Pants' <em>unit</em> tests (skipping the can-be-slow integration tests), filter out
+the python tests tagged with 'integration':</p>
+<div class="codehilite"><pre><span></span>$ ./pants <span class="nb">test</span> tests/python/pants_test:: --tag<span class="o">=</span>-integration
+</pre></div>
+<p>For convenience, this is wrapped up in a script <code>build-support/bin/unit-test.sh</code>.</p>
+<p>If you only want to run tests for changed targets, then you can use the
+<code>test-changed</code> goal:</p>
+<div class="codehilite"><pre><span></span>$ ./pants test-changed
+</pre></div>
+<p>You can run your code through the Travis-CI before you submit a change. Travis-CI is integrated
+with the pull requests for the <code>pantsbuild/pants</code> repo. Travis-CI will test it soon after the pull
+request is created. It will queue up a new job every time you subsequently push your branch.</p>
+<p>To kick off a new CI-build, push a branch to
+<a href="howto_contribute.html#download_source_code" pantsref="download_source_code">your fork</a> of <code>pantsbuild/pants</code>.
+Create a pull request on the <code>pantsbuild/pants</code> <a href="https://github.com/pantsbuild/pants">repo</a>,
+not your fork. If you are posting a review request, put the pull request number into the Bug
+field. Then, when you close the request, you can navigate from the bug number to easily close
+the pull request.</p>
+<p>If your CI-build failed in Travis-CI, and the failure looks like it's not due to
+your change, please open an issue with the part of the CI log containing the test failure and label
+the issue with <code>flaky-test</code>. If an issue already exists, add a comment to it noting that you
+encountered it too. After you've done that, you can ask in slack for someone to restart the shard.
+That will cause the shard to re-run its tests.</p>
+<h2 id="debugging">Debugging</h2>
+<p>To run Pants under <code>pdb</code> and set a breakpoint, you can typically add</p>
+<div class="codehilite"><pre><span></span><span class="kn">import</span> <span class="nn">pdb</span><span class="p">;</span> <span class="n">pdb</span><span class="o">.</span><span class="n">set_trace</span><span class="p">()</span>
+</pre></div>
+<p>...where you first want to break. If the code is in a test, instead use</p>
+<div class="codehilite"><pre><span></span><span class="kn">import</span> <span class="nn">pytest</span><span class="p">;</span> <span class="n">pytest</span><span class="o">.</span><span class="n">set_trace</span><span class="p">()</span>
+</pre></div>
+<p>To run tests and bring up <code>pdb</code> for failing tests, you can instead pass <code>--pdb</code> to
+<code>test.pytest --options</code>:</p>
+<div class="codehilite"><pre><span></span>$ ./pants test.pytest --options<span class="o">=</span><span class="s1">'--pdb'</span> tests/python/pants_test/tasks:
+... plenty of <span class="nb">test</span> output ...
+tests/python/pants_test/tasks/test_targets_help.py E
+&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt; traceback &gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;
+
+<span class="nv">cls</span> <span class="o">=</span> &lt;class <span class="s1">'pants_test.tasks.test_targets_help.TargetsHelpTest'</span>&gt;
+
+    @classmethod
+    def setUpClass<span class="o">(</span>cls<span class="o">)</span>:
+&gt;     super<span class="o">(</span>TargetsHelpTest, cls<span class="o">)</span>.setUpClass<span class="o">()</span>
+E     AttributeError: <span class="s1">'super'</span> object has no attribute <span class="s1">'setUpClass'</span>
+
+tests/python/pants_test/tasks/test_targets_help.py:24: AttributeError
+&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt; entering PDB &gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;
+&gt; /Users/lhosken/workspace/pants/tests/python/pants_test/tasks/test_targets_help.py<span class="o">(</span><span class="m">24</span><span class="o">)</span>setUpClass<span class="o">()</span>
+-&gt; super<span class="o">(</span>TargetsHelpTest, cls<span class="o">)</span>.setUpClass<span class="o">()</span>
+<span class="o">(</span>Pdb<span class="o">)</span>
+</pre></div>
+<p>Debug quickly; that test target will time out in a couple of minutes,
+quitting you out.</p>
+<p>To start an interactive Python shell that can <code>import</code> Pants modules,
+use the usual <code>./pants repl</code> on a <code>python_library</code> target that builds (or
+depends on) the modules you want:</p>
+<div class="codehilite"><pre><span></span>$ ./pants repl src/python/pants/build_graph
+/Users/lhosken/workspace/pants src/python/pants/build_graph
+Python <span class="m">2</span>.6.8 <span class="o">(</span>unknown, Mar  <span class="m">9</span> <span class="m">2014</span>, <span class="m">22</span>:16:00<span class="o">)</span>
+<span class="o">[</span>GCC <span class="m">4</span>.2.1 Compatible Apple LLVM <span class="m">5</span>.0 <span class="o">(</span>clang-500.0.68<span class="o">)]</span> on darwin
+Type <span class="s2">"help"</span>, <span class="s2">"copyright"</span>, <span class="s2">"credits"</span> or <span class="s2">"license"</span> <span class="k">for</span> more information.
+<span class="o">(</span>InteractiveConsole<span class="o">)</span>
+&gt;&gt;&gt; from pants.build_graph.target import Target
+&gt;&gt;&gt;
+</pre></div>
+<h2 id="developing-and-debugging-a-jvm-tool">Developing and Debugging a JVM Tool</h2>
+<p>Some Pants tools are written in Java and Scala. If you need
+to debug one of these tools and change code, keep in mind that these tools don't
+run straight from the Pants source tree.  They expect their jar dependencies to be
+resolved through external jar dependencies.  This means that to use a development
+version of a tool you will need to adjust the external dependency information
+in <code>BUILD.tools</code> to point Pants at a development version of your jar file.</p>
+<p>First, create a jar file for the tool with the <code>binary</code> goal.</p>
+<div class="codehilite"><pre><span></span>$ ./pants binary src/java/org/pantsbuild/tools/jar:main
+</pre></div>
+<p>The above command will create <code>dist/jar-tool.jar</code> according to the <em>jvm_binary</em>
+target defined in <code>src/java/org/pantsbuild/tools/jar/BUILD</code></p>
+<p>You'll need to update the jar dependency that this tool uses for Pants to see the
+development version.  See
+<a href="3rdparty_jvm.html#test_3rdparty_jvm_snapshot" pantsref="test_3rdparty_jvm_snapshot">Using a SNAPSHOT JVM Dependency</a>
+which describes how to specify the <code>url</code> and <code>mutable</code> attributes of a <code>jar</code>
+dependency found on the local filesystem:</p>
+<div class="codehilite"><pre><span></span><span class="n">jar_library</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'jar-tool'</span><span class="p">,</span>
+    <span class="n">jars</span><span class="o">=</span><span class="p">[</span>
+      <span class="n">jar</span><span class="p">(</span><span class="n">org</span><span class="o">=</span><span class="s1">'org.pantsbuild'</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">'jar-tool'</span><span class="p">,</span> <span class="n">rev</span><span class="o">=</span><span class="s1">'1.2.3-SNAPSHOT'</span><span class="p">,</span>
+          <span class="n">url</span><span class="o">=</span><span class="s1">'file:///Users/squarepants/Src/pants/dist/jar-tool.jar'</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="bp">True</span><span class="p">),</span>
+  <span class="p">],</span>
+<span class="p">)</span>
+</pre></div>
+<p>For debugging, append JVM args to turn on the debugger for the appropriate tool in
+<code>pants.ini</code>:</p>
+<div class="codehilite"><pre><span></span><span class="k">[jar-tool]</span>
+<span class="na">jvm_options: ['-Xdebug', '-Xrunjdwp:transport</span><span class="o">=</span><span class="s">dt_socket,server=y,suspend=y,address=5005']</span>
+</pre></div>
+<p>Note that most tools run under nailgun by default. The easiest way to
+debug them is to disable nailgun by specifying the command line option
+<code>--execution-strategy=subprocess</code> or setting <code>execution_strategy: subprocess</code> in the specific tool
+section or in the <code>[DEFAULT]</code> section of <code>pants.ini</code>.</p>
+<div class="codehilite"><pre><span></span><span class="k">[DEFAULT]</span>
+<span class="na">execution_strategy: subprocess</span>
+</pre></div>
+<h3 id="jvm-tool-development-tips">JVM Tool Development Tips</h3>
+<p>If you need to debug the tool under nailgun, make
+sure you run <code>pants goal ng-killall</code> or <code>pants goal clean-all</code> after you update the
+jar file so that any running nailgun servers are restarted on the next invocation
+of Pants.</p>
+<p>Also, you may need to clean up some additional state when testing a tool. Some tools
+cache a shaded version under <code>~/.cache/pants/artifact_cache/</code>.  Clear out the cache
+before testing a new version of the tool as follows:</p>
+<div class="codehilite"><pre><span></span>$ rm -rf ~/.cache/pants/artifact_cache
+</pre></div>
+<p>If you have trouble resolving the file with Ivy after making the
+above changes to <code>BUILD.tools</code>:</p>
+<ul>
+<li>Make sure your url is absolute and contains three slashes (<code>///</code>) at the start
+of the path.</li>
+<li>
+<p>If your repo has an <code>ivysettings.xml</code> file (the pants repo currently does not),
+try adding a minimal <code>&lt;filesystem&gt;</code> resolver that doesn't enforce a pom being
+present as follows:</p>
+<div class="codehilite"><pre><span></span><span class="nt">&lt;resolvers&gt;</span>
+  <span class="nt">&lt;chain</span> <span class="na">name=</span><span class="s">"chain-repos"</span> <span class="na">returnFirst=</span><span class="s">"true"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;filesystem</span> <span class="na">name=</span><span class="s">"internal"</span><span class="nt">&gt;&lt;/filesystem&gt;</span>
+    ...
+  <span class="nt">&lt;/chain&gt;</span>
+<span class="nt">&lt;/resolvers&gt;</span>
+</pre></div>
+</li>
+</ul>
+
+            <!-- main content end -->
+
+            <div class="generated">
+              Generated by <a href="docs.html">publish_docs</a>
+              from dist/markdown/html/src/docs/howto_develop.html 2019-05-07T19:16:16.307249
+            </div>
+
+          </div> <!-- mainflow -->
+
+        </div> <!-- content -->
+
+      </div>
+
+      <div class="col-md-1">
+      </div>
+
+    </div> <!-- row -->
+  </div> <!-- container-fluid -->
+
+</div> <!-- page -->
+
+<script src="https://code.jquery.com/jquery-2.2.3.min.js" integrity="sha384-I6F5OKECLVtK/BL+8iSLDEHowSAfUo76ZL9+kGAgTRdiByINKJaqTPH/QVNS1VDb" crossorigin="anonymous"></script>
+<script src="bootstrap-custom.min.js"></script>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-78111411-1', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+</html>

@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!--
+  Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+  Licensed under the Apache License, Version 2.0 (see LICENSE).
+-->
+
+<head>
+  <meta charset="utf-8"/>
+  <title>Invoking Pants</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="shortcut icon" href="pants-logo.ico">
+  <!-- In case this is a "test publish", tell search engines where real version lives: -->
+  <link rel="canonical" href="http://pantsbuild.org/invoking.html">
+
+  <link rel="stylesheet" href="bootstrap-custom.min.css">
+  <link rel="stylesheet" href="bootstrap-custom-theme.min.css">
+  <link rel="stylesheet" href="docsite.css">
+</head>
+
+<body>
+
+<div class="header">
+  <nav class="navbar navbar-default navbar-static-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand navbar-brand-img" href="index.html">
+          <img src="pants-logo.ico" alt="[pantsbuild logo]">
+        </a>
+        <a class="navbar-brand" href="index.html">
+          Pants
+        </a>
+      </div>
+      <div id="navbar" class="navbar-collapse collapse">
+        <ul class="nav navbar-nav navbar-right">
+          <li><a href="/">Docs</a></li>
+          <li><a href="community.html">Community</a></li>
+          <li><a href="https://www.github.com/pantsbuild/pants">GitHub</a></li>
+          <li>
+            <form class="navbar-form navbar-left search" role="search" action="https://www.google.com/search">
+              <div class="form-group">
+                <input type="text" name="as_q" class="form-control query" placeholder="Search">
+                <input name="as_sitesearch" value="pantsbuild.org" type="hidden">
+              </div>
+            </form>
+          </li>
+        </ul>
+      </div><!--/.nav-collapse -->
+    </div>
+  </nav>
+</div>
+
+<div class="page">
+
+  <div class="container-fluid">
+    <div class="row">
+
+      <div class="col-md-1">
+      </div>
+
+      <div class="col-md-2">
+        <div class="site-toc">
+          <ul>
+                  <li class="toc-h1 toc-heading">
+                    Getting Started
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="install.html">Installing Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="setup_repo.html">Setting Up Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="first_tutorial.html">Tutorial</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="common_tasks.html">Common Tasks</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="orgs.html">Pants for Organizations</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Pants Basics
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="why_use_pants.html">Why Use Pants?</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="first_concepts.html">Pants Concepts</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="build_files.html">BUILD files</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="target_addresses.html">Target Addresses</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="3rdparty.html">Third-Party Dependencies</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="options.html">Pants Options</a>
+                  </li>
+                  <li class="toc-h1 toc-link toc-here">
+                    Invoking Pants
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="reporting_server.html">Reporting Server</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="ide_support.html">IDE Support</a>
+                  </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#JVM-Support" aria-expanded="false" aria-controls="JVM-Support">JVM Support<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="JVM-Support">
+                        <li class="toc-h1 toc-link ">
+                          <a href="jvm_projects.html">JVM Projects with Pants</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="3rdparty_jvm.html">JVM Dependency Management</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="scala.html">Scala Support</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="publish.html">Publishing Artifacts</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="from_maven.html">Pants for Maven Experts</a>
+                        </li>
+                    </ul>
+                </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#Python-Support" aria-expanded="false" aria-controls="Python-Support">Python Support<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="Python-Support">
+                        <li class="toc-h1 toc-link ">
+                          <a href="python_readme.html">Python Projects with Pants</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="3rdparty_py.html">Python 3rdparty Pattern</a>
+                        </li>
+                    </ul>
+                </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="go_readme.html">Go support for Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="node_readme.html">Node.js Support</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Code &amp; Doc Generation
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="thrift_deps.html">Thrift</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="grpcio_gen.html">Python gRPC + protobufs</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="page.html">Markdown</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Getting Help
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="tshoot.html">Troubleshooting</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="community.html">Community</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Reference
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="build_dictionary.html">Pants BUILD Dictionary</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="options_reference.html">Pants Reference</a>
+                  </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#Release-Notes" aria-expanded="false" aria-controls="Release-Notes">Release Notes<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="Release-Notes">
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.16.x.html">1.16.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.15.x.html">1.15.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.14.x.html">1.14.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.13.x.html">1.13.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.12.x.html">1.12.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.11.x.html">1.11.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.10.x.html">1.10.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.9.x.html">1.9.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.8.x.html">1.8.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.7.x.html">1.7.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.6.x.html">1.6.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.5.x.html">1.5.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.4.x.html">1.4.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.3.x.html">1.3.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.2.x.html">1.2.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.1.x.html">1.1.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.0.x.html">1.0.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-master.html">Master Pre-Releases</a>
+                        </li>
+                    </ul>
+                </li>
+                  <li class="toc-h1 toc-heading">
+                    Developer
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="dev.html">Pants Developer Center</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="export.html">Export Format</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="architecture.html">Architecture</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Blogs
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="coursier_migration.html">Twitter&#x27;s Coursier Migration</a>
+                  </li>
+          </ul>
+        </div> <!-- site-toc -->
+      </div>
+
+      <div class="col-md-8">
+        <div class="content">
+
+          <div class="mainflow">
+              <nav class="pagetoc">
+                <ul>
+                    <li class="toc-h1"><a href="#order-of-arguments">Order of Arguments</a></li>
+                    <li class="toc-h1"><a href="#how-to-use-shorthand-flags">How to Use Shorthand Flags</a></li>
+                    <li class="toc-h1"><a href="#passthrough-args">Passthrough Args</a></li>
+                    <li class="toc-h1"><a href="#the-pants-daemon-pantsd">The Pants Daemon (pantsd)</a></li>
+                    <li class="toc-h2"><a href="#benefits">Benefits</a></li>
+                    <li class="toc-h2"><a href="#caveats">Caveats</a></li>
+                    <li class="toc-h2"><a href="#usage">Usage</a></li>
+                    <li class="toc-h2"><a href="#rollout">Rollout</a></li>
+                    <li class="toc-h1"><a href="#profiling-pants">Profiling Pants</a></li>
+                </ul>
+              </nav>
+
+            <!-- main content start -->
+            <!-- generated by pants! -->
+<style>
+.codehilite .hll { background-color: #ffffcc }
+.codehilite  { background: #f0f0f0; }
+.codehilite .c { color: #60a0b0; font-style: italic } /* Comment */
+.codehilite .err { border: 1px solid #FF0000 } /* Error */
+.codehilite .k { color: #007020; font-weight: bold } /* Keyword */
+.codehilite .o { color: #666666 } /* Operator */
+.codehilite .ch { color: #60a0b0; font-style: italic } /* Comment.Hashbang */
+.codehilite .cm { color: #60a0b0; font-style: italic } /* Comment.Multiline */
+.codehilite .cp { color: #007020 } /* Comment.Preproc */
+.codehilite .cpf { color: #60a0b0; font-style: italic } /* Comment.PreprocFile */
+.codehilite .c1 { color: #60a0b0; font-style: italic } /* Comment.Single */
+.codehilite .cs { color: #60a0b0; background-color: #fff0f0 } /* Comment.Special */
+.codehilite .gd { color: #A00000 } /* Generic.Deleted */
+.codehilite .ge { font-style: italic } /* Generic.Emph */
+.codehilite .gr { color: #FF0000 } /* Generic.Error */
+.codehilite .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.codehilite .gi { color: #00A000 } /* Generic.Inserted */
+.codehilite .go { color: #888888 } /* Generic.Output */
+.codehilite .gp { color: #c65d09; font-weight: bold } /* Generic.Prompt */
+.codehilite .gs { font-weight: bold } /* Generic.Strong */
+.codehilite .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.codehilite .gt { color: #0044DD } /* Generic.Traceback */
+.codehilite .kc { color: #007020; font-weight: bold } /* Keyword.Constant */
+.codehilite .kd { color: #007020; font-weight: bold } /* Keyword.Declaration */
+.codehilite .kn { color: #007020; font-weight: bold } /* Keyword.Namespace */
+.codehilite .kp { color: #007020 } /* Keyword.Pseudo */
+.codehilite .kr { color: #007020; font-weight: bold } /* Keyword.Reserved */
+.codehilite .kt { color: #902000 } /* Keyword.Type */
+.codehilite .m { color: #40a070 } /* Literal.Number */
+.codehilite .s { color: #4070a0 } /* Literal.String */
+.codehilite .na { color: #4070a0 } /* Name.Attribute */
+.codehilite .nb { color: #007020 } /* Name.Builtin */
+.codehilite .nc { color: #0e84b5; font-weight: bold } /* Name.Class */
+.codehilite .no { color: #60add5 } /* Name.Constant */
+.codehilite .nd { color: #555555; font-weight: bold } /* Name.Decorator */
+.codehilite .ni { color: #d55537; font-weight: bold } /* Name.Entity */
+.codehilite .ne { color: #007020 } /* Name.Exception */
+.codehilite .nf { color: #06287e } /* Name.Function */
+.codehilite .nl { color: #002070; font-weight: bold } /* Name.Label */
+.codehilite .nn { color: #0e84b5; font-weight: bold } /* Name.Namespace */
+.codehilite .nt { color: #062873; font-weight: bold } /* Name.Tag */
+.codehilite .nv { color: #bb60d5 } /* Name.Variable */
+.codehilite .ow { color: #007020; font-weight: bold } /* Operator.Word */
+.codehilite .w { color: #bbbbbb } /* Text.Whitespace */
+.codehilite .mb { color: #40a070 } /* Literal.Number.Bin */
+.codehilite .mf { color: #40a070 } /* Literal.Number.Float */
+.codehilite .mh { color: #40a070 } /* Literal.Number.Hex */
+.codehilite .mi { color: #40a070 } /* Literal.Number.Integer */
+.codehilite .mo { color: #40a070 } /* Literal.Number.Oct */
+.codehilite .sa { color: #4070a0 } /* Literal.String.Affix */
+.codehilite .sb { color: #4070a0 } /* Literal.String.Backtick */
+.codehilite .sc { color: #4070a0 } /* Literal.String.Char */
+.codehilite .dl { color: #4070a0 } /* Literal.String.Delimiter */
+.codehilite .sd { color: #4070a0; font-style: italic } /* Literal.String.Doc */
+.codehilite .s2 { color: #4070a0 } /* Literal.String.Double */
+.codehilite .se { color: #4070a0; font-weight: bold } /* Literal.String.Escape */
+.codehilite .sh { color: #4070a0 } /* Literal.String.Heredoc */
+.codehilite .si { color: #70a0d0; font-style: italic } /* Literal.String.Interpol */
+.codehilite .sx { color: #c65d09 } /* Literal.String.Other */
+.codehilite .sr { color: #235388 } /* Literal.String.Regex */
+.codehilite .s1 { color: #4070a0 } /* Literal.String.Single */
+.codehilite .ss { color: #517918 } /* Literal.String.Symbol */
+.codehilite .bp { color: #007020 } /* Name.Builtin.Pseudo */
+.codehilite .fm { color: #06287e } /* Name.Function.Magic */
+.codehilite .vc { color: #bb60d5 } /* Name.Variable.Class */
+.codehilite .vg { color: #bb60d5 } /* Name.Variable.Global */
+.codehilite .vi { color: #bb60d5 } /* Name.Variable.Instance */
+.codehilite .vm { color: #bb60d5 } /* Name.Variable.Magic */
+.codehilite .il { color: #40a070 } /* Literal.Number.Integer.Long */
+</style>
+<h1 id="invoking-pants">Invoking Pants</h1>
+<p>This page discusses advanced usage when invoking Pants on the command line.
+We assume you already know the <a href="first_tutorial.html">basic command-line structure</a>.</p>
+<ul>
+<li>For details on how to specify target addresses, see <a href="target_addresses.html">Target Addresses</a>.</li>
+<li>For details on how to specify options, see <a href="options.html">Options</a>.</li>
+<li>For a list of Pants' goals and their options, see the <a href="options_reference.html">Options Reference</a>.</li>
+</ul>
+<h2 id="order-of-arguments">Order of Arguments</h2>
+<p>A simple Pants command line looks like <code>./pants goal target</code>. E.g., <code>./pants compile src/java/::</code>.</p>
+<p>The full command line specification is:</p>
+<div class="codehilite"><pre><span></span>./pants &lt;global and fully-qualified flags&gt; <span class="se">\</span>
+        &lt;goal1.task1&gt; &lt;shorthand flags <span class="k">for</span> task1&gt; <span class="se">\</span>
+        &lt;goal2.task2&gt; &lt;shorthand flags <span class="k">for</span> task2&gt; <span class="se">\</span>
+        ... <span class="se">\</span>
+        &lt;target1&gt; &lt;target2&gt; ... <span class="o">[</span>-- passthrough options <span class="k">for</span> last goal<span class="o">]</span>
+</pre></div>
+<p>Fully qualified flags can be passed anywhere on the command line
+before the <code>--</code> separator for passthrough args, but
+shorthand flags must immediately follow the goal they apply to.</p>
+<p>Consider the following command:</p>
+<div class="codehilite"><pre><span></span>./pants --level<span class="o">=</span>debug compile.zinc --no-delete-scratch --resolve-ivy-open src::
+</pre></div>
+<ul>
+<li><code>--level</code> is a global flag.</li>
+<li>The goal and task to run are <code>compile.zinc</code>.</li>
+<li>The <code>--no-delete-scratch</code> is shorthand for the
+  <code>--compile-zinc-no-delete-scratch</code> flag.</li>
+<li>The <code>--resolve-ivy-open</code> command is a fully qualified flag and
+  applies to the <code>resolve.ivy</code> task.  Although the task <code>resolve.ivy</code>
+  isn't specified on the command line it implicitly runs because
+  <code>compile.zinc</code> task depends on it.</li>
+</ul>
+<p>You can pass options to pants using the a config file, the
+environment, or command line flags. See the
+<a href="options.html">Options</a> page for more details.</p>
+<h2 id="how-to-use-shorthand-flags">How to Use Shorthand Flags</h2>
+<p>Either fully qualified or shorthand flags can be used to pass an
+option to a task. The fully qualified (or long form) options are
+listed in the <code>help</code> output and the <a href="options_reference.html">Options Reference</a>.
+The long form is more foolproof to use because it can go almost anywhere on
+the command line, but the shorthand version can save typing.</p>
+<p>For many goals, there is only a single task registered. For example,
+to specify the <code>--list-sep</code> option for the <code>list</code> goal you could use
+the long form:</p>
+<div class="codehilite"><pre><span></span>./pants list --list-sep<span class="o">=</span><span class="s1">'|'</span> examples/src/python/example:
+</pre></div>
+<p>or you could use the short form:</p>
+<div class="codehilite"><pre><span></span>./pants list --sep<span class="o">=</span><span class="s1">'|'</span> examples/src/python/example:
+</pre></div>
+<p>When a goal has multiple tasks registered, you must fully specify the
+task and goal name to use the short form flag.  Here's an example of
+using the long form to pass an option to the <code>zinc</code> task:</p>
+<div class="codehilite"><pre><span></span>./pants --no-compile-zinc-delete-scratch compile src::
+</pre></div>
+<p>To use the shorthand form of the option, specify both goal and task
+name as <code>compile.zinc</code>:</p>
+<div class="codehilite"><pre><span></span>./pants  compile.zinc --no-delete-scratch src::
+</pre></div>
+<p>This is especially handy if you have lots of options to type:</p>
+<div class="codehilite"><pre><span></span>./pants publish.jar --named-snapshot<span class="o">=</span><span class="m">1</span>.2.3-SNAPSHOT --no-dryrun --force src/java::
+</pre></div>
+<p>You can use shorthand even when you want to pass options to multiple
+tasks by listing each task.  For example:</p>
+<div class="codehilite"><pre><span></span>./pants compile --compile-zinc-no-delete-scratch --resolve-ivy-open src::
+</pre></div>
+<p>can also be expressed using shorthand flags:</p>
+<div class="codehilite"><pre><span></span>./pants --level<span class="o">=</span>debug compile.zinc --no-delete-scratch resolve.ivy --open src::
+</pre></div>
+<h2 id="passthrough-args">Passthrough Args</h2>
+<p>In some cases Pants allows you to pass arguments directly through to the underlying tool it invokes.
+These are specified last on the command line after a double-hyphen, and are passed through the
+last goal specified.</p>
+<p>E.g., to pass <code>-k foo</code> to <code>pytest</code> (to say "only run tests whose names contain <code>foo</code>"):</p>
+<div class="codehilite"><pre><span></span>./pants test.pytest tests/python/pants_test/tasks -- -k foo
+</pre></div>
+<p>You can use <code>test</code> instead of <code>test.pytest</code> above; Pants then applies the passthrough args
+through all tasks in <code>test</code> that support them. In this case, it would pass them to JUnit as well.
+So it only makes sense to do this if you know that JUnit won't be invoked in practice (because
+you're not invoking Pants on any Java tests).</p>
+<h2 id="the-pants-daemon-pantsd">The Pants Daemon (pantsd)</h2>
+<p>The <code>1.3.0</code> release of pants included an alpha release of a daemon (<code>pantsd</code>) to accelerate common
+graph operations including build file parsing and source fingerprinting. As of the <code>1.4.0</code> release,
+we now consider the daemon to be of late beta quality: it's nearly ready to be enabled by default!</p>
+<h3 id="benefits">Benefits</h3>
+<p>The daemon caches many filesystem operations run over run, and uses watchman to invalidate that
+cache. This can significantly improve the performance of incremental and noop builds (ie,
+cases where relatively small portions of the repo have changed since the previous build).</p>
+<h3 id="caveats">Caveats</h3>
+<p>As of <code>1.4.0</code>, there is one remaining set of caveats to using the daemon:</p>
+<ul>
+<li>Although <code>./pants repl</code> works, it is missing some advanced TTY integrations which prevent
+  line editing and some control sequences from being propagated. See the
+  <a href="https://github.com/pantsbuild/pants/milestone/11">Daemon Beta milestone</a> for a summary.</li>
+</ul>
+<h3 id="usage">Usage</h3>
+<p>To enable the daemon, see the example in <code>pants.daemon.ini</code> in the root of the pantsbuild repo:</p>
+<p>
+<div class="md-included-snippet"><div class="codehilite"><pre><span></span><span class="c1"># A config override that enables use of pantsd. This is currently recommended for beta testers.</span>
+<span class="c1">#</span>
+<span class="c1"># Usage:</span>
+<span class="c1">#</span>
+<span class="c1">#    In a shell that you want to use the daemon in:</span>
+<span class="c1">#</span>
+<span class="c1">#      $ export PANTS_CONFIG_FILES="$(pwd)/pants.daemon.ini"</span>
+<span class="c1">#</span>
+<span class="c1">#    And then use pants as you normally would:</span>
+<span class="c1">#</span>
+<span class="c1">#      $ ./pants ...</span>
+<span class="c1">#</span>
+<span class="c1">#    To kill the daemon, you can run either <code>clean-all</code> or <code>kill-pantsd</code>:</span>
+<span class="c1">#</span>
+<span class="c1">#      $ ./pants clean-all</span>
+<span class="c1">#      $ ./pants kill-pantsd</span>
+<span class="c1">#</span>
+<span class="c1">#</span>
+<span class="c1"># Observation Tools:</span>
+<span class="c1">#</span>
+<span class="c1">#  To see what's going on with the daemon, you can tail the pantsd log file in another window:</span>
+<span class="c1">#</span>
+<span class="c1">#    $ cd $SOURCE</span>
+<span class="c1">#    $ tail -F .pants.d/pantsd/pantsd.log</span>
+<span class="c1">#</span>
+<span class="c1">#  To see what's going on with the client, runner and daemon processes you can watch the process table:</span>
+<span class="c1">#</span>
+<span class="c1">#    $ watch -n.1 "ps -ef | grep -v grep | grep pants"</span>
+<span class="c1">#</span>
+
+<span class="k">[GLOBAL]</span>
+<span class="na">enable_pantsd: True</span>
+</pre></div></div>
+</p>
+<h3 id="rollout">Rollout</h3>
+<p>The daemon will be in beta until the caveat mentioned above is addressed, but we hope to
+enable the daemon by default for the <a href="https://github.com/pantsbuild/pants/milestone/12"><code>1.5.0</code> release of pants</a>.</p>
+<h2 id="profiling-pants">Profiling Pants</h2>
+<p>There are three environment variables that profile various parts of a pants run.</p>
+<ul>
+<li><code>PANTS_PROFILE</code> - Covers the entire run when pantsd is disabled, or the post-fork portion
+  of a pantsd run.</li>
+<li><code>PANTSC_PROFILE</code> - Covers the client in a pantsd run, which connects to pantsd and then
+  communicates on the socket until the run completes.</li>
+<li><code>PANTSD_PROFILE</code> - Covers the graph warming operations pre-fork in a pantsd run.</li>
+</ul>
+<p>To enable profiling, set the relevant environment variable to a path to write a profile to, and
+then run pants:</p>
+<div class="codehilite"><pre><span></span><span class="nv">PANTS_PROFILE</span><span class="o">=</span>myprofile.prof ./pants ..
+</pre></div>
+<p>Once you have a profile file, you can use any visualizer that supports python profiles, such as
+<code>snakeviz</code> or <code>gprof2dot</code>.</p>
+
+            <!-- main content end -->
+
+            <div class="generated">
+              Generated by <a href="docs.html">publish_docs</a>
+              from dist/markdown/html/src/docs/invoking.html 2019-05-07T19:16:16.368798
+            </div>
+
+          </div> <!-- mainflow -->
+
+        </div> <!-- content -->
+
+      </div>
+
+      <div class="col-md-1">
+      </div>
+
+    </div> <!-- row -->
+  </div> <!-- container-fluid -->
+
+</div> <!-- page -->
+
+<script src="https://code.jquery.com/jquery-2.2.3.min.js" integrity="sha384-I6F5OKECLVtK/BL+8iSLDEHowSAfUo76ZL9+kGAgTRdiByINKJaqTPH/QVNS1VDb" crossorigin="anonymous"></script>
+<script src="bootstrap-custom.min.js"></script>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-78111411-1', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+</html>

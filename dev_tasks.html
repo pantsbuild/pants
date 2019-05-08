@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!--
+  Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+  Licensed under the Apache License, Version 2.0 (see LICENSE).
+-->
+
+<head>
+  <meta charset="utf-8"/>
+  <title>Task Developer&#x27;s Guide</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="shortcut icon" href="pants-logo.ico">
+  <!-- In case this is a "test publish", tell search engines where real version lives: -->
+  <link rel="canonical" href="http://pantsbuild.org/dev_tasks.html">
+
+  <link rel="stylesheet" href="bootstrap-custom.min.css">
+  <link rel="stylesheet" href="bootstrap-custom-theme.min.css">
+  <link rel="stylesheet" href="docsite.css">
+</head>
+
+<body>
+
+<div class="header">
+  <nav class="navbar navbar-default navbar-static-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand navbar-brand-img" href="index.html">
+          <img src="pants-logo.ico" alt="[pantsbuild logo]">
+        </a>
+        <a class="navbar-brand" href="index.html">
+          Pants
+        </a>
+      </div>
+      <div id="navbar" class="navbar-collapse collapse">
+        <ul class="nav navbar-nav navbar-right">
+          <li><a href="/">Docs</a></li>
+          <li><a href="community.html">Community</a></li>
+          <li><a href="https://www.github.com/pantsbuild/pants">GitHub</a></li>
+          <li>
+            <form class="navbar-form navbar-left search" role="search" action="https://www.google.com/search">
+              <div class="form-group">
+                <input type="text" name="as_q" class="form-control query" placeholder="Search">
+                <input name="as_sitesearch" value="pantsbuild.org" type="hidden">
+              </div>
+            </form>
+          </li>
+        </ul>
+      </div><!--/.nav-collapse -->
+    </div>
+  </nav>
+</div>
+
+<div class="page">
+
+  <div class="container-fluid">
+    <div class="row">
+
+      <div class="col-md-1">
+      </div>
+
+      <div class="col-md-2">
+        <div class="site-toc">
+          <ul>
+                  <li class="toc-h1 toc-heading">
+                    Getting Started
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="install.html">Installing Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="setup_repo.html">Setting Up Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="first_tutorial.html">Tutorial</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="common_tasks.html">Common Tasks</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="orgs.html">Pants for Organizations</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Pants Basics
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="why_use_pants.html">Why Use Pants?</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="first_concepts.html">Pants Concepts</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="build_files.html">BUILD files</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="target_addresses.html">Target Addresses</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="3rdparty.html">Third-Party Dependencies</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="options.html">Pants Options</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="invoking.html">Invoking Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="reporting_server.html">Reporting Server</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="ide_support.html">IDE Support</a>
+                  </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#JVM-Support" aria-expanded="false" aria-controls="JVM-Support">JVM Support<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="JVM-Support">
+                        <li class="toc-h1 toc-link ">
+                          <a href="jvm_projects.html">JVM Projects with Pants</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="3rdparty_jvm.html">JVM Dependency Management</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="scala.html">Scala Support</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="publish.html">Publishing Artifacts</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="from_maven.html">Pants for Maven Experts</a>
+                        </li>
+                    </ul>
+                </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#Python-Support" aria-expanded="false" aria-controls="Python-Support">Python Support<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="Python-Support">
+                        <li class="toc-h1 toc-link ">
+                          <a href="python_readme.html">Python Projects with Pants</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="3rdparty_py.html">Python 3rdparty Pattern</a>
+                        </li>
+                    </ul>
+                </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="go_readme.html">Go support for Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="node_readme.html">Node.js Support</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Code &amp; Doc Generation
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="thrift_deps.html">Thrift</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="grpcio_gen.html">Python gRPC + protobufs</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="page.html">Markdown</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Getting Help
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="tshoot.html">Troubleshooting</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="community.html">Community</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Reference
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="build_dictionary.html">Pants BUILD Dictionary</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="options_reference.html">Pants Reference</a>
+                  </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#Release-Notes" aria-expanded="false" aria-controls="Release-Notes">Release Notes<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="Release-Notes">
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.16.x.html">1.16.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.15.x.html">1.15.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.14.x.html">1.14.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.13.x.html">1.13.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.12.x.html">1.12.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.11.x.html">1.11.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.10.x.html">1.10.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.9.x.html">1.9.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.8.x.html">1.8.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.7.x.html">1.7.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.6.x.html">1.6.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.5.x.html">1.5.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.4.x.html">1.4.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.3.x.html">1.3.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.2.x.html">1.2.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.1.x.html">1.1.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.0.x.html">1.0.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-master.html">Master Pre-Releases</a>
+                        </li>
+                    </ul>
+                </li>
+                  <li class="toc-h1 toc-heading">
+                    Developer
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="dev.html">Pants Developer Center</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="export.html">Export Format</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="architecture.html">Architecture</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Blogs
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="coursier_migration.html">Twitter&#x27;s Coursier Migration</a>
+                  </li>
+          </ul>
+        </div> <!-- site-toc -->
+      </div>
+
+      <div class="col-md-8">
+        <div class="content">
+
+          <div class="mainflow">
+              <nav class="pagetoc">
+                <ul>
+                    <li class="toc-h1"><a href="#hello-task">Hello Task</a></li>
+                    <li class="toc-h1"><a href="#task-installation-associate-task-with-goals">Task Installation: Associate Task with Goal[s]</a></li>
+                    <li class="toc-h1"><a href="#products-how-one-task-consumes-the-output-of-another">Products: How one Task consumes the output of another</a></li>
+                    <li class="toc-h1"><a href="#product_types-and-require_data-why-test-comes-after-compile">product_types and require_data: Why &quot;test&quot; comes after &quot;compile&quot;</a></li>
+                    <li class="toc-h1"><a href="#task-implementation-versioning">Task Implementation Versioning</a></li>
+                    <li class="toc-h1"><a href="#task-configuration">Task Configuration</a></li>
+                    <li class="toc-h2"><a href="#scopes">Scopes</a></li>
+                    <li class="toc-h2"><a href="#fine-tuning-options">Fine-tuning Options</a></li>
+                    <li class="toc-h1"><a href="#grouptask">GroupTask</a></li>
+                    <li class="toc-h1"><a href="#jvm-tool-bootstrapping">JVM Tool Bootstrapping</a></li>
+                    <li class="toc-h1"><a href="#enabling-artifact-caching-for-tasks">Enabling Artifact Caching For Tasks</a></li>
+                    <li class="toc-h1"><a href="#recording-target-specific-data">Recording Target Specific Data</a></li>
+                </ul>
+              </nav>
+
+            <!-- main content start -->
+            <!-- generated by pants! -->
+<style>
+.codehilite .hll { background-color: #ffffcc }
+.codehilite  { background: #f0f0f0; }
+.codehilite .c { color: #60a0b0; font-style: italic } /* Comment */
+.codehilite .err { border: 1px solid #FF0000 } /* Error */
+.codehilite .k { color: #007020; font-weight: bold } /* Keyword */
+.codehilite .o { color: #666666 } /* Operator */
+.codehilite .ch { color: #60a0b0; font-style: italic } /* Comment.Hashbang */
+.codehilite .cm { color: #60a0b0; font-style: italic } /* Comment.Multiline */
+.codehilite .cp { color: #007020 } /* Comment.Preproc */
+.codehilite .cpf { color: #60a0b0; font-style: italic } /* Comment.PreprocFile */
+.codehilite .c1 { color: #60a0b0; font-style: italic } /* Comment.Single */
+.codehilite .cs { color: #60a0b0; background-color: #fff0f0 } /* Comment.Special */
+.codehilite .gd { color: #A00000 } /* Generic.Deleted */
+.codehilite .ge { font-style: italic } /* Generic.Emph */
+.codehilite .gr { color: #FF0000 } /* Generic.Error */
+.codehilite .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.codehilite .gi { color: #00A000 } /* Generic.Inserted */
+.codehilite .go { color: #888888 } /* Generic.Output */
+.codehilite .gp { color: #c65d09; font-weight: bold } /* Generic.Prompt */
+.codehilite .gs { font-weight: bold } /* Generic.Strong */
+.codehilite .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.codehilite .gt { color: #0044DD } /* Generic.Traceback */
+.codehilite .kc { color: #007020; font-weight: bold } /* Keyword.Constant */
+.codehilite .kd { color: #007020; font-weight: bold } /* Keyword.Declaration */
+.codehilite .kn { color: #007020; font-weight: bold } /* Keyword.Namespace */
+.codehilite .kp { color: #007020 } /* Keyword.Pseudo */
+.codehilite .kr { color: #007020; font-weight: bold } /* Keyword.Reserved */
+.codehilite .kt { color: #902000 } /* Keyword.Type */
+.codehilite .m { color: #40a070 } /* Literal.Number */
+.codehilite .s { color: #4070a0 } /* Literal.String */
+.codehilite .na { color: #4070a0 } /* Name.Attribute */
+.codehilite .nb { color: #007020 } /* Name.Builtin */
+.codehilite .nc { color: #0e84b5; font-weight: bold } /* Name.Class */
+.codehilite .no { color: #60add5 } /* Name.Constant */
+.codehilite .nd { color: #555555; font-weight: bold } /* Name.Decorator */
+.codehilite .ni { color: #d55537; font-weight: bold } /* Name.Entity */
+.codehilite .ne { color: #007020 } /* Name.Exception */
+.codehilite .nf { color: #06287e } /* Name.Function */
+.codehilite .nl { color: #002070; font-weight: bold } /* Name.Label */
+.codehilite .nn { color: #0e84b5; font-weight: bold } /* Name.Namespace */
+.codehilite .nt { color: #062873; font-weight: bold } /* Name.Tag */
+.codehilite .nv { color: #bb60d5 } /* Name.Variable */
+.codehilite .ow { color: #007020; font-weight: bold } /* Operator.Word */
+.codehilite .w { color: #bbbbbb } /* Text.Whitespace */
+.codehilite .mb { color: #40a070 } /* Literal.Number.Bin */
+.codehilite .mf { color: #40a070 } /* Literal.Number.Float */
+.codehilite .mh { color: #40a070 } /* Literal.Number.Hex */
+.codehilite .mi { color: #40a070 } /* Literal.Number.Integer */
+.codehilite .mo { color: #40a070 } /* Literal.Number.Oct */
+.codehilite .sa { color: #4070a0 } /* Literal.String.Affix */
+.codehilite .sb { color: #4070a0 } /* Literal.String.Backtick */
+.codehilite .sc { color: #4070a0 } /* Literal.String.Char */
+.codehilite .dl { color: #4070a0 } /* Literal.String.Delimiter */
+.codehilite .sd { color: #4070a0; font-style: italic } /* Literal.String.Doc */
+.codehilite .s2 { color: #4070a0 } /* Literal.String.Double */
+.codehilite .se { color: #4070a0; font-weight: bold } /* Literal.String.Escape */
+.codehilite .sh { color: #4070a0 } /* Literal.String.Heredoc */
+.codehilite .si { color: #70a0d0; font-style: italic } /* Literal.String.Interpol */
+.codehilite .sx { color: #c65d09 } /* Literal.String.Other */
+.codehilite .sr { color: #235388 } /* Literal.String.Regex */
+.codehilite .s1 { color: #4070a0 } /* Literal.String.Single */
+.codehilite .ss { color: #517918 } /* Literal.String.Symbol */
+.codehilite .bp { color: #007020 } /* Name.Builtin.Pseudo */
+.codehilite .fm { color: #06287e } /* Name.Function.Magic */
+.codehilite .vc { color: #bb60d5 } /* Name.Variable.Class */
+.codehilite .vg { color: #bb60d5 } /* Name.Variable.Global */
+.codehilite .vi { color: #bb60d5 } /* Name.Variable.Instance */
+.codehilite .vm { color: #bb60d5 } /* Name.Variable.Magic */
+.codehilite .il { color: #40a070 } /* Literal.Number.Integer.Long */
+</style>
+<h1 id="task-developers-guide">Task Developer's Guide</h1>
+<p>In Pants, code that does "real build work" (e.g., downloads prebuilt
+artifacts, compiles Java code, runs tests) lives in <em>Tasks</em>. To add a
+feature to Pants so that it can, e.g., compile a new language, you want
+to write a new Task.</p>
+<p>This page documents how to develop a Pants Task, enabling you to teach
+pants how to do things it does not already know how to do today. To see
+the Tasks that are built into Pants, look over
+<code>src/python/pants/backend/*/tasks/*.py</code>. The code makes more sense if
+you know the concepts from internals. The rest of this page introduces
+some concepts especially useful when defining a Task.</p>
+<h2 id="hello-task">Hello Task</h2>
+<p>To implement a Task, you define a subclass of
+<a href="https://github.com/pantsbuild/pants/blob/master/src/python/pants/task/task.py">pants.task.task.Task</a>
+and define an <code>execute</code> method for that class. The <code>execute</code> method does
+the work.</p>
+<p>The Task can see (and affect) the state of the build via its <code>.context</code>
+member, a
+<a href="https://github.com/pantsbuild/pants/blob/master/src/python/pants/goal/context.py">pants.goal.context.Context</a>.</p>
+<p><strong>Which targets to act on?</strong> A typical Task wants to act on all "in
+play" targets that match some predicate. Here, "'in play' targets" means
+those targets the user specified on the command line, the targets needed
+to build those targets, the targets needed to build <em>those</em> targets,
+etc. Call <code>self.context.targets()</code> to get these. This method takes an
+optional parameter, a predicate function; this is useful for filtering
+just those targets that match some criteria.</p>
+<h2 id="task-installation-associate-task-with-goals">Task Installation: Associate Task with Goal[s]</h2>
+<p>Defining a Task is nice, but doesn't hook it up so users can get to it.
+<em>Install</em> a task to make it available to users. To do this, you register
+it with Pants, associating it with a goal. A <a href="howto_plugin.html">plugin's</a> <code>register.py</code>
+registers goals in its <code>register_goals</code> function. Here's an excerpt from
+<a href="https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/python/register.py">Pants' own Python
+backend</a>:</p>
+<p>
+<div class="md-included-snippet"><div class="codehilite"><pre><span></span><span class="k">def</span> <span class="nf">register_goals</span><span class="p">():</span>
+  <span class="n">task</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'interpreter'</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">SelectInterpreter</span><span class="p">)</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="s1">'pyprep'</span><span class="p">)</span>
+  <span class="n">task</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'build-local-dists'</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">BuildLocalPythonDistributions</span><span class="p">)</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="s1">'pyprep'</span><span class="p">)</span>
+  <span class="n">task</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'requirements'</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">ResolveRequirements</span><span class="p">)</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="s1">'pyprep'</span><span class="p">)</span>
+  <span class="n">task</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'sources'</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">GatherSources</span><span class="p">)</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="s1">'pyprep'</span><span class="p">)</span>
+  <span class="n">task</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'py'</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">PythonRun</span><span class="p">)</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="s1">'run'</span><span class="p">)</span>
+  <span class="n">task</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'pytest-prep'</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">PytestPrep</span><span class="p">)</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="s1">'test'</span><span class="p">)</span>
+  <span class="n">task</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'pytest'</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">PytestRun</span><span class="p">)</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="s1">'test'</span><span class="p">)</span>
+  <span class="n">task</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'py'</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">PythonRepl</span><span class="p">)</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="s1">'repl'</span><span class="p">)</span>
+  <span class="n">task</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'setup-py'</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">SetupPy</span><span class="p">)</span><span class="o">.</span><span class="n">install</span><span class="p">()</span>
+  <span class="n">task</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'py'</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">PythonBinaryCreate</span><span class="p">)</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="s1">'binary'</span><span class="p">)</span>
+  <span class="n">task</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'py-wheels'</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">LocalPythonDistributionArtifact</span><span class="p">)</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="s1">'binary'</span><span class="p">)</span>
+  <span class="n">task</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'isort-prep'</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">IsortPrep</span><span class="p">)</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="s1">'fmt'</span><span class="p">)</span>
+  <span class="n">task</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'isort'</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">IsortRun</span><span class="p">)</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="s1">'fmt'</span><span class="p">)</span>
+  <span class="n">task</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'py'</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">PythonBundle</span><span class="p">)</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="s1">'bundle'</span><span class="p">)</span>
+  <span class="n">task</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'unpack-wheels'</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="n">UnpackWheels</span><span class="p">)</span><span class="o">.</span><span class="n">install</span><span class="p">()</span>
+
+
+<span class="k">def</span> <span class="nf">rules</span><span class="p">():</span>
+  <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">python_test_runner</span><span class="o">.</span><span class="n">rules</span><span class="p">())</span>
+</pre></div></div>
+</p>
+<p>That <code>task(...)</code> is a name for
+<code>pants.goal.task_registrar.TaskRegistrar</code>. Calling its <code>install</code> method
+installs the task in a goal with the same name. To install a task in
+goal <code>foo</code>, use <code>Goal.by_name('foo').install</code>. You can install more than
+one task in a goal; e.g., there are separate tasks to run Java tests and
+Python tests; but both are in the <code>test</code> goal.</p>
+<p>Generally you'll be installing your task into an existing goal like <code>test</code>,
+<code>fmt</code> or <code>compile</code>. You can find most of these goals and their purpose by
+running the <code>./pants goals</code> command; however, some goals of a general nature
+are installed by pants without tasks and are thus hidden from <code>./pants goals</code>
+output. The <code>buildgen</code> goal is an example of this, reserving a slot for tasks
+that can auto-generate BUILD files for various languages; none of which are
+installed by default. You can hunt for these by searching for <code>Goal.register</code>
+calls in <code>src/python/pants/core_tasks/register.py</code>.</p>
+<h2 id="products-how-one-task-consumes-the-output-of-another">Products: How one Task consumes the output of another</h2>
+<p>One task might need to consume the "products" (outputs) of another. E.g., the Java test runner
+task uses Java <code>.class</code> files that the Java compile task produces. Pants
+tasks keep track of this in the
+<a href="https://github.com/pantsbuild/pants/blob/master/src/python/pants/goal/products.py">pants.goal.products.ProductMapping</a>
+that is provided in the task's context at <code>self.context.products</code>.</p>
+<p>The <code>ProductMapping</code> is basically a dict. Calling
+<code>self.context.products.get('jar_dependencies')</code> looks up
+<code>jar_dependencies</code> in that dict. Tasks can set/change the value stored
+at that key; later tasks can read (and perhaps further change) that
+value. That value might be, say, a dictionary that maps target specs to
+file paths.</p>
+<h2 id="product_types-and-require_data-why-test-comes-after-compile"><code>product_types</code> and <code>require_data</code>: Why "test" comes after "compile"</h2>
+<p>It might only make sense to run your Task after some other Task has
+finished. E.g., Pants has separate tasks to compile Java code and run
+Java tests; it only makes sense to run those tests after compiling. To
+tell Pants about these inter-task dependencies...</p>
+<p>The "early" task class defines a <code>product_types</code> class method that
+returns a list of strings:</p>
+<p>
+<div class="md-included-snippet"><div class="codehilite"><pre><span></span>  <span class="k">def</span> <span class="nf">product_types</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+    <span class="k">return</span> <span class="p">[</span><span class="s1">'runtime_classpath'</span><span class="p">]</span>
+</pre></div></div>
+</p>
+<p>The "late" task defines a <code>prepare</code> method that calls
+<code>round_manager.require_data</code> to "require" one of those same strings:</p>
+<p>
+<div class="md-included-snippet"><div class="codehilite"><pre><span></span>  <span class="k">def</span> <span class="nf">prepare</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">options</span><span class="p">,</span> <span class="n">round_manager</span><span class="p">):</span>
+    <span class="nb">super</span><span class="p">(</span><span class="n">DuplicateDetector</span><span class="p">,</span> <span class="bp">cls</span><span class="p">)</span><span class="o">.</span><span class="n">prepare</span><span class="p">(</span><span class="n">options</span><span class="p">,</span> <span class="n">round_manager</span><span class="p">)</span>
+    <span class="n">round_manager</span><span class="o">.</span><span class="n">require_data</span><span class="p">(</span><span class="s1">'runtime_classpath'</span><span class="p">)</span>
+</pre></div></div>
+</p>
+<p>Pants uses this information to determine which tasks must run first to
+prepare data required by other tasks. (If one task requires data that no
+task provides, Pants errors out.)</p>
+<p>A task can have more than one product type. You might want to know which type[s] were <code>require</code>d
+by other tasks. If one product is especially "expensive" to make, perhaps your task should only
+do so if another task will use it. Use <code>self.context.products.isrequired</code> to find out if a task
+required a product type:</p>
+<p>
+<div class="md-included-snippet"><div class="codehilite"><pre><span></span>    <span class="n">catalog</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">products</span><span class="o">.</span><span class="n">isrequired</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">jvmdoc</span><span class="p">()</span><span class="o">.</span><span class="n">product_type</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">catalog</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">combined</span><span class="p">:</span>
+      <span class="k">raise</span> <span class="n">TaskError</span><span class="p">(</span>
+          <span class="s1">'Cannot provide {} target mappings for combined output'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">jvmdoc</span><span class="p">()</span><span class="o">.</span><span class="n">product_type</span><span class="p">))</span>
+</pre></div></div>
+</p>
+<h2 id="task-implementation-versioning">Task Implementation Versioning</h2>
+<p>Tasks may optionally specify an implementation version.  This is useful to be sure that cached
+objects from previous runs of pants using an older version are not used.  If you change a task
+class in a way that will impact its outputs you should update the version.  Implementation
+versions are set with the class method implementation_version.</p>
+<div class="codehilite"><pre><span></span><span class="n">Class</span> <span class="n">FooTask</span><span class="p">(</span><span class="n">Task</span><span class="p">):</span>
+  <span class="nd">@classmethod</span>
+  <span class="k">def</span> <span class="nf">implementation_version</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+    <span class="k">return</span> <span class="nb">super</span><span class="p">(</span><span class="n">FooTask</span><span class="p">,</span> <span class="bp">cls</span><span class="p">)</span><span class="o">.</span><span class="n">implementation_version</span><span class="p">()</span> <span class="o">+</span> <span class="p">[(</span><span class="s1">'FooTask'</span><span class="p">,</span> <span class="mi">1</span><span class="p">)]</span>
+</pre></div>
+<p>We store both a version number and the name of the class in order to disambiguate changes in
+different classes that have the same implementation version set.</p>
+<h2 id="task-configuration">Task Configuration</h2>
+<p>Tasks may be configured via the options system.</p>
+<p>To define an option, implement your Task's <code>register_options</code>
+class method and call the passed-in <code>register</code> function:</p>
+<p>
+<div class="md-included-snippet"><div class="codehilite"><pre><span></span>  <span class="k">def</span> <span class="nf">register_options</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">register</span><span class="p">):</span>
+    <span class="nb">super</span><span class="p">(</span><span class="n">Checkstyle</span><span class="p">,</span> <span class="bp">cls</span><span class="p">)</span><span class="o">.</span><span class="n">register_options</span><span class="p">(</span><span class="n">register</span><span class="p">)</span>
+    <span class="n">register</span><span class="p">(</span><span class="s1">'--configuration'</span><span class="p">,</span> <span class="n">advanced</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="n">file_option</span><span class="p">,</span> <span class="n">fingerprint</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
+             <span class="n">help</span><span class="o">=</span><span class="s1">'Path to the checkstyle configuration file.'</span><span class="p">)</span>
+    <span class="n">register</span><span class="p">(</span><span class="s1">'--properties'</span><span class="p">,</span> <span class="n">advanced</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="n">dict_with_files_option</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="p">{},</span>
+             <span class="n">fingerprint</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>
+             <span class="n">help</span><span class="o">=</span><span class="s1">'Dictionary of property mappings to use for checkstyle.properties.'</span><span class="p">)</span>
+</pre></div></div>
+</p>
+<p>Option values are available via <code>self.get_options()</code>:</p>
+<div class="codehilite"><pre><span></span><span class="c1"># Did user pass in the --my-option CLI flag (or set it in pants.ini)?</span>
+<span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_options</span><span class="p">()</span><span class="o">.</span><span class="n">my_option</span><span class="p">:</span>
+</pre></div>
+<h3 id="scopes">Scopes</h3>
+<p>Every task has an options <em>scope</em>: If the task is registered as <code>my-task</code> in goal <code>my-goal</code>, then its
+scope is <code>my-goal.my-task</code>, unless goal and task are the same string, in which case the scope is simply
+that string. For example, the <code>ZincCompile</code> task has scope <code>compile.zinc</code>, and the <code>filemap</code>
+task has the scope <code>filemap</code>.</p>
+<p>The scope is used to set options values. E.g., the value of <code>self.get_options().my_option</code> for a
+task with scope <code>scope</code> is set by, in this order:
+  - The value of the cmd-line flag <code>--scope-my-option</code>.
+  - The value of the environment variable <code>PANTS_SCOPE_MY_OPTION</code>.
+  - The value of the pants.ini var <code>my_option</code> in section <code>scope</code>.</p>
+<p>Note that if the task being run is specified explicitly on the command line, you can omit the
+scope from the cmd-line flag name. For example, instead of
+<code>./pants compile --compile-java-foo-bar</code> you can do <code>./pants compile.java --foo-bar</code>. See
+<a href="invoking.html">Invoking Pants</a> for more information.</p>
+<h3 id="fine-tuning-options">Fine-tuning Options</h3>
+<p>When calling the <code>register</code> function, passing a few additional arguments
+will affect the behaviour of the registered option. The most common parameters are:</p>
+<ul>
+<li><code>type</code>: Constrains the type of the option. Takes a python type constructor (one of <code>bool</code>, <code>str</code>, <code>int</code>, <code>float</code>, <code>list</code>, <code>dict</code>), or a
+  special option type constructor like <code>target_option</code> from <a href="https://github.com/pantsbuild/pants/blob/master/src/python/pants/option/custom_types.py">pants.option.custom_types</a>.
+  If not specified, the option will be a string.</li>
+<li><code>default</code>: Sets a default value that will be used if the option is not specified by the user.</li>
+<li><code>advanced</code>: Indicates that an option is intended either for use by power users, or for use in
+  only in pants.ini, rather than from the command-line. By default, advanced options are not displayed in <code>./pants help</code>.</li>
+<li><code>fingerprint</code>: Indicates that the value of the registered option affects the products
+  of the task, such that changing the option would result in different products. When <code>True</code>,
+  changing the option will cause targets built by the task to be invalidated and rebuilt.</li>
+</ul>
+<h2 id="grouptask">GroupTask</h2>
+<p><code>Task</code>s may be grouped together under a parent <code>GroupTask</code>.
+Specifically, the JVM compile tasks:</p>
+<div class="codehilite"><pre><span></span><span class="n">jvm_compile</span> <span class="o">=</span> <span class="n">GroupTask</span><span class="o">.</span><span class="n">named</span><span class="p">(</span>
+<span class="s1">'jvm-compilers'</span><span class="p">,</span>
+<span class="n">product_type</span><span class="o">=</span><span class="p">[</span><span class="s1">'compile_classpath'</span><span class="p">,</span> <span class="s1">'classes_by_source'</span><span class="p">],</span>
+<span class="n">flag_namespace</span><span class="o">=</span><span class="p">[</span><span class="s1">'compile'</span><span class="p">])</span>
+
+<span class="n">jvm_compile</span><span class="o">.</span><span class="n">add_member</span><span class="p">(</span><span class="n">AptCompile</span><span class="p">)</span>
+<span class="n">jvm_compile</span><span class="o">.</span><span class="n">add_member</span><span class="p">(</span><span class="n">ZincCompile</span><span class="p">)</span>
+</pre></div>
+<p>A <code>GroupTask</code> allows its constituent tasks to 'claim' targets for
+processing, and can iterate between those tasks until all work is done.
+This allows, e.g., Java code to depend on Scala code which itself
+depends on some other Java code.</p>
+<h2 id="jvm-tool-bootstrapping">JVM Tool Bootstrapping</h2>
+<p>If you want to integrate an existing JVM-based tool with a pants task,
+Pants must be able to bootstrap it. That is, a running Pants will need
+to fetch the tool and create a classpath with which to run it.</p>
+<p>Your job as a task developer is to set up the arguments passed to your
+tool (e.g.: source file names to compile) and do something useful after
+the tool has run. For example, a code generation tool would identify
+targets that own IDL sources, pass those sources as arguments to the
+code generator, create targets of the correct type to own generated
+sources, and mutate the targets graph rewriting dependencies on targets
+owning IDL sources to point at targets that own the generated code.
+<!-- TODO(https://github.com/pantsbuild/pants/issues/681)
+     highlight useful snippets instead of saying "here's a link to the
+     source and a list of things we hope you notice" --></p>
+<p>The <a href="http://www.scalastyle.org/">Scalastyle</a> tool enforces style
+policies for scala code. The <a href="https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/jvm/tasks/scalastyle.py">Pants Scalastyle
+task</a>
+shows some useful idioms for JVM tasks.</p>
+<ul>
+<li>Inherit <code>NailgunTask</code> to avoid starting up a new JVM.</li>
+<li>Specify the tool executable as a Pants <code>jar</code>; Pants knows how to
+    download and run those.</li>
+<li>Let organizations/users override the jar in <code>pants.ini</code>; it makes it
+    easy to use/test a new version.</li>
+</ul>
+<h2 id="enabling-artifact-caching-for-tasks">Enabling Artifact Caching For Tasks</h2>
+<ul>
+<li>
+<p><strong>Artifacts</strong> are the output created when a task processes a target.</p>
+<ul>
+<li>For example, the artifacts of a <code>JavaCompile</code> task on a target <code>java_library</code> would be the <code>.class</code> files produced by compiling the library.</li>
+</ul>
+</li>
+<li>
+<p><strong>VersionedTarget</strong> (VT) is a wrapper around a Pants target that is used to determine whether a task should do work for that target.</p>
+<ul>
+<li>If a task determines the VT has already been processed, that VT is considered "valid".</li>
+</ul>
+</li>
+</ul>
+<p><strong>Automatic caching</strong></p>
+<p>Pants offers automatic caching of a target's output directory. Automatic caching works by assigning a results directory to each VT of the InvalidationCheck yielded by <code>Task-&gt;invalidated</code>.</p>
+<p>A task operating on a given VT should place the resulting artifacts in the VT's
+<code>results_dir</code>. After exiting the <code>invalidated</code> context block, these artifacts
+will be automatically uploaded to the artifact cache.</p>
+<p>This interface for caching is disabled by default. To enable, override
+<code>Task-&gt;cache_target_dirs</code> to return True.</p>
+<p><strong>VersionedTargetSets</strong></p>
+<p>By default, Pants caching operates on (VT, artifacts) pairs. But certain tasks may need to write multiple targets and their artifacts together under a single cache key. For example, Ivy resolution, where the set of resolved 3rd party dependencies is a property of all targets taken together, not of each target individually.</p>
+<p>To implement caching for groupings of targets, you can override the <code>check_artifact_cache_for</code> method in your task to check for the collected <code>VersionedTarget</code>s as a <code>VersionedTargetSet</code>:</p>
+<div class="codehilite"><pre><span></span>def check_artifact_cache_for(self, invalidation_check):
+  return [VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)]
+</pre></div>
+<p><strong>Manual caching</strong></p>
+<p>Pants allows more fine grained cache management, although it then becomes the responsibility of the task developer to manually upload VT / artifact pairs to the cache. Here is a template for how manual caching might be implemented:</p>
+<div class="codehilite"><pre><span></span>def execute(self):
+  targets = self.context.targets(lambda t: isinstance(t, YourTarget)):
+  with self.invalidated(targets) as invalidation_check:
+
+    # Run your task over the invalid vts and cache the output.
+    for vt in invalidation_check.invalids_vts:
+      output_location = do_some_work()
+      if self.artifact_cache_writes_enabled():
+        self.update_artifact_cache((vt, [output_location]))
+</pre></div>
+<h2 id="recording-target-specific-data">Recording Target Specific Data</h2>
+<p>If you would like to track target information such as the targets being run,
+their run times, or some other target-specific piece of data, <code>run_tracker</code>
+provides this ability via the <code>report_target_info</code> method. The data reported
+will be stored in the <code>run_info</code> JSON blob along with timestamp, run id, etc.</p>
+<p>There are various reasons you might want to collect target information. The
+information could be used for things like tracking developer behavior (for
+example, inferring what code developers are constantly changing by observing
+which targets are run most often) or target heath (for example, a historical
+look at targets and their flakiness).</p>
+
+            <!-- main content end -->
+
+            <div class="generated">
+              Generated by <a href="docs.html">publish_docs</a>
+              from dist/markdown/html/src/docs/dev_tasks.html 2019-05-07T19:16:16.192039
+            </div>
+
+          </div> <!-- mainflow -->
+
+        </div> <!-- content -->
+
+      </div>
+
+      <div class="col-md-1">
+      </div>
+
+    </div> <!-- row -->
+  </div> <!-- container-fluid -->
+
+</div> <!-- page -->
+
+<script src="https://code.jquery.com/jquery-2.2.3.min.js" integrity="sha384-I6F5OKECLVtK/BL+8iSLDEHowSAfUo76ZL9+kGAgTRdiByINKJaqTPH/QVNS1VDb" crossorigin="anonymous"></script>
+<script src="bootstrap-custom.min.js"></script>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-78111411-1', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+</html>

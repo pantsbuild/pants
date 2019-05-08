@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!--
+  Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+  Licensed under the Apache License, Version 2.0 (see LICENSE).
+-->
+
+<head>
+  <meta charset="utf-8"/>
+  <title>Setting Up Pants</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="shortcut icon" href="pants-logo.ico">
+  <!-- In case this is a "test publish", tell search engines where real version lives: -->
+  <link rel="canonical" href="http://pantsbuild.org/setup_repo.html">
+
+  <link rel="stylesheet" href="bootstrap-custom.min.css">
+  <link rel="stylesheet" href="bootstrap-custom-theme.min.css">
+  <link rel="stylesheet" href="docsite.css">
+</head>
+
+<body>
+
+<div class="header">
+  <nav class="navbar navbar-default navbar-static-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand navbar-brand-img" href="index.html">
+          <img src="pants-logo.ico" alt="[pantsbuild logo]">
+        </a>
+        <a class="navbar-brand" href="index.html">
+          Pants
+        </a>
+      </div>
+      <div id="navbar" class="navbar-collapse collapse">
+        <ul class="nav navbar-nav navbar-right">
+          <li><a href="/">Docs</a></li>
+          <li><a href="community.html">Community</a></li>
+          <li><a href="https://www.github.com/pantsbuild/pants">GitHub</a></li>
+          <li>
+            <form class="navbar-form navbar-left search" role="search" action="https://www.google.com/search">
+              <div class="form-group">
+                <input type="text" name="as_q" class="form-control query" placeholder="Search">
+                <input name="as_sitesearch" value="pantsbuild.org" type="hidden">
+              </div>
+            </form>
+          </li>
+        </ul>
+      </div><!--/.nav-collapse -->
+    </div>
+  </nav>
+</div>
+
+<div class="page">
+
+  <div class="container-fluid">
+    <div class="row">
+
+      <div class="col-md-1">
+      </div>
+
+      <div class="col-md-2">
+        <div class="site-toc">
+          <ul>
+                  <li class="toc-h1 toc-heading">
+                    Getting Started
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="install.html">Installing Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link toc-here">
+                    Setting Up Pants
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="first_tutorial.html">Tutorial</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="common_tasks.html">Common Tasks</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="orgs.html">Pants for Organizations</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Pants Basics
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="why_use_pants.html">Why Use Pants?</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="first_concepts.html">Pants Concepts</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="build_files.html">BUILD files</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="target_addresses.html">Target Addresses</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="3rdparty.html">Third-Party Dependencies</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="options.html">Pants Options</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="invoking.html">Invoking Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="reporting_server.html">Reporting Server</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="ide_support.html">IDE Support</a>
+                  </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#JVM-Support" aria-expanded="false" aria-controls="JVM-Support">JVM Support<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="JVM-Support">
+                        <li class="toc-h1 toc-link ">
+                          <a href="jvm_projects.html">JVM Projects with Pants</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="3rdparty_jvm.html">JVM Dependency Management</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="scala.html">Scala Support</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="publish.html">Publishing Artifacts</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="from_maven.html">Pants for Maven Experts</a>
+                        </li>
+                    </ul>
+                </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#Python-Support" aria-expanded="false" aria-controls="Python-Support">Python Support<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="Python-Support">
+                        <li class="toc-h1 toc-link ">
+                          <a href="python_readme.html">Python Projects with Pants</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="3rdparty_py.html">Python 3rdparty Pattern</a>
+                        </li>
+                    </ul>
+                </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="go_readme.html">Go support for Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="node_readme.html">Node.js Support</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Code &amp; Doc Generation
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="thrift_deps.html">Thrift</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="grpcio_gen.html">Python gRPC + protobufs</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="page.html">Markdown</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Getting Help
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="tshoot.html">Troubleshooting</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="community.html">Community</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Reference
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="build_dictionary.html">Pants BUILD Dictionary</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="options_reference.html">Pants Reference</a>
+                  </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#Release-Notes" aria-expanded="false" aria-controls="Release-Notes">Release Notes<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="Release-Notes">
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.16.x.html">1.16.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.15.x.html">1.15.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.14.x.html">1.14.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.13.x.html">1.13.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.12.x.html">1.12.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.11.x.html">1.11.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.10.x.html">1.10.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.9.x.html">1.9.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.8.x.html">1.8.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.7.x.html">1.7.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.6.x.html">1.6.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.5.x.html">1.5.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.4.x.html">1.4.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.3.x.html">1.3.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.2.x.html">1.2.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.1.x.html">1.1.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.0.x.html">1.0.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-master.html">Master Pre-Releases</a>
+                        </li>
+                    </ul>
+                </li>
+                  <li class="toc-h1 toc-heading">
+                    Developer
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="dev.html">Pants Developer Center</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="export.html">Export Format</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="architecture.html">Architecture</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Blogs
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="coursier_migration.html">Twitter&#x27;s Coursier Migration</a>
+                  </li>
+          </ul>
+        </div> <!-- site-toc -->
+      </div>
+
+      <div class="col-md-8">
+        <div class="content">
+
+          <div class="mainflow">
+              <nav class="pagetoc">
+                <ul>
+                    <li class="toc-h1"><a href="#source-roots">Source Roots</a></li>
+                    <li class="toc-h1"><a href="#gitignore">.gitignore</a></li>
+                    <li class="toc-h1"><a href="#build-files">BUILD files</a></li>
+                    <li class="toc-h1"><a href="#options">Options</a></li>
+                    <li class="toc-h1"><a href="#tools">Tools</a></li>
+                    <li class="toc-h1"><a href="#build-cache">Build Cache</a></li>
+                    <li class="toc-h1"><a href="#uploading-timing-stats">Uploading Timing Stats</a></li>
+                    <li class="toc-h1"><a href="#using-pants-behind-a-firewall">Using Pants behind a firewall</a></li>
+                    <li class="toc-h2"><a href="#configuring-the-python-requests-library">Configuring the Python requests library</a></li>
+                    <li class="toc-h2"><a href="#bootstrapping-ivy">Bootstrapping Ivy</a></li>
+                    <li class="toc-h1"><a href="#nexus-as-proxy">Nexus as proxy</a></li>
+                    <li class="toc-h2"><a href="#redirecting-tool-downloads-to-other-servers">Redirecting tool downloads to other servers</a></li>
+                    <li class="toc-h2"><a href="#redirecting-python-requirements-to-other-servers">Redirecting python requirements to other servers</a></li>
+                </ul>
+              </nav>
+
+            <!-- main content start -->
+            <!-- generated by pants! -->
+<style>
+.codehilite .hll { background-color: #ffffcc }
+.codehilite  { background: #f0f0f0; }
+.codehilite .c { color: #60a0b0; font-style: italic } /* Comment */
+.codehilite .err { border: 1px solid #FF0000 } /* Error */
+.codehilite .k { color: #007020; font-weight: bold } /* Keyword */
+.codehilite .o { color: #666666 } /* Operator */
+.codehilite .ch { color: #60a0b0; font-style: italic } /* Comment.Hashbang */
+.codehilite .cm { color: #60a0b0; font-style: italic } /* Comment.Multiline */
+.codehilite .cp { color: #007020 } /* Comment.Preproc */
+.codehilite .cpf { color: #60a0b0; font-style: italic } /* Comment.PreprocFile */
+.codehilite .c1 { color: #60a0b0; font-style: italic } /* Comment.Single */
+.codehilite .cs { color: #60a0b0; background-color: #fff0f0 } /* Comment.Special */
+.codehilite .gd { color: #A00000 } /* Generic.Deleted */
+.codehilite .ge { font-style: italic } /* Generic.Emph */
+.codehilite .gr { color: #FF0000 } /* Generic.Error */
+.codehilite .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.codehilite .gi { color: #00A000 } /* Generic.Inserted */
+.codehilite .go { color: #888888 } /* Generic.Output */
+.codehilite .gp { color: #c65d09; font-weight: bold } /* Generic.Prompt */
+.codehilite .gs { font-weight: bold } /* Generic.Strong */
+.codehilite .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.codehilite .gt { color: #0044DD } /* Generic.Traceback */
+.codehilite .kc { color: #007020; font-weight: bold } /* Keyword.Constant */
+.codehilite .kd { color: #007020; font-weight: bold } /* Keyword.Declaration */
+.codehilite .kn { color: #007020; font-weight: bold } /* Keyword.Namespace */
+.codehilite .kp { color: #007020 } /* Keyword.Pseudo */
+.codehilite .kr { color: #007020; font-weight: bold } /* Keyword.Reserved */
+.codehilite .kt { color: #902000 } /* Keyword.Type */
+.codehilite .m { color: #40a070 } /* Literal.Number */
+.codehilite .s { color: #4070a0 } /* Literal.String */
+.codehilite .na { color: #4070a0 } /* Name.Attribute */
+.codehilite .nb { color: #007020 } /* Name.Builtin */
+.codehilite .nc { color: #0e84b5; font-weight: bold } /* Name.Class */
+.codehilite .no { color: #60add5 } /* Name.Constant */
+.codehilite .nd { color: #555555; font-weight: bold } /* Name.Decorator */
+.codehilite .ni { color: #d55537; font-weight: bold } /* Name.Entity */
+.codehilite .ne { color: #007020 } /* Name.Exception */
+.codehilite .nf { color: #06287e } /* Name.Function */
+.codehilite .nl { color: #002070; font-weight: bold } /* Name.Label */
+.codehilite .nn { color: #0e84b5; font-weight: bold } /* Name.Namespace */
+.codehilite .nt { color: #062873; font-weight: bold } /* Name.Tag */
+.codehilite .nv { color: #bb60d5 } /* Name.Variable */
+.codehilite .ow { color: #007020; font-weight: bold } /* Operator.Word */
+.codehilite .w { color: #bbbbbb } /* Text.Whitespace */
+.codehilite .mb { color: #40a070 } /* Literal.Number.Bin */
+.codehilite .mf { color: #40a070 } /* Literal.Number.Float */
+.codehilite .mh { color: #40a070 } /* Literal.Number.Hex */
+.codehilite .mi { color: #40a070 } /* Literal.Number.Integer */
+.codehilite .mo { color: #40a070 } /* Literal.Number.Oct */
+.codehilite .sa { color: #4070a0 } /* Literal.String.Affix */
+.codehilite .sb { color: #4070a0 } /* Literal.String.Backtick */
+.codehilite .sc { color: #4070a0 } /* Literal.String.Char */
+.codehilite .dl { color: #4070a0 } /* Literal.String.Delimiter */
+.codehilite .sd { color: #4070a0; font-style: italic } /* Literal.String.Doc */
+.codehilite .s2 { color: #4070a0 } /* Literal.String.Double */
+.codehilite .se { color: #4070a0; font-weight: bold } /* Literal.String.Escape */
+.codehilite .sh { color: #4070a0 } /* Literal.String.Heredoc */
+.codehilite .si { color: #70a0d0; font-style: italic } /* Literal.String.Interpol */
+.codehilite .sx { color: #c65d09 } /* Literal.String.Other */
+.codehilite .sr { color: #235388 } /* Literal.String.Regex */
+.codehilite .s1 { color: #4070a0 } /* Literal.String.Single */
+.codehilite .ss { color: #517918 } /* Literal.String.Symbol */
+.codehilite .bp { color: #007020 } /* Name.Builtin.Pseudo */
+.codehilite .fm { color: #06287e } /* Name.Function.Magic */
+.codehilite .vc { color: #bb60d5 } /* Name.Variable.Class */
+.codehilite .vg { color: #bb60d5 } /* Name.Variable.Global */
+.codehilite .vi { color: #bb60d5 } /* Name.Variable.Instance */
+.codehilite .vm { color: #bb60d5 } /* Name.Variable.Magic */
+.codehilite .il { color: #40a070 } /* Literal.Number.Integer.Long */
+</style>
+<h1 id="setting-up-pants">Setting Up Pants</h1>
+<p>Pants will work out of the box, at least for basic functionality. However some uses require further setup.</p>
+<h2 id="source-roots">Source Roots</h2>
+<p>Pants needs to know where the root of a source tree is, so it can correctly set up import paths,
+bundle code etc.</p>
+<p>In typical cases, Pants can deduce the source roots automatically based on naming conventions.
+E.g., <code>src/&lt;lang&gt;</code>, <code>src/main/&lt;lang&gt;</code>, <code>test/&lt;lang&gt;</code>, <code>src/test/&lt;lang&gt;</code>, <code>3rdparty/&lt;lang&gt;</code> and so on.
+However if your source roots don't conform to any of the default patterns, you can add your own
+patterns.  See <code>./pants help-advanced source</code> for details.</p>
+<h2 id="gitignore"><code>.gitignore</code></h2>
+<p>If you use Git as your SCM you'll want to add the following entries to your <code>.gitignore</code> file:</p>
+<p><code>.pants.d</code><br/>
+<code>dist</code><br/>
+<code>.pids</code><br/>
+<code>.pants.workdir.file_lock</code></p>
+<h2 id="build-files"><code>BUILD</code> files</h2>
+<p>BUILD files describe the dependency graph of your codebase.  You'll need to
+<a href="build_files.html">create some</a> in order to use Pants.</p>
+<p><a id="setup_mvn2pants" pantsmark="setup_mvn2pants"></a>
+If you're converting a <code>mvn</code>-built workspace to Pants, you can get a head start by using
+information from your <code>pom.xml</code> files. The <a href="https://github.com/ericzundel/mvn2pants"><code>mvn2pants</code></a>
+repo demonstrates some scripts that convert <code>pom.xml</code> files into <code>BUILD</code> files. This can get
+you up and running with Pants faster. Careful, though: Maven projects tend to be very coarse-grained.
+Once you have things working, you'll probably want to break down the large Maven-style targets
+into finer-grained ones.</p>
+<h2 id="options">Options</h2>
+<p>Pants is very configurable and has literally hundreds of tuneable parameters, known in Pants
+parlance as <em>options</em>.</p>
+<p>Most options are  automatically set to useful defaults. However it is inevitable that sooner or
+later you'll need to tweak some of them.</p>
+<ul>
+<li><a href="options.html">More details on pants options</a></li>
+<li><a href="options_reference.html">Options reference</a></li>
+</ul>
+<h2 id="tools">Tools</h2>
+<p>Pants calls out to other tools for many build steps. E.g., it uses Zinc for incremental compilation
+of Java and Scala code.</p>
+<p>Pants bootstraps such tools as needed.  The default versions of these tools can be overridden
+using the appropriate options. It's idiomatic, but not required, to set these options to addresses
+of targets in a special BUILD file named <code>BUILD.tools</code> in the repo root.</p>
+<p>Pants uses <code>Ivy</code> to fetch JVM-based tools.  Ivy requires an XML configuration file.
+By default, pants uses the configuration that ships with Ivy,
+but if you need to change Ivy settings you can specify your own in <code>pants.ini</code>:</p>
+<div class="codehilite"><pre><span></span>[ivy]
+ivy_settings: %(pants_supportdir)s/ivy/ivysettings.xml
+cache_dir: ~/.ivy2/pants
+</pre></div>
+<p>For more information on Ivy settings, see the <a href="http://ant.apache.org/ivy/">Ivy documentation</a></p>
+<p><a id="setup_cache"></a></p>
+<h2 id="build-cache">Build Cache</h2>
+<p>Pants automatically caches its work locally. But most organizations will want to set up a shared
+remote build cache. To do so, set <code>cache</code> options in <code>pants.ini</code>:</p>
+<div class="codehilite"><pre><span></span>[cache]
+read_from: ['https://myserver.co/pantscache']
+write_to: ['https://myserver.co/pantscache']
+</pre></div>
+<p>Note that the read and write cache locations are separate options: you may, for example, only want
+your CI machines, not individual developer builds, to populate the shared cache.</p>
+<p>Valid option values are:</p>
+<ul>
+<li><code>[ 'https://myserver.co/pantscache' ]</code> RESTful server URL.</li>
+<li><code>[ '/tmp/pantscache' ]</code> local directory.</li>
+<li><code>[ 'https://myserver.us/pcache|https://myserver.bf/pcache' ]</code> pipe-separated list of URLs--Pants pings each and uses the fastest.</li>
+<li><code>[ '/tmp/pantscache', 'https://myserver.co/pcache' ]</code> try local fs first, then remote server.</li>
+</ul>
+<p>For details see the <code>_do_create_artifact_cache</code> docstring in
+<a href="https://github.com/pantsbuild/pants/blob/master/src/python/pants/cache/cache_setup.py"><code>cache_setup.py</code></a>.</p>
+<p>The remote server should be a RESTful server that can handle <code>GET</code>, <code>HEAD</code>, <code>PUT</code>, and <code>DELETE</code> requests
+on large binary blobs. E.g., you can implement this using <a href="https://www.varnish-cache.org/">Varnish</a>
+in front of <a href="https://www.nginx.com/resources/wiki/">nginx</a> (with <code>dav_methods PUT DELETE;</code> enabled).</p>
+<p>When reading from a cache server, Pants tries to <code>GET</code> an URL at some path under the server URL;
+your server should respond with 404 if there's nothing there, 200 if there is.</p>
+<p>When writing to a cache server, Pants first tries a <code>HEAD</code> request to see if the file's already
+there; respond with 404 if there's nothing there, 200 if there is. If Pants gets a 404, it will
+then try a <code>PUT</code> request; store the file it sends.</p>
+<p>If the user's <code>.netrc</code> has authentication information for the cache server[s], Pants will use it.
+(Thus, if only some users with known-good setups should be able to write to the cache, you might
+find it handy to use <code>.netrc</code> to authenticate those users.)</p>
+<h2 id="uploading-timing-stats">Uploading Timing Stats</h2>
+<p>Pants tracks information about its performance: what it builds, how much
+time various build operations take, cache hits, and more.
+If you you work with a large engineering organization, you might want to
+gather this information in one place, so it can inform decisions about how
+to improve everybody's build times.</p>
+<p>To upload these stats to a server for future analysis set the following option in <code>pants.ini</code>:</p>
+<div class="codehilite"><pre><span></span><span class="k">[run-tracker]</span>
+<span class="na">stats_upload_urls: {</span>
+  <span class="na">'http://myorg.org/pantsstats': 'authprovider'</span>
+<span class="na">}</span>
+</pre></div>
+<p>Pants will <code>POST</code> JSON data to each key URL.  The <code>authprovider</code> is the name of the provider the
+user must auth against in order to post to the corresponding URL.
+See <a href="login.html">here</a> for details on how to authenticate Pants against
+an auth provider.</p>
+<p>If posting to the URL does not require authentication, use the empty string as the auth provider.</p>
+<p>The posted JSON format should be self-explanatory.</p>
+<h2 id="using-pants-behind-a-firewall">Using Pants behind a firewall</h2>
+<p>Pants may encounter issues running behind a firewall. Several components expect to be able to reach the Internet:</p>
+<ul>
+<li>Ivy bootstrapper</li>
+<li>Binary tool bootstrapping</li>
+<li>Ivy itself (used for tool bootstrapping and downloading external .jar files)</li>
+<li>Python requirements</li>
+</ul>
+<h3 id="configuring-the-python-requests-library">Configuring the Python requests library</h3>
+<p>Code in bootstrapper.py and other parts of Pants use the Python
+<a href="http://docs.python-requests.org/en/latest/">requests</a> library to
+download resources using http or https.  The first time you may
+encounter this is when Pants attempts to download an initial version
+of Ivy.  If this initial download is through a proxy, the requests
+library uses the <code>HTTP_PROXY</code> or <code>HTTPS_PROXY</code> environment variable to
+find the proxy server.</p>
+<div class="codehilite"><pre><span></span>export HTTP_PROXY=http://proxy.corp.example.com:123
+export HTTPS_PROXY=https://proxy.corp.example.com:456
+</pre></div>
+<p>If Pants tries to find resources with HTTPS urls, you may see an error like:</p>
+<div class="codehilite"><pre><span></span>Exception message: Problem fetching the ivy bootstrap jar! Problem GETing data from https://artifactserver.example.com/content/groups/public/org/apache/ivy/ivy/2.3.0/ivy-2.3.0.jar: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed (_ssl.c:581)
+</pre></div>
+<p>The requests library attempts to verify SSL certificates by default.
+The reason it is denying the request is that it cannot find a trusted
+public key for the root certificate authority presented by the server.
+The requests library uses the 'certifi' library of well known
+certificate authorities, if that library is installed.  If you are
+using a virtualenv installation of pants, using <code>pip
+install certifi</code> to add the certify package to your pants environment
+might help.  You can also download a .pem bundle from the
+<a href="https://certifiio.readthedocs.io/en/latest/">certifi project page</a> and set
+<code>REQUESTS_CA_BUNDLE</code> as mentioned below.</p>
+<p>If you are using hosts with a self-signed certificate, your
+certificate authority will not be available in the certifi library.
+You will need a <code>.pem</code> file for the local certificate authority.</p>
+<p>You can tell the requests library about your trusted certificate
+authority certificates by setting the environment variable <code>REQUESTS_CA_BUNDLE</code>.
+This variable should point to a file containing trusted certificates:</p>
+<div class="codehilite"><pre><span></span>export REQUESTS_CA_BUNDLE=/etc/certs/latest.pem
+</pre></div>
+<h3 id="bootstrapping-ivy">Bootstrapping Ivy</h3>
+<p>Pants fetches the Ivy tool with an initial manual bootstrapping step using the Python requests library.
+If you do not want to use <code>HTTP_PROXY</code> or <code>HTTPS_PROXY</code> as described above, you can re-redirect
+this initial download to another URL with a setting in <code>pants.ini</code>:</p>
+<div class="codehilite"><pre><span></span><span class="k">[ivy]</span>
+<span class="na">bootstrap_jar_url: https://proxy.corp.example.com/content/groups/public/org/apache/ivy/ivy/2.3.0/ivy-2.3.0.jar</span>
+</pre></div>
+<p>You may also encounter issues downloading this .jar file if you are using self-signed SSL certificates.
+See the section on Configuring the Python requests library above.</p>
+<h2 id="nexus-as-proxy">Nexus as proxy</h2>
+<p>If your site uses Sonatype Nexus or another reverse proxy for
+artifacts, you do not need to use a separate HTTP proxy.  Contact the
+reverse proxy administrator to setup a proxy for the sites listed in
+<code>build-support/ivy/settings.xml</code> and <code>pants.ini</code>.  By default these
+are <code>https://repo1.maven.org/maven2/</code> and <code>https://dl.bintray.com/pantsbuild/maven/</code>:</p>
+<p>Here is an excerpt of a modified ivysettings.xml with some possible configurations:</p>
+<div class="codehilite"><pre><span></span>&lt;macrodef name="_remote_resolvers"&gt;
+    &lt;chain returnFirst="true"&gt;
+      &lt;ibiblio name="example-corp-maven"
+               m2compatible="true"
+               usepoms="true"
+               root="https://nexus.example.com/content/groups/public/"/&gt;
+      &lt;ibiblio name="maven.twttr.com-maven"
+               m2compatible="true"
+               usepoms="true"
+               root="https://nexus.example.com/content/repositories/maven.twttr.com/"/&gt;
+  &lt;/chain&gt;
+&lt;/macrodef&gt;
+</pre></div>
+<h3 id="redirecting-tool-downloads-to-other-servers">Redirecting tool downloads to other servers</h3>
+<p>For the binary support tools like protoc, you will need to setup a
+proxy for the <code>dl.bintray.com</code> repo, or create your own repo of build
+tools:</p>
+<div class="codehilite"><pre><span></span><span class="na">binaries_baseurls</span> <span class="o">=</span> <span class="s">[</span>
+<span class="s">    "https://nexus.example.com/content/repositories/dl.bintray.com/pantsbuild/bin/build-support"</span>
+<span class="s">  ]</span>
+</pre></div>
+<h3 id="redirecting-python-requirements-to-other-servers">Redirecting python requirements to other servers</h3>
+<p>For python repos, you need to override the following settings in pants.ini:</p>
+<div class="codehilite"><pre><span></span><span class="k">[python-repos]</span>
+<span class="na">repos: [</span>
+    <span class="na">"https://pantsbuild.github.io/cheeseshop/third_party/python/dist/index.html",</span>
+    <span class="na">"https://pantsbuild.github.io/cheeseshop/third_party/python/index.html"</span>
+  <span class="na">]</span>
+
+<span class="na">indexes: [</span>
+    <span class="na">"https://pypi.org/simple/"</span>
+  <span class="na">]</span>
+</pre></div>
+<p>You can also reference a local repo relative to your project's build root with this pattern:</p>
+<div class="codehilite"><pre><span></span><span class="k">[python-repos]</span>
+<span class="na">repos: [</span>
+    <span class="na">"%(buildroot)s/repo_path"</span>
+  <span class="na">]</span>
+</pre></div>
+
+            <!-- main content end -->
+
+            <div class="generated">
+              Generated by <a href="docs.html">publish_docs</a>
+              from dist/markdown/html/src/docs/setup_repo.html 2019-05-07T19:16:17.795115
+            </div>
+
+          </div> <!-- mainflow -->
+
+        </div> <!-- content -->
+
+      </div>
+
+      <div class="col-md-1">
+      </div>
+
+    </div> <!-- row -->
+  </div> <!-- container-fluid -->
+
+</div> <!-- page -->
+
+<script src="https://code.jquery.com/jquery-2.2.3.min.js" integrity="sha384-I6F5OKECLVtK/BL+8iSLDEHowSAfUo76ZL9+kGAgTRdiByINKJaqTPH/QVNS1VDb" crossorigin="anonymous"></script>
+<script src="bootstrap-custom.min.js"></script>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-78111411-1', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+</html>

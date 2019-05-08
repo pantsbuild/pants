@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!--
+  Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+  Licensed under the Apache License, Version 2.0 (see LICENSE).
+-->
+
+<head>
+  <meta charset="utf-8"/>
+  <title>Pants Contributors Guide</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="shortcut icon" href="pants-logo.ico">
+  <!-- In case this is a "test publish", tell search engines where real version lives: -->
+  <link rel="canonical" href="http://pantsbuild.org/howto_contribute.html">
+
+  <link rel="stylesheet" href="bootstrap-custom.min.css">
+  <link rel="stylesheet" href="bootstrap-custom-theme.min.css">
+  <link rel="stylesheet" href="docsite.css">
+</head>
+
+<body>
+
+<div class="header">
+  <nav class="navbar navbar-default navbar-static-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand navbar-brand-img" href="index.html">
+          <img src="pants-logo.ico" alt="[pantsbuild logo]">
+        </a>
+        <a class="navbar-brand" href="index.html">
+          Pants
+        </a>
+      </div>
+      <div id="navbar" class="navbar-collapse collapse">
+        <ul class="nav navbar-nav navbar-right">
+          <li><a href="/">Docs</a></li>
+          <li><a href="community.html">Community</a></li>
+          <li><a href="https://www.github.com/pantsbuild/pants">GitHub</a></li>
+          <li>
+            <form class="navbar-form navbar-left search" role="search" action="https://www.google.com/search">
+              <div class="form-group">
+                <input type="text" name="as_q" class="form-control query" placeholder="Search">
+                <input name="as_sitesearch" value="pantsbuild.org" type="hidden">
+              </div>
+            </form>
+          </li>
+        </ul>
+      </div><!--/.nav-collapse -->
+    </div>
+  </nav>
+</div>
+
+<div class="page">
+
+  <div class="container-fluid">
+    <div class="row">
+
+      <div class="col-md-1">
+      </div>
+
+      <div class="col-md-2">
+        <div class="site-toc">
+          <ul>
+                  <li class="toc-h1 toc-heading">
+                    Getting Started
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="install.html">Installing Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="setup_repo.html">Setting Up Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="first_tutorial.html">Tutorial</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="common_tasks.html">Common Tasks</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="orgs.html">Pants for Organizations</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Pants Basics
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="why_use_pants.html">Why Use Pants?</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="first_concepts.html">Pants Concepts</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="build_files.html">BUILD files</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="target_addresses.html">Target Addresses</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="3rdparty.html">Third-Party Dependencies</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="options.html">Pants Options</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="invoking.html">Invoking Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="reporting_server.html">Reporting Server</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="ide_support.html">IDE Support</a>
+                  </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#JVM-Support" aria-expanded="false" aria-controls="JVM-Support">JVM Support<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="JVM-Support">
+                        <li class="toc-h1 toc-link ">
+                          <a href="jvm_projects.html">JVM Projects with Pants</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="3rdparty_jvm.html">JVM Dependency Management</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="scala.html">Scala Support</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="publish.html">Publishing Artifacts</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="from_maven.html">Pants for Maven Experts</a>
+                        </li>
+                    </ul>
+                </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#Python-Support" aria-expanded="false" aria-controls="Python-Support">Python Support<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="Python-Support">
+                        <li class="toc-h1 toc-link ">
+                          <a href="python_readme.html">Python Projects with Pants</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="3rdparty_py.html">Python 3rdparty Pattern</a>
+                        </li>
+                    </ul>
+                </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="go_readme.html">Go support for Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="node_readme.html">Node.js Support</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Code &amp; Doc Generation
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="thrift_deps.html">Thrift</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="grpcio_gen.html">Python gRPC + protobufs</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="page.html">Markdown</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Getting Help
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="tshoot.html">Troubleshooting</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="community.html">Community</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Reference
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="build_dictionary.html">Pants BUILD Dictionary</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="options_reference.html">Pants Reference</a>
+                  </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#Release-Notes" aria-expanded="false" aria-controls="Release-Notes">Release Notes<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="Release-Notes">
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.16.x.html">1.16.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.15.x.html">1.15.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.14.x.html">1.14.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.13.x.html">1.13.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.12.x.html">1.12.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.11.x.html">1.11.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.10.x.html">1.10.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.9.x.html">1.9.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.8.x.html">1.8.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.7.x.html">1.7.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.6.x.html">1.6.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.5.x.html">1.5.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.4.x.html">1.4.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.3.x.html">1.3.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.2.x.html">1.2.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.1.x.html">1.1.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.0.x.html">1.0.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-master.html">Master Pre-Releases</a>
+                        </li>
+                    </ul>
+                </li>
+                  <li class="toc-h1 toc-heading">
+                    Developer
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="dev.html">Pants Developer Center</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="export.html">Export Format</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="architecture.html">Architecture</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Blogs
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="coursier_migration.html">Twitter&#x27;s Coursier Migration</a>
+                  </li>
+          </ul>
+        </div> <!-- site-toc -->
+      </div>
+
+      <div class="col-md-8">
+        <div class="content">
+
+          <div class="mainflow">
+              <nav class="pagetoc">
+                <ul>
+                    <li class="toc-h1"><a href="#questions-issues-bug-reports">Questions, Issues, Bug Reports</a></li>
+                    <li class="toc-h1"><a href="#join-the-conversation">Join the Conversation</a></li>
+                    <li class="toc-h1"><a href="#life-of-a-change">Life of a Change</a></li>
+                    <li class="toc-h2"><a href="#identify-the-change">Identify the change</a></li>
+                    <li class="toc-h2"><a href="#getting-pants-source-code">Getting Pants Source Code</a></li>
+                    <li class="toc-h2"><a href="#making-the-change">Making the Change</a></li>
+                    <li class="toc-h2"><a href="#run-the-ci-tests">Run the CI Tests</a></li>
+                    <li class="toc-h2"><a href="#code-review">Code Review</a></li>
+                    <li class="toc-h3"><a href="#posting-the-first-draft">Posting the First Draft</a></li>
+                    <li class="toc-h3"><a href="#iterating">Iterating</a></li>
+                    <li class="toc-h3"><a href="#ci-failing">CI Failing?</a></li>
+                    <li class="toc-h2"><a href="#committing-a-change">Committing a Change</a></li>
+                </ul>
+              </nav>
+
+            <!-- main content start -->
+            <!-- generated by pants! -->
+<style>
+.codehilite .hll { background-color: #ffffcc }
+.codehilite  { background: #f0f0f0; }
+.codehilite .c { color: #60a0b0; font-style: italic } /* Comment */
+.codehilite .err { border: 1px solid #FF0000 } /* Error */
+.codehilite .k { color: #007020; font-weight: bold } /* Keyword */
+.codehilite .o { color: #666666 } /* Operator */
+.codehilite .ch { color: #60a0b0; font-style: italic } /* Comment.Hashbang */
+.codehilite .cm { color: #60a0b0; font-style: italic } /* Comment.Multiline */
+.codehilite .cp { color: #007020 } /* Comment.Preproc */
+.codehilite .cpf { color: #60a0b0; font-style: italic } /* Comment.PreprocFile */
+.codehilite .c1 { color: #60a0b0; font-style: italic } /* Comment.Single */
+.codehilite .cs { color: #60a0b0; background-color: #fff0f0 } /* Comment.Special */
+.codehilite .gd { color: #A00000 } /* Generic.Deleted */
+.codehilite .ge { font-style: italic } /* Generic.Emph */
+.codehilite .gr { color: #FF0000 } /* Generic.Error */
+.codehilite .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.codehilite .gi { color: #00A000 } /* Generic.Inserted */
+.codehilite .go { color: #888888 } /* Generic.Output */
+.codehilite .gp { color: #c65d09; font-weight: bold } /* Generic.Prompt */
+.codehilite .gs { font-weight: bold } /* Generic.Strong */
+.codehilite .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.codehilite .gt { color: #0044DD } /* Generic.Traceback */
+.codehilite .kc { color: #007020; font-weight: bold } /* Keyword.Constant */
+.codehilite .kd { color: #007020; font-weight: bold } /* Keyword.Declaration */
+.codehilite .kn { color: #007020; font-weight: bold } /* Keyword.Namespace */
+.codehilite .kp { color: #007020 } /* Keyword.Pseudo */
+.codehilite .kr { color: #007020; font-weight: bold } /* Keyword.Reserved */
+.codehilite .kt { color: #902000 } /* Keyword.Type */
+.codehilite .m { color: #40a070 } /* Literal.Number */
+.codehilite .s { color: #4070a0 } /* Literal.String */
+.codehilite .na { color: #4070a0 } /* Name.Attribute */
+.codehilite .nb { color: #007020 } /* Name.Builtin */
+.codehilite .nc { color: #0e84b5; font-weight: bold } /* Name.Class */
+.codehilite .no { color: #60add5 } /* Name.Constant */
+.codehilite .nd { color: #555555; font-weight: bold } /* Name.Decorator */
+.codehilite .ni { color: #d55537; font-weight: bold } /* Name.Entity */
+.codehilite .ne { color: #007020 } /* Name.Exception */
+.codehilite .nf { color: #06287e } /* Name.Function */
+.codehilite .nl { color: #002070; font-weight: bold } /* Name.Label */
+.codehilite .nn { color: #0e84b5; font-weight: bold } /* Name.Namespace */
+.codehilite .nt { color: #062873; font-weight: bold } /* Name.Tag */
+.codehilite .nv { color: #bb60d5 } /* Name.Variable */
+.codehilite .ow { color: #007020; font-weight: bold } /* Operator.Word */
+.codehilite .w { color: #bbbbbb } /* Text.Whitespace */
+.codehilite .mb { color: #40a070 } /* Literal.Number.Bin */
+.codehilite .mf { color: #40a070 } /* Literal.Number.Float */
+.codehilite .mh { color: #40a070 } /* Literal.Number.Hex */
+.codehilite .mi { color: #40a070 } /* Literal.Number.Integer */
+.codehilite .mo { color: #40a070 } /* Literal.Number.Oct */
+.codehilite .sa { color: #4070a0 } /* Literal.String.Affix */
+.codehilite .sb { color: #4070a0 } /* Literal.String.Backtick */
+.codehilite .sc { color: #4070a0 } /* Literal.String.Char */
+.codehilite .dl { color: #4070a0 } /* Literal.String.Delimiter */
+.codehilite .sd { color: #4070a0; font-style: italic } /* Literal.String.Doc */
+.codehilite .s2 { color: #4070a0 } /* Literal.String.Double */
+.codehilite .se { color: #4070a0; font-weight: bold } /* Literal.String.Escape */
+.codehilite .sh { color: #4070a0 } /* Literal.String.Heredoc */
+.codehilite .si { color: #70a0d0; font-style: italic } /* Literal.String.Interpol */
+.codehilite .sx { color: #c65d09 } /* Literal.String.Other */
+.codehilite .sr { color: #235388 } /* Literal.String.Regex */
+.codehilite .s1 { color: #4070a0 } /* Literal.String.Single */
+.codehilite .ss { color: #517918 } /* Literal.String.Symbol */
+.codehilite .bp { color: #007020 } /* Name.Builtin.Pseudo */
+.codehilite .fm { color: #06287e } /* Name.Function.Magic */
+.codehilite .vc { color: #bb60d5 } /* Name.Variable.Class */
+.codehilite .vg { color: #bb60d5 } /* Name.Variable.Global */
+.codehilite .vi { color: #bb60d5 } /* Name.Variable.Instance */
+.codehilite .vm { color: #bb60d5 } /* Name.Variable.Magic */
+.codehilite .il { color: #40a070 } /* Literal.Number.Integer.Long */
+</style>
+<h1 id="pants-contributors-guide">Pants Contributors Guide</h1>
+<p>This page documents how to make contributions to Pants. If you've
+<a href="howto_develop.html">developed a change to Pants</a>,
+it passes all tests, and
+you'd like to "send it upstream", here's what to do:</p>
+<h2 id="questions-issues-bug-reports">Questions, Issues, Bug Reports</h2>
+<p>See <a href="howto_ask.html">How To Ask</a></p>
+<h2 id="join-the-conversation">Join the Conversation</h2>
+<p>Join the <a href="https://groups.google.com/forum/#!forum/pants-devel" title="pants-devel Google Group">pants-devel Google Group</a> to keep in touch with other
+pants developers.</p>
+<p>Join the <a href="https://pantsbuild.slack.com">pantsbuild Slack team</a> and hop on the
+<code>#general</code> channel for higher bandwidth questions and answers about hacking on
+or using pants. You can <a href="https://pantsslack.herokuapp.com/">send yourself an invite</a> or ask for one
+on the <a href="https://groups.google.com/forum/#!forum/pants-devel" title="pants-devel Google Group">pants-devel Google group</a>.</p>
+<p>Watch the <a href="https://github.com/pantsbuild/pants">pantsbuild/pants Github
+project</a> for notifications of new
+issues, etc.</p>
+<p>Follow <a href="https://twitter.com/pantsbuild">@pantsbuild on Twitter</a> for
+occasional announcements.</p>
+<p>Find out when the CI tests go red/green by adding your email address to
+<a href="https://github.com/pantsbuild/pants/blob/master/.travis.yml">.travis.yml</a>.</p>
+<h2 id="life-of-a-change">Life of a Change</h2>
+<p>Let's walk through the process of making a change to pants. At a high
+level, the steps are:</p>
+<ul>
+<li>Identify the change you'd like to make (e.g.: fix a bug, add a feature).</li>
+<li>Get the code.</li>
+<li>Make your change on a branch.</li>
+<li>Get a code review.</li>
+<li>Commit your change to master.</li>
+</ul>
+<h3 id="identify-the-change">Identify the change</h3>
+<p>It's a good idea to make sure the work you'll be embarking on is
+generally agreed to be in a useful direction for the project before
+getting too far along.</p>
+<p>If there is a pre-existing github issue filed and un-assigned, feel free
+to grab it and ask any clarifying questions needed on
+<a href="https://groups.google.com/forum/#!forum/pants-devel">pants-devel</a>. If
+there is an issue you'd like to work on that's assigned and stagnant,
+please ping the assignee and finally
+<a href="https://groups.google.com/forum/#!forum/pants-devel">pants-devel</a>
+before taking over ownership for the issue.</p>
+<p>If you have an idea for new work that's not yet been discussed on
+<a href="https://groups.google.com/forum/#!forum/pants-devel">pants-devel</a>, then
+start a conversation there to vet the proposal. Once the group agrees
+it's worth a spike you can file a github issue and assign it to
+yourself.</p>
+<p><a id="download_source_code" pantsmark="download_source_code"></a></p>
+<h3 id="getting-pants-source-code">Getting Pants Source Code</h3>
+<p>If you just want to compile and look at the source code, the easiest way
+is to clone the repo.</p>
+<div class="codehilite"><pre><span></span>$ git clone https://github.com/pantsbuild/pants
+</pre></div>
+<p>If you would like to start developing patches and contributing them
+back, you will want to create a fork of the repo using the <a href="https://help.github.com/articles/fork-a-repo/">instructions
+on github.com</a>. With this
+setup, you can push branches and run Travis-CI before your change is
+committed.</p>
+<p>If you've already cloned your repo without forking, you don't have to
+re-checkout your repo. First, create the fork on github. Make a note the
+clone url of your fork. Then run the following commands:</p>
+<div class="codehilite"><pre><span></span>$ git remote remove origin
+$ git remote add origin &lt;url-to-clone-your-fork&gt;
+$ git remote add upstream  https://github.com/pantsbuild/pants
+</pre></div>
+<p>After this change, <code>git push</code> and <code>git pull</code> will go to your fork. You
+can get the latest changes from the <code>pantsbuild/pants</code> repo's master
+branch using the <a href="https://help.github.com/articles/syncing-a-fork/">syncing a
+fork</a> instructions on
+github.</p>
+<p>Whether you've cloned the repo or your fork of the repo, you should setup the
+local pre-commit hooks to ensure your commits meet minimum compliance checks
+before pushing branches to ci:</p>
+<div class="codehilite"><pre><span></span>$ ./build-support/bin/setup.sh
+</pre></div>
+<p>You can always run the pre-commit checks manually via:</p>
+<div class="codehilite"><pre><span></span>$ ./build-support/bin/pre-commit.sh
+</pre></div>
+<p><strong>Pro tip:</strong> If you are certain that you have not accidentally committed anything to
+the <code>master</code> branch that you want to keep, and you want to reset to an <em>exact</em> copy of
+the <code>pantsbuild/pants</code> repo's master branch, use these commands:</p>
+<div class="codehilite"><pre><span></span>$ git fetch upstream
+$ git checkout master <span class="o">&amp;&amp;</span> git reset --hard upstream/master
+</pre></div>
+<p><strong>Mac users:</strong> Pants requires a more modern OpenSSL version than the one that comes with macOS.
+To get all dependencies to resolve correctly, run the following commands the first time you
+set up Pants.</p>
+<div class="codehilite"><pre><span></span>$ brew install openssl
+$ <span class="nb">echo</span> <span class="s1">'export PATH="/usr/local/opt/openssl/bin:$PATH"'</span> &gt;&gt; ~/.bashrc
+$ <span class="nb">echo</span> <span class="s1">'export LDFLAGS="-L/usr/local/opt/openssl/lib"'</span> &gt;&gt; ~/.bashrc
+$ <span class="nb">echo</span> <span class="s1">'export CPPFLAGS="-I/usr/local/opt/openssl/include"'</span> &gt;&gt; ~/.bashrc
+</pre></div>
+<h3 id="making-the-change">Making the Change</h3>
+<p>You might want to familiarize yourself with the
+<a href="internals.html">Pants Internals</a>,
+<a href="howto_develop.html">Pants Developers Guide</a>, and the
+<a href="styleguide.html">Pants Style Guide</a>.</p>
+<p>Create a new branch off master and make changes.</p>
+<div class="codehilite"><pre><span></span>$ git checkout -b <span class="nv">$FEATURE_BRANCH</span>
+</pre></div>
+<p>Does your change alter Pants' behavior in a way users will notice? If
+so, then along with changing code...</p>
+<ul>
+<li>Consider updating the
+    <a href="docs.html">user documentation</a>.</li>
+</ul>
+<h3 id="run-the-ci-tests">Run the CI Tests</h3>
+<p>Before posting a review but certainly before the branch ships you should
+run relevant tests. If you're not sure what those are,
+<a href="howto_develop.html#dev_run_all_tests" pantsref="dev_run_all_tests">run all the tests</a>.</p>
+<h3 id="code-review">Code Review</h3>
+<p>Now that your change is complete, post it for review. We use <code>github.com</code> pull requests
+to host code reviews:</p>
+<h4 id="posting-the-first-draft">Posting the First Draft</h4>
+<p>When <a href="howto_develop.html#dev_run_all_tests" pantsref="dev_run_all_tests">all of the tests are green on travis</a>, you're
+probably ready to request review for the change!</p>
+<p>To get your pull request reviewed, you should:</p>
+<ul>
+<li>Include a short and descriptive title.</li>
+<li>Fill in each of the sections of the pull request template, and include links to any
+  relevant github issues for the change.</li>
+<li>Mention (usually in a comment on the PR) any specific
+  <a href="https://github.com/orgs/pantsbuild/teams/committers">pants committers</a>
+  who should review your change. Running <code>git log -- $filename</code> on one or more of the files that
+  you changed is a good way to find potential reviewers!</li>
+</ul>
+<p>You can see a list of all actively <code>reviewable</code> reviews <a href="https://github.com/pantsbuild/pants/pulls?utf8=%E2%9C%93&amp;q=is%3Apr%20is%3Aopen%20status%3Asuccess">here</a>.</p>
+<h4 id="iterating">Iterating</h4>
+<p>If reviewers post any feedback
+(<a href="https://help.github.com/articles/reviewing-proposed-changes-in-a-pull-request/">for more information on providing feedback see</a>),
+there might be a few iterations before finally getting a Ship It. As reviewers enter
+feedback, the github page updates; it should also send
+you mail as long as you are <code>Subscribed</code> to notifications for the pull request.</p>
+<p>Github pull requests currently lack the ability to mark a review comment as "blocking"
+for a change, so it's important for contributors and reviewers to communicate clearly which
+comments they view as blocking. If it's unclear whether a reviewer feels strongly about
+a particular point, please bias toward clearing up the uncertainty before proceeding.</p>
+<p>If those reviews inspire you to change some code, great.  Change some
+code and commit locally. When you're ready to update the pull request with your changes,
+push to the relevant branch on your fork as you did before:</p>
+<div class="codehilite"><pre><span></span>$ git push &lt;your-username&gt; <span class="nv">$FEATURE_BRANCH</span>
+</pre></div>
+<p>Look over the fields in the pull request you created earlier; perhaps some could use updating.
+Press the web form's <code>edit</code> button.</p>
+<p>If at any point you need to make changes that will fundamentally overhaul a review,
+consider temporarily removing the <code>reviewable</code> label in order to let reviewers know
+to hold off until the code is ready.</p>
+<h4 id="ci-failing">CI Failing?</h4>
+<p>If your pull request fails in travis, you can look at the shard logs to see the
+failure cause. From that log, you can figure out what tests you need to run to reproduce the failure
+locally. If you cannot reproduce the failure locally and it looks unrelated to your change, please
+open an issue for it with the label
+<a href="https://github.com/pantsbuild/pants/labels/flaky-test"><code>flaky-test</code></a>. You can also ping slack to
+ask for someone to restart the failing shard.
+(<a href="howto_develop.html#dev_run_all_tests" pantsref="dev_run_all_tests">More on checking CI test runs here</a>)</p>
+<h3 id="committing-a-change">Committing a Change</h3>
+<p>At this point you've made a change, had it reviewed (and received one or more Ship Its!) and
+are ready to complete things by getting your change in master. (If you're not a
+committer, please ask one to do this section for you.)</p>
+<p>A committer should push the <code>Squash and merge</code> button on the PR, and ensure that the
+commit message generated from the review summary is accurate. In particular, the title should
+contain a useful summary of the change, and the description should follow the pull request
+template (defined in the root of the repo at <code>PULL_REQUEST_TEMPLATE.md</code>).</p>
+<p>Finally, the committer will select <code>Confirm squash and merge</code>. The change is now complete. Huzzah!</p>
+
+            <!-- main content end -->
+
+            <div class="generated">
+              Generated by <a href="docs.html">publish_docs</a>
+              from dist/markdown/html/src/docs/howto_contribute.html 2019-05-07T19:16:16.293807
+            </div>
+
+          </div> <!-- mainflow -->
+
+        </div> <!-- content -->
+
+      </div>
+
+      <div class="col-md-1">
+      </div>
+
+    </div> <!-- row -->
+  </div> <!-- container-fluid -->
+
+</div> <!-- page -->
+
+<script src="https://code.jquery.com/jquery-2.2.3.min.js" integrity="sha384-I6F5OKECLVtK/BL+8iSLDEHowSAfUo76ZL9+kGAgTRdiByINKJaqTPH/QVNS1VDb" crossorigin="anonymous"></script>
+<script src="bootstrap-custom.min.js"></script>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-78111411-1', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+</html>

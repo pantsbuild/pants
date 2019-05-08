@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!--
+  Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+  Licensed under the Apache License, Version 2.0 (see LICENSE).
+-->
+
+<head>
+  <meta charset="utf-8"/>
+  <title>Twitter&#x27;s Coursier Migration</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="shortcut icon" href="pants-logo.ico">
+  <!-- In case this is a "test publish", tell search engines where real version lives: -->
+  <link rel="canonical" href="http://pantsbuild.org/coursier_migration.html">
+
+  <link rel="stylesheet" href="bootstrap-custom.min.css">
+  <link rel="stylesheet" href="bootstrap-custom-theme.min.css">
+  <link rel="stylesheet" href="docsite.css">
+</head>
+
+<body>
+
+<div class="header">
+  <nav class="navbar navbar-default navbar-static-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand navbar-brand-img" href="index.html">
+          <img src="pants-logo.ico" alt="[pantsbuild logo]">
+        </a>
+        <a class="navbar-brand" href="index.html">
+          Pants
+        </a>
+      </div>
+      <div id="navbar" class="navbar-collapse collapse">
+        <ul class="nav navbar-nav navbar-right">
+          <li><a href="/">Docs</a></li>
+          <li><a href="community.html">Community</a></li>
+          <li><a href="https://www.github.com/pantsbuild/pants">GitHub</a></li>
+          <li>
+            <form class="navbar-form navbar-left search" role="search" action="https://www.google.com/search">
+              <div class="form-group">
+                <input type="text" name="as_q" class="form-control query" placeholder="Search">
+                <input name="as_sitesearch" value="pantsbuild.org" type="hidden">
+              </div>
+            </form>
+          </li>
+        </ul>
+      </div><!--/.nav-collapse -->
+    </div>
+  </nav>
+</div>
+
+<div class="page">
+
+  <div class="container-fluid">
+    <div class="row">
+
+      <div class="col-md-1">
+      </div>
+
+      <div class="col-md-2">
+        <div class="site-toc">
+          <ul>
+                  <li class="toc-h1 toc-heading">
+                    Getting Started
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="install.html">Installing Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="setup_repo.html">Setting Up Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="first_tutorial.html">Tutorial</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="common_tasks.html">Common Tasks</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="orgs.html">Pants for Organizations</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Pants Basics
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="why_use_pants.html">Why Use Pants?</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="first_concepts.html">Pants Concepts</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="build_files.html">BUILD files</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="target_addresses.html">Target Addresses</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="3rdparty.html">Third-Party Dependencies</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="options.html">Pants Options</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="invoking.html">Invoking Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="reporting_server.html">Reporting Server</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="ide_support.html">IDE Support</a>
+                  </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#JVM-Support" aria-expanded="false" aria-controls="JVM-Support">JVM Support<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="JVM-Support">
+                        <li class="toc-h1 toc-link ">
+                          <a href="jvm_projects.html">JVM Projects with Pants</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="3rdparty_jvm.html">JVM Dependency Management</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="scala.html">Scala Support</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="publish.html">Publishing Artifacts</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="from_maven.html">Pants for Maven Experts</a>
+                        </li>
+                    </ul>
+                </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#Python-Support" aria-expanded="false" aria-controls="Python-Support">Python Support<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="Python-Support">
+                        <li class="toc-h1 toc-link ">
+                          <a href="python_readme.html">Python Projects with Pants</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="3rdparty_py.html">Python 3rdparty Pattern</a>
+                        </li>
+                    </ul>
+                </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="go_readme.html">Go support for Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="node_readme.html">Node.js Support</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Code &amp; Doc Generation
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="thrift_deps.html">Thrift</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="grpcio_gen.html">Python gRPC + protobufs</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="page.html">Markdown</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Getting Help
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="tshoot.html">Troubleshooting</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="community.html">Community</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Reference
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="build_dictionary.html">Pants BUILD Dictionary</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="options_reference.html">Pants Reference</a>
+                  </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#Release-Notes" aria-expanded="false" aria-controls="Release-Notes">Release Notes<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="Release-Notes">
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.16.x.html">1.16.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.15.x.html">1.15.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.14.x.html">1.14.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.13.x.html">1.13.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.12.x.html">1.12.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.11.x.html">1.11.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.10.x.html">1.10.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.9.x.html">1.9.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.8.x.html">1.8.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.7.x.html">1.7.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.6.x.html">1.6.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.5.x.html">1.5.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.4.x.html">1.4.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.3.x.html">1.3.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.2.x.html">1.2.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.1.x.html">1.1.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.0.x.html">1.0.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-master.html">Master Pre-Releases</a>
+                        </li>
+                    </ul>
+                </li>
+                  <li class="toc-h1 toc-heading">
+                    Developer
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="dev.html">Pants Developer Center</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="export.html">Export Format</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="architecture.html">Architecture</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Blogs
+                  </li>
+                  <li class="toc-h1 toc-link toc-here">
+                    Twitter&#x27;s Coursier Migration
+                  </li>
+          </ul>
+        </div> <!-- site-toc -->
+      </div>
+
+      <div class="col-md-8">
+        <div class="content">
+
+          <div class="mainflow">
+              <nav class="pagetoc">
+                <ul>
+                    <li class="toc-h1"><a href="#tldr">Tl;dr</a></li>
+                    <li class="toc-h1"><a href="#background">Background</a></li>
+                    <li class="toc-h1"><a href="#motivation-and-initial-investigation">Motivation and Initial Investigation</a></li>
+                    <li class="toc-h1"><a href="#pre-migration-changes-made-to-coursier">Pre-Migration - Changes Made to Coursier</a></li>
+                    <li class="toc-h2"><a href="#usability">Usability</a></li>
+                    <li class="toc-h3"><a href="#json-report">JSON Report</a></li>
+                    <li class="toc-h3"><a href="#granularity">Granularity</a></li>
+                    <li class="toc-h3"><a href="#direct-url-fetching">Direct URL Fetching</a></li>
+                    <li class="toc-h2"><a href="#reliability">Reliability</a></li>
+                    <li class="toc-h2"><a href="#visibility">Visibility</a></li>
+                    <li class="toc-h1"><a href="#the-migration-process">The Migration Process</a></li>
+                    <li class="toc-h2"><a href="#phase-1-ide-only">Phase 1 - IDE Only</a></li>
+                    <li class="toc-h2"><a href="#phase-2-all-pants-commands">Phase 2 - All Pants Commands</a></li>
+                    <li class="toc-h3"><a href="#issues-to-notice">Issues to notice</a></li>
+                    <li class="toc-h4"><a href="#resolve-differences-and-safety">Resolve Differences and Safety</a></li>
+                    <li class="toc-h4"><a href="#caching-discrepancy">Caching Discrepancy</a></li>
+                    <li class="toc-h1"><a href="#limitation">Limitation</a></li>
+                    <li class="toc-h1"><a href="#result">Result</a></li>
+                    <li class="toc-h2"><a href="#pants-export-used-for-intellij">Pants export (used for intellij)</a></li>
+                    <li class="toc-h2"><a href="#pants-resolve-used-for-compiletest">Pants resolve (used for compile/test)</a></li>
+                    <li class="toc-h1"><a href="#appendix">Appendix</a></li>
+                    <li class="toc-h2"><a href="#1-example-of-translation-for-pants-jar_library-target-to-coursier-command-line">1. Example of translation for Pants jar_library target to Coursier command line</a></li>
+                    <li class="toc-h2"><a href="#2-why-3rdparty-resolve-caching-wasnt-too-great">2. Why 3rdparty resolve caching wasn’t too great?</a></li>
+                    <li class="toc-h2"><a href="#3-example-intellij-pants-plugin-issue">3. Example IntelliJ Pants Plugin issue</a></li>
+                    <li class="toc-h2"><a href="#4-resolve-difference-investigation">4. Resolve difference investigation</a></li>
+                    <li class="toc-h2"><a href="#5-resolve-differenceserrors-between-ivy-and-coursier">5. Resolve differences/errors between Ivy and Coursier</a></li>
+                    <li class="toc-h3"><a href="#platform-dependent-resolve">Platform dependent resolve</a></li>
+                    <li class="toc-h3"><a href="#dependency-management-via-parent-pom">Dependency management via parent pom</a></li>
+                    <li class="toc-h1"><a href="#related-links">Related links</a></li>
+                </ul>
+              </nav>
+
+            <!-- main content start -->
+            <!-- generated by pants! -->
+<style>
+.codehilite .hll { background-color: #ffffcc }
+.codehilite  { background: #f0f0f0; }
+.codehilite .c { color: #60a0b0; font-style: italic } /* Comment */
+.codehilite .err { border: 1px solid #FF0000 } /* Error */
+.codehilite .k { color: #007020; font-weight: bold } /* Keyword */
+.codehilite .o { color: #666666 } /* Operator */
+.codehilite .ch { color: #60a0b0; font-style: italic } /* Comment.Hashbang */
+.codehilite .cm { color: #60a0b0; font-style: italic } /* Comment.Multiline */
+.codehilite .cp { color: #007020 } /* Comment.Preproc */
+.codehilite .cpf { color: #60a0b0; font-style: italic } /* Comment.PreprocFile */
+.codehilite .c1 { color: #60a0b0; font-style: italic } /* Comment.Single */
+.codehilite .cs { color: #60a0b0; background-color: #fff0f0 } /* Comment.Special */
+.codehilite .gd { color: #A00000 } /* Generic.Deleted */
+.codehilite .ge { font-style: italic } /* Generic.Emph */
+.codehilite .gr { color: #FF0000 } /* Generic.Error */
+.codehilite .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.codehilite .gi { color: #00A000 } /* Generic.Inserted */
+.codehilite .go { color: #888888 } /* Generic.Output */
+.codehilite .gp { color: #c65d09; font-weight: bold } /* Generic.Prompt */
+.codehilite .gs { font-weight: bold } /* Generic.Strong */
+.codehilite .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.codehilite .gt { color: #0044DD } /* Generic.Traceback */
+.codehilite .kc { color: #007020; font-weight: bold } /* Keyword.Constant */
+.codehilite .kd { color: #007020; font-weight: bold } /* Keyword.Declaration */
+.codehilite .kn { color: #007020; font-weight: bold } /* Keyword.Namespace */
+.codehilite .kp { color: #007020 } /* Keyword.Pseudo */
+.codehilite .kr { color: #007020; font-weight: bold } /* Keyword.Reserved */
+.codehilite .kt { color: #902000 } /* Keyword.Type */
+.codehilite .m { color: #40a070 } /* Literal.Number */
+.codehilite .s { color: #4070a0 } /* Literal.String */
+.codehilite .na { color: #4070a0 } /* Name.Attribute */
+.codehilite .nb { color: #007020 } /* Name.Builtin */
+.codehilite .nc { color: #0e84b5; font-weight: bold } /* Name.Class */
+.codehilite .no { color: #60add5 } /* Name.Constant */
+.codehilite .nd { color: #555555; font-weight: bold } /* Name.Decorator */
+.codehilite .ni { color: #d55537; font-weight: bold } /* Name.Entity */
+.codehilite .ne { color: #007020 } /* Name.Exception */
+.codehilite .nf { color: #06287e } /* Name.Function */
+.codehilite .nl { color: #002070; font-weight: bold } /* Name.Label */
+.codehilite .nn { color: #0e84b5; font-weight: bold } /* Name.Namespace */
+.codehilite .nt { color: #062873; font-weight: bold } /* Name.Tag */
+.codehilite .nv { color: #bb60d5 } /* Name.Variable */
+.codehilite .ow { color: #007020; font-weight: bold } /* Operator.Word */
+.codehilite .w { color: #bbbbbb } /* Text.Whitespace */
+.codehilite .mb { color: #40a070 } /* Literal.Number.Bin */
+.codehilite .mf { color: #40a070 } /* Literal.Number.Float */
+.codehilite .mh { color: #40a070 } /* Literal.Number.Hex */
+.codehilite .mi { color: #40a070 } /* Literal.Number.Integer */
+.codehilite .mo { color: #40a070 } /* Literal.Number.Oct */
+.codehilite .sa { color: #4070a0 } /* Literal.String.Affix */
+.codehilite .sb { color: #4070a0 } /* Literal.String.Backtick */
+.codehilite .sc { color: #4070a0 } /* Literal.String.Char */
+.codehilite .dl { color: #4070a0 } /* Literal.String.Delimiter */
+.codehilite .sd { color: #4070a0; font-style: italic } /* Literal.String.Doc */
+.codehilite .s2 { color: #4070a0 } /* Literal.String.Double */
+.codehilite .se { color: #4070a0; font-weight: bold } /* Literal.String.Escape */
+.codehilite .sh { color: #4070a0 } /* Literal.String.Heredoc */
+.codehilite .si { color: #70a0d0; font-style: italic } /* Literal.String.Interpol */
+.codehilite .sx { color: #c65d09 } /* Literal.String.Other */
+.codehilite .sr { color: #235388 } /* Literal.String.Regex */
+.codehilite .s1 { color: #4070a0 } /* Literal.String.Single */
+.codehilite .ss { color: #517918 } /* Literal.String.Symbol */
+.codehilite .bp { color: #007020 } /* Name.Builtin.Pseudo */
+.codehilite .fm { color: #06287e } /* Name.Function.Magic */
+.codehilite .vc { color: #bb60d5 } /* Name.Variable.Class */
+.codehilite .vg { color: #bb60d5 } /* Name.Variable.Global */
+.codehilite .vi { color: #bb60d5 } /* Name.Variable.Instance */
+.codehilite .vm { color: #bb60d5 } /* Name.Variable.Magic */
+.codehilite .il { color: #40a070 } /* Literal.Number.Integer.Long */
+</style>
+<h1 id="twitters-coursier-migration">Twitter's Coursier Migration</h1>
+<p><strong>08/31/2018</strong></p>
+<p><strong>Authors and Contributors</strong></p>
+<p><a href="https://twitter.com/yidcheng">Yi Cheng</a>, <a href="https://twitter.com/baroquebobcat">Nora Howard</a>, and <a href="https://twitter.com/dordogh">Dorothy Ordogh</a> at Twitter Engineering Effectiveness - Build.</p>
+<p><strong>Timeframe</strong></p>
+<p>Twitter migrated to Coursier from Ivy during Q1 2018.</p>
+<h2 id="tldr">Tl;dr</h2>
+<p>This blog post discusses the motivation, preparation work, deployment processes, and results of replacing Ivy with Coursier in Pants.</p>
+<h2 id="background">Background</h2>
+<p>Twitter uses Pants as the build tool for the main repository which accounts for the majority of development. Inevitably, projects can get large with hundreds or thousands of source and binary (“3rdparty”) dependencies.</p>
+<p>At this scale, an IDE is also commonly used to help developer productivity. Regardless of which IDE is used, Pants will need to tell it where all the 3rdparty dependencies are located. For JVM projects specifically, that means resolving maven style 3rdparty artifacts.</p>
+<p>In some cases build tools (such as Gradle and Maven) implement their own 3rdparty resolution logic, whereas others (such as Pants and SBT) use a standalone tool called Ivy to do the resolve via certain APIs. This post discusses why and how Twitter adopted another 3rdparty resolve tool called Coursier to replace Ivy and how much impact it made.</p>
+<h2 id="motivation-and-initial-investigation">Motivation and Initial Investigation</h2>
+<p>For a common project with relatively few 3rdparty dependencies (&lt;20), the resolve time for Ivy is rather minimal, typically a few seconds to resolve and a few more to download the artifacts with reasonable network speed.</p>
+<p>However, Ivy is not so scalable with a large set of 3rdparty dependencies. The table below shows the measurement in the initial investigation on cacheless resolve. We did so by manually converting the XML passed to Ivy to the rough command line equivalent for Coursier <a href="#1-example-of-translation-for-pants-jar_library-target-to-coursier-command-line">[1]</a> <a href="#2-why-3rdparty-resolve-caching-wasnt-too-great">[2]</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th># of root level 3rdparty dependencies</th>
+<th># of transitive 3rdparty dependencies (obtained later for this blogpost)</th>
+<th>Ivy</th>
+<th>Coursier (20 concurrent connections)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A</td>
+<td>140</td>
+<td>231</td>
+<td>290s</td>
+<td>80s</td>
+</tr>
+<tr>
+<td>B</td>
+<td>330</td>
+<td>480</td>
+<td>1468s</td>
+<td>132s</td>
+</tr>
+</tbody>
+</table>
+<h2 id="pre-migration-changes-made-to-coursier">Pre-Migration - Changes Made to Coursier</h2>
+<p>The initial investigation gave us the motivation to pursue Coursier. However, there were still some gaps before Pants could fully utilize it. It was important to test the changes made to Coursier, i.e. testing all JVM targets in CI environment in our case. All changes below were iterated with this process to assure quality.</p>
+<h3 id="usability">Usability</h3>
+<h4 id="json-report">JSON Report</h4>
+<p>Since Pants is written in Python, it needs to call Coursier via command line, so a JSON report from Coursier was implemented to facilitate this as the main API.</p>
+<p><a href="https://github.com/coursier/coursier/pull/692">https://github.com/coursier/coursier/pull/692</a></p>
+<p>There was also a follow up patch to further improve the JSON report to support more detailed coordinate specification.</p>
+<p><a href="https://github.com/coursier/coursier/pull/782">https://github.com/coursier/coursier/pull/782</a></p>
+<h4 id="granularity">Granularity</h4>
+<p>Previously Coursier’s command line could only specify exclusions and classifiers on a global level, so we made it more granular: to the module level.</p>
+<p><a href="https://github.com/coursier/coursier/pull/735">https://github.com/coursier/coursier/pull/735</a></p>
+<p><a href="https://github.com/coursier/coursier/pull/692">https://github.com/coursier/coursier/pull/692</a></p>
+<h4 id="direct-url-fetching">Direct URL Fetching</h4>
+<p>We also added support for fetching an artifact with an arbitrary URL, which is commonly used to iterate against a jar that’s not published.</p>
+<p><a href="https://github.com/coursier/coursier/pull/774">https://github.com/coursier/coursier/pull/774</a></p>
+<h3 id="reliability">Reliability</h3>
+<p>Some artifacts are rather large (on the scale of 100-200MB), so there’s a chance the download may fail. Previously this would cause a bad artifact corrupting the local cache, which was later removed with the patch.</p>
+<p><a href="https://github.com/coursier/coursier/pull/797">https://github.com/coursier/coursier/pull/797</a></p>
+<h3 id="visibility">Visibility</h3>
+<p>To better help with the migration, such as comparing the result with Ivy and sanity check, we needed Coursier to print out the resolve graph correctly.</p>
+<p><a href="https://github.com/coursier/coursier/pull/671">https://github.com/coursier/coursier/pull/671</a></p>
+<h2 id="the-migration-process">The Migration Process</h2>
+<p>The actual migration was done in two major phases: 1) Coursier only for IDE project import, and then 2) Coursier for all Pants commands</p>
+<h3 id="phase-1-ide-only">Phase 1 - IDE Only</h3>
+<p>There are two reasons to use IDE as the initial testing ground.</p>
+<ul>
+<li>
+<p>Being less critical. Twitter developers only use IDE for code assistance such as syntax highlighting and code navigation. Whereas releasing and test running will still use Ivy code path. Therefore, any bug encountered initially in IDE will not affect production <a href="#3-example-intellij-pants-plugin-issue">[3]</a>.</p>
+</li>
+<li>
+<p>To further prove out the performance impact at scale. This provided early feedback of Coursier usage at scale as opposed to the sampling in the initial investigation.</p>
+</li>
+</ul>
+<p>The process was done by having IntelliJ Pants Plugin to recognize a special config .ij.import.rc under the repo root (<a href="https://github.com/pantsbuild/intellij-pants-plugin/pull/324">https://github.com/pantsbuild/intellij-pants-plugin/pull/324</a>) which overwrites the default resolver Ivy to Coursier. Additionally, developers were always given the option to fall back to Ivy in case they were blocked by Coursier.</p>
+<h3 id="phase-2-all-pants-commands">Phase 2 - All Pants Commands</h3>
+<p>Switching to Coursier for all Pants commands was much riskier because that was what developers used every day for the actual compilation and what CI infrastructure used for testing and deployment. To reduce the risk, we broke it down further:</p>
+<ul>
+<li>Experimentally turn on Coursier for a percentage of developer laptops and increase enrollment percentage slowly over 2-3 weeks. If any blocking issue was observed, we immediately tuned it back to 0.</li>
+<li>Aggregating all the deployment targets, and compare the resolution differences between Ivy and Coursier <a href="#4-resolve-difference-investigation">[4]</a>, i.e A/B testing.</li>
+</ul>
+<h4 id="issues-to-notice">Issues to notice</h4>
+<h5 id="resolve-differences-and-safety">Resolve Differences and Safety</h5>
+<p>Different resolves for the same set of 3rdparty dependencies can occur between Ivy and Coursier for various reasons. In the end, they are separate tools, so their implementations or bugs are different even though they are supposed to respect the same maven specification.</p>
+<p>In multiple instances, we found that Ivy does not resolve correctly accordingly to Maven's “standard” <a href="#5-resolve-differenceserrors-between-ivy-and-coursier">[5]</a>. Although Coursier's resolves may be more correct, it DOES NOT mean applications will always work as intended with the correct but different resolve. Sometimes it works accidentally with the wrong resolve. That is why we need to be careful.</p>
+<p>That said, if the resolves are the same between Ivy and Coursier, then it is normally safe. In some edge cases, the order of JVM class loading would make a difference.</p>
+<h5 id="caching-discrepancy">Caching Discrepancy</h5>
+<ul>
+<li>Between Ivy and Coursier. With the expected resolve differences explained above, cache keys for compilation will be different between Ivy and Coursier since 3rdparty dependencies are part of the cache key. We rely on CI infrastructure to populate caches, so it needs to populate the compile cache resulting from both Ivy and Coursier until the migration is completed.</li>
+<li>Some resolves are platform dependent, meaning that even if two builds have the same resolver, one cannot reuse the cache from the other if they are built on different platforms, e.g. MacOS and Linux. For this very reason, we turned off Coursier enrollment before finding and settling the difference between platforms [5].</li>
+</ul>
+<h2 id="limitation">Limitation</h2>
+<p>At the end of the day, unit tests typically would only run part of the 3rdparty dependencies' code that an application depends on, so there is no way to fully validate whether any transitive 3rdparty dependencies are functioning correctly. Hence the recommendation we provided for the owners of all JVM applications with different resolves was to have them go through any integration tests or staging environment if applicable.</p>
+<h2 id="result">Result</h2>
+<h3 id="pants-export-used-for-intellij">Pants export (used for intellij)</h3>
+<ul>
+<li>p95 down from 130s to 72s</li>
+<li>p90 down from 90s to 51s</li>
+</ul>
+<h3 id="pants-resolve-used-for-compiletest">Pants resolve (used for compile/test)</h3>
+<ul>
+<li>p95 down from 45s to 23s</li>
+<li>p90 unchanged</li>
+</ul>
+<p>The weekly savings on user laptop, (average Coursier time - average Ivy time) * total invocation, is about 40 hours, i.e. equivalent to a full head count. This may not seem a lot given the size of Twitter, but keep in mind that this is the time developers have no choice but to wait for.</p>
+<p>Additional note: once caches are on disk, warm resolve is the same between Ivy and Coursier. Hence the improvement is mostly above the p90 range.</p>
+<h2 id="appendix">Appendix</h2>
+<h3 id="1-example-of-translation-for-pants-jar_library-target-to-coursier-command-line">1. Example of translation for Pants jar_library target to Coursier command line</h3>
+<div class="codehilite"><pre><span></span>jar_library(
+  name='specs2-junit_2.11',
+  jars=[
+    jar(org='org.specs2', name='specs2-junit_2.11', rev='3.8.9'),
+  ],
+)
+</pre></div>
+<p>Translation to Ivy-resolve.xml:</p>
+<div class="codehilite"><pre><span></span>&lt;dependency org="org.specs2" name="specs2-junit_2.11" rev="3.8.9"&gt;
+   &lt;conf name="default" mapped="default" /&gt;
+   &lt;artifact name="specs2-junit_2.11" type="jar" /&gt;
+&lt;/dependency&gt;
+</pre></div>
+<p>Translation to Coursier CLI:</p>
+<div class="codehilite"><pre><span></span>./coursier fetch org.specs2:specs2-junit_2.11:3.8.9
+</pre></div>
+<h3 id="2-why-3rdparty-resolve-caching-wasnt-too-great">2. Why 3rdparty resolve caching wasn’t too great?</h3>
+<p>Two major steps are involved when doing 3rdparty resolve</p>
+<ul>
+<li>Figure out what artifacts are needed</li>
+<li>Download them</li>
+</ul>
+<p>The goal and benefit of caching 3rdparty resolve is to reuse the result from step 1, likely from another machine, thus only needing to do step 2 because not all artifacts are present.</p>
+<p>Currently Pants resolves 3rdparty dependencies per context. For example, with target A and target B
+resolve(A) =&gt; SetA jars
+resolve(B) =&gt; SetB jars
+resolve(A + B) is not necessarily (SetA union SetB) jars, because there may be conflicts to manage and SNAPSHOT to recompute.</p>
+<p>Since Pants command can involve an arbitrary number of targets. Given n targets users are interested in, the total number of combination is 2n, so the likelihood of cache hit would be low.</p>
+<p>There is also the practical aspect in terms of implementation and maintenance cost vs benefit.</p>
+<h3 id="3-example-intellij-pants-plugin-issue">3. Example IntelliJ Pants Plugin issue</h3>
+<p>Exclude jars imported into the project for IntelliJ Junit/Scala runner <a href="https://github.com/pantsbuild/intellij-pants-plugin/pull/331">https://github.com/pantsbuild/intellij-pants-plugin/pull/331</a></p>
+<h3 id="4-resolve-difference-investigation">4. Resolve difference investigation</h3>
+<p>This following script compares the resolves done by Ivy and Coursier on the same target.</p>
+<div class="codehilite"><pre><span></span>target=$1
+
+echo "target: $target"
+./pants --resolver-resolver=coursier export --output-file=a.out $target &amp;&gt; /dev/null \
+&amp;&amp; jq '.libraries | keys'  &lt; a.out  &gt; coursier_libs \
+&amp;&amp; ./pants --resolver-resolver=ivy export --output-file=a.out $target &amp;&gt; /dev/null \
+&amp;&amp; jq '.libraries | keys'  &lt; a.out  &gt; ivy_libs
+
+diff coursier_libs ivy_libs
+</pre></div>
+<p>Gives a simpler version of the diff is captured below. For example:</p>
+<p><code>&lt;</code> means what Coursier has</p>
+<p><code>&gt;</code> means what Ivy has</p>
+<div class="codehilite"><pre><span></span>&lt;   "asm:asm:3.1",
+---
+&gt;   "asm:asm:3.2",
+128d127
+&lt;   "org.apache.hadoop:hadoop-yarn-server-nodemanager:2.6.0.t01",
+130c129
+&lt;   "org.apache.httpcomponents:httpcore:4.2.4",
+---
+&gt;   "org.apache.httpcomponents:httpcore:4.2.5",
+</pre></div>
+<p>To examine the difference in detail, we need to obtain the reports from Ivy and Coursier, then compare them manually.
+Ivy:</p>
+<div class="codehilite"><pre><span></span>./pants --no-cache-resolve-ivy-read --resolver-resolver=ivy invalidate resolve.ivy --open --report &lt;target&gt;
+</pre></div>
+<p>Coursier:</p>
+<div class="codehilite"><pre><span></span>./pants --resolver-resolver=coursier resolve.coursier --report &lt;target&gt;
+</pre></div>
+<h3 id="5-resolve-differenceserrors-between-ivy-and-coursier">5. Resolve differences/errors between Ivy and Coursier</h3>
+<h4 id="platform-dependent-resolve">Platform dependent resolve</h4>
+<p><a href="https://github.com/coursier/coursier/issues/700">https://github.com/coursier/coursier/issues/700</a></p>
+<ul>
+<li>It turned out that the build was previously working accidentally with Ivy resolve. The should-be platform dependent jar was used by our build in both linux and MacOS builds because Ivy ignored the platform specific requirement. Hence switching to Coursier broke the build. The solution was to force fetching the platform dependent jar regardless of the platform.</li>
+<li>This also caused complication in caching, because of 3rdparty jars are part of the compile cache key, so if a 3rdparty jar is platform dependent, that means cache populated by CI on linux cannot be reused on MacOS.</li>
+</ul>
+<h4 id="dependency-management-via-parent-pom">Dependency management via parent pom</h4>
+<p><a href="https://github.com/coursier/coursier/issues/809">https://github.com/coursier/coursier/issues/809</a></p>
+<ul>
+<li>org.apache.httpcomponents:httpcore:4.2.5 (Ivy) -&gt; org.apache.httpcomponents:httpcore:4.2.4 (Coursier). The difference is harmless, but the correct one should be 4.2.4.</li>
+</ul>
+<h2 id="related-links">Related links</h2>
+<p><a href="jvm_projects.html#toolchain">How to use Coursier in Pants</a></p>
+<p><a href="https://github.com/coursier/coursier">Coursier repo</a></p>
+
+            <!-- main content end -->
+
+            <div class="generated">
+              Generated by <a href="docs.html">publish_docs</a>
+              from dist/markdown/html/src/docs/blog/coursier_migration.html 2019-05-07T19:16:15.966167
+            </div>
+
+          </div> <!-- mainflow -->
+
+        </div> <!-- content -->
+
+      </div>
+
+      <div class="col-md-1">
+      </div>
+
+    </div> <!-- row -->
+  </div> <!-- container-fluid -->
+
+</div> <!-- page -->
+
+<script src="https://code.jquery.com/jquery-2.2.3.min.js" integrity="sha384-I6F5OKECLVtK/BL+8iSLDEHowSAfUo76ZL9+kGAgTRdiByINKJaqTPH/QVNS1VDb" crossorigin="anonymous"></script>
+<script src="bootstrap-custom.min.js"></script>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-78111411-1', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+</html>

@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!--
+  Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+  Licensed under the Apache License, Version 2.0 (see LICENSE).
+-->
+
+<head>
+  <meta charset="utf-8"/>
+  <title>Release Process</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="shortcut icon" href="pants-logo.ico">
+  <!-- In case this is a "test publish", tell search engines where real version lives: -->
+  <link rel="canonical" href="http://pantsbuild.org/release.html">
+
+  <link rel="stylesheet" href="bootstrap-custom.min.css">
+  <link rel="stylesheet" href="bootstrap-custom-theme.min.css">
+  <link rel="stylesheet" href="docsite.css">
+</head>
+
+<body>
+
+<div class="header">
+  <nav class="navbar navbar-default navbar-static-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand navbar-brand-img" href="index.html">
+          <img src="pants-logo.ico" alt="[pantsbuild logo]">
+        </a>
+        <a class="navbar-brand" href="index.html">
+          Pants
+        </a>
+      </div>
+      <div id="navbar" class="navbar-collapse collapse">
+        <ul class="nav navbar-nav navbar-right">
+          <li><a href="/">Docs</a></li>
+          <li><a href="community.html">Community</a></li>
+          <li><a href="https://www.github.com/pantsbuild/pants">GitHub</a></li>
+          <li>
+            <form class="navbar-form navbar-left search" role="search" action="https://www.google.com/search">
+              <div class="form-group">
+                <input type="text" name="as_q" class="form-control query" placeholder="Search">
+                <input name="as_sitesearch" value="pantsbuild.org" type="hidden">
+              </div>
+            </form>
+          </li>
+        </ul>
+      </div><!--/.nav-collapse -->
+    </div>
+  </nav>
+</div>
+
+<div class="page">
+
+  <div class="container-fluid">
+    <div class="row">
+
+      <div class="col-md-1">
+      </div>
+
+      <div class="col-md-2">
+        <div class="site-toc">
+          <ul>
+                  <li class="toc-h1 toc-heading">
+                    Getting Started
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="install.html">Installing Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="setup_repo.html">Setting Up Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="first_tutorial.html">Tutorial</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="common_tasks.html">Common Tasks</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="orgs.html">Pants for Organizations</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Pants Basics
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="why_use_pants.html">Why Use Pants?</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="first_concepts.html">Pants Concepts</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="build_files.html">BUILD files</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="target_addresses.html">Target Addresses</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="3rdparty.html">Third-Party Dependencies</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="options.html">Pants Options</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="invoking.html">Invoking Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="reporting_server.html">Reporting Server</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="ide_support.html">IDE Support</a>
+                  </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#JVM-Support" aria-expanded="false" aria-controls="JVM-Support">JVM Support<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="JVM-Support">
+                        <li class="toc-h1 toc-link ">
+                          <a href="jvm_projects.html">JVM Projects with Pants</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="3rdparty_jvm.html">JVM Dependency Management</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="scala.html">Scala Support</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="publish.html">Publishing Artifacts</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="from_maven.html">Pants for Maven Experts</a>
+                        </li>
+                    </ul>
+                </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#Python-Support" aria-expanded="false" aria-controls="Python-Support">Python Support<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="Python-Support">
+                        <li class="toc-h1 toc-link ">
+                          <a href="python_readme.html">Python Projects with Pants</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="3rdparty_py.html">Python 3rdparty Pattern</a>
+                        </li>
+                    </ul>
+                </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="go_readme.html">Go support for Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="node_readme.html">Node.js Support</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Code &amp; Doc Generation
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="thrift_deps.html">Thrift</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="grpcio_gen.html">Python gRPC + protobufs</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="page.html">Markdown</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Getting Help
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="tshoot.html">Troubleshooting</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="community.html">Community</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Reference
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="build_dictionary.html">Pants BUILD Dictionary</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="options_reference.html">Pants Reference</a>
+                  </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#Release-Notes" aria-expanded="false" aria-controls="Release-Notes">Release Notes<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="Release-Notes">
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.16.x.html">1.16.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.15.x.html">1.15.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.14.x.html">1.14.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.13.x.html">1.13.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.12.x.html">1.12.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.11.x.html">1.11.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.10.x.html">1.10.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.9.x.html">1.9.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.8.x.html">1.8.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.7.x.html">1.7.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.6.x.html">1.6.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.5.x.html">1.5.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.4.x.html">1.4.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.3.x.html">1.3.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.2.x.html">1.2.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.1.x.html">1.1.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.0.x.html">1.0.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-master.html">Master Pre-Releases</a>
+                        </li>
+                    </ul>
+                </li>
+                  <li class="toc-h1 toc-heading">
+                    Developer
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="dev.html">Pants Developer Center</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="export.html">Export Format</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="architecture.html">Architecture</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Blogs
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="coursier_migration.html">Twitter&#x27;s Coursier Migration</a>
+                  </li>
+          </ul>
+        </div> <!-- site-toc -->
+      </div>
+
+      <div class="col-md-8">
+        <div class="content">
+
+          <div class="mainflow">
+              <nav class="pagetoc">
+                <ul>
+                    <li class="toc-h1"><a href="#0-prerequisites">0. Prerequisites</a></li>
+                    <li class="toc-h1"><a href="#1-prepare-release">1. Prepare Release</a></li>
+                    <li class="toc-h2"><a href="#preparing-a-release-from-the-master-branch">Preparing a release from the master branch</a></li>
+                    <li class="toc-h2"><a href="#preparing-a-release-from-a-stable-branch">Preparing a release from a stable branch</a></li>
+                    <li class="toc-h1"><a href="#2-optional-dry-run">2. (Optional) Dry Run</a></li>
+                    <li class="toc-h1"><a href="#3-publish-to-pypi">3. Publish to PyPi</a></li>
+                    <li class="toc-h1"><a href="#4-announce">4. Announce</a></li>
+                    <li class="toc-h1"><a href="#wzxhzdk7wzxhzdk8listing-packages-and-owners">Listing Packages and Owners</a></li>
+                </ul>
+              </nav>
+
+            <!-- main content start -->
+            <!-- generated by pants! -->
+<style>
+.codehilite .hll { background-color: #ffffcc }
+.codehilite  { background: #f0f0f0; }
+.codehilite .c { color: #60a0b0; font-style: italic } /* Comment */
+.codehilite .err { border: 1px solid #FF0000 } /* Error */
+.codehilite .k { color: #007020; font-weight: bold } /* Keyword */
+.codehilite .o { color: #666666 } /* Operator */
+.codehilite .ch { color: #60a0b0; font-style: italic } /* Comment.Hashbang */
+.codehilite .cm { color: #60a0b0; font-style: italic } /* Comment.Multiline */
+.codehilite .cp { color: #007020 } /* Comment.Preproc */
+.codehilite .cpf { color: #60a0b0; font-style: italic } /* Comment.PreprocFile */
+.codehilite .c1 { color: #60a0b0; font-style: italic } /* Comment.Single */
+.codehilite .cs { color: #60a0b0; background-color: #fff0f0 } /* Comment.Special */
+.codehilite .gd { color: #A00000 } /* Generic.Deleted */
+.codehilite .ge { font-style: italic } /* Generic.Emph */
+.codehilite .gr { color: #FF0000 } /* Generic.Error */
+.codehilite .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.codehilite .gi { color: #00A000 } /* Generic.Inserted */
+.codehilite .go { color: #888888 } /* Generic.Output */
+.codehilite .gp { color: #c65d09; font-weight: bold } /* Generic.Prompt */
+.codehilite .gs { font-weight: bold } /* Generic.Strong */
+.codehilite .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.codehilite .gt { color: #0044DD } /* Generic.Traceback */
+.codehilite .kc { color: #007020; font-weight: bold } /* Keyword.Constant */
+.codehilite .kd { color: #007020; font-weight: bold } /* Keyword.Declaration */
+.codehilite .kn { color: #007020; font-weight: bold } /* Keyword.Namespace */
+.codehilite .kp { color: #007020 } /* Keyword.Pseudo */
+.codehilite .kr { color: #007020; font-weight: bold } /* Keyword.Reserved */
+.codehilite .kt { color: #902000 } /* Keyword.Type */
+.codehilite .m { color: #40a070 } /* Literal.Number */
+.codehilite .s { color: #4070a0 } /* Literal.String */
+.codehilite .na { color: #4070a0 } /* Name.Attribute */
+.codehilite .nb { color: #007020 } /* Name.Builtin */
+.codehilite .nc { color: #0e84b5; font-weight: bold } /* Name.Class */
+.codehilite .no { color: #60add5 } /* Name.Constant */
+.codehilite .nd { color: #555555; font-weight: bold } /* Name.Decorator */
+.codehilite .ni { color: #d55537; font-weight: bold } /* Name.Entity */
+.codehilite .ne { color: #007020 } /* Name.Exception */
+.codehilite .nf { color: #06287e } /* Name.Function */
+.codehilite .nl { color: #002070; font-weight: bold } /* Name.Label */
+.codehilite .nn { color: #0e84b5; font-weight: bold } /* Name.Namespace */
+.codehilite .nt { color: #062873; font-weight: bold } /* Name.Tag */
+.codehilite .nv { color: #bb60d5 } /* Name.Variable */
+.codehilite .ow { color: #007020; font-weight: bold } /* Operator.Word */
+.codehilite .w { color: #bbbbbb } /* Text.Whitespace */
+.codehilite .mb { color: #40a070 } /* Literal.Number.Bin */
+.codehilite .mf { color: #40a070 } /* Literal.Number.Float */
+.codehilite .mh { color: #40a070 } /* Literal.Number.Hex */
+.codehilite .mi { color: #40a070 } /* Literal.Number.Integer */
+.codehilite .mo { color: #40a070 } /* Literal.Number.Oct */
+.codehilite .sa { color: #4070a0 } /* Literal.String.Affix */
+.codehilite .sb { color: #4070a0 } /* Literal.String.Backtick */
+.codehilite .sc { color: #4070a0 } /* Literal.String.Char */
+.codehilite .dl { color: #4070a0 } /* Literal.String.Delimiter */
+.codehilite .sd { color: #4070a0; font-style: italic } /* Literal.String.Doc */
+.codehilite .s2 { color: #4070a0 } /* Literal.String.Double */
+.codehilite .se { color: #4070a0; font-weight: bold } /* Literal.String.Escape */
+.codehilite .sh { color: #4070a0 } /* Literal.String.Heredoc */
+.codehilite .si { color: #70a0d0; font-style: italic } /* Literal.String.Interpol */
+.codehilite .sx { color: #c65d09 } /* Literal.String.Other */
+.codehilite .sr { color: #235388 } /* Literal.String.Regex */
+.codehilite .s1 { color: #4070a0 } /* Literal.String.Single */
+.codehilite .ss { color: #517918 } /* Literal.String.Symbol */
+.codehilite .bp { color: #007020 } /* Name.Builtin.Pseudo */
+.codehilite .fm { color: #06287e } /* Name.Function.Magic */
+.codehilite .vc { color: #bb60d5 } /* Name.Variable.Class */
+.codehilite .vg { color: #bb60d5 } /* Name.Variable.Global */
+.codehilite .vi { color: #bb60d5 } /* Name.Variable.Instance */
+.codehilite .vm { color: #bb60d5 } /* Name.Variable.Magic */
+.codehilite .il { color: #40a070 } /* Literal.Number.Integer.Long */
+</style>
+<h1 id="release-process">Release Process</h1>
+<p>This page describes how to make a versioned release of Pants and
+other related packages to PyPi.  If you need to release pants jvm tools
+(jars), see the
+<a href="release_jvm.html">JVM Artifact Release Process</a>
+page.</p>
+<p>Deciding the "who", "what", and "when" of releasing is described on the
+<a href="release_strategy.html">Release Strategy</a> page. Note that for some
+lucky release managers, this may result in two or more releases in a particular week.</p>
+<p>A release is always prepared for each pantsbuild/pants branch by a green Travis CI run; ie: master,
+1.0.x, 1.1.x, etc. branches on <a href="https://github.com/pantsbuild/pants">github.com/pantsbuild/pants</a> will have wheels created, tested
+and deployed to <a href="https://binaries.pantsbuild.org">binaries.pantsbuild.org</a> ready for use in a release.</p>
+<p>Once you know what to release, releasing pants involves:</p>
+<ul>
+<li>Preparing the release.</li>
+<li>(optional) Perform a release dry run.</li>
+<li>Publishing the release to PyPi.</li>
+<li>Announce the release on pants-devel.</li>
+</ul>
+<h2 id="0-prerequisites">0. Prerequisites</h2>
+<p>There are several things that require one-time setup in order to be
+able to perform pants releases.  The release script checks that all
+these steps have been performed in one way or another, but you might
+like to go through this list ahead of time rather than have the release
+script fail:</p>
+<ul>
+<li>
+<p><strong>Create a pgp signing key</strong> if you don't already have one.</p>
+<p>You might use the gpg implementation of pgp and start here:
+<a href="https://www.gnupg.org/gph/en/manual/c14.html">www.gnupg.org/gph/en/manual/c14.html</a></p>
+</li>
+<li>
+<p>If using gpg, <strong>ensure that the gpg-agent is running</strong> (for OS X, see
+    instructions <a href="https://blog.chendry.org/2015/03/13/starting-gpg-agent-in-osx.html">here</a>),
+    and ensure that gpg is set up to use it (e.g., set <code>use-agent</code> in <code>~/.gnupg/gpg.conf</code>).</p>
+</li>
+<li>
+<p><strong>Configure git to use your pgp key</strong> for signing release tags.</p>
+<p>A description of the configuration can be found here:
+<a href="https://help.github.com/articles/telling-git-about-your-gpg-key/">help.github.com/articles/telling-git-about-your-gpg-key/</a></p>
+</li>
+<li>
+<p><strong>Create a pypi account</strong> if you don't already have one.</p>
+<p>You can register here: <a href="https://pypi.org/account/register/">pypi.org/account/register</a></p>
+</li>
+<li>
+<p><strong>Get your pypi account added as an <code>owner</code> for all pantsbuild.pants packages.</strong></p>
+<p>You can ask any one of the current <a href="#owners">Owners</a> to do this.</p>
+</li>
+<li>
+<p><strong>Configure your pypi credentials locally in <code>~/.pypirc</code></strong></p>
+<p>For some versions of python it's necessary to use both a <code>server-login</code> and
+<code>pypi</code> section containing the same info. This will do it:</p>
+<div class="codehilite"><pre><span></span>cat <span class="s">&lt;&lt; EOF &gt; ~/.pypirc &amp;&amp; chmod 600 ~/.pypirc</span>
+<span class="s">[pypi]</span>
+<span class="s">username: &lt;fill me in&gt;</span>
+<span class="s">password: &lt;fill me in&gt;</span>
+
+<span class="s">[server-login]</span>
+<span class="s">username: &lt;fill me in&gt;</span>
+<span class="s">password: &lt;fill me in&gt;</span>
+<span class="s">EOF</span>
+</pre></div>
+</li>
+<li>
+<p>Note that the release script expects your pantsbuild/pants git remote to be named <code>origin</code>.
+    If you have another name for it, you should <code>git remote rename othername origin</code> before running
+    the release script, and rename it back afterwards.</p>
+</li>
+</ul>
+<h2 id="1-prepare-release">1. Prepare Release</h2>
+<p>Pants and the common libraries are published to the <a href="https://pypi.org/pypi">Python Package
+Index</a> per the Python community
+convention.</p>
+<p>Although the build and publish are automated, the version bumping, changelog edits,
+and CONTRIBUTORS management are not. Changelog edits and CONTRIBUTOR updates always
+occur in master, while version changes generally only occur in the relevant release branch.</p>
+<h3 id="releasing-from-different-release-branches">Releasing from different release branches</h3>
+<p>Every week we do a release from master.  In most cases we will use the <code>dev</code> naming convention
+detailed in <a href="http://www.pantsbuild.org/release_strategy.html">Release Strategy</a>. When we are
+ready to create a new stable branch we will release under the <code>rc</code> naming convention instead of
+<code>dev</code>.  For example releases in master should look similar to the following: 1.1.0dev0, 1.1.0dev1,
+1.1.0dev2, 1.1.0rc0, 1.2.0dev0, 1.2.0dev1, 1.2.0rc0, 1.3.0dev0. <em>In addition to a release from master
+the release manager may also need to do a release from a stable branch.</em></p>
+<h4 id="preparing-a-release-from-the-master-branch">Preparing a release from the master branch</h4>
+<ol>
+<li>Edit the version number in <code>src/python/pants/VERSION</code></li>
+<li>Update <code>src/python/pants/notes/master.rst</code> to reflect the changes for this week (can use
+   <code>build-support/bin/release-changelog-helper.sh</code> to get a head start).</li>
+<li>If this release is also a release candidate then:<ul>
+<li>Create the corresponding notes file for that release, initialized with notes for all
+   <code>dev</code> releases in the series. <br/>
+<em>For example if you were releasing <code>1.2.0rc0</code> you would need to
+   create <code>src/python/pants/notes/1.2.x.rst</code> and include all <code>1.2.0devX</code> release notes.</em></li>
+<li>Add the file to pants.ini in the branch_notes section.</li>
+<li>Add the new notes file to <code>src/docs/docsite.json</code>.</li>
+<li>Create a new page() in <code>src/python/pants/notes/BUILD</code> corresponding to the new notes. <br/>
+   For additional information on generating documentation see the
+   <a href="http://www.pantsbuild.org/docs#generating-the-site">docs reference</a></li>
+</ul>
+</li>
+<li>Bring the CONTRIBUTORS roster in
+   <a href="https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md">CONTRIBUTORS.md</a>
+   up to date by running <code>./build-support/bin/contributors.sh</code>.</li>
+<li>Create and land a review for changes in the master branch.</li>
+<li>Execute the release as described later on this page.</li>
+<li>Finally, if creating a release candidate, create the stable branch from the commit in
+   master for your release. For example if you were releasing <code>1.2.0rc0</code>, create the branch
+   <code>1.2.x</code> from your release commit.</li>
+</ol>
+<h4 id="preparing-a-release-from-a-stable-branch">Preparing a release from a stable branch</h4>
+<p>See <a href="http://www.pantsbuild.org/release_strategy.html">Release Strategy</a> for more details about
+whether a release is needed from a stable branch.</p>
+<ol>
+<li>Cherry pick <a href="https://github.com/pantsbuild/pants/pulls?q=is%3Apr+label%3Aneeds-cherrypick">changes labelled needs-cherrypick</a>
+    for the relevant milestone directly to the stable branch.  Note that these pull requests must have been merged into
+    master, and therefore will already be closed.</li>
+<li>In master, update the branch-specific file in <code>src/python/pants/notes</code> to reflect all patches that were
+    cherry-picked (can use <code>build-support/bin/release-changelog-helper.sh</code> to get a head start).
+    For example if you were releasing 1.2.0rc1 you would edit <code>src/python/pants/notes/1.2.x.rst</code>.</li>
+<li>Create and land a review for the notes changes in master.</li>
+<li>Cherry pick the merged notes changes from master to the release branch.</li>
+<li>In your release branch: edit and commit the version number in <code>src/python/pants/VERSION</code>.</li>
+<li>Execute the release as described later on this page.</li>
+<li>Remove the <a href="https://github.com/pantsbuild/pants/pulls?q=is%3Apr+label%3Aneeds-cherrypick">needs-cherrypick</a> label from the changes cherry-picked into the new release.</li>
+</ol>
+<h2 id="2-optional-dry-run">2. (Optional) Dry Run</h2>
+<p>A dry run is not strictly required since CI includes one, but you might
+like to try one anyway. To do so, switch to your release branch (which will either be <code>master</code> for
+an unstable weekly release, or a release branch like <code>1.9.x</code> for a stable release), and ensure that
+your version number commit is present. After confirming this, run:</p>
+<div class="codehilite"><pre><span></span>$ ./build-support/bin/release.sh -n
+</pre></div>
+<p>This will perform a dry run local build of the pantsbuild.pants wheel
+and other related package wheelss, install them in a virtualenv and then
+smoke test basic operations.</p>
+<p>Note that in addition to CI checking dry runs work, the release publish
+flow also performs a mandatory dry run so executing a dry run separately
+is not required.</p>
+<h2 id="3-publish-to-pypi">3. Publish to PyPi</h2>
+<p>Once the six "Build wheels" Travis shards have completed for your release
+commit, you can publish to PyPi. First, ensure that you are on your release branch at your version
+bump commit. Then, publish the release:</p>
+<div class="codehilite"><pre><span></span>$ ./build-support/bin/release.sh
+</pre></div>
+<p>This also performs a dry run and then proceeds to upload the smoke
+tested wheels to PyPi. It may take a few minutes for the packages to be downloadable.</p>
+<p>Note: If you are releasing from <code>master</code> and new commits have landed after your release commit, you
+can reset to your commit (<code>git reset --hard &lt;sha&gt;</code>) before publishing.</p>
+<h2 id="4-announce">4. Announce</h2>
+<p>Check PyPi to ensure everything looks good. The <a href="https://pypi.org/pypi/pantsbuild.pants">pantsbuild.pants
+package index page</a>
+should display the package version you just uploaded. The same check
+applies to other related package PyPi pages.</p>
+<p>To test the packages are installable:</p>
+<div class="codehilite"><pre><span></span>$ ./build-support/bin/release.sh -t
+</pre></div>
+<p>This will attempt to install the just-published packages from pypi and
+then smoke test them.</p>
+<p>Finally, announce the release to pants-devel.  You can get a
+contributor list for the email by running the following where <code>&lt;tag&gt;</code>
+if the tag for the prior release (eg: release_0.0.33)</p>
+<div class="codehilite"><pre><span></span>$ ./build-support/bin/contributors.sh -s &lt;tag&gt;
+</pre></div>
+<h2 id="wzxhzdk7wzxhzdk8listing-packages-and-owners"><a name="owners"></a>Listing Packages and Owners</h2>
+<p>The current list of packages can be obtained via :</p>
+<div class="codehilite"><pre><span></span>$ ./build-support/bin/release.sh -l
+</pre></div>
+<p>You can run the following to get a full ownership roster for each
+package :</p>
+<div class="codehilite"><pre><span></span>$ ./build-support/bin/release.sh -o
+</pre></div>
+<p>We generally expect all packages to have the same set of owners, which you can
+view <a href="https://pypi.org/project/pantsbuild.pants/">here</a>.</p>
+
+            <!-- main content end -->
+
+            <div class="generated">
+              Generated by <a href="docs.html">publish_docs</a>
+              from dist/markdown/html/src/docs/release.html 2019-05-07T19:16:17.708118
+            </div>
+
+          </div> <!-- mainflow -->
+
+        </div> <!-- content -->
+
+      </div>
+
+      <div class="col-md-1">
+      </div>
+
+    </div> <!-- row -->
+  </div> <!-- container-fluid -->
+
+</div> <!-- page -->
+
+<script src="https://code.jquery.com/jquery-2.2.3.min.js" integrity="sha384-I6F5OKECLVtK/BL+8iSLDEHowSAfUo76ZL9+kGAgTRdiByINKJaqTPH/QVNS1VDb" crossorigin="anonymous"></script>
+<script src="bootstrap-custom.min.js"></script>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-78111411-1', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+</html>

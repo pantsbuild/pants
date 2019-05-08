@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!--
+  Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+  Licensed under the Apache License, Version 2.0 (see LICENSE).
+-->
+
+<head>
+  <meta charset="utf-8"/>
+  <title>Thrift</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="shortcut icon" href="pants-logo.ico">
+  <!-- In case this is a "test publish", tell search engines where real version lives: -->
+  <link rel="canonical" href="http://pantsbuild.org/thrift_deps.html">
+
+  <link rel="stylesheet" href="bootstrap-custom.min.css">
+  <link rel="stylesheet" href="bootstrap-custom-theme.min.css">
+  <link rel="stylesheet" href="docsite.css">
+</head>
+
+<body>
+
+<div class="header">
+  <nav class="navbar navbar-default navbar-static-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand navbar-brand-img" href="index.html">
+          <img src="pants-logo.ico" alt="[pantsbuild logo]">
+        </a>
+        <a class="navbar-brand" href="index.html">
+          Pants
+        </a>
+      </div>
+      <div id="navbar" class="navbar-collapse collapse">
+        <ul class="nav navbar-nav navbar-right">
+          <li><a href="/">Docs</a></li>
+          <li><a href="community.html">Community</a></li>
+          <li><a href="https://www.github.com/pantsbuild/pants">GitHub</a></li>
+          <li>
+            <form class="navbar-form navbar-left search" role="search" action="https://www.google.com/search">
+              <div class="form-group">
+                <input type="text" name="as_q" class="form-control query" placeholder="Search">
+                <input name="as_sitesearch" value="pantsbuild.org" type="hidden">
+              </div>
+            </form>
+          </li>
+        </ul>
+      </div><!--/.nav-collapse -->
+    </div>
+  </nav>
+</div>
+
+<div class="page">
+
+  <div class="container-fluid">
+    <div class="row">
+
+      <div class="col-md-1">
+      </div>
+
+      <div class="col-md-2">
+        <div class="site-toc">
+          <ul>
+                  <li class="toc-h1 toc-heading">
+                    Getting Started
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="install.html">Installing Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="setup_repo.html">Setting Up Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="first_tutorial.html">Tutorial</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="common_tasks.html">Common Tasks</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="orgs.html">Pants for Organizations</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Pants Basics
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="why_use_pants.html">Why Use Pants?</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="first_concepts.html">Pants Concepts</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="build_files.html">BUILD files</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="target_addresses.html">Target Addresses</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="3rdparty.html">Third-Party Dependencies</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="options.html">Pants Options</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="invoking.html">Invoking Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="reporting_server.html">Reporting Server</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="ide_support.html">IDE Support</a>
+                  </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#JVM-Support" aria-expanded="false" aria-controls="JVM-Support">JVM Support<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="JVM-Support">
+                        <li class="toc-h1 toc-link ">
+                          <a href="jvm_projects.html">JVM Projects with Pants</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="3rdparty_jvm.html">JVM Dependency Management</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="scala.html">Scala Support</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="publish.html">Publishing Artifacts</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="from_maven.html">Pants for Maven Experts</a>
+                        </li>
+                    </ul>
+                </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#Python-Support" aria-expanded="false" aria-controls="Python-Support">Python Support<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="Python-Support">
+                        <li class="toc-h1 toc-link ">
+                          <a href="python_readme.html">Python Projects with Pants</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="3rdparty_py.html">Python 3rdparty Pattern</a>
+                        </li>
+                    </ul>
+                </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="go_readme.html">Go support for Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="node_readme.html">Node.js Support</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Code &amp; Doc Generation
+                  </li>
+                  <li class="toc-h1 toc-link toc-here">
+                    Thrift
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="grpcio_gen.html">Python gRPC + protobufs</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="page.html">Markdown</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Getting Help
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="tshoot.html">Troubleshooting</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="community.html">Community</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Reference
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="build_dictionary.html">Pants BUILD Dictionary</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="options_reference.html">Pants Reference</a>
+                  </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#Release-Notes" aria-expanded="false" aria-controls="Release-Notes">Release Notes<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="Release-Notes">
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.16.x.html">1.16.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.15.x.html">1.15.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.14.x.html">1.14.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.13.x.html">1.13.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.12.x.html">1.12.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.11.x.html">1.11.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.10.x.html">1.10.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.9.x.html">1.9.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.8.x.html">1.8.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.7.x.html">1.7.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.6.x.html">1.6.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.5.x.html">1.5.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.4.x.html">1.4.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.3.x.html">1.3.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.2.x.html">1.2.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.1.x.html">1.1.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.0.x.html">1.0.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-master.html">Master Pre-Releases</a>
+                        </li>
+                    </ul>
+                </li>
+                  <li class="toc-h1 toc-heading">
+                    Developer
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="dev.html">Pants Developer Center</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="export.html">Export Format</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="architecture.html">Architecture</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Blogs
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="coursier_migration.html">Twitter&#x27;s Coursier Migration</a>
+                  </li>
+          </ul>
+        </div> <!-- site-toc -->
+      </div>
+
+      <div class="col-md-8">
+        <div class="content">
+
+          <div class="mainflow">
+              <nav class="pagetoc">
+                <ul>
+                    <li class="toc-h1"><a href="#generating-code">Generating Code</a></li>
+                    <li class="toc-h2"><a href="#target-example">Target Example</a></li>
+                    <li class="toc-h2"><a href="#configuring">Configuring</a></li>
+                    <li class="toc-h1"><a href="#thrift-example">Thrift Example</a></li>
+                    <li class="toc-h2"><a href="#thrift-idl">Thrift IDL</a></li>
+                    <li class="toc-h2"><a href="#build-targets">BUILD Targets</a></li>
+                    <li class="toc-h2"><a href="#using-in-regular-code">Using in &quot;Regular&quot; Code</a></li>
+                    <li class="toc-h1"><a href="#publishing">Publishing</a></li>
+                </ul>
+              </nav>
+
+            <!-- main content start -->
+            <!-- generated by pants! -->
+<style>
+.codehilite .hll { background-color: #ffffcc }
+.codehilite  { background: #f0f0f0; }
+.codehilite .c { color: #60a0b0; font-style: italic } /* Comment */
+.codehilite .err { border: 1px solid #FF0000 } /* Error */
+.codehilite .k { color: #007020; font-weight: bold } /* Keyword */
+.codehilite .o { color: #666666 } /* Operator */
+.codehilite .ch { color: #60a0b0; font-style: italic } /* Comment.Hashbang */
+.codehilite .cm { color: #60a0b0; font-style: italic } /* Comment.Multiline */
+.codehilite .cp { color: #007020 } /* Comment.Preproc */
+.codehilite .cpf { color: #60a0b0; font-style: italic } /* Comment.PreprocFile */
+.codehilite .c1 { color: #60a0b0; font-style: italic } /* Comment.Single */
+.codehilite .cs { color: #60a0b0; background-color: #fff0f0 } /* Comment.Special */
+.codehilite .gd { color: #A00000 } /* Generic.Deleted */
+.codehilite .ge { font-style: italic } /* Generic.Emph */
+.codehilite .gr { color: #FF0000 } /* Generic.Error */
+.codehilite .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.codehilite .gi { color: #00A000 } /* Generic.Inserted */
+.codehilite .go { color: #888888 } /* Generic.Output */
+.codehilite .gp { color: #c65d09; font-weight: bold } /* Generic.Prompt */
+.codehilite .gs { font-weight: bold } /* Generic.Strong */
+.codehilite .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.codehilite .gt { color: #0044DD } /* Generic.Traceback */
+.codehilite .kc { color: #007020; font-weight: bold } /* Keyword.Constant */
+.codehilite .kd { color: #007020; font-weight: bold } /* Keyword.Declaration */
+.codehilite .kn { color: #007020; font-weight: bold } /* Keyword.Namespace */
+.codehilite .kp { color: #007020 } /* Keyword.Pseudo */
+.codehilite .kr { color: #007020; font-weight: bold } /* Keyword.Reserved */
+.codehilite .kt { color: #902000 } /* Keyword.Type */
+.codehilite .m { color: #40a070 } /* Literal.Number */
+.codehilite .s { color: #4070a0 } /* Literal.String */
+.codehilite .na { color: #4070a0 } /* Name.Attribute */
+.codehilite .nb { color: #007020 } /* Name.Builtin */
+.codehilite .nc { color: #0e84b5; font-weight: bold } /* Name.Class */
+.codehilite .no { color: #60add5 } /* Name.Constant */
+.codehilite .nd { color: #555555; font-weight: bold } /* Name.Decorator */
+.codehilite .ni { color: #d55537; font-weight: bold } /* Name.Entity */
+.codehilite .ne { color: #007020 } /* Name.Exception */
+.codehilite .nf { color: #06287e } /* Name.Function */
+.codehilite .nl { color: #002070; font-weight: bold } /* Name.Label */
+.codehilite .nn { color: #0e84b5; font-weight: bold } /* Name.Namespace */
+.codehilite .nt { color: #062873; font-weight: bold } /* Name.Tag */
+.codehilite .nv { color: #bb60d5 } /* Name.Variable */
+.codehilite .ow { color: #007020; font-weight: bold } /* Operator.Word */
+.codehilite .w { color: #bbbbbb } /* Text.Whitespace */
+.codehilite .mb { color: #40a070 } /* Literal.Number.Bin */
+.codehilite .mf { color: #40a070 } /* Literal.Number.Float */
+.codehilite .mh { color: #40a070 } /* Literal.Number.Hex */
+.codehilite .mi { color: #40a070 } /* Literal.Number.Integer */
+.codehilite .mo { color: #40a070 } /* Literal.Number.Oct */
+.codehilite .sa { color: #4070a0 } /* Literal.String.Affix */
+.codehilite .sb { color: #4070a0 } /* Literal.String.Backtick */
+.codehilite .sc { color: #4070a0 } /* Literal.String.Char */
+.codehilite .dl { color: #4070a0 } /* Literal.String.Delimiter */
+.codehilite .sd { color: #4070a0; font-style: italic } /* Literal.String.Doc */
+.codehilite .s2 { color: #4070a0 } /* Literal.String.Double */
+.codehilite .se { color: #4070a0; font-weight: bold } /* Literal.String.Escape */
+.codehilite .sh { color: #4070a0 } /* Literal.String.Heredoc */
+.codehilite .si { color: #70a0d0; font-style: italic } /* Literal.String.Interpol */
+.codehilite .sx { color: #c65d09 } /* Literal.String.Other */
+.codehilite .sr { color: #235388 } /* Literal.String.Regex */
+.codehilite .s1 { color: #4070a0 } /* Literal.String.Single */
+.codehilite .ss { color: #517918 } /* Literal.String.Symbol */
+.codehilite .bp { color: #007020 } /* Name.Builtin.Pseudo */
+.codehilite .fm { color: #06287e } /* Name.Function.Magic */
+.codehilite .vc { color: #bb60d5 } /* Name.Variable.Class */
+.codehilite .vg { color: #bb60d5 } /* Name.Variable.Global */
+.codehilite .vi { color: #bb60d5 } /* Name.Variable.Instance */
+.codehilite .vm { color: #bb60d5 } /* Name.Variable.Magic */
+.codehilite .il { color: #40a070 } /* Literal.Number.Integer.Long */
+</style>
+<h1 id="thrift">Thrift</h1>
+<p><a href="http://thrift.apache.org/">Apache Thrift</a> is a popular framework for
+working with data types and service interfaces. It uses an Interface
+Definition Language (IDL) to define these types and interfaces. There
+are tools to generate code in "real" programming languages from Thrift
+IDL files. Two programs, perhaps in different programming languages,
+should be able to communicate over Thrift interfaces by using this
+generated code.</p>
+<p>Pants knows Thrift. For each Thrift file you use, your codebase has some
+<code>BUILD</code> targets that represent "real" code generated from IDL code. You
+can write code in your favorite language that imports the generated
+code. To make the import work, your code's <code>BUILD</code> target depends on the
+appropriate Thrift <code>BUILD</code> target.</p>
+<h2 id="generating-code">Generating Code</h2>
+<p>You have some Thrift; you want to use it from your "regular" programming
+language. Normally, to make, e.g., Java code usable, you set up a
+<code>java_library</code> target with sources <code>*.java</code> and then depend on that
+target; Thrift works similarly, but you use a different target type that
+generates Java code from <code>*.thrift</code>. You can define Java, Python, or
+Scala library targets whose code is Thrift-generated by setting up
+<em>lang</em>_thrift_library targets. (Scala is tricky; you use a
+<code>java_thrift_library</code> with carefully-chosen parameters.) Other targets
+can depend on a <em>lang</em>_thrift_library and their code can then import
+the generated code.</p>
+<h3 id="target-example">Target Example</h3>
+<p>This example sets up a <code>java_thrift_library</code> target; its source is
+Thrift; it generates Java.</p>
+<div class="codehilite"><pre><span></span><span class="c1"># Target defined in src/thrift/com/twitter/mybird/BUILD:</span>
+<span class="n">java_thrift_library</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'mybird'</span><span class="p">,</span>
+  <span class="c1"># Specify dependencies for thrift IDL file includes.</span>
+  <span class="n">dependencies</span><span class="o">=</span><span class="p">[</span>
+    <span class="s1">'src/thrift/com/twitter/otherbird'</span><span class="p">,</span>
+  <span class="p">],</span>
+  <span class="n">sources</span><span class="o">=</span><span class="n">globs</span><span class="p">(</span><span class="s1">'*.thrift'</span><span class="p">)</span>
+<span class="p">)</span>
+</pre></div>
+<p>Pants knows that before it compiles such a target, it must first
+generate Java code from the Thrift IDL files. Users can depend on this
+target like any other internal target. In this case, users would add a
+dependency on <code>'src/thrift/com/twitter/mybird'</code>.</p>
+<p>One <em>lang</em>_thrift_library can depend on another; use this if one of
+your Thrift files <code>include</code>s a Thrift file that lives in another target.</p>
+<h3 id="configuring">Configuring</h3>
+<p>Here are some popular <code>*_thrift_library</code> configurations:</p>
+<p><strong>Java</strong></p>
+<p>Use Apache Thrift compiler (the default):</p>
+<div class="codehilite"><pre><span></span><span class="n">java_thrift_library</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+</pre></div>
+<p>...or Scrooge:</p>
+<div class="codehilite"><pre><span></span><span class="n">java_thrift_library</span><span class="p">(</span>
+  <span class="n">compiler</span><span class="o">=</span><span class="s1">'scrooge'</span><span class="p">)</span>
+</pre></div>
+<p><strong>Python</strong></p>
+<div class="codehilite"><pre><span></span><span class="n">python_thrift_library</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+</pre></div>
+<p><strong>Scala</strong></p>
+<div class="codehilite"><pre><span></span><span class="n">java_thrift_library</span><span class="p">(</span>  <span class="c1"># Yes, a "java" library to generate Scala</span>
+  <span class="n">compiler</span><span class="o">=</span><span class="s1">'scrooge'</span><span class="p">,</span> <span class="c1"># default compiler does not gen Scala; Scrooge does</span>
+  <span class="n">language</span><span class="o">=</span><span class="s1">'scala'</span><span class="p">,</span>
+  <span class="c1"># maybe set compiler_args</span>
+<span class="p">)</span>
+</pre></div>
+<p><strong>Android</strong></p>
+<p>Scrooge compiler can now generate java code with a limited number of getters and
+setters which is more suitable for Android applications which have a 65K limit on the
+number of methods.</p>
+<div class="codehilite"><pre><span></span><span class="n">java_thrift_library</span><span class="p">(</span>  <span class="c1"># Yes, a "java" library to generate Scala</span>
+  <span class="n">compiler</span><span class="o">=</span><span class="s1">'scrooge'</span><span class="p">,</span> <span class="c1"># default compiler does not gen android; Scrooge does</span>
+  <span class="n">language</span><span class="o">=</span><span class="s1">'android'</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+<h2 id="thrift-example">Thrift Example</h2>
+<p>Let's look at some sample code that puts all of this together.</p>
+<ul>
+<li>Thrift IDL code (<code>.thrift</code> files)</li>
+<li><code>BUILD</code> targets for the Thrift IDL code</li>
+<li>Java code that <code>import</code>s code generated from Thrift</li>
+<li><code>BUILD</code> target dependencies that allow that <code>import</code></li>
+</ul>
+<h3 id="thrift-idl">Thrift IDL</h3>
+<p>Our example uses two Thrift files, one of which <code>include</code>s the other. They look pretty ordinary.
+The <code>include</code>d Thrift, <code>examples/src/thrift/org/pantsbuild/example/distance/distance.thrift</code>, is
+regular Thrift:</p>
+<p>
+<div class="md-included-snippet"><div class="codehilite"><pre><span></span><span class="c">// Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).</span>
+<span class="c">// Licensed under the Apache License, Version 2.0 (see LICENSE).</span>
+
+<span class="kn">namespace</span><span class="w"> </span><span class="nn">java</span><span class="w"> </span><span class="n">org.pantsbuild.example.distance.thriftjava</span><span class="w"></span>
+<span class="kn">namespace</span><span class="w"> </span><span class="nn">py</span><span class="w"> </span><span class="n">org.pantsbuild.example.distance</span><span class="w"></span>
+
+<span class="cm">/*<em></em></span>
+<span class="cm"> * Structure for expressing distance measures: 8mm, 12 parsecs, etc.</span>
+<span class="cm"> * Not so useful on its own.</span>
+<span class="cm"> </span></pre></div></div></p>/<span class="w"></span>
+<span class="kd">struct</span><span class="w"> </span><span class="nc">Distance</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w"> </span><span class="mi">1</span><span class="p">:</span><span class="w"> </span><span class="k">optional</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="n">Unit</span><span class="p">;</span><span class="w"></span>
+<span class="w"> </span><span class="mi">2</span><span class="p">:</span><span class="w"> </span><span class="k">required</span><span class="w"> </span><span class="kt">i64</span><span class="w"> </span><span class="n">Number</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+
+<p>The <code>include</code>ing Thrift,
+<code>examples/src/thrift/org/pantsbuild/example/precipitation/precipitation.thrift</code>,
+also looks ordinary. (The include path is a little tricky: it's based on source roots.
+Thus, if your source tree has more than one root <code>foo</code> and <code>bar</code> and has Thrift in both,
+code in foo can <code>include</code> code from <code>bar</code> without mentioning <code>bar</code> in the include path.):</p>
+<p>
+<div class="md-included-snippet"><div class="codehilite"><pre><span></span><span class="c">// Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).</span>
+<span class="c">// Licensed under the Apache License, Version 2.0 (see LICENSE).</span>
+
+<span class="kn">namespace</span><span class="w"> </span><span class="nn">java</span><span class="w"> </span><span class="n">org.pantsbuild.example.precipitation.thriftjava</span><span class="w"></span>
+<span class="kn">namespace</span><span class="w"> </span><span class="nn">py</span><span class="w"> </span><span class="n">org.pantsbuild.example.precipitation</span><span class="w"></span>
+
+<span class="kn">include</span><span class="w"> </span><span class="s2">"org/pantsbuild/example/distance/distance.thrift"</span><span class="w"></span>
+
+<span class="cm">/*<em></em></span>
+<span class="cm"> * Structure for recording weather events, e.g., 8mm of rain.</span>
+<span class="cm"> </span></pre></div></div></p>/<span class="w"></span>
+<span class="kd">struct</span><span class="w"> </span><span class="nc">Precipitation</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w"> </span><span class="mi">1</span><span class="p">:</span><span class="w"> </span><span class="k">optional</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="n">substance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"rain"</span><span class="p">;</span><span class="w"></span>
+<span class="w"> </span><span class="mi">2</span><span class="p">:</span><span class="w"> </span><span class="k">optional</span><span class="w"> </span><span class="n">distance.Distance</span><span class="w"> </span><span class="n">distance</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+
+<h3 id="build-targets">BUILD Targets</h3>
+<p>In a <code>BUILD</code> file, we use a <code>java_thrift_library</code> or
+<code>python_thrift_library</code> to generate "real" code from Thrift. Our example
+just uses Java; thus, the <code>BUILD</code> file for <code>distance.thrift</code> looks like</p>
+<p>
+<div class="md-included-snippet"><div class="codehilite"><pre><span></span><span class="n">java_thrift_library</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'distance-java'</span><span class="p">,</span>
+  <span class="n">sources</span><span class="o">=</span><span class="p">[</span><span class="s1">'distance.thrift'</span><span class="p">],</span>
+  <span class="n">provides</span> <span class="o">=</span> <span class="n">artifact</span><span class="p">(</span><span class="n">org</span><span class="o">=</span><span class="s1">'org.pantsbuild.example'</span><span class="p">,</span>
+                      <span class="n">name</span><span class="o">=</span><span class="s1">'distance-thrift-java'</span><span class="p">,</span>
+                      <span class="n">repo</span><span class="o">=</span><span class="n">public</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">python_thrift_library</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'distance-python'</span><span class="p">,</span>
+  <span class="n">sources</span><span class="o">=</span><span class="p">[</span><span class="s1">'distance.thrift'</span><span class="p">],</span>
+  <span class="n">provides</span><span class="o">=</span><span class="n">setup_py</span><span class="p">(</span>
+    <span class="n">name</span><span class="o">=</span><span class="s1">'pantsbuild.pants.distance-thrift-python'</span><span class="p">,</span>
+    <span class="n">version</span><span class="o">=</span><span class="s1">'0.0.1'</span><span class="p">,</span>
+  <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="n">python_thrift_library</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'unexported-distance-python'</span><span class="p">,</span>
+  <span class="n">sources</span><span class="o">=</span><span class="p">[</span><span class="s1">'unexported_distance.thrift'</span><span class="p">],</span>
+<span class="p">)</span>
+</pre></div></div>
+</p>
+<p>Notice the target type is
+<a href="build_dictionary.html#bdict_java_thrift_library" pantsref="bdict_java_thrift_library">java_thrift_library</a>,
+and this target staked its claim to our distance thrift IDL file.
+JVM library targets
+(e.g.:
+<a href="build_dictionary.html#bdict_java_library" pantsref="bdict_java_library"><code>java_library</code></a>,
+<a href="build_dictionary.html#bdict_scala_library" pantsref="bdict_scala_library"><code>scala_library</code></a>) that depend on this
+target will simply see generated code from the IDL. Since no additional
+options are specified we use the defaults; however, if we need more
+control over how code is generated we control that through arguments
+provided by
+<a href="build_dictionary.html#bdict_java_thrift_library" pantsref="bdict_java_thrift_library">java_thrift_library</a>.</p>
+<blockquote>
+<p><strong>note</strong></p>
+<p>While the name <code>java_thrift_library</code> might make you think it generates
+Java, it can also generate other target languages via the <code>language</code>
+parameter (scala for example). For Python code, however, use
+<a href="build_dictionary.html#bdict_python_thrift_library" pantsref="bdict_python_thrift_library">python_thrift_library</a>.</p>
+</blockquote>
+<p>As with "regular" languages, for one target's code to include another's,
+a target should have the other in its <code>dependencies</code>. Thus, to allow
+<code>precipitation.thrift</code> to depend on <code>distance.thrift</code>, we set up
+<code>.../precipitation/BUILD</code> like so:</p>
+<p>
+<div class="md-included-snippet"><div class="codehilite"><pre><span></span><span class="n">java_thrift_library</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'precipitation-java'</span><span class="p">,</span>
+  <span class="n">sources</span><span class="o">=</span><span class="p">[</span><span class="s1">'precipitation.thrift'</span><span class="p">],</span>
+  <span class="n">dependencies</span><span class="o">=</span><span class="p">[</span>
+    <span class="s1">'examples/src/thrift/org/pantsbuild/example/distance:distance-java'</span><span class="p">,</span>
+  <span class="p">],</span>
+  <span class="n">provides</span> <span class="o">=</span> <span class="n">artifact</span><span class="p">(</span><span class="n">org</span><span class="o">=</span><span class="s1">'org.pantsbuild.example'</span><span class="p">,</span>
+                      <span class="n">name</span><span class="o">=</span><span class="s1">'precipitation-thrift-java'</span><span class="p">,</span>
+                      <span class="n">repo</span><span class="o">=</span><span class="n">public</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">python_thrift_library</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'precipitation-python'</span><span class="p">,</span>
+  <span class="n">sources</span><span class="o">=</span><span class="p">[</span><span class="s1">'precipitation.thrift'</span><span class="p">],</span>
+  <span class="n">dependencies</span><span class="o">=</span><span class="p">[</span>
+    <span class="s1">'examples/src/thrift/org/pantsbuild/example/distance:distance-python'</span><span class="p">,</span>
+  <span class="p">],</span>
+  <span class="n">provides</span><span class="o">=</span><span class="n">setup_py</span><span class="p">(</span>
+    <span class="n">name</span><span class="o">=</span><span class="s1">'pantsbuild.pants.precipitation-thrift-python'</span><span class="p">,</span>
+    <span class="n">version</span><span class="o">=</span><span class="s1">'0.0.1'</span><span class="p">,</span>
+  <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="n">python_thrift_library</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'monolithic-precipitation-python'</span><span class="p">,</span>
+  <span class="n">sources</span><span class="o">=</span><span class="p">[</span><span class="s1">'monolithic_precipitation.thrift'</span><span class="p">],</span>
+  <span class="n">dependencies</span><span class="o">=</span><span class="p">[</span>
+    <span class="s1">'examples/src/thrift/org/pantsbuild/example/distance:unexported-distance-python'</span><span class="p">,</span>
+  <span class="p">],</span>
+  <span class="n">provides</span><span class="o">=</span><span class="n">setup_py</span><span class="p">(</span>
+    <span class="n">name</span><span class="o">=</span><span class="s1">'pantsbuild.pants.monolithic-precipitation-thrift-python'</span><span class="p">,</span>
+    <span class="n">version</span><span class="o">=</span><span class="s1">'0.0.1'</span><span class="p">,</span>
+  <span class="p">)</span>
+<span class="p">)</span>
+</pre></div></div>
+</p>
+<h3 id="using-in-regular-code">Using in "Regular" Code</h3>
+<p>We want to use the Thrift-generated interface from "regular" code. In
+this Java example, we want to <code>import</code> the generated code. In our Java,
+the <code>import</code> statements use the names from the <code>.thrift</code> files'
+<code>namespace</code>s:</p>
+<p>
+<div class="md-included-snippet"><div class="codehilite"><pre><span></span><span class="kn">package</span> <span class="nn">org.pantsbuild.example.usethrift</span><span class="o">;</span>
+
+<span class="kn">import</span> <span class="nn">org.junit.Test</span><span class="o">;</span>
+
+<span class="kn">import</span> <span class="nn">org.pantsbuild.example.distance.thriftjava.Distance</span><span class="o">;</span>
+<span class="kn">import</span> <span class="nn">org.pantsbuild.example.precipitation.thriftjava.Precipitation</span><span class="o">;</span>
+
+<span class="cm">/<em> Not testing behavior; we're happy if this compiles. </em>/</span>
+<span class="kd">public</span> <span class="kd">class</span> <span class="nc">UseThriftTest</span> <span class="o">{</span>
+  <span class="nd">@Test</span>
+  <span class="kd">public</span> <span class="kt">void</span> <span class="nf">makeItRain</span><span class="o">()</span> <span class="o">{</span>
+    <span class="n">Distance</span> <span class="n">notMuch</span> <span class="o">=</span> <span class="k">new</span> <span class="n">Distance</span><span class="o">().</span><span class="na">setNumber</span><span class="o">(</span><span class="mi">8</span><span class="o">).</span><span class="na">setUnit</span><span class="o">(</span><span class="s">"mm"</span><span class="o">);</span>
+    <span class="n">Precipitation</span> <span class="n">sprinkle</span> <span class="o">=</span> <span class="k">new</span> <span class="n">Precipitation</span><span class="o">().</span><span class="na">setDistance</span><span class="o">(</span><span class="n">notMuch</span><span class="o">);</span>
+  <span class="o">}</span>
+<span class="o">}</span>
+</pre></div></div>
+</p>
+<p>As usual, for code in one target to use code from another, one target
+needs to depend on the other. Thus, our Java code's target has the
+<code>*_thrift_library</code> target whose code it uses in its dependencies:</p>
+<p>
+<div class="md-included-snippet"><div class="codehilite"><pre><span></span><span class="n">junit_tests</span><span class="p">(</span>
+  <span class="n">sources</span><span class="o">=</span><span class="p">[</span><span class="s1">'UseThriftTest.java'</span><span class="p">,],</span>
+  <span class="n">dependencies</span><span class="o">=</span><span class="p">[</span>
+    <span class="s1">'3rdparty:junit'</span><span class="p">,</span>
+    <span class="s1">'3rdparty:thrift'</span><span class="p">,</span>
+    <span class="s1">'examples/src/thrift/org/pantsbuild/example/distance:distance-java'</span><span class="p">,</span>
+    <span class="s1">'examples/src/thrift/org/pantsbuild/example/precipitation:precipitation-java'</span><span class="p">,</span>
+  <span class="p">],</span>
+<span class="p">)</span>
+</pre></div></div>
+</p>
+<h2 id="publishing">Publishing</h2>
+<p>Publishing a <em>lang</em>_thrift_library is like
+<a href="publish.html">publishing a "regular" library</a>
+The targets use <code>provides</code>
+parameters. It might look something like:</p>
+<div class="codehilite"><pre><span></span><span class="n">java_thrift_library</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'eureka-java'</span><span class="p">,</span>
+  <span class="n">sources</span><span class="o">=</span><span class="p">[</span><span class="s1">'eureka.thrift'</span><span class="p">],</span>
+  <span class="n">dependencies</span><span class="o">=</span><span class="p">[</span>
+    <span class="s1">'src/thrift/org/archimedes/volume:volume-java'</span><span class="p">,</span>
+  <span class="p">],</span>
+  <span class="n">language</span><span class="o">=</span><span class="s1">'java'</span><span class="p">,</span>
+  <span class="n">provides</span><span class="o">=</span><span class="n">artifact</span><span class="p">(</span>
+    <span class="n">org</span><span class="o">=</span><span class="s1">'org.archimedes'</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s1">'eureka-java'</span><span class="p">,</span>
+    <span class="n">repo</span><span class="o">=</span><span class="s1">'BUILD.archimedes:jar-public'</span><span class="p">,</span>
+<span class="p">))</span>
+
+<span class="n">java_thrift_library</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s1">'eureka-scala'</span><span class="p">,</span>
+  <span class="n">sources</span><span class="o">=</span><span class="p">[</span><span class="s1">'eureka.thrift'</span><span class="p">],</span>
+  <span class="n">dependencies</span><span class="o">=</span><span class="p">[</span>
+    <span class="s1">'src/thrift/org/archimedes/volume:volume-scala'</span><span class="p">,</span>
+  <span class="p">],</span>
+  <span class="n">compiler</span><span class="o">=</span><span class="s1">'scrooge'</span><span class="p">,</span>
+  <span class="n">language</span><span class="o">=</span><span class="s1">'scala'</span><span class="p">,</span>
+  <span class="n">provides</span><span class="o">=</span><span class="n">artifact</span><span class="p">(</span>
+    <span class="n">org</span><span class="o">=</span><span class="s1">'org.archimedes'</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s1">'eureka-scala'</span><span class="p">,</span>
+    <span class="n">repo</span><span class="o">=</span><span class="s1">'BUILD.archimedes:jar-public'</span><span class="p">,</span>
+  <span class="p">))</span>
+</pre></div>
+
+            <!-- main content end -->
+
+            <div class="generated">
+              Generated by <a href="docs.html">publish_docs</a>
+              from dist/markdown/html/examples/src/thrift/org/pantsbuild/example/README.html 2019-05-07T19:16:17.850188
+            </div>
+
+          </div> <!-- mainflow -->
+
+        </div> <!-- content -->
+
+      </div>
+
+      <div class="col-md-1">
+      </div>
+
+    </div> <!-- row -->
+  </div> <!-- container-fluid -->
+
+</div> <!-- page -->
+
+<script src="https://code.jquery.com/jquery-2.2.3.min.js" integrity="sha384-I6F5OKECLVtK/BL+8iSLDEHowSAfUo76ZL9+kGAgTRdiByINKJaqTPH/QVNS1VDb" crossorigin="anonymous"></script>
+<script src="bootstrap-custom.min.js"></script>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-78111411-1', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+</html>

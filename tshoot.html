@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!--
+  Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+  Licensed under the Apache License, Version 2.0 (see LICENSE).
+-->
+
+<head>
+  <meta charset="utf-8"/>
+  <title>Troubleshooting</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="shortcut icon" href="pants-logo.ico">
+  <!-- In case this is a "test publish", tell search engines where real version lives: -->
+  <link rel="canonical" href="http://pantsbuild.org/tshoot.html">
+
+  <link rel="stylesheet" href="bootstrap-custom.min.css">
+  <link rel="stylesheet" href="bootstrap-custom-theme.min.css">
+  <link rel="stylesheet" href="docsite.css">
+</head>
+
+<body>
+
+<div class="header">
+  <nav class="navbar navbar-default navbar-static-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand navbar-brand-img" href="index.html">
+          <img src="pants-logo.ico" alt="[pantsbuild logo]">
+        </a>
+        <a class="navbar-brand" href="index.html">
+          Pants
+        </a>
+      </div>
+      <div id="navbar" class="navbar-collapse collapse">
+        <ul class="nav navbar-nav navbar-right">
+          <li><a href="/">Docs</a></li>
+          <li><a href="community.html">Community</a></li>
+          <li><a href="https://www.github.com/pantsbuild/pants">GitHub</a></li>
+          <li>
+            <form class="navbar-form navbar-left search" role="search" action="https://www.google.com/search">
+              <div class="form-group">
+                <input type="text" name="as_q" class="form-control query" placeholder="Search">
+                <input name="as_sitesearch" value="pantsbuild.org" type="hidden">
+              </div>
+            </form>
+          </li>
+        </ul>
+      </div><!--/.nav-collapse -->
+    </div>
+  </nav>
+</div>
+
+<div class="page">
+
+  <div class="container-fluid">
+    <div class="row">
+
+      <div class="col-md-1">
+      </div>
+
+      <div class="col-md-2">
+        <div class="site-toc">
+          <ul>
+                  <li class="toc-h1 toc-heading">
+                    Getting Started
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="install.html">Installing Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="setup_repo.html">Setting Up Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="first_tutorial.html">Tutorial</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="common_tasks.html">Common Tasks</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="orgs.html">Pants for Organizations</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Pants Basics
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="why_use_pants.html">Why Use Pants?</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="first_concepts.html">Pants Concepts</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="build_files.html">BUILD files</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="target_addresses.html">Target Addresses</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="3rdparty.html">Third-Party Dependencies</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="options.html">Pants Options</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="invoking.html">Invoking Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="reporting_server.html">Reporting Server</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="ide_support.html">IDE Support</a>
+                  </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#JVM-Support" aria-expanded="false" aria-controls="JVM-Support">JVM Support<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="JVM-Support">
+                        <li class="toc-h1 toc-link ">
+                          <a href="jvm_projects.html">JVM Projects with Pants</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="3rdparty_jvm.html">JVM Dependency Management</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="scala.html">Scala Support</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="publish.html">Publishing Artifacts</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="from_maven.html">Pants for Maven Experts</a>
+                        </li>
+                    </ul>
+                </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#Python-Support" aria-expanded="false" aria-controls="Python-Support">Python Support<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="Python-Support">
+                        <li class="toc-h1 toc-link ">
+                          <a href="python_readme.html">Python Projects with Pants</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="3rdparty_py.html">Python 3rdparty Pattern</a>
+                        </li>
+                    </ul>
+                </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="go_readme.html">Go support for Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="node_readme.html">Node.js Support</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Code &amp; Doc Generation
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="thrift_deps.html">Thrift</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="grpcio_gen.html">Python gRPC + protobufs</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="page.html">Markdown</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Getting Help
+                  </li>
+                  <li class="toc-h1 toc-link toc-here">
+                    Troubleshooting
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="community.html">Community</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Reference
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="build_dictionary.html">Pants BUILD Dictionary</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="options_reference.html">Pants Reference</a>
+                  </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#Release-Notes" aria-expanded="false" aria-controls="Release-Notes">Release Notes<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="Release-Notes">
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.16.x.html">1.16.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.15.x.html">1.15.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.14.x.html">1.14.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.13.x.html">1.13.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.12.x.html">1.12.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.11.x.html">1.11.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.10.x.html">1.10.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.9.x.html">1.9.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.8.x.html">1.8.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.7.x.html">1.7.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.6.x.html">1.6.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.5.x.html">1.5.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.4.x.html">1.4.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.3.x.html">1.3.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.2.x.html">1.2.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.1.x.html">1.1.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.0.x.html">1.0.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-master.html">Master Pre-Releases</a>
+                        </li>
+                    </ul>
+                </li>
+                  <li class="toc-h1 toc-heading">
+                    Developer
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="dev.html">Pants Developer Center</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="export.html">Export Format</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="architecture.html">Architecture</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Blogs
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="coursier_migration.html">Twitter&#x27;s Coursier Migration</a>
+                  </li>
+          </ul>
+        </div> <!-- site-toc -->
+      </div>
+
+      <div class="col-md-8">
+        <div class="content">
+
+          <div class="mainflow">
+              <nav class="pagetoc">
+                <ul>
+                    <li class="toc-h1"><a href="#reporting-server">Reporting Server</a></li>
+                    <li class="toc-h1"><a href="#maximum-verbosity">Maximum Verbosity</a></li>
+                    <li class="toc-h1"><a href="#cleaning">Cleaning</a></li>
+                    <li class="toc-h1"><a href="#stopping-nailguns">Stopping Nailguns</a></li>
+                    <li class="toc-h1"><a href="#nailgun-errors">Nailgun Errors</a></li>
+                    <li class="toc-h1"><a href="#ivy-failures">Ivy Failures</a></li>
+                    <li class="toc-h1"><a href="#ivy-resolution">Ivy Resolution</a></li>
+                    <li class="toc-h1"><a href="#ivy-http-debugging">Ivy HTTP Debugging</a></li>
+                    <li class="toc-h1"><a href="#getting-a-stack-trace-from-a-running-pants-process">Getting a stack trace from a running pants process</a></li>
+                    <li class="toc-h1"><a href="#questions-issues-bug-reports">Questions, Issues, Bug Reports</a></li>
+                </ul>
+              </nav>
+
+            <!-- main content start -->
+            <!-- generated by pants! -->
+<style>
+.codehilite .hll { background-color: #ffffcc }
+.codehilite  { background: #f0f0f0; }
+.codehilite .c { color: #60a0b0; font-style: italic } /* Comment */
+.codehilite .err { border: 1px solid #FF0000 } /* Error */
+.codehilite .k { color: #007020; font-weight: bold } /* Keyword */
+.codehilite .o { color: #666666 } /* Operator */
+.codehilite .ch { color: #60a0b0; font-style: italic } /* Comment.Hashbang */
+.codehilite .cm { color: #60a0b0; font-style: italic } /* Comment.Multiline */
+.codehilite .cp { color: #007020 } /* Comment.Preproc */
+.codehilite .cpf { color: #60a0b0; font-style: italic } /* Comment.PreprocFile */
+.codehilite .c1 { color: #60a0b0; font-style: italic } /* Comment.Single */
+.codehilite .cs { color: #60a0b0; background-color: #fff0f0 } /* Comment.Special */
+.codehilite .gd { color: #A00000 } /* Generic.Deleted */
+.codehilite .ge { font-style: italic } /* Generic.Emph */
+.codehilite .gr { color: #FF0000 } /* Generic.Error */
+.codehilite .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.codehilite .gi { color: #00A000 } /* Generic.Inserted */
+.codehilite .go { color: #888888 } /* Generic.Output */
+.codehilite .gp { color: #c65d09; font-weight: bold } /* Generic.Prompt */
+.codehilite .gs { font-weight: bold } /* Generic.Strong */
+.codehilite .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.codehilite .gt { color: #0044DD } /* Generic.Traceback */
+.codehilite .kc { color: #007020; font-weight: bold } /* Keyword.Constant */
+.codehilite .kd { color: #007020; font-weight: bold } /* Keyword.Declaration */
+.codehilite .kn { color: #007020; font-weight: bold } /* Keyword.Namespace */
+.codehilite .kp { color: #007020 } /* Keyword.Pseudo */
+.codehilite .kr { color: #007020; font-weight: bold } /* Keyword.Reserved */
+.codehilite .kt { color: #902000 } /* Keyword.Type */
+.codehilite .m { color: #40a070 } /* Literal.Number */
+.codehilite .s { color: #4070a0 } /* Literal.String */
+.codehilite .na { color: #4070a0 } /* Name.Attribute */
+.codehilite .nb { color: #007020 } /* Name.Builtin */
+.codehilite .nc { color: #0e84b5; font-weight: bold } /* Name.Class */
+.codehilite .no { color: #60add5 } /* Name.Constant */
+.codehilite .nd { color: #555555; font-weight: bold } /* Name.Decorator */
+.codehilite .ni { color: #d55537; font-weight: bold } /* Name.Entity */
+.codehilite .ne { color: #007020 } /* Name.Exception */
+.codehilite .nf { color: #06287e } /* Name.Function */
+.codehilite .nl { color: #002070; font-weight: bold } /* Name.Label */
+.codehilite .nn { color: #0e84b5; font-weight: bold } /* Name.Namespace */
+.codehilite .nt { color: #062873; font-weight: bold } /* Name.Tag */
+.codehilite .nv { color: #bb60d5 } /* Name.Variable */
+.codehilite .ow { color: #007020; font-weight: bold } /* Operator.Word */
+.codehilite .w { color: #bbbbbb } /* Text.Whitespace */
+.codehilite .mb { color: #40a070 } /* Literal.Number.Bin */
+.codehilite .mf { color: #40a070 } /* Literal.Number.Float */
+.codehilite .mh { color: #40a070 } /* Literal.Number.Hex */
+.codehilite .mi { color: #40a070 } /* Literal.Number.Integer */
+.codehilite .mo { color: #40a070 } /* Literal.Number.Oct */
+.codehilite .sa { color: #4070a0 } /* Literal.String.Affix */
+.codehilite .sb { color: #4070a0 } /* Literal.String.Backtick */
+.codehilite .sc { color: #4070a0 } /* Literal.String.Char */
+.codehilite .dl { color: #4070a0 } /* Literal.String.Delimiter */
+.codehilite .sd { color: #4070a0; font-style: italic } /* Literal.String.Doc */
+.codehilite .s2 { color: #4070a0 } /* Literal.String.Double */
+.codehilite .se { color: #4070a0; font-weight: bold } /* Literal.String.Escape */
+.codehilite .sh { color: #4070a0 } /* Literal.String.Heredoc */
+.codehilite .si { color: #70a0d0; font-style: italic } /* Literal.String.Interpol */
+.codehilite .sx { color: #c65d09 } /* Literal.String.Other */
+.codehilite .sr { color: #235388 } /* Literal.String.Regex */
+.codehilite .s1 { color: #4070a0 } /* Literal.String.Single */
+.codehilite .ss { color: #517918 } /* Literal.String.Symbol */
+.codehilite .bp { color: #007020 } /* Name.Builtin.Pseudo */
+.codehilite .fm { color: #06287e } /* Name.Function.Magic */
+.codehilite .vc { color: #bb60d5 } /* Name.Variable.Class */
+.codehilite .vg { color: #bb60d5 } /* Name.Variable.Global */
+.codehilite .vi { color: #bb60d5 } /* Name.Variable.Instance */
+.codehilite .vm { color: #bb60d5 } /* Name.Variable.Magic */
+.codehilite .il { color: #40a070 } /* Literal.Number.Integer.Long */
+</style>
+<h1 id="troubleshooting">Troubleshooting</h1>
+<h2 id="reporting-server">Reporting Server</h2>
+<p>You can get a huge amount of useful debugging information from the detailed HTML
+build reports. See  for information on how to view these reports.</p>
+<h2 id="maximum-verbosity">Maximum Verbosity</h2>
+<p>To output verbose debugging information to stdout set the log level to <code>debug</code>:</p>
+<div class="codehilite"><pre><span></span>$ ./pants -ldebug ...
+</pre></div>
+<p><a id="washpants" pantsmark="washpants"> </a></p>
+<h2 id="cleaning">Cleaning</h2>
+<p>If you suspect that your build products are in a bad state you can remove
+them with <code>./pants clean-all</code>.</p>
+<h2 id="stopping-nailguns">Stopping Nailguns</h2>
+<p>Pants runs JVM processes in persistent daemons called "nailguns".  If you think they may
+be holding bad state, you can kill them with <code>./pants ng-killall</code>.  They will
+restart on the next build.</p>
+<h2 id="nailgun-errors">Nailgun Errors</h2>
+<p>If nailguns stop resonding, look for clues in the <code>stdout</code> and <code>stderr</code> files in
+<code>.pants.d/ng/*/*</code>.</p>
+<h2 id="ivy-failures">Ivy Failures</h2>
+<p>You can see an Ivy invocation's detailed outputs in the <a href="reporting_server.html">HTML report</a>.</p>
+<p>You can get more verbose information from Ivy with the <code>--resolve-ivy-args=-debug</code> option.</p>
+<p>This setting does not affect the output of the Ivy tasks used for bootstrapping tools.</p>
+<h2 id="ivy-resolution">Ivy Resolution</h2>
+<p>You can view Ivy's report of how it resolved each (transitive) third-party dependency:</p>
+<div class="codehilite"><pre><span></span>$ ./pants resolve.ivy --open examples/tests/java/org/pantsbuild/example/hello/greet
+</pre></div>
+<h2 id="ivy-http-debugging">Ivy HTTP Debugging</h2>
+<p>This is a bit more involved, but gives you deeper inspection into the
+network traffic between Ivy and the repo.</p>
+<p>First, you need to add commons-httpclient to the bootstrapped Ivy
+installation by creating a custom ivy.xml.  You can
+start with the org.apache.ivy xml file under the ivy cache and just
+add a dependency for commons-httpclient as follows:</p>
+<div class="codehilite"><pre><span></span>$ cat ./ivy-with-commons-httpclient.xml
+<span class="nt">&lt;ivy-module</span> <span class="na">version=</span><span class="s">"2.0"</span><span class="nt">&gt;</span>
+        <span class="nt">&lt;info</span> <span class="na">organisation=</span><span class="s">"org.apache.ivy"</span> <span class="na">module=</span><span class="s">"ivy-caller"</span> <span class="nt">/&gt;</span>
+        <span class="nt">&lt;configurations</span> <span class="na">defaultconf=</span><span class="s">"default"</span> <span class="nt">/&gt;</span>
+        <span class="nt">&lt;dependencies&gt;</span>
+                <span class="nt">&lt;dependency</span> <span class="na">org=</span><span class="s">"org.apache.ivy"</span> <span class="na">name=</span><span class="s">"ivy"</span> <span class="na">rev=</span><span class="s">"2.3.0"</span> <span class="nt">/&gt;</span>
+                <span class="nt">&lt;dependency</span> <span class="na">org=</span><span class="s">"commons-httpclient"</span> <span class="na">name=</span><span class="s">"commons-httpclient"</span> <span class="na">rev=</span><span class="s">"3.0"</span> <span class="nt">/&gt;</span>
+        <span class="nt">&lt;/dependencies&gt;</span>
+<span class="nt">&lt;/ivy-module&gt;</span>
+</pre></div>
+<p>Then, reference your modified ivy profile from pants.ini and flip on
+some extra logging in the commons-httpclient by setting some system properties:</p>
+<div class="codehilite"><pre><span></span><span class="k">[ivy]</span>
+<span class="na">ivy_profile: ivy-with-commons-httpclient.xml</span>
+
+<span class="c1"># Enable httpcommons debugging when bootstrapping tools</span>
+<span class="k">[bootstrap.bootstrap-jvm-tools]</span>
+<span class="na">jvm_options: [</span>
+    <span class="na">"-Dorg.apache.commons.logging.Log</span><span class="o">=</span><span class="s">org.apache.commons.logging.impl.SimpleLog",</span>
+<span class="s">    "-Dorg.apache.commons.logging.simplelog.showdatetime=true",</span>
+<span class="s">    "-Dorg.apache.commons.logging.simplelog.log.httpclient.wire.header=debug",</span>
+<span class="s">    "-Dorg.apache.commons.logging.simplelog.log.org.apache.commons.httpclient=debug",</span>
+<span class="s">  ]</span>
+
+<span class="c1"># Enable httpcommons debugging when resolving 3rdparty libraries</span>
+<span class="k">[resolve.ivy]</span>
+<span class="na">jvm_options: [</span>
+    <span class="na">"-Dorg.apache.commons.logging.Log</span><span class="o">=</span><span class="s">org.apache.commons.logging.impl.SimpleLog",</span>
+<span class="s">    "-Dorg.apache.commons.logging.simplelog.showdatetime=true",</span>
+<span class="s">    "-Dorg.apache.commons.logging.simplelog.log.httpclient.wire.header=debug",</span>
+<span class="s">    "-Dorg.apache.commons.logging.simplelog.log.org.apache.commons.httpclient=debug",</span>
+<span class="s">    ]</span>
+</pre></div>
+<p>You'll be able to see the output in the pants reporting server output
+by expanding the <code>stderr</code> nodes.</p>
+<div class="codehilite"><pre><span></span>2015/03/12 03:55:56:456 PDT [DEBUG] HttpConnection - -Open connection to repo1.maven.org:443
+2015/03/12 03:55:57:144 PDT [DEBUG] header - -&gt;&gt; "HEAD /maven2/org/antlr/antlr4/4.1/antlr4-4.1.pom HTTP/1.1[\r][\n]"
+2015/03/12 03:55:57:144 PDT [DEBUG] HttpMethodBase - -Adding Host request header
+2015/03/12 03:55:57:149 PDT [DEBUG] header - -&gt;&gt; "User-Agent: Apache Ivy/2.3.0[\r][\n]"
+2015/03/12 03:55:57:150 PDT [DEBUG] header - -&gt;&gt; "Host: repo1.maven.org[\r][\n]"
+2015/03/12 03:55:57:150 PDT [DEBUG] header - -&gt;&gt; "[\r][\n]"
+2015/03/12 03:55:57:448 PDT [DEBUG] header - -&lt;&lt; "HTTP/1.1 200 OK[\r][\n]"
+2015/03/12 03:55:57:450 PDT [DEBUG] header - -&lt;&lt; "Date: Thu, 12 Mar 2015 10:55:57 GMT[\r][\n]"
+2015/03/12 03:55:57:450 PDT [DEBUG] header - -&lt;&lt; "Server: nginx[\r][\n]"
+2015/03/12 03:55:57:450 PDT [DEBUG] header - -&lt;&lt; "Content-Type: text/xml[\r][\n]"
+2015/03/12 03:55:57:450 PDT [DEBUG] header - -&lt;&lt; "Content-Length: 4800[\r][\n]"
+2015/03/12 03:55:57:450 PDT [DEBUG] header - -&lt;&lt; "Last-Modified: Fri, 05 Jul 2013 21:35:45 GMT[\r][\n]"
+2015/03/12 03:55:57:450 PDT [DEBUG] header - -&lt;&lt; "ETag: "51d73c31-12c0"[\r][\n]"
+2015/03/12 03:55:57:450 PDT [DEBUG] header - -&lt;&lt; "Accept-Ranges: bytes[\r][\n]"
+2015/03/12 03:55:57:450 PDT [DEBUG] header - -&lt;&lt; "Accept-Ranges: bytes[\r][\n]"
+2015/03/12 03:55:57:450 PDT [DEBUG] header - -&lt;&lt; "Via: 1.1 varnish[\r][\n]"
+2015/03/12 03:55:57:451 PDT [DEBUG] header - -&lt;&lt; "Accept-Ranges: bytes[\r][\n]"
+2015/03/12 03:55:57:451 PDT [DEBUG] header - -&lt;&lt; "Via: 1.1 varnish[\r][\n]"
+2015/03/12 03:55:57:451 PDT [DEBUG] header - -&lt;&lt; "X-Served-By: cache-iad2127-IAD, cache-atl6233-ATL[\r][\n]"
+2015/03/12 03:55:57:451 PDT [DEBUG] header - -&lt;&lt; "X-Cache: MISS, MISS[\r][\n]"
+2015/03/12 03:55:57:451 PDT [DEBUG] header - -&lt;&lt; "X-Cache-Hits: 0, 0[\r][\n]"
+2015/03/12 03:55:57:451 PDT [DEBUG] header - -&lt;&lt; "X-Timer: S1426157757.333469,VS0,VE36[\r][\n]"
+</pre></div>
+<h2 id="getting-a-stack-trace-from-a-running-pants-process">Getting a stack trace from a running pants process</h2>
+<p>Pants implements <code>faulthandler</code> support in all execution contexts. To get a stack trace from a running pants process, send a <code>SIGUSR2</code> signal like so:</p>
+<div class="codehilite"><pre><span></span>$ kill -31 &lt;pid&gt;
+</pre></div>
+<p>For traditional pants runs, this will dump a stack trace (for all threads) to stderr. For pantsd-based runs and for pantsd itself, the traces will end up in the <code>.pantsd/pantsd/pantsd.log</code> file.</p>
+<h2 id="questions-issues-bug-reports">Questions, Issues, Bug Reports</h2>
+<p>See <a href="howto_ask.html">How to Ask</a></p>
+
+            <!-- main content end -->
+
+            <div class="generated">
+              Generated by <a href="docs.html">publish_docs</a>
+              from dist/markdown/html/src/docs/tshoot.html 2019-05-07T19:16:17.874235
+            </div>
+
+          </div> <!-- mainflow -->
+
+        </div> <!-- content -->
+
+      </div>
+
+      <div class="col-md-1">
+      </div>
+
+    </div> <!-- row -->
+  </div> <!-- container-fluid -->
+
+</div> <!-- page -->
+
+<script src="https://code.jquery.com/jquery-2.2.3.min.js" integrity="sha384-I6F5OKECLVtK/BL+8iSLDEHowSAfUo76ZL9+kGAgTRdiByINKJaqTPH/QVNS1VDb" crossorigin="anonymous"></script>
+<script src="bootstrap-custom.min.js"></script>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-78111411-1', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+</html>

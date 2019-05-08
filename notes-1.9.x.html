@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!--
+  Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+  Licensed under the Apache License, Version 2.0 (see LICENSE).
+-->
+
+<head>
+  <meta charset="utf-8"/>
+  <title>1.9.x Stable Releases</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="shortcut icon" href="pants-logo.ico">
+  <!-- In case this is a "test publish", tell search engines where real version lives: -->
+  <link rel="canonical" href="http://pantsbuild.org/notes-1.9.x.html">
+
+  <link rel="stylesheet" href="bootstrap-custom.min.css">
+  <link rel="stylesheet" href="bootstrap-custom-theme.min.css">
+  <link rel="stylesheet" href="docsite.css">
+</head>
+
+<body>
+
+<div class="header">
+  <nav class="navbar navbar-default navbar-static-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand navbar-brand-img" href="index.html">
+          <img src="pants-logo.ico" alt="[pantsbuild logo]">
+        </a>
+        <a class="navbar-brand" href="index.html">
+          Pants
+        </a>
+      </div>
+      <div id="navbar" class="navbar-collapse collapse">
+        <ul class="nav navbar-nav navbar-right">
+          <li><a href="/">Docs</a></li>
+          <li><a href="community.html">Community</a></li>
+          <li><a href="https://www.github.com/pantsbuild/pants">GitHub</a></li>
+          <li>
+            <form class="navbar-form navbar-left search" role="search" action="https://www.google.com/search">
+              <div class="form-group">
+                <input type="text" name="as_q" class="form-control query" placeholder="Search">
+                <input name="as_sitesearch" value="pantsbuild.org" type="hidden">
+              </div>
+            </form>
+          </li>
+        </ul>
+      </div><!--/.nav-collapse -->
+    </div>
+  </nav>
+</div>
+
+<div class="page">
+
+  <div class="container-fluid">
+    <div class="row">
+
+      <div class="col-md-1">
+      </div>
+
+      <div class="col-md-2">
+        <div class="site-toc">
+          <ul>
+                  <li class="toc-h1 toc-heading">
+                    Getting Started
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="install.html">Installing Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="setup_repo.html">Setting Up Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="first_tutorial.html">Tutorial</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="common_tasks.html">Common Tasks</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="orgs.html">Pants for Organizations</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Pants Basics
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="why_use_pants.html">Why Use Pants?</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="first_concepts.html">Pants Concepts</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="build_files.html">BUILD files</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="target_addresses.html">Target Addresses</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="3rdparty.html">Third-Party Dependencies</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="options.html">Pants Options</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="invoking.html">Invoking Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="reporting_server.html">Reporting Server</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="ide_support.html">IDE Support</a>
+                  </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#JVM-Support" aria-expanded="false" aria-controls="JVM-Support">JVM Support<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="JVM-Support">
+                        <li class="toc-h1 toc-link ">
+                          <a href="jvm_projects.html">JVM Projects with Pants</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="3rdparty_jvm.html">JVM Dependency Management</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="scala.html">Scala Support</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="publish.html">Publishing Artifacts</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="from_maven.html">Pants for Maven Experts</a>
+                        </li>
+                    </ul>
+                </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#Python-Support" aria-expanded="false" aria-controls="Python-Support">Python Support<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="Python-Support">
+                        <li class="toc-h1 toc-link ">
+                          <a href="python_readme.html">Python Projects with Pants</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="3rdparty_py.html">Python 3rdparty Pattern</a>
+                        </li>
+                    </ul>
+                </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="go_readme.html">Go support for Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="node_readme.html">Node.js Support</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Code &amp; Doc Generation
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="thrift_deps.html">Thrift</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="grpcio_gen.html">Python gRPC + protobufs</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="page.html">Markdown</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Getting Help
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="tshoot.html">Troubleshooting</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="community.html">Community</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Reference
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="build_dictionary.html">Pants BUILD Dictionary</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="options_reference.html">Pants Reference</a>
+                  </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#Release-Notes" aria-expanded="false" aria-controls="Release-Notes">Release Notes<span class="caret"></span></a>
+                    <ul class="" id="Release-Notes">
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.16.x.html">1.16.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.15.x.html">1.15.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.14.x.html">1.14.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.13.x.html">1.13.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.12.x.html">1.12.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.11.x.html">1.11.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.10.x.html">1.10.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link toc-here">
+                          1.9.x Stable Releases
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.8.x.html">1.8.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.7.x.html">1.7.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.6.x.html">1.6.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.5.x.html">1.5.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.4.x.html">1.4.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.3.x.html">1.3.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.2.x.html">1.2.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.1.x.html">1.1.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.0.x.html">1.0.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-master.html">Master Pre-Releases</a>
+                        </li>
+                    </ul>
+                </li>
+                  <li class="toc-h1 toc-heading">
+                    Developer
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="dev.html">Pants Developer Center</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="export.html">Export Format</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="architecture.html">Architecture</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Blogs
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="coursier_migration.html">Twitter&#x27;s Coursier Migration</a>
+                  </li>
+          </ul>
+        </div> <!-- site-toc -->
+      </div>
+
+      <div class="col-md-8">
+        <div class="content">
+
+          <div class="mainflow">
+              <nav class="pagetoc">
+                <ul>
+                    <li class="toc-h1"><a href="#heading__101">1.9.0 (09/17/2018)</a></li>
+                    <li class="toc-h1"><a href="#heading_rc_102">1.9.0rc3 (09/10/2018)</a></li>
+                    <li class="toc-h2"><a href="#heading_bugfixes_103">Bugfixes</a></li>
+                    <li class="toc-h1"><a href="#heading_rc_104">1.9.0rc2 (08/30/2018)</a></li>
+                    <li class="toc-h2"><a href="#heading_newfeatures_105">New features</a></li>
+                    <li class="toc-h2"><a href="#heading_bugfixes_106">Bugfixes</a></li>
+                    <li class="toc-h2"><a href="#heading_refactoringimproveme_107">Refactoring, Improvements, and Tooling</a></li>
+                    <li class="toc-h1"><a href="#heading_rc_108">1.9.0rc1 (07/20/2018)</a></li>
+                    <li class="toc-h1"><a href="#heading_rc_109">1.9.0rc0 (07/19/2018)</a></li>
+                    <li class="toc-h2"><a href="#heading_newfeatures_110">New features</a></li>
+                    <li class="toc-h2"><a href="#heading_bugfixes_111">Bugfixes</a></li>
+                    <li class="toc-h2"><a href="#heading_refactoringimproveme_112">Refactoring, Improvements, and Tooling</a></li>
+                    <li class="toc-h2"><a href="#heading_documentationupdates_113">Documentation Updates</a></li>
+                    <li class="toc-h2"><a href="#heading_pythonporting_114">Python 3 porting (#6062)</a></li>
+                    <li class="toc-h1"><a href="#heading_dev_115">1.9.0.dev1 (07/14/2018)</a></li>
+                    <li class="toc-h2"><a href="#heading_newfeatures_116">New features</a></li>
+                    <li class="toc-h2"><a href="#heading_apichanges_117">API Changes</a></li>
+                    <li class="toc-h2"><a href="#heading_bugfixes_118">Bugfixes</a></li>
+                    <li class="toc-h2"><a href="#heading_refactoringimproveme_119">Refactoring, Improvements, and Tooling</a></li>
+                    <li class="toc-h1"><a href="#heading_dev_120">1.9.0.dev0 (06/25/2018)</a></li>
+                    <li class="toc-h2"><a href="#heading_newfeatures_121">New features</a></li>
+                    <li class="toc-h2"><a href="#heading_apichanges_122">API Changes</a></li>
+                    <li class="toc-h2"><a href="#heading_bugfixes_123">Bugfixes</a></li>
+                    <li class="toc-h2"><a href="#heading_refactoringimproveme_124">Refactoring, Improvements, and Tooling</a></li>
+                    <li class="toc-h2"><a href="#heading_documentationupdates_125">Documentation Updates</a></li>
+                </ul>
+              </nav>
+
+            <!-- main content start -->
+            <!-- generated by pants! -->
+<title>1.9.x Stable Releases</title>
+<p style="font: 200% bold">1.9.x Stable Releases</p>
+<p>This document describes releases leading up to the <tt class="docutils literal">1.9.x</tt> <tt class="docutils literal">stable</tt> series.</p>
+<div class="section" id="id1">
+<h1 id="heading__101">1.9.0 (09/17/2018)</h1>
+<p>The first stable release of the 1.9.x series, with no changes since <cite>rc3</cite>.</p>
+</div>
+<div class="section" id="rc3-09-10-2018">
+<h1 id="heading_rc_102">1.9.0rc3 (09/10/2018)</h1>
+<div class="section" id="bugfixes">
+<h2 id="heading_bugfixes_103">Bugfixes</h2>
+<ul class="simple">
+<li>Cherry-pick setup_py fixes (#6472)
+<a class="reference external" href="https://github.com/travis-ci/travis-ci/issues/8315">Issue #8315</a>
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6472">PR #6472</a></li>
+<li>Work around production <cite>coverage</cite> float. (#6452)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6452">PR #6452</a></li>
+<li>Cancel running work when entering the fork context (#6464)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6464">PR #6464</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="rc2-08-30-2018">
+<h1 id="heading_rc_104">1.9.0rc2 (08/30/2018)</h1>
+<div class="section" id="new-features">
+<h2 id="heading_newfeatures_105">New features</h2>
+<ul class="simple">
+<li>Add --output-dir flag to ScalaFmt task (#6134)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6134">PR #6134</a></li>
+</ul>
+</div>
+<div class="section" id="id2">
+<h2 id="heading_bugfixes_106">Bugfixes</h2>
+<ul class="simple">
+<li>Fix --binaries-path-by-id fingerprinting error (#6413)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6413">PR #6413</a></li>
+<li>added fullpath to fix path concat issue with files when not in git root (#6331)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6331">PR #6331</a></li>
+<li>Link requirements targets to their source. (#6405)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6405">PR #6405</a></li>
+<li>Move fork context management to rust (#5521)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/5521">PR #5521</a></li>
+<li>Bound pytest below 3.7 to avoid a ZipImportError (#6285)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6285">PR #6285</a></li>
+<li>Fix pydist native sources selection (#6205)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6205">PR #6205</a></li>
+<li>Fix spurious deprecation warning for fatal_warnings (#6237)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6237">PR #6237</a></li>
+</ul>
+</div>
+<div class="section" id="refactoring-improvements-and-tooling">
+<h2 id="heading_refactoringimproveme_107">Refactoring, Improvements, and Tooling</h2>
+<ul class="simple">
+<li>Add basic native task unit tests. (#6179)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6179">PR #6179</a></li>
+<li>Associate cli arguments with executables and refactor llvm/gcc c/c++ toolchain selection (#6217)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6217">PR #6217</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="rc1-07-20-2018">
+<h1 id="heading_rc_108">1.9.0rc1 (07/20/2018)</h1>
+<ul class="simple">
+<li>1.9.0rc0 failed due to a pypi error (#6192)
+<a class="reference external" href="https://github.com/pantsbuild/pants/issues/6192">Issue 6192</a></li>
+</ul>
+</div>
+<div class="section" id="rc0-07-19-2018">
+<h1 id="heading_rc_109">1.9.0rc0 (07/19/2018)</h1>
+<div class="section" id="id3">
+<h2 id="heading_newfeatures_110">New features</h2>
+<ul class="simple">
+<li>Conan (third party) support for ctypes native libraries (#5998)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/5998">PR #5998</a>
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/5815">PR #5815</a></li>
+<li>Early support for @console_rule. (#6088)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6088">PR #6088</a></li>
+</ul>
+</div>
+<div class="section" id="id4">
+<h2 id="heading_bugfixes_111">Bugfixes</h2>
+<ul class="simple">
+<li>Fix incorrect use of bytes() when invoking the daemon in a tty (#6181)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6181">PR #6181</a></li>
+<li>rustfmt check more reliably works (#6172)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6172">PR #6172</a></li>
+<li>Fix isort issues (#6174)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6174">PR #6174</a></li>
+<li>add the target fingerprint to the version of each local dist so that we don't use the first cached one (#6022)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6022">PR #6022</a></li>
+<li>Eliminate obsolete PANTS_ARGS from ci. (#6141)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6141">PR #6141</a></li>
+<li>Preserve output directories if process execution failed (#6152)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6152">PR #6152</a></li>
+</ul>
+</div>
+<div class="section" id="id5">
+<h2 id="heading_refactoringimproveme_112">Refactoring, Improvements, and Tooling</h2>
+<ul class="simple">
+<li>Upgrade to isort 4.3.4. (#6166)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6166">PR #6166</a></li>
+<li>fs_util can list the recursive files in a Directory (#6153)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6153">PR #6153</a></li>
+<li>Support output directory saving in remote execution (#6167)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6167">PR #6167</a></li>
+<li>Move each EntryState in the graph under its own Mutex (#6095)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6095">PR #6095</a></li>
+</ul>
+</div>
+<div class="section" id="documentation-updates">
+<h2 id="heading_documentationupdates_113">Documentation Updates</h2>
+<ul class="simple">
+<li>Impose a consistent sort on CONTRIBUTORS.md. (#6125)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6125">PR #6125</a></li>
+</ul>
+</div>
+<div class="section" id="python-3-porting-6062">
+<h2 id="heading_pythonporting_114">Python 3 porting (#6062)</h2>
+<ul class="simple">
+<li>Port engine to Python 3 (#6133)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6133">PR #6133</a></li>
+<li>Port go to py3 (#6139)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6139">PR #6139</a></li>
+<li>Port init package to Python 3 (#6145)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6145">PR #6145</a></li>
+<li>Port help package to Python 3 (#6144)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6144">PR #6144</a></li>
+<li>Port invalidation to Python 3 (#6147)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6147">PR #6147</a></li>
+<li>port cpp to py3 (#6116)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6116">PR #6116</a></li>
+<li>Port ivy to Python 3 (#6154)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6154">PR #6154</a></li>
+<li>Port java to Python 3 (#6159)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6159">PR #6159</a></li>
+<li>Port contrib/scalajs to py3 (#6164)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6164">PR #6164</a></li>
+<li>port scrooge to py3 (#6165)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6165">PR #6165</a></li>
+<li>Add missing future dependency to BUILD (#6135)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6135">PR #6135</a></li>
+<li>Port binaries package to Python 3 (#6127)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6127">PR #6127</a></li>
+<li>Port option package to python3 (#6117)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6117">PR #6117</a></li>
+<li>Port to mypy to py3 (#6140)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6140">PR #6140</a></li>
+<li>Port goal package to Python 3 (#6138)
+<a class="reference external" href="https://github.com/pantsbuild/pants/issues/6062">Issue #6062</a>
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6138">PR #6138</a></li>
+<li>Port findbugs to py3 (#6137)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6137">PR #6137</a></li>
+<li>Port backend project info to Python 3 (#6132)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6132">PR #6132</a></li>
+<li>Port backend graph info to Python 3 (#6131)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6131">PR #6131</a></li>
+<li>Port core tasks to Python 3 (#6130)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6130">PR #6130</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="dev1-07-14-2018">
+<h1 id="heading_dev_115">1.9.0.dev1 (07/14/2018)</h1>
+<div class="section" id="id6">
+<h2 id="heading_newfeatures_116">New features</h2>
+<ul class="simple">
+<li>Add support for reusing Graph node values if their inputs haven't changed (#6059)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6059">PR #6059</a></li>
+<li>Compile a VERY simple java source remotely (no dependencies or inner classes) (#5999)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/5999">PR #5999</a></li>
+<li>Expose materialize_directory as an intrinsic function on the scheduler (#6028)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6028">PR #6028</a></li>
+<li>Targets always have a Snapshot (#5994)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/5994">PR #5994</a></li>
+<li>Add an execution strategy flag (#5981)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/5981">PR #5981</a></li>
+<li>Enable passing option sets to the compiler and deprecate fatal_warnings (#6065)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6065">PR #6065</a></li>
+</ul>
+</div>
+<div class="section" id="api-changes">
+<h2 id="heading_apichanges_117">API Changes</h2>
+<ul class="simple">
+<li>Upgrade to v2 of bazel protobuf (#6027)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6027">PR #6027</a></li>
+<li>Add PrimitivesSetField and deprecate SetOfPrimitivesField (#6087)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6087">PR #6087</a></li>
+<li>Update to rust 1.27, implicitly requiring OSX 10.11 (#6035)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6035">PR #6035</a></li>
+</ul>
+</div>
+<div class="section" id="id7">
+<h2 id="heading_bugfixes_118">Bugfixes</h2>
+<ul class="simple">
+<li>Fix local execution of hermetic integration tests (#6101)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6101">PR #6101</a></li>
+<li>Use PrimitivesSetField in ScalaJs target and minor help text fixup (#6113)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6113">PR #6113</a></li>
+<li>Fix 'current' platform handling. (#6104)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6104">PR #6104</a></li>
+<li>Make RUST_BACKTRACE sniffing less specific (#6107)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6107">PR #6107</a></li>
+<li>Improve source field deprecations (#6097)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6097">PR #6097</a></li>
+<li>Remove and prevent inaccurate __eq__ implementations on datatype (#6061)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6061">PR #6061</a></li>
+<li>Ensure correct toolchain per clone. (#6054)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6054">PR #6054</a></li>
+<li>Have pantsbuild-ci-bot do deploys. (#6053)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6053">PR #6053</a></li>
+<li>Fix go-import meta tag ends with /&gt; #6036 (#6037)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6037">PR #6037</a></li>
+<li>Fix bad exclusion introduced during rushed change. (#6034)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6034">PR #6034</a></li>
+<li>Fix unicode handling in Exiters (#6032)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6032">PR #6032</a></li>
+<li>[pantsd] Improve environment unicode handling. (#6031)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6031">PR #6031</a></li>
+<li>Actually return execution options (#6019)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6019">PR #6019</a></li>
+<li>Ignore the <cite>logs/</cite> dir. (#6021)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6021">PR #6021</a></li>
+<li>Fix edge removal in Graph that could make invalidation inaccurate (#6123)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6123">PR #6123</a></li>
+</ul>
+</div>
+<div class="section" id="id8">
+<h2 id="heading_refactoringimproveme_119">Refactoring, Improvements, and Tooling</h2>
+<ul class="simple">
+<li>Port errorprone to py3 (#6118)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6118">PR #6118</a></li>
+<li>Port console to Python 3 (#6121)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6121">PR #6121</a></li>
+<li>Port buildgen to py3 (#6110)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6110">PR #6110</a></li>
+<li>Add release metadata to boxfuture (#6106)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6106">PR #6106</a></li>
+<li>Port engine/fs.py datatype() instances (#6103)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6103">PR #6103</a>
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6098">PR #6098</a>
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6092">PR #6092</a></li>
+<li>Port findbugs to py3. (#6120)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6120">PR #6120</a></li>
+<li>Port codeanalysis to py3. (#6111)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6111">PR #6111</a></li>
+<li>Port buildrefactor to py3. (#6109)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6109">PR #6109</a></li>
+<li>Switch from output_async to spawn_async, and buffer output. (#6105)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6105">PR #6105</a></li>
+<li>Allow Rust to store <cite>unicode</cite> as well as <cite>bytes</cite> (#6108)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6108">PR #6108</a>
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6103">PR #6103</a></li>
+<li>Remove unnecessary __future__ imports  (#6096)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6096">PR #6096</a></li>
+<li>Port fs to python 3 compatibility (#6091)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6091">PR #6091</a></li>
+<li>Nodes output cheaply-cloneable values (#6078)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6078">PR #6078</a></li>
+<li>execution_strategy is a memoized_property (#6052)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6052">PR #6052</a></li>
+<li>Port backend/python to Python 3 (#6086)
+<a class="reference external" href="https://github.com/pantsbuild/pants/issues/6062">Issue #6062</a>
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6086">PR #6086</a></li>
+<li>Port backend/native to Python 3 (#6084)
+<a class="reference external" href="https://github.com/pantsbuild/pants/issues/6062">Issue #6062</a>
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6084">PR #6084</a></li>
+<li>Port majority of pants/util to Python 3 (#6073)
+<a class="reference external" href="https://github.com/pantsbuild/pants/issues/6062">Issue #6062</a>
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6073">PR #6073</a></li>
+<li>Port backend/codegen and backend/docgen to Python 3 (#6083)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6083">PR #6083</a></li>
+<li>Port util/process_handler.py and util/tarutil.py to Python 3 (#6082)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6082">PR #6082</a>
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6073">PR #6073</a></li>
+<li>Add <cite>-ltrace</cite> and requests debug logging. (#6070)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6070">PR #6070</a></li>
+<li>Port util metaprogramming files to Python3 (#6072)
+<a class="reference external" href="https://github.com/pantsbuild/pants/issues/6062">Issue #6062</a>
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6072">PR #6072</a></li>
+<li>Add future lib and port src/base to Python3 (#6067)
+<a class="reference external" href="https://github.com/pantsbuild/pants/issues/6062),">Issue #6062),</a>
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6067">PR #6067</a></li>
+<li>Run <cite>futurize --stage1</cite> to make safe changes for python 3 compatibility. (#6063)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6063">PR #6063</a>
+<a class="reference external" href="https://github.com/pantsbuild/pants/issues/6062">Issue #6062</a></li>
+<li>Switch to a per-entry state machine in Graph (#6013)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6013">PR #6013</a></li>
+<li>Log more in rust tests (#6060)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6060">PR #6060</a></li>
+<li>Introduce libc subsystem to find crti.o on linux hosts and unskip the native backend subsystem tests (#5943)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/5943">PR #5943</a></li>
+<li>Clean up process execution python API (#6051)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6051">PR #6051</a></li>
+<li>Skip pyprep and pytest-prep if there are no python targest (#6039)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6039">PR #6039</a></li>
+<li>Simplify rust code (#6043)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6043">PR #6043</a></li>
+<li>[remoting] Move local process execution tempdirs into the workdir, add option to not delete them (#6023)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6023">PR #6023</a></li>
+<li>Many rust lints (#5982)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/5982">PR #5982</a></li>
+<li>Include type name in TypedDataType construction errors (#6015)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6015">PR #6015</a></li>
+<li>Consolidate <cite>src/python/pants/python</cite> -&gt; <cite>src/python/pants/backend/python</cite> (#6025)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6025">PR #6025</a></li>
+<li>Extract and genericize Graph for easier testing (#6010)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6010">PR #6010</a></li>
+<li>Add libc search noop option (#6122)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6122">PR #6122</a></li>
+<li>Fix test_objects handling of dataclass() py2-py3 compatibility (#6098)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6098">PR #6098</a>
+<a class="reference external" href="https://github.com/pantsbuild/pants/issues/6062">Issue #6062</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="dev0-06-25-2018">
+<h1 id="heading_dev_120">1.9.0.dev0 (06/25/2018)</h1>
+<div class="section" id="id19">
+<h2 id="heading_newfeatures_121">New features</h2>
+<ul class="simple">
+<li>Release Pants as a pex. (#6014)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6014">PR #6014</a></li>
+<li>C/C++ targets which can be compiled/linked and used in python_dist() with ctypes (#5815)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/5815">PR #5815</a></li>
+</ul>
+</div>
+<div class="section" id="id21">
+<h2 id="heading_apichanges_122">API Changes</h2>
+<ul class="simple">
+<li>Deprecate sources except EagerFilesetWithSpec (#5993)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/5993">PR #5993</a></li>
+<li>source attribute is automatically promoted to sources (#5908)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/5908">PR #5908</a></li>
+</ul>
+</div>
+<div class="section" id="id22">
+<h2 id="heading_bugfixes_123">Bugfixes</h2>
+<ul class="simple">
+<li>Run scalafix before scalafmt (#6011)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6011">PR #6011</a></li>
+</ul>
+</div>
+<div class="section" id="id23">
+<h2 id="heading_refactoringimproveme_124">Refactoring, Improvements, and Tooling</h2>
+<ul class="simple">
+<li>Add .vscode/ folder to .gitignore (#6020)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6020">PR #6020</a></li>
+<li>[engine] Selecting for ExecuteProcessResult will Throw on non-zero exit (#6000)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/6000">PR #6000</a></li>
+<li>Context always has a scheduler in tests (#5997)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/5997">PR #5997</a></li>
+<li>Engine looks up default sources when parsing (#5989)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/5989">PR #5989</a></li>
+<li>Fix TestSetupPyInterpreter.test_setuptools_version (#5988)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/5988">PR #5988</a></li>
+<li>Caching tests are parsed through the engine (#5985)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/5985">PR #5985</a></li>
+<li>Override get_sources for pants plugins (#5984)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/5984">PR #5984</a></li>
+<li>make_target upgrades sources to EagerFilesetWithSpec (#5974)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/5974">PR #5974</a></li>
+<li>Robustify test_namespace_effective PYTHONPATH. (#5976)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/5976">PR #5976</a></li>
+</ul>
+</div>
+<div class="section" id="id24">
+<h2 id="heading_documentationupdates_125">Documentation Updates</h2>
+<ul class="simple">
+<li>1.7.0 release notes (#5983)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/5983">PR #5983</a></li>
+</ul>
+</div>
+</div>
+
+            <!-- main content end -->
+
+            <div class="generated">
+              Generated by <a href="docs.html">publish_docs</a>
+              from dist/markdown/html/src/python/pants/notes/1.9.x.html 2019-05-07T19:16:16.643418
+            </div>
+
+          </div> <!-- mainflow -->
+
+        </div> <!-- content -->
+
+      </div>
+
+      <div class="col-md-1">
+      </div>
+
+    </div> <!-- row -->
+  </div> <!-- container-fluid -->
+
+</div> <!-- page -->
+
+<script src="https://code.jquery.com/jquery-2.2.3.min.js" integrity="sha384-I6F5OKECLVtK/BL+8iSLDEHowSAfUo76ZL9+kGAgTRdiByINKJaqTPH/QVNS1VDb" crossorigin="anonymous"></script>
+<script src="bootstrap-custom.min.js"></script>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-78111411-1', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+</html>

@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!--
+  Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+  Licensed under the Apache License, Version 2.0 (see LICENSE).
+-->
+
+<head>
+  <meta charset="utf-8"/>
+  <title>1.2.x Stable Releases</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="shortcut icon" href="pants-logo.ico">
+  <!-- In case this is a "test publish", tell search engines where real version lives: -->
+  <link rel="canonical" href="http://pantsbuild.org/notes-1.2.x.html">
+
+  <link rel="stylesheet" href="bootstrap-custom.min.css">
+  <link rel="stylesheet" href="bootstrap-custom-theme.min.css">
+  <link rel="stylesheet" href="docsite.css">
+</head>
+
+<body>
+
+<div class="header">
+  <nav class="navbar navbar-default navbar-static-top">
+    <div class="container">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <a class="navbar-brand navbar-brand-img" href="index.html">
+          <img src="pants-logo.ico" alt="[pantsbuild logo]">
+        </a>
+        <a class="navbar-brand" href="index.html">
+          Pants
+        </a>
+      </div>
+      <div id="navbar" class="navbar-collapse collapse">
+        <ul class="nav navbar-nav navbar-right">
+          <li><a href="/">Docs</a></li>
+          <li><a href="community.html">Community</a></li>
+          <li><a href="https://www.github.com/pantsbuild/pants">GitHub</a></li>
+          <li>
+            <form class="navbar-form navbar-left search" role="search" action="https://www.google.com/search">
+              <div class="form-group">
+                <input type="text" name="as_q" class="form-control query" placeholder="Search">
+                <input name="as_sitesearch" value="pantsbuild.org" type="hidden">
+              </div>
+            </form>
+          </li>
+        </ul>
+      </div><!--/.nav-collapse -->
+    </div>
+  </nav>
+</div>
+
+<div class="page">
+
+  <div class="container-fluid">
+    <div class="row">
+
+      <div class="col-md-1">
+      </div>
+
+      <div class="col-md-2">
+        <div class="site-toc">
+          <ul>
+                  <li class="toc-h1 toc-heading">
+                    Getting Started
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="install.html">Installing Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="setup_repo.html">Setting Up Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="first_tutorial.html">Tutorial</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="common_tasks.html">Common Tasks</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="orgs.html">Pants for Organizations</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Pants Basics
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="why_use_pants.html">Why Use Pants?</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="first_concepts.html">Pants Concepts</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="build_files.html">BUILD files</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="target_addresses.html">Target Addresses</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="3rdparty.html">Third-Party Dependencies</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="options.html">Pants Options</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="invoking.html">Invoking Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="reporting_server.html">Reporting Server</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="ide_support.html">IDE Support</a>
+                  </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#JVM-Support" aria-expanded="false" aria-controls="JVM-Support">JVM Support<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="JVM-Support">
+                        <li class="toc-h1 toc-link ">
+                          <a href="jvm_projects.html">JVM Projects with Pants</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="3rdparty_jvm.html">JVM Dependency Management</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="scala.html">Scala Support</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="publish.html">Publishing Artifacts</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="from_maven.html">Pants for Maven Experts</a>
+                        </li>
+                    </ul>
+                </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#Python-Support" aria-expanded="false" aria-controls="Python-Support">Python Support<span class="caret"></span></a>
+                    <ul class="collapse sidebar-nav sidebar-submenu" id="Python-Support">
+                        <li class="toc-h1 toc-link ">
+                          <a href="python_readme.html">Python Projects with Pants</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="3rdparty_py.html">Python 3rdparty Pattern</a>
+                        </li>
+                    </ul>
+                </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="go_readme.html">Go support for Pants</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="node_readme.html">Node.js Support</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Code &amp; Doc Generation
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="thrift_deps.html">Thrift</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="grpcio_gen.html">Python gRPC + protobufs</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="page.html">Markdown</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Getting Help
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="tshoot.html">Troubleshooting</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="community.html">Community</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Reference
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="build_dictionary.html">Pants BUILD Dictionary</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="options_reference.html">Pants Reference</a>
+                  </li>
+                <li class="toc-h1">
+                  <a class="sidebar-nav-heading" class="toc-drop" data-toggle="collapse" href="#Release-Notes" aria-expanded="false" aria-controls="Release-Notes">Release Notes<span class="caret"></span></a>
+                    <ul class="" id="Release-Notes">
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.16.x.html">1.16.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.15.x.html">1.15.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.14.x.html">1.14.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.13.x.html">1.13.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.12.x.html">1.12.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.11.x.html">1.11.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.10.x.html">1.10.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.9.x.html">1.9.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.8.x.html">1.8.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.7.x.html">1.7.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.6.x.html">1.6.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.5.x.html">1.5.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.4.x.html">1.4.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.3.x.html">1.3.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link toc-here">
+                          1.2.x Stable Releases
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.1.x.html">1.1.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-1.0.x.html">1.0.x Stable Releases</a>
+                        </li>
+                        <li class="toc-h1 toc-link ">
+                          <a href="notes-master.html">Master Pre-Releases</a>
+                        </li>
+                    </ul>
+                </li>
+                  <li class="toc-h1 toc-heading">
+                    Developer
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="dev.html">Pants Developer Center</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="export.html">Export Format</a>
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="architecture.html">Architecture</a>
+                  </li>
+                  <li class="toc-h1 toc-heading">
+                    Blogs
+                  </li>
+                  <li class="toc-h1 toc-link ">
+                    <a href="coursier_migration.html">Twitter&#x27;s Coursier Migration</a>
+                  </li>
+          </ul>
+        </div> <!-- site-toc -->
+      </div>
+
+      <div class="col-md-8">
+        <div class="content">
+
+          <div class="mainflow">
+              <nav class="pagetoc">
+                <ul>
+                    <li class="toc-h1"><a href="#heading__101">1.2.1 (01/20/2017)</a></li>
+                    <li class="toc-h1"><a href="#heading_rc_102">1.2.1rc0 (12/19/2016)</a></li>
+                    <li class="toc-h2"><a href="#heading_bugfixes_103">Bugfixes</a></li>
+                    <li class="toc-h2"><a href="#heading_newfeatures_104">New Features</a></li>
+                    <li class="toc-h1"><a href="#heading__105">1.2.0 (10/31/2016)</a></li>
+                    <li class="toc-h1"><a href="#heading_rc_106">1.2.0rc4 (10/27/2016)</a></li>
+                    <li class="toc-h2"><a href="#heading_bugfixes_107">Bugfixes</a></li>
+                    <li class="toc-h1"><a href="#heading_rc_108">1.2.0rc3 (10/20/2016)</a></li>
+                    <li class="toc-h2"><a href="#heading_bugfixes_109">Bugfixes</a></li>
+                    <li class="toc-h2"><a href="#heading_newfeatures_110">New Features</a></li>
+                    <li class="toc-h2"><a href="#heading_refactoringimproveme_111">Refactoring, Improvements, and Tooling</a></li>
+                    <li class="toc-h1"><a href="#heading_rc_112">1.2.0rc2 (10/18/2016)</a></li>
+                    <li class="toc-h2"><a href="#heading_apichanges_113">API Changes</a></li>
+                    <li class="toc-h2"><a href="#heading_bugfixes_114">Bugfixes</a></li>
+                    <li class="toc-h2"><a href="#heading_newfeatures_115">New Features</a></li>
+                    <li class="toc-h2"><a href="#heading_refactoringimproveme_116">Refactoring, Improvements, and Tooling</a></li>
+                    <li class="toc-h1"><a href="#heading_rc_117">1.2.0rc1 (10/13/2016)</a></li>
+                    <li class="toc-h2"><a href="#heading_apichanges_118">API Changes</a></li>
+                    <li class="toc-h2"><a href="#heading_bugfixes_119">Bugfixes</a></li>
+                    <li class="toc-h2"><a href="#heading_refactoringimproveme_120">Refactoring, Improvements, and Tooling</a></li>
+                    <li class="toc-h1"><a href="#heading_rc_121">1.2.0rc0 (10/07/2016)</a></li>
+                    <li class="toc-h2"><a href="#heading_newfeatures_122">New Features</a></li>
+                    <li class="toc-h2"><a href="#heading_refactoringimproveme_123">Refactoring, Improvements, and Tooling</a></li>
+                    <li class="toc-h2"><a href="#heading_newenginework_124">New Engine Work</a></li>
+                    <li class="toc-h1"><a href="#heading_dev_125">1.2.0dev12 (9/30/2016)</a></li>
+                    <li class="toc-h2"><a href="#heading_bugfixes_126">Bugfixes</a></li>
+                    <li class="toc-h2"><a href="#heading_refactoringimproveme_127">Refactoring, Improvements, and Tooling</a></li>
+                    <li class="toc-h2"><a href="#heading_newenginework_128">New Engine Work</a></li>
+                    <li class="toc-h1"><a href="#heading_dev_129">1.2.0dev11 (9/23/2016)</a></li>
+                    <li class="toc-h2"><a href="#heading_apichanges_130">API Changes</a></li>
+                    <li class="toc-h2"><a href="#heading_bugfixes_131">Bugfixes</a></li>
+                    <li class="toc-h2"><a href="#heading_refactoringimproveme_132">Refactoring, Improvements, and Tooling</a></li>
+                    <li class="toc-h2"><a href="#heading_newenginework_133">New Engine Work</a></li>
+                    <li class="toc-h1"><a href="#heading_dev_134">1.2.0dev10 (9/20/2016)</a></li>
+                    <li class="toc-h2"><a href="#heading_bugfixes_135">Bugfixes</a></li>
+                    <li class="toc-h2"><a href="#heading_refactoringimproveme_136">Refactoring, Improvements, and Tooling</a></li>
+                    <li class="toc-h2"><a href="#heading_newfeatures_137">New Features</a></li>
+                    <li class="toc-h2"><a href="#heading_newenginework_138">New Engine Work</a></li>
+                    <li class="toc-h1"><a href="#heading_dev_139">1.2.0dev9 (9/12/2016)</a></li>
+                    <li class="toc-h2"><a href="#heading_bugfixes_140">Bugfixes</a></li>
+                    <li class="toc-h2"><a href="#heading_refactoringimproveme_141">Refactoring, Improvements, and Tooling</a></li>
+                    <li class="toc-h1"><a href="#heading_dev_142">1.2.0dev8 (09/02/2016)</a></li>
+                    <li class="toc-h1"><a href="#heading_dev_143">1.2.0dev7 (09/02/2016)</a></li>
+                    <li class="toc-h2"><a href="#heading_bugfixes_144">Bugfixes</a></li>
+                    <li class="toc-h2"><a href="#heading_newenginework_145">New Engine Work</a></li>
+                    <li class="toc-h2"><a href="#heading_refactoringimproveme_146">Refactoring, Improvements, and Tooling</a></li>
+                    <li class="toc-h1"><a href="#heading_dev_147">1.2.0-dev6 (8/26/2016)</a></li>
+                    <li class="toc-h2"><a href="#heading_newfeatures_148">New Features</a></li>
+                    <li class="toc-h2"><a href="#heading_bugfixes_149">Bugfixes</a></li>
+                    <li class="toc-h2"><a href="#heading_refactoringimproveme_150">Refactoring, Improvements, and Tooling</a></li>
+                    <li class="toc-h2"><a href="#heading_newenginework_151">New Engine Work</a></li>
+                    <li class="toc-h1"><a href="#heading_dev_152">1.2.0-dev5 (8/19/2016)</a></li>
+                    <li class="toc-h2"><a href="#heading_newenginework_153">New Engine Work</a></li>
+                    <li class="toc-h2"><a href="#heading_refactoringimproveme_154">Refactoring, Improvements, and Tooling</a></li>
+                    <li class="toc-h1"><a href="#heading_dev_155">1.2.0-dev4 (8/12/2016)</a></li>
+                    <li class="toc-h2"><a href="#heading_newfeatures_156">New Features</a></li>
+                    <li class="toc-h2"><a href="#heading_bugfixes_157">Bugfixes</a></li>
+                    <li class="toc-h2"><a href="#heading_newenginework_158">New Engine Work</a></li>
+                    <li class="toc-h2"><a href="#heading_refactoringimproveme_159">Refactoring, Improvements, and Tooling</a></li>
+                    <li class="toc-h1"><a href="#heading_dev_160">1.2.0-dev3 (8/7/2016)</a></li>
+                    <li class="toc-h2"><a href="#heading_refactoringimproveme_161">Refactoring, Improvements, and Tooling</a></li>
+                    <li class="toc-h1"><a href="#heading_dev_162">1.2.0-dev2 (8/5/2016)</a></li>
+                    <li class="toc-h2"><a href="#heading_refactoringimproveme_163">Refactoring, Improvements, and Tooling</a></li>
+                    <li class="toc-h1"><a href="#heading_dev_164">1.2.0-dev1 (7/30/2016)</a></li>
+                    <li class="toc-h2"><a href="#heading_newfeatures_165">New Features</a></li>
+                    <li class="toc-h2"><a href="#heading_apichanges_166">API Changes</a></li>
+                    <li class="toc-h2"><a href="#heading_bugfixes_167">Bugfixes</a></li>
+                    <li class="toc-h2"><a href="#heading_newenginework_168">New Engine Work</a></li>
+                    <li class="toc-h2"><a href="#heading_refactoringimproveme_169">Refactoring, Improvements, and Tooling</a></li>
+                    <li class="toc-h1"><a href="#heading_dev_170">1.2.0-dev0 (7/18/2016)</a></li>
+                    <li class="toc-h2"><a href="#heading_newfeatures_171">New Features</a></li>
+                    <li class="toc-h2"><a href="#heading_apichanges_172">API Changes</a></li>
+                    <li class="toc-h2"><a href="#heading_bugfixes_173">Bugfixes</a></li>
+                    <li class="toc-h2"><a href="#heading_newenginework_174">New Engine Work</a></li>
+                    <li class="toc-h2"><a href="#heading_refactoringimproveme_175">Refactoring, Improvements, and Tooling</a></li>
+                </ul>
+              </nav>
+
+            <!-- main content start -->
+            <!-- generated by pants! -->
+<title>1.2.x Stable Releases</title>
+<p style="font: 200% bold">1.2.x Stable Releases</p>
+<p>This document describes releases leading up to the <tt class="docutils literal">1.2.x</tt> <tt class="docutils literal">stable</tt> series.</p>
+<div class="section" id="id1">
+<h1 id="heading__101">1.2.1 (01/20/2017)</h1>
+<p>Promotion of the 1.2.1rc0 release to a stable release, with no changes.</p>
+</div>
+<div class="section" id="rc0-12-19-2016">
+<h1 id="heading_rc_102">1.2.1rc0 (12/19/2016)</h1>
+<p>The first release candidate for stable 1.2.1: includes a backlog of recent fixes, particularly
+for initialization issues with Task results_dirs. Additionally, includes native support for
+running Scalatest tests via JUnit using Pants' junit_tests target type.</p>
+<div class="section" id="bugfixes">
+<h2 id="heading_bugfixes_103">Bugfixes</h2>
+<ul class="simple">
+<li>Ensure that invalid vts have results_dir cleaned before passing to ta… (#4139)
+<a class="reference external" href="https://github.com/pantsbuild/pants/pull/4139">PR #4139</a></li>
+<li>Surface --dereference-symlinks flag to task caching level
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4338">RB #4338</a></li>
+<li>Correction on [resolve.node]
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4364">RB #4364</a></li>
+<li>Remove safe_mkdir on results_dir in [resolve.node]
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4362">RB #4362</a></li>
+</ul>
+</div>
+<div class="section" id="new-features">
+<h2 id="heading_newfeatures_104">New Features</h2>
+<ul class="simple">
+<li>Bump junit-runner to 1.0.16
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4381">RB #4381</a></li>
+<li>Patch to make scala tests work
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4361">RB #4361</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="id2">
+<h1 id="heading__105">1.2.0 (10/31/2016)</h1>
+<p>The stable <tt class="docutils literal">1.2.0</tt> release! This is equivalent to the 1.2.0rc4 release from Friday.</p>
+<p>The releases on this page encompass the complete list of changes since the previous
+<tt class="docutils literal">stable</tt> release (<tt class="docutils literal">1.1.0</tt>).</p>
+<p>Thanks to the contributors!</p>
+</div>
+<div class="section" id="rc4-10-27-2016">
+<h1 id="heading_rc_106">1.2.0rc4 (10/27/2016)</h1>
+<p>The fifth release candidate for stable 1.2.0, which includes a fix for the <tt class="docutils literal">fmt.isort</tt>
+task and an important correctness fix for golang remote rev pinning. This release candidate
+likely be elevated to the final 1.2.0 release tomorrow, barring any unexpected turbulence.</p>
+<div class="section" id="id3">
+<h2 id="heading_bugfixes_107">Bugfixes</h2>
+<ul class="simple">
+<li>Change default ./pants fmt.isort &lt;empty&gt; behavior to no-op; Add sources check for isort.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4327">RB #4327</a></li>
+<li>Bugfix: when synthesizing remote libraries in Go, pin them to the same rev as adjacent libs.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4325">RB #4325</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="rc3-10-20-2016">
+<h1 id="heading_rc_108">1.2.0rc3 (10/20/2016)</h1>
+<p>The fourth release candidate for stable 1.2.0, which limits the default targets affected
+by scalafmt and includes Benjy's lovely "default source globs" patch.</p>
+<div class="section" id="id4">
+<h2 id="heading_bugfixes_109">Bugfixes</h2>
+<ul class="simple">
+<li>Fix erroneous deprecated scope warnings.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4323">RB #4323</a></li>
+</ul>
+</div>
+<div class="section" id="id5">
+<h2 id="heading_newfeatures_110">New Features</h2>
+<ul class="simple">
+<li>Allow targets to have sensible defaults for sources=.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4300">RB #4300</a></li>
+</ul>
+</div>
+<div class="section" id="refactoring-improvements-and-tooling">
+<h2 id="heading_refactoringimproveme_111">Refactoring, Improvements, and Tooling</h2>
+<ul class="simple">
+<li>Add a target-types option to scalafmt to avoid formatting all targets
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4328">RB #4328</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="rc2-10-18-2016">
+<h1 id="heading_rc_112">1.2.0rc2 (10/18/2016)</h1>
+<p>The third, and perhaps final, release candidate for stable 1.2.0.</p>
+<p>Notably: this release candidate restores JDK7 compatibility for junit tests.</p>
+<div class="section" id="api-changes">
+<h2 id="heading_apichanges_113">API Changes</h2>
+<ul class="simple">
+<li>Update junit runner to 1.0.15 to get java 7 compatibility
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4324">RB #4324</a></li>
+<li>Back down the minimum required java version for running Pants tools to java 7
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4314">RB #4314</a></li>
+</ul>
+</div>
+<div class="section" id="id6">
+<h2 id="heading_bugfixes_114">Bugfixes</h2>
+<ul class="simple">
+<li>Fix exclude_target_regexp breakage in test-changed and --files option breakage in changed with diffspec
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4321">RB #4321</a></li>
+<li>Prevent cleanup error at end of pants test with --test-junit-html-report option, update safe_rmtree to be symlink aware
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4319">RB #4319</a></li>
+<li>fix --changed-files option
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4309">RB #4309</a></li>
+</ul>
+</div>
+<div class="section" id="id7">
+<h2 id="heading_newfeatures_115">New Features</h2>
+<ul class="simple">
+<li>Adding scalafmt formatting to fmt goal and enable by default
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4312">RB #4312</a></li>
+</ul>
+</div>
+<div class="section" id="id8">
+<h2 id="heading_refactoringimproveme_116">Refactoring, Improvements, and Tooling</h2>
+<ul class="simple">
+<li>migrate changed integration tests to isolated temp git repos and add an environment variable to override buildroot
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4295">RB #4295</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="rc1-10-13-2016">
+<h1 id="heading_rc_117">1.2.0rc1 (10/13/2016)</h1>
+<p>Second release candidate for stable 1.2.0.</p>
+<div class="section" id="id9">
+<h2 id="heading_apichanges_118">API Changes</h2>
+<ul class="simple">
+<li>Add subsystem_utils to test_infra
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4303">RB #4303</a></li>
+</ul>
+</div>
+<div class="section" id="id10">
+<h2 id="heading_bugfixes_119">Bugfixes</h2>
+<ul class="simple">
+<li>Switch default deference back to True for tarball artifact
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4304">RB #4304</a></li>
+<li>Filter inactive goals from <cite>Goal.all</cite>.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4298">RB #4298</a></li>
+<li>JUnit runner fix for len(args) &gt; max_args in argfile.safe_args
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4294">RB #4294</a></li>
+</ul>
+</div>
+<div class="section" id="id11">
+<h2 id="heading_refactoringimproveme_120">Refactoring, Improvements, and Tooling</h2>
+<ul class="simple">
+<li>Version clarification
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4299">RB #4299</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="rc0-10-07-2016">
+<h1 id="heading_rc_121">1.2.0rc0 (10/07/2016)</h1>
+<p>First release candidate for stable 1.2.0.</p>
+<div class="section" id="id12">
+<h2 id="heading_newfeatures_122">New Features</h2>
+<ul class="simple">
+<li>Make the name= target keyword optional in BUILD files.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4275">RB #4275</a></li>
+<li>Add Scalafmt Support to Pants
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4216">RB #4216</a></li>
+</ul>
+</div>
+<div class="section" id="id13">
+<h2 id="heading_refactoringimproveme_123">Refactoring, Improvements, and Tooling</h2>
+<ul class="simple">
+<li>Add libffi to pants pre-reqs, qualify JDK req.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4285">RB #4285</a></li>
+<li>Update the setup.py description.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4283">RB #4283</a></li>
+<li>Refactor Intermediate Target Generation Logic
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4277">RB #4277</a></li>
+<li>Clean up after failed artifact extractions
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4255">RB #4255</a></li>
+<li>Publish the CPP plugin
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4282">RB #4282</a></li>
+<li>Change --no-dryrun to the new flag in docs
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4280">RB #4280</a></li>
+<li>Add --no-transitive flag to findbugs so you can run findbugs only for the targets specified on the command line
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4276">RB #4276</a></li>
+</ul>
+</div>
+<div class="section" id="new-engine-work">
+<h2 id="heading_newenginework_124">New Engine Work</h2>
+<ul class="simple">
+<li>[engine] Rule Graph construction perf improvements
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4281">RB #4281</a></li>
+<li>[engine] Introduce static analysis model and replace validator with it
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4251">RB #4251</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="dev12-9-30-2016">
+<h1 id="heading_dev_125">1.2.0dev12 (9/30/2016)</h1>
+<p>Regularly scheduled unstable release, highlighted by engine work and OSX 10.12 support.
+Thanks to the contributors!</p>
+<div class="section" id="id14">
+<h2 id="heading_bugfixes_126">Bugfixes</h2>
+<ul class="simple">
+<li>Remove deprecated <cite>from_target</cite> usage in examples.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4262">RB #4262</a></li>
+</ul>
+</div>
+<div class="section" id="id15">
+<h2 id="heading_refactoringimproveme_127">Refactoring, Improvements, and Tooling</h2>
+<ul class="simple">
+<li>show deprecation warning for options given in env and config
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4272">RB #4272</a></li>
+<li>Update binary_util OS map for OSX Sierra.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4266">RB #4266</a></li>
+<li>Make LegacyAddressMapper v2 engine backed
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4239">RB #4239</a></li>
+<li>Upgrade to junit-runner 1.0.14.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4264">RB #4264</a></li>
+<li>Fix handling of method specs.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4258">RB #4258</a></li>
+<li>Factor workunit failure into final exit code.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4244">RB #4244</a></li>
+</ul>
+</div>
+<div class="section" id="id16">
+<h2 id="heading_newenginework_128">New Engine Work</h2>
+<ul class="simple">
+<li>[engine] Iterative improvements for`changed` and friends.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4269">RB #4269</a></li>
+<li>[engine] Allow injecting of intrinsic providers to ease testing
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4263">RB #4263</a></li>
+<li>[engine] When requesting select nodes or regular nodes, return state values rather than requiring a separate call
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4261">RB #4261</a></li>
+<li>[engine] Introduce TypeConstraint#satisfied_by_type
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4260">RB #4260</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="dev11-9-23-2016">
+<h1 id="heading_dev_129">1.2.0dev11 (9/23/2016)</h1>
+<p>Regularly scheduled unstable release.</p>
+<p>Heads up!: this release contains a change to an important default value for those who
+use pants to build scala codebases. The default <tt class="docutils literal"><span class="pre">--scala-platform-version</span></tt> has changed
+from <tt class="docutils literal">2.10</tt> to <tt class="docutils literal">2.11</tt>. If you do not set this value in your pants.ini (highly recommended!)
+this may result in a surprise scala upgrade for you.</p>
+<p>Thanks to the contributors!</p>
+<div class="section" id="id17">
+<h2 id="heading_apichanges_130">API Changes</h2>
+<ul class="simple">
+<li>Bump default scala platform version to 2.11
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4256">RB #4256</a></li>
+</ul>
+</div>
+<div class="section" id="id18">
+<h2 id="heading_bugfixes_131">Bugfixes</h2>
+<ul class="simple">
+<li>Clean up analysis.tmp usage between pants and zinc wrapper (Part 1)
+<a class="reference external" href="https://github.com/pantsbuild/pants/issues/3667">Issue #3667</a>
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4245">RB #4245</a></li>
+<li>Clean up analysis.tmp usage between pants and zinc wrapper (Part 2)
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4246">RB #4246</a></li>
+</ul>
+</div>
+<div class="section" id="id19">
+<h2 id="heading_refactoringimproveme_132">Refactoring, Improvements, and Tooling</h2>
+<ul class="simple">
+<li>Update minimum JDK requirements.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4127">RB #4127</a>
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4253">RB #4253</a></li>
+</ul>
+</div>
+<div class="section" id="id20">
+<h2 id="heading_newenginework_133">New Engine Work</h2>
+<ul class="simple">
+<li>[engine] Move subselectors to selector properties
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4235">RB #4235</a></li>
+<li>[engine] Daemon cacheable <cite>changed</cite>.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4207">RB #4207</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="dev10-9-20-2016">
+<h1 id="heading_dev_134">1.2.0dev10 (9/20/2016)</h1>
+<p>Regularly scheduled unstable release. Thanks to the contributors!
+Version bump, previous release only did a partial upload.</p>
+<div class="section" id="id21">
+<h2 id="heading_bugfixes_135">Bugfixes</h2>
+<ul class="simple">
+<li>Correct Pants's incorrect guesses for go source roots.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4247">RB #4247</a></li>
+<li>Fix ng-killall by swallowing psutil exceptions in filter
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4237">RB #4237</a></li>
+<li>Fix for idea-plugin goal that generates too long project filename
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4231">RB #4231</a></li>
+<li>wrapped globs excludes - include incorrect arg in error message
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4232">RB #4232</a></li>
+</ul>
+</div>
+<div class="section" id="id22">
+<h2 id="heading_refactoringimproveme_136">Refactoring, Improvements, and Tooling</h2>
+<ul class="simple">
+<li>Inject an automatic dep on junit for all junit_tests targets.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4228">RB #4228</a></li>
+<li>Simplify failed test reporting.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4240">RB #4240</a></li>
+<li>Fixup the simple plugin setup docs.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4241">RB #4241</a></li>
+<li>Add description to type constraints
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4233">RB #4233</a></li>
+<li>Differentiate between source root categories.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4230">RB #4230</a></li>
+<li>Restore ChangedTargetGoalsIntegrationTest.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4227">RB #4227</a></li>
+<li>Deprecate the <cite>subsystem_instance</cite> utility function.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4220">RB #4220</a></li>
+</ul>
+</div>
+<div class="section" id="id23">
+<h2 id="heading_newfeatures_137">New Features</h2>
+<ul class="simple">
+<li>Add a timeout to scalajs tests
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4229">RB #4229</a></li>
+<li>Disallow absolute file paths in specs in BUILD files
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4221">RB #4221</a></li>
+</ul>
+</div>
+<div class="section" id="id24">
+<h2 id="heading_newenginework_138">New Engine Work</h2>
+<ul class="simple">
+<li>[engine] Convert all isinstance product checks to using Exactly type constraints
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4236">RB #4236</a></li>
+<li>[engine] Check that types passed to TypeConstraint inits are in fact types
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4209">RB #4209</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="dev9-9-12-2016">
+<h1 id="heading_dev_139">1.2.0dev9 (9/12/2016)</h1>
+<p>Regularly scheduled unstable release. Thanks to the contributors!
+Version bump, previous release only did a partial upload.</p>
+<div class="section" id="id25">
+<h2 id="heading_bugfixes_140">Bugfixes</h2>
+<ul class="simple">
+<li>Re-enable test_junit_tests_using_cucumber.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4212">RB #4212</a></li>
+<li>Reset subsystem state for integration tests.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4219">RB #4219</a></li>
+<li>Remove spurious pants.pex file that somehow ended up in the repo.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4214">RB #4214</a>
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4218">RB #4218</a></li>
+<li>Fix a non-determinism I added in the ANTLR support
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4187">RB #4187</a></li>
+</ul>
+</div>
+<div class="section" id="id26">
+<h2 id="heading_refactoringimproveme_141">Refactoring, Improvements, and Tooling</h2>
+<ul class="simple">
+<li>Edit Greeting{,Test}.java to get a known edit sha for tests.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4217">RB #4217</a></li>
+<li>Refactor memoization of the global distribution locator.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4214">RB #4214</a></li>
+<li>Clean up junit xml report file location logic.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4211">RB #4211</a></li>
+<li>Upgrade default go to 1.7.1.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4210">RB #4210</a></li>
+<li>Make util.objects.datatype classes not iterable
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4163">RB #4163</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="dev8-09-02-2016">
+<h1 id="heading_dev_142">1.2.0dev8 (09/02/2016)</h1>
+<p>Regularly scheduled unstable release. Thanks to the contributors!
+Version bump, previous release only did a partial upload.</p>
+</div>
+<div class="section" id="dev7-09-02-2016">
+<h1 id="heading_dev_143">1.2.0dev7 (09/02/2016)</h1>
+<p>Regularly scheduled unstable release. Thanks to the contributors!</p>
+<div class="section" id="id28">
+<h2 id="heading_bugfixes_144">Bugfixes</h2>
+<ul class="simple">
+<li>[jvm-compile][bug] Fixes other target's class dir ending up on classpath
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4198">RB #4198</a></li>
+<li>Fixed bugs in Go thrift generation with services
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4177">RB #4177</a></li>
+</ul>
+</div>
+<div class="section" id="id29">
+<h2 id="heading_newenginework_145">New Engine Work</h2>
+<ul class="simple">
+<li>[engine] Add Runnable State
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4158">RB #4158</a></li>
+<li>[engine] Don't filter directories in watchman subscription
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4095">RB #4095</a></li>
+</ul>
+</div>
+<div class="section" id="id30">
+<h2 id="heading_refactoringimproveme_146">Refactoring, Improvements, and Tooling</h2>
+<ul class="simple">
+<li>Eliminate all direct use of pytest.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4201">RB #4201</a></li>
+<li>Update pants versioning to use python's packaging.version
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4200">RB #4200</a></li>
+<li>[jvm-compile][test] Add test explicitly checking classpath for z.jars
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4199">RB #4199</a></li>
+<li>Plumb fetch timeout through <cite>BinaryUtil</cite>.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4196">RB #4196</a></li>
+<li>Upgrade default go to 1.7.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4195">RB #4195</a></li>
+<li>Fixup <cite>PythonTarget</cite> <cite>resource_targets</cite> docs.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4148">RB #4148</a></li>
+<li>Customize tarfile module next() method
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4123">RB #4123</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="dev6-8-26-2016">
+<h1 id="heading_dev_147">1.2.0-dev6 (8/26/2016)</h1>
+<p>Regularly scheduled unstable release. Thanks to the contributors!</p>
+<div class="section" id="id31">
+<h2 id="heading_newfeatures_148">New Features</h2>
+<ul class="simple">
+<li>A clear error message for checkstyle misconfiguration.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4176">RB #4176</a></li>
+</ul>
+</div>
+<div class="section" id="id32">
+<h2 id="heading_bugfixes_149">Bugfixes</h2>
+<ul class="simple">
+<li>Performance fix for consolidated classpath
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4184">RB #4184</a></li>
+</ul>
+</div>
+<div class="section" id="id33">
+<h2 id="heading_refactoringimproveme_150">Refactoring, Improvements, and Tooling</h2>
+<ul class="simple">
+<li>Refactor classpath consolidation into a separate task.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4152">RB #4152</a></li>
+<li>Refactor idea-plugin goal
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4159">RB #4159</a></li>
+<li>Remove all calls to create_subsystem() in tests.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4178">RB #4178</a></li>
+</ul>
+</div>
+<div class="section" id="id34">
+<h2 id="heading_newenginework_151">New Engine Work</h2>
+<ul class="simple">
+<li>Support exclude_target_regexps and ignore_patterns in v2 engine
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4172">RB #4172</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="dev5-8-19-2016">
+<h1 id="heading_dev_152">1.2.0-dev5 (8/19/2016)</h1>
+<p>Regularly scheduled unstable release.</p>
+<div class="section" id="id35">
+<h2 id="heading_newenginework_153">New Engine Work</h2>
+<ul class="simple">
+<li>Defer daemon-wise <cite>LegacyBuildGraph</cite> construction to post-fork.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4168">RB #4168</a></li>
+<li>[engine] Validate that variant_key of SelectVariant is string type git_shat msg: 5a7e838d512069a24d12ec0b7dcdc7b7d5bdfa3b
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4149">RB #4149</a></li>
+</ul>
+</div>
+<div class="section" id="id36">
+<h2 id="heading_refactoringimproveme_154">Refactoring, Improvements, and Tooling</h2>
+<ul class="simple">
+<li>Adjust the output file locations for the Antlr task.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4161">RB #4161</a></li>
+<li>build dictionary: one description per arg is plenty
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4164">RB #4164</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="dev4-8-12-2016">
+<h1 id="heading_dev_155">1.2.0-dev4 (8/12/2016)</h1>
+<p>Regularly scheduled unstable release.</p>
+<div class="section" id="id37">
+<h2 id="heading_newfeatures_156">New Features</h2>
+<ul class="simple">
+<li>Introduce fmt goal, isort subgoal
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4134">RB #4134</a></li>
+</ul>
+</div>
+<div class="section" id="id38">
+<h2 id="heading_bugfixes_157">Bugfixes</h2>
+<ul class="simple">
+<li>Fix GitTest control of git <cite>user.email</cite>.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4146">RB #4146</a></li>
+<li>Restore publishing of the docsite during releases
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4140">RB #4140</a></li>
+</ul>
+</div>
+<div class="section" id="id39">
+<h2 id="heading_newenginework_158">New Engine Work</h2>
+<ul class="simple">
+<li>[engine] Fix bundle rel_path handling in engine
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4150">RB #4150</a></li>
+<li>[engine] Fix running changed with v2 flag; Replace context address_mapper; Fix excludes filespecs in engine globs.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4114">RB #4114</a></li>
+<li>Fix BundleAdaptor to BundleProps Conversion
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4057">RB #4057</a>
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4129">RB #4129</a></li>
+</ul>
+</div>
+<div class="section" id="id40">
+<h2 id="heading_refactoringimproveme_159">Refactoring, Improvements, and Tooling</h2>
+<ul class="simple">
+<li>Eliminate use of mox in favor of mock.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4143">RB #4143</a></li>
+<li>Convert FetcherTest to use mock instead of mox.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4142">RB #4142</a></li>
+<li>[jvm-compile] narrow compile dependencies from full closure to just next nearest invalid compilation targets
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4136">RB #4136</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="dev3-8-7-2016">
+<h1 id="heading_dev_160">1.2.0-dev3 (8/7/2016)</h1>
+<p>Unscheduled extra unstable release.</p>
+<div class="section" id="id41">
+<h2 id="heading_refactoringimproveme_161">Refactoring, Improvements, and Tooling</h2>
+<ul class="simple">
+<li>Move the custom javac option to the Java subsystem.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4141">RB #4141</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="dev2-8-5-2016">
+<h1 id="heading_dev_162">1.2.0-dev2 (8/5/2016)</h1>
+<p>Regularly scheduled unstable release.</p>
+<div class="section" id="id42">
+<h2 id="heading_refactoringimproveme_163">Refactoring, Improvements, and Tooling</h2>
+<ul class="simple">
+<li>Upgrade travis ci to use jdk 8
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4127">RB #4127</a></li>
+<li>Additional checks for module type determination.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4131">RB #4131</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="dev1-7-30-2016">
+<h1 id="heading_dev_164">1.2.0-dev1 (7/30/2016)</h1>
+<p>Regularly scheduled unstable release.</p>
+<div class="section" id="id44">
+<h2 id="heading_newfeatures_165">New Features</h2>
+<ul class="simple">
+<li>Allow specification of an alternate javac location.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4124">RB #4124</a></li>
+<li>Add support to Fetcher for <cite>file:</cite> URLs.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4099">RB #4099</a></li>
+<li>JSON output format for Pants options
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4113">RB #4113</a></li>
+</ul>
+</div>
+<div class="section" id="id45">
+<h2 id="heading_apichanges_166">API Changes</h2>
+</div>
+<div class="section" id="id46">
+<h2 id="heading_bugfixes_167">Bugfixes</h2>
+<ul class="simple">
+<li>Avoid clobbering <cite>type_alias</cite> kwarg in the <cite>Registrar</cite> if already explicitly set.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4106">RB #4106</a></li>
+<li>Fix JUnit -fail-fast, add test for early exit hook and remove unused code
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4060">RB #4060</a>
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4081">RB #4081</a></li>
+<li>Fixup the 1.1.x notes, which were not being rendered on the site, and contained rendering errors.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4098">RB #4098</a></li>
+</ul>
+</div>
+<div class="section" id="id47">
+<h2 id="heading_newenginework_168">New Engine Work</h2>
+<ul class="simple">
+<li>Ensure target <cite>resources=</cite> ordering is respected in the v2 engine.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4128">RB #4128</a></li>
+<li>[engine] Pass selectors to select nodes; Use selectors in error messages
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4031">RB #4031</a></li>
+<li>Remove Duplicates in File System tasks in v2 Engine
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4096">RB #4096</a></li>
+</ul>
+</div>
+<div class="section" id="id48">
+<h2 id="heading_refactoringimproveme_169">Refactoring, Improvements, and Tooling</h2>
+<ul class="simple">
+<li>A custom version of com.sun.tools.javac.api.JavacTool.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4122">RB #4122</a></li>
+<li>Time out Jenkins shards after 60 minutes.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4082">RB #4082</a></li>
+<li>Eliminate file listing ordering assumptions.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4121">RB #4121</a></li>
+<li>Upgrade the pants bootstrap venv to 15.0.2.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4120">RB #4120</a></li>
+<li>Bump default wheel version to latest.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4116">RB #4116</a></li>
+<li>Remove warnings from the release process.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4119">RB #4119</a></li>
+<li>Upgrade default go to 1.6.3.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4115">RB #4115</a></li>
+<li>Added a page on policies for pants committers
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4105">RB #4105</a></li>
+<li>Cleanup <cite>BinaryUtil</cite>.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4108">RB #4108</a></li>
+<li>Update junit-runner to version 1.0.13
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4102">RB #4102</a>
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4101">RB #4101</a>
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4091">RB #4091</a>
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4081">RB #4081</a>
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4107">RB #4107</a></li>
+<li>Enable autoFlush for JUnit printstream so we get output as the tests run
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4101">RB #4101</a>
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4102">RB #4102</a></li>
+<li>Print a message for cycles in the graph when computing the target fingerprint
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4087">RB #4087</a></li>
+<li>Pin remaining core-sensitive options.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4100">RB #4100</a>
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4104">RB #4104</a></li>
+<li>Set the encoding for javac in pantsbuild/pants
+<a class="reference external" href="https://github.com/pantsbuild/pants/issues/3702">Issue #3702</a>
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4103">RB #4103</a></li>
+<li>Customize pants settings for Jenkins.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4101">RB #4101</a>
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4100">RB #4100</a></li>
+<li>Buffer the ConsoleRunner's use of stdio.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4101">RB #4101</a></li>
+<li>Extract <cite>safe_args</cite> to a jvm backend module.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4090">RB #4090</a></li>
+<li>Move <cite>ui_open</cite> into its own <cite>util</cite> module.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4089">RB #4089</a></li>
+<li>Simplify <cite>ConcurrentRunnerScheduler</cite> &amp; cleanup.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4091">RB #4091</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="dev0-7-18-2016">
+<h1 id="heading_dev_170">1.2.0-dev0 (7/18/2016)</h1>
+<p>Regularly scheduled unstable release! Unstable releases from master will use the
+<tt class="docutils literal">dev</tt> suffix from now on (see <a class="reference external" href="https://github.com/pantsbuild/pants/issues/3382">#3382</a>).</p>
+<div class="section" id="id57">
+<h2 id="heading_newfeatures_171">New Features</h2>
+<p>None this week!</p>
+</div>
+<div class="section" id="id58">
+<h2 id="heading_apichanges_172">API Changes</h2>
+<ul class="simple">
+<li>Bump Junit Runner to 1.0.12
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4072">RB #4072</a>
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4026">RB #4026</a>
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4047">RB #4047</a></li>
+<li>Support for Tasks to request optional product requirements.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4071">RB #4071</a></li>
+</ul>
+</div>
+<div class="section" id="id59">
+<h2 id="heading_bugfixes_173">Bugfixes</h2>
+<ul class="simple">
+<li>RGlobs.to_filespec should generate filespecs that match git spec
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4078">RB #4078</a></li>
+<li>ivy runner make a copy of jvm_options before mutating it
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4080">RB #4080</a></li>
+<li>Log exceptions from testRunFinished() in our listener
+<a class="reference external" href="https://github.com/pantsbuild/pants/issues/3638">Issue #3638</a>
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4060">RB #4060</a></li>
+<li>Fix problems with unicode in junit XML output when writing to HTML report
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4051">RB #4051</a></li>
+<li>[bugfix] Fix <cite>remote_sources()</cite> targets dependency injection.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4052">RB #4052</a></li>
+</ul>
+</div>
+<div class="section" id="id61">
+<h2 id="heading_newenginework_174">New Engine Work</h2>
+<ul class="simple">
+<li>Convert BundleAdaptor to BundleProps during JvmApp target creation
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4057">RB #4057</a></li>
+<li>Repair pantsd+watchman integration test flakiness.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4067">RB #4067</a></li>
+<li>[engine] Isolated Process Execution - First Cut
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4029">RB #4029</a></li>
+</ul>
+</div>
+<div class="section" id="id63">
+<h2 id="heading_refactoringimproveme_175">Refactoring, Improvements, and Tooling</h2>
+<ul class="simple">
+<li>Use ProjectTree in SourceRoots.all_roots().
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4079">RB #4079</a></li>
+<li>Add a note indicating that scope=forced is available beginning in 1.1.0
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4070">RB #4070</a></li>
+<li>Update version numbering and clarify notes updates
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4069">RB #4069</a></li>
+<li>Improve deprecation warning for default backend option reliance.
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4061">RB #4061</a>
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4053">RB #4053</a></li>
+<li>Cleanup the annotation test project code
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4056">RB #4056</a></li>
+<li>Add documentation for scopes
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4050">RB #4050</a></li>
+<li>Add collection literals note to styleguide
+<a class="reference external" href="https://rbcommons.com/s/twitter/r/4028">RB #4028</a></li>
+</ul>
+</div>
+</div>
+
+            <!-- main content end -->
+
+            <div class="generated">
+              Generated by <a href="docs.html">publish_docs</a>
+              from dist/markdown/html/src/python/pants/notes/1.2.x.html 2019-05-07T19:16:16.509580
+            </div>
+
+          </div> <!-- mainflow -->
+
+        </div> <!-- content -->
+
+      </div>
+
+      <div class="col-md-1">
+      </div>
+
+    </div> <!-- row -->
+  </div> <!-- container-fluid -->
+
+</div> <!-- page -->
+
+<script src="https://code.jquery.com/jquery-2.2.3.min.js" integrity="sha384-I6F5OKECLVtK/BL+8iSLDEHowSAfUo76ZL9+kGAgTRdiByINKJaqTPH/QVNS1VDb" crossorigin="anonymous"></script>
+<script src="bootstrap-custom.min.js"></script>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+        (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-78111411-1', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+</html>
