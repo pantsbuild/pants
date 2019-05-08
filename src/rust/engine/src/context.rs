@@ -24,6 +24,7 @@ use core::clone::Clone;
 use fs::{self, safe_create_dir_all_ioerror, PosixFS, ResettablePool, Store};
 use graph::{EntryId, Graph, NodeContext};
 use log::debug;
+use parking_lot::RwLock;
 use process_execution::{self, BoundedCommandRunner, CommandRunner};
 use rand::seq::SliceRandom;
 use reqwest;
@@ -44,7 +45,7 @@ pub struct Core {
   pub rule_graph: RuleGraph,
   pub types: Types,
   pub fs_pool: Arc<ResettablePool>,
-  pub runtime: Resettable<Arc<Runtime>>,
+  pub runtime: Resettable<Arc<RwLock<Runtime>>>,
   pub futures_timer_thread: Resettable<futures_timer::HelperThread>,
   store_and_command_runner_and_http_client:
     Resettable<(Store, BoundedCommandRunner, reqwest::r#async::Client)>,
@@ -81,7 +82,9 @@ impl Core {
 
     let fs_pool = Arc::new(ResettablePool::new("io-".to_string()));
     let runtime = Resettable::new(|| {
-      Arc::new(Runtime::new().unwrap_or_else(|e| panic!("Could not initialize Runtime: {:?}", e)))
+      Arc::new(RwLock::new(Runtime::new().unwrap_or_else(|e| {
+        panic!("Could not initialize Runtime: {:?}", e)
+      })))
     });
     // We re-use these certs for both the execution and store service; they're generally tied together.
     let root_ca_certs = if let Some(path) = remote_root_ca_certs_path {
@@ -286,6 +289,6 @@ impl NodeContext for Context {
   where
     F: Future<Item = (), Error = ()> + Send + 'static,
   {
-    self.core.runtime.get().executor().spawn(future);
+    self.core.runtime.get().read().executor().spawn(future);
   }
 }
