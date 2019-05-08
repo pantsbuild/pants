@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import os
 import sys
 from builtins import str
 
@@ -87,6 +88,7 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup):
   ]
   requirements_pex_request = ExecuteProcessRequest(
     argv=tuple(requirements_pex_argv),
+    env={'PATH': os.pathsep.join(python_setup.interpreter_search_paths)},
     input_files=pex_snapshot.directory_digest,
     description='Resolve requirements for {}'.format(target_root.address.reference()),
     output_files=(output_pytest_requirements_pex_filename,),
@@ -114,6 +116,7 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup):
 
   request = ExecuteProcessRequest(
     argv=(python_binary, './{}'.format(output_pytest_requirements_pex_filename)),
+    env={'PATH': os.pathsep.join(python_setup.interpreter_search_paths)},
     input_files=merged_input_files,
     description='Run pytest for {}'.format(target_root.address.reference()),
   )
