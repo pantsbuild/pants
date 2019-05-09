@@ -29,7 +29,9 @@ class PythonInterpreterFingerprintStrategy(DefaultFingerprintHashingMixin, Finge
   def compute_fingerprint(self, python_target):
     # Consider the target's compatibility requirements, and if those are missing then fall back
     # to the global interpreter constraints. Only these two values can affect the selected interpreter.
-    hash_elements_for_target = sorted(self.python_setup.compatibility_or_constraints(python_target))
+    hash_elements_for_target = sorted(
+      self.python_setup.compatibility_or_constraints(python_target.compatibility)
+    )
     if not hash_elements_for_target:
       return None
     hasher = hashlib.sha1()
