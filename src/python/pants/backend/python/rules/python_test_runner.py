@@ -29,15 +29,12 @@ class PyTestResult(TestResult):
 
 
 def parse_interpreter_constraints(python_setup, python_target_adaptors):
-  # TODO(7691): Remove this hack once python_setup.compatibility_or_constraints() gets changed
-  # to accept a compatibility argument.
-  for target_adaptor in python_target_adaptors:
-    if not hasattr(target_adaptor, 'compatibility'):
-      target_adaptor.compatibility = None
   constraints = {
     constraint
     for target_adaptor in python_target_adaptors
-    for constraint in python_setup.compatibility_or_constraints(target_adaptor)
+    for constraint in python_setup.compatibility_or_constraints(
+      getattr(target_adaptor, 'compatibility', None)
+    )
   }
   constraints_args = []
   for constraint in sorted(constraints):
@@ -71,6 +68,9 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup):
 
   # TODO(#7061): This str() can be removed after we drop py2!
   python_binary = text_type(sys.executable)
+  interpreter_constraint_args = parse_interpreter_constraints(
+    python_setup, python_target_adaptors=[target.adaptor for target in all_targets]
+  )
 
   # TODO: This is non-hermetic because the requirements will be resolved on the fly by
   # pex27, where it should be hermetically provided in some way.
@@ -80,7 +80,7 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup):
     './{}'.format(pex_snapshot.files[0]),
     '-e', 'pytest:main',
     '-o', output_pytest_requirements_pex_filename,
-  ] + parse_interpreter_constraints(python_setup, all_targets) + [
+  ] + interpreter_constraint_args + [
     # TODO(#7061): This text_type() wrapping can be removed after we drop py2!
     text_type(req)
     # Sort all user requirement strings to increase the chance of cache hits across invocations.
