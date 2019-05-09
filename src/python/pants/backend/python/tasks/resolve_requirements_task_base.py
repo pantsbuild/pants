@@ -36,8 +36,8 @@ class ResolveRequirementsTaskBase(Task):
   def subsystem_dependencies(cls):
     return super(ResolveRequirementsTaskBase, cls).subsystem_dependencies() + (
       PexBuilderWrapper.Factory,
+      PythonSetup,
       PythonNativeCode.scoped(cls),
-      PythonSetup.scoped(cls),
     )
 
   @memoized_property
