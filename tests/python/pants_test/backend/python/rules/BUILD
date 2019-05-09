@@ -7,6 +7,7 @@ python_tests(
   dependencies=[
     'src/python/pants/backend/python/rules',
     'src/python/pants/backend/python/subsystems',
+    'src/python/pants/engine/legacy:structs',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
