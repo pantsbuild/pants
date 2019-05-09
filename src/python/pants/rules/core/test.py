@@ -40,10 +40,10 @@ def fast_test(console, addresses):
     console.write_stdout('\n')
 
   for address, test_result in zip(addresses, test_results):
-    console.print_stdout('{0:80}.....{1:>10}'.format(address.reference(), test_result.status))
+    console.print_stdout('{0:80}.....{1:>10}'.format(address.reference(), test_result.status.value))
 
   if did_any_fail:
-    console.print_stderr('Tests failed')
+    console.print_stderr(console.red('Tests failed'))
     exit_code = PANTS_FAILED_EXIT_CODE
   else:
     exit_code = PANTS_SUCCEEDED_EXIT_CODE

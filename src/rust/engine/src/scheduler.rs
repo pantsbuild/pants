@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::{HashMap, HashSet};
+use std::convert::TryInto;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Arc};
@@ -11,7 +12,7 @@ use futures::future::{self, Future};
 
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
-use crate::nodes::{NodeKey, Select, Tracer, TryInto, Visualizer};
+use crate::nodes::{NodeKey, Select, Tracer, Visualizer};
 use crate::selectors;
 use graph::{EntryId, Graph, InvalidationResult, NodeContext};
 use indexmap::IndexMap;
@@ -234,7 +235,7 @@ impl Scheduler {
     roots: Vec<Root>,
     count: usize,
   ) {
-    let executor = context.core.runtime.get().executor();
+    let executor = context.core.runtime.get().read().executor();
     // Attempt all roots in parallel, failing fast to retry for `Invalidated`.
     let roots_res = future::join_all(
       roots
@@ -407,6 +408,6 @@ impl NodeContext for RootContext {
   where
     F: Future<Item = (), Error = ()> + Send + 'static,
   {
-    self.core.runtime.get().executor().spawn(future);
+    self.core.runtime.get().read().executor().spawn(future);
   }
 }

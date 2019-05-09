@@ -40,11 +40,11 @@ class PantsService(AbstractClass):
   by a calling thread that is holding the Service `lifecycle_lock`. Under that lock, a caller
   can signal a service to "pause", "run", or "terminate" (see _ServiceState for more details).
 
-  pantsd pauses all Services before forking a pantsd-runner in order to ensure that no "relevant"
+  pantsd pauses all Services before forking a pantsd in order to ensure that no "relevant"
   locks are held (or awaited: see #6565) by threads that might not survive the fork. While paused,
   a Service must not have any threads running that might interact with any non-private locks.
 
-  After forking, the pantsd-runner (child) process should call `terminate()` to finish shutting down
+  After forking, the pantsd (child) process should call `terminate()` to finish shutting down
   the service, and the parent process should call `resume()` to cause the service to resume running.
   """
 

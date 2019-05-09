@@ -17,7 +17,7 @@ import psutil
 from future.utils import PY3
 
 from pants.java.nailgun_io import NailgunStreamWriter
-from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
+from pants.java.nailgun_protocol import ChunkType, MaybeShutdownSocket, NailgunProtocol
 from pants.util.dirutil import safe_file_dump
 from pants.util.osutil import safe_kill
 from pants.util.socket import RecvBufferedSocket
@@ -115,8 +115,11 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
     :raises: :class:`Exception` if the session completes before the timeout, the `reason` argument
                                 to .set_exit_timeout() will be raised."""
     try:
-      for chunk_type, payload in self.iter_chunks(self._sock, return_bytes=True,
-                                                  timeout_object=self):
+      for chunk_type, payload in self.iter_chunks(
+        MaybeShutdownSocket(self._sock),
+        return_bytes=True,
+        timeout_object=self,
+      ):
         # TODO(#6579): assert that we have at this point received all the chunk types in
         # ChunkType.REQUEST_TYPES, then require PID and PGRP (exactly once?), and then allow any of
         # ChunkType.EXECUTION_TYPES.
@@ -143,7 +146,7 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
           raise self.ProtocolError('received unexpected chunk {} -> {}'.format(chunk_type, payload))
     except NailgunProtocol.ProcessStreamTimeout as e:
       assert(self.remote_pid is not None)
-      # NB: We overwrite the process title in the pantsd-runner process, which causes it to have an
+      # NB: We overwrite the process title in the pantsd process, which causes it to have an
       # argv with lots of empty spaces for some reason. We filter those out and pretty-print the
       # rest here.
       filtered_remote_cmdline = safe_shlex_join(

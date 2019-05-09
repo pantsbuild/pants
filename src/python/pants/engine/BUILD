@@ -64,8 +64,11 @@ python_library(
   name='goal',
   sources=['goal.py'],
   dependencies=[
+    'src/python/pants/cache',
     'src/python/pants/option',
+    'src/python/pants/util:memo',
     'src/python/pants/util:meta',
+    'src/python/pants/util:objects',
   ]
 )
 
@@ -214,7 +217,10 @@ python_library(
 
 python_library(
   name='console',
-  sources=['console.py']
+  sources=['console.py'],
+  dependencies=[
+    '3rdparty/python:ansicolors',
+  ],
 )
 
 resources(

@@ -128,11 +128,7 @@ class JavacCompile(JvmCompile):
     except DistributionLocator.Error:
       distribution = JvmPlatform.preferred_jvm_distribution([settings], strict=False)
 
-    javac_cmd = ['{}/bin/javac'.format(distribution.real_home)]
-
-    javac_cmd.extend([
-      '-classpath', ':'.join(classpath),
-    ])
+    javac_args = []
 
     if settings.args:
       settings_args = settings.args
@@ -140,16 +136,16 @@ class JavacCompile(JvmCompile):
         logger.debug('Substituting "$JAVA_HOME" with "{}" in jvm-platform args.'
                      .format(distribution.home))
         settings_args = (a.replace('$JAVA_HOME', distribution.home) for a in settings.args)
-      javac_cmd.extend(settings_args)
+      javac_args.extend(settings_args)
 
-      javac_cmd.extend([
+      javac_args.extend([
         # TODO: support -release
         '-source', str(settings.source_level),
         '-target', str(settings.target_level),
       ])
 
     if self.execution_strategy == self.HERMETIC:
-      javac_cmd.extend([
+      javac_args.extend([
         # We need to strip the source root from our output files. Outputting to a directory, and
         # capturing that directory, does the job.
         # Unfortunately, javac errors if the directory you pass to -d doesn't exist, and we don't
@@ -160,19 +156,34 @@ class JavacCompile(JvmCompile):
         '-d', '.',
       ])
     else:
-      javac_cmd.extend([
+      javac_args.extend([
         '-d', ctx.classes_dir.path,
       ])
 
-    javac_cmd.extend(self._javac_plugin_args(javac_plugin_map))
+    javac_args.extend(self._javac_plugin_args(javac_plugin_map))
 
-    javac_cmd.extend(args)
+    javac_args.extend(args)
 
     compiler_option_sets_args = self.get_merged_args_for_compiler_option_sets(compiler_option_sets)
-    javac_cmd.extend(compiler_option_sets_args)
+    javac_args.extend(compiler_option_sets_args)
 
-    with argfile.safe_args(ctx.sources, self.get_options()) as batched_sources:
-      javac_cmd.extend(batched_sources)
+    javac_args.extend([
+      '-classpath', ':'.join(classpath),
+    ])
+    javac_args.extend(ctx.sources)
+
+    # From https://docs.oracle.com/javase/8/docs/technotes/tools/windows/javac.html#BHCJEIBB
+    # Wildcards (*) aren’t allowed in these lists (such as for specifying *.java).
+    # Use of the at sign (@) to recursively interpret files isn’t supported.
+    # The -J options aren’t supported because they’re passed to the launcher,
+    # which doesn’t support argument files.
+    j_args = [j_arg for j_arg in javac_args if j_arg.startswith('-J')]
+    safe_javac_args = list(filter(lambda x: x not in j_args, javac_args))
+
+    with argfile.safe_args(safe_javac_args, self.get_options()) as batched_args:
+      javac_cmd = ['{}/bin/javac'.format(distribution.real_home)]
+      javac_cmd.extend(j_args)
+      javac_cmd.extend(batched_args)
 
       if self.execution_strategy == self.HERMETIC:
         self._execute_hermetic_compile(javac_cmd, ctx)

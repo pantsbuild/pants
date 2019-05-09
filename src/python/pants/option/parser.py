@@ -12,6 +12,7 @@ import traceback
 from builtins import next, object, open, str
 from collections import defaultdict
 
+import Levenshtein
 import six
 import yaml
 
@@ -29,6 +30,7 @@ from pants.option.errors import (BooleanOptionNameWithNo, FrozenRegistration, Im
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
+from pants.util.objects import SubclassesOf, datatype
 
 
 class Parser(object):
@@ -115,37 +117,79 @@ class Parser(object):
   def scope(self):
     return self._scope
 
+  @property
+  def known_args(self):
+    return self._known_args
+
   def walk(self, callback):
     """Invoke callback on this parser and its descendants, in depth-first order."""
     callback(self)
     for child in self._child_parsers:
       child.walk(callback)
 
-  def _create_flag_value_map(self, flags):
-    """Returns a map of flag -> list of values, based on the given flag strings.
+  class ParseArgsRequest(datatype([
+      ('flag_value_map', SubclassesOf(dict)),
+      'namespace',
+      'get_all_scoped_flag_names',
+      ('levenshtein_max_distance', int),
+  ])):
 
-    None signals no value given (e.g., -x, --foo).
-    The value is a list because the user may specify the same flag multiple times, and that's
-    sometimes OK (e.g., when appending to list-valued options).
+    @staticmethod
+    def _create_flag_value_map(flags):
+      """Returns a map of flag -> list of values, based on the given flag strings.
+
+      None signals no value given (e.g., -x, --foo).
+      The value is a list because the user may specify the same flag multiple times, and that's
+      sometimes OK (e.g., when appending to list-valued options).
+      """
+      flag_value_map = defaultdict(list)
+      for flag in flags:
+        key, has_equals_sign, flag_val = flag.partition('=')
+        if not has_equals_sign:
+          if not flag.startswith('--'):  # '-xfoo' style.
+            key = flag[0:2]
+            flag_val = flag[2:]
+          if not flag_val:
+            # Either a short option with no value or a long option with no equals sign.
+            # Important so we can distinguish between no value ('--foo') and setting to an empty
+            # string ('--foo='), for options with an implicit_value.
+            flag_val = None
+        flag_value_map[key].append(flag_val)
+      return flag_value_map
+
+    def __new__(cls, flags_in_scope, namespace,
+                get_all_scoped_flag_names,
+                levenshtein_max_distance):
+      """
+      :param Iterable flags_in_scope: Iterable of arg strings to parse into flag values.
+      :param namespace: The object to register the flag values on
+      :param function get_all_scoped_flag_names: A 0-argument function which returns an iterable of
+                                                 all registered option names in all their scopes. This
+                                                 is used to create an error message with suggestions
+                                                 when raising a `ParseError`.
+      :param int levenshtein_max_distance: The maximum Levenshtein edit distance between option names
+                                           to determine similarly named options when an option name
+                                           hasn't been registered.
+      """
+      flag_value_map = cls._create_flag_value_map(flags_in_scope)
+      return super(Parser.ParseArgsRequest, cls).__new__(cls, flag_value_map, namespace,
+                                                         get_all_scoped_flag_names,
+                                                         levenshtein_max_distance)
+
+  def parse_args(self, parse_args_request):
+    """Set values for this parser's options on the namespace object.
+
+    :param Parser.ParseArgsRequest parse_args_request: parameters for parsing this parser's
+                                                       arguments.
+    :returns: The `parse_args_request.namespace` object that the option values are being registered
+              on.
+    :raises: :class:`ParseError` if any flags weren't recognized.
     """
-    flag_value_map = defaultdict(list)
-    for flag in flags:
-      key, has_equals_sign, flag_val = flag.partition('=')
-      if not has_equals_sign:
-        if not flag.startswith('--'):  # '-xfoo' style.
-          key = flag[0:2]
-          flag_val = flag[2:]
-        if not flag_val:
-          # Either a short option with no value or a long option with no equals sign.
-          # Important so we can distinguish between no value ('--foo') and setting to an empty
-          # string ('--foo='), for options with an implicit_value.
-          flag_val = None
-      flag_value_map[key].append(flag_val)
-    return flag_value_map
 
-  def parse_args(self, flags, namespace):
-    """Set values for this parser's options on the namespace object."""
-    flag_value_map = self._create_flag_value_map(flags)
+    flag_value_map = parse_args_request.flag_value_map
+    namespace = parse_args_request.namespace
+    get_all_scoped_flag_names = parse_args_request.get_all_scoped_flag_names
+    levenshtein_max_distance = parse_args_request.levenshtein_max_distance
 
     mutex_map = defaultdict(list)
     for args, kwargs in self._unnormalized_option_registrations_iter():
@@ -221,12 +265,74 @@ class Parser(object):
 
       setattr(namespace, dest, val)
 
-    # See if there are any unconsumed flags remaining.
+    # See if there are any unconsumed flags remaining, and if so, raise a ParseError.
     if flag_value_map:
-      raise ParseError('Unrecognized command line flags on {}: {}'.format(
-        self._scope_str(), ', '.join(flag_value_map.keys())))
+      self._raise_error_for_invalid_flag_names(
+        flag_value_map,
+        all_scoped_flag_names=list(get_all_scoped_flag_names()),
+        levenshtein_max_distance=levenshtein_max_distance)
 
     return namespace
+
+  def _raise_error_for_invalid_flag_names(self, flag_value_map, all_scoped_flag_names,
+                                          levenshtein_max_distance):
+    """Identify similar option names to unconsumed flags and raise a ParseError with those names."""
+    matching_flags = {}
+    for flag_name in flag_value_map.keys():
+      # We will be matching option names without their leading hyphens, in order to capture both
+      # short and long-form options.
+      flag_normalized_unscoped_name = re.sub(r'^-+', '', flag_name)
+      flag_normalized_scoped_name = (
+        '{}-{}'.format(self.scope.replace('.', '-'), flag_normalized_unscoped_name)
+        if self.scope != GLOBAL_SCOPE
+        else flag_normalized_unscoped_name)
+
+      substring_matching_option_names = []
+      levenshtein_matching_option_names = defaultdict(list)
+      for other_scoped_flag in all_scoped_flag_names:
+        other_complete_flag_name = other_scoped_flag.scoped_arg
+        other_normalized_scoped_name = other_scoped_flag.normalized_scoped_arg
+        other_normalized_unscoped_name = other_scoped_flag.normalized_arg
+        if flag_normalized_unscoped_name == other_normalized_unscoped_name:
+          # If the unscoped option name itself matches, but the scope doesn't, display it.
+          substring_matching_option_names.append(other_complete_flag_name)
+        elif other_normalized_scoped_name.startswith(flag_normalized_scoped_name):
+          # If the invalid scoped option name is the beginning of another scoped option name,
+          # display it. This will also suggest long-form options such as --verbose for an attempted
+          # -v (if -v isn't defined as an option).
+          substring_matching_option_names.append(other_complete_flag_name)
+        else:
+          # If an unscoped option name is similar to the unscoped option from the command line
+          # according to --option-name-check-distance, display the matching scoped option name. This
+          # covers misspellings!
+          unscoped_option_levenshtein_distance = Levenshtein.distance(flag_normalized_unscoped_name, other_normalized_unscoped_name)
+          if unscoped_option_levenshtein_distance <= levenshtein_max_distance:
+            # NB: We order the matched flags by Levenshtein distance compared to the entire option string!
+            fully_scoped_levenshtein_distance = Levenshtein.distance(flag_normalized_scoped_name, other_normalized_scoped_name)
+            levenshtein_matching_option_names[fully_scoped_levenshtein_distance].append(other_complete_flag_name)
+
+      # If any option name matched or started with the invalid flag in any scope, put that
+      # first. Then, display the option names matching in order of overall edit distance, in a deterministic way.
+      all_matching_scoped_option_names = substring_matching_option_names + [
+        flag
+        for distance in sorted(levenshtein_matching_option_names.keys())
+        for flag in sorted(levenshtein_matching_option_names[distance])
+      ]
+      if all_matching_scoped_option_names:
+        matching_flags[flag_name] = all_matching_scoped_option_names
+
+    if matching_flags:
+      suggestions_message = ' Suggestions:\n{}'.format('\n'.join(
+        '{}: [{}]'.format(flag_name, ', '.join(matches))
+        for flag_name, matches in matching_flags.items()
+      ))
+    else:
+      suggestions_message = ''
+    raise ParseError(
+      'Unrecognized command line flags on {scope}: {flags}.{suggestions_message}'
+      .format(scope=self._scope_str(),
+              flags=', '.join(flag_value_map.keys()),
+              suggestions_message=suggestions_message))
 
   def option_registrations_iter(self):
     """Returns an iterator over the normalized registration arguments of each option in this parser.

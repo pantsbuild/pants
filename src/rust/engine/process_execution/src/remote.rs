@@ -21,6 +21,7 @@ use time;
 use super::{ExecuteProcessRequest, ExecutionStats, FallibleExecuteProcessResult};
 use std;
 use std::cmp::min;
+use std::collections::btree_map::BTreeMap;
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an ExecuteProcessRequest, and may be populated only by the
@@ -38,6 +39,7 @@ pub struct CommandRunner {
   cache_key_gen_version: Option<String>,
   instance_name: Option<String>,
   authorization_header: Option<String>,
+  platform_properties: BTreeMap<String, String>,
   channel: grpcio::Channel,
   env: Arc<grpcio::Environment>,
   execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
@@ -128,8 +130,12 @@ impl super::CommandRunner for CommandRunner {
     let operations_client = self.operations_client.clone();
 
     let store = self.store.clone();
-    let execute_request_result =
-      make_execute_request(&req, &self.instance_name, &self.cache_key_gen_version);
+    let execute_request_result = make_execute_request(
+      &req,
+      &self.instance_name,
+      &self.cache_key_gen_version,
+      self.platform_properties.clone(),
+    );
 
     let ExecuteProcessRequest {
       description,
@@ -303,6 +309,7 @@ impl CommandRunner {
     instance_name: Option<String>,
     root_ca_certs: Option<Vec<u8>>,
     oauth_bearer_token: Option<String>,
+    platform_properties: BTreeMap<String, String>,
     thread_count: usize,
     store: Store,
     futures_timer_thread: resettable::Resettable<futures_timer::HelperThread>,
@@ -330,6 +337,7 @@ impl CommandRunner {
       cache_key_gen_version,
       instance_name,
       authorization_header: oauth_bearer_token.map(|t| format!("Bearer {}", t)),
+      platform_properties,
       channel,
       env,
       execution_client,
@@ -729,6 +737,7 @@ fn make_execute_request(
   req: &ExecuteProcessRequest,
   instance_name: &Option<String>,
   cache_key_gen_version: &Option<String>,
+  mut platform_properties: BTreeMap<String, String>,
 ) -> Result<
   (
     bazel_protos::remote_execution::Action,
@@ -781,20 +790,22 @@ fn make_execute_request(
   output_directories.sort();
   command.set_output_directories(protobuf::RepeatedField::from_vec(output_directories));
 
-  // Ideally, the JDK would be brought along as part of the input directory, but we don't currently
-  // have support for that. The platform with which we're experimenting for remote execution
-  // supports this property, and will symlink .jdk to a system-installed JDK:
-  // https://github.com/twitter/scoot/pull/391
   if req.jdk_home.is_some() {
-    command.set_platform({
-      let mut platform = bazel_protos::remote_execution::Platform::new();
-      platform.mut_properties().push({
-        let mut property = bazel_protos::remote_execution::Platform_Property::new();
-        property.set_name("JDK_SYMLINK".to_owned());
-        property.set_value(".jdk".to_owned());
-        property
-      });
-      platform
+    // Ideally, the JDK would be brought along as part of the input directory, but we don't
+    // currently have support for that. Scoot supports this property, and will symlink .jdk to a
+    // system-installed JDK https://github.com/twitter/scoot/pull/391 - we should probably come to
+    // some kind of consensus across tools as to how this should work; RBE appears to work by
+    // allowing you to specify a jdk-version platform property, and it will put a JDK at a
+    // well-known path in the docker container you specify in which to run.
+    platform_properties.insert("JDK_SYMLINK".to_owned(), ".jdk".to_owned());
+  }
+
+  for (name, value) in platform_properties {
+    command.mut_platform().mut_properties().push({
+      let mut property = bazel_protos::remote_execution::Platform_Property::new();
+      property.set_name(name.clone());
+      property.set_value(value.clone());
+      property
     });
   }
 
@@ -915,7 +926,6 @@ mod tests {
   use std::iter::{self, FromIterator};
   use std::ops::Sub;
   use std::path::PathBuf;
-  use std::sync::Arc;
   use std::time::Duration;
 
   #[derive(Debug, PartialEq)]
@@ -998,7 +1008,7 @@ mod tests {
     );
 
     assert_eq!(
-      super::make_execute_request(&req, &None, &None),
+      super::make_execute_request(&req, &None, &None, BTreeMap::new()),
       Ok((want_action, want_command, want_execute_request))
     );
   }
@@ -1072,7 +1082,7 @@ mod tests {
     );
 
     assert_eq!(
-      super::make_execute_request(&req, &Some("dark-tower".to_owned()), &None),
+      super::make_execute_request(&req, &Some("dark-tower".to_owned()), &None, BTreeMap::new()),
       Ok((want_action, want_command, want_execute_request))
     );
   }
@@ -1151,7 +1161,7 @@ mod tests {
     );
 
     assert_eq!(
-      super::make_execute_request(&req, &None, &Some("meep".to_owned())),
+      super::make_execute_request(&req, &None, &Some("meep".to_owned()), BTreeMap::new()),
       Ok((want_action, want_command, want_execute_request))
     );
   }
@@ -1206,7 +1216,84 @@ mod tests {
     );
 
     assert_eq!(
-      super::make_execute_request(&req, &None, &None),
+      super::make_execute_request(&req, &None, &None, BTreeMap::new()),
+      Ok((want_action, want_command, want_execute_request))
+    );
+  }
+
+  #[test]
+  fn make_execute_request_with_jdk_and_extra_platform_properties() {
+    let input_directory = TestDirectory::containing_roland();
+    let req = ExecuteProcessRequest {
+      argv: owned_string_vec(&["/bin/echo", "yo"]),
+      env: BTreeMap::new(),
+      input_files: input_directory.digest(),
+      output_files: BTreeSet::new(),
+      output_directories: BTreeSet::new(),
+      timeout: Duration::from_millis(1000),
+      description: "some description".to_owned(),
+      jdk_home: Some(PathBuf::from("/tmp")),
+    };
+
+    let mut want_command = bazel_protos::remote_execution::Command::new();
+    want_command.mut_arguments().push("/bin/echo".to_owned());
+    want_command.mut_arguments().push("yo".to_owned());
+    want_command.mut_platform().mut_properties().push({
+      let mut property = bazel_protos::remote_execution::Platform_Property::new();
+      property.set_name("FIRST".to_owned());
+      property.set_value("foo".to_owned());
+      property
+    });
+    want_command.mut_platform().mut_properties().push({
+      let mut property = bazel_protos::remote_execution::Platform_Property::new();
+      property.set_name("JDK_SYMLINK".to_owned());
+      property.set_value(".jdk".to_owned());
+      property
+    });
+    want_command.mut_platform().mut_properties().push({
+      let mut property = bazel_protos::remote_execution::Platform_Property::new();
+      property.set_name("last".to_owned());
+      property.set_value("bar".to_owned());
+      property
+    });
+
+    let mut want_action = bazel_protos::remote_execution::Action::new();
+    want_action.set_command_digest(
+      (&Digest(
+        Fingerprint::from_hex_string(
+          "a809e7c54a105e7d98cc61558ac13ca3c05a5e1cb33326dfde189c72887dac29",
+        )
+        .unwrap(),
+        65,
+      ))
+        .into(),
+    );
+    want_action.set_input_root_digest((&input_directory.digest()).into());
+
+    let mut want_execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
+    want_execute_request.set_action_digest(
+      (&Digest(
+        Fingerprint::from_hex_string(
+          "3d8d2a0282cb45b365b338f80ddab039dfa461dadde053e12bd5c3ab3329d928",
+        )
+        .unwrap(),
+        140,
+      ))
+        .into(),
+    );
+
+    assert_eq!(
+      super::make_execute_request(
+        &req,
+        &None,
+        &None,
+        vec![
+          ("FIRST".to_owned(), "foo".to_owned()),
+          ("last".to_owned(), "bar".to_owned())
+        ]
+        .into_iter()
+        .collect()
+      ),
       Ok((want_action, want_command, want_execute_request))
     );
   }
@@ -1231,6 +1318,7 @@ mod tests {
           },
           &None,
           &None,
+          BTreeMap::new(),
         )
         .unwrap()
         .2,
@@ -1254,7 +1342,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         vec![
@@ -1343,6 +1431,8 @@ mod tests {
 
   #[test]
   fn ensure_inline_stdio_is_stored() {
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+
     let test_stdout = TestData::roland();
     let test_stderr = TestData::catnip();
 
@@ -1351,7 +1441,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&echo_roland_request(), &None, &None)
+        super::make_execute_request(&echo_roland_request(), &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         vec![make_successful_operation(
@@ -1370,7 +1460,6 @@ mod tests {
     let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       &store_dir_path,
-      Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       &[cas.address()],
       None,
       &None,
@@ -1390,11 +1479,14 @@ mod tests {
       None,
       None,
       None,
+      BTreeMap::new(),
       1,
       store,
       timer_thread,
     );
-    let result = cmd_runner.run(echo_roland_request()).wait().unwrap();
+    let result = runtime
+      .block_on(cmd_runner.run(echo_roland_request()))
+      .unwrap();
     assert_eq!(
       result.without_execution_attempts(),
       FallibleExecuteProcessResult {
@@ -1406,23 +1498,17 @@ mod tests {
       }
     );
 
-    let local_store = fs::Store::local_only(
-      &store_dir_path,
-      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    )
-    .expect("Error creating local store");
+    let local_store = fs::Store::local_only(&store_dir_path).expect("Error creating local store");
     {
       assert_eq!(
-        local_store
-          .load_file_bytes_with(test_stdout.digest(), |v| v)
-          .wait()
+        runtime
+          .block_on(local_store.load_file_bytes_with(test_stdout.digest(), |v| v))
           .unwrap(),
         Some(test_stdout.bytes())
       );
       assert_eq!(
-        local_store
-          .load_file_bytes_with(test_stderr.digest(), |v| v)
-          .wait()
+        runtime
+          .block_on(local_store.load_file_bytes_with(test_stderr.digest(), |v| v))
           .unwrap(),
         Some(test_stderr.bytes())
       );
@@ -1438,7 +1524,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         Vec::from_iter(
@@ -1489,7 +1575,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         vec![
@@ -1514,7 +1600,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         vec![
@@ -1553,7 +1639,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         vec![
@@ -1591,7 +1677,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         vec![MockOperation::new({
@@ -1623,7 +1709,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         vec![
@@ -1658,7 +1744,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         vec![MockOperation::new({
@@ -1684,7 +1770,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None)
+        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         vec![
@@ -1706,6 +1792,8 @@ mod tests {
 
   #[test]
   fn execute_missing_file_uploads_if_known() {
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+
     let roland = TestData::roland();
 
     let mock_server = {
@@ -1713,7 +1801,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&cat_roland_request(), &None, &None)
+        super::make_execute_request(&cat_roland_request(), &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         vec![
@@ -1738,7 +1826,6 @@ mod tests {
     let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       store_dir,
-      Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       &[cas.address()],
       None,
       &None,
@@ -1751,28 +1838,27 @@ mod tests {
       timer_thread.with(|t| t.handle()),
     )
     .expect("Failed to make store");
-    store
-      .store_file_bytes(roland.bytes(), false)
-      .wait()
+    runtime
+      .block_on(store.store_file_bytes(roland.bytes(), false))
       .expect("Saving file bytes to store");
-    store
-      .record_directory(&TestDirectory::containing_roland().directory(), false)
-      .wait()
+    runtime
+      .block_on(store.record_directory(&TestDirectory::containing_roland().directory(), false))
       .expect("Saving directory bytes to store");
-
-    let result = CommandRunner::new(
+    let command_runner = CommandRunner::new(
       &mock_server.address(),
       None,
       None,
       None,
       None,
+      BTreeMap::new(),
       1,
       store,
       timer_thread,
-    )
-    .run(cat_roland_request())
-    .wait()
-    .unwrap();
+    );
+
+    let result = runtime
+      .block_on(command_runner.run(cat_roland_request()))
+      .unwrap();
     assert_eq!(
       result.without_execution_attempts(),
       FallibleExecuteProcessResult {
@@ -1812,7 +1898,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&cat_roland_request(), &None, &None)
+        super::make_execute_request(&cat_roland_request(), &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         vec![
@@ -1838,7 +1924,6 @@ mod tests {
     let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       store_dir,
-      Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       &[cas.address()],
       None,
       &None,
@@ -1862,6 +1947,7 @@ mod tests {
       None,
       None,
       None,
+      BTreeMap::new(),
       1,
       store,
       timer_thread,
@@ -1893,7 +1979,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&cat_roland_request(), &None, &None)
+        super::make_execute_request(&cat_roland_request(), &None, &None, BTreeMap::new())
           .unwrap()
           .2,
         // We won't get as far as trying to run the operation, so don't expect any requests whose
@@ -1910,7 +1996,6 @@ mod tests {
     let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       store_dir,
-      Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       &[cas.address()],
       None,
       &None,
@@ -1924,19 +2009,22 @@ mod tests {
     )
     .expect("Failed to make store");
 
-    let error = CommandRunner::new(
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    let runner = CommandRunner::new(
       &mock_server.address(),
       None,
       None,
       None,
       None,
+      BTreeMap::new(),
       1,
       store,
       timer_thread,
-    )
-    .run(cat_roland_request())
-    .wait()
-    .expect_err("Want error");
+    );
+
+    let error = runtime
+      .block_on(runner.run(cat_roland_request()))
+      .expect_err("Want error");
     assert_contains(&error, &format!("{}", missing_digest.0));
   }
 
@@ -2151,7 +2239,7 @@ mod tests {
         let op_name = "gimme-foo".to_string();
         mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, &None, &None)
+          super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
             .unwrap()
             .2,
           vec![
@@ -2189,7 +2277,7 @@ mod tests {
         let op_name = "gimme-foo".to_string();
         mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, &None, &None)
+          super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
             .unwrap()
             .2,
           vec![
@@ -2509,7 +2597,8 @@ mod tests {
       .directory(&TestDirectory::containing_roland())
       .build();
     let command_runner = create_command_runner(address, &cas);
-    command_runner.run(request).wait()
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    runtime.block_on(command_runner.run(request))
   }
 
   fn create_command_runner(address: String, cas: &mock::StubCAS) -> CommandRunner {
@@ -2517,7 +2606,6 @@ mod tests {
     let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       store_dir,
-      Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       &[cas.address()],
       None,
       &None,
@@ -2531,7 +2619,17 @@ mod tests {
     )
     .expect("Failed to make store");
 
-    CommandRunner::new(&address, None, None, None, None, 1, store, timer_thread)
+    CommandRunner::new(
+      &address,
+      None,
+      None,
+      None,
+      None,
+      BTreeMap::new(),
+      1,
+      store,
+      timer_thread,
+    )
   }
 
   fn timer_thread() -> resettable::Resettable<futures_timer::HelperThread> {
@@ -2546,12 +2644,13 @@ mod tests {
       .directory(&TestDirectory::containing_roland())
       .build();
     let command_runner = create_command_runner("".to_owned(), &cas);
-    command_runner
-      .extract_execute_response(
-        super::OperationOrStatus::Operation(operation),
-        &mut ExecutionHistory::default(),
-      )
-      .wait()
+
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+
+    runtime.block_on(command_runner.extract_execute_response(
+      super::OperationOrStatus::Operation(operation),
+      &mut ExecutionHistory::default(),
+    ))
   }
 
   fn extract_output_files_from_response(
@@ -2562,9 +2661,9 @@ mod tests {
       .directory(&TestDirectory::containing_roland())
       .build();
     let command_runner = create_command_runner("".to_owned(), &cas);
-    command_runner
-      .extract_output_files(&execute_response)
-      .wait()
+
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    runtime.block_on(command_runner.extract_output_files(&execute_response))
   }
 
   fn make_any_proto(message: &dyn Message) -> protobuf::well_known_types::Any {

@@ -122,14 +122,16 @@ class PythonSetup(Subsystem):
   def scratch_dir(self):
     return os.path.join(self.get_options().pants_workdir, *self.options_scope.split('.'))
 
-  def compatibility_or_constraints(self, target):
+  def compatibility_or_constraints(self, compatibility):
     """
-    Return either the compatibility of the given target, or the interpreter constraints.
-    If interpreter constraints are supplied by the CLI flag, return those only.
+    Return either the given compatibility, or the interpreter constraints. If interpreter
+    constraints are supplied by the CLI flag, return those only.
+
+    :param compatibility: Optional[List[str]], e.g. None or ['CPython>3'].
     """
     if self.get_options().is_flagged('interpreter_constraints'):
       return tuple(self.interpreter_constraints)
-    return tuple(target.compatibility or self.interpreter_constraints)
+    return tuple(compatibility or self.interpreter_constraints)
 
   @classmethod
   def expand_interpreter_search_paths(cls, interpreter_search_paths, pyenv_root_func=None):

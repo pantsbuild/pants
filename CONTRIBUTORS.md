@@ -158,6 +158,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Qicheng Ma
 + Robert Stapenhurst
 + Roger Jiang
++ Rushal Verma
 + Ryan Williams
 + Sameer Brenn
 + Sara Solano

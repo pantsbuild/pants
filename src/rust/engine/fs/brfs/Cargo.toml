@@ -23,6 +23,7 @@ parking_lot = "0.6"
 protobuf = { version = "2.0.4", features = ["with-bytes"] }
 serverset = { path = "../../serverset" }
 time = "0.1.39"
+tokio = "0.1"
 
 [dev-dependencies]
 bytes = "0.4.5"

@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std;
+use std::convert::TryInto;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
@@ -13,20 +14,22 @@ use futures::Future;
 
 use crate::core::{Failure, TypeId};
 use crate::handles::maybe_drop_handles;
-use crate::nodes::{NodeKey, TryInto, WrappedNode};
+use crate::nodes::{NodeKey, WrappedNode};
 use crate::rule_graph::RuleGraph;
 use crate::scheduler::Session;
 use crate::tasks::Tasks;
 use crate::types::Types;
 use boxfuture::{BoxFuture, Boxable};
 use core::clone::Clone;
-use fs::{self, safe_create_dir_all_ioerror, PosixFS, ResettablePool, Store};
+use fs::{self, safe_create_dir_all_ioerror, PosixFS, Store};
 use graph::{EntryId, Graph, NodeContext};
 use log::debug;
+use parking_lot::RwLock;
 use process_execution::{self, BoundedCommandRunner, CommandRunner};
 use rand::seq::SliceRandom;
 use reqwest;
 use resettable::Resettable;
+use std::collections::btree_map::BTreeMap;
 
 ///
 /// The core context shared (via Arc) between the Scheduler and the Context objects of
@@ -41,8 +44,7 @@ pub struct Core {
   pub tasks: Tasks,
   pub rule_graph: RuleGraph,
   pub types: Types,
-  pub fs_pool: Arc<ResettablePool>,
-  pub runtime: Resettable<Arc<Runtime>>,
+  pub runtime: Resettable<Arc<RwLock<Runtime>>>,
   pub futures_timer_thread: Resettable<futures_timer::HelperThread>,
   store_and_command_runner_and_http_client:
     Resettable<(Store, BoundedCommandRunner, reqwest::r#async::Client)>,
@@ -69,6 +71,7 @@ impl Core {
     remote_store_chunk_bytes: usize,
     remote_store_chunk_upload_timeout: Duration,
     remote_store_rpc_retries: usize,
+    remote_execution_extra_platform_properties: BTreeMap<String, String>,
     process_execution_parallelism: usize,
     process_execution_cleanup_local_dirs: bool,
   ) -> Core {
@@ -76,9 +79,10 @@ impl Core {
     let mut remote_store_servers = remote_store_servers;
     remote_store_servers.shuffle(&mut rand::thread_rng());
 
-    let fs_pool = Arc::new(ResettablePool::new("io-".to_string()));
     let runtime = Resettable::new(|| {
-      Arc::new(Runtime::new().unwrap_or_else(|e| panic!("Could not initialize Runtime: {:?}", e)))
+      Arc::new(RwLock::new(Runtime::new().unwrap_or_else(|e| {
+        panic!("Could not initialize Runtime: {:?}", e)
+      })))
     });
     // We re-use these certs for both the execution and store service; they're generally tied together.
     let root_ca_certs = if let Some(path) = remote_root_ca_certs_path {
@@ -100,7 +104,6 @@ impl Core {
       None
     };
 
-    let fs_pool2 = fs_pool.clone();
     let futures_timer_thread = Resettable::new(|| futures_timer::HelperThread::new().unwrap());
     let futures_timer_thread2 = futures_timer_thread.clone();
     let store_and_command_runner_and_http_client = Resettable::new(move || {
@@ -109,11 +112,10 @@ impl Core {
         .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))
         .and_then(|()| {
           if remote_store_servers.is_empty() {
-            Store::local_only(local_store_dir, fs_pool2.clone())
+            Store::local_only(local_store_dir)
           } else {
             Store::with_remote(
               local_store_dir,
-              fs_pool2.clone(),
               &remote_store_servers,
               remote_instance_name.clone(),
               &root_ca_certs,
@@ -138,6 +140,7 @@ impl Core {
           remote_instance_name.clone(),
           root_ca_certs.clone(),
           oauth_bearer_token.clone(),
+          remote_execution_extra_platform_properties.clone(),
           // Allow for some overhead for bookkeeping threads (if any).
           process_execution_parallelism + 2,
           store.clone(),
@@ -145,7 +148,6 @@ impl Core {
         )),
         None => Box::new(process_execution::local::CommandRunner::new(
           store.clone(),
-          fs_pool2.clone(),
           work_dir.clone(),
           process_execution_cleanup_local_dirs,
         )),
@@ -166,13 +168,12 @@ impl Core {
       tasks: tasks,
       rule_graph: rule_graph,
       types: types,
-      fs_pool: fs_pool.clone(),
       runtime: runtime,
       futures_timer_thread: futures_timer_thread,
       store_and_command_runner_and_http_client: store_and_command_runner_and_http_client,
       // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
-      vfs: PosixFS::new(&build_root, fs_pool, &ignore_patterns).unwrap_or_else(|e| {
+      vfs: PosixFS::new(&build_root, &ignore_patterns).unwrap_or_else(|e| {
         panic!("Could not initialize VFS: {:?}", e);
       }),
       build_root: build_root,
@@ -198,11 +199,9 @@ impl Core {
     }
     let t = self.futures_timer_thread.with_reset(|| {
       self.runtime.with_reset(|| {
-        self.graph.with_exclusive(|| {
-          self
-            .fs_pool
-            .with_shutdown(|| self.store_and_command_runner_and_http_client.with_reset(f))
-        })
+        self
+          .graph
+          .with_exclusive(|| self.store_and_command_runner_and_http_client.with_reset(f))
       })
     });
     self
@@ -283,6 +282,6 @@ impl NodeContext for Context {
   where
     F: Future<Item = (), Error = ()> + Send + 'static,
   {
-    self.core.runtime.get().executor().spawn(future);
+    self.core.runtime.get().read().executor().spawn(future);
   }
 }

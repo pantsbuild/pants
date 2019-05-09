@@ -50,11 +50,10 @@ pub mod logger;
 
 pub type Logger = logger::Logger;
 
-use num_enum::CustomTryInto;
+use num_enum::TryFromPrimitive;
 
 // This is a hard-coding of constants in the standard logging python package.
-// TODO: Switch from CustomTryInto to TryFromPrimitive when try_from is stable.
-#[derive(Debug, Eq, PartialEq, CustomTryInto, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, TryFromPrimitive, Clone, Copy)]
 #[repr(u64)]
 enum PythonLogLevel {
   NotSet = 0,
@@ -63,14 +62,14 @@ enum PythonLogLevel {
   Debug = 10,
   Info = 20,
   Warn = 30,
-  Error = 40,
+  Error_ = 40,
   Critical = 50,
 }
 
 impl From<log::Level> for PythonLogLevel {
   fn from(level: log::Level) -> Self {
     match level {
-      log::Level::Error => PythonLogLevel::Error,
+      log::Level::Error => PythonLogLevel::Error_,
       log::Level::Warn => PythonLogLevel::Warn,
       log::Level::Info => PythonLogLevel::Info,
       log::Level::Debug => PythonLogLevel::Debug,
@@ -87,7 +86,7 @@ impl From<PythonLogLevel> for log::LevelFilter {
       PythonLogLevel::Debug => log::LevelFilter::Debug,
       PythonLogLevel::Info => log::LevelFilter::Info,
       PythonLogLevel::Warn => log::LevelFilter::Warn,
-      PythonLogLevel::Error => log::LevelFilter::Error,
+      PythonLogLevel::Error_ => log::LevelFilter::Error,
       // Rust doesn't have a Critical, so treat them like Errors.
       PythonLogLevel::Critical => log::LevelFilter::Error,
     }
@@ -104,7 +103,7 @@ impl From<PythonLogLevel> for log::Level {
       PythonLogLevel::Debug => log::Level::Debug,
       PythonLogLevel::Info => log::Level::Info,
       PythonLogLevel::Warn => log::Level::Warn,
-      PythonLogLevel::Error => log::Level::Error,
+      PythonLogLevel::Error_ => log::Level::Error,
       // Rust doesn't have a Critical, so treat them like Errors.
       PythonLogLevel::Critical => log::Level::Error,
     }

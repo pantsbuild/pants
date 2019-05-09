@@ -35,6 +35,7 @@ class PytestPrep(PythonExecutionTaskBase):
       pex_info.merge_pex_path(pex_path)  # We're now on the sys.path twice.
       PEXBuilder(pex_path, interpreter=interpreter, pex_info=pex_info).freeze()
       self._pex = PEX(pex=pex_path, interpreter=interpreter)
+      self._interpreter = interpreter
 
     @property
     def pex(self):
@@ -43,6 +44,14 @@ class PytestPrep(PythonExecutionTaskBase):
       :rtype: :class:`pex.pex.PEX`
       """
       return self._pex
+
+    @property
+    def interpreter(self):
+      """Return the interpreter used to build this PEX.
+
+      :rtype: :class:`pex.interpreter.PythonInterpreter`
+      """
+      return self._interpreter
 
     @property
     def config_path(self):
@@ -85,7 +94,7 @@ class PytestPrep(PythonExecutionTaskBase):
       return
     pex_info = PexInfo.default()
     pex_info.entry_point = 'pytest'
-    pytest_binary = self.create_pex(pex_info)
+    pytest_binary = self.create_pex(pex_info, pin_selected_interpreter=True)
     interpreter = self.context.products.get_data(PythonInterpreter)
     self.context.products.register_data(self.PytestBinary,
                                         self.PytestBinary(interpreter, pytest_binary))

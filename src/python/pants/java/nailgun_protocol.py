@@ -8,6 +8,7 @@ import datetime
 import os
 import socket
 import struct
+import threading
 import time
 from abc import abstractmethod
 from builtins import bytes, object, str, zip
@@ -251,7 +252,7 @@ class NailgunProtocol(object):
       """
 
   @classmethod
-  def iter_chunks(cls, sock, return_bytes=False, timeout_object=None):
+  def iter_chunks(cls, maybe_shutdown_socket, return_bytes=False, timeout_object=None):
     """Generates chunks from a connected socket until an Exit chunk is sent or a timeout occurs.
 
     :param sock: the socket to read from.
@@ -261,32 +262,39 @@ class NailgunProtocol(object):
     :raises: :class:`cls.ProcessStreamTimeout`
     """
     assert(timeout_object is None or isinstance(timeout_object, cls.TimeoutProvider))
-    orig_timeout_time = None
-    timeout_interval = None
-    while 1:
-      if orig_timeout_time is not None:
-        remaining_time = time.time() - (orig_timeout_time + timeout_interval)
-        if remaining_time > 0:
-          original_timestamp = datetime.datetime.fromtimestamp(orig_timeout_time).isoformat()
-          raise cls.ProcessStreamTimeout(
-            "iterating over bytes from nailgun timed out with timeout interval {} starting at {}, "
-            "overtime seconds: {}"
-            .format(timeout_interval, original_timestamp, remaining_time))
-      elif timeout_object is not None:
-        opts = timeout_object.maybe_timeout_options()
-        if opts:
-          orig_timeout_time = opts.start_time
-          timeout_interval = opts.interval
-          continue
-        remaining_time = None
-      else:
-        remaining_time = None
 
-      with cls._set_socket_timeout(sock, timeout=remaining_time):
-        chunk_type, payload = cls.read_chunk(sock, return_bytes)
-        yield chunk_type, payload
-        if chunk_type == ChunkType.EXIT:
+    if timeout_object is None:
+      deadline = None
+    else:
+      options = timeout_object.maybe_timeout_options()
+      if options is None:
+        deadline = None
+      else:
+        deadline = options.start_time + options.interval
+
+    while 1:
+      if deadline is not None:
+        overtime_seconds = deadline - time.time()
+        if overtime_seconds > 0:
+          original_timestamp = datetime.datetime.fromtimestamp(deadline).isoformat()
+          raise cls.ProcessStreamTimeout(
+            "iterating over bytes from nailgun timed out at {}, overtime seconds: {}"
+            .format(original_timestamp, overtime_seconds))
+
+      with maybe_shutdown_socket.lock:
+        if maybe_shutdown_socket.is_shutdown:
           break
+        # We poll with low timeouts because we poll under a lock. This allows the DaemonPantsRunner
+        # to shut down the socket, and us to notice, pretty quickly.
+        with cls._set_socket_timeout(maybe_shutdown_socket.socket, timeout=0.01):
+          try:
+            chunk_type, payload = cls.read_chunk(maybe_shutdown_socket.socket, return_bytes)
+          except socket.timeout:
+            # Timeouts are handled by the surrounding loop
+            continue
+      yield chunk_type, payload
+      if chunk_type == ChunkType.EXIT:
+        break
 
   @classmethod
   def send_start_reading_input(cls, sock):
@@ -390,3 +398,20 @@ class NailgunProtocol(object):
     :returns: A tuple of boolean values indicating ttyname paths or None for (stdin, stdout, stderr).
     """
     return tuple(env.get(cls.TTY_PATH_ENV.format(fd_id)) for fd_id in STDIO_DESCRIPTORS)
+
+
+class MaybeShutdownSocket(object):
+  """A wrapper around a socket which knows whether it has been shut down.
+
+  Because we may shut down a nailgun socket from one thread, and read from it on another, we use
+  this wrapper so that a shutting-down thread can signal to a reading thread that it should stop
+  reading.
+
+  lock guards access to is_shutdown, shutting down the socket, and any calls which need to guarantee
+  they don't race a shutdown call.
+  """
+
+  def __init__(self, sock):
+    self.socket = sock
+    self.lock = threading.Lock()
+    self.is_shutdown = False

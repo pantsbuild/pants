@@ -36,7 +36,6 @@ def all_enclosing_scopes(scope, allow_global=True):
 
   _validate_full_scope(scope)
 
-  # TODO: validate scopes here and/or in `enclosing_scope()` instead of assuming correctness.
   def scope_within_range(tentative_scope):
     if tentative_scope is None:
       return False

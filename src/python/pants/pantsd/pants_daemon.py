@@ -15,7 +15,7 @@ from future.utils import text_type
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
-from pants.base.exception_sink import ExceptionSink
+from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.base.exiter import Exiter
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.native import Native
@@ -80,6 +80,16 @@ class _LoggerStream(object):
   @property
   def buffer(self):
     return self
+
+
+class PantsDaemonSignalHandler(SignalHandler):
+
+  def __init__(self, daemon):
+    super(PantsDaemonSignalHandler, self).__init__()
+    self._daemon = daemon
+
+  def handle_sigint(self, signum, _frame):
+    self._daemon.terminate(include_watchman=False)
 
 
 class PantsDaemon(FingerprintedProcessManager):
@@ -349,8 +359,9 @@ class PantsDaemon(FingerprintedProcessManager):
       service.setup(self._services)
 
   @staticmethod
-  def _make_thread(target):
-    t = threading.Thread(target=target)
+  def _make_thread(service):
+    name = "{}Thread".format(service.__class__.__name__)
+    t = threading.Thread(target=service.run, name=name)
     t.daemon = True
     return t
 
@@ -360,7 +371,7 @@ class PantsDaemon(FingerprintedProcessManager):
       self._logger.critical('no services to run, bailing!')
       return
 
-    service_thread_map = {service: self._make_thread(service.run)
+    service_thread_map = {service: self._make_thread(service)
                           for service in pants_services.services}
 
     # Start services.

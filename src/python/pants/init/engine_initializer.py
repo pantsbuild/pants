@@ -180,7 +180,9 @@ class LegacyGraphSession(datatype(['scheduler_session', 'build_file_aliases', 'g
     :returns: An exit code.
     """
     subject = target_roots.specs
-    console = Console()
+    console = Console(
+      use_colors=options_bootstrapper.bootstrap_options.for_global_scope().colors
+    )
     for goal in goals:
       goal_product = self.goal_map[goal]
       params = Params(subject, options_bootstrapper, console)
