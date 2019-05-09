@@ -6,5 +6,7 @@ python_tests(
   sources=['test_python_test_runner.py'],
   dependencies=[
     'src/python/pants/backend/python/rules',
+    'src/python/pants/backend/python/subsystems',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )

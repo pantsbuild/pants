@@ -7,42 +7,42 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from unittest import TestCase
 
 from pants.backend.python.rules.python_test_runner import parse_interpreter_constraints
+from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 
 class TestPythonTestRunner(TestCase):
 
+  def assert_interpreter_constraints_parsed(
+    self, python_setup_constraints, target_constraints, expected
+  ):
+    python_setup = global_subsystem_instance(
+      PythonSetup,
+      options={PythonSetup.options_scope: {"interpreter_constraints": python_setup_constraints}}
+    )
+    # TODO: figure out how to mock TargetAdaptor
+    target_adaptor = target_constraints
+    self.assertEqual(parse_interpreter_constraints(python_setup, [target_adaptor]), expected)
+
   def test_interpreter_constraints_none_used(self):
-    # Want
-    # * python_setup to have no interpreter constraints
-    # * hydrated_target to have no `compatibility`
-    self.assertEqual(
-      parse_interpreter_constraints(),
-      []
+    self.assert_interpreter_constraints_parsed(
+      python_setup_constraints=None,
+      target_constraints=None,
+      expected=[]
     )
 
   def test_interpreter_constraints_global_used(self):
-    # Want
-    # * python_setup to have constraints ["CPython>=400"]
-    # * hydrated_target to have no `compatibility`
-    self.assertEqual(
-      parse_interpreter_constraints(),
-      ["--interpreter-constraint", "CPython>=400"]
+    self.assert_interpreter_constraints_parsed(
+      python_setup_constraints=["CPython>=400"],
+      target_constraints=None,
+      expected=["--interpreter-constraint", "CPython>=400"]
     )
 
   def test_interpreter_constraints_compability_field_used(self):
-    # Want
-    # * python_setup to have no interpreter constraints
-    # * hydrated_target to have `compatibility` ["CPython>=400"]
-    self.assertEqual(
-      parse_interpreter_constraints(),
-      ["--interpreter-constraint", "CPython>=400"]
-    )
-
-  def test_interpreter_constraints_multiple_constraints(self):
-    # Want
-    # * python_setup to have no interpreter constraints
-    # * hydrated_targets to have `compatibility` ["CPython>=400", "CPython<=1"]
-    self.assertEqual(
-      parse_interpreter_constraints(),
-      ["--interpreter-constraint", "CPython<=1", "--interpreter-constraint", "CPython>=400"]
+    self.assert_interpreter_constraints_parsed(
+      python_setup_constraints=None,
+      target_constraints=["CPython<=1", "CPython>=400",],
+      expected=[
+        "--interpreter-constraint", "CPython<=1", "--interpreter-constraint", "CPython>=400"
+      ]
     )
