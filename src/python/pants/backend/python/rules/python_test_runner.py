@@ -40,7 +40,7 @@ def parse_interpreter_constraints(python_setup, hydrated_targets):
     for constraint in python_setup.compatibility_or_constraints(target.adaptor)
   }
   constraints_args = []
-  for constraint in constraints:
+  for constraint in sorted(constraints):
     constraints_args.extend(["--interpreter-constraint", constraint])
   return constraints_args
 
