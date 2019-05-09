@@ -41,7 +41,7 @@ pub use serverset::BackoffConfig;
 
 use std::cmp::min;
 use std::ffi::OsStr;
-use std::io::{self, Read};
+use std::io;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
@@ -51,6 +51,7 @@ use ::ignore::gitignore::{Gitignore, GitignoreBuilder};
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use futures::future::{self, Future};
+use futures::Stream;
 use glob::{MatchOptions, Pattern};
 use lazy_static::lazy_static;
 
@@ -557,16 +558,11 @@ pub struct GlobWithSource {
 #[derive(Clone)]
 pub struct PosixFS {
   root: Dir,
-  pool: Arc<ResettablePool>,
   ignore: Arc<GitignoreStyleExcludes>,
 }
 
 impl PosixFS {
-  pub fn new<P: AsRef<Path>>(
-    root: P,
-    pool: Arc<ResettablePool>,
-    ignore_patterns: &[String],
-  ) -> Result<PosixFS, String> {
+  pub fn new<P: AsRef<Path>>(root: P, ignore_patterns: &[String]) -> Result<PosixFS, String> {
     let root: &Path = root.as_ref();
     let canonical_root = root
       .canonicalize()
@@ -592,100 +588,78 @@ impl PosixFS {
     })?;
     Ok(PosixFS {
       root: canonical_root,
-      pool: pool,
       ignore: ignore,
     })
   }
 
-  fn scandir_sync(&self, dir_relative_to_root: &Dir) -> Result<Vec<Stat>, io::Error> {
+  pub fn scandir(
+    &self,
+    dir_relative_to_root: Dir,
+  ) -> impl Future<Item = DirectoryListing, Error = io::Error> {
     let dir_abs = self.root.0.join(&dir_relative_to_root.0);
-    let mut stats: Vec<Stat> = dir_abs
-      .read_dir()?
-      .map(|readdir| {
-        let dir_entry = readdir?;
-        let get_metadata = || std::fs::metadata(dir_abs.join(dir_entry.file_name()));
-        PosixFS::stat_internal(
-          dir_relative_to_root.0.join(dir_entry.file_name()),
-          dir_entry.file_type()?,
-          &dir_abs,
-          get_metadata,
-        )
+    let posix_fs = self.clone();
+    let ignore = self.ignore.clone();
+    tokio_fs::read_dir(dir_abs.clone())
+      .and_then(move |readdir| {
+        readdir
+          .and_then(move |dir_entry| {
+            let dir_relative_to_root = dir_relative_to_root.clone();
+            posix_fs.stat(dir_relative_to_root.0.join(dir_entry.file_name()))
+          })
+          .filter(move |s| !ignore.is_ignored(s))
+          .collect()
       })
-      .filter(|s| match s {
-        Ok(ref s) =>
-        // It would be nice to be able to ignore paths before stat'ing them, but in order to apply
-        // git-style ignore patterns, we need to know whether a path represents a directory.
-        {
-          !self.ignore.is_ignored(s)
-        }
-        Err(_) => true,
+      .map(|mut stats| {
+        stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
+        DirectoryListing(stats)
       })
-      .collect::<Result<Vec<_>, io::Error>>()?;
-    stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
-    Ok(stats)
   }
 
   pub fn is_ignored(&self, stat: &Stat) -> bool {
     self.ignore.is_ignored(stat)
   }
 
-  pub fn read_file(&self, file: &File) -> BoxFuture<FileContent, io::Error> {
+  pub fn read_file(&self, file: &File) -> impl Future<Item = FileContent, Error = io::Error> {
     let path = file.path.clone();
     let path_abs = self.root.0.join(&file.path);
-    self
-      .pool
-      .spawn_fn(move || {
-        std::fs::File::open(&path_abs).and_then(|mut f| {
-          let mut content = Vec::new();
-          f.read_to_end(&mut content)?;
-          Ok(FileContent {
-            path: path,
-            content: Bytes::from(content),
-          })
-        })
+    tokio_fs::File::open(path_abs)
+      .and_then(|file| tokio_codec::FramedRead::new(file, tokio_codec::BytesCodec::new()).concat2())
+      .map(|content| FileContent {
+        path,
+        content: content.freeze(),
       })
-      .to_boxed()
   }
 
-  pub fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
+  pub fn read_link(&self, link: &Link) -> impl Future<Item = PathBuf, Error = io::Error> {
     let link_parent = link.0.parent().map(Path::to_owned);
     let link_abs = self.root.0.join(link.0.as_path()).to_owned();
-    self
-      .pool
-      .spawn_fn(move || {
-        link_abs.read_link().and_then(|path_buf| {
-          if path_buf.is_absolute() {
-            Err(io::Error::new(
+    tokio_fs::read_link(link_abs.clone()).and_then(move |path_buf| {
+      if path_buf.is_absolute() {
+        Err(io::Error::new(
+          io::ErrorKind::InvalidData,
+          format!("Absolute symlink: {:?}", link_abs),
+        ))
+      } else {
+        link_parent
+          .map(|parent| parent.join(path_buf))
+          .ok_or_else(|| {
+            io::Error::new(
               io::ErrorKind::InvalidData,
-              format!("Absolute symlink: {:?}", link_abs),
-            ))
-          } else {
-            link_parent
-              .map(|parent| parent.join(path_buf))
-              .ok_or_else(|| {
-                io::Error::new(
-                  io::ErrorKind::InvalidData,
-                  format!("Symlink without a parent?: {:?}", link_abs),
-                )
-              })
-          }
-        })
-      })
-      .to_boxed()
+              format!("Symlink without a parent?: {:?}", link_abs),
+            )
+          })
+      }
+    })
   }
 
   ///
   /// Makes a Stat for path_for_stat relative to absolute_path_to_root.
   ///
-  fn stat_internal<F>(
+  fn stat_internal(
     path_for_stat: PathBuf,
-    file_type: std::fs::FileType,
     absolute_path_to_root: &Path,
-    get_metadata: F,
-  ) -> Result<Stat, io::Error>
-  where
-    F: FnOnce() -> Result<fs::Metadata, io::Error>,
-  {
+    metadata: &std::fs::Metadata,
+  ) -> Result<Stat, io::Error> {
     if !path_for_stat.is_relative() {
       return Err(io::Error::new(
         io::ErrorKind::InvalidInput,
@@ -705,16 +679,17 @@ impl PosixFS {
         ),
       ));
     }
-    if file_type.is_dir() {
-      Ok(Stat::Dir(Dir(path_for_stat)))
+    let file_type = metadata.file_type();
+    if file_type.is_symlink() {
+      Ok(Stat::Link(Link(path_for_stat)))
     } else if file_type.is_file() {
-      let is_executable = get_metadata()?.permissions().mode() & 0o100 == 0o100;
+      let is_executable = metadata.permissions().mode() & 0o100 == 0o100;
       Ok(Stat::File(File {
         path: path_for_stat,
         is_executable: is_executable,
       }))
-    } else if file_type.is_symlink() {
-      Ok(Stat::Link(Link(path_for_stat)))
+    } else if file_type.is_dir() {
+      Ok(Stat::Dir(Dir(path_for_stat)))
     } else {
       Err(io::Error::new(
         io::ErrorKind::InvalidData,
@@ -726,33 +701,20 @@ impl PosixFS {
     }
   }
 
-  pub fn stat(&self, relative_path: PathBuf) -> Result<Stat, io::Error> {
-    PosixFS::stat_path(relative_path, &self.root.0)
-  }
-
-  fn stat_path(relative_path: PathBuf, root: &Path) -> Result<Stat, io::Error> {
-    let metadata = fs::symlink_metadata(root.join(&relative_path))?;
-    PosixFS::stat_internal(relative_path, metadata.file_type(), &root, || Ok(metadata))
-  }
-
-  pub fn scandir(&self, dir: &Dir) -> BoxFuture<DirectoryListing, io::Error> {
-    let dir = dir.to_owned();
-    let fs: PosixFS = self.clone();
-    self
-      .pool
-      .spawn_fn(move || fs.scandir_sync(&dir))
-      .map(DirectoryListing)
-      .to_boxed()
+  pub fn stat(&self, relative_path: PathBuf) -> impl Future<Item = Stat, Error = io::Error> {
+    let root = self.root.0.clone();
+    tokio_fs::symlink_metadata(self.root.0.join(&relative_path))
+      .and_then(move |metadata| PosixFS::stat_internal(relative_path, &root, &metadata))
   }
 }
 
 impl VFS<io::Error> for Arc<PosixFS> {
   fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
-    PosixFS::read_link(self, link)
+    PosixFS::read_link(self, link).to_boxed()
   }
 
   fn scandir(&self, dir: Dir) -> BoxFuture<Arc<DirectoryListing>, io::Error> {
-    PosixFS::scandir(self, &dir).map(Arc::new).to_boxed()
+    PosixFS::scandir(self, dir).map(Arc::new).to_boxed()
   }
 
   fn is_ignored(&self, stat: &Stat) -> bool {
@@ -774,11 +736,9 @@ impl PathStatGetter<io::Error> for Arc<PosixFS> {
       paths
         .into_iter()
         .map(|path| {
-          let root = self.root.0.clone();
           let fs = self.clone();
           self
-            .pool
-            .spawn_fn(move || PosixFS::stat_path(path, &root))
+            .stat(path)
             .then(|stat_result| match stat_result {
               Ok(v) => Ok(Some(v)),
               Err(err) => match err.kind() {
@@ -872,7 +832,7 @@ mod posixfs_test {
 
   use super::{
     Dir, DirectoryListing, File, GlobExpansionConjunction, GlobMatching, Link, PathGlobs, PathStat,
-    PathStatGetter, PosixFS, ResettablePool, Stat, StrictGlobMatching, VFS,
+    PathStatGetter, PosixFS, Stat, StrictGlobMatching, VFS,
   };
   use boxfuture::{BoxFuture, Boxable};
   use futures::future::{self, Future};
@@ -907,12 +867,12 @@ mod posixfs_test {
       0o600,
     );
     let fs = new_posixfs(&dir.path());
-    let file_content = fs
-      .read_file(&File {
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let file_content = rt
+      .block_on(fs.read_file(&File {
         path: path.clone(),
         is_executable: false,
-      })
-      .wait()
+      }))
       .unwrap();
     assert_eq!(file_content.path, path);
     assert_eq!(file_content.content, content);
@@ -936,8 +896,9 @@ mod posixfs_test {
     let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("photograph_marmosets");
     make_file(&dir.path().join(&path), &[], 0o700);
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
     assert_eq!(
-      posix_fs.stat(path.clone()).unwrap(),
+      runtime.block_on(posix_fs.stat(path.clone())).unwrap(),
       super::Stat::File(File {
         path: path,
         is_executable: true,
@@ -951,8 +912,9 @@ mod posixfs_test {
     let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("marmosets");
     make_file(&dir.path().join(&path), &[], 0o600);
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
     assert_eq!(
-      posix_fs.stat(path.clone()).unwrap(),
+      runtime.block_on(posix_fs.stat(path.clone())).unwrap(),
       super::Stat::File(File {
         path: path,
         is_executable: false,
@@ -966,8 +928,9 @@ mod posixfs_test {
     let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("enclosure");
     std::fs::create_dir(dir.path().join(&path)).unwrap();
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
     assert_eq!(
-      posix_fs.stat(path.clone()).unwrap(),
+      runtime.block_on(posix_fs.stat(path.clone())).unwrap(),
       super::Stat::Dir(Dir(path))
     )
   }
@@ -981,16 +944,18 @@ mod posixfs_test {
 
     let link_path = PathBuf::from("remarkably_similar_marmoset");
     std::os::unix::fs::symlink(&dir.path().join(path), dir.path().join(&link_path)).unwrap();
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
     assert_eq!(
-      posix_fs.stat(link_path.clone()).unwrap(),
+      runtime.block_on(posix_fs.stat(link_path.clone())).unwrap(),
       super::Stat::Link(Link(link_path))
     )
   }
 
   #[test]
   fn stat_other() {
-    new_posixfs("/dev")
-      .stat(PathBuf::from("null"))
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    runtime
+      .block_on(new_posixfs("/dev").stat(PathBuf::from("null")))
       .expect_err("Want error");
   }
 
@@ -998,8 +963,9 @@ mod posixfs_test {
   fn stat_missing() {
     let dir = tempfile::TempDir::new().unwrap();
     let posix_fs = new_posixfs(&dir.path());
-    posix_fs
-      .stat(PathBuf::from("no_marmosets"))
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    runtime
+      .block_on(posix_fs.stat(PathBuf::from("no_marmosets")))
       .expect_err("Want error");
   }
 
@@ -1009,8 +975,9 @@ mod posixfs_test {
     let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("empty_enclosure");
     std::fs::create_dir(dir.path().join(&path)).unwrap();
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
     assert_eq!(
-      posix_fs.scandir(&Dir(path)).wait().unwrap(),
+      runtime.block_on(posix_fs.scandir(Dir(path))).unwrap(),
       DirectoryListing(vec![])
     );
   }
@@ -1045,8 +1012,10 @@ mod posixfs_test {
       0o600,
     );
 
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+
     assert_eq!(
-      posix_fs.scandir(&Dir(path)).wait().unwrap(),
+      runtime.block_on(posix_fs.scandir(Dir(path))).unwrap(),
       DirectoryListing(vec![
         Stat::File(File {
           path: a_marmoset,
@@ -1071,7 +1040,7 @@ mod posixfs_test {
     let dir = tempfile::TempDir::new().unwrap();
     let posix_fs = new_posixfs(&dir.path());
     posix_fs
-      .scandir(&Dir(PathBuf::from("no_marmosets_here")))
+      .scandir(Dir(PathBuf::from("no_marmosets_here")))
       .wait()
       .expect_err("Want error");
   }
@@ -1103,8 +1072,9 @@ mod posixfs_test {
     std::os::unix::fs::symlink("doesnotexist", &root_path.join("symlink_to_nothing")).unwrap();
 
     let posix_fs = Arc::new(new_posixfs(&root_path));
-    let path_stats = posix_fs
-      .path_stats(vec![
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    let path_stats = runtime
+      .block_on(posix_fs.path_stats(vec![
         PathBuf::from("executable_file"),
         PathBuf::from("regular_file"),
         PathBuf::from("dir"),
@@ -1113,8 +1083,7 @@ mod posixfs_test {
         PathBuf::from("dir_symlink"),
         PathBuf::from("symlink_to_nothing"),
         PathBuf::from("doesnotexist"),
-      ])
-      .wait()
+      ]))
       .unwrap();
     let v: Vec<Option<PathStat>> = vec![
       Some(PathStat::file(
@@ -1190,7 +1159,10 @@ mod posixfs_test {
 
   fn assert_only_file_is_executable(path: &Path, want_is_executable: bool) {
     let fs = new_posixfs(path);
-    let stats = fs.scandir(&Dir(PathBuf::from("."))).wait().unwrap();
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    let stats = runtime
+      .block_on(fs.scandir(Dir(PathBuf::from("."))))
+      .unwrap();
     assert_eq!(stats.0.len(), 1);
     match stats.0.get(0).unwrap() {
       &super::Stat::File(File {
@@ -1201,12 +1173,7 @@ mod posixfs_test {
   }
 
   fn new_posixfs<P: AsRef<Path>>(dir: P) -> PosixFS {
-    PosixFS::new(
-      dir.as_ref(),
-      Arc::new(ResettablePool::new("test-pool-".to_string())),
-      &[],
-    )
-    .unwrap()
+    PosixFS::new(dir.as_ref(), &[]).unwrap()
   }
 
   ///

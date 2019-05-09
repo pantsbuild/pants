@@ -23,21 +23,14 @@ use bytes::{Bytes, BytesMut};
 
 pub struct CommandRunner {
   store: fs::Store,
-  fs_pool: Arc<fs::ResettablePool>,
   work_dir: PathBuf,
   cleanup_local_dirs: bool,
 }
 
 impl CommandRunner {
-  pub fn new(
-    store: fs::Store,
-    fs_pool: Arc<fs::ResettablePool>,
-    work_dir: PathBuf,
-    cleanup_local_dirs: bool,
-  ) -> CommandRunner {
+  pub fn new(store: fs::Store, work_dir: PathBuf, cleanup_local_dirs: bool) -> CommandRunner {
     CommandRunner {
       store,
-      fs_pool,
       work_dir,
       cleanup_local_dirs,
     }
@@ -223,7 +216,6 @@ impl super::CommandRunner for CommandRunner {
     let workdir_path2 = workdir_path.clone();
     let workdir_path3 = workdir_path.clone();
     let store = self.store.clone();
-    let fs_pool = self.fs_pool.clone();
 
     let env = req.env;
     let output_file_paths = req.output_files;
@@ -284,7 +276,7 @@ impl super::CommandRunner for CommandRunner {
           future::ok(fs::Snapshot::empty()).to_boxed()
         } else {
           // Use no ignore patterns, because we are looking for explicitly listed paths.
-          future::done(fs::PosixFS::new(workdir_path2, fs_pool, &[]))
+          future::done(fs::PosixFS::new(workdir_path2, &[]))
             .map_err(|err| {
               format!(
                 "Error making posix_fs to fetch local process execution output files: {}",
@@ -338,7 +330,6 @@ mod tests {
   use super::super::CommandRunner as CommandRunnerTrait;
   use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
   use fs;
-  use futures::Future;
   use std;
   use std::collections::{BTreeMap, BTreeSet};
   use std::env;
@@ -903,14 +894,15 @@ mod tests {
   ) -> Result<FallibleExecuteProcessResult, String> {
     let store_dir = TempDir::new().unwrap();
     let pool = Arc::new(fs::ResettablePool::new("test-pool-".to_owned()));
-    let store = fs::Store::local_only(store_dir.path(), pool.clone()).unwrap();
+    let store = fs::Store::local_only(store_dir.path(), pool).unwrap();
     let runner = super::CommandRunner {
       store: store,
-      fs_pool: pool,
       work_dir: dir,
       cleanup_local_dirs: cleanup,
     };
-    runner.run(req).wait()
+    tokio::runtime::Runtime::new()
+      .unwrap()
+      .block_on(runner.run(req))
   }
 
   fn find_bash() -> String {
