@@ -27,6 +27,8 @@ def fast_test(console, addresses):
   test_results = yield [Get(TestResult, Address, address.to_address()) for address in addresses]
   did_any_fail = False
   for address, test_result in zip(addresses, test_results):
+    if test_result.status == Status.FAILURE:
+      did_any_fail = True
     if test_result.stdout:
       console.write_stdout(
         "{} stdout:\n{}\n".format(
@@ -34,8 +36,13 @@ def fast_test(console, addresses):
           console.red(test_result.stdout) if test_result.status == Status.FAILURE else test_result.stdout
         )
       )
-    if test_result.status == Status.FAILURE:
-      did_any_fail = True
+    if test_result.stderr:
+      console.write_stderr(
+        "{} stderr:\n{}\n".format(
+          address.reference(),
+          console.red(test_result.stderr) if test_result.status == Status.FAILURE else test_result.stderr
+        )
+      )
 
   console.write_stdout("\n")
 
