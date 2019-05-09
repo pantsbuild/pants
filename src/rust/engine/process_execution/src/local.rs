@@ -335,7 +335,6 @@ mod tests {
   use std::env;
   use std::os::unix::fs::PermissionsExt;
   use std::path::{Path, PathBuf};
-  use std::sync::Arc;
   use std::time::Duration;
   use tempfile::TempDir;
   use testutil::data::{TestData, TestDirectory};
@@ -893,8 +892,7 @@ mod tests {
     cleanup: bool,
   ) -> Result<FallibleExecuteProcessResult, String> {
     let store_dir = TempDir::new().unwrap();
-    let pool = Arc::new(fs::ResettablePool::new("test-pool-".to_owned()));
-    let store = fs::Store::local_only(store_dir.path(), pool).unwrap();
+    let store = fs::Store::local_only(store_dir.path()).unwrap();
     let runner = super::CommandRunner {
       store: store,
       work_dir: dir,
