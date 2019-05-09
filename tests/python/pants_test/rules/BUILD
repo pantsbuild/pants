@@ -6,7 +6,6 @@ INTEGRATION_SOURCES = globs('*_integration.py')
 python_tests(
   sources=globs('*.py', exclude=[INTEGRATION_SOURCES]),
   dependencies=[
-    '3rdparty/python:ansicolors',
     '3rdparty/python:future',
     '3rdparty/python:mock',
     'src/python/pants/backend/python/rules',
@@ -21,7 +20,6 @@ python_tests(
   name='integration',
   sources=INTEGRATION_SOURCES,
   dependencies=[
-    '3rdparty/python:ansicolors',
     'tests/python/pants_test:int-test',
   ],
   tags={'integration'},

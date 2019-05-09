@@ -4,8 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from colors import red
-
 from pants.backend.python.rules.python_test_runner import PyTestResult
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.build_graph.address import Address
@@ -33,7 +31,7 @@ def fast_test(console, addresses):
       console.write_stdout(
         "{} stdout:\n{}\n".format(
           address.reference(),
-          red(test_result.stdout) if test_result.status == Status.FAILURE else test_result.stdout
+          console.red(test_result.stdout) if test_result.status == Status.FAILURE else test_result.stdout
         )
       )
     if test_result.status == Status.FAILURE:

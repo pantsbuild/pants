@@ -7,8 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from builtins import str
 from textwrap import dedent
 
-from colors import red, strip_color
-
 from pants.backend.python.rules.python_test_runner import PyTestResult
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.legacy.graph import HydratedTarget
@@ -22,7 +20,7 @@ from pants_test.test_base import TestBase
 
 class TestTest(TestBase, SchedulerTestBase, AbstractClass):
   def single_target_test(self, result, expected_console_output, success=True):
-    console = MockConsole()
+    console = MockConsole(use_colors=False)
 
     res = run_rule(fast_test, console, (self.make_build_target_address("some/target"),), {
       (TestResult, Address): lambda _: result,
@@ -55,15 +53,15 @@ class TestTest(TestBase, SchedulerTestBase, AbstractClass):
       result=TestResult(status=Status.FAILURE, stdout='Here is some output from a test'),
       expected_console_output=dedent("""\
         some/target stdout:
-        {}
+        Here is some output from a test
 
         some/target                                                                     .....   FAILURE
-        """.format(red("Here is some output from a test"))),
+        """),
       success=False,
     )
 
   def test_output_mixed(self):
-    console = MockConsole()
+    console = MockConsole(use_colors=False)
     target1 = self.make_build_target_address("testprojects/tests/python/pants/passes")
     target2 = self.make_build_target_address("testprojects/tests/python/pants/fails")
 
@@ -80,7 +78,7 @@ class TestTest(TestBase, SchedulerTestBase, AbstractClass):
     })
 
     self.assertEqual(1, res.exit_code)
-    self.assertEquals(strip_color(console.stdout.getvalue()), dedent("""\
+    self.assertEquals(console.stdout.getvalue(), dedent("""\
       testprojects/tests/python/pants/passes stdout:
       I passed
 

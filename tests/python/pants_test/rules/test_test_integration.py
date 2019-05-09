@@ -6,8 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from textwrap import dedent
 
-from colors import strip_color
-
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -38,6 +36,7 @@ class TestIntegrationTest(PantsRunIntegrationTest):
     args = [
       '--no-v1',
       '--v2',
+      '--no-colors',
       'test',
     ] + trailing_args
 
@@ -49,12 +48,13 @@ class TestIntegrationTest(PantsRunIntegrationTest):
     args = [
       '--no-v1',
       '--v2',
+      '--no-colors',
       'test',
     ] + trailing_args
 
     pants_run = self.run_pants(args)
     self.assert_failure(pants_run)
-    self.assertEqual('Tests failed\n', strip_color(pants_run.stderr_data))
+    self.assertEqual('Tests failed\n', pants_run.stderr_data)
 
     return pants_run
 
@@ -86,7 +86,7 @@ class TestIntegrationTest(PantsRunIntegrationTest):
       'testprojects/tests/python/pants/dummies:failing_target',
     ])
     self.assert_fuzzy_string_match(
-      strip_color(pants_run.stdout_data),
+      pants_run.stdout_data,
       dedent("""\
         testprojects/tests/python/pants/dummies:failing_target stdout:
         ============================= test session starts ==============================
@@ -164,7 +164,7 @@ class TestIntegrationTest(PantsRunIntegrationTest):
       'testprojects/tests/python/pants/dummies:passing_target',
     ])
     self.assert_fuzzy_string_match(
-      strip_color(pants_run.stdout_data),
+      pants_run.stdout_data,
       dedent("""\
         testprojects/tests/python/pants/dummies:failing_target stdout:
         ============================= test session starts ==============================
