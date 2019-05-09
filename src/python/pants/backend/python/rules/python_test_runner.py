@@ -28,16 +28,16 @@ class PyTestResult(TestResult):
   pass
 
 
-def parse_interpreter_constraints(python_setup, hydrated_targets):
+def parse_interpreter_constraints(python_setup, python_target_adaptors):
   # TODO(7691): Remove this hack once python_setup.compatibility_or_constraints() gets changed
   # to accept a compatibility argument.
-  for target in hydrated_targets:
-    if not hasattr(target.adaptor, 'compatibility'):
-      target.adaptor.compatibility = None
+  for target_adaptor in python_target_adaptors:
+    if not hasattr(target_adaptor, 'compatibility'):
+      target_adaptor.compatibility = None
   constraints = {
     constraint
-    for target in hydrated_targets
-    for constraint in python_setup.compatibility_or_constraints(target.adaptor)
+    for target_adaptor in python_target_adaptors
+    for constraint in python_setup.compatibility_or_constraints(target_adaptor)
   }
   constraints_args = []
   for constraint in sorted(constraints):
