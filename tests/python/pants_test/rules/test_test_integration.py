@@ -112,6 +112,29 @@ class TestIntegrationTest(PantsRunIntegrationTest):
         """),
     )
 
+  def test_absolute_source_dep(self):
+    pants_run = self.run_passing_pants_test([
+      'testprojects/tests/python/pants/dummies:target_with_absolute_source_dep',
+    ])
+    self.assert_fuzzy_string_match(
+      pants_run.stdout_data,
+      dedent("""\
+        testprojects/tests/python/pants/dummies:target_with_absolute_source_dep stdout:
+        ============================= test session starts ==============================
+        platform SOME_TEXT
+        rootdir: SOME_TEXT
+        plugins: SOME_TEXT
+        collected 1 item
+
+        testprojects/tests/python/pants/dummies/test_with_absolute_source_dep.py . [100%]
+
+        =========================== 1 passed in SOME_TEXT ===========================
+
+
+        testprojects/tests/python/pants/dummies:target_with_absolute_source_dep         .....   SUCCESS
+        """)
+      )
+
   def test_relative_source_dep(self):
     pants_run = self.run_passing_pants_test([
       'testprojects/tests/python/pants/dummies:target_with_relative_source_dep',
