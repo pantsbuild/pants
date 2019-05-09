@@ -165,7 +165,6 @@ class MockConsole(object):
     print(payload, file=self.stderr)
 
   def _safe_color(self, text, color):
-    """We should only output color when the global flag --colors is enabled."""
     return color(text) if self._use_colors else text
 
   def blue(self, text):
