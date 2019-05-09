@@ -214,7 +214,10 @@ python_library(
 
 python_library(
   name='console',
-  sources=['console.py']
+  sources=['console.py'],
+  dependencies=[
+    '3rdparty/python:ansicolors',
+  ],
 )
 
 resources(
