@@ -17,8 +17,8 @@ python_library(
 )
 
 python_tests(
-  name = 'target_with_source_dep',
-  sources = ['test_with_source_dep.py'],
+  name = 'target_with_relative_source_dep',
+  sources = ['test_with_relative_source_dep.py'],
   dependencies = [
     ':example_lib',
   ],
