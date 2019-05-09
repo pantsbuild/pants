@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from builtins import str
+from textwrap import dedent
 
 from pants.backend.python.rules.python_test_runner import PyTestResult
 from pants.build_graph.address import Address, BuildFileAddress
@@ -19,7 +20,7 @@ from pants_test.test_base import TestBase
 
 class TestTest(TestBase, SchedulerTestBase, AbstractClass):
   def single_target_test(self, result, expected_console_output, success=True):
-    console = MockConsole()
+    console = MockConsole(use_colors=False)
 
     res = run_rule(fast_test, console, (self.make_build_target_address("some/target"),), {
       (TestResult, Address): lambda _: result,
@@ -38,51 +39,37 @@ class TestTest(TestBase, SchedulerTestBase, AbstractClass):
 
   def test_outputs_success(self):
     self.single_target_test(
-      TestResult(status=Status.SUCCESS, stdout='Here is some output from a test'),
-      """Here is some output from a test
+      result=TestResult(status=Status.SUCCESS, stdout='Here is some output from a test'),
+      expected_console_output=dedent("""\
+        some/target stdout:
+        Here is some output from a test
 
-some/target                                                                     .....   SUCCESS
-"""
+        some/target                                                                     .....   SUCCESS
+      """),
     )
 
   def test_output_failure(self):
     self.single_target_test(
-      TestResult(status=Status.FAILURE, stdout='Here is some output from a test'),
-      """Here is some output from a test
+      result=TestResult(status=Status.FAILURE, stdout='Here is some output from a test'),
+      expected_console_output=dedent("""\
+        some/target stdout:
+        Here is some output from a test
 
-some/target                                                                     .....   FAILURE
-""",
+        some/target                                                                     .....   FAILURE
+        """),
       success=False,
     )
 
-  def test_output_no_trailing_newline(self):
-    self.single_target_test(
-      TestResult(status=Status.SUCCESS, stdout='Here is some output from a test'),
-      """Here is some output from a test
-
-some/target                                                                     .....   SUCCESS
-"""
-    )
-
-  def test_output_trailing_newline(self):
-    self.single_target_test(
-      TestResult(status=Status.SUCCESS, stdout='Here is some output from a test\n'),
-      """Here is some output from a test
-
-some/target                                                                     .....   SUCCESS
-"""
-    )
-
   def test_output_mixed(self):
-    console = MockConsole()
+    console = MockConsole(use_colors=False)
     target1 = self.make_build_target_address("testprojects/tests/python/pants/passes")
     target2 = self.make_build_target_address("testprojects/tests/python/pants/fails")
 
     def make_result(target):
       if target == target1:
-        return TestResult(status=Status.SUCCESS, stdout='I passed')
+        return TestResult(status=Status.SUCCESS, stdout='I passed\n')
       elif target == target2:
-        return TestResult(status=Status.FAILURE, stdout='I failed')
+        return TestResult(status=Status.FAILURE, stdout='I failed\n')
       else:
         raise Exception("Unrecognised target")
 
@@ -91,12 +78,17 @@ some/target                                                                     
     })
 
     self.assertEqual(1, res.exit_code)
-    self.assertEquals(console.stdout.getvalue(), """I passed
-I failed
+    self.assertEquals(console.stdout.getvalue(), dedent("""\
+      testprojects/tests/python/pants/passes stdout:
+      I passed
 
-testprojects/tests/python/pants/passes                                          .....   SUCCESS
-testprojects/tests/python/pants/fails                                           .....   FAILURE
-""")
+      testprojects/tests/python/pants/fails stdout:
+      I failed
+
+
+      testprojects/tests/python/pants/passes                                          .....   SUCCESS
+      testprojects/tests/python/pants/fails                                           .....   FAILURE
+      """))
 
   def test_coordinator_python_test(self):
     target_adaptor = PythonTestsAdaptor(type_alias='python_tests')

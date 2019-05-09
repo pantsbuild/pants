@@ -25,19 +25,19 @@ class Test(Goal):
 @console_rule(Test, [Console, BuildFileAddresses])
 def fast_test(console, addresses):
   test_results = yield [Get(TestResult, Address, address.to_address()) for address in addresses]
-  wrote_any_stdout = False
   did_any_fail = False
-  for test_result in test_results:
-    wrote_any_stdout |= bool(test_result.stdout)
-    # Assume \n-terminated
-    console.write_stdout(test_result.stdout)
-    if test_result.stdout and not test_result.stdout[-1] == '\n':
-      console.write_stdout('\n')
+  for address, test_result in zip(addresses, test_results):
+    if test_result.stdout:
+      console.write_stdout(
+        "{} stdout:\n{}\n".format(
+          address.reference(),
+          console.red(test_result.stdout) if test_result.status == Status.FAILURE else test_result.stdout
+        )
+      )
     if test_result.status == Status.FAILURE:
       did_any_fail = True
 
-  if wrote_any_stdout:
-    console.write_stdout('\n')
+  console.write_stdout("\n")
 
   for address, test_result in zip(addresses, test_results):
     console.print_stdout('{0:80}.....{1:>10}'.format(address.reference(), test_result.status.value))
