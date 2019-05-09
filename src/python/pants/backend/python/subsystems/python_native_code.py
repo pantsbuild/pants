@@ -4,7 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from builtins import str
+import logging
+from textwrap import dedent
 
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
@@ -17,6 +18,9 @@ from pants.binaries.executable_pex_tool import ExecutablePexTool
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 from pants.util.objects import SubclassesOf
+
+
+logger = logging.getLogger(__name__)
 
 
 class PythonNativeCode(Subsystem):
@@ -74,22 +78,6 @@ class PythonNativeCode(Subsystem):
           return True
     return False
 
-  def _get_targets_by_declared_platform_with_placeholders(self, targets_by_platform):
-    """
-    Aggregates a dict that maps a platform string to a list of targets that specify the platform.
-    If no targets have platforms arguments, return a dict containing platforms inherited from
-    the PythonSetup object.
-
-    :param tgts: a list of :class:`Target` objects.
-    :returns: a dict mapping a platform string to a list of targets that specify the platform.
-    """
-
-    if not targets_by_platform:
-      for platform in self._python_setup.platforms:
-        targets_by_platform[platform] = ['(No target) Platform inherited from either the '
-                                          '--platforms option or a pants.ini file.']
-    return targets_by_platform
-
   def check_build_for_current_platform_only(self, targets):
     """
     Performs a check of whether the current target closure has native sources and if so, ensures
@@ -99,26 +87,26 @@ class PythonNativeCode(Subsystem):
     :return: a boolean value indicating whether the current target closure has native sources.
     :raises: :class:`pants.base.exceptions.IncompatiblePlatformsError`
     """
+    # TODO(#5949): convert this to checking if the closure of python requirements has any
+    # platform-specific packages (maybe find the platforms there too?).
     if not self._any_targets_have_native_sources(targets):
       return False
 
-    targets_by_platform = pex_build_util.targets_by_platform(targets, self._python_setup)
-    platforms_with_sources = self._get_targets_by_declared_platform_with_placeholders(targets_by_platform)
+    platforms_with_sources = pex_build_util.targets_by_platform(targets, self._python_setup)
     platform_names = list(platforms_with_sources.keys())
 
-    if len(platform_names) < 1:
-      raise self.PythonNativeCodeError(
-        "Error: there should be at least one platform in the target closure, because "
-        "we checked that there are native sources.")
-
-    if platform_names == ['current']:
+    if not platform_names:
+      return True
+    elif platform_names == ['current']:
       return True
 
-    raise IncompatiblePlatformsError(
-      'The target set contains one or more targets that depend on '
-      'native code. Please ensure that the platform arguments in all relevant targets and build '
-      'options are compatible with the current platform. Found targets for platforms: {}'
-      .format(str(platforms_with_sources)))
+    raise IncompatiblePlatformsError(dedent("""\
+      The target set contains one or more targets that depend on native code. Please ensure that the
+      platform arguments in python_binary() targets, as well as the value of
+      --{}-platforms, are compatible with the current platform.
+      Platform assignments for python targets: {}
+      """.format(PythonSetup.get_options_scope_equivalent_flag_component(),
+                 platforms_with_sources)))
 
 
 class BuildSetupRequiresPex(ExecutablePexTool):

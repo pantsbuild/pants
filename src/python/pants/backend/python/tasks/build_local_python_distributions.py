@@ -215,7 +215,7 @@ class BuildLocalPythonDistributions(Task):
     setup_requires_pex = self._build_setup_requires_pex_settings.bootstrap(
       interpreter, setup_reqs_pex_path, extra_reqs=setup_reqs_to_resolve)
     self.context.log.debug('Using pex file as setup.py interpreter: {}'
-                           .format(setup_requires_pex))
+                           .format(setup_requires_pex.path()))
 
     self._create_dist(
       dist_target,
@@ -281,6 +281,7 @@ class BuildLocalPythonDistributions(Task):
                     interpreter=setup_requires_pex.path(),
                     command=setup_py_snapshot_version_argv))
 
+  # TODO: convert this into a SimpleCodegenTask, which does the exact same thing as this method!
   def _inject_synthetic_dist_requirements(self, dist, req_lib_addr):
     """Inject a synthetic requirements library that references a local wheel.
 
@@ -289,9 +290,9 @@ class BuildLocalPythonDistributions(Task):
     :return: a :class: `PythonRequirementLibrary` referencing the locally-built wheel.
     """
     whl_dir, base = split_basename_and_dirname(dist)
-    whl_metadata = base.split('-')
-    req_name = '=='.join([whl_metadata[0], whl_metadata[1]])
-    req = PythonRequirement(req_name, repository=whl_dir)
+    name, version = base.split('-')[0:2]
+    full_req_string = '{}=={}'.format(name, version)
+    req = PythonRequirement(full_req_string, repository=whl_dir)
     self.context.build_graph.inject_synthetic_target(req_lib_addr, PythonRequirementLibrary,
                                                      requirements=[req])
 

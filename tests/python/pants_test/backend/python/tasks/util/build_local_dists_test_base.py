@@ -18,8 +18,10 @@ from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.util.collections import assert_single_element
 from pants.util.meta import classproperty
+from pants.util.objects import enum
 from pants_test.backend.python.tasks.python_task_test_base import (PythonTaskTestBase,
-                                                                   name_and_platform)
+                                                                   name_and_platform,
+                                                                   normalized_current_platform)
 from pants_test.task_test_base import DeclarativeTaskTestMixin
 
 
@@ -73,7 +75,7 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskT
     return re.sub(r'[^a-zA-Z0-9]', '.', versioned_target_fingerprint.lower())
 
   def _create_distribution_synthetic_target(self, python_dist_target, extra_targets=[]):
-    all_specified_targets = list(self.target_dict.values())
+    all_specified_targets = list(self.target_dict.values()) + list(extra_targets)
     result = self.invoke_tasks(
       # We set `target_closure` to check that all the targets in the build graph are exactly the
       # ones we've just created before building python_dist()s (which creates further targets).
@@ -98,6 +100,9 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskT
 
     return context, synthetic_target, snapshot_version
 
+  class ExpectedPlatformType(enum(['universal', 'current'])):
+    """Whether to check that the produced wheel has the 'any' platform, or the current one."""
+
   def _assert_dist_and_wheel_identity(self, expected_name, expected_version, expected_platform,
                                       dist_target, **kwargs):
     context, synthetic_target, fingerprint_suffix = self._create_distribution_synthetic_target(
@@ -113,4 +118,8 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskT
     dist, version, platform = name_and_platform(local_wheel)
     self.assertEquals(dist, expected_name)
     self.assertEquals(version, expected_snapshot_version)
-    self.assertEquals(platform, expected_platform)
+
+    expected_platform.resolve_for_enum_variant({
+      'universal': lambda: self.assertEquals(platform, 'any'),
+      'current': lambda: self.assertEquals(platform, normalized_current_platform()),
+    })()

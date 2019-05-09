@@ -100,18 +100,19 @@ setup(
 
   def test_create_distribution(self):
     universal_dist = self.target_dict['universal']
-    self._assert_dist_and_wheel_identity('universal_dist', '0.0.0', 'any', universal_dist)
+    self._assert_dist_and_wheel_identity(
+      'universal_dist', '0.0.0', self.ExpectedPlatformType.universal, universal_dist)
 
   def test_python_dist_setup_requires(self):
     setup_requires_dist = self.target_dict['setup_requires']
     self._assert_dist_and_wheel_identity(
-      'setup_requires_dist_united_states', '0.0.0', 'any',
+      'setup_requires_dist_united_states', '0.0.0', self.ExpectedPlatformType.universal,
       setup_requires_dist, extra_targets=[self.target_dict['pycountry']])
 
   def test_install_requires(self):
     install_requires_dist = self.target_dict['install_requires']
     self._assert_dist_and_wheel_identity(
-      'install_requires_dist', '0.0.0', 'any',
+      'install_requires_dist', '0.0.0', self.ExpectedPlatformType.universal,
       install_requires_dist)
 
   def test_install_requires_conflict(self):

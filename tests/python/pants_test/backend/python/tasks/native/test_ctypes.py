@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from builtins import str
+from textwrap import dedent
 
 from twitter.common.collections import OrderedDict
 
@@ -13,9 +13,10 @@ from pants.backend.native.targets.native_library import CLibrary, CppLibrary
 from pants.backend.native.tasks.c_compile import CCompile
 from pants.backend.native.tasks.cpp_compile import CppCompile
 from pants.backend.native.tasks.link_shared_libraries import LinkSharedLibraries
+from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
+from pants.base.exceptions import IncompatiblePlatformsError
 from pants.util.meta import classproperty
-from pants_test.backend.python.tasks.python_task_test_base import check_wheel_platform_matches_host
 from pants_test.backend.python.tasks.util.build_local_dists_test_base import \
   BuildLocalPythonDistributionsTestBase
 
@@ -38,13 +39,13 @@ class TestBuildLocalDistsWithCtypesNativeSources(BuildLocalPythonDistributionsTe
       'ctypes_native_library': NativeArtifact(lib_name='c-math-lib'),
       'sources': ['c_math_lib.c', 'c_math_lib.h'],
       'filemap': {
-        'c_math_lib.c': """\
-#include "c_math_lib.h"
-int add_two(int x) { return x + 2; }
-        """,
-        'c_math_lib.h': """\
-int add_two(int);
-        """,
+        'c_math_lib.c': dedent("""\
+        #include "c_math_lib.h"
+        int add_two(int x) { return x + 2; }
+        """),
+        'c_math_lib.h': dedent("""\
+        int add_two(int);
+        """),
       },
     }),
 
@@ -55,15 +56,15 @@ int add_two(int);
       'dependencies': ['src/python/plat_specific_c_dist:ctypes_c_library'],
       'filemap': {
         '__init__.py': '',
-        'setup.py': """\
-from setuptools import setup, find_packages
-setup(
-  name='platform_specific_ctypes_c_dist',
-  version='0.0.0',
-  packages=find_packages(),
-  data_files=[('', ['libc-math-lib.so'])],
-)
-        """,
+        'setup.py': dedent("""\
+        from setuptools import setup, find_packages
+        setup(
+          name='platform_specific_ctypes_c_dist',
+          version='0.0.0',
+          packages=find_packages(),
+          data_files=[('', ['libc-math-lib.so'])],
+        )
+        """),
       },
     }),
 
@@ -73,13 +74,13 @@ setup(
       'ctypes_native_library': NativeArtifact(lib_name='cpp-math-lib'),
       'sources': ['cpp_math_lib.cpp', 'cpp_math_lib.hpp'],
       'filemap': {
-        'cpp_math_lib.cpp': """\
-#include "cpp_math_lib.hpp"
-int add_two(int x) { return (x++) + 1; }
-        """,
-        'cpp_math_lib.hpp': """\
-int add_two(int);
-        """,
+        'cpp_math_lib.cpp': dedent("""\
+        #include "cpp_math_lib.hpp"
+        int add_two(int x) { return (x++) + 1; }
+        """),
+        'cpp_math_lib.hpp': dedent("""\
+        int add_two(int);
+        """),
       },
     }),
 
@@ -90,15 +91,15 @@ int add_two(int);
       'dependencies': ['src/python/plat_specific_cpp_dist:ctypes_cpp_library'],
       'filemap': {
         '__init__.py': '',
-        'setup.py': """\
-from setuptools import setup, find_packages
-setup(
-  name='platform_specific_ctypes_cpp_dist',
-  version='0.0.0',
-  packages=find_packages(),
-  data_files=[('', ['libcpp-math-lib.so'])],
-)
-        """,
+        'setup.py': dedent("""\
+        from setuptools import setup, find_packages
+        setup(
+          name='platform_specific_ctypes_cpp_dist',
+          version='0.0.0',
+          packages=find_packages(),
+          data_files=[('', ['libcpp-math-lib.so'])],
+        )
+        """),
       },
     }),
 
@@ -106,23 +107,64 @@ setup(
 
   def test_ctypes_c_dist(self):
     platform_specific_dist = self.target_dict['platform_specific_ctypes_c_dist']
-    context, synthetic_target, snapshot_version = self._create_distribution_synthetic_target(
-      platform_specific_dist, extra_targets=[self.target_dict['ctypes_c_library']])
-    self.assertEqual(['platform_specific_ctypes_c_dist==0.0.0+{}'.format(snapshot_version)],
-                      [str(x.requirement) for x in synthetic_target.requirements.value])
-    local_wheel_products = context.products.get('local_wheels')
-    local_wheel = self.retrieve_single_product_at_target_base(
-      local_wheel_products, platform_specific_dist)
-    self.assertTrue(check_wheel_platform_matches_host(local_wheel))
+    self._assert_dist_and_wheel_identity(
+      'platform_specific_ctypes_c_dist', '0.0.0', self.ExpectedPlatformType.current,
+      platform_specific_dist, extra_targets=[self.target_dict['ctypes_c_library']],
+    )
 
   def test_ctypes_cpp_dist(self):
     platform_specific_dist = self.target_dict['platform_specific_ctypes_cpp_dist']
-    context, synthetic_target, snapshot_version = self._create_distribution_synthetic_target(
-      platform_specific_dist, extra_targets=[self.target_dict['ctypes_cpp_library']])
-    self.assertEqual(['platform_specific_ctypes_cpp_dist==0.0.0+{}'.format(snapshot_version)],
-                      [str(x.requirement) for x in synthetic_target.requirements.value])
+    self._assert_dist_and_wheel_identity(
+      'platform_specific_ctypes_cpp_dist', '0.0.0', self.ExpectedPlatformType.current,
+      platform_specific_dist, extra_targets=[self.target_dict['ctypes_cpp_library']],
+    )
 
-    local_wheel_products = context.products.get('local_wheels')
-    local_wheel = self.retrieve_single_product_at_target_base(
-      local_wheel_products, platform_specific_dist)
-    self.assertTrue(check_wheel_platform_matches_host(local_wheel))
+  def test_multiplatform_python_setup_resolve_bypasses_python_setup(self):
+    self.set_options_for_scope('python-setup',
+                               platforms=['current', 'linux-x86_64', 'macosx_10_14_x86_64'])
+    platform_specific_dist = self.target_dict['platform_specific_ctypes_cpp_dist']
+    self._assert_dist_and_wheel_identity(
+      'platform_specific_ctypes_cpp_dist', '0.0.0', self.ExpectedPlatformType.current,
+      platform_specific_dist,
+      extra_targets=[self.target_dict['ctypes_cpp_library']],
+    )
+
+  def test_resolve_for_native_sources_allows_current_platform_only(self):
+    platform_specific_dist = self.target_dict['platform_specific_ctypes_cpp_dist']
+    compatible_python_binary_target = self.make_target(
+      spec='src/python/plat_specific:bin',
+      target_type=PythonBinary,
+      dependencies=[platform_specific_dist],
+      entry_point='this-will-not-run',
+      platforms=['current'],
+    )
+    self._assert_dist_and_wheel_identity(
+      'platform_specific_ctypes_cpp_dist', '0.0.0', self.ExpectedPlatformType.current,
+      platform_specific_dist,
+      extra_targets=[
+        self.target_dict['ctypes_cpp_library'],
+        compatible_python_binary_target,
+      ])
+
+  def test_multiplatform_resolve_with_binary(self):
+    platform_specific_dist = self.target_dict['platform_specific_ctypes_cpp_dist']
+    incompatible_python_binary_target = self.make_target(
+      spec='src/python/plat_specific:bin',
+      target_type=PythonBinary,
+      dependencies=[platform_specific_dist],
+      entry_point='this-will-not-run',
+      platforms=['current', 'linux-x86_64', 'macosx_10_14_x86_64'],
+    )
+    with self.assertRaisesWithMessage(IncompatiblePlatformsError, dedent("""\
+      The target set contains one or more targets that depend on native code. Please ensure that the
+      platform arguments in python_binary() targets, as well as the value of
+      --python-setup-platforms, are compatible with the current platform.
+      Platform assignments for python targets: {'current': OrderedSet([PythonBinary(src/python/plat_specific:bin)]), 'linux-x86_64': OrderedSet([PythonBinary(src/python/plat_specific:bin)]), 'macosx_10_14_x86_64': OrderedSet([PythonBinary(src/python/plat_specific:bin)])}
+      """)):
+      self._assert_dist_and_wheel_identity(
+        'platform_specific_ctypes_cpp_dist', '0.0.0', self.ExpectedPlatformType.current,
+        platform_specific_dist,
+        extra_targets=[
+          self.target_dict['ctypes_cpp_library'],
+          incompatible_python_binary_target,
+        ])
