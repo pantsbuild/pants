@@ -978,7 +978,10 @@ mod local {
       })
       .then(|blocking_result| match blocking_result {
         Ok(v) => v,
-        Err(blocking_err) => panic!("TODO: {}", blocking_err),
+        Err(blocking_err) => Err(format!(
+          "Unable to run blocking task to store_bytes in local ByteStore on tokio runtime: {}",
+          blocking_err
+        )),
       })
       .to_boxed()
     }
@@ -1021,7 +1024,7 @@ mod local {
         })).then(|blocking_result| {
         match blocking_result {
           Ok(v) => v,
-          Err(blocking_err) => panic!("TODO: {}", blocking_err),
+          Err(blocking_err) => Err(format!("Unable to run blocking task to load_bytes in local ByteStore on tokio runtime: {}", blocking_err)),
         }
       }).to_boxed()
     }
@@ -1633,7 +1636,7 @@ mod local {
     }
 
     fn prime_store_with_file_bytes(store: &ByteStore, bytes: Bytes) -> Digest {
-      block_on(store.store_bytes(EntryType::File, bytes, false)).expect("Storing file bytes")
+      block_on(store.store_bytes(EntryType::File, bytes, false)).expect("Error storing file bytes")
     }
 
     fn get_directory_size(path: &Path) -> usize {
