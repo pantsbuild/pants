@@ -30,3 +30,4 @@ tokio-process = "0.2.1"
 mock = { path = "../testutil/mock" }
 tempfile = "3"
 testutil = { path = "../testutil" }
+tokio = "0.1"

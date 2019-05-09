@@ -738,25 +738,25 @@ pub extern "C" fn capture_snapshots(
 
   with_scheduler(scheduler_ptr, |scheduler| {
     let core = scheduler.core.clone();
-    futures::future::join_all(
-      path_globs_and_roots
-        .into_iter()
-        .map(|(path_globs, root, digest_hint)| {
-          let core = core.clone();
-          fs::Snapshot::capture_snapshot_from_arbitrary_root(
-            core.store(),
-            core.fs_pool.clone(),
-            root,
-            path_globs,
-            digest_hint,
-          )
-          .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
-        })
-        .collect::<Vec<_>>(),
+    core.runtime.get().write().block_on(
+      futures::future::join_all(
+        path_globs_and_roots
+          .into_iter()
+          .map(|(path_globs, root, digest_hint)| {
+            let core = core.clone();
+            fs::Snapshot::capture_snapshot_from_arbitrary_root(
+              core.store(),
+              root,
+              path_globs,
+              digest_hint,
+            )
+            .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
+          })
+          .collect::<Vec<_>>(),
+      )
+      .map(|values| externs::store_tuple(&values)),
     )
   })
-  .map(|values| externs::store_tuple(&values))
-  .wait()
   .into()
 }
 
@@ -779,8 +779,15 @@ pub extern "C" fn merge_directories(
   };
 
   with_scheduler(scheduler_ptr, |scheduler| {
-    fs::Snapshot::merge_directories(scheduler.core.store(), digests)
-      .wait()
+    scheduler
+      .core
+      .runtime
+      .get()
+      .write()
+      .block_on(fs::Snapshot::merge_directories(
+        scheduler.core.store(),
+        digests,
+      ))
       .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
       .into()
   })
@@ -811,15 +818,16 @@ pub extern "C" fn materialize_directories(
   };
 
   with_scheduler(scheduler_ptr, |scheduler| {
-    futures::future::join_all(
-      dir_and_digests
-        .into_iter()
-        .map(|(dir, digest)| scheduler.core.store().materialize_directory(dir, digest))
-        .collect::<Vec<_>>(),
+    scheduler.core.runtime.get().write().block_on(
+      futures::future::join_all(
+        dir_and_digests
+          .into_iter()
+          .map(|(dir, digest)| scheduler.core.store().materialize_directory(dir, digest))
+          .collect::<Vec<_>>(),
+      )
+      .map(|_| ()),
     )
   })
-  .map(|_| ())
-  .wait()
   .into()
 }
 

@@ -458,7 +458,7 @@ impl WrappedNode for Scandir {
     context
       .core
       .vfs
-      .scandir(&self.0)
+      .scandir(self.0)
       .then(move |listing_res| match listing_res {
         Ok(listing) => Ok(Arc::new(listing)),
         Err(e) => Err(throw(&format!("Failed to scandir for {:?}: {:?}", dir, e))),
