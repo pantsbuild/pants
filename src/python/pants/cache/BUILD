@@ -3,17 +3,15 @@
 
 python_library(
   dependencies = [
-    'src/python/pants/util:collections_abc_backport',
     '3rdparty/python:future',
     '3rdparty/python:requests',
-    '3rdparty/python:pyopenssl',
-    '3rdparty/python:six',
-    'src/python/pants/base:deprecated',
+    'src/python/pants/base:build_environment',
     'src/python/pants/base:validation',
-    'src/python/pants/engine:native',
-    'src/python/pants/option',
     'src/python/pants/subsystem',
+    'src/python/pants/util:collections_abc_backport',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
+    'src/python/pants/util:meta',
   ]
 )

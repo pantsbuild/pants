@@ -64,7 +64,7 @@ python_library(
   name='goal',
   sources=['goal.py'],
   dependencies=[
-    'src/python/pants/cache:cache_setup',
+    'src/python/pants/cache',
     'src/python/pants/option',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
