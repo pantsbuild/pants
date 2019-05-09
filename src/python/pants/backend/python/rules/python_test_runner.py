@@ -28,6 +28,23 @@ class PyTestResult(TestResult):
   pass
 
 
+def parse_interpreter_constraints(python_setup, hydrated_targets):
+  # TODO(7691): Remove this hack once python_setup.compatibility_or_constraints() gets changed
+  # to accept a compatibility argument.
+  for target in hydrated_targets:
+    if not hasattr(target.adaptor, 'compatibility'):
+      target.adaptor.compatibility = None
+  constraints = {
+    constraint
+    for target in hydrated_targets
+    for constraint in python_setup.compatibility_or_constraints(target.adaptor)
+  }
+  constraints_args = []
+  for constraint in constraints:
+    constraints_args.extend(["--interpreter-constraint", constraint])
+  return constraints_args
+
+
 # TODO: Support deps
 # TODO: Support resources
 @rule(PyTestResult, [TransitiveHydratedTarget, PyTest, PythonSetup])
@@ -55,21 +72,6 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup):
   # TODO(#7061): This str() can be removed after we drop py2!
   python_binary = text_type(sys.executable)
 
-  # TODO(7680): TargetAdaptors should populate Target attributes with a None value, meaning when
-  # they are not specified in the BUILD file. Here, we need every target adaptor to have
-  # its `.compatibility` defined, so we hackily monkey patch it for now.
-  for target in all_targets:
-    if not hasattr(target.adaptor, 'compatibility'):
-      target.adaptor.compatibility = None
-  constraints = {
-    constraint
-    for target in all_targets
-    for constraint in python_setup.compatibility_or_constraints(target.adaptor)
-  }
-  constraints_args = []
-  for constraint in constraints:
-    constraints_args.extend(["--interpreter-constraint", constraint])
-
   # TODO: This is non-hermetic because the requirements will be resolved on the fly by
   # pex27, where it should be hermetically provided in some way.
   output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
@@ -78,7 +80,7 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup):
     './{}'.format(pex_snapshot.files[0]),
     '-e', 'pytest:main',
     '-o', output_pytest_requirements_pex_filename,
-  ] + constraints_args + [
+  ] + parse_interpreter_constraints(python_setup, all_targets) + [
     # TODO(#7061): This text_type() wrapping can be removed after we drop py2!
     text_type(req)
     # Sort all user requirement strings to increase the chance of cache hits across invocations.
