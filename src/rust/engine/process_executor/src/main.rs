@@ -39,7 +39,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::iter::Iterator;
 use std::path::PathBuf;
 use std::process::exit;
-use std::sync::Arc;
 use std::time::Duration;
 
 /// A binary which takes args of format:
@@ -212,7 +211,6 @@ fn main() {
     .value_of("local-store-path")
     .map(PathBuf::from)
     .unwrap_or_else(fs::Store::default_path);
-  let pool = Arc::new(fs::ResettablePool::new("process-executor-".to_owned()));
   let timer_thread = resettable::Resettable::new(|| futures_timer::HelperThread::new().unwrap());
   let server_arg = args.value_of("server");
   let remote_instance_arg = args.value_of("remote-instance-name").map(str::to_owned);
@@ -246,7 +244,6 @@ fn main() {
 
       fs::Store::with_remote(
         local_store_path,
-        pool.clone(),
         &[cas_server.to_owned()],
         remote_instance_arg.clone(),
         &root_ca_certs,
@@ -260,7 +257,7 @@ fn main() {
         timer_thread.with(futures_timer::HelperThread::handle),
       )
     }
-    (None, None) => fs::Store::local_only(local_store_path, pool.clone()),
+    (None, None) => fs::Store::local_only(local_store_path),
     _ => panic!("Must specify either both --server and --cas-server or neither."),
   }
   .expect("Error making store");
@@ -316,7 +313,6 @@ fn main() {
     }
     None => Box::new(process_execution::local::CommandRunner::new(
       store.clone(),
-      pool,
       work_dir,
       true,
     )) as Box<dyn process_execution::CommandRunner>,

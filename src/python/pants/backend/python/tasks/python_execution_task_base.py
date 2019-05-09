@@ -139,7 +139,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
         else:
           constraints = {
             constraint for rt in relevant_targets if is_python_target(rt)
-            for constraint in PythonSetup.global_instance().compatibility_or_constraints(rt)
+            for constraint in PythonSetup.global_instance().compatibility_or_constraints(rt.compatibility)
           }
           self.context.log.debug('target set {} has constraints: {}'
                                  .format(relevant_targets, constraints))

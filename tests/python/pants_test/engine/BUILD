@@ -5,6 +5,7 @@ python_library(
   name = 'util',
   sources = ['util.py'],
   dependencies = [
+    '3rdparty/python:ansicolors',
     '3rdparty/python:future',
     'src/python/pants/binaries',
     'src/python/pants/engine:addressable',

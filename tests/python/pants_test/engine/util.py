@@ -10,6 +10,8 @@ from builtins import str
 from io import StringIO
 from types import GeneratorType
 
+from colors import blue, green, red
+
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.addressable import addressable_list
 from pants.engine.native import Native
@@ -145,9 +147,10 @@ def remove_locations_from_traceback(trace):
 class MockConsole(object):
   """An implementation of pants.engine.console.Console which captures output."""
 
-  def __init__(self):
+  def __init__(self, use_colors=True):
     self.stdout = StringIO()
     self.stderr = StringIO()
+    self._use_colors = use_colors
 
   def write_stdout(self, payload):
     self.stdout.write(payload)
@@ -160,3 +163,15 @@ class MockConsole(object):
 
   def print_stderr(self, payload):
     print(payload, file=self.stderr)
+
+  def _safe_color(self, text, color):
+    return color(text) if self._use_colors else text
+
+  def blue(self, text):
+    return self._safe_color(text, blue)
+
+  def green(self, text):
+    return self._safe_color(text, green)
+
+  def red(self, text):
+    return self._safe_color(text, red)
