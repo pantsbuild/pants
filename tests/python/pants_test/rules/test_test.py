@@ -90,6 +90,18 @@ class TestTest(TestBase, SchedulerTestBase, AbstractClass):
       testprojects/tests/python/pants/fails                                           .....   FAILURE
       """))
 
+  def test_stderr(self):
+    self.single_target_test(
+      result=TestResult(status=Status.FAILURE, stdout='', stderr='Failure running the tests!'),
+      expected_console_output=dedent("""\
+        some/target stderr:
+        Failure running the tests!
+
+        some/target                                                                     .....   FAILURE
+        """),
+      success=False,
+    )
+
   def test_coordinator_python_test(self):
     target_adaptor = PythonTestsAdaptor(type_alias='python_tests')
 

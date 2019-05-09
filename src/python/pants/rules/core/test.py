@@ -37,7 +37,9 @@ def fast_test(console, addresses):
         )
       )
     if test_result.stderr:
-      console.write_stderr(
+      # NB: we write to stdout, rather than to stderr, to avoid potential issues interleaving the
+      # two streams.
+      console.write_stdout(
         "{} stderr:\n{}\n".format(
           address.reference(),
           console.red(test_result.stderr) if test_result.status == Status.FAILURE else test_result.stderr
