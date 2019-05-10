@@ -449,7 +449,6 @@ class PantsDaemon(FingerprintedProcessManager):
     # Pass all of sys.argv so that we can proxy arg flags e.g. `-ldebug`.
     cmd = [sys.executable] + sys.argv
     self._logger.debug('cmd is: PANTS_ENTRYPOINT={} {}'.format(entry_point, ' '.join(cmd)))
-    # TODO: Improve error handling on launch failures.
     os.spawnve(os.P_NOWAIT, sys.executable, cmd, env=exec_env)
 
   def needs_launch(self):
