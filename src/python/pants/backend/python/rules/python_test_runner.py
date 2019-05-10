@@ -10,7 +10,7 @@ from builtins import str
 from future.utils import text_type
 
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.engine.fs import Digest, MergedDirectories, Snapshot, UrlToFetch
+from pants.engine.fs import Digest, MergedDirectories, PrefixStrippedDirectory, Snapshot, UrlToFetch
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
                                            FallibleExecuteProcessResult)
 from pants.engine.legacy.graph import TransitiveHydratedTarget
@@ -97,6 +97,12 @@ def run_python_test(transitive_hydrated_target, pytest):
     Digest,
     MergedDirectories,
     MergedDirectories(directories=tuple(all_input_digests)),
+  )
+
+  source_root_adjusted_files = yield Get(
+    Digest,
+    PrefixStrippedDirectory,
+    PrefixStrippedDirectory()
   )
 
   request = ExecuteProcessRequest(
