@@ -16,6 +16,7 @@ import re
 import sys
 from io import open
 
+
 EXPECTED_HEADER="""# coding=utf-8
 # Copyright YYYY Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).

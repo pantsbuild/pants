@@ -103,7 +103,7 @@ def safe_mkdir_for_all(paths):
 # TODO(#6742): payload should be Union[str, bytes] in type hint syntax, but from
 # https://pythonhosted.org/an_example_pypi_project/sphinx.html#full-code-example it doesn't appear
 # that is possible to represent in docstring type syntax.
-def safe_file_dump(filename, payload='', mode='w'):
+def safe_file_dump(filename, payload='', mode='w', makedirs=False):
   """Write a string to a file.
 
   This method is "safe" to the extent that `safe_open` is "safe". See the explanation on the method
@@ -116,7 +116,11 @@ def safe_file_dump(filename, payload='', mode='w'):
   :param string payload: The string to write to the file.
   :param string mode: A mode argument for the python `open` builtin which should be a write mode
                       variant. Defaults to 'w'.
+  :param bool makedirs: Whether to make all parent directories of this file before making it.
   """
+  if makedirs:
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+
   with safe_open(filename, mode=mode) as f:
     f.write(payload)
 

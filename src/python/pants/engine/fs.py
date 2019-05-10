@@ -26,13 +26,6 @@ class FileContent(datatype([('path', text_type), ('content', binary_type)])):
     return repr(self)
 
 
-class Path(datatype([('path', text_type), 'stat'])):
-  """A filesystem path, holding both its symbolic path name, and underlying canonical Stat.
-
-  Both values are relative to the ProjectTree's buildroot.
-  """
-
-
 class PathGlobs(datatype([
     'include',
     'exclude',
@@ -155,6 +148,10 @@ class MergedDirectories(datatype([('directories', tuple)])):
   pass
 
 
+class PrefixStrippedDirectory(datatype([('directory_digest', Digest), ('prefix', text_type)])):
+  pass
+
+
 class DirectoryToMaterialize(datatype([('path', text_type), ('directory_digest', Digest)])):
   """A request to materialize the contents of a directory digest at the provided path."""
   pass
@@ -189,5 +186,6 @@ def create_fs_rules():
     RootRule(Digest),
     RootRule(MergedDirectories),
     RootRule(PathGlobs),
+    RootRule(PrefixStrippedDirectory),
     RootRule(UrlToFetch),
   ]

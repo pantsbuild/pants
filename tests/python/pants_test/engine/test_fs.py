@@ -14,12 +14,13 @@ from contextlib import contextmanager
 from future.utils import PY2, text_type
 
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, DirectoryToMaterialize, FilesContent,
-                             MergedDirectories, PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch,
-                             create_fs_rules)
+  MergedDirectories, PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch,
+  create_fs_rules, PrefixStrippedDirectory)
 from pants.engine.scheduler import ExecutionError
 from pants.option.global_options import GlobMatchErrorBehavior
+from pants.util.collections import assert_single_element
 from pants.util.contextutil import http_server, temporary_dir
-from pants.util.dirutil import relative_symlink
+from pants.util.dirutil import relative_symlink, safe_file_dump
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.test_base import TestBase
@@ -370,6 +371,79 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       with open(created_file, 'r') as f:
         content = f.read()
         self.assertEqual(content, "European Burmese")
+
+  def test_strip_prefix(self):
+    # Set up files:
+
+    relevant_files = (
+      'characters/dark_tower/roland',
+      'characters/dark_tower/susannah',
+    )
+    all_files = (
+      'books/dark_tower/gunslinger',
+      'characters/altered_carbon/kovacs',
+    ) + relevant_files + (
+      'index',
+    )
+
+    with temporary_dir() as temp_dir:
+      safe_file_dump(os.path.join(temp_dir, 'index'), 'books\ncharacters\n')
+      safe_file_dump(
+        os.path.join(temp_dir, "characters", "altered_carbon", "kovacs"),
+        "Envoy",
+        makedirs=True,
+      )
+
+      tower_dir = os.path.join(temp_dir, "characters", "dark_tower")
+      safe_file_dump(os.path.join(tower_dir, "roland"), "European Burmese", makedirs=True)
+      safe_file_dump(os.path.join(tower_dir, "susannah"), "Not sure actually", makedirs=True)
+
+      safe_file_dump(
+        os.path.join(temp_dir, "books", "dark_tower", "gunslinger"),
+        "1982",
+        makedirs=True,
+      )
+
+      snapshot, snapshot_with_extra_files = self.scheduler.capture_snapshots((
+        PathGlobsAndRoot(PathGlobs(("characters/dark_tower/*",)), text_type(temp_dir)),
+        PathGlobsAndRoot(PathGlobs(("**",)), text_type(temp_dir)),
+      ))
+      # Check that we got the full snapshots that we expect
+      self.assertEquals(snapshot.files, relevant_files)
+      self.assertEquals(snapshot_with_extra_files.files, all_files)
+
+      # Strip empty prefix:
+      zero_prefix_stripped_digest = assert_single_element(self.scheduler.product_request(
+        Digest,
+        [PrefixStrippedDirectory(snapshot.directory_digest, text_type(""))],
+      ))
+      self.assertEquals(snapshot.directory_digest, zero_prefix_stripped_digest)
+
+      # Strip a non-empty prefix shared by all files:
+      stripped_digest = assert_single_element(self.scheduler.product_request(
+        Digest,
+        [PrefixStrippedDirectory(snapshot.directory_digest, text_type("characters/dark_tower"))],
+      ))
+      self.assertEquals(
+        stripped_digest,
+        Digest(
+          fingerprint='71e788fc25783c424db555477071f5e476d942fc958a5d06ffc1ed223f779a8c',
+          serialized_bytes_length=162,
+        )
+      )
+      expected_snapshot = assert_single_element(self.scheduler.capture_snapshots((
+        PathGlobsAndRoot(PathGlobs(("*",)), text_type(tower_dir)),
+      )))
+      self.assertEquals(expected_snapshot.files, ('roland', 'susannah'))
+      self.assertEquals(stripped_digest, expected_snapshot.directory_digest)
+
+      # Strip a prefix which isn't shared by all files:
+      # TODO: Should this work (discarding non-matching files) or error?
+      stripped_digest_from_extra_files = assert_single_element(self.scheduler.product_request(
+        Digest,
+        [PrefixStrippedDirectory(snapshot_with_extra_files.directory_digest, text_type("characters/dark_tower"))]
+      ))
+      self.assertEquals(stripped_digest_from_extra_files, expected_snapshot.directory_digest)
 
   def test_glob_match_error(self):
     with self.assertRaises(ValueError) as cm:

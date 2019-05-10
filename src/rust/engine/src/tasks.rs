@@ -86,6 +86,10 @@ impl Tasks {
         input: types.merged_directories,
       },
       Intrinsic {
+        product: types.directory_digest,
+        input: types.prefix_stripped_directory,
+      },
+      Intrinsic {
         product: types.process_result,
         input: types.process_request,
       },

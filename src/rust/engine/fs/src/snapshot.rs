@@ -341,6 +341,66 @@ impl Snapshot {
       .to_boxed()
   }
 
+  pub fn strip_prefix(
+    store: Store,
+    root_digest: Digest,
+    prefix: PathBuf,
+  ) -> impl Future<Item = Digest, Error = String> {
+    let store2 = store.clone();
+    Self::get_directory_or_err(store.clone(), root_digest)
+      .and_then(move |dir| {
+        futures::future::loop_fn(
+          (dir, PathBuf::new(), prefix),
+          move |(dir, already_stripped, prefix)| {
+            let mut components = prefix.components();
+            let component_to_strip = components.next();
+            if let Some(component_to_strip) = component_to_strip {
+              let remaining_prefix = components.collect();
+              let index = dir
+                .get_directories()
+                .binary_search_by(|node| {
+                  node
+                    .get_name()
+                    .cmp(component_to_strip.as_os_str().to_string_lossy().as_ref())
+                })
+                .map_err(|_index| {
+                  // TODO: Should this error, or just return an empty Directory?
+                  format!(
+                    "Stripping prefix from root directory {:?}, {}directory {} didn't contain a directory named {}",
+                    root_digest,
+                    if already_stripped.components().next().is_some() { "sub" } else { "" },
+                    already_stripped.display(),
+                    component_to_strip.as_os_str().to_string_lossy().as_ref()
+                  )
+                });
+              let maybe_digest: Result<Digest, String> = dir.get_directories()[try_future!(index)]
+                .get_digest()
+                .into();
+              let next_already_stripped = already_stripped.join(component_to_strip);
+              let dir = Self::get_directory_or_err(store.clone(), try_future!(maybe_digest));
+              dir
+                .map(|dir| {
+                  futures::future::Loop::Continue((dir, next_already_stripped, remaining_prefix))
+                })
+                .to_boxed()
+            } else {
+              futures::future::ok(futures::future::Loop::Break(dir)).to_boxed()
+            }
+          },
+        )
+      })
+      .and_then(move |dir| store2.record_directory(&dir, true))
+  }
+
+  fn get_directory_or_err(
+    store: Store,
+    digest: Digest,
+  ) -> impl Future<Item = bazel_protos::remote_execution::Directory, Error = String> {
+    store
+      .load_directory(digest)
+      .and_then(move |maybe_dir| maybe_dir.ok_or_else(|| format!("{:?} was not known", digest)))
+  }
+
   ///
   /// Capture a Snapshot of a presumed-immutable piece of the filesystem.
   ///
@@ -807,6 +867,115 @@ mod tests {
         x
       ),
     }
+  }
+
+  #[test]
+  fn strip_empty_prefix() {
+    let (store, _, _, _, mut runtime) = setup();
+
+    let dir = TestDirectory::nested();
+    runtime
+      .block_on(store.record_directory(&dir.directory(), false))
+      .expect("Error storing directory");
+
+    let result = runtime.block_on(super::Snapshot::strip_prefix(
+      store,
+      dir.digest(),
+      PathBuf::from(""),
+    ));
+    assert_eq!(result, Ok(dir.digest()));
+  }
+
+  #[test]
+  fn strip_non_empty_prefix() {
+    let (store, _, _, _, mut runtime) = setup();
+
+    let dir = TestDirectory::nested();
+    runtime
+      .block_on(store.record_directory(&dir.directory(), false))
+      .expect("Error storing directory");
+    runtime
+      .block_on(store.record_directory(&TestDirectory::containing_roland().directory(), false))
+      .expect("Error storing directory");
+
+    let result = runtime.block_on(super::Snapshot::strip_prefix(
+      store,
+      dir.digest(),
+      PathBuf::from("cats"),
+    ));
+    assert_eq!(result, Ok(TestDirectory::containing_roland().digest()));
+  }
+
+  #[test]
+  fn strip_dir_not_in_store() {
+    let (store, _, _, _, mut runtime) = setup();
+    let digest = TestDirectory::nested().digest();
+    let result = runtime.block_on(super::Snapshot::strip_prefix(
+      store,
+      digest,
+      PathBuf::from("cats"),
+    ));
+    assert_eq!(result, Err(format!("{:?} was not known", digest)));
+  }
+
+  #[test]
+  fn strip_subdir_not_in_store() {
+    let (store, _, _, _, mut runtime) = setup();
+    let dir = TestDirectory::nested();
+    runtime
+      .block_on(store.record_directory(&dir.directory(), false))
+      .expect("Error storing directory");
+    let result = runtime.block_on(super::Snapshot::strip_prefix(
+      store,
+      dir.digest(),
+      PathBuf::from("cats"),
+    ));
+    assert_eq!(
+      result,
+      Err(format!(
+        "{:?} was not known",
+        TestDirectory::containing_roland().digest()
+      ))
+    );
+  }
+
+  #[test]
+  fn strip_non_matching_prefix() {
+    let (store, _, _, _, mut runtime) = setup();
+    let dir = TestDirectory::recursive();
+    let child_dir = TestDirectory::containing_roland();
+    runtime
+      .block_on(store.record_directory(&dir.directory(), false))
+      .expect("Error storing directory");
+    runtime
+      .block_on(store.record_directory(&child_dir.directory(), false))
+      .expect("Error storing directory");
+    let result = runtime.block_on(super::Snapshot::strip_prefix(
+      store,
+      dir.digest(),
+      PathBuf::from("cats"),
+    ));
+
+    // TODO: Should this discard non-matching files (as this test suggests), or error?
+    assert_eq!(result, Ok(child_dir.digest()));
+  }
+
+  #[test]
+  fn strip_subdir_not_in_dir() {
+    let (store, _, _, _, mut runtime) = setup();
+    let dir = TestDirectory::nested();
+    runtime
+      .block_on(store.record_directory(&dir.directory(), false))
+      .expect("Error storing directory");
+    runtime
+      .block_on(store.record_directory(&TestDirectory::containing_roland().directory(), false))
+      .expect("Error storing directory");
+    let result = runtime.block_on(super::Snapshot::strip_prefix(
+      store,
+      dir.digest(),
+      PathBuf::from("cats/ugly"),
+    ));
+    assert_eq!(result, Err(format!("Stripping prefix from root directory {:?}, subdirectory cats didn't contain a directory named ugly", dir.digest())));
   }
 
   fn make_dir_stat(root: &Path, relpath: &Path) -> PathStat {
