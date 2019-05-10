@@ -15,7 +15,8 @@ class Status(enum(['SUCCESS', 'FAILURE'])): pass
 class TestResult(datatype([
   ('status', Status),
   # The stdout of the test runner (which may or may not include actual testcase output).
-  ('stdout', text_type)
+  ('stdout', text_type),
+  ('stderr', text_type),
 ])):
 
   # Prevent this class from being detected by pytest as a test class.
