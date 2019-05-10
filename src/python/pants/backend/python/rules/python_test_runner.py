@@ -90,24 +90,24 @@ def run_python_test(transitive_hydrated_target, pytest):
       sources_snapshot = maybe_source_target.adaptor.sources.snapshot
       all_sources_digests.append(sources_snapshot.directory_digest)
 
-  all_input_digests = all_sources_digests + [
-    requirements_pex_response.output_directory_digest,
+  all_sources_digests_adjusted_for_source_root = yield [
+    Get(Digest, PrefixStrippedDirectory(digest, "testprojects/tests/python"))
+    for digest in all_sources_digests
   ]
+
+  all_input_digests = (
+    list(all_sources_digests_adjusted_for_source_root) +
+    [requirements_pex_response.output_directory_digest,]
+  )
   merged_input_files = yield Get(
     Digest,
     MergedDirectories,
     MergedDirectories(directories=tuple(all_input_digests)),
   )
 
-  source_root_adjusted_files = yield Get(
-    Digest,
-    PrefixStrippedDirectory,
-    PrefixStrippedDirectory()
-  )
-
   request = ExecuteProcessRequest(
     argv=(python_binary, './{}'.format(output_pytest_requirements_pex_filename)),
-    input_files=source_root_adjusted_files,
+    input_files=merged_input_files,
     description='Run pytest for {}'.format(target_root.address.reference()),
   )
 

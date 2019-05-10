@@ -8,4 +8,5 @@ from pants.rules.core import filedeps, list_targets, test, source_roots
 
 
 def rules():
-  return list_targets.rules() + filedeps.rules() + test.rules() + source_roots.rules()
+  # return list_targets.rules() + filedeps.rules() + test.rules() + source_roots.rules()
+  return list_targets.rules() + filedeps.rules() + test.rules()
