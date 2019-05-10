@@ -26,13 +26,6 @@ class FileContent(datatype([('path', text_type), ('content', binary_type)])):
     return repr(self)
 
 
-class Path(datatype([('path', text_type), 'stat'])):
-  """A filesystem path, holding both its symbolic path name, and underlying canonical Stat.
-
-  Both values are relative to the ProjectTree's buildroot.
-  """
-
-
 class PathGlobs(datatype([
     'include',
     'exclude',
