@@ -34,9 +34,9 @@ def main() -> None:
 
 def find_files(*directories: str, extension: str) -> List[str]:
   return [
-    file
+    fp
     for directory in directories
-    for file in glob(f"{directory}/**/*{extension}", recursive=True)
+    for fp in glob(f"{directory}/**/*{extension}", recursive=True)
   ]
 
 
