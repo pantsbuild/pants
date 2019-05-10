@@ -38,7 +38,7 @@ mkdir -p $out
 cd $out
 git clone "$repo_url"
 cd "$(ls)"
-mkdir -p "./$path_within_url" && cp -R "$root/../../dist/docsite/*" "./$path_within_url"
+mkdir -p "./$path_within_url" && cp -R "$root/../../dist/docsite"/* "./$path_within_url"
 git add .
 git commit -am "publish by $USER"
 git push origin master
