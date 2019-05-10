@@ -8,6 +8,7 @@ import os
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
+from pants.base.revision import Revision
 from pants.base.workunit import WorkUnitLabel
 
 from pants.contrib.codeanalysis.tasks.indexable_java_targets import IndexableJavaTargets
@@ -53,10 +54,12 @@ class IndexJava(NailgunTask):
     with self.invalidated(indexable_targets, invalidate_dependents=True) as invalidation_check:
       if invalidation_check.invalid_vts:
         indexer_cp = self.tool_classpath('kythe-java-indexer')
-        # Kythe jars embed a copy of Java 9's com.sun.tools.javac and javax.tools, for use on JDK8.
-        # We must put these jars on the bootclasspath, ahead of any others, to ensure that we load
-        # the Java 9 versions, and not the runtime's versions.
-        jvm_options = ['-Xbootclasspath/p:{}'.format(':'.join(indexer_cp))]
+        jvm_options = []
+        if self.dist.version < Revision.lenient('9'):
+          # Kythe jars embed a copy of Java 9's com.sun.tools.javac and javax.tools, for use on
+          # JDK8. We must put these jars on the bootclasspath, ahead of any others, to ensure that
+          # we load the Java 9 versions, and not the runtime's versions.
+          jvm_options.append('-Xbootclasspath/p:{}'.format(':'.join(indexer_cp)))
         jvm_options.extend(self.get_options().jvm_options)
 
         for vt in invalidation_check.invalid_vts:

@@ -28,16 +28,16 @@ jar_library(name = 'scrooge-linter',
             ])
 
 # Google doesn't publish Kythe jars (yet?).  So we publish them to a custom repo
-# (https://github.com/benjyw/binhost) for now.  See build-support/ivy/ivysettings.xml
+# (https://github.com/toolchainlabs/binhost) for now.  See build-support/ivy/ivysettings.xml
 # for more info.
 jar_library(
   name='kythe-java-extractor',
-  jars = [jar(org='kythe', name='javac_extractor', rev='v0.0.26.5-snowchain037-82964297aef')]
+  jars = [jar(org='kythe', name='javac_extractor', rev='v0.0.30-toolchain001-26a6b03b-000')]
 )
 
 jar_library(
   name='kythe-java-indexer',
-  jars = [jar(org='kythe', name='java_indexer', rev='v0.0.26.5-snowchain037-82964297aef')]
+  jars = [jar(org='kythe', name='java_indexer', rev='v0.0.30-toolchain001-26a6b03b-000')]
 )
 
 # Runtime dependencies for the Avro Java generated code.

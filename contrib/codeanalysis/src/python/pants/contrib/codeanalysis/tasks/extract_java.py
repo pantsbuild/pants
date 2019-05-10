@@ -10,6 +10,7 @@ from builtins import next
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
+from pants.base.revision import Revision
 
 from pants.contrib.codeanalysis.tasks.indexable_java_targets import IndexableJavaTargets
 
@@ -18,6 +19,7 @@ from pants.contrib.codeanalysis.tasks.indexable_java_targets import IndexableJav
 class ExtractJava(JvmToolTaskMixin):
   cache_target_dirs = True
 
+  # Despite the name this is a valid entry point for higher versions of Javac.
   _KYTHE_JAVA_EXTRACTOR_MAIN = 'com.google.devtools.kythe.extractors.java.standalone.Javac8Wrapper'
 
   @classmethod
@@ -60,10 +62,12 @@ class ExtractJava(JvmToolTaskMixin):
       for vt in invalidation_check.invalid_vts:
         self.context.log.info('Kythe extracting from {}\n'.format(vt.target.address.spec))
         javac_args = self._get_javac_args_from_zinc_args(targets_to_zinc_args[vt.target])
-        # Kythe jars embed a copy of Java 9's com.sun.tools.javac and javax.tools, for use on JDK8.
-        # We must put these jars on the bootclasspath, ahead of any others, to ensure that we load
-        # the Java 9 versions, and not the runtime's versions.
-        jvm_options = ['-Xbootclasspath/p:{}'.format(':'.join(extractor_cp))]
+        jvm_options = []
+        if self.dist.version < Revision.lenient('9'):
+          # Kythe jars embed a copy of Java 9's com.sun.tools.javac and javax.tools, for use on
+          # JDK8. We must put these jars on the bootclasspath, ahead of any others, to ensure that
+          # we load the Java 9 versions, and not the runtime's versions.
+          jvm_options.append('-Xbootclasspath/p:{}'.format(':'.join(extractor_cp)))
         jvm_options.extend(self.get_options().jvm_options)
         jvm_options.extend([
           '-DKYTHE_CORPUS={}'.format(vt.target.address.spec),
