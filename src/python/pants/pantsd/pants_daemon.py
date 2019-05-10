@@ -477,8 +477,17 @@ class PantsDaemon(FingerprintedProcessManager):
     self.watchman_launcher.maybe_launch()
     self._logger.debug('launching pantsd')
     self.daemon_spawn()
-    # Wait up to 60 seconds for pantsd to write its pidfile.
-    pantsd_pid = self.await_pid(60)
+    try:
+      # Wait up to 60 seconds for pantsd to write its pidfile.
+      pantsd_pid = self.await_pid(60)
+    except self.Timeout as e:
+      if not self.is_alive():
+        # If pantsd server is not alive
+        self._logger.error("The daemon process has crashed before it could write its pid!")
+        os._exit(0)
+      else:
+        raise(e)
+
     listening_port = self.read_named_socket('pailgun', int)
     self._logger.debug('pantsd is running at pid {}, pailgun port is {}'
                        .format(self.pid, listening_port))
