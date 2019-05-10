@@ -125,8 +125,8 @@ function find_pkg() {
 function pkg_pants_install_test() {
   local version=$1
   shift
-  local PIP_ARGS="$@"
-  pip install "${PIP_ARGS}" "pantsbuild.pants==${version}" || \
+  local PIP_ARGS=("$@")
+  pip install "${PIP_ARGS[@]}" "pantsbuild.pants==${version}" || \
     die "pip install of pantsbuild.pants failed!"
   execute_packaged_pants_with_internal_backends list src:: || \
     die "'pants list src::' failed in venv!"
@@ -137,8 +137,8 @@ function pkg_pants_install_test() {
 function pkg_testinfra_install_test() {
   local version=$1
   shift
-  local PIP_ARGS="$@"
-  pip install "${PIP_ARGS}" "pantsbuild.pants.testinfra==${version}" && \
+  local PIP_ARGS=("$@")
+  pip install "${PIP_ARGS[@]}" "pantsbuild.pants.testinfra==${version}" && \
   python -c "import pants_test"
 }
 
@@ -206,15 +206,15 @@ function build_3rdparty_packages() {
   rm -rf "${DEPLOY_3RDPARTY_WHEEL_DIR}"
   mkdir -p "${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}"
 
-  local req_args=""
+  local req_args=()
   for req_file in "${REQUIREMENTS_3RDPARTY_FILES[@]}"; do
-    req_args="${req_args} -r ${ROOT}/$req_file"
+    req_args=("${req_args[@]}" -r "${ROOT}/$req_file")
   done
 
   start_travis_section "3rdparty" "Building 3rdparty whls from ${REQUIREMENTS_3RDPARTY_FILES[*]}"
   activate_tmp_venv
 
-  pip wheel --wheel-dir="${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}" "${req_args}"
+  pip wheel --wheel-dir="${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}" "${req_args[@]}"
 
   deactivate
   end_travis_section
@@ -322,7 +322,7 @@ function install_and_test_packages() {
   for package in "${packages[@]}"
   do
     start_travis_section "${package}" "Installing and testing package ${package}-${VERSION}"
-    eval pkg_${package##*\.}_install_test ${PIP_ARGS[@]} || \
+    eval pkg_${package##*\.}_install_test "${PIP_ARGS[@]}" || \
       die "Failed to install and test package ${package}-${VERSION}!"
     end_travis_section
   done
