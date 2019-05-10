@@ -21,6 +21,8 @@ function venv_dir() {
 }
 
 function activate_venv() {
+  # Because the venv/bin/activate script's location is dynamic and not located in a fixed
+  # place, Shellcheck will not be able to find it so we tell Shellcheck to ignore the file.
   # shellcheck source=/dev/null
   source "$(venv_dir)/bin/activate"
 }

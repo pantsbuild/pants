@@ -264,6 +264,8 @@ function build_fs_util() {
 }
 
 function activate_tmp_venv() {
+  # Because the venv/bin/activate script's location is dynamic and not located in a fixed
+  # place, Shellcheck will not be able to find it so we tell Shellcheck to ignore the file.
   # shellcheck source=/dev/null
   VENV_DIR=$(mktemp -d -t pants.XXXXX) && \
   "${ROOT}/build-support/virtualenv" "$VENV_DIR" && \
@@ -568,6 +570,8 @@ function activate_twine() {
 
   rm -rf "${venv_dir}"
   "${ROOT}/build-support/virtualenv" "${venv_dir}"
+  # Because the venv/bin/activate script's location is dynamic and not located in a fixed
+  # place, Shellcheck will not be able to find it so we tell Shellcheck to ignore the file.
   # shellcheck source=/dev/null
   source "${venv_dir}/bin/activate"
   pip install twine
