@@ -10,9 +10,9 @@ GIT_URL="${GIT_URL:-${PANTS_GH_PAGES}}"
 PANTS_SITE_URL='https://www.pantsbuild.org'
 VIEW_PUBLISH_URL="${VIEW_PUBLISH_URL:-${PANTS_SITE_URL}}"
 
-REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd "$(git rev-parse --show-toplevel)" && pwd)
 
-source ${REPO_ROOT}/build-support/common.sh
+source "${REPO_ROOT}/build-support/common.sh"
 
 PANTS_EXE="${REPO_ROOT}/pants"
 
@@ -69,10 +69,10 @@ ${PANTS_EXE} sitegen \
 
 function do_open() {
   if [[ "${preview}" = "true" ]]; then
-    if which xdg-open &>/dev/null; then
-      xdg-open $1
-    elif which open &>/dev/null; then
-      open $1
+    if command -v xdg-open &>/dev/null; then
+      xdg-open "$1"
+    elif command -v open &>/dev/null; then
+      open "$1"
     else
       die "Failed to find an opener on your system for $1"
     fi
@@ -92,7 +92,7 @@ fi
 if [[ "${publish}" = "true" ]]; then
   url="${VIEW_PUBLISH_URL}/${publish_path}"
   if [[ "${publish_confirmed}" != "true" ]] ; then
-    read -ep "To abort publishing these docs to ${url} press CTRL-C, otherwise press enter to \
+    read -rep "To abort publishing these docs to ${url} press CTRL-C, otherwise press enter to \
 continue."
   fi
   (

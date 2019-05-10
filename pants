@@ -37,7 +37,7 @@
 
 set -e
 
-HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # Set RUN_PANTS_FROM_PEX to non-empty to cause this wrapper script to delegate directly
 # to ./pants.pex. We use this in CI to avoid bootstrapping in every shard.
@@ -49,11 +49,13 @@ fi
 
 # Exposes:
 # + activate_pants_venv: Activate a virtualenv for pants requirements, creating it if needed.
-source ${HERE}/build-support/pants_venv
+# shellcheck source=build-support/pants_venv
+source "${HERE}/build-support/pants_venv"
 
 # Exposes:
 # + bootstrap_native_code: Builds target-specific native engine binaries.
-source ${HERE}/build-support/bin/native/bootstrap_code.sh
+# shellcheck source=build-support/bin/native/bootstrap_code.sh
+source "${HERE}/build-support/bin/native/bootstrap_code.sh"
 
 # Default to using Python 3 if not otherwise specified.
 export PY="${PY:-python3}"
@@ -69,19 +71,19 @@ export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRE
 
 PANTS_EXE="${HERE}/src/python/pants/bin/pants_loader.py"
 
-if [[ ! -z "${WRAPPER_REQUIREMENTS}" ]]; then
+if [[ -n "${WRAPPER_REQUIREMENTS}" ]]; then
   REQUIREMENTS=(
-    $(echo ${WRAPPER_REQUIREMENTS} | tr : ' ')
+    $(echo "${WRAPPER_REQUIREMENTS}" | tr : ' ')
     ${REQUIREMENTS[@]}
   )
 fi
 
 PANTS_SRCPATH=(
-  ${HERE}/src/python
+  "${HERE}/src/python"
 )
-if [[ ! -z "${WRAPPER_SRCPATH}" ]]; then
+if [[ -n "${WRAPPER_SRCPATH}" ]]; then
   PANTS_SRCPATH=(
-    $(echo ${WRAPPER_SRCPATH} | tr : ' ')
+    $(echo "${WRAPPER_SRCPATH}" | tr : ' ')
     ${PANTS_SRCPATH[@]}
   )
 fi
@@ -92,17 +94,17 @@ function exec_pants_bare() {
   activate_pants_venv 1>&2
   bootstrap_native_code 1>&2
   PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" \
-    exec python ${PANTS_EXE} "$@"
+    exec python "${PANTS_EXE}" "$@"
 }
 
-if [[ ! -z "${WRAPPER_REQUIREMENTS}" ]]; then
+if [[ -n "${WRAPPER_REQUIREMENTS}" ]]; then
   log "*** Running pants with extra requirements: ${WRAPPER_REQUIREMENTS} ***"
 fi
-if [[ ! -z "${WRAPPER_SRCPATH}" ]]; then
+if [[ -n "${WRAPPER_SRCPATH}" ]]; then
   log "*** Running pants with extra sources ${WRAPPER_SRCPATH} ***"
 fi
 
-if [[ ! -z "$PANTS_DEV" && "$PANTS_DEV" -eq 0 ]]; then
+if [[ -n "$PANTS_DEV" && "$PANTS_DEV" -eq 0 ]]; then
   # Unexport PANTS_DEV if explicitly set to 0.
   export -n PANTS_DEV
 else

@@ -23,7 +23,7 @@ set -eo pipefail
 # If a file "went away", this won't remove it.
 
 root=$(
-  cd $(dirname $0)
+  cd "$(dirname $0)"
   /bin/pwd
 )
 
@@ -36,9 +36,9 @@ trap "rm -fr $out" 0 1 2
 
 mkdir -p $out
 cd $out
-git clone $repo_url
-cd `ls`
-mkdir -p ./$path_within_url && cp -R $root/../../dist/docsite/* ./$path_within_url
+git clone "$repo_url"
+cd "$(ls)"
+mkdir -p "./$path_within_url" && cp -R "$root/../../dist/docsite/*" "./$path_within_url"
 git add .
 git commit -am "publish by $USER"
 git push origin master
