@@ -4,9 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.rules.core import filedeps, list_targets, test, source_roots
+from pants.rules.core import filedeps, list_targets, test
 
 
 def rules():
-  return list_targets.rules() + filedeps.rules() + test.rules() + source_roots.rules()
-  # return list_targets.rules() + filedeps.rules() + test.rules()
+  return list_targets.rules() + filedeps.rules() + test.rules()

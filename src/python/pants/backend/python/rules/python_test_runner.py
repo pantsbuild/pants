@@ -18,7 +18,7 @@ from pants.engine.legacy.graph import TransitiveHydratedTarget
 from pants.engine.rules import optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.core_test_model import Status, TestResult
-from pants.rules.core.source_roots import SourceRootDigest
+from pants.source.source_root import SourceRootConfig
 
 
 # This class currently exists so that other rules could be added which turned a HydratedTarget into
@@ -30,8 +30,8 @@ class PyTestResult(TestResult):
 
 # TODO: Support deps
 # TODO: Support resources
-@rule(PyTestResult, [TransitiveHydratedTarget, PyTest])
-def run_python_test(transitive_hydrated_target, pytest):
+@rule(PyTestResult, [TransitiveHydratedTarget, PyTest, SourceRootConfig])
+def run_python_test(transitive_hydrated_target, pytest, source_root_config):
   target_root = transitive_hydrated_target.root
 
   # TODO: Inject versions and digests here through some option, rather than hard-coding it.
@@ -92,12 +92,12 @@ def run_python_test(transitive_hydrated_target, pytest):
       sources_snapshot = maybe_source_target.adaptor.sources.snapshot
       all_sources_digests.append(sources_snapshot.directory_digest)
 
-  all_sources_digests_adjusted_for_source_root_wrapped = yield [
-    Get(SourceRootDigest, Digest, digest)
+  source_roots = source_root_config.get_source_roots()
+  all_sources_digests_adjusted_for_source_root = yield [
+    # TODO: how to go from digest to target.adaptor.address...
+    Get(Digest, PrefixStrippedDirectory(digest, "testprojects/tests/python"))
     for digest in all_sources_digests
   ]
-
-  all_sources_digests_adjusted_for_source_root = [sd.digest for sd in all_sources_digests_adjusted_for_source_root_wrapped]
 
   sources_digest = yield Get(
     Digest,
@@ -105,6 +105,9 @@ def run_python_test(transitive_hydrated_target, pytest):
     MergedDirectories(directories=tuple(all_sources_digests_adjusted_for_source_root)),
   )
 
+  # Take a set of source file names, return a set of __init__.py
+  # Maybe use a snapshot.files field? Can convert a digest to snapshot.
+  # Make the algorithm Stu linked to static, then link to it here.
   touch_init_request = ExecuteProcessRequest(
     argv=("touch", "pants/__init__.py"),
     output_files=("pants/__init__.py",),
@@ -146,4 +149,5 @@ def rules():
   return [
       run_python_test,
       optionable_rule(PyTest),
+      optionable_rule(SourceRootConfig),
     ]
