@@ -107,7 +107,7 @@ def run_python_test(transitive_hydrated_target, pytest):
 
   request = ExecuteProcessRequest(
     argv=(python_binary, './{}'.format(output_pytest_requirements_pex_filename)),
-    input_files=merged_input_files,
+    input_files=source_root_adjusted_files,
     description='Run pytest for {}'.format(target_root.address.reference()),
   )
 
