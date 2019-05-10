@@ -20,6 +20,13 @@ include_version = true
 line_length = 100
 language = "C"
 
+[parse]
+parse_deps = true
+# If more deps are added here, make sure to also add them to be rerun-triggers in src/cffi_build.rs.
+# We specify this explicitly because otherwise all transitive deps are parsed, and that takes a
+# very long time.
+include = ["logging"]
+
 [export]
 # TODO: wrapped_PyInit_native_engine is declared twice if not excluded here, figure out why.
 exclude = ["Handle", "wrapped_PyInit_native_engine"]

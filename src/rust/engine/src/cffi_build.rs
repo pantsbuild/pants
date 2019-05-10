@@ -120,6 +120,8 @@ fn main() -> Result<(), CffiBuildError> {
   let bindings_config_path = Path::new("cbindgen.toml");
   mark_for_change_detection(&bindings_config_path);
   mark_for_change_detection(Path::new("src"));
+  // Explicitly re-run if logging is modified because it's a hard-coded dep in cbindgen.toml.
+  mark_for_change_detection(Path::new("logging"));
 
   let scheduler_file_path = Path::new("src/cffi/scheduler.h");
   let crate_dir = env::var("CARGO_MANIFEST_DIR")?;

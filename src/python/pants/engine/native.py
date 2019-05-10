@@ -727,16 +727,11 @@ class Native(Singleton):
   def flush_log(self):
     return self.lib.flush_log()
 
-  # These methods hard-code details of the logging::Destination struct from Rust.
-  # Ensure any updates here are reflected there.
   def override_thread_logging_destination_to_just_pantsd(self):
-    self._override_thread_logging_destination(1)
+    self.lib.override_thread_logging_destination(self.lib.Pantsd)
 
   def override_thread_logging_destination_to_just_stderr(self):
-    self._override_thread_logging_destination(2)
-
-  def _override_thread_logging_destination(self, bitflags):
-    return self.lib.override_thread_logging_destination(bitflags)
+    self.lib.override_thread_logging_destination(self.lib.Stderr)
 
   def match_path_globs(self, path_globs, paths):
     path_globs = self.context.to_value(path_globs)

@@ -18,7 +18,7 @@ crate-type = ["cdylib"]
 
 [build-dependencies]
 build_utils = { path = "build_utils" }
-cbindgen = "0.6.7"
+cbindgen = "0.8.6"
 cc = "1.0"
 walkdir = "2"
 
@@ -79,10 +79,9 @@ default-members = [
 [dependencies]
 boxfuture = { path = "boxfuture" }
 bytes = "0.4.5"
-enumflags2 = "0.5"
 fnv = "1.0.5"
 fs = { path = "fs" }
-futures = "^0.1.16"
+futures = "0.1.27"
 # TODO: Switch to a release once https://github.com/alexcrichton/futures-timer/pull/11 and https://github.com/alexcrichton/futures-timer/pull/12 merge
 futures-timer = { git = "https://github.com/pantsbuild/futures-timer", rev = "0b747e565309a58537807ab43c674d8951f9e5a0" }
 graph = { path = "graph" }
@@ -104,6 +103,3 @@ tempfile = "3"
 ui = { path = "ui" }
 url = "1.7.1"
 tar_api = { path = "tar_api" }
-
-[replace]
-"futures:0.1.26" = { git = "https://github.com/illicitonion/futures-rs", rev = "c4a3a6be9ed096bde707f65e3a82d461c64f7718" }

@@ -836,9 +836,7 @@ pub extern "C" fn init_logging(level: u64, show_rust_3rdparty_logs: bool) {
 
 #[no_mangle]
 pub extern "C" fn setup_pantsd_logger(log_file_ptr: *const raw::c_char, level: u64) -> PyResult {
-  logging::THREAD_DESTINATION.with(|destination| {
-    *destination.lock() |= Destination::Pantsd;
-  });
+  logging::set_destination(Destination::Pantsd);
 
   let path_str = unsafe { CStr::from_ptr(log_file_ptr).to_string_lossy().into_owned() };
   let path = PathBuf::from(path_str);
@@ -852,9 +850,7 @@ pub extern "C" fn setup_pantsd_logger(log_file_ptr: *const raw::c_char, level: u
 // Might be called before externs are set, therefore can't return a PyResult
 #[no_mangle]
 pub extern "C" fn setup_stderr_logger(level: u64) {
-  logging::THREAD_DESTINATION.with(|destination| {
-    *destination.lock() |= Destination::Stderr;
-  });
+  logging::set_destination(Destination::Stderr);
   LOGGER
     .set_stderr_logger(level)
     .expect("Error setting up STDERR logger");
@@ -876,11 +872,8 @@ pub extern "C" fn flush_log() {
 }
 
 #[no_mangle]
-pub extern "C" fn override_thread_logging_destination(new_destination: u8) {
-  logging::THREAD_DESTINATION.with(|destination| {
-    let flags = enumflags2::BitFlags::from_bits(new_destination);
-    *destination.lock() = flags.expect("Bad logging destination bitflags");
-  });
+pub extern "C" fn override_thread_logging_destination(destination: Destination) {
+  logging::set_destination(destination);
 }
 
 fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {

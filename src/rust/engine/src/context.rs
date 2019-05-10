@@ -227,14 +227,17 @@ impl Core {
   /// Start running a Future on a tokio Runtime.
   ///
   pub fn spawn<F: Future<Item = (), Error = ()> + Send + 'static>(&self, future: F) {
-    let logging_destination = logging::destination_for_current_thread();
+    // Make sure to copy our (thread-local) logging destination into the task.
+    // When a daemon thread kicks off a future, it should log like a daemon thread (and similarly
+    // for a user-facing thread).
+    let logging_destination = logging::get_destination();
     self
       .runtime
       .get()
       .read()
       .executor()
       .spawn(futures::future::ok(()).and_then(move |()| {
-        logging::set_task_logging_destination(logging_destination);
+        logging::set_destination(logging_destination);
         future
       }))
   }
@@ -253,13 +256,16 @@ impl Core {
     &self,
     future: F,
   ) -> Result<Item, Error> {
-    let logging_destination = logging::destination_for_current_thread();
+    // Make sure to copy our (thread-local) logging destination into the task.
+    // When a daemon thread kicks off a future, it should log like a daemon thread (and similarly
+    // for a user-facing thread).
+    let logging_destination = logging::get_destination();
     self
       .runtime
       .get()
       .write()
       .block_on(futures::future::ok(()).and_then(move |()| {
-        logging::set_task_logging_destination(logging_destination);
+        logging::set_destination(logging_destination);
         future
       }))
   }

@@ -46,37 +46,9 @@ macro_rules! debug_log {
     };
 }
 
-use enumflags2::BitFlags;
-use enumflags2_derive::EnumFlags;
-use futures::task_local;
-use parking_lot::Mutex;
-
-// These values are hard-coded on the Python side in native's override_thread_logging_destination_*
-// methods. Ensure any updates here are reflected there.
-#[derive(EnumFlags, Copy, Clone, Debug, PartialEq, Eq)]
-#[repr(u8)]
-pub enum Destination {
-  Pantsd = 0b01,
-  Stderr = 0b10,
-}
-
-thread_local! {
-  pub static THREAD_DESTINATION: Mutex<BitFlags<Destination>> = Mutex::new(Destination::Stderr.into())
-}
-
-task_local! {
-  static TASK_DESTINATION: Mutex<Option<BitFlags<Destination>>> = Mutex::new(None)
-}
-
-pub fn set_task_logging_destination(destination: BitFlags<Destination>) {
-  TASK_DESTINATION.with(|task_destination| {
-    *task_destination.lock() = Some(destination);
-  })
-}
-
 pub mod logger;
 
-pub use logger::destination_for_current_thread;
+pub use logger::{get_destination, set_destination, Destination};
 
 pub type Logger = logger::Logger;
 
