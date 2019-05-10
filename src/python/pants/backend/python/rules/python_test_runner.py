@@ -83,26 +83,26 @@ def run_python_test(transitive_hydrated_target, pytest, source_root_config):
   requirements_pex_response = yield Get(
     ExecuteProcessResult, ExecuteProcessRequest, requirements_pex_request)
 
-  # Gather sources.
+  source_roots = source_root_config.get_source_roots()
+
+  # Gather sources and adjust for the source root.
   # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of raising to
   # simplify the hasattr() checks here!
   all_sources_digests = []
   for maybe_source_target in all_targets:
     if hasattr(maybe_source_target.adaptor, 'sources'):
       sources_snapshot = maybe_source_target.adaptor.sources.snapshot
-      all_sources_digests.append(sources_snapshot.directory_digest)
-
-  source_roots = source_root_config.get_source_roots()
-  all_sources_digests_adjusted_for_source_root = yield [
-    # TODO: how to go from digest to target.adaptor.address...
-    Get(Digest, PrefixStrippedDirectory(digest, "testprojects/tests/python"))
-    for digest in all_sources_digests
-  ]
+      digest_adjusted_for_source_root = yield Get(
+        Digest,
+        PrefixStrippedDirectory(
+          sources_snapshot.directory_digest,
+          source_roots.find_by_path(maybe_source_target.adaptor.address.spec_path).path
+        )
+      )
+      all_sources_digests.append(digest_adjusted_for_source_root)
 
   sources_digest = yield Get(
-    Digest,
-    MergedDirectories,
-    MergedDirectories(directories=tuple(all_sources_digests_adjusted_for_source_root)),
+    Digest, MergedDirectories(directories=tuple(all_sources_digests)),
   )
 
   # Take a set of source file names, return a set of __init__.py
