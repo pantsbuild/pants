@@ -106,7 +106,7 @@ export PANTS_DEV=1
 
 # We only want to output failures and skips.
 # See https://docs.pytest.org/en/latest/usage.html#detailed-summary-report.
-export PYTEST_PASSTHRU_ARGS="-q -rfa"
+export PYTEST_PASSTHRU_ARGS=(-q -rfa)
 
 # Determine the Python version to use for bootstrapping pants.pex. This would usually not be
 # necessary to set when developing locally, because the `./pants` and `./pants2` scripts set
@@ -197,7 +197,7 @@ if [[ "${run_internal_backends:-false}" == "true" ]]; then
   start_travis_section "BackendTests" "Running internal backend python tests"
   (
     ./pants.pex test.pytest \
-    pants-plugins/src/python:: pants-plugins/tests/python:: -- "${PYTEST_PASSTHRU_ARGS}"
+    pants-plugins/src/python:: pants-plugins/tests/python:: -- "${PYTEST_PASSTHRU_ARGS[@]}"
   ) || die "Internal backend python test failure"
   end_travis_section
 fi
@@ -210,7 +210,7 @@ if [[ "${run_python:-false}" == "true" ]]; then
   (
     ./pants.pex --tag='-integration' test.pytest --chroot \
       "--test-pytest-test-shard=${python_unit_shard}" \
-      src/python:: tests/python:: -- "${PYTEST_PASSTHRU_ARGS}"
+      src/python:: tests/python:: -- "${PYTEST_PASSTHRU_ARGS[@]}"
   ) || die "Core python test failure"
   end_travis_section
 fi
@@ -223,7 +223,7 @@ if [[ "${run_contrib:-false}" == "true" ]]; then
   (
     ./pants.pex --exclude-target-regexp='.*/testprojects/.*' test.pytest \
     "--test-pytest-test-shard=${python_contrib_shard}" \
-    contrib:: -- "${PYTEST_PASSTHRU_ARGS}"
+    contrib:: -- "${PYTEST_PASSTHRU_ARGS[@]}"
   ) || die "Contrib python test failure"
   end_travis_section
 fi
@@ -270,7 +270,7 @@ if [[ "${test_platform_specific_behavior:-false}" == 'true' ]]; then
                        "Running platform-specific testing on platform: $(uname)"
   (
     ./pants.pex --tag='+platform_specific_behavior' test \
-                src/python/:: tests/python:: -- "${PYTEST_PASSTHRU_ARGS}"
+                src/python/:: tests/python:: -- "${PYTEST_PASSTHRU_ARGS[@]}"
   ) || die "Pants platform-specific test failure"
   end_travis_section
 fi
@@ -284,7 +284,7 @@ if [[ "${run_integration:-false}" == "true" ]]; then
   (
     ./pants.pex --tag='+integration' test.pytest \
       "--test-pytest-test-shard=${python_intg_shard}" \
-      src/python:: tests/python:: -- "${PYTEST_PASSTHRU_ARGS}"
+      src/python:: tests/python:: -- "${PYTEST_PASSTHRU_ARGS[@]}"
   ) || die "Pants Integration test failure"
   end_travis_section
 fi
