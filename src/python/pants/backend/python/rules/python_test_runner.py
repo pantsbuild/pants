@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import os
 import sys
 from builtins import str
 
@@ -95,10 +96,27 @@ def run_python_test(transitive_hydrated_target, pytest):
     for digest in all_sources_digests
   ]
 
-  all_input_digests = (
-    list(all_sources_digests_adjusted_for_source_root) +
-    [requirements_pex_response.output_directory_digest,]
+  sources_digest = yield Get(
+    Digest,
+    MergedDirectories,
+    MergedDirectories(directories=tuple(all_sources_digests_adjusted_for_source_root)),
   )
+
+  touch_init_request = ExecuteProcessRequest(
+    argv=("touch", "pants/__init__.py"),
+    output_files=("pants/__init__.py",),
+    description="Create __init__.py",
+    input_files=sources_digest,
+    env={"PATH": os.environ["PATH"]}
+  )
+
+  touch_init_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, touch_init_request)
+
+  all_input_digests = [
+    sources_digest,
+    requirements_pex_response.output_directory_digest,
+    touch_init_result.output_directory_digest
+  ]
   merged_input_files = yield Get(
     Digest,
     MergedDirectories,
