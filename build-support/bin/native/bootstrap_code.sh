@@ -42,7 +42,7 @@ function calculate_current_hash() {
   #
   # Assumes we're in the venv that will be used to build the native engine.
   (
-   cd "${REPO_ROOT}" || exit
+   cd "${REPO_ROOT}" || exit 1
    (echo "${MODE_FLAG}"
     echo "${RUST_TOOLCHAIN}"
     uname

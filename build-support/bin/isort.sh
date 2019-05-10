@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-cd "${REPO_ROOT}" || exit
+cd "${REPO_ROOT}" || exit 1
 
 # shellcheck source=build-support/common.sh
 source build-support/common.sh
