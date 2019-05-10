@@ -42,7 +42,7 @@ echo "* Checking headers"
 ./build-support/bin/check_header.py "${DIRS_TO_CHECK[@]}" --files-added "${ADDED_FILES[@]}"
 
 echo "* Checking for banned imports"
-./build-support/bin/check_banned_imports.sh
+./build-support/bin/check_banned_imports.py
 
 echo "* Checking for bad shell patterns" && ./build-support/bin/check_shell.sh || exit 1
 

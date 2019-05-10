@@ -39,7 +39,7 @@ class TestTest(TestBase, SchedulerTestBase, AbstractClass):
 
   def test_outputs_success(self):
     self.single_target_test(
-      result=TestResult(status=Status.SUCCESS, stdout='Here is some output from a test'),
+      result=TestResult(status=Status.SUCCESS, stdout='Here is some output from a test', stderr=''),
       expected_console_output=dedent("""\
         some/target stdout:
         Here is some output from a test
@@ -50,7 +50,7 @@ class TestTest(TestBase, SchedulerTestBase, AbstractClass):
 
   def test_output_failure(self):
     self.single_target_test(
-      result=TestResult(status=Status.FAILURE, stdout='Here is some output from a test'),
+      result=TestResult(status=Status.FAILURE, stdout='Here is some output from a test', stderr=''),
       expected_console_output=dedent("""\
         some/target stdout:
         Here is some output from a test
@@ -67,9 +67,9 @@ class TestTest(TestBase, SchedulerTestBase, AbstractClass):
 
     def make_result(target):
       if target == target1:
-        return TestResult(status=Status.SUCCESS, stdout='I passed\n')
+        return TestResult(status=Status.SUCCESS, stdout='I passed\n', stderr='')
       elif target == target2:
-        return TestResult(status=Status.FAILURE, stdout='I failed\n')
+        return TestResult(status=Status.FAILURE, stdout='I failed\n', stderr='')
       else:
         raise Exception("Unrecognised target")
 
@@ -90,21 +90,33 @@ class TestTest(TestBase, SchedulerTestBase, AbstractClass):
       testprojects/tests/python/pants/fails                                           .....   FAILURE
       """))
 
+  def test_stderr(self):
+    self.single_target_test(
+      result=TestResult(status=Status.FAILURE, stdout='', stderr='Failure running the tests!'),
+      expected_console_output=dedent("""\
+        some/target stderr:
+        Failure running the tests!
+
+        some/target                                                                     .....   FAILURE
+        """),
+      success=False,
+    )
+
   def test_coordinator_python_test(self):
     target_adaptor = PythonTestsAdaptor(type_alias='python_tests')
 
     result = run_rule(coordinator_of_tests, HydratedTarget(Address.parse("some/target"), target_adaptor, ()), {
-      (PyTestResult, HydratedTarget): lambda _: PyTestResult(status=Status.FAILURE, stdout='foo'),
+      (PyTestResult, HydratedTarget): lambda _: PyTestResult(status=Status.FAILURE, stdout='foo', stderr=''),
     })
 
-    self.assertEqual(result, TestResult(status=Status.FAILURE, stdout='foo'))
+    self.assertEqual(result, TestResult(status=Status.FAILURE, stdout='foo', stderr=''))
 
   def test_coordinator_unknown_test(self):
     target_adaptor = PythonTestsAdaptor(type_alias='unknown_tests')
 
     with self.assertRaises(Exception) as cm:
       run_rule(coordinator_of_tests, HydratedTarget(Address.parse("some/target"), target_adaptor, ()), {
-        (PyTestResult, HydratedTarget): lambda _: PyTestResult(status=Status.FAILURE, stdout='foo'),
+        (PyTestResult, HydratedTarget): lambda _: PyTestResult(status=Status.FAILURE, stdout='foo', stderr=''),
       })
 
     self.assertEqual(str(cm.exception), "Didn't know how to run tests for type unknown_tests")
