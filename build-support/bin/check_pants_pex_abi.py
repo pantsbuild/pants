@@ -9,10 +9,7 @@ import json
 import zipfile
 from pathlib import Path
 
-
-RED = "\033[31m"
-BLUE = "\033[34m"
-RESET = "\033[0m"
+from common import die, green
 
 
 def main() -> None:
@@ -32,7 +29,7 @@ def main() -> None:
   if not parsed_abis.issubset(expected_abis):
     die("pants.pex was built with the incorrect ABI. Expected wheels with: {}, found: {}."
         .format(' or '.join(sorted(expected_abis)), ', '.join(sorted(parsed_abis))))
-  success("Success. The pants.pex was built with wheels carrying the expected ABIs: {}."
+  green("Success. The pants.pex was built with wheels carrying the expected ABIs: {}."
           .format(', '.join(sorted(parsed_abis))))
 
 
@@ -50,14 +47,6 @@ def parse_abi_from_filename(filename: str) -> str:
   For example, `configparser-3.5.0-py2-abi3-any.whl` would return `abi3`.
   See https://www.python.org/dev/peps/pep-0425/#use for how wheel filenames are defined."""
   return filename.split("-")[-2]
-
-
-def success(message: str) -> None:
-  print(f"{BLUE}{message}{RESET}")
-
-
-def die(message: str) -> None:
-  raise SystemExit(f"{RED}{message}{RESET}")
 
 
 if __name__ == "__main__":

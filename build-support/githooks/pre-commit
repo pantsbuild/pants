@@ -18,6 +18,8 @@ DIRS_TO_CHECK=(
   pants-plugins
   examples
   contrib
+  # TODO(6071): Add `build-support/bin` once we update the check_header_helper.py script to
+  # allow Python 3 headers (i.e. without __future__ and coding=utf-8).
 )
 
 # TODO(#7068): Fix all these checks to only act on staged files with
