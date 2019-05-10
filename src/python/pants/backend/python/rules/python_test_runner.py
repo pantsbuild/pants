@@ -18,6 +18,7 @@ from pants.engine.legacy.graph import TransitiveHydratedTarget
 from pants.engine.rules import optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.core_test_model import Status, TestResult
+from pants.rules.core.source_roots import SourceRootDigest
 
 
 # This class currently exists so that other rules could be added which turned a HydratedTarget into
@@ -91,10 +92,12 @@ def run_python_test(transitive_hydrated_target, pytest):
       sources_snapshot = maybe_source_target.adaptor.sources.snapshot
       all_sources_digests.append(sources_snapshot.directory_digest)
 
-  all_sources_digests_adjusted_for_source_root = yield [
-    Get(Digest, PrefixStrippedDirectory(digest, "testprojects/tests/python"))
+  all_sources_digests_adjusted_for_source_root_wrapped = yield [
+    Get(SourceRootDigest, Digest, digest)
     for digest in all_sources_digests
   ]
+
+  all_sources_digests_adjusted_for_source_root = [sd.digest for sd in all_sources_digests_adjusted_for_source_root_wrapped]
 
   sources_digest = yield Get(
     Digest,
