@@ -1,7 +1,9 @@
 #!/bin/bash -u
 
-PYTHON_FILES="$(find src tests pants-plugins examples contrib -name '*.py')"
-RUST_FILES="$(find src/rust/engine -name '*.rs')"
+# NB: this assumes that there are no spaces in the filenames. For a more robust way to
+# store the result of `find` in a Bash array, see https://stackoverflow.com/a/23357277.
+PYTHON_FILES=("$(find src tests pants-plugins examples contrib -name '*.py')")
+RUST_FILES=("$(find src/rust/engine -name '*.rs')")
 
 bad_files="$(echo "${PYTHON_FILES}" | xargs grep -l "^import subprocess$")"
 if [ -n "${bad_files}" ]; then
