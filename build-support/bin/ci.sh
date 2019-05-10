@@ -55,11 +55,10 @@ EOF
 }
 
 # No python test sharding (1 shard) by default.
-python_unit_shard="0/1"
 python_contrib_shard="0/1"
 python_intg_shard="0/1"
 
-while getopts "h27fxbmrjlpeasu:ny:ci:tz" opt; do
+while getopts "h27fxbmrjlpeasny:ci:tz" opt; do
   case ${opt} in
     h) usage ;;
     2) python_two="true" ;;
@@ -72,7 +71,6 @@ while getopts "h27fxbmrjlpeasu:ny:ci:tz" opt; do
     j) run_jvm="true" ;;
     l) run_internal_backends="true" ;;
     p) run_python="true" ;;
-    u) python_unit_shard=${OPTARG} ;;
     e) run_rust_tests="true" ;;
     a) run_cargo_audit="true" ;;
     s) run_rust_clippy="true" ;;
@@ -203,15 +201,12 @@ if [[ "${run_internal_backends:-false}" == "true" ]]; then
 fi
 
 if [[ "${run_python:-false}" == "true" ]]; then
-  if [[ "0/1" != "${python_unit_shard}" ]]; then
-    shard_desc=" [shard ${python_unit_shard}]"
-  fi
-  start_travis_section "CoreTests" "Running core python tests${shard_desc}"
+  start_travis_section "CoreTests" "Running core Python tests"
   (
-    ./pants.pex --tag='-integration' test.pytest --chroot \
-      "--test-pytest-test-shard=${python_unit_shard}" \
-      src/python:: tests/python:: -- "${PYTEST_PASSTHRU_ARGS[@]}"
-  ) || die "Core python test failure"
+    # TODO: how to clean up targets.txt and ensure it happens?
+    ./pants.pex --tag='-integration' --filter-type='python_tests' filter src/python:: tests/python:: > targets.txt
+    ./pants.pex --no-v1 --v2 --target-spec-file=targets.txt test.pytest -- "${PYTEST_PASSTHRU_ARGS[@]}"
+  ) || die "Core Python test failure"
   end_travis_section
 fi
 
