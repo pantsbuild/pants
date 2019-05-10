@@ -47,7 +47,7 @@ printf "%s\n" "${ADDED_FILES[@]}" \
   | ./build-support/bin/check_header_helper.py "${DIRS_TO_CHECK[@]}"
 
 echo "* Checking for banned imports"
-./build-support/bin/check_banned_imports.sh
+./build-support/bin/check_banned_imports.py
 
 echo "* Checking for bad shell patterns" && ./build-support/bin/check_shell.sh || exit 1
 
