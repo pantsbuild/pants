@@ -42,6 +42,7 @@ class ExecutionOptions(datatype([
   'remote_instance_name',
   'remote_ca_certs_path',
   'remote_oauth_bearer_token_path',
+  'remote_execution_extra_platform_properties',
 ])):
   """A collection of all options related to (remote) execution of processes.
 
@@ -64,6 +65,7 @@ class ExecutionOptions(datatype([
       remote_instance_name=bootstrap_options.remote_instance_name,
       remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
       remote_oauth_bearer_token_path=bootstrap_options.remote_oauth_bearer_token_path,
+      remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
     )
 
 
@@ -80,6 +82,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_instance_name=None,
     remote_ca_certs_path=None,
     remote_oauth_bearer_token_path=None,
+    remote_execution_extra_platform_properties=[],
   )
 
 
@@ -125,6 +128,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   '["DEPRECATED: scope some_scope will be removed"]. The regexps will be matched '
                   'from the start of the warning string, and will always be case-insensitive. '
                   'See the `warnings` module documentation for more background on these are used.')
+    register('--option-name-check-distance', advanced=True, type=int, default=2,
+             help='The maximum Levenshtein distance to use when offering suggestions for invalid '
+                  'option names.')
 
     register('--pants-version', advanced=True, default=pants_version(),
              help='Use this pants version. Note Pants code only uses this to verify that you are '
@@ -302,7 +308,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     # TODO(#7514): Make this default to 1.0 seconds if stdin is a tty!
     register('--pantsd-pailgun-quit-timeout', advanced=True, type=float, default=5.0,
              help='The length of time (in seconds) to wait for further output after sending a '
-                  'signal to the remote pantsd-runner process before killing it.')
+                  'signal to the remote pantsd process before killing it.')
     register('--pantsd-log-dir', advanced=True, default=None,
              help='The directory to log pantsd output to.')
     register('--pantsd-invalidation-globs', advanced=True, type=list, default=[],
@@ -366,6 +372,11 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Path to a file containing an oauth token to use for grpc connections to '
                   '--remote-execution-server and --remote-store-server. If not specified, no '
                   'authorization will be performed.')
+    register('--remote-execution-extra-platform-properties', advanced=True,
+             help='Platform properties to set on remote execution requests. '
+                  'Format: property=value. Multiple values should be specified as multiple '
+                  'occurrences of this flag. Pants itself may add additional platform properties.',
+                   type=list, default=[])
 
     # This should eventually deprecate the RunTracker worker count, which is used for legacy cache
     # lookups via CacheSetup in TaskBase.

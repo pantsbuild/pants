@@ -53,6 +53,7 @@ use log;
 use tar_api;
 
 use std::borrow::Borrow;
+use std::collections::BTreeMap;
 use std::ffi::CStr;
 use std::fs::File;
 use std::io;
@@ -66,8 +67,8 @@ use crate::context::Core;
 use crate::core::{Function, Key, Params, TypeId, Value};
 use crate::externs::{
   Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern, DropHandlesExtern,
-  EqualsExtern, EvalExtern, ExternContext, Externs, GeneratorSendExtern, GetTypeForExtern,
-  HandleBuffer, IdentifyExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult, RawBuffer,
+  EqualsExtern, ExternContext, Externs, GeneratorSendExtern, GetTypeForExtern, HandleBuffer,
+  IdentifyExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult, RawBuffer,
   StoreBoolExtern, StoreBytesExtern, StoreF64Extern, StoreI64Extern, StoreTupleExtern,
   StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
 };
@@ -109,9 +110,9 @@ impl RawNodes {
 pub extern "C" fn externs_set(
   context: *const ExternContext,
   log_level: u8,
+  none: Handle,
   call: CallExtern,
   generator_send: GeneratorSendExtern,
-  eval: EvalExtern,
   get_type_for: GetTypeForExtern,
   identify: IdentifyExtern,
   equals: EqualsExtern,
@@ -134,9 +135,9 @@ pub extern "C" fn externs_set(
   externs::set_externs(Externs {
     context,
     log_level,
+    none,
     call,
     generator_send,
-    eval,
     get_type_for,
     identify,
     equals,
@@ -212,6 +213,7 @@ pub extern "C" fn scheduler_create(
   remote_store_chunk_bytes: u64,
   remote_store_chunk_upload_timeout_seconds: u64,
   remote_store_rpc_retries: u64,
+  remote_execution_extra_platform_properties_buf: BufferBuffer,
   process_execution_parallelism: u64,
   process_execution_cleanup_local_dirs: bool,
 ) -> *const Scheduler {
@@ -257,6 +259,16 @@ pub extern "C" fn scheduler_create(
   let remote_instance_name_string = remote_instance_name
     .to_string()
     .expect("remote_instance_name was not valid UTF8");
+  let remote_execution_extra_platform_properties_map: BTreeMap<_, _> = remote_execution_extra_platform_properties_buf
+      .to_strings()
+      .expect("Failed to decode remote_execution_extra_platform_properties")
+      .into_iter()
+      .map(|s| {
+        let mut parts: Vec<_> = s.splitn(2, '=').collect();
+        assert_eq!(parts.len(), 2, "Got invalid remote_execution_extra_platform_properties - must be of format key=value but got {}", s);
+        let (value, key) = (parts.pop().unwrap().to_owned(), parts.pop().unwrap().to_owned());
+        (key, value)
+      }).collect();
 
   let remote_root_ca_certs_path = {
     let path = remote_root_ca_certs_path_buffer.to_os_string();
@@ -306,6 +318,7 @@ pub extern "C" fn scheduler_create(
     remote_store_chunk_bytes as usize,
     Duration::from_secs(remote_store_chunk_upload_timeout_seconds),
     remote_store_rpc_retries as usize,
+    remote_execution_extra_platform_properties_map,
     process_execution_parallelism as usize,
     process_execution_cleanup_local_dirs as bool,
   ))))
@@ -705,8 +718,7 @@ pub extern "C" fn capture_snapshots(
         nodes::Snapshot::lift_path_globs(&externs::project_ignoring_type(&value, "path_globs"));
       let digest_hint = {
         let maybe_digest = externs::project_ignoring_type(&value, "digest_hint");
-        // TODO: Extract a singleton Key for None.
-        if maybe_digest == externs::eval("None").unwrap() {
+        if maybe_digest == Value::from(externs::none()) {
           None
         } else {
           Some(nodes::lift_digest(&maybe_digest)?)
@@ -726,25 +738,25 @@ pub extern "C" fn capture_snapshots(
 
   with_scheduler(scheduler_ptr, |scheduler| {
     let core = scheduler.core.clone();
-    futures::future::join_all(
-      path_globs_and_roots
-        .into_iter()
-        .map(|(path_globs, root, digest_hint)| {
-          let core = core.clone();
-          fs::Snapshot::capture_snapshot_from_arbitrary_root(
-            core.store(),
-            core.fs_pool.clone(),
-            root,
-            path_globs,
-            digest_hint,
-          )
-          .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
-        })
-        .collect::<Vec<_>>(),
+    core.runtime.get().write().block_on(
+      futures::future::join_all(
+        path_globs_and_roots
+          .into_iter()
+          .map(|(path_globs, root, digest_hint)| {
+            let core = core.clone();
+            fs::Snapshot::capture_snapshot_from_arbitrary_root(
+              core.store(),
+              root,
+              path_globs,
+              digest_hint,
+            )
+            .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
+          })
+          .collect::<Vec<_>>(),
+      )
+      .map(|values| externs::store_tuple(&values)),
     )
   })
-  .map(|values| externs::store_tuple(&values))
-  .wait()
   .into()
 }
 
@@ -767,8 +779,15 @@ pub extern "C" fn merge_directories(
   };
 
   with_scheduler(scheduler_ptr, |scheduler| {
-    fs::Snapshot::merge_directories(scheduler.core.store(), digests)
-      .wait()
+    scheduler
+      .core
+      .runtime
+      .get()
+      .write()
+      .block_on(fs::Snapshot::merge_directories(
+        scheduler.core.store(),
+        digests,
+      ))
       .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
       .into()
   })
@@ -799,15 +818,16 @@ pub extern "C" fn materialize_directories(
   };
 
   with_scheduler(scheduler_ptr, |scheduler| {
-    futures::future::join_all(
-      dir_and_digests
-        .into_iter()
-        .map(|(dir, digest)| scheduler.core.store().materialize_directory(dir, digest))
-        .collect::<Vec<_>>(),
+    scheduler.core.runtime.get().write().block_on(
+      futures::future::join_all(
+        dir_and_digests
+          .into_iter()
+          .map(|(dir, digest)| scheduler.core.store().materialize_directory(dir, digest))
+          .collect::<Vec<_>>(),
+      )
+      .map(|_| ()),
     )
   })
-  .map(|_| ())
-  .wait()
   .into()
 }
 

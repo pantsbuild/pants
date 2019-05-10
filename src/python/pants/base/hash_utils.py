@@ -6,14 +6,18 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import hashlib
 import json
+import logging
 from builtins import bytes, object, open, str
 
-from future.utils import PY3
+from future.utils import PY3, binary_type, text_type
 from twitter.common.collections import OrderedSet
 
 from pants.util.collections_abc_backport import Iterable, Mapping, OrderedDict, Set
 from pants.util.objects import DatatypeMixin
 from pants.util.strutil import ensure_binary
+
+
+logger = logging.getLogger(__name__)
 
 
 def hash_all(strs, digest=None):
@@ -62,7 +66,17 @@ class CoercingEncoder(json.JSONEncoder):
     else:
       return self.encode(key_obj)
 
+  def _is_natively_encodable(self, o):
+    return isinstance(o, (type(None), bool, int, list, text_type, binary_type))
+
   def default(self, o):
+    if self._is_natively_encodable(o):
+      # isinstance() checks are expensive, particularly for abstract base classes such as Mapping:
+      # https://stackoverflow.com/questions/42378726/why-is-checking-isinstancesomething-mapping-so-slow
+      # This means that, if we let natively encodable types all through, we incur a performance hit, since
+      # we call this function very often.
+      # TODO(#7658) Figure out why we call this function so often.
+      return o
     if isinstance(o, Mapping):
       # Preserve order to avoid collisions for OrderedDict inputs to json.dumps(). We don't do this
       # for general mappings because dicts have an arbitrary key ordering in some versions of python
@@ -81,7 +95,7 @@ class CoercingEncoder(json.JSONEncoder):
       return OrderedDict(
         (self._maybe_encode_dict_key(k), self.default(v))
         for k, v in ordered_kv_pairs)
-    elif isinstance(o, Set):
+    if isinstance(o, Set):
       # We disallow OrderedSet (although it is not a stdlib collection) for the same reasons as
       # OrderedDict above.
       if isinstance(o, OrderedSet):
@@ -89,15 +103,19 @@ class CoercingEncoder(json.JSONEncoder):
                         .format(cls=type(self).__name__, val=o))
       # Set order is arbitrary in python 3.6 and 3.7, so we need to keep this sorted() call.
       return sorted(self.default(i) for i in o)
-    elif isinstance(o, DatatypeMixin):
+    if isinstance(o, DatatypeMixin):
       # datatype objects will intentionally raise in the __iter__ method, but the Iterable abstract
       # base class will match any class with any superclass that has the attribute __iter__ in the
       # __dict__ (see https://docs.python.org/2/library/abc.html), so we need to check for it
       # specially here.
       # TODO: determine if the __repr__ should be some abstractmethod on DatatypeMixin!
       return self.default(repr(o))
-    elif isinstance(o, Iterable) and not isinstance(o, (bytes, list, str)):
+    if isinstance(o, Iterable) and not isinstance(o, (bytes, list, str)):
       return list(self.default(i) for i in o)
+    logger.debug("Our custom json encoder {} is trying to hash a primitive type, but has gone through"
+                 "checking every other registered type class before. These checks are expensive,"
+                 "so you should consider registering the type {} within"
+                 "this function ({}.default)".format(type(self).__name__, type(o), type(self).__name__))
     return o
 
   def encode(self, o):

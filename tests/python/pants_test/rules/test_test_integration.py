@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from textwrap import dedent
+
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -34,6 +36,7 @@ class TestIntegrationTest(PantsRunIntegrationTest):
     args = [
       '--no-v1',
       '--v2',
+      '--no-colors',
       'test',
     ] + trailing_args
 
@@ -45,6 +48,7 @@ class TestIntegrationTest(PantsRunIntegrationTest):
     args = [
       '--no-v1',
       '--v2',
+      '--no-colors',
       'test',
     ] + trailing_args
 
@@ -59,19 +63,22 @@ class TestIntegrationTest(PantsRunIntegrationTest):
       'testprojects/tests/python/pants/dummies:passing_target',
     ])
     self.assert_fuzzy_string_match(
-      pants_run.stdout_data, """\
-============================= test session starts ==============================
-platform SOME_TEXT
-rootdir: SOME_TEXT
-plugins: SOME_TEXT
-collected 1 item
+      pants_run.stdout_data,
+      dedent("""\
+        testprojects/tests/python/pants/dummies:passing_target stdout:
+        ============================= test session starts ==============================
+        platform SOME_TEXT
+        rootdir: SOME_TEXT
+        plugins: SOME_TEXT
+        collected 1 item
 
-testprojects/tests/python/pants/dummies/test_pass.py .                   [100%]
+        testprojects/tests/python/pants/dummies/test_pass.py .                   [100%]
 
-=========================== 1 passed in SOME_TEXT ===========================
+        =========================== 1 passed in SOME_TEXT ===========================
 
-testprojects/tests/python/pants/dummies:passing_target                          .....   SUCCESS
-""",
+
+        testprojects/tests/python/pants/dummies:passing_target                          .....   SUCCESS
+        """),
     )
 
   def test_failing_python_test(self):
@@ -79,64 +86,77 @@ testprojects/tests/python/pants/dummies:passing_target                          
       'testprojects/tests/python/pants/dummies:failing_target',
     ])
     self.assert_fuzzy_string_match(
-      pants_run.stdout_data, """\
-============================= test session starts ==============================
-platform SOME_TEXT
-rootdir: SOME_TEXT
-plugins: SOME_TEXT
-collected 1 item
+      pants_run.stdout_data,
+      dedent("""\
+        testprojects/tests/python/pants/dummies:failing_target stdout:
+        ============================= test session starts ==============================
+        platform SOME_TEXT
+        rootdir: SOME_TEXT
+        plugins: SOME_TEXT
+        collected 1 item
 
-testprojects/tests/python/pants/dummies/test_fail.py F                   [100%]
+        testprojects/tests/python/pants/dummies/test_fail.py F                   [100%]
 
-=================================== FAILURES ===================================
-__________________________________ test_fail ___________________________________
+        =================================== FAILURES ===================================
+        __________________________________ test_fail ___________________________________
 
-    def test_fail():
->     assert False
-E     assert False
+            def test_fail():
+        >     assert False
+        E     assert False
 
-testprojects/tests/python/pants/dummies/test_fail.py:2: AssertionError
-=========================== 1 failed in SOME_TEXT ===========================
+        testprojects/tests/python/pants/dummies/test_fail.py:2: AssertionError
+        =========================== 1 failed in SOME_TEXT ===========================
 
-testprojects/tests/python/pants/dummies:failing_target                          .....   FAILURE
-""",
+
+        testprojects/tests/python/pants/dummies:failing_target                          .....   FAILURE
+        """),
     )
 
   def test_source_dep(self):
     pants_run = self.run_passing_pants_test([
       'testprojects/tests/python/pants/dummies:target_with_source_dep',
     ])
-    self.assert_fuzzy_string_match(pants_run.stdout_data, """\
-============================= test session starts ==============================
-platform SOME_TEXT
-rootdir: SOME_TEXT
-plugins: SOME_TEXT
-collected 1 item
+    self.assert_fuzzy_string_match(
+      pants_run.stdout_data,
+      dedent("""\
+        testprojects/tests/python/pants/dummies:target_with_source_dep stdout:
+        ============================= test session starts ==============================
+        platform SOME_TEXT
+        rootdir: SOME_TEXT
+        plugins: SOME_TEXT
+        collected 1 item
 
-testprojects/tests/python/pants/dummies/test_with_source_dep.py .        [100%]
+        testprojects/tests/python/pants/dummies/test_with_source_dep.py .        [100%]
 
-=========================== 1 passed in SOME_TEXT ===========================
+        =========================== 1 passed in SOME_TEXT ===========================
 
-testprojects/tests/python/pants/dummies:target_with_source_dep                  .....   SUCCESS
-""")
+
+        testprojects/tests/python/pants/dummies:target_with_source_dep                  .....   SUCCESS
+        """)
+    )
 
   def test_thirdparty_dep(self):
     pants_run = self.run_passing_pants_test([
       'testprojects/tests/python/pants/dummies:target_with_thirdparty_dep',
     ])
-    self.assert_fuzzy_string_match(pants_run.stdout_data, """\
-============================= test session starts ==============================
-platform SOME_TEXT
-rootdir: SOME_TEXT
-plugins: SOME_TEXT
-collected 1 item
+    self.assert_fuzzy_string_match(
+      pants_run.stdout_data,
+      dedent("""\
+        testprojects/tests/python/pants/dummies:target_with_thirdparty_dep stdout:
+        ============================= test session starts ==============================
+        platform SOME_TEXT
+        rootdir: SOME_TEXT
+        plugins: SOME_TEXT
+        collected 1 item
 
-testprojects/tests/python/pants/dummies/test_with_thirdparty_dep.py .    [100%]
+        testprojects/tests/python/pants/dummies/test_with_thirdparty_dep.py .    [100%]
 
-=========================== 1 passed in SOME_TEXT ===========================
+        =========================== 1 passed in SOME_TEXT ===========================
 
-testprojects/tests/python/pants/dummies:target_with_thirdparty_dep              .....   SUCCESS
-""")
+
+        testprojects/tests/python/pants/dummies:target_with_thirdparty_dep              .....   SUCCESS
+        """)
+    )
 
   def test_mixed_python_tests(self):
     pants_run = self.run_failing_pants_test([
@@ -144,35 +164,40 @@ testprojects/tests/python/pants/dummies:target_with_thirdparty_dep              
       'testprojects/tests/python/pants/dummies:passing_target',
     ])
     self.assert_fuzzy_string_match(
-      pants_run.stdout_data, """\
-============================= test session starts ==============================
-platform SOME_TEXT
-rootdir: SOME_TEXT
-plugins: SOME_TEXT
-collected 1 item
+      pants_run.stdout_data,
+      dedent("""\
+        testprojects/tests/python/pants/dummies:failing_target stdout:
+        ============================= test session starts ==============================
+        platform SOME_TEXT
+        rootdir: SOME_TEXT
+        plugins: SOME_TEXT
+        collected 1 item
 
-testprojects/tests/python/pants/dummies/test_fail.py F                   [100%]
+        testprojects/tests/python/pants/dummies/test_fail.py F                   [100%]
 
-=================================== FAILURES ===================================
-__________________________________ test_fail ___________________________________
+        =================================== FAILURES ===================================
+        __________________________________ test_fail ___________________________________
 
-    def test_fail():
->     assert False
-E     assert False
+            def test_fail():
+        >     assert False
+        E     assert False
 
-testprojects/tests/python/pants/dummies/test_fail.py:2: AssertionError
-=========================== 1 failed in SOME_TEXT ===========================
-============================= test session starts ==============================
-platform SOME_TEXT
-rootdir: SOME_TEXT
-plugins: SOME_TEXT
-collected 1 item
+        testprojects/tests/python/pants/dummies/test_fail.py:2: AssertionError
+        =========================== 1 failed in SOME_TEXT ===========================
 
-testprojects/tests/python/pants/dummies/test_pass.py .                   [100%]
+        testprojects/tests/python/pants/dummies:passing_target stdout:
+        ============================= test session starts ==============================
+        platform SOME_TEXT
+        rootdir: SOME_TEXT
+        plugins: SOME_TEXT
+        collected 1 item
 
-=========================== 1 passed in SOME_TEXT ===========================
+        testprojects/tests/python/pants/dummies/test_pass.py .                   [100%]
 
-testprojects/tests/python/pants/dummies:failing_target                          .....   FAILURE
-testprojects/tests/python/pants/dummies:passing_target                          .....   SUCCESS
-""",
+        =========================== 1 passed in SOME_TEXT ===========================
+
+
+        testprojects/tests/python/pants/dummies:failing_target                          .....   FAILURE
+        testprojects/tests/python/pants/dummies:passing_target                          .....   SUCCESS
+        """),
     )

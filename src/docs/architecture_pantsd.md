@@ -45,7 +45,7 @@ Examples of services are [`FSEventService`](https://github.com/pantsbuild/pants/
 A `PailgunService` is a `PantsService` which spins up and polls a `PailgunServer`.
 A `PailgunServer` is a `TCPServer` with `ThreadingMixIn`, which listens to Pailgun requests in a socket and spins up instances of `PailgunHandler`s to handle them. It overrides `ThreadingMixIn.process_request_thread()` to spin up one thread and one handler per request. A `PailgunServer` holds a reference to the class `DaemonPantsRunner`, which can be used to run pants from the server.
 A `PailgunHandler` is a class that parses the requests sent to the server, and uses `DaemonPantsRunner` to invoke pants with the environment and arguments specified by the request.
-A `DaemonPantsRunner` is a `ProcessManager`, which implements a `run()` method that forks the current process (running the pantsd server), creating an instance of `LocalPantsRunner` in the child process. These child processes are named `pantsd-runner []` processes.
+A `DaemonPantsRunner` implements a `run()` method that creates an instance of `LocalPantsRunner`.
 
 An end-to-end run with Pantsd
 -----------------------------
@@ -73,10 +73,6 @@ If we run the command `./pants --enable-pantsd list src/scala::`, the following 
   * `ThreadingMixIn.process_request()` will spin up a new `Thread` and call `PailgunServer.process_request_thread()` (it would usually call `ThreadingMixIn.process_request_thread()`, but we override it).
   * _(note: we are now in a separate thread)_ `PailgunServer.process_request_thread()` will create an instance of `PailgunHandler`, and call `PailgunHandler.handle_request()`.
   * `PailgunHandler.handle_request()` will create an instance of `DaemonPantsRunner`, and it will `run()` it. Creating an instance of `DaemonPantsRunner` with `DaemonPantsRunner.create()` means that it will call the `SchedulerService` to get a warm graph.
-  * `DaemonPantsRunner` will call `daemonize()`, which will:
-    * Stop current services in the daemon (`DaemonPantsRunner.pre_fork()`).
-    * Fork the process.
-    * Resume all the services in the parent process (`DaemonPantsRunner.post_fork_child()`).
-    * In the child process, rename the process to `pantsd-runner []`, create an instance of `LocalPantsRunner` with the graph (and options, and such) it got from the `SchedulerService`, and run as if the daemon didn't exist.
+  * `DaemonPantsRunner` will create an instance of `LocalPantsRunner` with the graph (and options, and such) it got from the `SchedulerService`, and run as if the daemon didn't exist.
 
 4. The `PailgunServer` will wait until `LocalPantsRunner` is finished in `handle_request`.

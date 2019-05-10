@@ -145,11 +145,11 @@ class Payload(object):
       field.mark_dirty()
 
   def __getattr__(self, attr):
-    field = self._fields[attr]
+    try:
+      field = self._fields[attr]
+    except KeyError:
+      raise AttributeError(attr)
     if field is not None:
       return field.value
     else:
       return None
-
-  def __hasattr__(self, attr):
-    return attr in self._fields

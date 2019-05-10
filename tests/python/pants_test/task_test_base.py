@@ -353,6 +353,8 @@ class DeclarativeTaskTestMixin(object):
                                     `for_task_types`.
     :return: A datatype containing the created context and the task instances which were executed.
     :rtype: :class:`DeclarativeTaskTestMixin.TaskInvocationResult`
+    :raises: If any exception is raised during task execution, the context will be attached to the
+             exception object as the attribute '_context' with setattr() before re-raising.
     """
     run_before_synthesized_task_types = self._synthesize_task_types(tuple(self.run_before_task_types))
     run_after_synthesized_task_types = self._synthesize_task_types(tuple(self.run_after_task_types))
@@ -380,8 +382,13 @@ class DeclarativeTaskTestMixin(object):
       current_task_instance
     ] + run_after_task_instances
 
-    for tsk in all_task_instances:
-      tsk.execute()
+    try:
+      for tsk in all_task_instances:
+        tsk.execute()
+    except Exception as e:
+      # TODO(#7644): Remove this hack before anything more starts relying on it!
+      setattr(e, '_context', context)
+      raise e
 
     return self.TaskInvocationResult(
       context=context,

@@ -9,6 +9,7 @@ import re
 from textwrap import dedent
 from typing import Iterable, List
 
+
 EXPECTED_HEADER = dedent("""\
   # coding=utf-8
   # Copyright YYYY Pants project contributors (see CONTRIBUTORS.md).
@@ -25,6 +26,7 @@ _current_century_regex = re.compile(r'20\d\d')
 
 class HeaderCheckFailure(Exception):
   """This is only used for control flow and to propagate the `.message` field."""
+
 
 def main() -> None:
   args = create_parser().parse_args()
@@ -54,6 +56,7 @@ def create_parser() -> argparse.ArgumentParser:
     help="Any newly created files that should be check for a valid copyright year."
   )
   return parser
+
 
 def check_header(filename: str, *, is_newly_created: bool = False) -> None:
   """Raises `HeaderCheckFailure` if the header doesn't match."""

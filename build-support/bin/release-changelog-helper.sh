@@ -37,7 +37,35 @@ else
 fi
 
 echo
+echo "Potentially relevant headers:"
+echo "----------------------------------------------------------------------------------------------------"
+cat <<EOF
+
+API Changes
+~~~~~~~~~~~
+
+
+New Features
+~~~~~~~~~~~~
+
+
+Bugfixes
+~~~~~~~~
+
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+Documentation
+~~~~~~~~~~~~~
+
+
+EOF
+
+echo
 echo "Changes since ${LAST_RELEASE_SHA}:"
+echo "----------------------------------------------------------------------------------------------------"
 echo
 
 for sha in `git log --format="format:%H" HEAD ^${LAST_RELEASE_SHA}`

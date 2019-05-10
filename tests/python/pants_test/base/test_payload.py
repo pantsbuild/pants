@@ -99,7 +99,7 @@ class PayloadTest(TestBase):
     self.assertEqual(None, payload.get_field_value('bar'))
     self.assertEqual(None, payload.get_field('bar', default='nothing').value)
     self.assertEqual(None, payload.get_field_value('bar', default='nothing'))
-    with self.assertRaises(KeyError):
+    with self.assertRaises(AttributeError):
       self.assertEqual(None, payload.field_doesnt_exist)
     self.assertEqual(None, payload.get_field('field_doesnt_exist'))
     self.assertEqual(None, payload.get_field_value('field_doesnt_exist'))

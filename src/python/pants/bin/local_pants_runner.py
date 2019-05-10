@@ -82,12 +82,8 @@ class LocalPantsRunner(object):
   """Handles a single pants invocation running in the process-local context."""
 
   @staticmethod
-  def parse_options(args, env, setup_logging=False, options_bootstrapper=None):
+  def parse_options(args, env, options_bootstrapper=None):
     options_bootstrapper = options_bootstrapper or OptionsBootstrapper.create(args=args, env=env)
-    bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
-    if setup_logging:
-      # Bootstrap logging and then fully initialize options.
-      setup_logging_from_options(bootstrap_options)
     build_config = BuildConfigInitializer.get(options_bootstrapper)
     options = OptionsInitializer.create(options_bootstrapper, build_config)
     return options, build_config, options_bootstrapper
@@ -140,10 +136,12 @@ class LocalPantsRunner(object):
     options, build_config, options_bootstrapper = cls.parse_options(
       args,
       env,
-      setup_logging=True,
       options_bootstrapper=options_bootstrapper,
     )
     global_options = options.for_global_scope()
+    # This works as expected due to the encapsulated_logger in DaemonPantsRunner and
+    # we don't have to gate logging setup anymore.
+    setup_logging_from_options(global_options)
 
     # Option values are usually computed lazily on demand,
     # but command line options are eagerly computed for validation.
@@ -257,6 +255,9 @@ class LocalPantsRunner(object):
       self._target_roots,
       self._exiter
     )
+    if self._options.help_request:
+      return goal_runner_factory.handle_help()
+
     return goal_runner_factory.create().run()
 
   def _maybe_run_v2(self):

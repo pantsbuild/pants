@@ -24,6 +24,8 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
     """
     return False
 
+  _NO_BUILD_FILE_TARGET_BASE = 'testprojects/src/python/no_build_file'
+
   _SOURCES_TARGET_BASE = 'testprojects/src/python/sources'
 
   _SOURCES_ERR_MSGS = {
@@ -146,10 +148,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
     self.assertNotIn("WARN]", pants_run.stderr_data)
 
   def test_existing_directory_with_no_build_files_fails(self):
-    options = [
-        '--pants-ignore=+["/build-support/bin/native/src"]',
-      ]
-    pants_run = self.run_pants(options + ['list', 'build-support/bin::'])
+    pants_run = self.run_pants(['list', "{}::".format(self._NO_BUILD_FILE_TARGET_BASE)])
     self.assert_failure(pants_run)
     self.assertIn("does not match any targets.", pants_run.stderr_data)
 

@@ -4,6 +4,159 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.16.0rc0 (5/7/2019)
+--------------------
+
+API Changes
+~~~~~~~~~~~
+
+* allow configuration of the subsystems to initialize in a test (#7665)
+  `PR #7665 <https://github.com/pantsbuild/pants/pull/7665>`_
+
+* Replace GracefulTerminationException with PantsRunFinishedWithFailureException (#7671)
+  `PR #7671 <https://github.com/pantsbuild/pants/pull/7671>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix for reference cycle from Target to BuildGraph (#7666)
+  `PR #7666 <https://github.com/pantsbuild/pants/pull/7666>`_
+
+* Put all arguments to javac in safe_args not just the source paths (#7651)
+  `PR #7651 <https://github.com/pantsbuild/pants/pull/7651>`_
+
+* convert to text_type() for external repos running pants py2 (#7664)
+  `PR #7664 <https://github.com/pantsbuild/pants/pull/7664>`_
+
+* Small logging update to java executor and fix undefined var in release.sh (#7667)
+  `PR #7667 <https://github.com/pantsbuild/pants/pull/7667>`_
+  `PR #7370 <https://github.com/pantsbuild/pants/pull/7370>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Short-circuit primitive encoding on CoercingEncoder (#7655)
+  `PR #7655 <https://github.com/pantsbuild/pants/pull/7655>`_
+
+1.16.0.dev4 (5/06/2019)
+-----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Remote Execution allows extra platform properties to be set (#7650)
+  `PR #7650 <https://github.com/pantsbuild/pants/pull/7650>`_
+
+* add suffix and Levenshtein matching for invalid option names (#7637)
+  `PR #7637 <https://github.com/pantsbuild/pants/pull/7637>`_
+
+Bugfixes
+~~~~~~~~
+
+* Apply timeouts to pex resolves (#7659)
+  `PEX Issue #26 <http://github.com/pantsbuild/pex/issues/26>`_
+  `PR #7659 <https://github.com/pantsbuild/pants/pull/7659>`_
+
+* pin the PEX_PYTHON{,_PATH} running the pytest pex to avoid using incompatible pytest requirements (#7563)
+  `PR #7563 <https://github.com/pantsbuild/pants/pull/7563>`_
+
+* Fix hasattr on Payload (#7432)
+  `PR #7432 <https://github.com/pantsbuild/pants/pull/7432>`_
+
+* Two targets can swap positions with pantsd (again) (#7642)
+  `PR #7642 <https://github.com/pantsbuild/pants/pull/7642>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* pantsd runs no longer fork (#7596)
+  `PR #7596 <https://github.com/pantsbuild/pants/pull/7596>`_
+
+* Replace externs::eval with externs::none (#7646)
+  `PR #7646 <https://github.com/pantsbuild/pants/pull/7646>`_
+
+* Add the possibility to ignore sigint from other threads (#7623)
+  `PR #7623 <https://github.com/pantsbuild/pants/pull/7623>`_
+
+* Name threads that the daemon starts (#7639)
+  `PR #7639 <https://github.com/pantsbuild/pants/pull/7639>`_
+
+* Add testing for improved error message from #7628 when no valid interpreter can be resolved (#7630)
+  `PR #7630 <https://github.com/pantsbuild/pants/pull/7630>`_
+
+* Extend pantsd test timeout (#7527)
+  `PR #7527 <https://github.com/pantsbuild/pants/pull/7527>`_
+
+* Skip flaky test (#7638)
+  `PR #7638 <https://github.com/pantsbuild/pants/pull/7638>`_
+
+* Use TryInto instead of custom types (#7542)
+  `PR #7542 <https://github.com/pantsbuild/pants/pull/7542>`_
+
+* use upstream rustup init script download workaround for old curl version on CentOS6 (#7619)
+  `PR #7619 <https://github.com/pantsbuild/pants/pull/7619>`_
+
+1.16.0.dev3 (4/27/2019)
+-----------------------
+
+Bugfixes
+~~~~~~~~
+
+* PythonTests force default platform resolves (#7618)
+  `PR #7618 <https://github.com/pantsbuild/pants/pull/7618>`_
+
+* Fix to decode bytes to unicode in server when reading file from disk (#7610)
+  `PR #7610 <https://github.com/pantsbuild/pants/pull/7610>`_
+
+* Two targets can swap positions with pantsd (#7583) (#7617)
+  `PR #7583 <https://github.com/pantsbuild/pants/pull/7583>`_
+
+* Fix empty failed target to ensure pants raises the error if python test fails (#7570)
+  `PR #7570 <https://github.com/pantsbuild/pants/pull/7570>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Modernize `check_pants_pex_abi.py` script to Python 3 (#7631)
+  `PR #7631 <https://github.com/pantsbuild/pants/pull/7631>`_
+
+* unify precedence logic for options which may be overridden on targets (#7594)
+  `PR #7594 <https://github.com/pantsbuild/pants/pull/7594>`_
+
+* fix --owner-of path matching to remove repeated directory separators (#7588)
+  `PR #7588 <https://github.com/pantsbuild/pants/pull/7588>`_
+
+* fix cron job by wrapping the python binary in text_type() (#7611)
+  `PR #7611 <https://github.com/pantsbuild/pants/pull/7611>`_
+
+* download rustup-init without --proto to work around outdated centos6 curl version (#7615)
+  `PR #7615 <https://github.com/pantsbuild/pants/pull/7615>`_
+
+* Default release script to use Python 3 in preparation for dropping Python 2 release (#7608)
+  `PR #7608 <https://github.com/pantsbuild/pants/pull/7608>`_
+
+* Better support --test-junit-test with classname, remove support for file path (#7589)
+  `PR #7589 <https://github.com/pantsbuild/pants/pull/7589>`_
+
+* Refactor uses of dirutil.py to use the new default Unicode semantics (#7604)
+  `PR #7604 <https://github.com/pantsbuild/pants/pull/7604>`_
+
+* Ensure test symlink is always seen by engine. (#7605)
+  `PR #7605 <https://github.com/pantsbuild/pants/pull/7605>`_
+
+* pantsd auto invalidates pants.ini and all pythonpath of pants (#7599)
+  `PR #7599 <https://github.com/pantsbuild/pants/pull/7599>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Improve error message when no valid Python interpreter can be resolved (#7628)
+  `PR #7628 <https://github.com/pantsbuild/pants/pull/7628>`_
+
+* Fix typo in How to Contribute docs (#7614)
+  `PR #7614 <https://github.com/pantsbuild/pants/pull/7614>`_
+
+
 1.16.0.dev2 (4/22/2019)
 -----------------------
 
@@ -1054,7 +1207,7 @@ Refactoring, Improvements, and Tooling
 
 * Allow Pants to run with Python 3 via `./pants3` script (#6959)
   `PR #6959 <https://github.com/pantsbuild/pants/pull/6959>`_
-  
+
 * Properly render \n in exceptions with Py3 (#7073)
   `PR #7073 <https://github.com/pantsbuild/pants/pull/7073>`_
 

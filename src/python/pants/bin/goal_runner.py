@@ -15,6 +15,7 @@ from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
+from pants.help.help_printer import HelpPrinter
 from pants.java.nailgun_executor import NailgunProcessGroup
 from pants.option.ranked_value import RankedValue
 from pants.task.task import QuietTaskMixin
@@ -49,6 +50,11 @@ class GoalRunnerFactory(object):
     self._fail_fast = self._global_options.fail_fast
     self._explain = self._global_options.explain
     self._kill_nailguns = self._global_options.kill_nailguns
+
+  def handle_help(self):
+    """Handle requests for `help` information."""
+    help_printer = HelpPrinter(self._options)
+    return help_printer.print_help()
 
   def _determine_v1_goals(self, address_mapper, options):
     """Check and populate the requested goals for a given run."""

@@ -33,6 +33,14 @@ class PantsRunner(object):
     self._env = env or os.environ
     self._start_time = start_time
 
+  # This could be a bootstrap option, but it's preferable to keep these very limited to make it
+  # easier to make the daemon the default use case. Once the daemon lifecycle is stable enough we
+  # should be able to avoid needing to kill it at all.
+  _DAEMON_KILLING_GOALS = frozenset(['kill-pantsd', 'clean-all'])
+
+  def will_terminate_pantsd(self):
+    return not frozenset(self._args).isdisjoint(self._DAEMON_KILLING_GOALS)
+
   def _enable_rust_logging(self, global_bootstrap_options):
     levelname = global_bootstrap_options.level.upper()
     init_rust_logger(levelname, global_bootstrap_options.log_show_rust_3rdparty)
@@ -57,7 +65,8 @@ class PantsRunner(object):
     for message_regexp in global_bootstrap_options.ignore_pants_warnings:
       warnings.filterwarnings(action='ignore', message=message_regexp)
 
-    if global_bootstrap_options.enable_pantsd:
+    # TODO https://github.com/pantsbuild/pants/issues/7205
+    if global_bootstrap_options.enable_pantsd and not self.will_terminate_pantsd():
       try:
         return RemotePantsRunner(self._exiter, self._args, self._env, options_bootstrapper).run()
       except RemotePantsRunner.Fallback as e:
@@ -65,6 +74,9 @@ class PantsRunner(object):
 
     # N.B. Inlining this import speeds up the python thin client run by about 100ms.
     from pants.bin.local_pants_runner import LocalPantsRunner
+
+    if self.will_terminate_pantsd():
+      logger.debug("Pantsd terminating goal detected: {}".format(self._args))
 
     runner = LocalPantsRunner.create(
         self._exiter,

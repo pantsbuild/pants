@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 import os
+import weakref
 from builtins import object, str
 from hashlib import sha1
 
@@ -325,7 +326,7 @@ class Target(AbstractTarget):
     self.payload.freeze()
     self.name = name
     self.address = address
-    self._build_graph = build_graph
+    self._build_graph = weakref.proxy(build_graph)
     self._type_alias = type_alias
     self._tags = set(tags or []).union(self.TagAssignments.tags_for(address.spec))
     self.description = description

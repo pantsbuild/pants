@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 import socket
+import threading
 import traceback
 
 from six.moves.socketserver import BaseRequestHandler, BaseServer, TCPServer, ThreadingMixIn
@@ -137,6 +138,20 @@ class PailgunServer(ThreadingMixIn, TCPServer):
     """Override of TCPServer.server_bind() that tracks bind-time assigned random ports."""
     TCPServer.server_bind(self)
     _, self.server_port = self.socket.getsockname()[:2]
+
+  def process_request(self, request, client_address):
+    """Start a new thread to process the request.
+
+    This is lovingly copied and pasted from ThreadingMixIn, with the addition of setting the name
+    of the thread. It's a shame that ThreadingMixIn doesn't provide a customization hook.
+    """
+    t = threading.Thread(
+      target=self.process_request_thread,
+      args=(request, client_address),
+      name="PailgunRequestThread",
+    )
+    t.daemon = self.daemon_threads
+    t.start()
 
   def handle_request(self):
     """Override of TCPServer.handle_request() that provides locking.

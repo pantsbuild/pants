@@ -17,28 +17,6 @@ function cargo_bin() {
   "${RUSTUP}" which cargo
 }
 
-# TODO(7288): RustUp tries to use a more secure protocol to avoid downgrade attacks. This, however,
-# broke support for Centos6 (https://github.com/rust-lang/rustup.rs/issues/1794). So, we first try
-# to use their recommend install, and downgrade to their workaround if necessary.
-function curl_rustup_init_script_while_maybe_downgrading() {
-  if ! curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs; then
-    log "Initial 'curl' command failed, trying backup url..."
-    case "$(uname)" in
-      Darwin)
-        host_triple='x86_64-apple-darwin'
-      ;;
-      Linux)
-        host_triple='x86_64-unknown-linux-gnu'
-      ;;
-      *)
-        die "unrecognized platform $(uname) -- could not bootstrap rustup!"
-      ;;
-    esac
-    full_rustup_backup_url="https://static.rust-lang.org/rustup/dist/${host_triple}/rustup-init"
-    curl -sSf "$full_rustup_backup_url"
-  fi
-}
-
 function bootstrap_rust() {
   RUST_TOOLCHAIN="$(cat ${REPO_ROOT}/rust-toolchain)"
   RUST_COMPONENTS=(
@@ -49,17 +27,15 @@ function bootstrap_rust() {
 
   # Control a pants-specific rust toolchain.
   if [[ ! -x "${RUSTUP}" ]]; then
+    # NB: rustup installs itself into CARGO_HOME, but fetches toolchains into RUSTUP_HOME.
     log "A pants owned rustup installation could not be found, installing via the instructions at" \
         "https://www.rustup.rs ..."
-    local -r rustup_tmp_dir="$(mktemp -d)"
-    trap "rm -rf ${rustup_tmp_dir}" EXIT
-    # NB: The downloaded file here *must* be named `rustup-init`, or the workaround binary fails
-    # with "info: caused by: No such file or directory (os error 2)".
-    local -r rustup_init_destination="${rustup_tmp_dir}/rustup-init"
-    # NB: rustup installs itself into CARGO_HOME, but fetches toolchains into RUSTUP_HOME.
-    curl_rustup_init_script_while_maybe_downgrading > "$rustup_init_destination"
-    chmod +x "$rustup_init_destination"
-    "$rustup_init_destination" -y --no-modify-path --default-toolchain none 1>&2
+    # This is the recommended installation method for Unix when '--proto' is not available on curl
+    # (as in CentOS6), see # https://github.com/rust-lang/rustup.rs#other-installation-methods.
+    # The workaround was added in https://github.com/rust-lang/rustup.rs/pull/1803.
+    # TODO(7288): Once we migrate to Centos7, we can go back to using RustUp's preferred and more
+    # secure installation method. Convert this to the snippet from https://rustup.rs.
+    curl https://sh.rustup.rs -sSf | sh -s -- -y --no-modify-path --default-toolchain none 1>&2
   fi
 
   local -r cargo="${CARGO_HOME}/bin/cargo"

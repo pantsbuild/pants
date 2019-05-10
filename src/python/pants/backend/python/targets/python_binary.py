@@ -38,6 +38,7 @@ class PythonBinary(PythonTarget):
 
     @classmethod
     def register_options(cls, register):
+      super(PythonBinary.Defaults, cls).register_options(register)
       register('--pex-emit-warnings', advanced=True, type=bool, default=True, fingerprint=True,
                help='Whether built pex binaries should emit pex warnings at runtime by default. '
                     'Can be over-ridden by specifying the `emit_warnings` parameter of individual '

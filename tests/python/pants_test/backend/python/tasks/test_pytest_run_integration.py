@@ -20,10 +20,15 @@ from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 class PytestRunIntegrationTest(PantsRunIntegrationTest):
   testproject = 'testprojects/src/python/interpreter_selection'
 
+  # NB: Occasionally running a test in CI may take multiple seconds. The tests in this file which
+  # use the --timeout-default argument are not testing for performance regressions, but just for
+  # correctness of timeout behavior, so we set this to a higher value to avoid flakiness.
+  _non_flaky_timeout_seconds = 5
+
   def test_pytest_run_timeout_succeeds(self):
     pants_run = self.run_pants(['clean-all',
                                 'test.pytest',
-                                '--timeout-default=2',
+                                '--timeout-default={}'.format(self._non_flaky_timeout_seconds),
                                 'testprojects/tests/python/pants/timeout:exceeds_timeout',
                                 '--',
                                 '-kwithin_timeout'])
@@ -62,7 +67,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(['clean-all',
                                 'test.pytest',
                                 '--timeout-terminate-wait=2',
-                                '--timeout-default=5',
+                                '--timeout-default={}'.format(self._non_flaky_timeout_seconds),
                                 '--coverage=auto',
                                 '--cache-ignore',
                                 'testprojects/tests/python/pants/timeout:ignores_terminate'])
@@ -87,7 +92,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(['clean-all',
                                 'test.pytest',
                                 '--timeout-terminate-wait=2',
-                                '--timeout-default=5',
+                                '--timeout-default={}'.format(self._non_flaky_timeout_seconds),
                                 '--cache-ignore',
                                 'testprojects/tests/python/pants/timeout:terminates_self'])
     end = time.time()

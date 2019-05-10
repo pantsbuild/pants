@@ -34,7 +34,7 @@ class PailgunClientSignalHandler(SignalHandler):
 
   def _forward_signal_with_timeout(self, signum, signame):
     logger.info(
-      'Sending {} to pantsd-runner with pid {}, waiting up to {} seconds before sending SIGKILL...'
+      'Sending {} to pantsd with pid {}, waiting up to {} seconds before sending SIGKILL...'
       .format(signame, self._pailgun_client._maybe_last_pid(), self._timeout))
     self._pailgun_client.set_exit_timeout(
       timeout=self._timeout,
