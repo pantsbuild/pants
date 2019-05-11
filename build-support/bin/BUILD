@@ -26,3 +26,12 @@ python_binary(
   ],
   compatibility = ['CPython>=3.6'],
 )
+
+python_binary(
+  name = 'mypy',
+  sources = 'mypy.py',
+  dependencies = [
+    ':common',
+  ],
+  compatibility = ['CPython>=3.6'],
+)
