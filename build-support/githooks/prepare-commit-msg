@@ -3,8 +3,7 @@
 COMMIT_MSG_FILEPATH=$1
 COMMIT_MSG_SRC=$2
 
-# Note that xargs with no args just returns the string with surrounding whitespace trimmed.
-NUM_NON_MD_FILES=$(git status -s --porcelain | grep -v ".\md$" | wc -l | xargs)
+NUM_NON_MD_FILES=$(git status -s --porcelain | grep -cv ".\md$")
 
 # The msg source will be "commit" if we were called with --amend.
 if [ "${COMMIT_MSG_SRC}" != "commit" ] && [ "${NUM_NON_MD_FILES}" == "0" ]; then

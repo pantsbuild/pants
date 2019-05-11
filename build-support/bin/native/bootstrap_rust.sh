@@ -19,8 +19,9 @@ function cargo_bin() {
   "${RUSTUP}" which cargo
 }
 
+
 function bootstrap_rust() {
-  RUST_TOOLCHAIN="$(cat ${REPO_ROOT}/rust-toolchain)"
+  RUST_TOOLCHAIN="$(cat "${REPO_ROOT}/rust-toolchain")"
   RUST_COMPONENTS=(
     "rustfmt-preview"
     "rust-src"
@@ -47,8 +48,8 @@ function bootstrap_rust() {
     # If rustup was already bootstrapped against a different toolchain in the past, freshen it and
     # ensure the toolchain and components we need are installed.
     "${RUSTUP}" self update
-    "${RUSTUP}" toolchain install ${RUST_TOOLCHAIN}
-    "${RUSTUP}" component add --toolchain ${RUST_TOOLCHAIN} ${RUST_COMPONENTS[@]} >&2
+    "${RUSTUP}" toolchain install "${RUST_TOOLCHAIN}"
+    "${RUSTUP}" component add --toolchain "${RUST_TOOLCHAIN}" "${RUST_COMPONENTS[@]}" >&2
 
     symlink_target="$(python -c 'import os, sys; print(os.path.relpath(*sys.argv[1:]))' "$(RUSTUP_TOOLCHAIN="${RUST_TOOLCHAIN}" cargo_bin)" "${rust_toolchain_root}")"
     ln -fs "${symlink_target}" "${rust_toolchain_root}/${cargo_versioned}"
@@ -62,14 +63,14 @@ function bootstrap_rust() {
   local -r symlink_farm_root="${REPO_ROOT}/build-support/bin/native"
   if [[ ! -x "${symlink_farm_root}/.${cargo_versioned}" ]]; then
     (
-      cd "${symlink_farm_root}"
+      cd "${symlink_farm_root}" || exit 1
 
       # Kill potentially stale symlinks generated from an older or newer rust toolchain.
       git clean -fdx .
 
       ln -fs "rust_toolchain.sh" rustup
       local -r cargo_bin_dir="$(dirname "$(cargo_bin)")"
-      find "${cargo_bin_dir}" -type f | while read executable; do
+      find "${cargo_bin_dir}" -type f | while read -r executable; do
         if [[ -x "${executable}" ]]; then
           ln -fs "rust_toolchain.sh" "$(basename "${executable}")"
         fi

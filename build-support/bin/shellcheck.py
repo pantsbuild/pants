@@ -22,11 +22,11 @@ def ensure_shellcheck_installed() -> None:
 
 
 def run_shellcheck() -> None:
-  targets = glob("./build-support/bin/**/*.sh", recursive=True) + [
+  targets = glob("./build-support/bin/*.sh") + glob("./build-support/bin/native/*.sh") + [
     "./pants",
     "./pants2",
     "./build-support/common.sh",
-    "./build-support/pants_intellij.sh",
+    "./build-support/pants-intellij.sh",
     "./build-support/pants_venv",
     "./build-support/virtualenv",
     "./build-support/githooks/pre-commit",

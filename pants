@@ -67,6 +67,7 @@ export PY="${PY:-python3}"
 # Pants will try to use Python 2 for subprocesses. Without setting minor version constraints, when using Python 3
 # we could end up using a different Python minor version for subprocesses than we do for Pants.
 py_major_minor_patch=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:3])))')
+# shellcheck disable=SC2016
 export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor_patch}']}"
 
 PANTS_EXE="${HERE}/src/python/pants/bin/pants_loader.py"
@@ -74,7 +75,7 @@ PANTS_EXE="${HERE}/src/python/pants/bin/pants_loader.py"
 if [[ -n "${WRAPPER_REQUIREMENTS}" ]]; then
   REQUIREMENTS=(
     $(echo "${WRAPPER_REQUIREMENTS}" | tr : ' ')
-    ${REQUIREMENTS[@]}
+    "${REQUIREMENTS[@]}"
   )
 fi
 
@@ -84,10 +85,10 @@ PANTS_SRCPATH=(
 if [[ -n "${WRAPPER_SRCPATH}" ]]; then
   PANTS_SRCPATH=(
     $(echo "${WRAPPER_SRCPATH}" | tr : ' ')
-    ${PANTS_SRCPATH[@]}
+    "${PANTS_SRCPATH[@]}"
   )
 fi
-PANTS_SRCPATH="$(echo ${PANTS_SRCPATH[@]} | tr ' ' :)"
+PANTS_SRCPATH="$(echo "${PANTS_SRCPATH[@]}" | tr ' ' :)"
 
 function exec_pants_bare() {
   # Redirect activation and native bootstrap to ensure that they don't interfere with stdout.
