@@ -152,13 +152,13 @@ impl WrappedNode for Select {
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => match inner
         .rule()
       {
-        &rule_graph::Rule::Task(ref task) => context.get(Task {
+        &tasks::Rule::Task(ref task) => context.get(Task {
           params: self.params.clone(),
           product: self.product,
           task: task.clone(),
           entry: Arc::new(self.entry.clone()),
         }),
-        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+        &tasks::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.snapshot && input == context.core.types.path_globs =>
         {
           let context = context.clone();
@@ -169,7 +169,7 @@ impl WrappedNode for Select {
             .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
             .to_boxed()
         }
-        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+        &tasks::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.snapshot && input == context.core.types.url_to_fetch =>
         {
           let context = context.clone();
@@ -180,7 +180,7 @@ impl WrappedNode for Select {
             .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
             .to_boxed()
         }
-        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+        &tasks::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.directory_digest
             && input == context.core.types.directories_to_merge =>
         {
@@ -204,7 +204,7 @@ impl WrappedNode for Select {
             })
             .to_boxed()
         }
-        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+        &tasks::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.snapshot
             && input == context.core.types.directory_digest =>
         {
@@ -221,7 +221,7 @@ impl WrappedNode for Select {
             .to_boxed()
         }
 
-        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+        &tasks::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.directory_digest
             && input == context.core.types.directory_with_prefix_to_strip =>
         {
@@ -248,7 +248,7 @@ impl WrappedNode for Select {
             })
             .to_boxed()
         }
-        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+        &tasks::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.files_content
             && input == context.core.types.directory_digest =>
         {
@@ -268,7 +268,7 @@ impl WrappedNode for Select {
             })
             .to_boxed()
         }
-        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+        &tasks::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.process_result
             && input == context.core.types.process_request =>
         {
@@ -294,7 +294,7 @@ impl WrappedNode for Select {
             })
             .to_boxed()
         }
-        &rule_graph::Rule::Intrinsic(i) => panic!("Unrecognized intrinsic: {:?}", i),
+        &tasks::Rule::Intrinsic(i) => panic!("Unrecognized intrinsic: {:?}", i),
       },
       &rule_graph::Entry::Param(type_id) => {
         if let Some(key) = self.params.find(type_id) {

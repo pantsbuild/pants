@@ -160,7 +160,7 @@ impl Core {
       (store, command_runner, http_client)
     });
 
-    let rule_graph = RuleGraph::new(&tasks, root_subject_types);
+    let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);
 
     Core {
       graph: Graph::new(),

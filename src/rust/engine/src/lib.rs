@@ -855,12 +855,12 @@ pub extern "C" fn override_thread_logging_destination(destination: Destination) 
 }
 
 fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {
-  let graph_maker = GraphMaker::new(&scheduler.core.tasks, subject_types);
+  let graph_maker = GraphMaker::new(scheduler.core.tasks.as_map(), subject_types);
   graph_maker.full_graph()
 }
 
 fn graph_sub(scheduler: &Scheduler, subject_type: TypeId, product_type: TypeId) -> RuleGraph {
-  let graph_maker = GraphMaker::new(&scheduler.core.tasks, vec![subject_type]);
+  let graph_maker = GraphMaker::new(scheduler.core.tasks.as_map(), vec![subject_type]);
   graph_maker.sub_graph(subject_type, product_type)
 }
 

@@ -10,6 +10,12 @@ pub struct Get {
   pub subject: TypeId,
 }
 
+impl fmt::Display for Get {
+  fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    write!(f, "Get({}, {})", self.product, self.subject)
+  }
+}
+
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct Select {
   pub product: TypeId,

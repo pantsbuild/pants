@@ -8,20 +8,21 @@ use itertools::Itertools;
 
 use crate::core::{Params, TypeId};
 use crate::selectors::{Get, Select};
-use crate::tasks::{Intrinsic, Task, Tasks};
+use crate::tasks::Rule;
 
+type Tasks = HashMap<TypeId, Vec<Rule>>;
 type ParamTypes = BTreeSet<TypeId>;
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct UnreachableError {
-  task_rule: Task,
+  rule: Rule,
   diagnostic: Diagnostic,
 }
 
 impl UnreachableError {
-  fn new(task_rule: Task) -> UnreachableError {
+  fn new(rule: Rule) -> UnreachableError {
     UnreachableError {
-      task_rule: task_rule,
+      rule,
       diagnostic: Diagnostic {
         params: ParamTypes::default(),
         reason: "Was not usable by any other @rule.".to_string(),
@@ -50,15 +51,8 @@ impl EntryWithDeps {
   ///
   fn dependency_keys(&self) -> Vec<SelectKey> {
     match self {
-      &EntryWithDeps::Inner(InnerEntry {
-        rule: Rule::Task(Task {
-          ref clause,
-          ref gets,
-          ..
-        }),
-        ..
-      })
-      | &EntryWithDeps::Root(RootEntry {
+      &EntryWithDeps::Inner(InnerEntry { ref rule, .. }) => rule.dependency_keys(),
+      &EntryWithDeps::Root(RootEntry {
         ref clause,
         ref gets,
         ..
@@ -67,10 +61,6 @@ impl EntryWithDeps {
         .map(|s| SelectKey::JustSelect(s.clone()))
         .chain(gets.iter().map(|g| SelectKey::JustGet(*g)))
         .collect(),
-      &EntryWithDeps::Inner(InnerEntry {
-        rule: Rule::Intrinsic(Intrinsic { ref input, .. }),
-        ..
-      }) => vec![SelectKey::JustSelect(Select::new(*input))],
     }
   }
 
@@ -124,14 +114,6 @@ pub struct RootEntry {
   // a future commit.
   clause: Vec<Select>,
   gets: Vec<Get>,
-}
-
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
-pub enum Rule {
-  // Intrinsic rules are implemented in rust.
-  Intrinsic(Intrinsic),
-  // Task rules are implemented in python.
-  Task(Task),
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -236,7 +218,7 @@ impl<'t> GraphMaker<'t> {
   }
 
   pub fn full_graph(&self) -> RuleGraph {
-    self.construct_graph(self.gen_root_entries(&self.tasks.all_product_types()))
+    self.construct_graph(self.gen_root_entries(&self.tasks.keys().cloned().collect()))
   }
 
   pub fn construct_graph(&self, roots: Vec<RootEntry>) -> RuleGraph {
@@ -296,20 +278,16 @@ impl<'t> GraphMaker<'t> {
     let reachable_rules: HashSet<_> = visited
       .into_iter()
       .filter_map(|entry| match entry {
-        &EntryWithDeps::Inner(InnerEntry {
-          rule: Rule::Task(ref task_rule),
-          ..
-        }) => Some(task_rule.clone()),
+        &EntryWithDeps::Inner(InnerEntry { ref rule, .. }) if rule.require_reachable() => {
+          Some(rule.clone())
+        }
         _ => None,
       })
       .collect();
 
-    self
-      .tasks
-      .all_tasks()
-      .iter()
-      .filter(|r| !reachable_rules.contains(r))
-      .map(|&r| UnreachableError::new(r.clone()))
+    Itertools::flatten(self.tasks.values().map(|r| r.iter()))
+      .filter(|r| r.require_reachable() && !reachable_rules.contains(r))
+      .map(|r| UnreachableError::new(r.clone()))
       .collect()
   }
 
@@ -478,12 +456,13 @@ impl<'t> GraphMaker<'t> {
           reason: if params.is_empty() {
             format!(
               "No rule was available to compute {}. Maybe declare it as a RootRule({})?",
-              product, product,
+              select_key_str(&select_key),
+              product,
             )
           } else {
             format!(
               "No rule was available to compute {} with parameter type{} {}",
-              product,
+              select_key_str(&select_key),
               if params.len() > 1 { "s" } else { "" },
               params_str(&params),
             )
@@ -783,16 +762,12 @@ pub fn params_str(params: &ParamTypes) -> String {
 pub fn select_key_str(select_key: &SelectKey) -> String {
   match select_key {
     &SelectKey::JustSelect(ref s) => s.product.to_string(),
-    &SelectKey::JustGet(ref g) => get_str(g),
+    &SelectKey::JustGet(ref g) => g.to_string(),
   }
 }
 
 pub fn select_root_str(select: &Select) -> String {
   format!("Select({})", select.product)
-}
-
-fn get_str(get: &Get) -> String {
-  format!("Get({}, {})", get.product, get.subject)
 }
 
 ///
@@ -808,18 +783,9 @@ pub fn entry_str(entry: &Entry) -> String {
 fn entry_with_deps_str(entry: &EntryWithDeps) -> String {
   match entry {
     &EntryWithDeps::Inner(InnerEntry {
-      rule: Rule::Task(ref task_rule),
+      ref rule,
       ref params,
-    }) => format!("{} for {}", task_display(task_rule), params_str(params)),
-    &EntryWithDeps::Inner(InnerEntry {
-      rule: Rule::Intrinsic(ref intrinsic),
-      ref params,
-    }) => format!(
-      "({}, [{}], <intrinsic>) for {}",
-      intrinsic.product,
-      intrinsic.input,
-      params_str(params)
-    ),
+    }) => format!("{} for {}", rule, params_str(params)),
     &EntryWithDeps::Root(ref root) => format!(
       "{} for {}",
       root
@@ -831,33 +797,6 @@ fn entry_with_deps_str(entry: &EntryWithDeps) -> String {
       params_str(&root.params)
     ),
   }
-}
-
-fn task_display(task: &Task) -> String {
-  let product = format!("{}", task.product);
-  let mut clause_portion = task
-    .clause
-    .iter()
-    .map(|c| c.product.to_string())
-    .collect::<Vec<_>>()
-    .join(", ");
-  clause_portion = format!("[{}]", clause_portion);
-  let mut get_portion = task
-    .gets
-    .iter()
-    .map(|g| get_str(g))
-    .collect::<Vec<_>>()
-    .join(", ");
-  get_portion = if task.gets.is_empty() {
-    "".to_string()
-  } else {
-    format!("[{}], ", get_portion)
-  };
-  format!(
-    "({}, {}, {}{})",
-    product, clause_portion, get_portion, task.func,
-  )
-  .to_string()
 }
 
 impl RuleGraph {
@@ -933,16 +872,13 @@ impl RuleGraph {
   }
 
   pub fn validate(&self) -> Result<(), String> {
-    let mut collated_errors: HashMap<Task, Vec<Diagnostic>> = HashMap::new();
+    let mut collated_errors: HashMap<Rule, Vec<Diagnostic>> = HashMap::new();
 
     let used_rules: HashSet<_> = self
       .rule_dependency_edges
       .keys()
       .filter_map(|entry| match entry {
-        &EntryWithDeps::Inner(InnerEntry {
-          rule: Rule::Task(ref task_rule),
-          ..
-        }) => Some(task_rule),
+        &EntryWithDeps::Inner(InnerEntry { ref rule, .. }) => Some(rule),
         _ => None,
       })
       .collect();
@@ -952,23 +888,22 @@ impl RuleGraph {
     let mut rule_diagnostics: HashMap<_, _> = self
       .unreachable_rules
       .iter()
-      .map(|u| (&u.task_rule, vec![u.diagnostic.clone()]))
+      .map(|u| (&u.rule, vec![u.diagnostic.clone()]))
       .collect();
     for (e, diagnostics) in &self.unfulfillable_rules {
       match e {
-        &EntryWithDeps::Inner(InnerEntry {
-          rule: Rule::Task(ref task_rule),
-          ..
-        }) if !used_rules.contains(&task_rule) && !diagnostics.is_empty() => {
-          rule_diagnostics.insert(task_rule, diagnostics.clone());
+        &EntryWithDeps::Inner(InnerEntry { ref rule, .. })
+          if rule.require_reachable() && !diagnostics.is_empty() && !used_rules.contains(&rule) =>
+        {
+          rule_diagnostics.insert(rule, diagnostics.clone());
         }
         _ => {}
       }
     }
-    for (task_rule, diagnostics) in rule_diagnostics {
+    for (rule, diagnostics) in rule_diagnostics {
       for d in diagnostics {
         collated_errors
-          .entry(task_rule.clone())
+          .entry(rule.clone())
           .or_insert_with(Vec::new)
           .push(d);
       }
@@ -995,7 +930,7 @@ impl RuleGraph {
           })
           .collect::<Vec<_>>()
           .join("\n    ");
-        format!("{}:\n    {}", task_display(&rule), errors)
+        format!("{}:\n    {}", rule, errors)
       })
       .collect();
     msgs.sort();
@@ -1104,21 +1039,12 @@ fn rhs(tasks: &Tasks, params: &ParamTypes, product_type: TypeId) -> Vec<Entry> {
   if let Some(type_id) = params.get(&product_type) {
     entries.push(Entry::Param(*type_id));
   }
-  // If there are any intrinsics which can produce the desired type, add them.
-  if let Some(matching_intrinsics) = tasks.gen_intrinsic(product_type) {
-    entries.extend(matching_intrinsics.iter().map(|matching_intrinsic| {
+  // If there are any rules which can produce the desired type, add them.
+  if let Some(matching_rules) = tasks.get(&product_type) {
+    entries.extend(matching_rules.iter().map(|rule| {
       Entry::WithDeps(EntryWithDeps::Inner(InnerEntry {
         params: params.clone(),
-        rule: Rule::Intrinsic(*matching_intrinsic),
-      }))
-    }));
-  }
-  // If there are any tasks which can produce the desired type, add those.
-  if let Some(matching_tasks) = tasks.gen_tasks(product_type) {
-    entries.extend(matching_tasks.iter().map(|task_rule| {
-      Entry::WithDeps(EntryWithDeps::Inner(InnerEntry {
-        params: params.clone(),
-        rule: Rule::Task(task_rule.clone()),
+        rule: rule.clone(),
       }))
     }));
   }
