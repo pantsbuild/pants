@@ -116,6 +116,10 @@ def run_python_test(transitive_hydrated_target, pytest, source_root_config):
   # Gather sources and adjust for the source root.
   # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of raising to
   # simplify the hasattr() checks here!
+  # TODO: find some way to restore the full source name for the stdout of the Pytest run, so that
+  # we can output the original path, rather than the path without the source root. It appears we
+  # do this in V1 via parsing the Junit XML file and adding the value back? See pytest_run.py's
+  # _get_target_from_test().
   all_sources_digests = []
   for maybe_source_target in all_targets:
     if hasattr(maybe_source_target.adaptor, 'sources'):
