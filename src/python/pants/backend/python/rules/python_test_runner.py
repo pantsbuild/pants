@@ -11,7 +11,8 @@ from builtins import str
 from future.utils import text_type
 
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.engine.fs import Digest, MergedDirectories, PrefixStrippedDirectory, Snapshot, UrlToFetch
+from pants.engine.fs import (Digest, FilesContent, MergedDirectories, PrefixStrippedDirectory,
+                             Snapshot, UrlToFetch)
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
                                            FallibleExecuteProcessResult)
 from pants.engine.legacy.graph import TransitiveHydratedTarget
@@ -26,6 +27,29 @@ from pants.source.source_root import SourceRootConfig
 # Hopefully https://github.com/pantsbuild/pants/issues/4535 should help resolve this.
 class PyTestResult(TestResult):
   pass
+
+
+def identify_needed_inits(sources):
+  """Return list of the __init__.py files that should be created."""
+  # TODO: this is copied from
+  # https://github.com/pantsbuild/pants/blob/cae058e43001eea2bb8c6158ddaa75d520aa2db5/src/python/pants/backend/python/subsystems/pex_build_util.py#L305-L332.
+  # Deduplicate it.
+  packages = set()
+  for source in sources:
+    if source.endswith('.py'):
+      pkg_dir = os.path.dirname(source)
+      if pkg_dir and pkg_dir not in packages:
+        package = ''
+        for component in pkg_dir.split(os.sep):
+          package = os.path.join(package, component)
+          packages.add(package)
+
+  missing_pkg_files = set()
+  for package in packages:
+    pkg_file = os.path.join(package, '__init__.py')
+    if pkg_file not in sources:
+      missing_pkg_files.add(pkg_file)
+  return tuple(sorted(missing_pkg_files))
 
 
 # TODO: Support deps
@@ -105,13 +129,15 @@ def run_python_test(transitive_hydrated_target, pytest, source_root_config):
     Digest, MergedDirectories(directories=tuple(all_sources_digests)),
   )
 
-  # Take a set of source file names, return a set of __init__.py
-  # Maybe use a snapshot.files field? Can convert a digest to snapshot.
-  # Make the algorithm Stu linked to static, then link to it here.
+  # TODO: add intrinsic to go from Digest->Snapshot, so that we can avoid having to use
+  # `FileContent`, which unnecessarily gets the content.
+  file_contents = yield Get(FilesContent, Digest, sources_digest)
+  file_paths = [fc.path for fc in file_contents]
+  injected_inits = identify_needed_inits(file_paths)
   touch_init_request = ExecuteProcessRequest(
-    argv=("touch", "pants/__init__.py"),
-    output_files=("pants/__init__.py",),
-    description="Create __init__.py",
+    argv=("touch",) + injected_inits,
+    output_files=injected_inits,
+    description="Inject empty __init__.py into all packages without one already.",
     input_files=sources_digest,
     env={"PATH": os.environ["PATH"]}
   )
