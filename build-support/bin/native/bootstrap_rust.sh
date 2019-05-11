@@ -19,6 +19,7 @@ function cargo_bin() {
   "${RUSTUP}" which cargo
 }
 
+
 function bootstrap_rust() {
   RUST_TOOLCHAIN="$(cat "${REPO_ROOT}/rust-toolchain")"
   RUST_COMPONENTS=(
