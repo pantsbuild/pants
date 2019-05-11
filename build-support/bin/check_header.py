@@ -49,13 +49,13 @@ The following {len(header_parse_failures)} file(s) do not conform:
 
 def create_parser() -> argparse.ArgumentParser:
   parser = argparse.ArgumentParser(
-    description="Check all .py files start with the appropriate header."
+    description="Check that all .py files start with the appropriate header."
   )
   parser.add_argument("dirs", nargs="+",
     help="The directories to check. Will recursively check subdirectories."
   )
   parser.add_argument("-a", "--files-added", nargs="*", default=[],
-    help="Any newly created files that should be check for a valid copyright year."
+    help="Any passed files will be checked for a current copyright year."
   )
   return parser
 
@@ -68,14 +68,14 @@ def check_header(filename: str, *, is_newly_created: bool = False) -> None:
   except IOError as e:
     raise HeaderCheckFailure(f"{filename}: error while reading input ({e})")
   # If a shebang line is included, remove it. Otherwise, we will have conservatively grabbed
-  # one extra line at the end for the shebang case that is no longer necessary because.
+  # one extra line at the end for the shebang case that is no longer necessary.
   first_lines.pop(0 if first_lines[0].startswith("#!") else - 1)
-  # Check first lines even exist. Note that first_lines will always have an entry for each line,
-  # even if the file is completely empty.
+  # Check that the first lines even exists. Note that first_lines will always have an entry
+  # for each line, even if the file is completely empty.
   if len([line for line in first_lines if line]) < 4:
     raise HeaderCheckFailure(f"{filename}: missing the expected header")
-  # Check copyright year. If a new file, it should be the current year. Else, it should be parsed
-  # as within the current century
+  # Check copyright year. If it's a new file, it should be the current year. Else, it should
+  # be within the current century.
   copyright_line = first_lines[1]
   year = copyright_line[12:16]
   if is_newly_created and year != _current_year:
