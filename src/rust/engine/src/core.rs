@@ -10,6 +10,7 @@ use std::{fmt, hash};
 use crate::externs;
 use crate::handles::Handle;
 
+use rule_graph;
 use smallvec::{smallvec, SmallVec};
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
@@ -128,13 +129,15 @@ impl TypeId {
       write!(f, "{}", externs::type_to_str(self))
     }
   }
+}
 
+impl rule_graph::TypeId for TypeId {
   ///
   /// Render a string for a collection of TypeIds.
   ///
-  pub fn display<T>(type_ids: T) -> String
+  fn display<I>(type_ids: I) -> String
   where
-    T: Iterator<Item = TypeId>,
+    I: Iterator<Item = TypeId>,
   {
     Params::display(type_ids)
   }

@@ -15,8 +15,7 @@ use futures::Future;
 use crate::core::{Failure, TypeId};
 use crate::handles::maybe_drop_handles;
 use crate::nodes::{NodeKey, WrappedNode};
-use crate::rule_graph::RuleGraph;
-use crate::tasks::Tasks;
+use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 use boxfuture::{BoxFuture, Boxable};
 use core::clone::Clone;
@@ -28,6 +27,7 @@ use process_execution::{self, BoundedCommandRunner, CommandRunner};
 use rand::seq::SliceRandom;
 use reqwest;
 use resettable::Resettable;
+use rule_graph::RuleGraph;
 use std::collections::btree_map::BTreeMap;
 
 ///
@@ -41,7 +41,7 @@ use std::collections::btree_map::BTreeMap;
 pub struct Core {
   pub graph: Graph<NodeKey>,
   pub tasks: Tasks,
-  pub rule_graph: RuleGraph,
+  pub rule_graph: RuleGraph<Rule>,
   pub types: Types,
   runtime: Resettable<Arc<RwLock<Runtime>>>,
   pub futures_timer_thread: Resettable<futures_timer::HelperThread>,

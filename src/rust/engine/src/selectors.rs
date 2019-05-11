@@ -1,8 +1,11 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::core::TypeId;
 use std::fmt;
+
+use crate::core::TypeId;
+
+use rule_graph;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Get {
@@ -16,7 +19,7 @@ impl fmt::Display for Get {
   }
 }
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Select {
   pub product: TypeId,
 }
@@ -36,7 +39,7 @@ impl fmt::Debug for Select {
 ///
 /// A key for the dependencies used from a rule.
 ///
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
 pub enum DependencyKey {
   // A Get for a particular product/subject pair.
   JustGet(Get),
@@ -44,31 +47,27 @@ pub enum DependencyKey {
   JustSelect(Select),
 }
 
-impl DependencyKey {
+impl rule_graph::DependencyKey for DependencyKey {
+  type TypeId = TypeId;
+
   ///
   /// Generates a DependencyKey for a "root" dependency.
   ///
   /// TODO: Currently this uses 'Select', but when https://github.com/pantsbuild/pants/issues/7490
   /// is implemented, it should probably use `Get`.
   ///
-  pub fn new_root(product: TypeId) -> DependencyKey {
+  fn new_root(product: TypeId) -> DependencyKey {
     DependencyKey::JustSelect(Select::new(product))
   }
 
-  ///
-  /// Returns the product (output) type for this dependency.
-  ///
-  pub fn product(&self) -> TypeId {
+  fn product(&self) -> TypeId {
     match self {
       DependencyKey::JustGet(ref g) => g.product,
       DependencyKey::JustSelect(ref s) => s.product,
     }
   }
 
-  ///
-  /// Returns the Param (input) type for this dependency, if it provides one.
-  ///
-  pub fn provided_param(&self) -> Option<TypeId> {
+  fn provided_param(&self) -> Option<TypeId> {
     match self {
       DependencyKey::JustGet(ref g) => Some(g.subject),
       DependencyKey::JustSelect(_) => None,

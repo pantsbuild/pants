@@ -1,26 +1,51 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+#![deny(warnings)]
+// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
+#![deny(
+  clippy::all,
+  clippy::default_trait_access,
+  clippy::expl_impl_clone_on_copy,
+  clippy::if_not_else,
+  clippy::needless_continue,
+  clippy::single_match_else,
+  clippy::unseparated_literal_suffix,
+  clippy::used_underscore_binding
+)]
+// It is often more clear to show that nothing is being moved.
+#![allow(clippy::match_ref_pats)]
+// Subjective style.
+#![allow(
+  clippy::len_without_is_empty,
+  clippy::redundant_field_names,
+  clippy::too_many_arguments
+)]
+// Default isn't as big a deal as people seem to think it is.
+#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
+// Arc<Mutex> can be more clear than needing to grok Orderings:
+#![allow(clippy::mutex_atomic)]
+
+mod rules;
+
 use std::collections::{hash_map, BTreeSet, HashMap, HashSet};
 use std::io;
 
 use itertools::Itertools;
 
-use crate::core::TypeId;
-use crate::selectors::DependencyKey;
-use crate::tasks::Rule;
+pub use crate::rules::{DependencyKey, Rule, TypeId};
 
-type Tasks = HashMap<TypeId, Vec<Rule>>;
-type ParamTypes = BTreeSet<TypeId>;
+// TODO: Consider switching to HashSet and dropping the Ord bound from TypeId.
+type ParamTypes<T> = BTreeSet<T>;
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
-pub struct UnreachableError {
-  rule: Rule,
-  diagnostic: Diagnostic,
+pub struct UnreachableError<R: Rule> {
+  rule: R,
+  diagnostic: Diagnostic<R::TypeId>,
 }
 
-impl UnreachableError {
-  fn new(rule: Rule) -> UnreachableError {
+impl<R: Rule> UnreachableError<R> {
+  fn new(rule: R) -> UnreachableError<R> {
     UnreachableError {
       rule,
       diagnostic: Diagnostic {
@@ -33,28 +58,28 @@ impl UnreachableError {
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
-pub enum EntryWithDeps {
-  Root(RootEntry),
-  Inner(InnerEntry),
+pub enum EntryWithDeps<R: Rule> {
+  Root(RootEntry<R>),
+  Inner(InnerEntry<R>),
 }
 
-impl EntryWithDeps {
-  pub fn params(&self) -> &ParamTypes {
+impl<R: Rule> EntryWithDeps<R> {
+  pub fn params(&self) -> &ParamTypes<R::TypeId> {
     match self {
-      &EntryWithDeps::Inner(ref ie) => &ie.params,
-      &EntryWithDeps::Root(ref re) => &re.params,
+      EntryWithDeps::Inner(ref ie) => &ie.params,
+      EntryWithDeps::Root(ref re) => &re.params,
     }
   }
 
   ///
   /// Returns the set of DependencyKeys representing the dependencies of this EntryWithDeps.
   ///
-  fn dependency_keys(&self) -> Vec<DependencyKey> {
+  fn dependency_keys(&self) -> Vec<R::DependencyKey> {
     match self {
-      &EntryWithDeps::Inner(InnerEntry { ref rule, .. }) => rule.dependency_keys(),
-      &EntryWithDeps::Root(RootEntry {
+      EntryWithDeps::Inner(InnerEntry { ref rule, .. }) => rule.dependency_keys(),
+      EntryWithDeps::Root(RootEntry {
         ref dependency_key, ..
-      }) => vec![dependency_key.clone()],
+      }) => vec![*dependency_key],
     }
   }
 
@@ -62,15 +87,15 @@ impl EntryWithDeps {
   /// Given a set of used parameters (which must be a subset of the parameters available here),
   /// return a clone of this entry with its parameter set reduced to the used parameters.
   ///
-  fn simplified(&self, used_params: ParamTypes) -> EntryWithDeps {
+  fn simplified(&self, used_params: ParamTypes<R::TypeId>) -> EntryWithDeps<R> {
     let mut simplified = self.clone();
     {
       let simplified_params = match &mut simplified {
-        &mut EntryWithDeps::Inner(ref mut ie) => &mut ie.params,
-        &mut EntryWithDeps::Root(ref mut re) => &mut re.params,
+        EntryWithDeps::Inner(ref mut ie) => &mut ie.params,
+        EntryWithDeps::Root(ref mut re) => &mut re.params,
       };
 
-      let unavailable_params: ParamTypes =
+      let unavailable_params: ParamTypes<_> =
         used_params.difference(simplified_params).cloned().collect();
       assert!(
         unavailable_params.is_empty(),
@@ -86,76 +111,53 @@ impl EntryWithDeps {
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
-pub enum Entry {
-  Param(TypeId),
-  WithDeps(EntryWithDeps),
+pub enum Entry<R: Rule> {
+  Param(R::TypeId),
+  WithDeps(EntryWithDeps<R>),
 }
 
-impl Entry {
-  fn params(&self) -> Vec<TypeId> {
+impl<R: Rule> Entry<R> {
+  fn params(&self) -> Vec<R::TypeId> {
     match self {
-      &Entry::WithDeps(ref e) => e.params().iter().cloned().collect(),
-      &Entry::Param(ref type_id) => vec![*type_id],
+      Entry::WithDeps(ref e) => e.params().iter().cloned().collect(),
+      Entry::Param(ref type_id) => vec![*type_id],
     }
   }
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
-pub struct RootEntry {
-  params: ParamTypes,
-  dependency_key: DependencyKey,
+pub struct RootEntry<R: Rule> {
+  params: ParamTypes<R::TypeId>,
+  dependency_key: R::DependencyKey,
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
-pub struct InnerEntry {
-  params: ParamTypes,
-  rule: Rule,
+pub struct InnerEntry<R: Rule> {
+  params: ParamTypes<R::TypeId>,
+  rule: R,
 }
 
-impl InnerEntry {
-  pub fn rule(&self) -> &Rule {
+impl<R: Rule> InnerEntry<R> {
+  pub fn rule(&self) -> &R {
     &self.rule
   }
 }
 
-type RuleDependencyEdges = HashMap<EntryWithDeps, RuleEdges>;
-type UnfulfillableRuleMap = HashMap<EntryWithDeps, Vec<Diagnostic>>;
+type RuleDependencyEdges<R> = HashMap<EntryWithDeps<R>, RuleEdges<R>>;
+type UnfulfillableRuleMap<R> = HashMap<EntryWithDeps<R>, Vec<Diagnostic<<R as Rule>::TypeId>>>;
+type ChosenDependency<'a, R> = (&'a <R as Rule>::DependencyKey, &'a Entry<R>);
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
-pub struct Diagnostic {
-  params: ParamTypes,
+pub struct Diagnostic<T: TypeId> {
+  params: ParamTypes<T>,
   reason: String,
   details: Vec<String>,
 }
 
-impl Diagnostic {
-  fn ambiguous(
-    available_params: &ParamTypes,
-    key: &DependencyKey,
-    entries: Vec<&Entry>,
-  ) -> Diagnostic {
-    let params_clause = match available_params.len() {
-      0 => "",
-      1 => " with parameter type ",
-      _ => " with parameter types ",
-    };
-    Diagnostic {
-      params: available_params.clone(),
-      reason: format!(
-        "Ambiguous rules to compute {}{}{}",
-        key,
-        params_clause,
-        params_str(&available_params),
-      ),
-      details: entries.into_iter().map(entry_str).collect(),
-    }
-  }
-}
-
-enum ConstructGraphResult {
+enum ConstructGraphResult<R: Rule> {
   // The Entry was satisfiable without waiting for any additional nodes to be satisfied. The result
   // contains copies of the input Entry for each set subset of the parameters that satisfy it.
-  Fulfilled(Vec<EntryWithDeps>),
+  Fulfilled(Vec<EntryWithDeps<R>>),
   // The Entry was not satisfiable with installed rules.
   Unfulfillable,
   // The dependencies of an Entry might be satisfiable, but is currently blocked waiting for the
@@ -166,20 +168,23 @@ enum ConstructGraphResult {
   // case they represent everything except the caller's own parameters (which provides enough
   // information for the caller to complete).
   CycledOn {
-    cyclic_deps: HashSet<EntryWithDeps>,
-    partial_simplified_entries: Vec<EntryWithDeps>,
+    cyclic_deps: HashSet<EntryWithDeps<R>>,
+    partial_simplified_entries: Vec<EntryWithDeps<R>>,
   },
 }
 
 // Given the task index and the root subjects, it produces a rule graph that allows dependency nodes
 // to be found statically rather than dynamically.
-pub struct GraphMaker<'t> {
-  tasks: &'t Tasks,
-  root_param_types: ParamTypes,
+pub struct GraphMaker<'t, R: Rule> {
+  tasks: &'t HashMap<R::TypeId, Vec<R>>,
+  root_param_types: ParamTypes<R::TypeId>,
 }
 
-impl<'t> GraphMaker<'t> {
-  pub fn new(tasks: &'t Tasks, root_param_types: Vec<TypeId>) -> GraphMaker<'t> {
+impl<'t, R: Rule> GraphMaker<'t, R> {
+  pub fn new(
+    tasks: &'t HashMap<R::TypeId, Vec<R>>,
+    root_param_types: Vec<R::TypeId>,
+  ) -> GraphMaker<'t, R> {
     let root_param_types = root_param_types.into_iter().collect();
     GraphMaker {
       tasks,
@@ -187,7 +192,7 @@ impl<'t> GraphMaker<'t> {
     }
   }
 
-  pub fn sub_graph(&self, param_type: TypeId, product_type: TypeId) -> RuleGraph {
+  pub fn sub_graph(&self, param_type: R::TypeId, product_type: R::TypeId) -> RuleGraph<R> {
     // TODO: Update to support rendering a subgraph given a set of ParamTypes.
     let param_types = vec![param_type].into_iter().collect();
 
@@ -198,14 +203,14 @@ impl<'t> GraphMaker<'t> {
     }
   }
 
-  pub fn full_graph(&self) -> RuleGraph {
+  pub fn full_graph(&self) -> RuleGraph<R> {
     self.construct_graph(self.gen_root_entries(&self.tasks.keys().cloned().collect()))
   }
 
-  pub fn construct_graph(&self, roots: Vec<RootEntry>) -> RuleGraph {
-    let mut dependency_edges: RuleDependencyEdges = HashMap::new();
+  pub fn construct_graph(&self, roots: Vec<RootEntry<R>>) -> RuleGraph<R> {
+    let mut dependency_edges: RuleDependencyEdges<_> = HashMap::new();
     let mut simplified_entries = HashMap::new();
-    let mut unfulfillable_rules: UnfulfillableRuleMap = HashMap::new();
+    let mut unfulfillable_rules: UnfulfillableRuleMap<_> = HashMap::new();
 
     for beginning_root in roots {
       self.construct_graph_helper(
@@ -221,8 +226,8 @@ impl<'t> GraphMaker<'t> {
     RuleGraph {
       root_param_types: self.root_param_types.clone(),
       rule_dependency_edges: dependency_edges,
-      unfulfillable_rules: unfulfillable_rules,
-      unreachable_rules: unreachable_rules,
+      unfulfillable_rules,
+      unreachable_rules,
     }
   }
 
@@ -231,13 +236,13 @@ impl<'t> GraphMaker<'t> {
   ///
   fn unreachable_rules(
     &self,
-    full_dependency_edges: &RuleDependencyEdges,
-  ) -> Vec<UnreachableError> {
+    full_dependency_edges: &RuleDependencyEdges<R>,
+  ) -> Vec<UnreachableError<R>> {
     // Walk the graph, starting from root entries.
     let mut entry_stack: Vec<_> = full_dependency_edges
       .keys()
       .filter(|entry| match entry {
-        &EntryWithDeps::Root(_) => true,
+        EntryWithDeps::Root(_) => true,
         _ => false,
       })
       .collect();
@@ -250,7 +255,7 @@ impl<'t> GraphMaker<'t> {
 
       if let Some(edges) = full_dependency_edges.get(entry) {
         entry_stack.extend(edges.all_dependencies().filter_map(|e| match e {
-          &Entry::WithDeps(ref e) => Some(e),
+          Entry::WithDeps(ref e) => Some(e),
           _ => None,
         }));
       }
@@ -259,7 +264,7 @@ impl<'t> GraphMaker<'t> {
     let reachable_rules: HashSet<_> = visited
       .into_iter()
       .filter_map(|entry| match entry {
-        &EntryWithDeps::Inner(InnerEntry { ref rule, .. }) if rule.require_reachable() => {
+        EntryWithDeps::Inner(InnerEntry { ref rule, .. }) if rule.require_reachable() => {
           Some(rule.clone())
         }
         _ => None,
@@ -282,11 +287,11 @@ impl<'t> GraphMaker<'t> {
   ///
   fn construct_graph_helper(
     &self,
-    rule_dependency_edges: &mut RuleDependencyEdges,
-    all_simplified_entries: &mut HashMap<EntryWithDeps, Vec<EntryWithDeps>>,
-    unfulfillable_rules: &mut UnfulfillableRuleMap,
-    entry: EntryWithDeps,
-  ) -> ConstructGraphResult {
+    rule_dependency_edges: &mut RuleDependencyEdges<R>,
+    all_simplified_entries: &mut HashMap<EntryWithDeps<R>, Vec<EntryWithDeps<R>>>,
+    unfulfillable_rules: &mut UnfulfillableRuleMap<R>,
+    entry: EntryWithDeps<R>,
+  ) -> ConstructGraphResult<R> {
     if let Some(simplified) = all_simplified_entries.get(&entry) {
       // A simplified equivalent entry has already been computed, return it.
       return ConstructGraphResult::Fulfilled(simplified.clone());
@@ -348,11 +353,11 @@ impl<'t> GraphMaker<'t> {
   ///
   fn construct_dependencies(
     &self,
-    rule_dependency_edges: &mut RuleDependencyEdges,
-    all_simplified_entries: &mut HashMap<EntryWithDeps, Vec<EntryWithDeps>>,
-    unfulfillable_rules: &mut UnfulfillableRuleMap,
-    entry: EntryWithDeps,
-  ) -> Result<ConstructGraphResult, ()> {
+    rule_dependency_edges: &mut RuleDependencyEdges<R>,
+    all_simplified_entries: &mut HashMap<EntryWithDeps<R>, Vec<EntryWithDeps<R>>>,
+    unfulfillable_rules: &mut UnfulfillableRuleMap<R>,
+    entry: EntryWithDeps<R>,
+  ) -> Result<ConstructGraphResult<R>, ()> {
     let mut fulfillable_candidates_by_key = HashMap::new();
     let mut cycled_on = HashSet::new();
     let mut unfulfillable_diagnostics = Vec::new();
@@ -375,7 +380,7 @@ impl<'t> GraphMaker<'t> {
       // Collect fulfillable candidates, used parameters, and cyclic deps.
       let mut cycled = false;
       let fulfillable_candidates = fulfillable_candidates_by_key
-        .entry(dependency_key.clone())
+        .entry(dependency_key)
         .or_insert_with(Vec::new);
       for candidate in self.rhs(&params, product) {
         match candidate {
@@ -529,11 +534,11 @@ impl<'t> GraphMaker<'t> {
   /// dependencies are possible for any set of parameters, then the graph is ambiguous.
   ///
   fn monomorphize(
-    entry: &EntryWithDeps,
-    deps: &[(DependencyKey, Vec<Entry>)],
-  ) -> Result<HashMap<EntryWithDeps, RuleEdges>, Vec<Diagnostic>> {
+    entry: &EntryWithDeps<R>,
+    deps: &[(R::DependencyKey, Vec<Entry<R>>)],
+  ) -> Result<RuleDependencyEdges<R>, Vec<Diagnostic<R::TypeId>>> {
     // Collect the powerset of the union of used parameters, ordered by set size.
-    let params_powerset: Vec<Vec<TypeId>> = {
+    let params_powerset: Vec<Vec<R::TypeId>> = {
       let mut all_used_params = BTreeSet::new();
       for (key, inputs) in deps {
         let provided_param = key.provided_param();
@@ -555,7 +560,7 @@ impl<'t> GraphMaker<'t> {
 
     // Then, for the powerset of used parameters, determine which dependency combinations are
     // satisfiable.
-    let mut combinations: HashMap<EntryWithDeps, _> = HashMap::new();
+    let mut combinations: HashMap<EntryWithDeps<_>, _> = HashMap::new();
     let mut diagnostics = Vec::new();
     for available_params in params_powerset {
       let available_params = available_params.into_iter().collect();
@@ -599,9 +604,9 @@ impl<'t> GraphMaker<'t> {
   /// a single dependency key), fail with a Diagnostic.
   ///
   fn choose_dependencies<'a>(
-    available_params: &ParamTypes,
-    deps: &'a [(DependencyKey, Vec<Entry>)],
-  ) -> Result<Option<Vec<(&'a DependencyKey, &'a Entry)>>, Diagnostic> {
+    available_params: &ParamTypes<R::TypeId>,
+    deps: &'a [(R::DependencyKey, Vec<Entry<R>>)],
+  ) -> Result<Option<Vec<ChosenDependency<'a, R>>>, Diagnostic<R::TypeId>> {
     let mut combination = Vec::new();
     for (key, input_entries) in deps {
       let provided_param = key.provided_param();
@@ -624,7 +629,22 @@ impl<'t> GraphMaker<'t> {
           combination.push((key, chosen_entries[0]));
         }
         _ => {
-          return Err(Diagnostic::ambiguous(available_params, key, chosen_entries));
+          let params_clause = match available_params.len() {
+            0 => "",
+            1 => " with parameter type ",
+            _ => " with parameter types ",
+          };
+
+          return Err(Diagnostic {
+            params: available_params.clone(),
+            reason: format!(
+              "Ambiguous rules to compute {}{}{}",
+              key,
+              params_clause,
+              params_str(&available_params),
+            ),
+            details: chosen_entries.into_iter().map(entry_str).collect(),
+          });
         }
       }
     }
@@ -632,7 +652,7 @@ impl<'t> GraphMaker<'t> {
     Ok(Some(combination))
   }
 
-  fn choose_dependency<'a>(satisfiable_entries: Vec<&'a Entry>) -> Vec<&'a Entry> {
+  fn choose_dependency<'a>(satisfiable_entries: Vec<&'a Entry<R>>) -> Vec<&'a Entry<R>> {
     if satisfiable_entries.is_empty() {
       // No source of this dependency was satisfiable with these Params.
       return vec![];
@@ -647,8 +667,8 @@ impl<'t> GraphMaker<'t> {
     let mut rules = Vec::new();
     for satisfiable_entry in satisfiable_entries {
       let param_set_size = match satisfiable_entry {
-        &Entry::WithDeps(ref wd) => wd.params().len(),
-        &Entry::Param(_) => 1,
+        Entry::WithDeps(ref wd) => wd.params().len(),
+        Entry::Param(_) => 1,
       };
       if param_set_size < minimum_param_set_size {
         rules.clear();
@@ -680,21 +700,25 @@ impl<'t> GraphMaker<'t> {
     })
   }
 
-  fn gen_root_entries(&self, product_types: &HashSet<TypeId>) -> Vec<RootEntry> {
+  fn gen_root_entries(&self, product_types: &HashSet<R::TypeId>) -> Vec<RootEntry<R>> {
     product_types
       .iter()
       .filter_map(|product_type| self.gen_root_entry(&self.root_param_types, *product_type))
       .collect()
   }
 
-  fn gen_root_entry(&self, param_types: &ParamTypes, product_type: TypeId) -> Option<RootEntry> {
+  fn gen_root_entry(
+    &self,
+    param_types: &ParamTypes<R::TypeId>,
+    product_type: R::TypeId,
+  ) -> Option<RootEntry<R>> {
     let candidates = self.rhs(param_types, product_type);
     if candidates.is_empty() {
       None
     } else {
       Some(RootEntry {
         params: param_types.clone(),
-        dependency_key: DependencyKey::new_root(product_type),
+        dependency_key: R::DependencyKey::new_root(product_type),
       })
     }
   }
@@ -702,7 +726,7 @@ impl<'t> GraphMaker<'t> {
   ///
   /// Select Entries that can provide the given product type with the given parameters.
   ///
-  fn rhs(&self, params: &ParamTypes, product_type: TypeId) -> Vec<Entry> {
+  fn rhs(&self, params: &ParamTypes<R::TypeId>, product_type: R::TypeId) -> Vec<Entry<R>> {
     let mut entries = Vec::new();
     // If the params can provide the type directly, add that.
     if let Some(type_id) = params.get(&product_type) {
@@ -736,35 +760,48 @@ impl<'t> GraphMaker<'t> {
 ///   The collections of dependencies are contained by RuleEdges objects.
 /// `unfulfillable_rules` A map of rule entries to collections of Diagnostics
 ///   containing the reasons why they were eliminated from the graph.
-#[derive(Debug, Default)]
-pub struct RuleGraph {
-  root_param_types: ParamTypes,
-  rule_dependency_edges: RuleDependencyEdges,
-  unfulfillable_rules: UnfulfillableRuleMap,
-  unreachable_rules: Vec<UnreachableError>,
+#[derive(Debug)]
+pub struct RuleGraph<R: Rule> {
+  root_param_types: ParamTypes<R::TypeId>,
+  rule_dependency_edges: RuleDependencyEdges<R>,
+  unfulfillable_rules: UnfulfillableRuleMap<R>,
+  unreachable_rules: Vec<UnreachableError<R>>,
 }
 
-pub fn params_str(params: &ParamTypes) -> String {
-  TypeId::display(params.iter().cloned())
+// TODO: We can't derive this due to https://github.com/rust-lang/rust/issues/26925, which
+// unnecessarily requires `Rule: Default`.
+impl<R: Rule> Default for RuleGraph<R> {
+  fn default() -> Self {
+    RuleGraph {
+      root_param_types: ParamTypes::default(),
+      rule_dependency_edges: RuleDependencyEdges::default(),
+      unfulfillable_rules: UnfulfillableRuleMap::default(),
+      unreachable_rules: Vec::default(),
+    }
+  }
+}
+
+pub fn params_str<T: TypeId>(params: &ParamTypes<T>) -> String {
+  T::display(params.iter().cloned())
 }
 
 ///
 /// TODO: Move all of these methods to Display impls.
 ///
-pub fn entry_str(entry: &Entry) -> String {
+pub fn entry_str<R: Rule>(entry: &Entry<R>) -> String {
   match entry {
-    &Entry::WithDeps(ref e) => entry_with_deps_str(e),
-    &Entry::Param(type_id) => format!("Param({})", type_id),
+    Entry::WithDeps(ref e) => entry_with_deps_str(e),
+    Entry::Param(type_id) => format!("Param({})", type_id),
   }
 }
 
-fn entry_with_deps_str(entry: &EntryWithDeps) -> String {
+fn entry_with_deps_str<R: Rule>(entry: &EntryWithDeps<R>) -> String {
   match entry {
-    &EntryWithDeps::Inner(InnerEntry {
+    EntryWithDeps::Inner(InnerEntry {
       ref rule,
       ref params,
     }) => format!("{} for {}", rule, params_str(params)),
-    &EntryWithDeps::Root(ref root) => {
+    EntryWithDeps::Root(ref root) => {
       // TODO: Consider dropping this (final) public use of the keyword "Select", while ensuring
       // that error messages remain sufficiently grokkable.
       format!(
@@ -776,21 +813,21 @@ fn entry_with_deps_str(entry: &EntryWithDeps) -> String {
   }
 }
 
-impl RuleGraph {
-  pub fn new(tasks: &Tasks, root_param_types: Vec<TypeId>) -> RuleGraph {
+impl<R: Rule> RuleGraph<R> {
+  pub fn new(tasks: &HashMap<R::TypeId, Vec<R>>, root_param_types: Vec<R::TypeId>) -> RuleGraph<R> {
     GraphMaker::new(tasks, root_param_types).full_graph()
   }
 
-  pub fn find_root_edges<I: IntoIterator<Item = TypeId>>(
+  pub fn find_root_edges<I: IntoIterator<Item = R::TypeId>>(
     &self,
     param_inputs: I,
-    product: TypeId,
-  ) -> Result<RuleEdges, String> {
-    let params: ParamTypes = param_inputs.into_iter().collect();
-    let dependency_key = DependencyKey::new_root(product);
+    product: R::TypeId,
+  ) -> Result<RuleEdges<R>, String> {
+    let params: ParamTypes<_> = param_inputs.into_iter().collect();
+    let dependency_key = R::DependencyKey::new_root(product);
     let root = RootEntry {
       params: params.clone(),
-      dependency_key: dependency_key.clone(),
+      dependency_key,
     };
 
     // Attempt to find an exact match.
@@ -804,7 +841,7 @@ impl RuleGraph {
       .rule_dependency_edges
       .iter()
       .filter_map(|(entry, edges)| match entry {
-        &EntryWithDeps::Root(ref root_entry)
+        EntryWithDeps::Root(ref root_entry)
           if root_entry.dependency_key == dependency_key
             && root_entry.params.is_subset(&params) =>
         {
@@ -840,8 +877,8 @@ impl RuleGraph {
   /// TODO: It's not clear what is preventing `Node` implementations from ending up with non-Inner
   /// entries, but it would be good to make it typesafe instead.
   ///
-  pub fn edges_for_inner(&self, entry: &Entry) -> Option<RuleEdges> {
-    if let &Entry::WithDeps(ref e) = entry {
+  pub fn edges_for_inner(&self, entry: &Entry<R>) -> Option<RuleEdges<R>> {
+    if let Entry::WithDeps(ref e) = entry {
       self.rule_dependency_edges.get(e).cloned()
     } else {
       panic!("not an inner entry! {:?}", entry)
@@ -849,13 +886,13 @@ impl RuleGraph {
   }
 
   pub fn validate(&self) -> Result<(), String> {
-    let mut collated_errors: HashMap<Rule, Vec<Diagnostic>> = HashMap::new();
+    let mut collated_errors: HashMap<R, Vec<Diagnostic<_>>> = HashMap::new();
 
     let used_rules: HashSet<_> = self
       .rule_dependency_edges
       .keys()
       .filter_map(|entry| match entry {
-        &EntryWithDeps::Inner(InnerEntry { ref rule, .. }) => Some(rule),
+        EntryWithDeps::Inner(InnerEntry { ref rule, .. }) => Some(rule),
         _ => None,
       })
       .collect();
@@ -869,7 +906,7 @@ impl RuleGraph {
       .collect();
     for (e, diagnostics) in &self.unfulfillable_rules {
       match e {
-        &EntryWithDeps::Inner(InnerEntry { ref rule, .. })
+        EntryWithDeps::Inner(InnerEntry { ref rule, .. })
           if rule.require_reachable() && !diagnostics.is_empty() && !used_rules.contains(&rule) =>
         {
           rule_diagnostics.insert(rule, diagnostics.clone());
@@ -933,7 +970,7 @@ impl RuleGraph {
       .rule_dependency_edges
       .iter()
       .filter_map(|(k, deps)| match k {
-        &EntryWithDeps::Root(_) => {
+        EntryWithDeps::Root(_) => {
           let root_str = entry_with_deps_str(k);
           Some(format!(
             "    \"{}\" [color=blue]\n    \"{}\" -> {{{}}}",
@@ -957,7 +994,7 @@ impl RuleGraph {
       .rule_dependency_edges
       .iter()
       .filter_map(|(k, deps)| match k {
-        &EntryWithDeps::Inner(_) => {
+        EntryWithDeps::Inner(_) => {
           let mut deps_strs = deps
             .all_dependencies()
             .map(|d| format!("\"{}\"", entry_str(d)))
@@ -981,28 +1018,38 @@ impl RuleGraph {
 ///
 /// Records the dependency rules for a rule.
 ///
-#[derive(Eq, PartialEq, Clone, Debug, Default)]
-pub struct RuleEdges {
-  dependencies: HashMap<DependencyKey, Vec<Entry>>,
+#[derive(Eq, PartialEq, Clone, Debug)]
+pub struct RuleEdges<R: Rule> {
+  dependencies: HashMap<R::DependencyKey, Vec<Entry<R>>>,
 }
 
-impl RuleEdges {
-  pub fn entry_for(&self, dependency_key: &DependencyKey) -> Option<&Entry> {
+impl<R: Rule> RuleEdges<R> {
+  pub fn entry_for(&self, dependency_key: &R::DependencyKey) -> Option<&Entry<R>> {
     self
       .dependencies
       .get(dependency_key)
       .and_then(|entries| entries.first())
   }
 
-  pub fn all_dependencies(&self) -> impl Iterator<Item = &Entry> {
+  pub fn all_dependencies(&self) -> impl Iterator<Item = &Entry<R>> {
     Itertools::flatten(self.dependencies.values())
   }
 
-  fn add_edge(&mut self, dependency_key: DependencyKey, new_dependency: Entry) {
+  fn add_edge(&mut self, dependency_key: R::DependencyKey, new_dependency: Entry<R>) {
     self
       .dependencies
       .entry(dependency_key)
       .or_insert_with(Vec::new)
       .push(new_dependency);
+  }
+}
+
+// TODO: We can't derive this due to https://github.com/rust-lang/rust/issues/26925, which
+// unnecessarily requires `Rule: Default`.
+impl<R: Rule> Default for RuleEdges<R> {
+  fn default() -> Self {
+    RuleEdges {
+      dependencies: HashMap::default(),
+    }
   }
 }

@@ -17,9 +17,8 @@ use url::Url;
 use crate::context::{Context, Core};
 use crate::core::{throw, Failure, Key, Params, TypeId, Value};
 use crate::externs;
-use crate::rule_graph;
 use crate::selectors;
-use crate::tasks::{self, Intrinsic};
+use crate::tasks::{self, Intrinsic, Rule};
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::{self, BufMut};
 use fs::{
@@ -28,6 +27,7 @@ use fs::{
 };
 use hashing;
 use process_execution::{self, CommandRunner};
+use rule_graph;
 
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
 
@@ -95,11 +95,11 @@ pub trait WrappedNode: Into<NodeKey> {
 pub struct Select {
   pub params: Params,
   pub product: TypeId,
-  entry: rule_graph::Entry,
+  entry: rule_graph::Entry<Rule>,
 }
 
 impl Select {
-  pub fn new(mut params: Params, product: TypeId, entry: rule_graph::Entry) -> Select {
+  pub fn new(mut params: Params, product: TypeId, entry: rule_graph::Entry<Rule>) -> Select {
     params.retain(|k| match &entry {
       &rule_graph::Entry::Param(ref type_id) => type_id == k.type_id(),
       &rule_graph::Entry::WithDeps(ref with_deps) => with_deps.params().contains(k.type_id()),
@@ -111,7 +111,11 @@ impl Select {
     }
   }
 
-  pub fn new_from_edges(params: Params, product: TypeId, edges: &rule_graph::RuleEdges) -> Select {
+  pub fn new_from_edges(
+    params: Params,
+    product: TypeId,
+    edges: &rule_graph::RuleEdges<Rule>,
+  ) -> Select {
     let dependency_key = selectors::DependencyKey::JustSelect(selectors::Select::new(product));
     // TODO: Is it worth propagating an error here?
     let entry = edges
@@ -829,14 +833,14 @@ pub struct Task {
   params: Params,
   product: TypeId,
   task: tasks::Task,
-  entry: Arc<rule_graph::Entry>,
+  entry: Arc<rule_graph::Entry<Rule>>,
 }
 
 impl Task {
   fn gen_get(
     context: &Context,
     params: &Params,
-    entry: &Arc<rule_graph::Entry>,
+    entry: &Arc<rule_graph::Entry<Rule>>,
     gets: Vec<externs::Get>,
   ) -> NodeFuture<Vec<Value>> {
     let get_futures = gets
@@ -880,7 +884,7 @@ impl Task {
   fn generate(
     context: Context,
     params: Params,
-    entry: Arc<rule_graph::Entry>,
+    entry: Arc<rule_graph::Entry<Rule>>,
     generator: Value,
   ) -> NodeFuture<Value> {
     future::loop_fn(Value::from(externs::none()), move |input| {

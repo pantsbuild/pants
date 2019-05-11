@@ -1,0 +1,9 @@
+[package]
+version = "0.0.1"
+edition = "2018"
+name = "rule_graph"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+publish = false
+
+[dependencies]
+itertools = "0.7.2"

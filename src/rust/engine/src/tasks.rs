@@ -8,6 +8,8 @@ use crate::core::{Function, TypeId};
 use crate::selectors::{DependencyKey, Get, Select};
 use crate::types::Types;
 
+use rule_graph;
+
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub enum Rule {
   // Intrinsic rules are implemented in rust.
@@ -16,8 +18,11 @@ pub enum Rule {
   Task(Task),
 }
 
-impl Rule {
-  pub fn dependency_keys(&self) -> Vec<DependencyKey> {
+impl rule_graph::Rule for Rule {
+  type TypeId = TypeId;
+  type DependencyKey = DependencyKey;
+
+  fn dependency_keys(&self) -> Vec<DependencyKey> {
     match self {
       &Rule::Task(Task {
         ref clause,
@@ -25,7 +30,7 @@ impl Rule {
         ..
       }) => clause
         .iter()
-        .map(|s| DependencyKey::JustSelect(s.clone()))
+        .map(|s| DependencyKey::JustSelect(*s))
         .chain(gets.iter().map(|g| DependencyKey::JustGet(*g)))
         .collect(),
       &Rule::Intrinsic(Intrinsic { ref input, .. }) => {
@@ -34,7 +39,7 @@ impl Rule {
     }
   }
 
-  pub fn require_reachable(&self) -> bool {
+  fn require_reachable(&self) -> bool {
     match self {
       &Rule::Task(_) => true,
       &Rule::Intrinsic(_) => false,
