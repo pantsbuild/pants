@@ -9,7 +9,7 @@ from typing import List
 from common import die
 
 
-def main() -> None:
+def main():
   targets = create_parser().parse_args().targets
   run_mypy(targets)
 
