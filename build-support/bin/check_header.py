@@ -36,7 +36,7 @@ def main() -> None:
   for directory in args.dirs:
     header_parse_failures.extend(check_dir(directory, args.files_added))
   if header_parse_failures:
-    failures = '\n  '.join(header_parse_failures)
+    failures = '\n  '.join(str(failure) for failure in header_parse_failures)
     die(f"""\
 ERROR: All .py files other than __init__.py should start with the following header:
 
@@ -91,9 +91,8 @@ def check_header(filename: str, *, is_newly_created: bool = False) -> None:
     raise HeaderCheckFailure(f"{filename}: header does not match the expected header")
 
 
-def check_dir(directory: str, newly_created_files: Iterable[str]) -> List[str]:
-  """Returns list of files that fail the check."""
-  header_parse_failures = []
+def check_dir(directory: str, newly_created_files: Iterable[str]) -> List[HeaderCheckFailure]:
+  header_parse_failures: List[HeaderCheckFailure] = []
   for root, dirs, files in os.walk(directory):
     for f in files:
       if not f.endswith('.py') or os.path.basename(f) == '__init__.py':
@@ -102,7 +101,7 @@ def check_dir(directory: str, newly_created_files: Iterable[str]) -> List[str]:
       try:
         check_header(filename, is_newly_created=filename in newly_created_files)
       except HeaderCheckFailure as e:
-        header_parse_failures.append(str(e))
+        header_parse_failures.append(e)
   return header_parse_failures
 
 
