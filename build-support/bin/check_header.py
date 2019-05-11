@@ -9,6 +9,8 @@ import re
 from textwrap import dedent
 from typing import Iterable, List
 
+from common import die
+
 
 EXPECTED_HEADER = dedent("""\
   # coding=utf-8
@@ -35,7 +37,7 @@ def main() -> None:
     header_parse_failures.extend(check_dir(directory, args.files_added))
   if header_parse_failures:
     failures = '\n  '.join(header_parse_failures)
-    raise SystemExit(f"""\
+    die(f"""\
 ERROR: All .py files other than __init__.py should start with the following header:
 
 {EXPECTED_HEADER}

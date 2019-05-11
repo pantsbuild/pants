@@ -19,6 +19,9 @@ python_binary(
 python_binary(
   name = 'check_header',
   sources = 'check_header.py',
+  dependencies = [
+    ':common',
+  ],
   compatibility = ['CPython>=3.6'],
 )
 
