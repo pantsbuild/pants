@@ -15,9 +15,10 @@ def main() -> None:
   )
   rust_files = find_files("src/rust/engine", extension=".rs")
 
-  check_banned_import_if_snippet_present(
-    python_files,
-    snippet_regex=r"^from __future__ import",
+  python2_files = filter_files(python_files, snippet_regex=r"^from __future__ import")
+
+  check_banned_import(
+    python2_files,
     bad_import_regex=r"^import subprocess$",
     correct_import_message="`from pants.util.process_handler import subprocess`"
   )
@@ -41,32 +42,23 @@ def find_files(*directories: str, extension: str) -> List[str]:
   ]
 
 
-def check_banned_import(files: List[str], *, bad_import_regex: str, correct_import_message: str) -> None:
-  regex = re.compile(bad_import_regex)
-  bad_files: List[str] = []
+def filter_files(files: List[str], *, snippet_regex: str) -> List[str]:
+  regex = re.compile(snippet_regex)
+  result: List[str] = []
   for fp in files:
     with open(fp, 'r') as f:
       if any(re.search(regex, line) for line in f.readlines()):
-        bad_files.append(fp)
+        result.append(fp)
+  return result
+
+
+def check_banned_import(files: List[str], *, bad_import_regex: str, correct_import_message: str) -> None:
+  bad_files: List[str] = filter_files(files, snippet_regex=bad_import_regex)
   if bad_files:
     bad_files_str = "\n".join(bad_files)
     die(
       f"Found forbidden imports matching `{bad_import_regex}`. Instead, you should use "
       f"{correct_import_message}. Bad files:\n{bad_files_str}")
-
-
-def check_banned_import_if_snippet_present(
-  files: List[str], *, snippet_regex: str, bad_import_regex: str, correct_import_message: str
-) -> None:
-  regex = re.compile(snippet_regex)
-  filtered_files: List[str] = []
-  for fp in files:
-    with open(fp, 'r') as f:
-      if any(re.search(regex, line) for line in f.readlines()):
-        filtered_files.append(fp)
-  check_banned_import(
-    filtered_files, bad_import_regex=bad_import_regex, correct_import_message=correct_import_message
-  )
 
 
 if __name__ == "__main__":
