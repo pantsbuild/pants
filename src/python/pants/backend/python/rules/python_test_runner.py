@@ -54,6 +54,10 @@ def identify_needed_inits(sources):
 
 # TODO: Support deps
 # TODO: Support resources
+# TODO: this rule should not directly require SourceRootConfig. Arguably, we should
+# have a dedicated rule that will allow us to do something like this:
+# `yield Get(SourceRootDigest, Digest, digest)`. To see an example of what this might
+# look like, see https://github.com/pantsbuild/pants/blob/f25c5b9ec34cea8bae4e6ea47cbec5caefd81576/src/python/pants/rules/core/source_roots.py.
 @rule(PyTestResult, [TransitiveHydratedTarget, PyTest, SourceRootConfig])
 def run_python_test(transitive_hydrated_target, pytest, source_root_config):
   target_root = transitive_hydrated_target.root
