@@ -78,6 +78,27 @@ def targets_by_platform(targets, python_setup):
   return d
 
 
+def identify_missing_init_files(sources):
+  """Return the list of paths that would need to be added to ensure that every package has
+  an __init__.py. """
+  packages = set()
+  for source in sources:
+    if source.endswith('.py'):
+      pkg_dir = os.path.dirname(source)
+      if pkg_dir and pkg_dir not in packages:
+        package = ''
+        for component in pkg_dir.split(os.sep):
+          package = os.path.join(package, component)
+          packages.add(package)
+
+  missing_init_files = set()
+  for package in packages:
+    init_file = os.path.join(package, '__init__.py')
+    if init_file not in sources:
+      missing_init_files.add(init_file)
+  return missing_init_files
+
+
 def _create_source_dumper(builder, tgt):
   if type(tgt) == Files:
     # Loose `Files` as opposed to `Resources` or `PythonTarget`s have no (implied) package structure
@@ -305,31 +326,14 @@ class PexBuilderWrapper(object):
   def _prepare_inits(self):
     chroot = self._builder.chroot()
     sources = chroot.get('source') | chroot.get('resource')
-
-    packages = set()
-    for source in sources:
-      if source.endswith('.py'):
-        pkg_dir = os.path.dirname(source)
-        if pkg_dir and pkg_dir not in packages:
-          package = ''
-          for component in pkg_dir.split(os.sep):
-            package = os.path.join(package, component)
-            packages.add(package)
-
-    missing_pkg_files = []
-    for package in packages:
-      pkg_file = os.path.join(package, '__init__.py')
-      if pkg_file not in sources:
-        missing_pkg_files.append(pkg_file)
-
-    if missing_pkg_files:
+    missing_init_files = identify_missing_init_files(sources)
+    if missing_init_files:
       with temporary_file() as ns_package:
         ns_package.write(b'__import__("pkg_resources").declare_namespace(__name__)')
         ns_package.flush()
-        for missing_pkg_file in missing_pkg_files:
-          self._builder.add_source(ns_package.name, missing_pkg_file)
-
-    return missing_pkg_files
+        for missing_init_file in missing_init_files:
+          self._builder.add_source(ns_package.name, missing_init_file)
+    return missing_init_files
 
   def set_emit_warnings(self, emit_warnings):
     self._builder.info.emit_warnings = emit_warnings
