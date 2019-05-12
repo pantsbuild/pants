@@ -113,7 +113,7 @@ Errors:"""
 
   def test_no_py_namespace(self):
     no_py_namespace_target = self._target_dict()['no-py-namespace']
-    with self.assertRaises(PyThriftNamespaceClashCheck.NamespaceExtractionError) as cm:
+    with self.assertRaises(PyThriftNamespaceClashCheck.NamespaceParseError) as cm:
       self._run_tasks(target_roots=[no_py_namespace_target])
     self.assertEqual(str(cm.exception), """\
 Python namespaces could not be extracted from some thrift sources. Declaring a `namespace py` in
