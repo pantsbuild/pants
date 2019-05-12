@@ -47,11 +47,14 @@ class ExtractJava(JvmToolTaskMixin):
     cls.register_jvm_tool(register,
                           'kythe-java-extractor',
                           custom_rules=[
-                            # These need to remain unshaded so that Kythe can interact with the
-                            # javac embedded in its jar.
-                            Shader.exclude_package('com.sun', recursive=True),
                           ],
                           main=cls._KYTHE_JAVA_EXTRACTOR_MAIN)
+    cls.register_jvm_tool(register,
+                          'javac9',
+                          custom_rules=[
+                            Shader.exclude_package('com.sun', recursive=True),
+                          ],
+                          main='com.sun.tools.javac.main.Main')
 
   def execute(self):
     indexable_targets = IndexableJavaTargets.global_instance().get(self.context)
@@ -64,10 +67,9 @@ class ExtractJava(JvmToolTaskMixin):
         javac_args = self._get_javac_args_from_zinc_args(targets_to_zinc_args[vt.target])
         jvm_options = []
         if self.dist.version < Revision.lenient('9'):
-          # Kythe jars embed a copy of Java 9's com.sun.tools.javac and javax.tools, for use on
-          # JDK8. We must put these jars on the bootclasspath, ahead of any others, to ensure that
-          # we load the Java 9 versions, and not the runtime's versions.
-          jvm_options.append('-Xbootclasspath/p:{}'.format(':'.join(extractor_cp)))
+          # When run on JDK8, Kythe requires javac9 on the bootclasspath.
+          javac9_cp = self.tool_classpath('javac9')
+          jvm_options.append('-Xbootclasspath/p:{}'.format(':'.join(javac9_cp)))
         jvm_options.extend(self.get_options().jvm_options)
         jvm_options.extend([
           '-DKYTHE_CORPUS={}'.format(vt.target.address.spec),
@@ -77,7 +79,8 @@ class ExtractJava(JvmToolTaskMixin):
 
         result = self.dist.execute_java(
           classpath=extractor_cp, main=self._KYTHE_JAVA_EXTRACTOR_MAIN,
-          jvm_options=jvm_options, args=javac_args, workunit_name='kythe-extract')
+          jvm_options=jvm_options, args=javac_args, create_synthetic_jar=False,
+          workunit_factory=self.context.new_workunit, workunit_name='kythe-extract')
         if result != 0:
           raise TaskError('java {main} ... exited non-zero ({result})'.format(
             main=self._KYTHE_JAVA_EXTRACTOR_MAIN, result=result))

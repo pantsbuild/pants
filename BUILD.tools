@@ -40,6 +40,13 @@ jar_library(
   jars = [jar(org='kythe', name='java_indexer', rev='v0.0.30-toolchain001-26a6b03b-000')]
 )
 
+# Running Kythe on JDK8 requires a standalone javac 9 on the bootclasspath.
+# This jar is published to the same custom rpeo as the Kythe jars.
+jar_library(
+  name='javac9',
+  jars = [jar(org='java', name='javac', rev='9+181-r4173-1')]
+)
+
 # Runtime dependencies for the Avro Java generated code.
 avro_rev = '1.8.2'
 jar_library(

@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 
+from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.revision import Revision
@@ -18,6 +19,12 @@ class IndexJava(NailgunTask):
   cache_target_dirs = True
 
   _KYTHE_JAVA_INDEXER_MAIN = 'com.google.devtools.kythe.analyzers.java.JavaIndexer'
+
+  # The indexer unfortunately relies on some class-level global state (a JsonFormat.TypeRegistry,
+  # see com.google.devtools.kythe.util.JsonUtil), and throws when it's initialized more than once.
+  # An old fix for this (https://github.com/kythe/kythe/pull/117) no longer works. Until we can
+  # sort that out, we force this task to run Java in a subprocess.
+  execution_strategy = 'subprocess'
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -43,6 +50,12 @@ class IndexJava(NailgunTask):
     cls.register_jvm_tool(register,
                           'kythe-java-indexer',
                           main=cls._KYTHE_JAVA_INDEXER_MAIN)
+    cls.register_jvm_tool(register,
+                          'javac9',
+                          custom_rules=[
+                            Shader.exclude_package('com.sun', recursive=True),
+                          ],
+                          main='com.sun.tools.javac.main.Main')
 
   @staticmethod
   def _entries_file(vt):
@@ -56,10 +69,9 @@ class IndexJava(NailgunTask):
         indexer_cp = self.tool_classpath('kythe-java-indexer')
         jvm_options = []
         if self.dist.version < Revision.lenient('9'):
-          # Kythe jars embed a copy of Java 9's com.sun.tools.javac and javax.tools, for use on
-          # JDK8. We must put these jars on the bootclasspath, ahead of any others, to ensure that
-          # we load the Java 9 versions, and not the runtime's versions.
-          jvm_options.append('-Xbootclasspath/p:{}'.format(':'.join(indexer_cp)))
+          # When run on JDK8, Kythe requires javac9 on the bootclasspath.
+          javac9_cp = self.tool_classpath('javac9')
+          jvm_options.append('-Xbootclasspath/p:{}'.format(':'.join(javac9_cp)))
         jvm_options.extend(self.get_options().jvm_options)
 
         for vt in invalidation_check.invalid_vts:
