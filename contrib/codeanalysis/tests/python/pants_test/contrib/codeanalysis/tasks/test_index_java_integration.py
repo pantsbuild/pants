@@ -15,19 +15,19 @@ class TestIndexJavaIntegration(PantsRunIntegrationTest):
     # Very simple test that we can run the extractor and indexer on some
     # fairly trivial code without crashing, and that we produce something.
     args = ['index', 'examples/src/java/org/pantsbuild/example/hello::']
-    with self.temporary_workdir() as workdir:
+    with self.temporary_workdir(cleanup=False) as workdir:
       pants_run = self.run_pants_with_workdir(args, workdir)
       self.assert_success(pants_run)
       for tgt in ['examples.src.java.org.pantsbuild.example.hello.greet.greet',
                   'examples.src.java.org.pantsbuild.example.hello.main.main-bin',
                   'examples.src.java.org.pantsbuild.example.hello.simple.simple']:
-        kindex_glob = os.path.join(
-          workdir, 'index/kythe-java-extract/current/{}/current/*.kindex'.format(tgt))
-        kindex_files = glob.glob(kindex_glob)
-        self.assertEqual(1, len(kindex_files))
-        kindex_file = kindex_files[0]
-        self.assertTrue(os.path.isfile(kindex_file))
-        self.assertGreater(os.path.getsize(kindex_file), 200)  # Make sure it's not trivial.
+        kzip_glob = os.path.join(
+          workdir, 'index/kythe-java-extract/current/{}/current/*.kzip'.format(tgt))
+        kzip_files = glob.glob(kzip_glob)
+        self.assertEqual(1, len(kzip_files))
+        kzip_file = kzip_files[0]
+        self.assertTrue(os.path.isfile(kzip_file))
+        self.assertGreater(os.path.getsize(kzip_file), 200)  # Make sure it's not trivial.
 
         entries_path = os.path.join(
           workdir, 'index/kythe-java-index/current/{}/current/index.entries'.format(tgt))

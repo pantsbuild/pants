@@ -42,7 +42,7 @@ class IndexJava(NailgunTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(IndexJava, cls).prepare(options, round_manager)
-    round_manager.require_data('kindex_files')
+    round_manager.require_data('kzip_files')
 
   @classmethod
   def register_options(cls, register):
@@ -83,10 +83,10 @@ class IndexJava(NailgunTask):
 
   def _index(self, vt, indexer_cp, jvm_options):
     self.context.log.info('Kythe indexing {}'.format(vt.target.address.spec))
-    kindex_file = self.context.products.get_data('kindex_files').get(vt.target)
-    if not kindex_file:
-      raise TaskError('No .kindex file found for {}'.format(vt.target.address.spec))
-    args = [kindex_file, '--emit_jvm', 'semantic', '--out', self._entries_file(vt)]
+    kzip_file = self.context.products.get_data('kzip_files').get(vt.target)
+    if not kzip_file:
+      raise TaskError('No .kzip file found for {}'.format(vt.target.address.spec))
+    args = [kzip_file, '--emit_jvm', 'semantic', '--out', self._entries_file(vt)]
     result = self.runjava(classpath=indexer_cp, main=self._KYTHE_JAVA_INDEXER_MAIN,
                           jvm_options=jvm_options,
                           args=args, workunit_name='kythe-index',

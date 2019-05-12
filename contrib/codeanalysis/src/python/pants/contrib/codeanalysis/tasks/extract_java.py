@@ -33,8 +33,7 @@ class ExtractJava(JvmToolTaskMixin):
 
   @classmethod
   def product_types(cls):
-    # TODO: Support indexpack files?
-    return ['kindex_files']
+    return ['kzip_files']
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -88,10 +87,10 @@ class ExtractJava(JvmToolTaskMixin):
     for vt in invalidation_check.all_vts:
       created_files = os.listdir(vt.results_dir)
       if len(created_files) != 1:
-        raise TaskError('Expected a single .kindex file in {}. Got: {}.'.format(
+        raise TaskError('Expected a single .kzip file in {}. Got: {}.'.format(
           vt.results_dir, ', '.join(created_files) if created_files else 'none'))
-      kindex_files = self.context.products.get_data('kindex_files', dict)
-      kindex_files[vt.target] = os.path.join(vt.results_dir, created_files[0])
+      kzip_files = self.context.products.get_data('kzip_files', dict)
+      kzip_files[vt.target] = os.path.join(vt.results_dir, created_files[0])
 
   @staticmethod
   def _get_javac_args_from_zinc_args(zinc_args):
