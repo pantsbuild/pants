@@ -199,8 +199,8 @@ if [[ "${run_python:-false}" == "true" ]]; then
   fi
   start_travis_section "CoreTests" "Running core python tests${shard_desc}"
   (
-    ./pants.pex --tag='-integration' test.pytest \
-      --test-pytest-chroot --test-pytest-test-shard=${python_unit_shard} \
+    ./pants.pex --tag='-integration' --exclude-target-regexp='.*/testprojects/.*' \
+      test.pytest --test-pytest-chroot --test-pytest-test-shard=${python_unit_shard} \
       src/python:: tests/python:: contrib:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Core python test failure"
   end_travis_section
@@ -260,8 +260,10 @@ if [[ "${run_integration:-false}" == "true" ]]; then
   fi
   start_travis_section "IntegrationTests" "Running Pants Integration tests${shard_desc}"
   (
-    ./pants.pex --tag='+integration' test.pytest \
-      --test-pytest-test-shard=${python_intg_shard} \
+    # NB: We use test_testprojects_integration.py to specifically run the ones that
+    # we care about, and skip the rest.
+    ./pants.pex --tag='+integration' --exclude-target-regexp='.*/testprojects/.*' \
+      test.pytest --test-pytest-test-shard=${python_intg_shard} \
       src/python:: tests/python:: contrib:: -- ${PYTEST_PASSTHRU_ARGS}
   ) || die "Pants Integration test failure"
   end_travis_section
