@@ -22,6 +22,9 @@ Bugfixes
 * Fix dependency cycle with cache folder (#7693)
   `PR #7693 <https://github.com/pantsbuild/pants/pull/7693>`_
 
+* Add pantsd_invalidation_globs option into pants.ini (#7705)
+  `PR #7705 <https://github.com/pantsbuild/pants/pull/7705>`_
+
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
