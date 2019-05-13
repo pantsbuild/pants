@@ -395,7 +395,7 @@ impl Snapshot {
                     Self::directories_and_files(&extra_directories, &files),
                   )).to_boxed();
                 },
-                (true, trueP) => {
+                (true, true) => {
                   // Must be 0th index, because we've checked that we saw a matching directory, and no others.
                   let maybe_digest: Result<Digest, String> = dir.get_directories()[0]
                       .get_digest()

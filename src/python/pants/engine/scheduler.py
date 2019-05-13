@@ -113,7 +113,7 @@ class Scheduler(object):
       type_directory_digest=Digest,
       type_snapshot=Snapshot,
       type_merge_snapshots_request=MergedDirectories,
-      type_prefix_stripped_directory=DirectoryWithPrefixToStrip,
+      type_directory_with_prefix_to_strip=DirectoryWithPrefixToStrip,
       type_files_content=FilesContent,
       type_dir=Dir,
       type_file=File,
