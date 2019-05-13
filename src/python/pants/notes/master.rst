@@ -16,17 +16,20 @@ New Features
 Bugfixes
 ~~~~~~~~
 
-* Mark build-support Python files as Pants targets to lint build-support (#7633)
-  `PR #7633 <https://github.com/pantsbuild/pants/pull/7633>`_
-
 * Fix dependency cycle with cache folder (#7693)
   `PR #7693 <https://github.com/pantsbuild/pants/pull/7693>`_
+
+* Use global instance of PythonSetup for resolve requirements task base (#7672)
+  `PR #7672 <https://github.com/pantsbuild/pants/pull/7672>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 * Add pantsd_invalidation_globs option into pants.ini (#7705)
   `PR #7705 <https://github.com/pantsbuild/pants/pull/7705>`_
 
-Refactoring, Improvements, and Tooling
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Mark build-support Python files as Pants targets to lint build-support (#7633)
+  `PR #7633 <https://github.com/pantsbuild/pants/pull/7633>`_
 
 * Refactor `check_banned_imports.py` to allow Python 3 files to import `subprocess` (#7706)
   `PR #7706 <https://github.com/pantsbuild/pants/pull/7706>`_
@@ -60,9 +63,6 @@ Refactoring, Improvements, and Tooling
 
 * PosixFS no longer has its own threadpool (#7685)
   `PR #7685 <https://github.com/pantsbuild/pants/pull/7685>`_
-
-* Use global instance of PythonSetup for resolve requirements task base (#7672)
-  `PR #7672 <https://github.com/pantsbuild/pants/pull/7672>`_
 
 * Refactor v2 TestResult model to use enum (#7677)
   `PR #7677 <https://github.com/pantsbuild/pants/pull/7677>`_
