@@ -17,9 +17,9 @@ from types import GeneratorType
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
-from pants.engine.fs import (Digest, DirectoryToMaterialize, FileContent, FilesContent,
-                             MergedDirectories, PathGlobs, PathGlobsAndRoot,
-                             DirectoryWithPrefixToStrip, Snapshot, UrlToFetch)
+from pants.engine.fs import (Digest, DirectoryToMaterialize, DirectoryWithPrefixToStrip,
+                             FileContent, FilesContent, MergedDirectories, PathGlobs,
+                             PathGlobsAndRoot, Snapshot, UrlToFetch)
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.native import Function, TypeId
 from pants.engine.nodes import Return, Throw
