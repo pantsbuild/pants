@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from textwrap import dedent
 
 from pants.backend.codegen.thrift.python.py_thrift_namespace_clash_check import \
-  ClashingNamespaceError, NamespaceParseError, ValidatePythonThrift
+  NamespaceParseError, ValidatePythonThrift
 from pants.backend.codegen.thrift.python.py_thrift_namespace_clash_check import \
   rules as namespace_clash_rules
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
@@ -34,7 +34,7 @@ class PyThriftNamespaceClashCheckTest(ConsoleRuleTestBase):
     super(PyThriftNamespaceClashCheckTest, self).setUp()
 
     # ???
-    self.create_workdir_file('src/py-thrift/with-header.thrift', dedent("""\
+    self.create_file('src/py-thrift/with-header.thrift', dedent("""\
       // Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
       // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
@@ -50,7 +50,7 @@ class PyThriftNamespaceClashCheckTest(ConsoleRuleTestBase):
       )
       """))
 
-    self.create_workdir_file('src/py-thrift/bad.thrift', dedent("""\
+    self.create_file('src/py-thrift/bad.thrift', dedent("""\
       #@namespace scala org.pantsbuild.whatever
       namespace java org.pantsbuild.whatever
 
@@ -150,15 +150,17 @@ same python namespace. This is an upstream WONTFIX in thrift, see:
 Errors:"""
 
   def test_no_py_namespace(self):
+    self.maxDiff = None
     self.assert_console_raises_with_message(
       NamespaceParseError,
-      exc_message='?',
       execution_error=True,
-      args=['src/py-thrift:no-py-namespace'])
+      args=['src/py-thrift:no-py-namespace'],
+      exc_message=dedent("""\
+        no python namespace (matching the pattern '^namespace\s+py\s+([^\s]+)$') found in thrift source src/py-thrift/bad.thrift from target src/py-thrift:no-py-namespace!"""))
 
   def test_clashing_namespace_same_target(self):
     clashing_same_target = self._target_dict()['clashing-namespace']
-    with self.assertRaisesWithMessage(ClashingNamespaceError, """{}
+    with self.assertRaisesWithMessage(Exception, """{}
 org.pantsbuild.namespace: [(src/py-thrift:clashing-namespace, src/py-thrift/a.thrift), (src/py-thrift:clashing-namespace, src/py-thrift/b.thrift)]
 """.format(self._exception_prelude)):
       self._run_tasks(target_roots=[clashing_same_target])
@@ -166,7 +168,7 @@ org.pantsbuild.namespace: [(src/py-thrift:clashing-namespace, src/py-thrift/a.th
   def test_clashing_namespace_multiple_targets(self):
     target_dict = self._target_dict()
     clashing_targets = [target_dict[k] for k in ['clashingA', 'clashingB']]
-    with self.assertRaisesWithMessage(ClashingNamespaceError, """{}
+    with self.assertRaisesWithMessage(Exception, """{}
 org.pantsbuild.namespace: [(src/py-thrift-clashing:clashingA, src/py-thrift-clashing/a.thrift), (src/py-thrift-clashing:clashingB, src/py-thrift-clashing/b.thrift)]
 """.format(self._exception_prelude)):
       self._run_tasks(target_roots=clashing_targets)

@@ -130,7 +130,6 @@ def parse_py_thrift_namespace(parse_namespace_request):
 
 @rule(ParsedNamespaces, [HydratedTarget])
 def extract_py_thrift_namespaces(hydrated_target):
-  import pdb; pdb.set_trace()
   if hydrated_target.adaptor.type_alias == PythonThriftLibrary.alias():
     sources_snapshot = hydrated_target.adaptor.sources.snapshot
     files_content = yield Get(FilesContent, Digest, sources_snapshot.directory_digest)
