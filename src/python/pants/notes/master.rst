@@ -39,29 +39,21 @@ Refactoring, Improvements, and Tooling
 
 *  Convert `check_banned_imports.sh` to Python to workaround Bash array issues and for less duplication (#7702)
   `PR #7702 <https://github.com/pantsbuild/pants/pull/7702>`_
->`_ttps://github.com/pantsbuild/pants/pull/7698#discussion_r282947998.
-  `PR #6747 <https://github.com/pantsbuild/pants/pull/6747>`_
 
 * Output stderr in V2 test rule (#7694)
-  `Issue #7388 <https://github.com/pantsbuild/pants/issues/7388>`_
   `PR #7694 <https://github.com/pantsbuild/pants/pull/7694>`_
-  `PR #7676 <https://github.com/pantsbuild/pants/pull/7676>`_
 
 * Remove now-unused Path type (#7701)
   `PR #7701 <https://github.com/pantsbuild/pants/pull/7701>`_
 
 * Improve V2 `./pants test` output to make it easier to parse results of multiple targets (#7676)
-  `Issue #7388 <https://github.com/pantsbuild/pants/issues/7388>`_
   `PR #7676 <https://github.com/pantsbuild/pants/pull/7676>`_
 
 * Allow V2 console rules to use colors (#7689)
   `PR #7689 <https://github.com/pantsbuild/pants/pull/7689>`_
->`_ttps://github.com/pantsbuild/pants/pull/7676.
 
 * Refactor `PythonSetup.interpreter_or_constraints()` to take a `compatibility` value rather than a `PythonTarget`(#7691)
   `PR #7691 <https://github.com/pantsbuild/pants/pull/7691>`_
-  `PR #files#diff-04a0048c70898e46a42c73225c47b906R58 <https://github.com/pantsbuild/pants/pull/7679/files#diff-04a0048c70898e46a42c73225c47b906R58>`_
-  `PR #7680 <https://github.com/pantsbuild/pants/pull/7680>`_
 
 * Remove ResettablePool (#7688)
   `PR #7688 <https://github.com/pantsbuild/pants/pull/7688>`_
