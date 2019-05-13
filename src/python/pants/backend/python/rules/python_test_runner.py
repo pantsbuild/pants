@@ -12,6 +12,7 @@ from future.utils import text_type
 
 from pants.backend.python.subsystems.pex_build_util import identify_missing_init_files
 from pants.backend.python.subsystems.pytest import PyTest
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.engine.fs import (Digest, FilesContent, MergedDirectories, PrefixStrippedDirectory,
                              Snapshot, UrlToFetch)
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
@@ -30,14 +31,28 @@ class PyTestResult(TestResult):
   pass
 
 
+def parse_interpreter_constraints(python_setup, python_target_adaptors):
+  constraints = {
+    constraint
+    for target_adaptor in python_target_adaptors
+    for constraint in python_setup.compatibility_or_constraints(
+      getattr(target_adaptor, 'compatibility', None)
+    )
+  }
+  constraints_args = []
+  for constraint in sorted(constraints):
+    constraints_args.extend(["--interpreter-constraint", constraint])
+  return constraints_args
+
+
 # TODO: Support deps
 # TODO: Support resources
 # TODO: this rule should not directly require SourceRootConfig. Arguably, we should
 # have a dedicated rule that will allow us to do something like this:
 # `yield Get(SourceRootDigest, Digest, digest)`. To see an example of what this might
 # look like, see https://github.com/pantsbuild/pants/blob/f25c5b9ec34cea8bae4e6ea47cbec5caefd81576/src/python/pants/rules/core/source_roots.py.
-@rule(PyTestResult, [TransitiveHydratedTarget, PyTest, SourceRootConfig])
-def run_python_test(transitive_hydrated_target, pytest, source_root_config):
+@rule(PyTestResult, [TransitiveHydratedTarget, PyTest, PythonSetup, SourceRootConfig])
+def run_python_test(transitive_hydrated_target, pytest, python_setup, source_root_config):
   target_root = transitive_hydrated_target.root
 
   # TODO: Inject versions and digests here through some option, rather than hard-coding it.
@@ -58,9 +73,11 @@ def run_python_test(transitive_hydrated_target, pytest, source_root_config):
       for py_req in maybe_python_req_lib.adaptor.requirements:
         all_requirements.append(str(py_req.requirement))
 
-  # TODO: This should be configurable, both with interpreter constraints, and for remote execution.
   # TODO(#7061): This str() can be removed after we drop py2!
   python_binary = text_type(sys.executable)
+  interpreter_constraint_args = parse_interpreter_constraints(
+    python_setup, python_target_adaptors=[target.adaptor for target in all_targets]
+  )
 
   # TODO: This is non-hermetic because the requirements will be resolved on the fly by
   # pex27, where it should be hermetically provided in some way.
@@ -68,20 +85,19 @@ def run_python_test(transitive_hydrated_target, pytest, source_root_config):
   requirements_pex_argv = [
     python_binary,
     './{}'.format(pex_snapshot.files[0]),
-    # TODO(#7061): This text_type() can be removed after we drop py2!
-    '--python', text_type(python_binary),
     '-e', 'pytest:main',
     '-o', output_pytest_requirements_pex_filename,
-    # Sort all user requirement strings to increase the chance of cache hits across invocations.
-  ] + [
+  ] + interpreter_constraint_args + [
     # TODO(#7061): This text_type() wrapping can be removed after we drop py2!
     text_type(req)
+    # Sort all user requirement strings to increase the chance of cache hits across invocations.
     for req in sorted(
         list(pytest.get_requirement_strings())
         + list(all_requirements))
   ]
   requirements_pex_request = ExecuteProcessRequest(
     argv=tuple(requirements_pex_argv),
+    env={'PATH': os.pathsep.join(python_setup.interpreter_search_paths)},
     input_files=pex_snapshot.directory_digest,
     description='Resolve requirements for {}'.format(target_root.address.reference()),
     output_files=(output_pytest_requirements_pex_filename,),
@@ -143,6 +159,7 @@ def run_python_test(transitive_hydrated_target, pytest, source_root_config):
 
   request = ExecuteProcessRequest(
     argv=(python_binary, './{}'.format(output_pytest_requirements_pex_filename)),
+    env={'PATH': os.pathsep.join(python_setup.interpreter_search_paths)},
     input_files=merged_input_files,
     description='Run pytest for {}'.format(target_root.address.reference()),
   )
@@ -161,5 +178,6 @@ def rules():
   return [
       run_python_test,
       optionable_rule(PyTest),
+      optionable_rule(PythonSetup),
       optionable_rule(SourceRootConfig),
     ]

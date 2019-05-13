@@ -7,8 +7,11 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import multiprocessing
 import os
+import sys
 import time
+import traceback
 from builtins import object, open, str, zip
+from textwrap import dedent
 from types import GeneratorType
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
@@ -508,7 +511,56 @@ class SchedulerSession(object):
     :param list subjects: A list of subjects or Params instances for the request.
     :returns: A list of the requested products, with length match len(subjects).
     """
-    request = self.execution_request([product], subjects)
+    request = None
+    raised_exception = None
+    try:
+      request = self.execution_request([product], subjects)
+    except:                     # noqa: T803
+      # If there are any exceptions during CFFI extern method calls, we want to return an error with
+      # them and whatever failure results from it. This typically results from unhashable types.
+      if self._scheduler._native.cffi_extern_method_runtime_exceptions():
+        raised_exception = sys.exc_info()[0:3]
+      else:
+        # Otherwise, this is likely an exception coming from somewhere else, and we don't want to
+        # swallow that, so re-raise.
+        raise
+
+    # We still want to raise whenever there are any exceptions in any CFFI extern methods, even if
+    # that didn't lead to an exception in generating the execution request for some reason, so we
+    # check the extern exceptions list again.
+    internal_errors = self._scheduler._native.cffi_extern_method_runtime_exceptions()
+    if internal_errors:
+      error_tracebacks = [
+        ''.join(
+          traceback.format_exception(etype=error_info.exc_type,
+                                     value=error_info.exc_value,
+                                     tb=error_info.traceback))
+        for error_info in internal_errors
+      ]
+
+      raised_exception_message = None
+      if raised_exception:
+        exc_type, exc_value, tb = raised_exception
+        raised_exception_message = dedent("""\
+          The engine execution request raised this error, which is probably due to the errors in the
+          CFFI extern methods listed above, as CFFI externs return None upon error:
+          {}
+        """).format(''.join(traceback.format_exception(etype=exc_type, value=exc_value, tb=tb)))
+
+      # Zero out the errors raised in CFFI callbacks in case this one is caught and pants doesn't
+      # exit.
+      self._scheduler._native.reset_cffi_extern_method_runtime_exceptions()
+
+      raise ExecutionError(dedent("""\
+        {error_description} raised in CFFI extern methods:
+        {joined_tracebacks}{raised_exception_message}
+        """).format(
+          error_description=pluralize(len(internal_errors), 'Exception'),
+          joined_tracebacks='\n+++++++++\n'.join(formatted_tb for formatted_tb in error_tracebacks),
+          raised_exception_message=(
+            '\n\n{}'.format(raised_exception_message) if raised_exception_message else '')
+        ))
+
     returns, throws = self.execute(request)
 
     # Throw handling.

@@ -203,6 +203,7 @@ python_tests(
   coverage=['pants.engine.nodes', 'pants.engine.scheduler'],
   dependencies=[
     '3rdparty/python:future',
+    '3rdparty/python:mock',
     ':util',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/build_graph',
