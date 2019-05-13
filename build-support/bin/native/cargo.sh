@@ -2,7 +2,7 @@
 
 set -e
 
-REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)
 
 export PY=${PY:-python}
 
@@ -10,6 +10,7 @@ export PY=${PY:-python}
 # + CARGO_HOME: The CARGO_HOME of the Pants-controlled rust toolchain.
 # Exposes:
 # + bootstrap_rust: Bootstraps a Pants-controlled rust toolchain and associated extras.
+# shellcheck source=build-support/bin/native/bootstrap_rust.sh
 source "${REPO_ROOT}/build-support/bin/native/bootstrap_rust.sh"
 
 bootstrap_rust >&2
@@ -25,7 +26,8 @@ goroot="$("${download_binary}" "go" "1.7.3" "go.tar.gz")/go"
 protoc="$("${download_binary}" "protobuf" "3.4.1" "protoc")"
 
 export GOROOT="${goroot}"
-export PATH="${cmakeroot}/bin:${goroot}/bin:${CARGO_HOME}/bin:$(dirname "${protoc}"):${PATH}"
+PATH="${cmakeroot}/bin:${goroot}/bin:${CARGO_HOME}/bin:$(dirname "${protoc}"):${PATH}"
+export PATH
 export PROTOC="${protoc}"
 
 cargo_bin="${CARGO_HOME}/bin/cargo"
