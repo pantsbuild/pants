@@ -58,7 +58,14 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
   digest = Digest('61bb79384db0da8c844678440bd368bcbfac17bbdb865721ad3f9cb0ab29b629', 1826945)
   pex_snapshot = yield Get(Snapshot, UrlToFetch(url, digest))
 
-  all_targets = [target_root] + [dep.root for dep in transitive_hydrated_target.dependencies]
+  all_targets = set()
+  def add_transitive_deps(hydrated_target):
+    all_targets.add(hydrated_target.root)
+    for dep in hydrated_target.dependencies:
+      add_transitive_deps(dep)
+
+  add_transitive_deps(transitive_hydrated_target)
+
 
   # Produce a pex containing pytest and all transitive 3rdparty requirements.
   all_requirements = []
