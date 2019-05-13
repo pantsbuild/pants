@@ -10,12 +10,19 @@ python_library(
 python_binary(
   name = 'check_banned_imports',
   sources = 'check_banned_imports.py',
+  dependencies = [
+    ':common',
+  ],
   compatibility = ['CPython>=3.6'],
 )
 
 python_binary(
-  name = 'check_header_helper',
-  sources = 'check_header_helper.py',
+  name = 'check_header',
+  sources = 'check_header.py',
+  dependencies = [
+    ':common',
+  ],
+  compatibility = ['CPython>=3.6'],
 )
 
 python_binary(
