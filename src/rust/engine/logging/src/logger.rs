@@ -226,7 +226,7 @@ pub enum Destination {
 }
 
 thread_local! {
-  pub static THREAD_DESTINATION: Mutex<Destination> = Mutex::new(Destination::Stderr.into())
+  pub static THREAD_DESTINATION: Mutex<Destination> = Mutex::new(Destination::Stderr)
 }
 
 task_local! {
