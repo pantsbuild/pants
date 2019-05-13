@@ -87,7 +87,7 @@ impl Tasks {
       },
       Intrinsic {
         product: types.directory_digest,
-        input: types.prefix_stripped_directory,
+        input: types.directory_with_prefix_to_strip,
       },
       Intrinsic {
         product: types.process_result,

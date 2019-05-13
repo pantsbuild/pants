@@ -13,9 +13,9 @@ from contextlib import contextmanager
 
 from future.utils import PY2, text_type
 
-from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, DirectoryToMaterialize, FilesContent,
-  MergedDirectories, PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch,
-  create_fs_rules, PrefixStrippedDirectory)
+from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, DirectoryToMaterialize,
+                             DirectoryWithPrefixToStrip, FilesContent,MergedDirectories, PathGlobs,
+                             PathGlobsAndRoot, Snapshot, UrlToFetch, create_fs_rules)
 from pants.engine.scheduler import ExecutionError
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.collections import assert_single_element
@@ -415,14 +415,14 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       # Strip empty prefix:
       zero_prefix_stripped_digest = assert_single_element(self.scheduler.product_request(
         Digest,
-        [PrefixStrippedDirectory(snapshot.directory_digest, text_type(""))],
+        [DirectoryWithPrefixToStrip(snapshot.directory_digest, text_type(""))],
       ))
       self.assertEquals(snapshot.directory_digest, zero_prefix_stripped_digest)
 
       # Strip a non-empty prefix shared by all files:
       stripped_digest = assert_single_element(self.scheduler.product_request(
         Digest,
-        [PrefixStrippedDirectory(snapshot.directory_digest, text_type("characters/dark_tower"))],
+        [DirectoryWithPrefixToStrip(snapshot.directory_digest, text_type("characters/dark_tower"))],
       ))
       self.assertEquals(
         stripped_digest,
@@ -441,7 +441,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       with self.assertRaisesWithMessageContaining(Exception, "Cannot strip prefix characters/dark_tower from root directory Digest(Fingerprint<28c47f77867f0c8d577d2ada2f06b03fc8e5ef2d780e8942713b26c5e3f434b8>, 243) - root directory contained non-matching directory named: books and file named: index"):
         self.scheduler.product_request(
           Digest,
-          [PrefixStrippedDirectory(snapshot_with_extra_files.directory_digest, text_type("characters/dark_tower"))]
+          [DirectoryWithPrefixToStrip(snapshot_with_extra_files.directory_digest, text_type("characters/dark_tower"))]
         )
 
   def test_glob_match_error(self):

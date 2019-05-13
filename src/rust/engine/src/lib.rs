@@ -233,7 +233,7 @@ pub extern "C" fn scheduler_create(
     directory_digest: type_directory_digest,
     snapshot: type_snapshot,
     merged_directories: type_merge_directories_request,
-    prefix_stripped_directory: type_prefix_stripped_directory,
+    directory_with_prefix_to_strip: type_prefix_stripped_directory,
     files_content: type_files_content,
     dir: type_dir,
     file: type_file,
