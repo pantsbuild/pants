@@ -15,10 +15,10 @@ def main() -> None:
   )
   rust_files = find_files("src/rust/engine", extension=".rs")
 
-  python2_files = filter_files(python_files, snippet_regex=r"^from __future__ import")
+  python2_compatible_files = filter_files(python_files, snippet_regex=r"^from __future__ import")
 
   check_banned_import(
-    python2_files,
+    python2_compatible_files,
     bad_import_regex=r"^import subprocess$",
     correct_import_message="`from pants.util.process_handler import subprocess`"
   )
@@ -43,6 +43,7 @@ def find_files(*directories: str, extension: str) -> List[str]:
 
 
 def filter_files(files: List[str], *, snippet_regex: str) -> List[str]:
+  """Only return files that contain the snippet_regex."""
   regex = re.compile(snippet_regex)
   result: List[str] = []
   for fp in files:
