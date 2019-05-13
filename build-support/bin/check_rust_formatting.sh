@@ -9,7 +9,7 @@ function usage() {
   echo " -h    print out this help message"
   echo " -f    instead of erroring on files with bad formatting, fix those files"
 
-  if [[ -n "$@" ]]; then
+  if [[ -n "$*" ]]; then
     echo
     echo "$@"
   fi

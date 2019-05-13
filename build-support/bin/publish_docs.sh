@@ -12,6 +12,7 @@ VIEW_PUBLISH_URL="${VIEW_PUBLISH_URL:-${PANTS_SITE_URL}}"
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd "$(git rev-parse --show-toplevel)" && pwd)
 
+# shellcheck source=build-support/common.sh
 source "${REPO_ROOT}/build-support/common.sh"
 
 PANTS_EXE="${REPO_ROOT}/pants"
@@ -85,7 +86,7 @@ if [[ -z "${local_dir}" ]]; then
   do_open "${REPO_ROOT}/dist/docsite/index.html"
 else
   find "${REPO_ROOT}/dist/docsite" -mindepth 1 -maxdepth 1 \
-    | xargs -I '{}' cp -r '{}' "${local_dir}"
+    -exec -I '{}' cp -r '{}' "${local_dir}" +
   do_open "${local_dir}/index.html"
 fi
 
