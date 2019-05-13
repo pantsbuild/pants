@@ -13,6 +13,10 @@ class PythonThriftLibrary(PythonTarget):
   :API: public
   """
 
+  @classmethod
+  def alias(cls):
+    return 'python_thrift_library'
+
   def __init__(self, **kwargs):
     """
     :param sources: thrift source files (If more than one tries to use the same

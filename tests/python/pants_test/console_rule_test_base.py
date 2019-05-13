@@ -6,12 +6,16 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from io import StringIO
 
+from builtins import str
+
 from pants.engine.console import Console
 from pants.engine.goal import Goal
+from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Params
 from pants.init.options_initializer import BuildConfigInitializer
 from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.util.collections import assert_single_element
 from pants.util.meta import classproperty
 from pants_test.test_base import TestBase
 
@@ -123,12 +127,24 @@ class ConsoleRuleTestBase(TestBase):
     """
     self.assertEqual(list(output), self.execute_rule(**kwargs).splitlines())
 
-  def assert_console_raises(self, exception, **kwargs):
+  def assert_console_raises(self, exception, execution_error=False, **kwargs):
     """Verifies the expected exception is raised by the console task under test.
 
     :API: public
 
     **kwargs: additional kwargs are passed to execute_rule.
     """
-    with self.assertRaises(exception):
-      self.execute_rule(**kwargs)
+    if execution_error:
+      with self.assertRaises(ExecutionError) as cm:
+        self.execute_rule(**kwargs)
+      inner = assert_single_element(cm.exception.wrapped_exceptions)
+      self.assertTrue(isinstance(inner, exception), "inner was: {}".format(inner))
+      return inner
+    else:
+      with self.assertRaises(exception) as cm:
+        self.execute_rule(**kwargs)
+      return cm.exception
+
+  def assert_console_raises_with_message(self, exc_class, exc_message, **kwargs):
+    exc = self.assert_console_raises(exc_class, **kwargs)
+    self.assertEqual(str(exc), exc_message)
