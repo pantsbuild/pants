@@ -20,6 +20,7 @@ crate-type = ["cdylib"]
 build_utils = { path = "build_utils" }
 cbindgen = "0.6.7"
 cc = "1.0"
+walkdir = "2"
 
 [workspace]
 # These are the packages which are built/tested when the --all flag is passed to cargo.

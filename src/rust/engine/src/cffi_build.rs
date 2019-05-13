@@ -119,6 +119,7 @@ fn main() -> Result<(), CffiBuildError> {
   // Generate the scheduler.h bindings from the rust code in this crate.
   let bindings_config_path = Path::new("cbindgen.toml");
   mark_for_change_detection(&bindings_config_path);
+  mark_for_change_detection(Path::new("src"));
 
   let scheduler_file_path = Path::new("src/cffi/scheduler.h");
   let crate_dir = env::var("CARGO_MANIFEST_DIR")?;
@@ -134,13 +135,7 @@ fn main() -> Result<(), CffiBuildError> {
   // changed and avoid rebuilding the engine crate if we are just iterating on the implementations.
   mark_for_change_detection(&build_root.join("src/python/pants/engine/native.py"));
 
-  // N.B. The filename of this source code - at generation time - must line up 1:1 with the
-  // python import name, as python keys the initialization function name off of the import name.
   let cffi_dir = Path::new("src/cffi");
-  let c_path = cffi_dir.join("native_engine.c");
-  mark_for_change_detection(&c_path);
-  let env_script_path = cffi_dir.join("native_engine.cflags");
-  mark_for_change_detection(&env_script_path);
 
   let result = Command::new(&cffi_bootstrapper)
     .arg(cffi_dir)
@@ -154,6 +149,13 @@ fn main() -> Result<(), CffiBuildError> {
     );
     exit(exit_code.unwrap_or(1));
   }
+
+  // N.B. The filename of this source code - at generation time - must line up 1:1 with the
+  // python import name, as python keys the initialization function name off of the import name.
+  let c_path = cffi_dir.join("native_engine.c");
+  mark_for_change_detection(&c_path);
+  let env_script_path = cffi_dir.join("native_engine.cflags");
+  mark_for_change_detection(&env_script_path);
 
   // Now compile the cffi c sources.
   let mut config = cc::Build::new();
@@ -175,7 +177,15 @@ fn main() -> Result<(), CffiBuildError> {
 fn mark_for_change_detection(path: &Path) {
   // Restrict re-compilation check to just our input files.
   // See: http://doc.crates.io/build-script.html#outputs-of-the-build-script
-  println!("cargo:rerun-if-changed={}", path.to_str().unwrap());
+  if !path.exists() {
+    panic!(
+      "Cannot mark non-existing path for change detection: {}",
+      path.display()
+    );
+  }
+  for file in walkdir::WalkDir::new(path) {
+    println!("cargo:rerun-if-changed={}", file.unwrap().path().display());
+  }
 }
 
 fn make_flags(env_script_path: &Path) -> Result<Vec<String>, io::Error> {

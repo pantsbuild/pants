@@ -5,12 +5,16 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
+import sys
 from builtins import object, str
 from contextlib import contextmanager
 from textwrap import dedent
 
+import mock
+
+from pants.engine.native import Native
 from pants.engine.rules import RootRule, UnionRule, rule, union
-from pants.engine.scheduler import ExecutionError
+from pants.engine.scheduler import ExecutionError, SchedulerSession
 from pants.engine.selectors import Get, Params
 from pants.util.objects import datatype
 from pants_test.engine.util import assert_equal_with_printing, remove_locations_from_traceback
@@ -122,6 +126,18 @@ def c_unhashable(_):
   yield C()
 
 
+class CollectionType(datatype(['items'])):
+  pass
+
+
+@rule(C, [CollectionType])
+def c_unhashable_datatype(_):
+  # This `yield` would use the `nested_raise` rule, but it won't get to the point of raising since
+  # the hashability check will fail.
+  _ = yield Get(A, B, list()) # noqa: F841
+  yield C()
+
+
 @contextmanager
 def assert_execution_error(test_case, expected_msg):
   with test_case.assertRaises(ExecutionError) as cm:
@@ -208,8 +224,10 @@ class SchedulerWithNestedRaiseTest(TestBase):
     return super(SchedulerWithNestedRaiseTest, cls).rules() + [
       RootRule(B),
       RootRule(TypeCheckFailWrapper),
+      RootRule(CollectionType),
       a_typecheck_fail_test,
       c_unhashable,
+      c_unhashable_datatype,
       nested_raise,
     ]
 
@@ -224,15 +242,78 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
 
   def test_unhashable_failure(self):
     """Test that unhashable Get(...) params result in a structured error."""
-    expected_msg = """TypeError: unhashable type: 'list'"""
-    with assert_execution_error(self, expected_msg):
-      self.scheduler.product_request(C, [Params(TypeCheckFailWrapper(A()))])
+
+    def assert_has_cffi_extern_traceback_header(exc_str):
+      self.assertTrue(exc_str.startswith(dedent("""\
+        1 Exception raised in CFFI extern methods:
+        Traceback (most recent call last):
+        """)), "exc_str was: {}".format(exc_str))
+
+    def assert_has_end_of_cffi_extern_error_traceback(exc_str):
+      self.assertIn(dedent("""\
+        Traceback (most recent call last):
+          File LOCATION-INFO, in extern_identify
+            return c.identify(obj)
+          File LOCATION-INFO, in identify
+            hash_ = hash(obj)
+          File LOCATION-INFO, in __hash__
+            .format(self, type(self).__name__, field_name, e))
+        TypeError: For datatype object CollectionType(items=[1, 2, 3]) (type 'CollectionType'): in field 'items': unhashable type: 'list'
+        """), exc_str, "exc_str was: {}".format(exc_str))
+
+    resulting_engine_error = "Exception: No installed @rules can satisfy Select(C) for input Params(Any).\n\n\n"
+
+    # Test that the error contains the full traceback from within the CFFI context as well
+    # (mentioning which specific extern method ended up raising the exception).
+    with self.assertRaises(ExecutionError) as cm:
+      self.scheduler.product_request(C, [Params(CollectionType([1, 2, 3]))])
+    exc_str = remove_locations_from_traceback(str(cm.exception))
+    # TODO: convert these manual self.assertTrue() conditionals to a self.assertStartsWith() method
+    # in TestBase!
+    assert_has_cffi_extern_traceback_header(exc_str)
+    assert_has_end_of_cffi_extern_error_traceback(exc_str)
+    self.assertIn(dedent("""\
+      The engine execution request raised this error, which is probably due to the errors in the
+      CFFI extern methods listed above, as CFFI externs return None upon error:
+      """), exc_str)
+    self.assertTrue(exc_str.endswith(resulting_engine_error), "exc_str was: {}".format(exc_str))
+
+    PATCH_OPTS = dict(autospec=True, spec_set=True)
+    def create_cffi_exception():
+      try:
+        raise Exception('test cffi exception')
+      except:                   # noqa: T803
+        return Native.CFFIExternMethodRuntimeErrorInfo(*sys.exc_info()[0:3])
+
+    # Test that CFFI extern method errors result in an ExecutionError, even if .execution_request()
+    # succeeds.
+    with self.assertRaises(ExecutionError) as cm:
+      with mock.patch.object(SchedulerSession, 'execution_request',
+                             **PATCH_OPTS) as mock_exe_request:
+        with mock.patch.object(Native, 'cffi_extern_method_runtime_exceptions',
+                               **PATCH_OPTS) as mock_cffi_exceptions:
+          mock_exe_request.return_value = None
+          mock_cffi_exceptions.return_value = [create_cffi_exception()]
+          self.scheduler.product_request(C, [Params(CollectionType([1, 2, 3]))])
+    exc_str = remove_locations_from_traceback(str(cm.exception))
+    assert_has_cffi_extern_traceback_header(exc_str)
+    self.assertIn("Exception: test cffi exception", exc_str)
+    self.assertNotIn(resulting_engine_error, exc_str)
+
+    # Test that an error in the .execution_request() method is propagated directly, even if there
+    # are no CFFI extern methods.
+    class TestError(Exception): pass
+    with self.assertRaisesWithMessage(TestError, 'non-CFFI error'):
+      with mock.patch.object(SchedulerSession, 'execution_request',
+                             **PATCH_OPTS) as mock_exe_request:
+        mock_exe_request.side_effect = TestError('non-CFFI error')
+        self.scheduler.product_request(C, [Params(CollectionType([1, 2, 3]))])
 
   def test_trace_includes_rule_exception_traceback(self):
     # Execute a request that will trigger the nested raise, and then directly inspect its trace.
     request = self.scheduler.execution_request([A], [B()])
     self.scheduler.execute(request)
-    
+
     trace = remove_locations_from_traceback('\n'.join(self.scheduler.trace(request)))
     assert_equal_with_printing(self, dedent('''
                      Computing Select(<pants_test.engine.test_scheduler.B object at 0xEEEEEEEEE>, A)
