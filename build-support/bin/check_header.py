@@ -12,12 +12,18 @@ from typing import Iterable, List
 from common import die
 
 
-EXPECTED_HEADER = dedent("""\
+EXPECTED_HEADER_PY2 = dedent("""\
   # coding=utf-8
   # Copyright YYYY Pants project contributors (see CONTRIBUTORS.md).
   # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
   from __future__ import absolute_import, division, print_function, unicode_literals
+
+  """)
+
+EXPECTED_HEADER_PY3 = dedent("""\
+  # Copyright YYYY Pants project contributors (see CONTRIBUTORS.md).
+  # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
   """)
 
@@ -38,9 +44,12 @@ def main() -> None:
   if header_parse_failures:
     failures = '\n  '.join(str(failure) for failure in header_parse_failures)
     die(f"""\
-ERROR: All .py files other than __init__.py should start with the following header:
+ERROR: All .py files other than __init__.py should start with the header:
+{EXPECTED_HEADER_PY3}
 
-{EXPECTED_HEADER}
+If they must support Python 2 still, they should start with the header:
+{EXPECTED_HEADER_PY2}
+
 ---
 
 The following {len(header_parse_failures)} file(s) do not conform:
@@ -72,11 +81,15 @@ def check_header(filename: str, *, is_newly_created: bool = False) -> None:
   first_lines.pop(0 if first_lines[0].startswith("#!") else - 1)
   # Check that the first lines even exists. Note that first_lines will always have an entry
   # for each line, even if the file is completely empty.
-  if len([line for line in first_lines if line]) < 4:
+  if len([line for line in first_lines if line]) < 3:
     raise HeaderCheckFailure(f"{filename}: missing the expected header")
+  is_py3_file = all("from __future__" not in line for line in first_lines)
+  if is_py3_file:
+    first_lines = first_lines[:3]
   # Check copyright year. If it's a new file, it should be the current year. Else, it should
   # be within the current century.
-  copyright_line = first_lines[1]
+  copyright_line_index = 0 if is_py3_file else 1
+  copyright_line = first_lines[copyright_line_index]
   year = copyright_line[12:16]
   if is_newly_created and year != _current_year:
     raise HeaderCheckFailure(f'{filename}: copyright year must be {_current_year} (was {year})')
@@ -86,8 +99,8 @@ def check_header(filename: str, *, is_newly_created: bool = False) -> None:
       f"current year is {_current_year}"
     )
   # Replace copyright_line with sanitized year.
-  first_lines[1] = "# Copyright YYYY" + copyright_line[16:]
-  if "".join(first_lines) != EXPECTED_HEADER:
+  first_lines[copyright_line_index] = "# Copyright YYYY" + copyright_line[16:]
+  if "".join(first_lines) not in (EXPECTED_HEADER_PY2, EXPECTED_HEADER_PY3):
     raise HeaderCheckFailure(f"{filename}: header does not match the expected header")
 
 
