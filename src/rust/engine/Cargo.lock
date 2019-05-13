@@ -591,6 +591,7 @@ dependencies = [
  "tokio 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "ui 0.0.1",
  "url 1.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "walkdir 2.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
