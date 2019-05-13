@@ -71,9 +71,12 @@ def create_parser() -> argparse.ArgumentParser:
 
 def check_header(filename: str, *, is_newly_created: bool = False) -> None:
   """Raises `HeaderCheckFailure` if the header doesn't match."""
+  expected_num_py2_lines = 6
+  expected_num_py3_lines = 3
   try:
     with open(filename, 'r') as f:
-      first_lines = [f.readline() for _ in range(0, 7)]
+      # We grab an extra line in case there is a shebang.
+      first_lines = [f.readline() for _ in range(0, expected_num_py2_lines + 1)]
   except IOError as e:
     raise HeaderCheckFailure(f"{filename}: error while reading input ({e})")
   # If a shebang line is included, remove it. Otherwise, we will have conservatively grabbed
@@ -81,11 +84,11 @@ def check_header(filename: str, *, is_newly_created: bool = False) -> None:
   first_lines.pop(0 if first_lines[0].startswith("#!") else - 1)
   # Check that the first lines even exists. Note that first_lines will always have an entry
   # for each line, even if the file is completely empty.
-  if len([line for line in first_lines if line]) < 3:
+  if len([line for line in first_lines if line]) < expected_num_py3_lines:
     raise HeaderCheckFailure(f"{filename}: missing the expected header")
   is_py3_file = all("from __future__" not in line for line in first_lines)
   if is_py3_file:
-    first_lines = first_lines[:3]
+    first_lines = first_lines[:expected_num_py3_lines]
   # Check copyright year. If it's a new file, it should be the current year. Else, it should
   # be within the current century.
   copyright_line_index = 0 if is_py3_file else 1
