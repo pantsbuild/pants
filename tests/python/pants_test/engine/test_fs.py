@@ -437,13 +437,12 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       self.assertEquals(expected_snapshot.files, ('roland', 'susannah'))
       self.assertEquals(stripped_digest, expected_snapshot.directory_digest)
 
-      # Strip a prefix which isn't shared by all files:
-      # TODO: Should this work (discarding non-matching files) or error?
-      stripped_digest_from_extra_files = assert_single_element(self.scheduler.product_request(
-        Digest,
-        [PrefixStrippedDirectory(snapshot_with_extra_files.directory_digest, text_type("characters/dark_tower"))]
-      ))
-      self.assertEquals(stripped_digest_from_extra_files, expected_snapshot.directory_digest)
+      # Try to strip a prefix which isn't shared by all files:
+      with self.assertRaisesWithMessageContaining(Exception, "Cannot strip prefix characters/dark_tower from root directory Digest(Fingerprint<28c47f77867f0c8d577d2ada2f06b03fc8e5ef2d780e8942713b26c5e3f434b8>, 243) - root directory contained non-matching directory named: books and file named: index"):
+        self.scheduler.product_request(
+          Digest,
+          [PrefixStrippedDirectory(snapshot_with_extra_files.directory_digest, text_type("characters/dark_tower"))]
+        )
 
   def test_glob_match_error(self):
     with self.assertRaises(ValueError) as cm:
