@@ -4,6 +4,74 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.17.0.dev0 (5/13/2019)
+-----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* V2 `./pants test.pytest` selects interpreter based off of compatibility constraints (#7679)
+  `PR #7679 <https://github.com/pantsbuild/pants/pull/7679>`_
+
+Bugfixes
+~~~~~~~~
+
+* Mark build-support Python files as Pants targets to lint build-support (#7633)
+  `PR #7633 <https://github.com/pantsbuild/pants/pull/7633>`_
+
+* Fix dependency cycle with cache folder (#7693)
+  `PR #7693 <https://github.com/pantsbuild/pants/pull/7693>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Refactor `check_banned_imports.py` to allow Python 3 files to import `subprocess` (#7706)
+  `PR #7706 <https://github.com/pantsbuild/pants/pull/7706>`_
+
+* Rerun cbindgen on changes to src (#7708)
+  `PR #7708 <https://github.com/pantsbuild/pants/pull/7708>`_
+
+* add stack traces to unhashable TypeErrors in the engine (#7532)
+  `PR #7532 <https://github.com/pantsbuild/pants/pull/7532>`_
+
+*  Convert `check_banned_imports.sh` to Python to workaround Bash array issues and for less duplication (#7702)
+  `PR #7702 <https://github.com/pantsbuild/pants/pull/7702>`_
+>`_ttps://github.com/pantsbuild/pants/pull/7698#discussion_r282947998.
+  `PR #6747 <https://github.com/pantsbuild/pants/pull/6747>`_
+
+* Output stderr in V2 test rule (#7694)
+  `Issue #7388 <https://github.com/pantsbuild/pants/issues/7388>`_
+  `PR #7694 <https://github.com/pantsbuild/pants/pull/7694>`_
+  `PR #7676 <https://github.com/pantsbuild/pants/pull/7676>`_
+
+* Remove now-unused Path type (#7701)
+  `PR #7701 <https://github.com/pantsbuild/pants/pull/7701>`_
+
+* Improve V2 `./pants test` output to make it easier to parse results of multiple targets (#7676)
+  `Issue #7388 <https://github.com/pantsbuild/pants/issues/7388>`_
+  `PR #7676 <https://github.com/pantsbuild/pants/pull/7676>`_
+
+* Allow V2 console rules to use colors (#7689)
+  `PR #7689 <https://github.com/pantsbuild/pants/pull/7689>`_
+>`_ttps://github.com/pantsbuild/pants/pull/7676.
+
+* Refactor `PythonSetup.interpreter_or_constraints()` to take a `compatibility` value rather than a `PythonTarget`(#7691)
+  `PR #7691 <https://github.com/pantsbuild/pants/pull/7691>`_
+  `PR #files#diff-04a0048c70898e46a42c73225c47b906R58 <https://github.com/pantsbuild/pants/pull/7679/files#diff-04a0048c70898e46a42c73225c47b906R58>`_
+  `PR #7680 <https://github.com/pantsbuild/pants/pull/7680>`_
+
+* Remove ResettablePool (#7688)
+  `PR #7688 <https://github.com/pantsbuild/pants/pull/7688>`_
+
+* PosixFS no longer has its own threadpool (#7685)
+  `PR #7685 <https://github.com/pantsbuild/pants/pull/7685>`_
+
+* Use global instance of PythonSetup for resolve requirements task base (#7672)
+  `PR #7672 <https://github.com/pantsbuild/pants/pull/7672>`_
+
+* Refactor v2 TestResult model to use enum (#7677)
+  `PR #7677 <https://github.com/pantsbuild/pants/pull/7677>`_
+
 1.16.0rc0 (5/7/2019)
 --------------------
 
