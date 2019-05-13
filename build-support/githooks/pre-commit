@@ -64,10 +64,10 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
   echo "* Checking lint" && ./pants --exclude-target-regexp='testprojects/.*' --changed-parent="${MERGE_BASE}" lint || exit 1
 
   echo "* Checking types (for build-support)"
-  # NB: This script requires Python 3, so we must temporarily override any intepreter constraints
+  # NB: This task requires Python 3, so we must temporarily override any intepreter constraints
   # set by ci.sh, specifically it setting constraints to Python 2, because those constraints may
   # cause a select-interpreter failure.
-  PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6']" ./build-support/bin/mypy.py 'build-support::' || exit 1
+  PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6']" ./pants mypy 'build-support::' || exit 1
 
   if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then
     echo "* Checking formatting of rust files" && ./build-support/bin/check_rust_formatting.sh || exit 1
