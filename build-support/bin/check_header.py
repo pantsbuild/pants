@@ -112,7 +112,7 @@ def check_header_present(filename: str, lines: List[str]) -> None:
 
 def check_copyright_year(filename: str, *, copyright_line: str, is_newly_created: bool) -> None:
   """Check that copyright is current year if for a new file, else that it's within
-  the current centuury."""
+  the current century."""
   year = copyright_line[12:16]
   if is_newly_created and year != _current_year:
     raise HeaderCheckFailure(f'{filename}: copyright year must be {_current_year} (was {year})')
