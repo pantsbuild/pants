@@ -10,15 +10,18 @@ from builtins import str
 
 from future.utils import text_type
 
+from pants.backend.python.subsystems.pex_build_util import identify_missing_init_files
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
-from pants.engine.fs import Digest, MergedDirectories, Snapshot, UrlToFetch
+from pants.engine.fs import (Digest, DirectoryWithPrefixToStrip, FilesContent, MergedDirectories,
+                             Snapshot, UrlToFetch)
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
                                            FallibleExecuteProcessResult)
 from pants.engine.legacy.graph import TransitiveHydratedTarget
 from pants.engine.rules import optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.core_test_model import Status, TestResult
+from pants.source.source_root import SourceRootConfig
 
 
 # This class currently exists so that other rules could be added which turned a HydratedTarget into
@@ -44,8 +47,10 @@ def parse_interpreter_constraints(python_setup, python_target_adaptors):
 
 # TODO: Support deps
 # TODO: Support resources
-@rule(PyTestResult, [TransitiveHydratedTarget, PyTest, PythonSetup])
-def run_python_test(transitive_hydrated_target, pytest, python_setup):
+# TODO(7697): Use a dedicated rule for removing the source root prefix, so that this rule
+# does not have to depend on SourceRootConfig.
+@rule(PyTestResult, [TransitiveHydratedTarget, PyTest, PythonSetup, SourceRootConfig])
+def run_python_test(transitive_hydrated_target, pytest, python_setup, source_root_config):
   target_root = transitive_hydrated_target.root
 
   # TODO: Inject versions and digests here through some option, rather than hard-coding it.
@@ -98,18 +103,53 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup):
   requirements_pex_response = yield Get(
     ExecuteProcessResult, ExecuteProcessRequest, requirements_pex_request)
 
-  # Gather sources.
+  source_roots = source_root_config.get_source_roots()
+
+  # Gather sources and adjust for the source root.
   # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of raising to
   # simplify the hasattr() checks here!
-  all_sources_digests = []
+  # TODO(7714): restore the full source name for the stdout of the Pytest run.
+  sources_snapshots_and_source_roots = []
   for maybe_source_target in all_targets:
     if hasattr(maybe_source_target.adaptor, 'sources'):
-      sources_snapshot = maybe_source_target.adaptor.sources.snapshot
-      all_sources_digests.append(sources_snapshot.directory_digest)
-
-  all_input_digests = all_sources_digests + [
-    requirements_pex_response.output_directory_digest,
+      tgt_snapshot = maybe_source_target.adaptor.sources.snapshot
+      tgt_source_root = source_roots.find_by_path(maybe_source_target.adaptor.address.spec_path)
+      sources_snapshots_and_source_roots.append((tgt_snapshot, tgt_source_root))
+  all_sources_digests = yield [
+    Get(
+      Digest,
+      DirectoryWithPrefixToStrip(
+        directory_digest=snapshot.directory_digest,
+        prefix=source_root.path
+      )
+    )
+    for snapshot, source_root
+    in sources_snapshots_and_source_roots
   ]
+
+  sources_digest = yield Get(
+    Digest, MergedDirectories(directories=tuple(all_sources_digests)),
+  )
+
+  # TODO(7716): add a builtin rule to go from MergedDirectories->Snapshot or Digest->Snapshot.
+  # TODO(7715): generalize the injection of __init__.py files.
+  # TODO(7718): add a builtin rule for FilesContent->Snapshot.
+  file_contents = yield Get(FilesContent, Digest, sources_digest)
+  file_paths = [fc.path for fc in file_contents]
+  injected_inits = tuple(sorted(identify_missing_init_files(file_paths)))
+  if injected_inits:
+    touch_init_request = ExecuteProcessRequest(
+      argv=("/usr/bin/touch",) + injected_inits,
+      output_files=injected_inits,
+      description="Inject empty __init__.py into all packages without one already.",
+      input_files=sources_digest,
+    )
+    touch_init_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, touch_init_request)
+
+  all_input_digests = [sources_digest, requirements_pex_response.output_directory_digest]
+  if injected_inits:
+    all_input_digests.append(touch_init_result.output_directory_digest)
+
   merged_input_files = yield Get(
     Digest,
     MergedDirectories,
@@ -138,4 +178,5 @@ def rules():
       run_python_test,
       optionable_rule(PyTest),
       optionable_rule(PythonSetup),
+      optionable_rule(SourceRootConfig),
     ]

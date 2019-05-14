@@ -72,7 +72,7 @@ class TestIntegrationTest(PantsRunIntegrationTest):
         plugins: SOME_TEXT
         collected 1 item
 
-        testprojects/tests/python/pants/dummies/test_pass.py .                   [100%]
+        pants/dummies/test_pass.py .                                             [100%]
 
         =========================== 1 passed in SOME_TEXT ===========================
 
@@ -95,7 +95,7 @@ class TestIntegrationTest(PantsRunIntegrationTest):
         plugins: SOME_TEXT
         collected 1 item
 
-        testprojects/tests/python/pants/dummies/test_fail.py F                   [100%]
+        pants/dummies/test_fail.py F                                             [100%]
 
         =================================== FAILURES ===================================
         __________________________________ test_fail ___________________________________
@@ -104,7 +104,7 @@ class TestIntegrationTest(PantsRunIntegrationTest):
         >     assert False
         E     assert False
 
-        testprojects/tests/python/pants/dummies/test_fail.py:2: AssertionError
+        pants/dummies/test_fail.py:2: AssertionError
         =========================== 1 failed in SOME_TEXT ===========================
 
 
@@ -112,28 +112,51 @@ class TestIntegrationTest(PantsRunIntegrationTest):
         """),
     )
 
-  def test_source_dep(self):
+  def test_source_dep_absolute_import(self):
     pants_run = self.run_passing_pants_test([
-      'testprojects/tests/python/pants/dummies:target_with_source_dep',
+      'testprojects/tests/python/pants/dummies:target_with_source_dep_absolute_import',
     ])
     self.assert_fuzzy_string_match(
       pants_run.stdout_data,
       dedent("""\
-        testprojects/tests/python/pants/dummies:target_with_source_dep stdout:
+        testprojects/tests/python/pants/dummies:target_with_source_dep_absolute_import stdout:
         ============================= test session starts ==============================
         platform SOME_TEXT
         rootdir: SOME_TEXT
         plugins: SOME_TEXT
         collected 1 item
 
-        testprojects/tests/python/pants/dummies/test_with_source_dep.py .        [100%]
+        pants/dummies/test_with_source_dep_absolute_import.py .                  [100%]
 
         =========================== 1 passed in SOME_TEXT ===========================
 
 
-        testprojects/tests/python/pants/dummies:target_with_source_dep                  .....   SUCCESS
+        testprojects/tests/python/pants/dummies:target_with_source_dep_absolute_import  .....   SUCCESS
         """)
-    )
+      )
+
+  def test_source_dep_relative_import(self):
+    pants_run = self.run_passing_pants_test([
+      'testprojects/tests/python/pants/dummies:target_with_source_dep_relative_import',
+    ])
+    self.assert_fuzzy_string_match(
+      pants_run.stdout_data,
+      dedent("""\
+        testprojects/tests/python/pants/dummies:target_with_source_dep_relative_import stdout:
+        ============================= test session starts ==============================
+        platform SOME_TEXT
+        rootdir: SOME_TEXT
+        plugins: SOME_TEXT
+        collected 1 item
+
+        pants/dummies/test_with_source_dep_relative_import.py .                  [100%]
+
+        =========================== 1 passed in SOME_TEXT ===========================
+
+
+        testprojects/tests/python/pants/dummies:target_with_source_dep_relative_import  .....   SUCCESS
+        """)
+      )
 
   def test_thirdparty_dep(self):
     pants_run = self.run_passing_pants_test([
@@ -149,7 +172,7 @@ class TestIntegrationTest(PantsRunIntegrationTest):
         plugins: SOME_TEXT
         collected 1 item
 
-        testprojects/tests/python/pants/dummies/test_with_thirdparty_dep.py .    [100%]
+        pants/dummies/test_with_thirdparty_dep.py .                              [100%]
 
         =========================== 1 passed in SOME_TEXT ===========================
 
@@ -173,7 +196,7 @@ class TestIntegrationTest(PantsRunIntegrationTest):
         plugins: SOME_TEXT
         collected 1 item
 
-        testprojects/tests/python/pants/dummies/test_fail.py F                   [100%]
+        pants/dummies/test_fail.py F                                             [100%]
 
         =================================== FAILURES ===================================
         __________________________________ test_fail ___________________________________
@@ -182,7 +205,7 @@ class TestIntegrationTest(PantsRunIntegrationTest):
         >     assert False
         E     assert False
 
-        testprojects/tests/python/pants/dummies/test_fail.py:2: AssertionError
+        pants/dummies/test_fail.py:2: AssertionError
         =========================== 1 failed in SOME_TEXT ===========================
 
         testprojects/tests/python/pants/dummies:passing_target stdout:
@@ -192,7 +215,7 @@ class TestIntegrationTest(PantsRunIntegrationTest):
         plugins: SOME_TEXT
         collected 1 item
 
-        testprojects/tests/python/pants/dummies/test_pass.py .                   [100%]
+        pants/dummies/test_pass.py .                                             [100%]
 
         =========================== 1 passed in SOME_TEXT ===========================
 
