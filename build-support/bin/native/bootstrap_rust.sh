@@ -37,7 +37,7 @@ function bootstrap_rust() {
     # The workaround was added in https://github.com/rust-lang/rustup.rs/pull/1803.
     # TODO(7288): Once we migrate to Centos7, we can go back to using RustUp's preferred and more
     # secure installation method. Convert this to the snippet from https://rustup.rs.
-    curl https://sh.rustup.rs -sSf | sh -s -- -y --no-modify-path --default-toolchain none 1>&2
+    curl --fail https://sh.rustup.rs -sS | sh -s -- -y --no-modify-path --default-toolchain none 1>&2
   fi
 
   local -r cargo="${CARGO_HOME}/bin/cargo"
