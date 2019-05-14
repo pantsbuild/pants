@@ -187,8 +187,11 @@ impl WrappedNode for Select {
           if product == context.core.types.directory_digest
             && input == context.core.types.directories_to_merge =>
         {
-          let request =
-            self.select_product(&context, context.core.types.directories_to_merge, "intrinsic");
+          let request = self.select_product(
+            &context,
+            context.core.types.directories_to_merge,
+            "intrinsic",
+          );
           let core = context.core.clone();
           request
             .and_then(move |request| {
