@@ -71,7 +71,6 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
 
   all_targets = resolve_all_transitive_hydrated_targets(transitive_hydrated_target)
 
-
   # Produce a pex containing pytest and all transitive 3rdparty requirements.
   all_requirements = []
   for maybe_python_req_lib in all_targets:
