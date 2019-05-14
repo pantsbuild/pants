@@ -12,7 +12,7 @@ from typing import Iterable, List
 from common import die
 
 
-EXPECTED_HEADER = dedent("""\
+EXPECTED_HEADER_PY2 = dedent("""\
   # coding=utf-8
   # Copyright YYYY Pants project contributors (see CONTRIBUTORS.md).
   # Licensed under the Apache License, Version 2.0 (see LICENSE).
@@ -21,6 +21,14 @@ EXPECTED_HEADER = dedent("""\
 
   """)
 
+EXPECTED_HEADER_PY3 = dedent("""\
+  # Copyright YYYY Pants project contributors (see CONTRIBUTORS.md).
+  # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+  """)
+
+EXPECTED_NUM_PY2_LINES = 6
+EXPECTED_NUM_PY3_LINES = 3
 
 _current_year = str(datetime.datetime.now().year)
 _current_century_regex = re.compile(r'20\d\d')
@@ -38,9 +46,12 @@ def main() -> None:
   if header_parse_failures:
     failures = '\n  '.join(str(failure) for failure in header_parse_failures)
     die(f"""\
-ERROR: All .py files other than __init__.py should start with the following header:
+ERROR: All .py files other than __init__.py should start with the header:
+{EXPECTED_HEADER_PY3}
 
-{EXPECTED_HEADER}
+If they must support Python 2 still, they should start with the header:
+{EXPECTED_HEADER_PY2}
+
 ---
 
 The following {len(header_parse_failures)} file(s) do not conform:
@@ -62,21 +73,46 @@ def create_parser() -> argparse.ArgumentParser:
 
 def check_header(filename: str, *, is_newly_created: bool = False) -> None:
   """Raises `HeaderCheckFailure` if the header doesn't match."""
+  lines = get_header_lines(filename)
+  check_header_present(filename, lines)
+  is_py3_file = all("from __future__" not in line for line in lines)
+  if is_py3_file:
+    lines = lines[:EXPECTED_NUM_PY3_LINES]
+    copyright_line_index = 0
+    expected_header = EXPECTED_HEADER_PY3
+  else:
+    copyright_line_index = 1
+    expected_header = EXPECTED_HEADER_PY2
+  check_copyright_year(
+    filename, copyright_line=lines[copyright_line_index], is_newly_created=is_newly_created
+  )
+  check_matches_header(
+    filename, lines, expected_header=expected_header, copyright_line_index=copyright_line_index
+  )
+
+
+def get_header_lines(filename: str) -> List[str]:
   try:
     with open(filename, 'r') as f:
-      first_lines = [f.readline() for _ in range(0, 7)]
+      # We grab an extra line in case there is a shebang.
+      lines = [f.readline() for _ in range(0, EXPECTED_NUM_PY2_LINES + 1)]
   except IOError as e:
     raise HeaderCheckFailure(f"{filename}: error while reading input ({e})")
   # If a shebang line is included, remove it. Otherwise, we will have conservatively grabbed
   # one extra line at the end for the shebang case that is no longer necessary.
-  first_lines.pop(0 if first_lines[0].startswith("#!") else - 1)
-  # Check that the first lines even exists. Note that first_lines will always have an entry
-  # for each line, even if the file is completely empty.
-  if len([line for line in first_lines if line]) < 4:
+  lines.pop(0 if lines[0].startswith("#!") else - 1)
+  return lines
+
+
+def check_header_present(filename: str, lines: List[str]) -> None:
+  num_nonempty_lines = len([line for line in lines if line])
+  if num_nonempty_lines < EXPECTED_NUM_PY3_LINES:
     raise HeaderCheckFailure(f"{filename}: missing the expected header")
-  # Check copyright year. If it's a new file, it should be the current year. Else, it should
-  # be within the current century.
-  copyright_line = first_lines[1]
+
+
+def check_copyright_year(filename: str, *, copyright_line: str, is_newly_created: bool) -> None:
+  """Check that copyright is current year if for a new file, else that it's within
+  the current century."""
   year = copyright_line[12:16]
   if is_newly_created and year != _current_year:
     raise HeaderCheckFailure(f'{filename}: copyright year must be {_current_year} (was {year})')
@@ -85,9 +121,15 @@ def check_header(filename: str, *, is_newly_created: bool = False) -> None:
       f"{filename}: copyright year must match '{_current_century_regex.pattern}' (was {year}): " +
       f"current year is {_current_year}"
     )
-  # Replace copyright_line with sanitized year.
-  first_lines[1] = "# Copyright YYYY" + copyright_line[16:]
-  if "".join(first_lines) != EXPECTED_HEADER:
+
+
+def check_matches_header(
+  filename: str, lines: List[str], *, expected_header: str, copyright_line_index: int
+) -> None:
+  copyright_line = lines[copyright_line_index]
+  sanitized_lines = lines.copy()
+  sanitized_lines[copyright_line_index] = "# Copyright YYYY" + copyright_line[16:]
+  if "".join(sanitized_lines) != expected_header:
     raise HeaderCheckFailure(f"{filename}: header does not match the expected header")
 
 

@@ -127,11 +127,8 @@ subdir/__init__.py
 
       # Check that a file with a typo in the header fails
       safe_file_dump(new_py_path, dedent("""\
-        # coding=utf-8
         # Copyright {} Pants project contributors (see CONTRIBUTORS.md).
         # Licensed under the MIT License, Version 3.3 (see LICENSE).
-
-        from __future__ import absolute_import, division, print_function, unicode_literals
 
         """.format(cur_year))
       )
@@ -142,11 +139,8 @@ subdir/__init__.py
 
       # Check that a file without a valid copyright year fails.
       safe_file_dump(new_py_path, dedent("""\
-        # coding=utf-8
         # Copyright YYYY Pants project contributors (see CONTRIBUTORS.md).
         # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-        from __future__ import absolute_import, division, print_function, unicode_literals
 
         """)
       )
@@ -161,11 +155,8 @@ subdir/__init__.py
       # Check that a newly added file must have the current year.
       last_year = str(cur_year_num - 1)
       safe_file_dump(new_py_path, dedent("""\
-        # coding=utf-8
         # Copyright {} Pants project contributors (see CONTRIBUTORS.md).
         # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-        from __future__ import absolute_import, division, print_function, unicode_literals
 
         """.format(last_year))
       )
@@ -174,6 +165,18 @@ subdir/__init__.py
         added_files=[rel_new_py_path],
         expected_excerpt="subdir/file.py: copyright year must be {} (was {})".format(cur_year, last_year)
       )
+
+      # Check that we also support Python 2-style headers.
+      safe_file_dump(new_py_path, dedent("""\
+        # coding=utf-8
+        # Copyright {} Pants project contributors (see CONTRIBUTORS.md).
+        # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+        from __future__ import absolute_import, division, print_function, unicode_literals
+
+        """.format(cur_year))
+      )
+      self._assert_subprocess_success(worktree, [header_check_script, 'subdir'])
 
       # Check that a file isn't checked against the current year if it is not passed as an
       # arg to the script.
