@@ -84,7 +84,6 @@ python_tests(
   ]
 )
 
-# TODO: fails to install cryptography
 python_tests(
   name = 'meta',
   sources = ['test_meta.py'],
@@ -105,7 +104,6 @@ python_tests(
   ]
 )
 
-# TODO: fails to install cryptography
 python_tests(
   name = 'objects',
   sources = ['test_objects.py'],
@@ -117,7 +115,6 @@ python_tests(
   ]
 )
 
-# TODO: fails to install cryptography
 python_tests(
   name = 'osutil',
   sources = ['test_osutil.py'],

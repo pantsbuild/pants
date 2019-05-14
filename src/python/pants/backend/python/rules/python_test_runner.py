@@ -93,7 +93,13 @@ def run_python_test(test_target, pytest, python_setup, source_root_config):
   ]
   requirements_pex_request = ExecuteProcessRequest(
     argv=tuple(requirements_pex_argv),
-    env={'PATH': text_type(os.pathsep.join(python_setup.interpreter_search_paths))},
+    env={
+      'PATH': text_type(os.pathsep.join(python_setup.interpreter_search_paths)),
+      # NB: CPPFLAGS and LDFLAGS are necessary on certain systems (i.e. macOS) to get cryptography
+      # properly resolved.
+      'CPPFLAGS': text_type(os.environ.get('CPPFLAGS')),
+      'LDFLAGS': text_type(os.environ.get('LDFLAGS')),
+    },
     input_files=pex_snapshot.directory_digest,
     description='Resolve requirements for {}'.format(test_target.address.reference()),
     output_files=(output_pytest_requirements_pex_filename,),
