@@ -47,10 +47,8 @@ def parse_interpreter_constraints(python_setup, python_target_adaptors):
 
 # TODO: Support deps
 # TODO: Support resources
-# TODO: this rule should not directly require SourceRootConfig. Arguably, we should
-# have a dedicated rule that will allow us to do something like this:
-# `yield Get(SourceRootDigest, Digest, digest)`. To see an example of what this might
-# look like, see https://github.com/pantsbuild/pants/blob/f25c5b9ec34cea8bae4e6ea47cbec5caefd81576/src/python/pants/rules/core/source_roots.py.
+# TODO(7697): Use a dedicated rule for removing the source root prefix, so that this rule
+# does not have to depend on SourceRootConfig.
 @rule(PyTestResult, [TransitiveHydratedTarget, PyTest, PythonSetup, SourceRootConfig])
 def run_python_test(transitive_hydrated_target, pytest, python_setup, source_root_config):
   target_root = transitive_hydrated_target.root
@@ -110,10 +108,7 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
   # Gather sources and adjust for the source root.
   # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of raising to
   # simplify the hasattr() checks here!
-  # TODO: find some way to restore the full source name for the stdout of the Pytest run, so that
-  # we can output the original path, rather than the path without the source root. It appears we
-  # do this in V1 via parsing the Junit XML file and adding the value back? See pytest_run.py's
-  # _get_target_from_test(). This is a low priority.
+  # TODO(7714): restore the full source name for the stdout of the Pytest run.
   all_sources_digests = []
   for maybe_source_target in all_targets:
     if hasattr(maybe_source_target.adaptor, 'sources'):
@@ -131,10 +126,8 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
     Digest, MergedDirectories(directories=tuple(all_sources_digests)),
   )
 
-  # TODO: add intrinsic to go from Digest->Snapshot, so that we can avoid having to use
-  # `FileContent`, which unnecessarily gets the content.
-  # TODO: somehow generalize this injection of __init__.py files. Presumably it will be useful
-  # for other Python commands.
+  # TODO(7716): add a builtin rule to go from MergedDirectories->Snapshot or Digest->Snapshot.
+  # TODO(7715): generalize the injection of __init__.py files.
   file_contents = yield Get(FilesContent, Digest, sources_digest)
   file_paths = [fc.path for fc in file_contents]
   injected_inits = tuple(sorted(identify_missing_init_files(file_paths)))
