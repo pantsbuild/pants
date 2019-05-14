@@ -2,13 +2,15 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd -P)
-source ${REPO_ROOT}/build-support/common.sh
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd .. && pwd -P)
+
+# shellcheck source=build-support/common.sh
+source "${REPO_ROOT}/build-support/common.sh"
 
 REQUIREMENTS=(
-  ${REPO_ROOT}/3rdparty/python/requirements.txt
-  ${REPO_ROOT}/3rdparty/python/twitter/commons/requirements.txt
-  ${REPO_ROOT}/pants-plugins/3rdparty/python/requirements.txt
+  "${REPO_ROOT}/3rdparty/python/requirements.txt"
+  "${REPO_ROOT}/3rdparty/python/twitter/commons/requirements.txt"
+  "${REPO_ROOT}/pants-plugins/3rdparty/python/requirements.txt"
 )
 
 venv_dir_prefix="${REPO_ROOT}/build-support/pants_dev_deps"
@@ -19,6 +21,9 @@ function venv_dir() {
 }
 
 function activate_venv() {
+  # Because the venv/bin/activate script's location is dynamic and not located in a fixed
+  # place, Shellcheck will not be able to find it so we tell Shellcheck to ignore the file.
+  # shellcheck source=/dev/null
   source "$(venv_dir)/bin/activate"
 }
 
@@ -54,20 +59,20 @@ MESSAGE
 
 function activate_pants_venv() {
   fingerprint=""
-  for req in ${REQUIREMENTS[@]}; do
-    fingerprint="${fingerprint}$(cat ${req} | fingerprint_data)"
+  for req in "${REQUIREMENTS[@]}"; do
+    fingerprint="${fingerprint}$(fingerprint_data < "${req}")"
   done
   fingerprint=$(echo "${fingerprint}" | fingerprint_data)
 
   BOOTSTRAPPED_FILE="$(venv_dir)/BOOTSTRAPPED.${fingerprint}"
 
-  if ! [ -f ${BOOTSTRAPPED_FILE} ]; then
+  if ! [ -f "${BOOTSTRAPPED_FILE}" ]; then
     log "Bootstrapping pants_deps with requirements:"
     # Use -f ${REPO_ROOT}/third_party if patching in local dependencies like so
     # pip_extra="-f ${REPO_ROOT}/third_party"
     pip_extra=""
 
-    for req in ${REQUIREMENTS[@]}; do
+    for req in "${REQUIREMENTS[@]}"; do
       log "  ${req}"
     done
 
@@ -77,7 +82,7 @@ function activate_pants_venv() {
     # Needed for compilation of native python distributions.
     ensure_gcc
 
-    for req in ${REQUIREMENTS[@]}; do
+    for req in "${REQUIREMENTS[@]}"; do
       pip install ${pip_extra} -r "${req}" || \
         die "Failed to install requirements from ${req}."
     done
