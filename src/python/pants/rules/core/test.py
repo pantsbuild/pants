@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import logging
+
 from pants.backend.python.rules.python_test_runner import PyTestResult
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.build_graph.address import Address
@@ -14,6 +16,10 @@ from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.rules import console_rule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.core_test_model import Status, TestResult
+
+
+# TODO(#6004): use proper Logging singleton, rather than static logger.
+logger = logging.getLogger(__name__)
 
 
 class Test(Goal):
@@ -66,7 +72,12 @@ def coordinator_of_tests(target):
   #if isinstance(target.adaptor, PythonTestsAdaptor):
   # See https://github.com/pantsbuild/pants/issues/4535
   if target.adaptor.type_alias == 'python_tests':
+    logger.info("Starting test for {}...".format(target.address.reference()))
     result = yield Get(PyTestResult, HydratedTarget, target)
+    logger.info("Result of test for {}: {}".format(
+      target.address.reference(),
+      "success" if result.status == Status.SUCCESS else "failure")
+    )
     yield TestResult(status=result.status, stdout=result.stdout, stderr=result.stderr)
   else:
     raise Exception("Didn't know how to run tests for type {}".format(target.adaptor.type_alias))
