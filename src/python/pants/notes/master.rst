@@ -20,9 +20,11 @@ Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 * Setup MyPy config and enforce types for build-support scripts (#7704)
+  `Issue #6742 <https://github.com/pantsbuild/pants/issues/6742>`_
   `PR #7704 <https://github.com/pantsbuild/pants/pull/7704>`_
 
 * Add builtin Rust rule to strip prefixes from directories for source root support (#7699)
+  `Issue #7697 <https://github.com/pantsbuild/pants/issues/7697>`_
   `PR #7699 <https://github.com/pantsbuild/pants/pull/7699>`_
 
 * Refactor and modernize `check_header.py` to use Python 3 (#7635)
@@ -1277,7 +1279,7 @@ Refactoring, Improvements, and Tooling
 * Allow Pants to run with Python 3 via `./pants3` script (#6959)
   `PR #6959 <https://github.com/pantsbuild/pants/pull/6959>`_
 
-* Properly render \n in exceptions with Py3 (#7073)
+* Properly render newline in exceptions with Py3 (#7073)
   `PR #7073 <https://github.com/pantsbuild/pants/pull/7073>`_
 
 * use the asttokens 3rdparty lib to make @rule parsing errors very smooth (#7023)
