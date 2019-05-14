@@ -203,8 +203,8 @@ fi
 if [[ "${run_python:-false}" == "true" ]]; then
   start_travis_section "CoreTests" "Running core Python tests"
   (
-    # TODO: how to clean up targets.txt and ensure it happens?
-    ./pants.pex --tag='-integration' --filter-type='python_tests' filter src/python:: tests/python:: > targets.txt
+    trap 'rm targets.txt' EXIT
+    ./pants.pex --tag='-integration' --filter-type='python_tests' filter src/python:: > targets.txt
     ./pants.pex --no-v1 --v2 --target-spec-file=targets.txt test.pytest -- "${PYTEST_PASSTHRU_ARGS[@]}"
   ) || die "Core Python test failure"
   end_travis_section
