@@ -19,6 +19,14 @@ Bugfixes
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+* Setup MyPy config and enforce types for build-support scripts (#7704)
+  `Issue #6742 <https://github.com/pantsbuild/pants/issues/6742>`_
+  `PR #7704 <https://github.com/pantsbuild/pants/pull/7704>`_
+
+* Add builtin Rust rule to strip prefixes from directories for source root support (#7699)
+  `Issue #7697 <https://github.com/pantsbuild/pants/issues/7697>`_
+  `PR #7699 <https://github.com/pantsbuild/pants/pull/7699>`_
+
 * Refactor and modernize `check_header.py` to use Python 3 (#7635)
   `PR #7635 <https://github.com/pantsbuild/pants/pull/7635>`_
 
@@ -37,7 +45,7 @@ Refactoring, Improvements, and Tooling
 * add stack traces to unhashable TypeErrors in the engine (#7532)
   `PR #7532 <https://github.com/pantsbuild/pants/pull/7532>`_
 
-*  Convert `check_banned_imports.sh` to Python to workaround Bash array issues and for less duplication (#7702)
+* Convert `check_banned_imports.sh` to Python to workaround Bash array issues and for less duplication (#7702)
   `PR #7702 <https://github.com/pantsbuild/pants/pull/7702>`_
 
 * Output stderr in V2 test rule (#7694)
@@ -52,7 +60,7 @@ Refactoring, Improvements, and Tooling
 * Allow V2 console rules to use colors (#7689)
   `PR #7689 <https://github.com/pantsbuild/pants/pull/7689>`_
 
-* Refactor `PythonSetup.interpreter_or_constraints()` to take a `compatibility` value rather than a `PythonTarget`(#7691)
+* Refactor `PythonSetup.interpreter_or_constraints()` to take a `compatibility` value rather than a `PythonTarget` (#7691)
   `PR #7691 <https://github.com/pantsbuild/pants/pull/7691>`_
 
 * Remove ResettablePool (#7688)
