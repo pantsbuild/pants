@@ -30,13 +30,11 @@ DIRS_TO_CHECK=(
 # integration test!
 set -e
 
-# You can use ("$()") with double quotes in zsh, I assume this splits by IFS...
-ADDED_FILES=($(./build-support/bin/get_added_files.sh))
+ADDED_FILES=()
+while IFS='' read -r line; do array+=("${line}"); done< <(./build-support/bin/get_added_files.sh)
 MERGE_BASE="$(git_merge_base)"
 
 echo "* Checking packages"
-# TODO: Determine the most *hygienic* way to split an array on the command line in portable bash,
-# and stick to it.
 ./build-support/bin/check_packages.sh "${DIRS_TO_CHECK[@]}"
 
 echo "* Checking headers"

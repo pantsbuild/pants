@@ -73,28 +73,28 @@ export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRE
 PANTS_EXE="${HERE}/src/python/pants/bin/pants_loader.py"
 
 if [[ -n "${WRAPPER_REQUIREMENTS}" ]]; then
-  REQUIREMENTS=(
-    $(echo "${WRAPPER_REQUIREMENTS}" | tr : ' ')
-    "${REQUIREMENTS[@]}"
-  )
+  WRAPPER_REQUIREMENTS_ARRAY=()
+  while IFS='' read -r line; do WRAPPER_REQUIREMENTS_ARRAY+=("${line}"); done < \
+    <(echo "${WRAPPER_REQUIREMENTS}" | tr : ' ')
+  REQUIREMENTS=("${WRAPPER_REQUIREMENTS_ARRAY[@]}" "${PANTS_SRCPATH[@]}")
 fi
 
 PANTS_SRCPATH=(
   "${HERE}/src/python"
 )
 if [[ -n "${WRAPPER_SRCPATH}" ]]; then
-  PANTS_SRCPATH=(
-    $(echo "${WRAPPER_SRCPATH}" | tr : ' ')
-    "${PANTS_SRCPATH[@]}"
-  )
+  WRAPPER_SRCPATH_ARRAY=()
+  while IFS='' read -r line; do WRAPPER_SRCPATH_ARRAY+=("${line}"); done < \
+    <(echo "${WRAPPER_SRCPATH}" | tr : ' ')
+  PANTS_SRCPATH=("${WRAPPER_SRCPATH_ARRAY[@]}" "${PANTS_SRCPATH[@]}")
 fi
-PANTS_SRCPATH="$(echo "${PANTS_SRCPATH[@]}" | tr ' ' :)"
+PANTS_SRCPATH_STR="$(echo "${PANTS_SRCPATH[@]}" | tr ' ' :)"
 
 function exec_pants_bare() {
   # Redirect activation and native bootstrap to ensure that they don't interfere with stdout.
   activate_pants_venv 1>&2
   bootstrap_native_code 1>&2
-  PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" \
+  PYTHONPATH="${PANTS_SRCPATH_STR}:${PYTHONPATH}" \
     exec python "${PANTS_EXE}" "$@"
 }
 

@@ -515,9 +515,10 @@ function fetch_and_check_prebuilt_wheels() {
   fetch_prebuilt_wheels "${check_dir}"
 
   local missing=()
-  RELEASE_PACKAGES=(
-    $(run_packages_script list | grep '.' | awk '{print $1}')
-  ) || die "Failed to get a list of packages to release!"
+  RELEASE_PACKAGES=()
+  while IFS='' read -r line; do RELEASE_PACKAGES+=("${line}"); done < \
+    <(run_packages_script list | grep '.' | awk '{print $1}') \
+    || die "Failed to get a list of packages to release!"
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
     packages=($(find_pkg "${PACKAGE}" "${PANTS_UNSTABLE_VERSION}" "${check_dir}"))
