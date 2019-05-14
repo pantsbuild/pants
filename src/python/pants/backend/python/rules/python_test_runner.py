@@ -13,7 +13,8 @@ from future.utils import text_type
 from pants.backend.python.rules.inject_init import InitInjectedDigest
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
-from pants.engine.fs import Digest, DirectoryWithPrefixToStrip, MergedDirectories, Snapshot, UrlToFetch
+from pants.engine.fs import (Digest, DirectoryWithPrefixToStrip, MergedDirectories, Snapshot,
+                             UrlToFetch)
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
                                            FallibleExecuteProcessResult)
 from pants.engine.legacy.graph import TransitiveHydratedTarget
@@ -130,10 +131,11 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
     Digest, MergedDirectories(directories=tuple(all_sources_digests)),
   )
 
-  sources_digest_with_inits = yield Get(InitInjectedDigest, Digest, sources_digest)
+  inits_digest = yield Get(InitInjectedDigest, Digest, sources_digest)
 
   all_input_digests = [
-    sources_digest_with_inits.digest,
+    sources_digest,
+    inits_digest.digest,
     requirements_pex_response.output_directory_digest,
   ]
   merged_input_files = yield Get(

@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.python.subsystems.pex_build_util import identify_missing_init_files
-from pants.engine.fs import Digest, EMPTY_DIRECTORY_DIGEST, FilesContent, MergedDirectories, Snapshot
+from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest, FilesContent
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.rules import rule
 from pants.engine.selectors import Get
@@ -34,11 +34,12 @@ def inject_init(digest):
     )
     touch_init_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, touch_init_request)
     new_init_files_digest = touch_init_result.output_directory_digest
-  merged_digest = Get(
-    Digest,
-    MergedDirectories(directories=(digest, new_init_files_digest))
-  )
-  yield merged_digest
+  # TODO: get this to work. Likely related to https://github.com/pantsbuild/pants/issues/7710.
+  # merged_digest = yield Get(
+  #   Digest,
+  #   MergedDirectories(directories=(digest, new_init_files_digest))
+  # )
+  yield InitInjectedDigest(digest=new_init_files_digest)
 
 
 def rules():
