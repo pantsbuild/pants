@@ -20,11 +20,9 @@ Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 * Setup MyPy config and enforce types for build-support scripts (#7704)
-  `Issue #6742 <https://github.com/pantsbuild/pants/issues/6742>`_
   `PR #7704 <https://github.com/pantsbuild/pants/pull/7704>`_
 
 * Add builtin Rust rule to strip prefixes from directories for source root support (#7699)
-  `Issue #7697 <https://github.com/pantsbuild/pants/issues/7697>`_
   `PR #7699 <https://github.com/pantsbuild/pants/pull/7699>`_
 
 * Refactor and modernize `check_header.py` to use Python 3 (#7635)
