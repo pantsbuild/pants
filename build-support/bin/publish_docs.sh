@@ -85,8 +85,8 @@ set +x
 if [[ -z "${local_dir}" ]]; then
   do_open "${REPO_ROOT}/dist/docsite/index.html"
 else
-  find "${REPO_ROOT}/dist/docsite" -mindepth 1 -maxdepth 1 \
-    -exec -I '{}' cp -r '{}' "${local_dir}" +
+  find "${REPO_ROOT}/dist/docsite" -mindepth 1 -maxdepth 1 -print0 \
+    | xargs -0 -I '{}' cp -r '{}' "${local_dir}"
   do_open "${local_dir}/index.html"
 fi
 

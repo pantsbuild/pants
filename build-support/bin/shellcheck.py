@@ -22,18 +22,17 @@ def ensure_shellcheck_installed() -> None:
 
 
 def run_shellcheck() -> None:
-  targets = glob("./build-support/bin/*.sh") + glob("./build-support/bin/native/*.sh") + [
+  targets = set(glob("./**/*.sh", recursive=True)) | {
     "./pants",
     "./pants2",
-    "./build-support/common.sh",
-    "./build-support/pants-intellij.sh",
     "./build-support/pants_venv",
     "./build-support/virtualenv",
     "./build-support/githooks/pre-commit",
     "./build-support/githooks/prepare-commit-msg",
-    "./build-support/python/clean.sh",
-  ]
-  command = ["shellcheck", "--shell=bash", "--external-sources"] + targets
+  }
+  targets -= set(glob("./build-support/bin/native/src/**/*.sh", recursive=True))
+  targets -= set(glob("./build-support/virtualenv.dist/**/*.sh", recursive=True))
+  command = ["shellcheck", "--shell=bash", "--external-sources"] + sorted(targets)
   try:
     subprocess.run(command, check=True)
   except subprocess.CalledProcessError:
