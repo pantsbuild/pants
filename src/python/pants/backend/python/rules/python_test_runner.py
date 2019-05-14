@@ -13,7 +13,7 @@ from future.utils import text_type
 from pants.backend.python.subsystems.pex_build_util import identify_missing_init_files
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
-from pants.engine.fs import (Digest, FilesContent, MergedDirectories, PrefixStrippedDirectory,
+from pants.engine.fs import (Digest, DirectoryWithPrefixToStrip, FilesContent, MergedDirectories,
                              Snapshot, UrlToFetch)
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
                                            FallibleExecuteProcessResult)
@@ -120,7 +120,7 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
       sources_snapshot = maybe_source_target.adaptor.sources.snapshot
       digest_adjusted_for_source_root = yield Get(
         Digest,
-        PrefixStrippedDirectory(
+        DirectoryWithPrefixToStrip(
           sources_snapshot.directory_digest,
           source_roots.find_by_path(maybe_source_target.adaptor.address.spec_path).path
         )

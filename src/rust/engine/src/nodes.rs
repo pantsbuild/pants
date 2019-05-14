@@ -206,11 +206,11 @@ impl WrappedNode for Select {
         }
         &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.directory_digest
-            && input == context.core.types.prefix_stripped_directory =>
+            && input == context.core.types.directory_with_prefix_to_strip =>
         {
           let request = self.select_product(
             &context,
-            context.core.types.prefix_stripped_directory,
+            context.core.types.directory_with_prefix_to_strip,
             "intrinsic",
           );
           let core = context.core.clone();

@@ -352,37 +352,63 @@ impl Snapshot {
         futures::future::loop_fn(
           (dir, PathBuf::new(), prefix),
           move |(dir, already_stripped, prefix)| {
+            let has_already_stripped_any = already_stripped.components().next().is_some();
+
             let mut components = prefix.components();
             let component_to_strip = components.next();
             if let Some(component_to_strip) = component_to_strip {
               let remaining_prefix = components.collect();
-              let index = dir
-                .get_directories()
-                .binary_search_by(|node| {
-                  node
-                    .get_name()
-                    .cmp(component_to_strip.as_os_str().to_string_lossy().as_ref())
-                })
-                .map_err(|_index| {
-                  // TODO: Should this error, or just return an empty Directory?
-                  format!(
-                    "Stripping prefix from root directory {:?}, {}directory {} didn't contain a directory named {}",
+              let component_to_strip_str = component_to_strip.as_os_str().to_string_lossy();
+
+              let mut saw_matching_dir = false;
+              let extra_directories: Vec<_> = dir.get_directories().iter().filter_map(|subdir| {
+                if subdir.get_name() == component_to_strip_str {
+                  saw_matching_dir = true;
+                  None
+                } else {
+                  Some(subdir.get_name().to_owned())
+                }
+              }).collect();
+              let files: Vec<_> = dir.get_files().iter().map(|file| file.get_name().to_owned()).collect();
+
+              match (saw_matching_dir, extra_directories.is_empty() && files.is_empty()) {
+                (false, true) => return futures::future::ok(futures::future::Loop::Break(bazel_protos::remote_execution::Directory::new())).to_boxed(),
+                (false, false) => {
+                  // Prefer "No subdirectory found" error to "had extra files" error.
+                  return futures::future::err(format!(
+                    "Cannot strip prefix {} from root directory {:?} - {}directory{} didn't contain a directory named {}{}",
+                    already_stripped.join(&prefix).display(),
                     root_digest,
-                    if already_stripped.components().next().is_some() { "sub" } else { "" },
-                    already_stripped.display(),
-                    component_to_strip.as_os_str().to_string_lossy().as_ref()
-                  )
-                });
-              let maybe_digest: Result<Digest, String> = dir.get_directories()[try_future!(index)]
-                .get_digest()
-                .into();
-              let next_already_stripped = already_stripped.join(component_to_strip);
-              let dir = Self::get_directory_or_err(store.clone(), try_future!(maybe_digest));
-              dir
-                .map(|dir| {
-                  futures::future::Loop::Continue((dir, next_already_stripped, remaining_prefix))
-                })
-                .to_boxed()
+                    if has_already_stripped_any { "sub" } else { "root " },
+                    if has_already_stripped_any { format!(" {}", already_stripped.display()) } else { String::new() },
+                    component_to_strip_str,
+                    if !extra_directories.is_empty() || !files.is_empty() { format!(" but did contain {}", Self::directories_and_files(&extra_directories, &files)) } else { String::new() },
+                  )).to_boxed()
+                },
+                (true, false) => {
+                  return futures::future::err(format!(
+                    "Cannot strip prefix {} from root directory {:?} - {}directory{} contained non-matching {}",
+                    already_stripped.join(&prefix).display(),
+                    root_digest,
+                    if has_already_stripped_any { "sub" } else { "root " },
+                    if has_already_stripped_any { format!(" {}", already_stripped.display()) } else { String::new() },
+                    Self::directories_and_files(&extra_directories, &files),
+                  )).to_boxed();
+                },
+                (true, true) => {
+                  // Must be 0th index, because we've checked that we saw a matching directory, and no others.
+                  let maybe_digest: Result<Digest, String> = dir.get_directories()[0]
+                      .get_digest()
+                      .into();
+                  let next_already_stripped = already_stripped.join(component_to_strip);
+                  let dir = Self::get_directory_or_err(store.clone(), try_future!(maybe_digest));
+                  dir
+                      .map(|dir| {
+                        futures::future::Loop::Continue((dir, next_already_stripped, remaining_prefix))
+                      })
+                      .to_boxed()
+                }
+              }
             } else {
               futures::future::ok(futures::future::Loop::Break(dir)).to_boxed()
             }
@@ -390,6 +416,35 @@ impl Snapshot {
         )
       })
       .and_then(move |dir| store2.record_directory(&dir, true))
+  }
+
+  fn directories_and_files(directories: &[String], files: &[String]) -> String {
+    format!(
+      "{}{}{}",
+      if directories.is_empty() {
+        String::new()
+      } else {
+        format!(
+          "director{} named: {}",
+          if directories.len() == 1 { "y" } else { "ies" },
+          directories.join(", ")
+        )
+      },
+      if !directories.is_empty() && !files.is_empty() {
+        " and "
+      } else {
+        ""
+      },
+      if files.is_empty() {
+        String::new()
+      } else {
+        format!(
+          "file{} named: {}",
+          if files.len() == 1 { "" } else { "s" },
+          files.join(", ")
+        )
+      },
+    )
   }
 
   fn get_directory_or_err(
@@ -907,6 +962,23 @@ mod tests {
   }
 
   #[test]
+  fn strip_prefix_empty_subdir() {
+    let (store, _, _, _, mut runtime) = setup();
+
+    let dir = TestDirectory::containing_falcons_dir();
+    runtime
+      .block_on(store.record_directory(&dir.directory(), false))
+      .expect("Error storing directory");
+
+    let result = runtime.block_on(super::Snapshot::strip_prefix(
+      store,
+      dir.digest(),
+      PathBuf::from("falcons/peregrine"),
+    ));
+    assert_eq!(result, Ok(TestDirectory::empty().digest()));
+  }
+
+  #[test]
   fn strip_dir_not_in_store() {
     let (store, _, _, _, mut runtime) = setup();
     let digest = TestDirectory::nested().digest();
@@ -940,7 +1012,7 @@ mod tests {
   }
 
   #[test]
-  fn strip_non_matching_prefix() {
+  fn strip_prefix_non_matching_file() {
     let (store, _, _, _, mut runtime) = setup();
     let dir = TestDirectory::recursive();
     let child_dir = TestDirectory::containing_roland();
@@ -956,8 +1028,27 @@ mod tests {
       PathBuf::from("cats"),
     ));
 
-    // TODO: Should this discard non-matching files (as this test suggests), or error?
-    assert_eq!(result, Ok(child_dir.digest()));
+    assert_eq!(result, Err(format!("Cannot strip prefix cats from root directory {:?} - root directory contained non-matching file named: treats", dir.digest())));
+  }
+
+  #[test]
+  fn strip_prefix_non_matching_dir() {
+    let (store, _, _, _, mut runtime) = setup();
+    let dir = TestDirectory::double_nested_dir_and_file();
+    let child_dir = TestDirectory::nested_dir_and_file();
+    runtime
+      .block_on(store.record_directory(&dir.directory(), false))
+      .expect("Error storing directory");
+    runtime
+      .block_on(store.record_directory(&child_dir.directory(), false))
+      .expect("Error storing directory");
+    let result = runtime.block_on(super::Snapshot::strip_prefix(
+      store,
+      dir.digest(),
+      PathBuf::from("animals/cats"),
+    ));
+
+    assert_eq!(result, Err(format!("Cannot strip prefix animals/cats from root directory {:?} - subdirectory animals contained non-matching directory named: birds", dir.digest())));
   }
 
   #[test]
@@ -975,7 +1066,7 @@ mod tests {
       dir.digest(),
       PathBuf::from("cats/ugly"),
     ));
-    assert_eq!(result, Err(format!("Stripping prefix from root directory {:?}, subdirectory cats didn't contain a directory named ugly", dir.digest())));
+    assert_eq!(result, Err(format!("Cannot strip prefix cats/ugly from root directory {:?} - subdirectory cats didn't contain a directory named ugly but did contain file named: roland", dir.digest())));
   }
 
   fn make_dir_stat(root: &Path, relpath: &Path) -> PathStat {

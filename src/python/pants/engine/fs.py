@@ -148,7 +148,7 @@ class MergedDirectories(datatype([('directories', tuple)])):
   pass
 
 
-class PrefixStrippedDirectory(datatype([('directory_digest', Digest), ('prefix', text_type)])):
+class DirectoryWithPrefixToStrip(datatype([('directory_digest', Digest), ('prefix', text_type)])):
   pass
 
 
@@ -186,6 +186,6 @@ def create_fs_rules():
     RootRule(Digest),
     RootRule(MergedDirectories),
     RootRule(PathGlobs),
-    RootRule(PrefixStrippedDirectory),
+    RootRule(DirectoryWithPrefixToStrip),
     RootRule(UrlToFetch),
   ]

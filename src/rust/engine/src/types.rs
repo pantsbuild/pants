@@ -11,7 +11,7 @@ pub struct Types {
   pub directory_digest: TypeId,
   pub snapshot: TypeId,
   pub merged_directories: TypeId,
-  pub prefix_stripped_directory: TypeId,
+  pub directory_with_prefix_to_strip: TypeId,
   pub files_content: TypeId,
   pub dir: TypeId,
   pub file: TypeId,

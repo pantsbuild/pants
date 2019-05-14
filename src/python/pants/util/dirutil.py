@@ -16,6 +16,8 @@ from builtins import open
 from collections import defaultdict
 from contextlib import contextmanager
 
+from future.utils import PY3
+
 from pants.util.strutil import ensure_text
 
 
@@ -119,7 +121,14 @@ def safe_file_dump(filename, payload='', mode='w', makedirs=False):
   :param bool makedirs: Whether to make all parent directories of this file before making it.
   """
   if makedirs:
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    if PY3:
+      os.makedirs(os.path.dirname(filename), exist_ok=True)
+    else:
+      try:
+        os.makedirs(os.path.dirname(filename))
+      except OSError as e:
+        if e.errno != os.errno.EEXIST:
+          raise
 
   with safe_open(filename, mode=mode) as f:
     f.write(payload)
