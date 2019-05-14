@@ -91,12 +91,7 @@ def identify_missing_init_files(sources):
           package = os.path.join(package, component)
           packages.add(package)
 
-  missing_init_files = set()
-  for package in packages:
-    init_file = os.path.join(package, '__init__.py')
-    if init_file not in sources:
-      missing_init_files.add(init_file)
-  return missing_init_files
+  return {os.path.join(package, '__init__.py') for package in packages} - set(sources)
 
 
 def _create_source_dumper(builder, tgt):

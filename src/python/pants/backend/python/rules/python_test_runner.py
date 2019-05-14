@@ -109,19 +109,23 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
   # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of raising to
   # simplify the hasattr() checks here!
   # TODO(7714): restore the full source name for the stdout of the Pytest run.
-  all_sources_digests = []
+  sources_snapshots_and_source_roots = []
   for maybe_source_target in all_targets:
     if hasattr(maybe_source_target.adaptor, 'sources'):
-      sources_snapshot = maybe_source_target.adaptor.sources.snapshot
-      sources_source_root = source_roots.find_by_path(maybe_source_target.adaptor.address.spec_path)
-      digest_adjusted_for_source_root = yield Get(
-        Digest,
-        DirectoryWithPrefixToStrip(
-          directory_digest=sources_snapshot.directory_digest,
-          prefix=sources_source_root.path
-        )
+      snapshot = maybe_source_target.adaptor.sources.snapshot
+      source_root = source_roots.find_by_path(maybe_source_target.adaptor.address.spec_path)
+      sources_snapshots_and_source_roots.append((snapshot, source_root))
+  all_sources_digests = yield [
+    Get(
+      Digest,
+      DirectoryWithPrefixToStrip(
+        directory_digest=snapshot.directory_digest,
+        prefix=source_root.path
       )
-      all_sources_digests.append(digest_adjusted_for_source_root)
+    )
+    for snapshot, source_root
+    in sources_snapshots_and_source_roots
+  ]
 
   sources_digest = yield Get(
     Digest, MergedDirectories(directories=tuple(all_sources_digests)),
@@ -129,24 +133,23 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
 
   # TODO(7716): add a builtin rule to go from MergedDirectories->Snapshot or Digest->Snapshot.
   # TODO(7715): generalize the injection of __init__.py files.
+  # TODO(7718): add a builtin rule for FilesContent->Snapshot.
   file_contents = yield Get(FilesContent, Digest, sources_digest)
   file_paths = [fc.path for fc in file_contents]
   injected_inits = tuple(sorted(identify_missing_init_files(file_paths)))
-  touch_init_request = ExecuteProcessRequest(
-    argv=("touch",) + injected_inits,
-    output_files=injected_inits,
-    description="Inject empty __init__.py into all packages without one already.",
-    input_files=sources_digest,
-    env={"PATH": os.environ["PATH"]}
-  )
+  if injected_inits:
+    touch_init_request = ExecuteProcessRequest(
+      argv=("/usr/bin/touch",) + injected_inits,
+      output_files=injected_inits,
+      description="Inject empty __init__.py into all packages without one already.",
+      input_files=sources_digest,
+    )
+    touch_init_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, touch_init_request)
 
-  touch_init_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, touch_init_request)
+  all_input_digests = [sources_digest, requirements_pex_response.output_directory_digest]
+  if injected_inits:
+    all_input_digests.append(touch_init_result.output_directory_digest)
 
-  all_input_digests = [
-    sources_digest,
-    requirements_pex_response.output_directory_digest,
-    touch_init_result.output_directory_digest
-  ]
   merged_input_files = yield Get(
     Digest,
     MergedDirectories,
