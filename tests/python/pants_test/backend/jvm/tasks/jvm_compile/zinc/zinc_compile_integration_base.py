@@ -38,6 +38,38 @@ class BaseZincCompileIntegrationTest(object):
         self.assertTrue(jar.getinfo(SHAPELESS_CLSFILE),
                         'Expected a jar containing the expected class.')
 
+  # TODO: this could be converted into a unit test!
+  def test_consecutive_compiler_option_sets(self):
+    """Test that the ordering of args in compiler option sets are respected.
+
+    Generating a scalac profile requires two consecutive arguments, '-Yprofile-destination' and its
+    following argument, the file to write the CSV profile to. We want to be able to allow users to
+    successfully run scalac with profiling from pants, so we test this case in particular. See the
+    discussion from https://github.com/pantsbuild/pants/pull/7683.
+    """
+    with temporary_dir() as tmp_dir:
+      profile_destination = os.path.join(tmp_dir, 'scala_profile.csv')
+      self.do_command(
+        'compile',
+        SHAPELESS_TARGET,
+        # Flags to enable profiling and statistics on target
+        config={
+          'compile.zinc': {
+            'default_compiler_option_sets': ['profile'],
+            'compiler_option_sets_enabled_args': {
+              'profile': [
+                '-S-Ystatistics',
+                '-S-Yhot-statistics-enabled',
+                '-S-Yprofile-enabled',
+                '-S-Yprofile-destination',
+                '-S{}'.format(profile_destination),
+                '-S-Ycache-plugin-class-loader:last-modified',
+              ],
+            },
+          },
+        })
+      self.assertTrue(os.path.isfile(profile_destination))
+
   def test_scala_empty_compile(self):
     with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testproject/emptyscala',
                               expected_files=[]):

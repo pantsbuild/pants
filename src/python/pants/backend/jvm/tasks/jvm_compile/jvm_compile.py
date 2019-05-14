@@ -69,6 +69,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
              help='When set, any invalid/incompatible analysis files will be deleted '
                   'automatically.  When unset, an error is raised instead.')
 
+    # TODO(#7682): convert these into option sets!
     register('--warnings', default=True, type=bool, fingerprint=True,
              help='Compile with all configured warnings enabled.')
 
