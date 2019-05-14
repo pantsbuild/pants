@@ -7,12 +7,6 @@ not undergone the vetting associated with ``stable`` releases.
 1.17.0.dev0 (5/13/2019)
 -----------------------
 
-New Features
-~~~~~~~~~~~~
-
-* V2 `./pants test.pytest` selects interpreter based off of compatibility constraints (#7679)
-  `PR #7679 <https://github.com/pantsbuild/pants/pull/7679>`_
-
 Bugfixes
 ~~~~~~~~
 
@@ -24,6 +18,9 @@ Bugfixes
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Refactor and modernize `check_header.py` to use Python 3 (#7635)
+  `PR #7635 <https://github.com/pantsbuild/pants/pull/7635>`_
 
 * Add pantsd_invalidation_globs option into pants.ini (#7705)
   `PR #7705 <https://github.com/pantsbuild/pants/pull/7705>`_
@@ -66,6 +63,9 @@ Refactoring, Improvements, and Tooling
 
 * Refactor v2 TestResult model to use enum (#7677)
   `PR #7677 <https://github.com/pantsbuild/pants/pull/7677>`_
+
+* V2 `./pants test.pytest` selects interpreter based off of compatibility constraints (#7679)
+  `PR #7679 <https://github.com/pantsbuild/pants/pull/7679>`_
 
 1.16.0rc0 (5/7/2019)
 --------------------
