@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import hashlib
 import logging
 import os
 import tarfile
@@ -444,6 +445,25 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
           [DirectoryWithPrefixToStrip(snapshot_with_extra_files.directory_digest, text_type("characters/dark_tower"))]
         )
 
+  def test_lift_directory_digest_to_snapshot(self):
+    digest = self.prime_store_with_roland_digest()
+    snapshot = assert_single_element(self.scheduler.product_request(Snapshot, [digest]))
+    self.assertEquals(snapshot.files, ("roland",))
+    self.assertEquals(snapshot.directory_digest, digest)
+
+  def test_error_lifting_file_digest_to_snapshot(self):
+    self.prime_store_with_roland_digest()
+
+    # A file digest is not a directory digest! Hash the file that was primed as part of that
+    # directory, and show that we can't turn it into a Snapshot.
+    text = b"European Burmese"
+    hasher = hashlib.sha256()
+    hasher.update(text)
+    digest = Digest(fingerprint=text_type(hasher.hexdigest()), serialized_bytes_length=len(text))
+
+    with self.assertRaisesWithMessageContaining(ExecutionError, "unknown directory"):
+      self.scheduler.product_request(Snapshot, [digest])
+
   def test_glob_match_error(self):
     with self.assertRaises(ValueError) as cm:
       self.assert_walk_files(PathGlobs(
@@ -495,10 +515,10 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
         f.write("European Burmese")
       globs = PathGlobs(("*",), ())
       snapshot = self.scheduler.capture_snapshots((PathGlobsAndRoot(globs, text_type(temp_dir)),))[0]
-      self.assert_snapshot_equals(snapshot, ["roland"], Digest(
-        text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
-        80
-      ))
+
+      expected_digest = Digest(text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"), 80)
+      self.assert_snapshot_equals(snapshot, ["roland"], expected_digest)
+    return expected_digest
 
   pantsbuild_digest = Digest("63652768bd65af8a4938c415bdc25e446e97c473308d26b3da65890aebacf63f", 18)
 

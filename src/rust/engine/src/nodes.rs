@@ -205,6 +205,23 @@ impl WrappedNode for Select {
             .to_boxed()
         }
         &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+          if product == context.core.types.snapshot
+            && input == context.core.types.directory_digest =>
+        {
+          let core = context.core.clone();
+          self
+            .select_product(&context, context.core.types.directory_digest, "intrinsic")
+            .and_then(|directory_digest_val| {
+              lift_digest(&directory_digest_val).map_err(|str| throw(&str))
+            })
+            .and_then(move |digest| {
+              fs::Snapshot::from_digest(context.core.store(), digest).map_err(|str| throw(&str))
+            })
+            .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
+            .to_boxed()
+        }
+
+        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.directory_digest
             && input == context.core.types.directory_with_prefix_to_strip =>
         {
