@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import hashlib
 import os
-from builtins import open
+from builtins import object, open
 
 from future.utils import PY3
 from pex.executor import Executor
@@ -19,6 +19,32 @@ from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, Fing
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.util.dirutil import safe_mkdir_for
+
+
+class SelectInterpreterClientMixin(object):
+  """Helper methods for python tasks which require a specific interpreter to run.
+
+  pex may change its interface and deprecate methods of resolving interpreters. This mixin allows
+  individual python tasks to avoid the details of how to invoke pex with exactly the interpreter
+  they've selected.
+  """
+
+  def get_selected_interpreter(self):
+    return self.context.products.get_data(PythonInterpreter)
+
+  def env_for_pinning_runtime_interpreter_for_pex(self):
+    """Return an environment for invoking a pex which ensures the use of the selected interpreter.
+
+    When creating the merged pytest pex, we already have an interpreter, and we only invoke that pex
+    within a pants run, so we can be sure the selected interpreter will be available. Constraining
+    the interpreter search path at pex runtime ensures that any resolved requirements will be
+    compatible with the interpreter being used to invoke the merged pytest pex.
+    """
+    chosen_interpreter_binary_path = self.get_selected_interpreter().binary
+    return {
+      'PEX_PYTHON': chosen_interpreter_binary_path,
+      'PEX_PYTHON_PATH': chosen_interpreter_binary_path,
+    }
 
 
 class PythonInterpreterFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):

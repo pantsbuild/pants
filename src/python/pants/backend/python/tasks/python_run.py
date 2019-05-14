@@ -9,13 +9,14 @@ import signal
 
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.tasks.python_execution_task_base import PythonExecutionTaskBase
+from pants.backend.python.tasks.select_interpreter import SelectInterpreterClientMixin
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.util.osutil import safe_kill
 from pants.util.strutil import safe_shlex_split
 
 
-class PythonRun(PythonExecutionTaskBase):
+class PythonRun(PythonExecutionTaskBase, SelectInterpreterClientMixin):
   """Run a Python executable."""
 
   @classmethod
@@ -34,7 +35,7 @@ class PythonRun(PythonExecutionTaskBase):
       # jvm_binary, in which case we have to no-op and let jvm_run do its thing.
       # TODO(benjy): Use MutexTask to coordinate this.
 
-      pex = self.create_pex(binary.pexinfo)
+      pex = self.create_pex(binary.pexinfo, pin_selected_interpreter=True)
       args = []
       for arg in self.get_options().args:
         args.extend(safe_shlex_split(arg))
@@ -45,7 +46,10 @@ class PythonRun(PythonExecutionTaskBase):
       with self.context.new_workunit(name='run',
                                      cmd=cmdline,
                                      labels=[WorkUnitLabel.TOOL, WorkUnitLabel.RUN]):
-        po = pex.run(blocking=False, args=args, env=os.environ.copy())
+        env = os.environ.copy()
+        # NB: Constrain the pex environment to ensure the use of the selected interpreter!
+        env.update(self.env_for_pinning_runtime_interpreter_for_pex())
+        po = pex.run(blocking=False, args=args, env=env)
         try:
           result = po.wait()
           if result != 0:

@@ -612,14 +612,13 @@ class PantsRunIntegrationTest(unittest.TestCase):
     """Wrapper around run_pants method.
 
     :param args: command line arguments used to run pants
-    :param kwargs: handles 1 key
-      success - indicate whether to expect pants run to succeed or fail.
+    :param bool success: indicate whether to expect pants run to succeed or fail.
+    :param kwargs: forwarded to self.run_pants().
     :return: a PantsResult object
     """
-    success = kwargs.get('success', True)
-    cmd = []
-    cmd.extend(list(args))
-    pants_run = self.run_pants(cmd)
+    success = kwargs.pop('success', True)
+    cmd = list(args)
+    pants_run = self.run_pants(cmd, **kwargs)
     if success:
       self.assert_success(pants_run)
     else:
