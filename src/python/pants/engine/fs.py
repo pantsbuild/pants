@@ -148,6 +148,10 @@ class MergedDirectories(datatype([('directories', tuple)])):
   pass
 
 
+class DirectoryWithPrefixToStrip(datatype([('directory_digest', Digest), ('prefix', text_type)])):
+  pass
+
+
 class DirectoryToMaterialize(datatype([('path', text_type), ('directory_digest', Digest)])):
   """A request to materialize the contents of a directory digest at the provided path."""
   pass
@@ -182,5 +186,6 @@ def create_fs_rules():
     RootRule(Digest),
     RootRule(MergedDirectories),
     RootRule(PathGlobs),
+    RootRule(DirectoryWithPrefixToStrip),
     RootRule(UrlToFetch),
   ]
