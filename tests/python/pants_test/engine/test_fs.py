@@ -14,7 +14,7 @@ from contextlib import contextmanager
 from future.utils import PY2, text_type
 
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, DirectoryToMaterialize,
-                             DirectoryWithPrefixToStrip, FilesContent, MergedDirectories, PathGlobs,
+                             DirectoryWithPrefixToStrip, FilesContent, DirectoriesToMerge, PathGlobs,
                              PathGlobsAndRoot, Snapshot, UrlToFetch, create_fs_rules)
 from pants.engine.scheduler import ExecutionError
 from pants.option.global_options import GlobMatchErrorBehavior
@@ -334,13 +334,13 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
 
       empty_merged = self.scheduler.product_request(
         Digest,
-        [MergedDirectories((empty_snapshot.directory_digest,))],
+        [DirectoriesToMerge((empty_snapshot.directory_digest,))],
       )[0]
       self.assertEqual(empty_snapshot.directory_digest, empty_merged)
 
       roland_merged = self.scheduler.product_request(
         Digest,
-        [MergedDirectories((roland_snapshot.directory_digest, empty_snapshot.directory_digest))],
+        [DirectoriesToMerge((roland_snapshot.directory_digest, empty_snapshot.directory_digest))],
       )[0]
       self.assertEqual(
         roland_snapshot.directory_digest,
@@ -349,7 +349,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
 
       both_merged = self.scheduler.product_request(
         Digest,
-        [MergedDirectories((roland_snapshot.directory_digest, susannah_snapshot.directory_digest))],
+        [DirectoriesToMerge((roland_snapshot.directory_digest, susannah_snapshot.directory_digest))],
       )[0]
 
       self.assertEqual(both_snapshot.directory_digest, both_merged)

@@ -185,10 +185,10 @@ impl WrappedNode for Select {
         }
         &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.directory_digest
-            && input == context.core.types.merged_directories =>
+            && input == context.core.types.directories_to_merge =>
         {
           let request =
-            self.select_product(&context, context.core.types.merged_directories, "intrinsic");
+            self.select_product(&context, context.core.types.directories_to_merge, "intrinsic");
           let core = context.core.clone();
           request
             .and_then(move |request| {

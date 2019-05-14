@@ -301,14 +301,14 @@ impl Snapshot {
 
         // Group and recurse for DirectoryNodes.
         let sorted_child_directories = {
-          let mut merged_directories = Iterator::flatten(
+          let mut directories_to_merge = Iterator::flatten(
             directories
               .iter_mut()
               .map(|directory| directory.take_directories().into_iter()),
           )
           .collect::<Vec<_>>();
-          merged_directories.sort_by(|a, b| a.name.cmp(&b.name));
-          merged_directories
+          directories_to_merge.sort_by(|a, b| a.name.cmp(&b.name));
+          directories_to_merge
         };
         let store2 = store.clone();
         join_all(
