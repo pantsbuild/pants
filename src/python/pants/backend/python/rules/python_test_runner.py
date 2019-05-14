@@ -112,9 +112,9 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
   sources_snapshots_and_source_roots = []
   for maybe_source_target in all_targets:
     if hasattr(maybe_source_target.adaptor, 'sources'):
-      snapshot = maybe_source_target.adaptor.sources.snapshot
-      source_root = source_roots.find_by_path(maybe_source_target.adaptor.address.spec_path)
-      sources_snapshots_and_source_roots.append((snapshot, source_root))
+      tgt_snapshot = maybe_source_target.adaptor.sources.snapshot
+      tgt_source_root = source_roots.find_by_path(maybe_source_target.adaptor.address.spec_path)
+      sources_snapshots_and_source_roots.append((tgt_snapshot, tgt_source_root))
   all_sources_digests = yield [
     Get(
       Digest,
