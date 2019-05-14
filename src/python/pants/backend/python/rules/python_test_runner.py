@@ -17,7 +17,8 @@ from pants.engine.fs import (Digest, DirectoryWithPrefixToStrip, FilesContent, M
                              Snapshot, UrlToFetch)
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
                                            FallibleExecuteProcessResult)
-from pants.engine.legacy.graph import TransitiveHydratedTarget
+from pants.engine.legacy.graph import (BuildFileAddresses, TransitiveHydratedTarget,
+                                       TransitiveHydratedTargets)
 from pants.engine.rules import optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.core_test_model import Status, TestResult
@@ -58,7 +59,12 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
   digest = Digest('61bb79384db0da8c844678440bd368bcbfac17bbdb865721ad3f9cb0ab29b629', 1826945)
   pex_snapshot = yield Get(Snapshot, UrlToFetch(url, digest))
 
-  all_targets = [target_root] + [dep.root for dep in transitive_hydrated_target.dependencies]
+  # TODO(7726): replace this with a proper API to get the `closure` for a
+  # TransitiveHydratedTarget.
+  transitive_hydrated_targets = yield Get(
+    TransitiveHydratedTargets, BuildFileAddresses((target_root.address,))
+  )
+  all_targets = transitive_hydrated_targets.closure
 
   # Produce a pex containing pytest and all transitive 3rdparty requirements.
   all_requirements = []

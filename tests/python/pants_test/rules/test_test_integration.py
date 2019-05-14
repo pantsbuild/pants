@@ -181,6 +181,29 @@ class TestIntegrationTest(PantsRunIntegrationTest):
         """)
     )
 
+  def test_transitive_dep(self):
+    pants_run = self.run_passing_pants_test([
+      'testprojects/tests/python/pants/dummies:target_with_transitive_dep',
+    ])
+    self.assert_fuzzy_string_match(
+      pants_run.stdout_data,
+      dedent("""\
+        testprojects/tests/python/pants/dummies:target_with_transitive_dep stdout:
+        ============================= test session starts ==============================
+        platform SOME_TEXT
+        rootdir: SOME_TEXT
+        plugins: SOME_TEXT
+        collected 1 item
+
+        pants/dummies/test_with_transitive_dep.py .                              [100%]
+
+        =========================== 1 passed in SOME_TEXT ===========================
+
+
+        testprojects/tests/python/pants/dummies:target_with_transitive_dep              .....   SUCCESS
+        """)
+    )
+
   def test_mixed_python_tests(self):
     pants_run = self.run_failing_pants_test([
       'testprojects/tests/python/pants/dummies:failing_target',
