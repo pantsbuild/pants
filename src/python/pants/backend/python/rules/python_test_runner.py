@@ -113,7 +113,7 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
   # TODO: find some way to restore the full source name for the stdout of the Pytest run, so that
   # we can output the original path, rather than the path without the source root. It appears we
   # do this in V1 via parsing the Junit XML file and adding the value back? See pytest_run.py's
-  # _get_target_from_test().
+  # _get_target_from_test(). This is a low priority.
   all_sources_digests = []
   for maybe_source_target in all_targets:
     if hasattr(maybe_source_target.adaptor, 'sources'):
@@ -133,6 +133,8 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
 
   # TODO: add intrinsic to go from Digest->Snapshot, so that we can avoid having to use
   # `FileContent`, which unnecessarily gets the content.
+  # TODO: somehow generalize this injection of __init__.py files. Presumably it will be useful
+  # for other Python commands.
   file_contents = yield Get(FilesContent, Digest, sources_digest)
   file_paths = [fc.path for fc in file_contents]
   injected_inits = tuple(sorted(identify_missing_init_files(file_paths)))
