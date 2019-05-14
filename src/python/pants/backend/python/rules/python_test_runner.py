@@ -97,8 +97,8 @@ def run_python_test(test_target, pytest, python_setup, source_root_config):
       'PATH': text_type(os.pathsep.join(python_setup.interpreter_search_paths)),
       # NB: CPPFLAGS and LDFLAGS are necessary on certain systems (i.e. macOS) to get cryptography
       # properly resolved.
-      'CPPFLAGS': text_type(os.environ.get('CPPFLAGS')),
-      'LDFLAGS': text_type(os.environ.get('LDFLAGS')),
+      'CPPFLAGS': text_type(os.environ.get('CPPFLAGS', '')),
+      'LDFLAGS': text_type(os.environ.get('LDFLAGS', '')),
     },
     input_files=pex_snapshot.directory_digest,
     description='Resolve requirements for {}'.format(test_target.address.reference()),
@@ -162,7 +162,11 @@ def run_python_test(test_target, pytest, python_setup, source_root_config):
 
   request = ExecuteProcessRequest(
     argv=(python_binary, './{}'.format(output_pytest_requirements_pex_filename)),
-    env={'PATH': text_type(os.pathsep.join(python_setup.interpreter_search_paths))},
+    env={
+      'PATH': text_type(os.pathsep.join(python_setup.interpreter_search_paths)),
+      'LANG': text_type(os.environ.get('LANG', '')),
+      'LC_ALL': text_type(os.environ.get('LC_ALL', '')),
+    },
     input_files=merged_input_files,
     description='Run pytest for {}'.format(test_target.address.reference()),
   )

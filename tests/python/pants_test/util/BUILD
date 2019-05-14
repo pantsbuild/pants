@@ -32,7 +32,6 @@ python_tests(
   ]
 )
 
-# TODO: weird ASCII failure
 python_tests(
   name = 'dirutil',
   sources = ['test_dirutil.py'],
