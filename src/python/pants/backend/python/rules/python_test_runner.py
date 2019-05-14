@@ -45,6 +45,8 @@ def parse_interpreter_constraints(python_setup, python_target_adaptors):
   return constraints_args
 
 
+# TODO(7726): replace this function with a proper API to get the `closure` for a
+# TransitiveHydratedTarget.
 def resolve_all_transitive_hydrated_targets(initial_transitive_hydrated_target):
   all_targets = set()
   def recursively_add_transitive_deps(transitive_hydrated_target):
