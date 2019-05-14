@@ -135,7 +135,7 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
 
   all_input_digests = [
     sources_digest,
-    inits_digest.digest,
+    inits_digest.directory_digest,
     requirements_pex_response.output_directory_digest,
   ]
   merged_input_files = yield Get(

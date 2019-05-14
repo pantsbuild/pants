@@ -5,23 +5,20 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.python.subsystems.pex_build_util import identify_missing_init_files
-from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest, FilesContent
+from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.rules import rule
 from pants.engine.selectors import Get
 from pants.util.objects import datatype
 
 
-class InitInjectedDigest(datatype([('digest', Digest)])): pass
+class InitInjectedDigest(datatype([('directory_digest', Digest)])): pass
 
 
-# TODO(7716): change this signature to take a Snapshot once we add a builtin rule Digest->Snapshot.
-@rule(InitInjectedDigest, [Digest])
-def inject_init(digest):
+@rule(InitInjectedDigest, [Snapshot])
+def inject_init(snapshot):
   """Ensure that every package has an __init__.py file in it."""
-  file_contents = yield Get(FilesContent, Digest, digest)
-  file_paths = [fc.path for fc in file_contents]
-  missing_init_files = tuple(sorted(identify_missing_init_files(file_paths)))
+  missing_init_files = tuple(sorted(identify_missing_init_files(snapshot.files)))
   if not missing_init_files:
     new_init_files_digest = EMPTY_DIRECTORY_DIGEST
   else:
@@ -30,7 +27,7 @@ def inject_init(digest):
       argv=("/usr/bin/touch",) + missing_init_files,
       output_files=missing_init_files,
       description="Inject empty __init__.py into all packages without one already.",
-      input_files=digest,
+      input_files=snapshot.directory_digest,
     )
     touch_init_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, touch_init_request)
     new_init_files_digest = touch_init_result.output_directory_digest
@@ -39,7 +36,7 @@ def inject_init(digest):
   #   Digest,
   #   MergedDirectories(directories=(digest, new_init_files_digest))
   # )
-  yield InitInjectedDigest(digest=new_init_files_digest)
+  yield InitInjectedDigest(directory_digest=new_init_files_digest)
 
 
 def rules():
