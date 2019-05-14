@@ -324,6 +324,7 @@ function install_and_test_packages() {
   for package in "${packages[@]}"
   do
     start_travis_section "${package}" "Installing and testing package ${package}-${VERSION}"
+    # shellcheck disable=SC2086
     eval pkg_${package##*\.}_install_test "${PIP_ARGS[@]}" || \
       die "Failed to install and test package ${package}-${VERSION}!"
     end_travis_section
@@ -443,7 +444,7 @@ function reversion_whls() {
   local dest_dir=$2
   local output_version=$3
 
-  for whl in $(ls -1 "${src_dir}"/*.whl); do
+  for whl in "${src_dir}"/*.whl; do
     run_local_pants -q run src/python/pants/releases:reversion -- \
       --glob='pants/VERSION' \
       "${whl}" "${dest_dir}" "${output_version}" \
