@@ -113,11 +113,12 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
   for maybe_source_target in all_targets:
     if hasattr(maybe_source_target.adaptor, 'sources'):
       sources_snapshot = maybe_source_target.adaptor.sources.snapshot
+      sources_source_root = source_roots.find_by_path(maybe_source_target.adaptor.address.spec_path)
       digest_adjusted_for_source_root = yield Get(
         Digest,
         DirectoryWithPrefixToStrip(
-          sources_snapshot.directory_digest,
-          source_roots.find_by_path(maybe_source_target.adaptor.address.spec_path).path
+          directory_digest=sources_snapshot.directory_digest,
+          prefix=sources_source_root.path
         )
       )
       all_sources_digests.append(digest_adjusted_for_source_root)
