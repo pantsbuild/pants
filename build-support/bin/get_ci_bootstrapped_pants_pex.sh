@@ -18,7 +18,7 @@ NUM_VERSIONS=$(aws --no-sign-request --region us-east-1 s3api list-object-versio
 
 # Now fetch the pre-bootstrapped pex, so that the ./pants wrapper script can use it
 # instead of running from sources (and re-bootstrapping).
-aws --no-sign-request --region us-east-1 s3 cp ${BOOTSTRAPPED_PEX_URL} ./pants.pex
+aws --no-sign-request --region us-east-1 s3 cp "${BOOTSTRAPPED_PEX_URL}" ./pants.pex
 chmod 755 ./pants.pex
 
 # Pants code executing under test expects native_engine.so to be present as a resource

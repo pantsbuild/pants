@@ -9,7 +9,8 @@ source build-support/common.sh
 # running in the git root, as it looks for a .git directory relative to the working directory.
 # Explicitly absolute-ify the $GIT_DIR variable so that this doesn't happen.
 if [[ -n "${GIT_DIR}" && "${GIT_DIR}" != /* ]]; then
-  export GIR_DIR="$(pwd)/${GIT_DIR}"
+  GIT_DIR="$(pwd)/${GIT_DIR}"
+  export GIT_DIR
 fi
 
 DIRS_TO_CHECK=(
@@ -44,19 +45,21 @@ echo "* Checking headers"
 echo "* Checking for banned imports"
 ./build-support/bin/check_banned_imports.py
 
-echo "* Checking for bad shell patterns" && ./build-support/bin/check_shell.sh || exit 1
+echo "* Checking for bad shell patterns"
+./build-support/bin/check_shell.sh || exit 1
 
 # When travis builds a tag, it does so in a shallow clone without master fetched, which
 # fails in pants changed.
 if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
-  echo "* Checking imports" && ./build-support/bin/isort.sh || \
-    die "To fix import sort order, run \`\"$(pwd)/build-support/bin/isort.sh\" -f\`"
+  echo "* Checking imports"
+  ./build-support/bin/isort.sh || die "To fix import sort order, run \`\"$(pwd)/build-support/bin/isort.sh\" -f\`"
 
   # TODO(CMLivingston) Make lint use `-q` option again after addressing proper workunit labeling:
   # https://github.com/pantsbuild/pants/issues/6633
   # TODO: add a test case for this while including a pexrc file, as python checkstyle currently fails
   # quite often with a pexrc available.
-  echo "* Checking lint" && ./pants --exclude-target-regexp='testprojects/.*' --changed-parent="${MERGE_BASE}" lint || exit 1
+  echo "* Checking lint"
+  ./pants --exclude-target-regexp='testprojects/.*' --changed-parent="${MERGE_BASE}" lint || exit 1
 
   echo "* Checking types (for build-support)"
   # NB: This task requires Python 3, so we must temporarily override any intepreter constraints
@@ -65,22 +68,25 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
   PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython>=3.6']" ./pants mypy 'build-support::' || exit 1
 
   if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then
-    echo "* Checking formatting of rust files" && ./build-support/bin/check_rust_formatting.sh || exit 1
+    echo "* Checking formatting of rust files"
+    ./build-support/bin/check_rust_formatting.sh || exit 1
     # Clippy happens on a different Travis CI shard because of separate caching concerns.
     # The TRAVIS env var is documented here:
     #   https://docs.travis-ci.com/user/environment-variables/#default-environment-variables
     if [[ "${TRAVIS}" != "true" ]]; then
-      echo "* Running cargo clippy" && ./build-support/bin/check_clippy.sh || exit 1
+      echo "* Running cargo clippy"
+      ./build-support/bin/check_clippy.sh || exit 1
     fi
-    echo "* Checking rust target headers" && build-support/bin/check_rust_target_headers.sh || exit 1
+    echo "* Checking rust target headers"
+    build-support/bin/check_rust_target_headers.sh || exit 1
   fi
 
   if git diff "${MERGE_BASE}" --name-only | grep build-support/travis > /dev/null; then
-    echo "* Checking .travis.yml generation" && \
-    actual_travis_yml=$(<.travis.yml) && \
-    expected_travis_yml=$(./pants --quiet run build-support/travis:generate_travis_yml) && \
+    echo "* Checking .travis.yml generation"
+    actual_travis_yml=$(<.travis.yml)
+    expected_travis_yml=$(./pants --quiet run build-support/travis:generate_travis_yml)
     [ "${expected_travis_yml}" == "${actual_travis_yml}" ] || \
-    die "Travis config generator changed but .travis.yml file not regenerated. See top of that file for instructions."
+      die "Travis config generator changed but .travis.yml file not regenerated. See top of that file for instructions."
   fi
 else
   echo "* Skipping import/lint checks in partial working copy."
