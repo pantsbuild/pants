@@ -16,29 +16,26 @@ class TestInjectInit(TestBase):
   def rules(cls):
     return super(TestInjectInit, cls).rules() + [inject_init]
 
-  def test_noops_when_empty_snapshot(self):
+  def assert_result(self, input_snapshot, expected_digest):
     injected_digest = assert_single_element(
-      self.scheduler.product_request(InitInjectedDigest, [EMPTY_SNAPSHOT])
+      self.scheduler.product_request(InitInjectedDigest, [input_snapshot])
     )
-    self.assertEqual(injected_digest.directory_digest, EMPTY_DIRECTORY_DIGEST)
+    self.assertEqual(injected_digest.directory_digest, expected_digest)
+
+  def test_noops_when_empty_snapshot(self):
+    self.assert_result(input_snapshot=EMPTY_SNAPSHOT, expected_digest=EMPTY_DIRECTORY_DIGEST)
 
   def test_noops_when_init_already_present(self):
     snapshot = self.make_snapshot({
       "test/foo.py": "",
       "test/__init__.py": ""
     })
-    injected_digest = assert_single_element(
-      self.scheduler.product_request(InitInjectedDigest, [snapshot])
-    )
-    self.assertEqual(injected_digest.directory_digest, snapshot.directory_digest)
+    self.assert_result(input_snapshot=snapshot, expected_digest=snapshot.directory_digest)
 
   def test_adds_when_init_missing(self):
     snapshot = self.make_snapshot({"test/foo.py": ""})
-    injected_digest = assert_single_element(
-      self.scheduler.product_request(InitInjectedDigest, [snapshot])
-    )
     expected_digest = self.make_snapshot({
       "test/foo.py": "",
       "test/__init__.py": ""
     }).directory_digest
-    self.assertEqual(injected_digest.directory_digest, expected_digest)
+    self.assert_result(input_snapshot=snapshot, expected_digest=expected_digest)
