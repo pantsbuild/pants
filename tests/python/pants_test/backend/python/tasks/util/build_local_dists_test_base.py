@@ -119,7 +119,6 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskT
     self.assertEquals(dist, expected_name)
     self.assertEquals(version, expected_snapshot_version)
 
-    expected_platform.resolve_for_enum_variant({
-      'any': lambda: self.assertEquals(platform, 'any'),
-      'current': lambda: self.assertEquals(platform, normalized_current_platform()),
-    })()
+    if expected_platform == 'current':
+      expected_platform = normalized_current_platform()
+    self.assertEquals(platform, expected_platform)
