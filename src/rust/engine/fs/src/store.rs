@@ -689,7 +689,7 @@ mod local {
     self, Cursor, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
     RwTransaction, Transaction, WriteFlags,
   };
-  use log::{debug, error};
+  use log::{error, trace};
   use sha2::Sha256;
   use std;
   use std::collections::{BinaryHeap, HashMap};
@@ -1042,7 +1042,7 @@ mod local {
 
   impl ShardedLmdb {
     pub fn new(root_path: PathBuf) -> Result<ShardedLmdb, String> {
-      debug!("Initializing ShardedLmdb at root {:?}", root_path);
+      trace!("Initializing ShardedLmdb at root {:?}", root_path);
       let mut lmdbs = HashMap::new();
 
       for (env, dir, fingerprint_prefix) in ShardedLmdb::envs(&root_path)? {
