@@ -347,7 +347,7 @@ class PexBuilderWrapper(object):
 
   def build(self, safe_path):
     self.freeze()
-    self._builder.build(safe_path)
+    self._builder.build(safe_path, bytecode_compile=False, deterministic_timestamp=True)
 
   def set_shebang(self, shebang):
     self._builder.set_shebang(shebang)
