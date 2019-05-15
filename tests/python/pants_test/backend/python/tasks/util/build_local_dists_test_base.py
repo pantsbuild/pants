@@ -100,7 +100,7 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskT
 
     return context, synthetic_target, snapshot_version
 
-  class ExpectedPlatformType(enum(['universal', 'current'])):
+  class ExpectedPlatformType(enum(['any', 'current'])):
     """Whether to check that the produced wheel has the 'any' platform, or the current one."""
 
   def _assert_dist_and_wheel_identity(self, expected_name, expected_version, expected_platform,
@@ -120,6 +120,6 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskT
     self.assertEquals(version, expected_snapshot_version)
 
     expected_platform.resolve_for_enum_variant({
-      'universal': lambda: self.assertEquals(platform, 'any'),
+      'any': lambda: self.assertEquals(platform, 'any'),
       'current': lambda: self.assertEquals(platform, normalized_current_platform()),
     })()

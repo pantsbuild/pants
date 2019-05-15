@@ -75,10 +75,9 @@ def targets_by_platform(targets, python_setup):
   # There are currently no tests for this because they're super platform specific and it's hard for
   # us to express that on CI, but https://github.com/pantsbuild/pants/issues/7616 has an excellent
   # repro case for why this is necessary.
-  if explicit_platform_settings:
-    for target in targets_requiring_default_platforms:
-      for platform in python_setup.platforms:
-        explicit_platform_settings[platform].add(target)
+  for target in targets_requiring_default_platforms:
+    for platform in python_setup.platforms:
+      explicit_platform_settings[platform].add(target)
   return dict(explicit_platform_settings)
 
 

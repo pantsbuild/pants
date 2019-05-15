@@ -95,18 +95,23 @@ class PythonNativeCode(Subsystem):
     platforms_with_sources = pex_build_util.targets_by_platform(targets, self._python_setup)
     platform_names = list(platforms_with_sources.keys())
 
-    if not platform_names:
-      return True
-    elif platform_names == ['current']:
+    if not platform_names or platform_names == ['current']:
       return True
 
+    bad_targets = set()
+    for platform, targets in platforms_with_sources.items():
+      if platform == 'current':
+        continue
+      bad_targets.update(targets)
+
     raise IncompatiblePlatformsError(dedent("""\
-      The target set contains one or more targets that depend on native code. Please ensure that the
-      platform arguments in python_binary() targets, as well as the value of
-      --{}-platforms, are compatible with the current platform.
-      Platform assignments for python targets: {}
-      """.format(PythonSetup.get_options_scope_equivalent_flag_component(),
-                 platforms_with_sources)))
+      Pants doesn't currently support cross-compiling native code.
+      The following targets set platforms arguments other than ['current'], which is unsupported for this reason.
+      Please either remove the platforms argument from these targets, or set them to exactly ['current'].
+      Bad targets:
+      {}
+      """.format('\n'.join(sorted(target.address.reference() for target in bad_targets)))
+    ))
 
 
 class BuildSetupRequiresPex(ExecutablePexTool):

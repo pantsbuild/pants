@@ -184,3 +184,19 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
           assertInAny(platform, deps)
         for platform in want_missing_platforms:
           assertNotInAny(platform, deps)
+
+  def test_platforms_with_native_deps(self):
+    result = self.run_pants([
+      'binary',
+      'testprojects/src/python/python_distribution/ctypes:bin',
+      'testprojects/src/python/python_distribution/ctypes:with_platforms',
+    ])
+    self.assert_failure(result)
+    self.assertIn(dedent("""\
+      Pants doesn't currently support cross-compiling native code.
+      The following targets set platforms arguments other than ['current'], which is unsupported for this reason.
+      Please either remove the platforms argument from these targets, or set them to exactly ['current'].
+      Bad targets:
+      testprojects/src/python/python_distribution/ctypes:with_platforms
+    """), result.stderr_data)
+    self.assertNotIn('testprojects/src/python/python_distribution/ctypes:bin', result.stderr_data)

@@ -150,7 +150,7 @@ class PythonBinaryCreate(Task):
 
       # We need to ensure that we are resolving for only the current platform if we are
       # including local python dist targets that have native extensions.
-      self._python_native_code_settings.check_build_for_current_platform_only(self.get_targets())
+      self._python_native_code_settings.check_build_for_current_platform_only(self.context.targets())
       pex_builder.add_requirement_libs_from(req_tgts, platforms=binary_tgt.platforms)
 
       # Build the .pex file.

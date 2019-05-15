@@ -290,9 +290,9 @@ class BuildLocalPythonDistributions(Task):
     :return: a :class: `PythonRequirementLibrary` referencing the locally-built wheel.
     """
     whl_dir, base = split_basename_and_dirname(dist)
-    name, version = base.split('-')[0:2]
-    full_req_string = '{}=={}'.format(name, version)
-    req = PythonRequirement(full_req_string, repository=whl_dir)
+    whl_metadata = base.split('-')
+    req_name = '=='.join([whl_metadata[0], whl_metadata[1]])
+    req = PythonRequirement(req_name, repository=whl_dir)
     self.context.build_graph.inject_synthetic_target(req_lib_addr, PythonRequirementLibrary,
                                                      requirements=[req])
 
