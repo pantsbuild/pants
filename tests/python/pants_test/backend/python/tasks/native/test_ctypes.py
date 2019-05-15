@@ -17,7 +17,6 @@ from pants.backend.native.tasks.link_shared_libraries import LinkSharedLibraries
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
-from pants.base.exceptions import IncompatiblePlatformsError
 from pants.util.meta import classproperty
 from pants_test.backend.python.tasks.util.build_local_dists_test_base import \
   BuildLocalPythonDistributionsTestBase
