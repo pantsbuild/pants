@@ -8,7 +8,7 @@ import os
 
 from future.utils import text_type
 
-from pants.backend.python.rules.inject_init import InitInjectedDigest
+from pants.backend.python.rules.inject_init import InitInjectedDigest, inject_init
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, EMPTY_SNAPSHOT, PathGlobs, PathGlobsAndRoot
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
@@ -17,6 +17,10 @@ from pants_test.test_base import TestBase
 
 
 class TestInjectInit(TestBase):
+
+  @classmethod
+  def rules(cls):
+    return super(TestInjectInit, cls).rules() + [inject_init]
 
   def test_noops_when_empty_snapshot(self):
     injected_digest = assert_single_element(
