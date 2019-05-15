@@ -72,7 +72,7 @@ def coordinator_of_tests(target):
   #if isinstance(target.adaptor, PythonTestsAdaptor):
   # See https://github.com/pantsbuild/pants/issues/4535
   if target.adaptor.type_alias == 'python_tests':
-    logger.info("Starting tests for {}...".format(target.address.reference()))
+    logger.info("Starting tests: {}".format(target.address.reference()))
     result = yield Get(PyTestResult, HydratedTarget, target)
     logger.info("Tests {}: {}".format(
       "succeeded" if result.status == Status.SUCCESS else "failed",
