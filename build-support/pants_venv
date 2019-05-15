@@ -39,8 +39,7 @@ function create_venv() {
 }
 
 function ensure_gcc() {
-  GCC_VERSION=$(gcc -v 2>&1)
-  if (( $? != 0 )); then
+  if ! GCC_VERSION="$(gcc -v 2>&1)"; then
     die "$(cat << MESSAGE
 ERROR: unable to execute 'gcc'. Please verify that your compiler is installed, in your
        \$PATH and functional.

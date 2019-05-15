@@ -215,7 +215,7 @@ class BuildLocalPythonDistributions(Task):
     setup_requires_pex = self._build_setup_requires_pex_settings.bootstrap(
       interpreter, setup_reqs_pex_path, extra_reqs=setup_reqs_to_resolve)
     self.context.log.debug('Using pex file as setup.py interpreter: {}'
-                           .format(setup_requires_pex))
+                           .format(setup_requires_pex.path()))
 
     self._create_dist(
       dist_target,
@@ -281,6 +281,7 @@ class BuildLocalPythonDistributions(Task):
                     interpreter=setup_requires_pex.path(),
                     command=setup_py_snapshot_version_argv))
 
+  # TODO: convert this into a SimpleCodegenTask, which does the exact same thing as this method!
   def _inject_synthetic_dist_requirements(self, dist, req_lib_addr):
     """Inject a synthetic requirements library that references a local wheel.
 

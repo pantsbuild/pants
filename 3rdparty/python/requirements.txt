@@ -17,7 +17,7 @@ more-itertools<6.0.0 ; python_version<'3'
 packaging==16.8
 parameterized==0.6.1
 pathspec==0.5.9
-pex==1.6.6
+pex==1.6.7
 psutil==5.4.8
 pycodestyle==2.4.0
 pyflakes==2.0.0

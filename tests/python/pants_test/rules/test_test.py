@@ -4,6 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import logging
 from builtins import str
 from textwrap import dedent
 
@@ -104,17 +105,17 @@ class TestTest(TestBase, SchedulerTestBase, AbstractClass):
 
   def test_coordinator_python_test(self):
     target_adaptor = PythonTestsAdaptor(type_alias='python_tests')
-
-    result = run_rule(coordinator_of_tests, HydratedTarget(Address.parse("some/target"), target_adaptor, ()), {
-      (PyTestResult, HydratedTarget): lambda _: PyTestResult(status=Status.FAILURE, stdout='foo', stderr=''),
-    })
+    with self.captured_logging(logging.INFO):
+      result = run_rule(coordinator_of_tests, HydratedTarget(Address.parse("some/target"), target_adaptor, ()), {
+        (PyTestResult, HydratedTarget): lambda _: PyTestResult(status=Status.FAILURE, stdout='foo', stderr=''),
+      })
 
     self.assertEqual(result, TestResult(status=Status.FAILURE, stdout='foo', stderr=''))
 
   def test_coordinator_unknown_test(self):
     target_adaptor = PythonTestsAdaptor(type_alias='unknown_tests')
 
-    with self.assertRaises(Exception) as cm:
+    with self.captured_logging(logging.INFO), self.assertRaises(Exception) as cm:
       run_rule(coordinator_of_tests, HydratedTarget(Address.parse("some/target"), target_adaptor, ()), {
         (PyTestResult, HydratedTarget): lambda _: PyTestResult(status=Status.FAILURE, stdout='foo', stderr=''),
       })

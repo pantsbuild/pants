@@ -36,3 +36,19 @@ python_tests(
     '3rdparty/python:future',
   ],
 )
+
+python_library(
+  name = 'transitive_dep',
+  source = 'example_transitive_source.py',
+  dependencies = [
+    ':example_lib',
+  ],
+)
+
+python_tests(
+  name = 'target_with_transitive_dep',
+  sources = ['test_with_transitive_dep.py'],
+  dependencies = [
+    ':transitive_dep',
+  ],
+)

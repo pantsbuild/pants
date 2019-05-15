@@ -135,17 +135,17 @@ class LineOriented(object):
     output_file = line_oriented_options.values.output_file
     sep = line_oriented_options.values.sep.encode('utf-8').decode('unicode_escape')
 
-    stdout, stderr = console.stdout, console.stderr
     if output_file:
-      stdout = open(output_file, 'w')
+      stdout_file = open(output_file, 'w')
+      print_stdout = lambda msg: print(msg, file=stdout_file, end=sep)
+    else:
+      print_stdout = lambda msg: console.print_stdout(msg, end=sep)
+
+    print_stderr = lambda msg: console.print_stderr(msg)
 
     try:
-      print_stdout = lambda msg: print(msg, file=stdout, end=sep)
-      print_stderr = lambda msg: print(msg, file=stderr)
       yield print_stdout, print_stderr
     finally:
       if output_file:
-        stdout.close()
-      else:
-        stdout.flush()
-      stderr.flush()
+        stdout_file.close()
+      console.flush()

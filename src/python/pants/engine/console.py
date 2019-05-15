@@ -29,11 +29,11 @@ class Console(object):
   def write_stderr(self, payload):
     self.stderr.write(payload)
 
-  def print_stdout(self, payload):
-    print(payload, file=self.stdout)
+  def print_stdout(self, payload, end='\n'):
+    print(payload, file=self.stdout, end=end)
 
-  def print_stderr(self, payload):
-    print(payload, file=self.stderr)
+  def print_stderr(self, payload, end='\n'):
+    print(payload, file=self.stderr, end=end)
 
   def flush(self):
     self.stdout.flush()

@@ -144,7 +144,7 @@ class Snapshot(datatype([('directory_digest', Digest), ('files', tuple), ('dirs'
     return self == EMPTY_SNAPSHOT
 
 
-class MergedDirectories(datatype([('directories', tuple)])):
+class DirectoriesToMerge(datatype([('directories', tuple)])):
   pass
 
 
@@ -184,7 +184,7 @@ def create_fs_rules():
   """Creates rules that consume the intrinsic filesystem types."""
   return [
     RootRule(Digest),
-    RootRule(MergedDirectories),
+    RootRule(DirectoriesToMerge),
     RootRule(PathGlobs),
     RootRule(DirectoryWithPrefixToStrip),
     RootRule(UrlToFetch),

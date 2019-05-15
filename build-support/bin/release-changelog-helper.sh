@@ -75,7 +75,7 @@ do
 
   urls=()
   urls=(
-    ${urls}
+    "${urls[@]}"
     $(
       git log -1 --oneline "${sha}" | \
         grep -Eo "\(#[0-9]+\)" | \
@@ -83,7 +83,7 @@ do
     )
   )
   urls=(
-    ${urls}
+    "${urls[@]}"
     $(
       git log -1 "${sha}" --format="format:%b" | \
         grep -E "https?://" | \

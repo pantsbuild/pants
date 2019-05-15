@@ -8,6 +8,7 @@ python_library(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:revision',
     'src/python/pants/build_graph',
     'src/python/pants/java/jar',
   ]

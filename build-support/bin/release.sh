@@ -87,11 +87,11 @@ function run_pex() {
     PEX_VERSION="$(requirement pex | sed -e "s|pex==||")"
 
     pexdir="$(mktemp -d -t build_pex.XXXXX)"
-    trap "rm -rf ${pexdir}" EXIT
+    trap 'rm -rf "${pexdir}"' EXIT
 
     pex="${pexdir}/pex"
 
-    curl -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/pex" > "${pex}"
+    curl --fail -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/pex" > "${pex}"
     # We use `PEX_PYTHON_PATH="${PY}" "${PY}" "${pex}"` instead of either of:
     # 1. PEX_PYTHON_PATH="${PY}" "${pex}"
     # 2. "${PY}" "${pex}"
@@ -314,7 +314,7 @@ function install_and_test_packages() {
   # Avoid caching plugin installs.
   PANTS_PLUGIN_CACHE_DIR=$(mktemp -d -t plugins_cache.XXXXX)
   export PANTS_PLUGIN_CACHE_DIR
-  trap "rm -rf ${PANTS_PLUGIN_CACHE_DIR}" EXIT
+  trap 'rm -rf "${PANTS_PLUGIN_CACHE_DIR}"' EXIT
 
   packages=(
     $(run_packages_script list | grep '.' | awk '{print $1}')
@@ -324,6 +324,7 @@ function install_and_test_packages() {
   for package in "${packages[@]}"
   do
     start_travis_section "${package}" "Installing and testing package ${package}-${VERSION}"
+    # shellcheck disable=SC2086
     eval pkg_${package##*\.}_install_test "${PIP_ARGS[@]}" || \
       die "Failed to install and test package ${package}-${VERSION}!"
     end_travis_section
@@ -443,7 +444,7 @@ function reversion_whls() {
   local dest_dir=$2
   local output_version=$3
 
-  for whl in $(ls -1 "${src_dir}"/*.whl); do
+  for whl in "${src_dir}"/*.whl; do
     run_local_pants -q run src/python/pants/releases:reversion -- \
       --glob='pants/VERSION' \
       "${whl}" "${dest_dir}" "${output_version}" \
@@ -456,10 +457,10 @@ readonly BINARY_BASE_URL=https://binaries.pantsbuild.org
 function list_prebuilt_wheels() {
   # List prebuilt wheels as tab-separated tuples of filename and URL-encoded name.
   wheel_listing="$(mktemp -t pants.wheels.XXXXX)"
-  trap "rm -f ${wheel_listing}" RETURN
+  trap 'rm -f ${wheel_listing}"' RETURN
 
   for wheels_path in "${DEPLOY_PANTS_WHEELS_PATH}" "${DEPLOY_3RDPARTY_WHEELS_PATH}"; do
-    curl -sSL "${BINARY_BASE_URL}/?prefix=${wheels_path}" > "${wheel_listing}"
+    curl --fail -sSL "${BINARY_BASE_URL}/?prefix=${wheels_path}" > "${wheel_listing}"
     "${PY}" << EOF
 from __future__ import print_function
 import sys
@@ -508,7 +509,7 @@ function fetch_and_check_prebuilt_wheels() {
   if [[ -z "${check_dir}" ]]
   then
     check_dir=$(mktemp -d -t pants.wheel_check.XXXXX)
-    trap "rm -rf ${check_dir}" RETURN
+    trap 'rm -rf "${check_dir}"' RETURN
   fi
 
   banner "Checking prebuilt wheels for ${PANTS_UNSTABLE_VERSION}"

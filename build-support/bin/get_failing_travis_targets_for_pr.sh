@@ -8,7 +8,7 @@ pull=$1
 
 mkdir -p logs/jobs
 
-curl=(curl -s -S -H 'Travis-API-Version: 3')
+curl=(curl --fail -s -S -H 'Travis-API-Version: 3')
 
 "${curl[@]}" 'https://api.travis-ci.org/repo/pantsbuild%2Fpants/builds?event_type=pull_request&limit=100&sort_by=finished_at:desc' > logs/search
 jobs="$(jq "[ .builds[] | select(.pull_request_number == ${pull}) ][0] | .jobs[].id" logs/search)"
