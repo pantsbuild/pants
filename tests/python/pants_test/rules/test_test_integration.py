@@ -11,7 +11,14 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class TestIntegrationTest(PantsRunIntegrationTest):
 
-  def run_pants(self, args):
+  def run_pants(self, trailing_args):
+    args = [
+      '--no-v1',
+      '--v2',
+      '--no-colors',
+      '--level=warn',
+      'test',
+    ] + trailing_args
     # Set TERM=dumb to stop pytest from trying to be clever and wrap lines which may interfere with
     # our golden data.
     return super(TestIntegrationTest, self).run_pants(args, extra_env={'TERM': 'dumb'})
@@ -33,26 +40,12 @@ class TestIntegrationTest(PantsRunIntegrationTest):
         self.assertTrue(got_line.endswith(want_parts[1]), 'Line {} Want "{}" to end with "{}"'.format(line_number, got_line, want_parts[1]))
 
   def run_passing_pants_test(self, trailing_args):
-    args = [
-      '--no-v1',
-      '--v2',
-      '--no-colors',
-      'test',
-    ] + trailing_args
-
-    pants_run = self.run_pants(args)
+    pants_run = self.run_pants(trailing_args)
     self.assert_success(pants_run)
     return pants_run
 
   def run_failing_pants_test(self, trailing_args):
-    args = [
-      '--no-v1',
-      '--v2',
-      '--no-colors',
-      'test',
-    ] + trailing_args
-
-    pants_run = self.run_pants(args)
+    pants_run = self.run_pants(trailing_args)
     self.assert_failure(pants_run)
     self.assertEqual('Tests failed\n', pants_run.stderr_data)
 
