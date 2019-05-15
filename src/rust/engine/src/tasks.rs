@@ -78,6 +78,10 @@ impl Tasks {
         input: types.url_to_fetch,
       },
       Intrinsic {
+        product: types.snapshot,
+        input: types.directory_digest,
+      },
+      Intrinsic {
         product: types.files_content,
         input: types.directory_digest,
       },
