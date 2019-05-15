@@ -102,7 +102,7 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
     argv=tuple(requirements_pex_argv),
     env={'PATH': os.pathsep.join(python_setup.interpreter_search_paths)},
     input_files=pex_snapshot.directory_digest,
-    description='Resolve requirements for {}'.format(target_root.address.reference()),
+    description='Resolve requirements: {}'.format(", ".join(all_requirements)),
     output_files=(output_pytest_requirements_pex_filename,),
   )
   requirements_pex_response = yield Get(
