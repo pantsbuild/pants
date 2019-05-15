@@ -4,9 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import unittest
-from textwrap import dedent
-
 from twitter.common.collections import OrderedDict
 
 from pants.backend.native.targets.native_artifact import NativeArtifact
@@ -16,7 +13,6 @@ from pants.backend.native.tasks.cpp_compile import CppCompile
 from pants.backend.native.tasks.link_shared_libraries import LinkSharedLibraries
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
-from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
 from pants.util.meta import classproperty
 from pants_test.backend.python.tasks.util.build_local_dists_test_base import \
   BuildLocalPythonDistributionsTestBase
