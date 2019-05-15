@@ -1046,7 +1046,7 @@ mod local {
       let mut lmdbs = HashMap::new();
 
       for (env, dir, fingerprint_prefix) in ShardedLmdb::envs(&root_path)? {
-        debug!("Making ShardedLmdb content database for {:?}", dir);
+        trace!("Making ShardedLmdb content database for {:?}", dir);
         let content_database = env
           .create_db(Some("content"), DatabaseFlags::empty())
           .map_err(|e| {
@@ -1056,7 +1056,7 @@ mod local {
             )
           })?;
 
-        debug!("Making ShardedLmdb lease database for {:?}", dir);
+        trace!("Making ShardedLmdb lease database for {:?}", dir);
         let lease_database = env
           .create_db(Some("leases"), DatabaseFlags::empty())
           .map_err(|e| {
