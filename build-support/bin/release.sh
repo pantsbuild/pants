@@ -91,7 +91,7 @@ function run_pex() {
 
     pex="${pexdir}/pex"
 
-    curl -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/pex" > "${pex}"
+    curl --fail -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/pex" > "${pex}"
     # We use `PEX_PYTHON_PATH="${PY}" "${PY}" "${pex}"` instead of either of:
     # 1. PEX_PYTHON_PATH="${PY}" "${pex}"
     # 2. "${PY}" "${pex}"
@@ -459,7 +459,7 @@ function list_prebuilt_wheels() {
   trap "rm -f ${wheel_listing}" RETURN
 
   for wheels_path in "${DEPLOY_PANTS_WHEELS_PATH}" "${DEPLOY_3RDPARTY_WHEELS_PATH}"; do
-    curl -sSL "${BINARY_BASE_URL}/?prefix=${wheels_path}" > "${wheel_listing}"
+    curl --fail -sSL "${BINARY_BASE_URL}/?prefix=${wheels_path}" > "${wheel_listing}"
     "${PY}" << EOF
 from __future__ import print_function
 import sys

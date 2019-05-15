@@ -13,7 +13,7 @@ from future.utils import text_type
 from pants.backend.python.subsystems.pex_build_util import identify_missing_init_files
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
-from pants.engine.fs import (Digest, DirectoryWithPrefixToStrip, FilesContent, MergedDirectories,
+from pants.engine.fs import (Digest, DirectoriesToMerge, DirectoryWithPrefixToStrip, FilesContent,
                              Snapshot, UrlToFetch)
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
                                            FallibleExecuteProcessResult)
@@ -134,10 +134,10 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
   ]
 
   sources_digest = yield Get(
-    Digest, MergedDirectories(directories=tuple(all_sources_digests)),
+    Digest, DirectoriesToMerge(directories=tuple(all_sources_digests)),
   )
 
-  # TODO(7716): add a builtin rule to go from MergedDirectories->Snapshot or Digest->Snapshot.
+  # TODO(7716): add a builtin rule to go from DirectoriesToMerge->Snapshot or Digest->Snapshot.
   # TODO(7715): generalize the injection of __init__.py files.
   # TODO(7718): add a builtin rule for FilesContent->Snapshot.
   file_contents = yield Get(FilesContent, Digest, sources_digest)
@@ -158,8 +158,8 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
 
   merged_input_files = yield Get(
     Digest,
-    MergedDirectories,
-    MergedDirectories(directories=tuple(all_input_digests)),
+    DirectoriesToMerge,
+    DirectoriesToMerge(directories=tuple(all_input_digests)),
   )
 
   request = ExecuteProcessRequest(
