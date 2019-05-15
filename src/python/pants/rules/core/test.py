@@ -72,6 +72,9 @@ def coordinator_of_tests(target):
   #if isinstance(target.adaptor, PythonTestsAdaptor):
   # See https://github.com/pantsbuild/pants/issues/4535
   if target.adaptor.type_alias == 'python_tests':
+    # TODO(#6004): when streaming to live TTY, rely on V2 UI for this information. When not a
+    # live TTY, periodically dump heavy hitters to stderr. See
+    # https://github.com/pantsbuild/pants/issues/6004#issuecomment-492699898.
     logger.info("Starting tests: {}".format(target.address.reference()))
     result = yield Get(PyTestResult, HydratedTarget, target)
     logger.info("Tests {}: {}".format(
