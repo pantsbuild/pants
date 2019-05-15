@@ -35,9 +35,8 @@ def name_and_platform(whl):
   return dist, version, normalize_platform_tag(platform_tag)
 
 
-def check_wheel_platform_matches_host(wheel_dist):
-  _, _, wheel_platform = name_and_platform(wheel_dist)
-  return wheel_platform == normalize_platform_tag(pep425tags.get_platform())
+def normalized_current_platform():
+  return normalize_platform_tag(pep425tags.get_platform())
 
 
 class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
