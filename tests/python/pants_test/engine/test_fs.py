@@ -13,9 +13,9 @@ from contextlib import contextmanager
 
 from future.utils import PY2, text_type
 
-from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, DirectoryToMaterialize,
-                             DirectoryWithPrefixToStrip, FilesContent, DirectoriesToMerge, PathGlobs,
-                             PathGlobsAndRoot, Snapshot, UrlToFetch, create_fs_rules)
+from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, DirectoriesToMerge,
+                             DirectoryToMaterialize, DirectoryWithPrefixToStrip, FilesContent,
+                             PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch, create_fs_rules)
 from pants.engine.scheduler import ExecutionError
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.collections import assert_single_element

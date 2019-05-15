@@ -13,7 +13,7 @@ from future.utils import text_type
 from pants.backend.python.subsystems.pex_build_util import identify_missing_init_files
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
-from pants.engine.fs import (Digest, DirectoryWithPrefixToStrip, FilesContent, DirectoriesToMerge,
+from pants.engine.fs import (Digest, DirectoriesToMerge, DirectoryWithPrefixToStrip, FilesContent,
                              Snapshot, UrlToFetch)
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
                                            FallibleExecuteProcessResult)
