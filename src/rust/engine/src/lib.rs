@@ -232,7 +232,7 @@ pub extern "C" fn scheduler_create(
     path_globs: type_path_globs,
     directory_digest: type_directory_digest,
     snapshot: type_snapshot,
-    merged_directories: type_merge_directories_request,
+    directories_to_merge: type_merge_directories_request,
     directory_with_prefix_to_strip: type_directory_with_prefix_to_strip,
     files_content: type_files_content,
     dir: type_dir,

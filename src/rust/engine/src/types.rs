@@ -10,7 +10,7 @@ pub struct Types {
   pub path_globs: TypeId,
   pub directory_digest: TypeId,
   pub snapshot: TypeId,
-  pub merged_directories: TypeId,
+  pub directories_to_merge: TypeId,
   pub directory_with_prefix_to_strip: TypeId,
   pub files_content: TypeId,
   pub dir: TypeId,
