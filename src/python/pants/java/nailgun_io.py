@@ -16,21 +16,46 @@ from contextlib2 import ExitStack
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 
 
-@contextmanager
-def _pipe(isatty):
-  r_fd, w_fd = os.openpty() if isatty else os.pipe()
-  yield (r_fd, w_fd)
+class Pipe(object):
 
+  def __init__(self, read_fd, write_fd):
+    self.read_fd = read_fd
+    self.write_fd = write_fd
 
-@contextmanager
-def _self_closing_pipe(isatty):
-  with _pipe(isatty) as (r_fd, w_fd):
+  def is_writable(self):
+    """
+    If the write end of a pipe closes, the read end might still be open, to allow
+    readers to finish reading before closing it.
+    However, there are cases where we still want to know if the write end is closed.
+
+    :return: True if the write end of the pipe is open.
+    """
     try:
-      yield (r_fd, w_fd)
-    finally:
-      os.close(r_fd)
-      os.close(w_fd)
+      os.fstat(self.write_fd)
+    except OSError:
+      return False
+    return True
 
+  def close(self):
+    """Close the reading end of the pipe, which should close the writing end too."""
+    os.close(self.read_fd)
+
+  @staticmethod
+  def open(isatty):
+    """Open a pipe and create wrapper object."""
+    # TODO This doesn't need to be a contextmanager.
+    read_fd, write_fd = os.openpty() if isatty else os.pipe()
+    return Pipe(read_fd, write_fd)
+
+  @staticmethod
+  @contextmanager
+  def self_closing(isatty):
+    """Create a pipe and close it when done."""
+    pipe = Pipe.open(isatty)
+    try:
+      yield pipe
+    finally:
+      pipe.close()
 
 class _StoppableDaemonThread(threading.Thread):
   """A stoppable daemon threading.Thread."""
@@ -94,16 +119,16 @@ class NailgunStreamStdinReader(_StoppableDaemonThread):
     # The alternative is passing an os.dup(write_fd) to NSSR, but then we have the problem where
     # _self_closing_pipe doens't close the write_fd until the pants run is done, and that generates
     # issues around piping stdin to interactive processes such as REPLs.
-    with _pipe(isatty) as (read_fd, write_fd):
-      reader = NailgunStreamStdinReader(maybe_shutdown_socket, os.fdopen(write_fd, 'wb'))
-      with reader.running():
-        # Instruct the thin client to begin reading and sending stdin.
-        with maybe_shutdown_socket.lock:
-          NailgunProtocol.send_start_reading_input(maybe_shutdown_socket.socket)
-        try:
-          yield read_fd
-        finally:
-          os.close(read_fd)
+    pipe = Pipe.open(isatty)
+    reader = NailgunStreamStdinReader(maybe_shutdown_socket, os.fdopen(pipe.write_fd, 'wb'))
+    with reader.running():
+      # Instruct the thin client to begin reading and sending stdin.
+      with maybe_shutdown_socket.lock:
+        NailgunProtocol.send_start_reading_input(maybe_shutdown_socket.socket)
+      try:
+        yield pipe.read_fd
+      finally:
+        pipe.close()
 
   def run(self):
     try:
@@ -181,12 +206,12 @@ class NailgunStreamWriter(_StoppableDaemonThread):
 
     # N.B. This is purely to permit safe handling of a dynamic number of contextmanagers.
     with ExitStack() as stack:
-      read_fds, write_fds = list(zip(
+      pipes = list(
         # Allocate one pipe pair per chunk type provided.
-        *(stack.enter_context(_self_closing_pipe(isatty)) for isatty in isattys)
-      ))
+        (stack.enter_context(Pipe.self_closing(isatty)) for isatty in isattys)
+      )
       writer = NailgunStreamWriter(
-        read_fds,
+        tuple(pipe.read_fd for pipe in pipes),
         sock,
         chunk_types,
         chunk_eof_type,
@@ -194,7 +219,7 @@ class NailgunStreamWriter(_StoppableDaemonThread):
         select_timeout=select_timeout
       )
       with writer.running():
-        yield write_fds, writer
+        yield pipes, writer
 
   def run(self):
     while self._in_fds and not self.is_stopped:
