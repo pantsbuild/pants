@@ -30,7 +30,8 @@ PATCH_OPTS = dict(autospec=True, spec_set=True)
 class ContextutilTest(unittest.TestCase):
 
   @contextmanager
-  def setup_non_hermetic_environment(self):
+  def ensure_user_defined_in_environment(self):
+    """Utility to test for hermetic environments."""
     original_env = os.environ.copy()
     if "USER" not in original_env:
       os.environ["USER"] = "pantsbuild"
@@ -71,15 +72,13 @@ class ContextutilTest(unittest.TestCase):
           self.assertEqual('False\n', output.read())
 
   def test_hermetic_environment(self):
-    with self.setup_non_hermetic_environment():
-      self.assertIn('USER', os.environ)
-      with hermetic_environment_as(**{}):
+    with self.ensure_user_defined_in_environment():
+      with hermetic_environment_as():
         self.assertNotIn('USER', os.environ)
 
   def test_hermetic_environment_subprocesses(self):
-    with self.setup_non_hermetic_environment():
-      self.assertIn('USER', os.environ)
-      with hermetic_environment_as(**dict(AAA='333')):
+    with self.ensure_user_defined_in_environment():
+      with hermetic_environment_as(AAA='333'):
         output = subprocess.check_output('env', shell=True).decode('utf-8')
         self.assertNotIn('USER=', output)
         self.assertIn('AAA', os.environ)
@@ -91,9 +90,9 @@ class ContextutilTest(unittest.TestCase):
     UNICODE_CHAR = '¡'
     ENCODED_CHAR = UNICODE_CHAR.encode('utf-8')
     expected_output = UNICODE_CHAR if PY3 else ENCODED_CHAR
-    with environment_as(**dict(XXX=UNICODE_CHAR)):
+    with environment_as(XXX=UNICODE_CHAR):
       self.assertEqual(os.environ['XXX'], expected_output)
-      with hermetic_environment_as(**dict(AAA=UNICODE_CHAR)):
+      with hermetic_environment_as(AAA=UNICODE_CHAR):
         self.assertIn('AAA', os.environ)
         self.assertEqual(os.environ['AAA'], expected_output)
       self.assertEqual(os.environ['XXX'], expected_output)
