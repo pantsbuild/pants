@@ -7,6 +7,7 @@ python_tests(
   dependencies=[
     'src/python/pants/backend/python/rules',
     'src/python/pants/engine:fs',
+    'src/python/pants/engine:rules',
     'src/python/pants/util:collections',
     'tests/python/pants_test:test_base',
   ]
