@@ -328,6 +328,15 @@ class _FFISpecification(object):
     return c.utf8_buf(text_type(c.from_id(type_id.tup_0).__name__))
 
   @_extern_decl('Buffer', ['ExternContext*', 'Handle*'])
+  def extern_val_to_bytes(self, context_handle, val):
+    """Given a Handle for `obj`, write bytes(obj) and return it."""
+    c = self._ffi.from_handle(context_handle)
+    v = c.from_value(val[0])
+    # Consistently use the empty string to indicate None.
+    v_bytes = b'' if v is None else binary_type(v)
+    return c.buf(v_bytes)
+
+  @_extern_decl('Buffer', ['ExternContext*', 'Handle*'])
   def extern_val_to_str(self, context_handle, val):
     """Given a Handle for `obj`, write str(obj) and return it."""
     c = self._ffi.from_handle(context_handle)
@@ -667,6 +676,7 @@ class Native(Singleton):
                            self.ffi_lib.extern_equals,
                            self.ffi_lib.extern_clone_val,
                            self.ffi_lib.extern_drop_handles,
+                           self.ffi_lib.extern_val_to_bytes,
                            self.ffi_lib.extern_type_to_str,
                            self.ffi_lib.extern_val_to_str,
                            self.ffi_lib.extern_store_tuple,

@@ -70,7 +70,7 @@ use crate::externs::{
   EqualsExtern, ExternContext, Externs, GeneratorSendExtern, GetTypeForExtern, HandleBuffer,
   IdentifyExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult, RawBuffer,
   StoreBoolExtern, StoreBytesExtern, StoreF64Extern, StoreI64Extern, StoreTupleExtern,
-  StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
+  StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToBytesExtern, ValToStrExtern,
 };
 use crate::handles::Handle;
 use crate::rule_graph::{GraphMaker, RuleGraph};
@@ -118,6 +118,7 @@ pub extern "C" fn externs_set(
   equals: EqualsExtern,
   clone_val: CloneValExtern,
   drop_handles: DropHandlesExtern,
+  val_to_bytes: ValToBytesExtern,
   type_to_str: TypeToStrExtern,
   val_to_str: ValToStrExtern,
   store_tuple: StoreTupleExtern,
@@ -143,6 +144,7 @@ pub extern "C" fn externs_set(
     equals,
     clone_val,
     drop_handles,
+    val_to_bytes,
     type_to_str,
     val_to_str,
     store_tuple,
