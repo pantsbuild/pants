@@ -5,21 +5,17 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
-from builtins import str
 from textwrap import dedent
 
-from pants.backend.python.rules.python_test_runner import PyTestResult
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.legacy.structs import PythonTestsAdaptor
 from pants.rules.core.test import Status, TestResult, coordinator_of_tests, fast_test
-from pants.util.meta import AbstractClass
-from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.engine.util import MockConsole, run_rule
 from pants_test.test_base import TestBase
 
 
-class TestTest(TestBase, SchedulerTestBase, AbstractClass):
+class TestTest(TestBase):
   def single_target_test(self, result, expected_console_output, success=True):
     console = MockConsole(use_colors=False)
 
@@ -107,17 +103,7 @@ class TestTest(TestBase, SchedulerTestBase, AbstractClass):
     target_adaptor = PythonTestsAdaptor(type_alias='python_tests')
     with self.captured_logging(logging.INFO):
       result = run_rule(coordinator_of_tests, HydratedTarget(Address.parse("some/target"), target_adaptor, ()), {
-        (PyTestResult, HydratedTarget): lambda _: PyTestResult(status=Status.FAILURE, stdout='foo', stderr=''),
+        (TestResult, PythonTestsAdaptor): lambda _: TestResult(status=Status.FAILURE, stdout='foo', stderr=''),
       })
 
     self.assertEqual(result, TestResult(status=Status.FAILURE, stdout='foo', stderr=''))
-
-  def test_coordinator_unknown_test(self):
-    target_adaptor = PythonTestsAdaptor(type_alias='unknown_tests')
-
-    with self.captured_logging(logging.INFO), self.assertRaises(Exception) as cm:
-      run_rule(coordinator_of_tests, HydratedTarget(Address.parse("some/target"), target_adaptor, ()), {
-        (PyTestResult, HydratedTarget): lambda _: PyTestResult(status=Status.FAILURE, stdout='foo', stderr=''),
-      })
-
-    self.assertEqual(str(cm.exception), "Didn't know how to run tests for type unknown_tests")

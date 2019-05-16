@@ -25,8 +25,7 @@ from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.engine.legacy.structs import (BundleAdaptor, BundlesField, HydrateableField,
-                                         SourcesField, TargetAdaptor)
+from pants.engine.legacy.structs import BundleAdaptor, BundlesField, HydrateableField, SourcesField
 from pants.engine.mapper import AddressMapper
 from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct
@@ -505,8 +504,8 @@ def hydrate_target(hydrated_struct):
   for field in hydrated_fields:
     kwargs[field.name] = field.value
   yield HydratedTarget(target_adaptor.address,
-                        TargetAdaptor(**kwargs),
-                        tuple(target_adaptor.dependencies))
+                       type(target_adaptor)(**kwargs),
+                       tuple(target_adaptor.dependencies))
 
 
 def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):

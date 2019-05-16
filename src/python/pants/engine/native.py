@@ -727,6 +727,12 @@ class Native(Singleton):
   def flush_log(self):
     return self.lib.flush_log()
 
+  def override_thread_logging_destination_to_just_pantsd(self):
+    self.lib.override_thread_logging_destination(self.lib.Pantsd)
+
+  def override_thread_logging_destination_to_just_stderr(self):
+    self.lib.override_thread_logging_destination(self.lib.Stderr)
+
   def match_path_globs(self, path_globs, paths):
     path_globs = self.context.to_value(path_globs)
     paths_buf = self.context.utf8_buf_buf(tuple(paths))

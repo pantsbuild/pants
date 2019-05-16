@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.backend.python.rules.inject_init import InitInjectedDigest
+from pants.backend.python.rules.inject_init import InitInjectedDigest, inject_init
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, EMPTY_SNAPSHOT, Snapshot
 from pants.engine.rules import RootRule
 from pants.util.collections import assert_single_element
@@ -15,7 +15,7 @@ class TestInjectInit(TestBase):
 
   @classmethod
   def rules(cls):
-    return super(TestInjectInit, cls).rules() + [RootRule(Snapshot)]
+    return super(TestInjectInit, cls).rules() + [inject_init, RootRule(Snapshot)]
 
   def assert_result(self, input_snapshot, expected_digest):
     injected_digest = assert_single_element(

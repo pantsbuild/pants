@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from future.utils import text_type
 
+from pants.engine.rules import union
 from pants.util.objects import datatype, enum
 
 
@@ -18,6 +19,14 @@ class TestResult(datatype([
   ('stdout', text_type),
   ('stderr', text_type),
 ])):
+
+  # Prevent this class from being detected by pytest as a test class.
+  __test__ = False
+
+
+@union
+class TestTarget(object):
+  """A union for registration of a testable target type."""
 
   # Prevent this class from being detected by pytest as a test class.
   __test__ = False
