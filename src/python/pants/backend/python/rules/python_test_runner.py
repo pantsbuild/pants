@@ -17,19 +17,12 @@ from pants.engine.fs import (Digest, DirectoriesToMerge, DirectoryWithPrefixToSt
                              Snapshot, UrlToFetch)
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
                                            FallibleExecuteProcessResult)
-from pants.engine.legacy.graph import (BuildFileAddresses, TransitiveHydratedTarget,
-                                       TransitiveHydratedTargets)
-from pants.engine.rules import optionable_rule, rule
+from pants.engine.legacy.graph import BuildFileAddresses, TransitiveHydratedTargets
+from pants.engine.legacy.structs import PythonTestsAdaptor
+from pants.engine.rules import UnionRule, optionable_rule, rule
 from pants.engine.selectors import Get
-from pants.rules.core.core_test_model import Status, TestResult
+from pants.rules.core.core_test_model import Status, TestResult, TestTarget
 from pants.source.source_root import SourceRootConfig
-
-
-# This class currently exists so that other rules could be added which turned a HydratedTarget into
-# a language-specific test result, and could be installed alongside run_python_test.
-# Hopefully https://github.com/pantsbuild/pants/issues/4535 should help resolve this.
-class PyTestResult(TestResult):
-  pass
 
 
 def parse_interpreter_constraints(python_setup, python_target_adaptors):
@@ -46,13 +39,12 @@ def parse_interpreter_constraints(python_setup, python_target_adaptors):
   return constraints_args
 
 
-# TODO: Support deps
 # TODO: Support resources
 # TODO(7697): Use a dedicated rule for removing the source root prefix, so that this rule
 # does not have to depend on SourceRootConfig.
-@rule(PyTestResult, [TransitiveHydratedTarget, PyTest, PythonSetup, SourceRootConfig])
-def run_python_test(transitive_hydrated_target, pytest, python_setup, source_root_config):
-  target_root = transitive_hydrated_target.root
+@rule(TestResult, [PythonTestsAdaptor, PyTest, PythonSetup, SourceRootConfig])
+def run_python_test(test_target, pytest, python_setup, source_root_config):
+  """Runs pytest for one target."""
 
   # TODO: Inject versions and digests here through some option, rather than hard-coding it.
   url = 'https://github.com/pantsbuild/pex/releases/download/v1.6.6/pex'
@@ -62,25 +54,25 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
   # TODO(7726): replace this with a proper API to get the `closure` for a
   # TransitiveHydratedTarget.
   transitive_hydrated_targets = yield Get(
-    TransitiveHydratedTargets, BuildFileAddresses((target_root.address,))
+    TransitiveHydratedTargets, BuildFileAddresses((test_target.address,))
   )
-  all_targets = transitive_hydrated_targets.closure
+  all_targets = [t.adaptor for t in transitive_hydrated_targets.closure]
 
   # Produce a pex containing pytest and all transitive 3rdparty requirements.
   all_requirements = []
   for maybe_python_req_lib in all_targets:
     # This is a python_requirement()-like target.
-    if hasattr(maybe_python_req_lib.adaptor, 'requirement'):
+    if hasattr(maybe_python_req_lib, 'requirement'):
       all_requirements.append(str(maybe_python_req_lib.requirement))
     # This is a python_requirement_library()-like target.
-    if hasattr(maybe_python_req_lib.adaptor, 'requirements'):
-      for py_req in maybe_python_req_lib.adaptor.requirements:
+    if hasattr(maybe_python_req_lib, 'requirements'):
+      for py_req in maybe_python_req_lib.requirements:
         all_requirements.append(str(py_req.requirement))
 
   # TODO(#7061): This str() can be removed after we drop py2!
   python_binary = text_type(sys.executable)
   interpreter_constraint_args = parse_interpreter_constraints(
-    python_setup, python_target_adaptors=[target.adaptor for target in all_targets]
+    python_setup, python_target_adaptors=all_targets
   )
 
   # TODO: This is non-hermetic because the requirements will be resolved on the fly by
@@ -103,7 +95,7 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
     argv=tuple(requirements_pex_argv),
     env={'PATH': text_type(os.pathsep.join(python_setup.interpreter_search_paths))},
     input_files=pex_snapshot.directory_digest,
-    description='Resolve requirements for {}'.format(target_root.address.reference()),
+    description='Resolve requirements for {}'.format(test_target.address.reference()),
     output_files=(output_pytest_requirements_pex_filename,),
   )
   requirements_pex_response = yield Get(
@@ -117,9 +109,9 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
   # TODO(7714): restore the full source name for the stdout of the Pytest run.
   sources_snapshots_and_source_roots = []
   for maybe_source_target in all_targets:
-    if hasattr(maybe_source_target.adaptor, 'sources'):
-      tgt_snapshot = maybe_source_target.adaptor.sources.snapshot
-      tgt_source_root = source_roots.find_by_path(maybe_source_target.adaptor.address.spec_path)
+    if hasattr(maybe_source_target, 'sources'):
+      tgt_snapshot = maybe_source_target.sources.snapshot
+      tgt_source_root = source_roots.find_by_path(maybe_source_target.address.spec_path)
       sources_snapshots_and_source_roots.append((tgt_snapshot, tgt_source_root))
   all_sources_digests = yield [
     Get(
@@ -166,13 +158,13 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
     argv=(python_binary, './{}'.format(output_pytest_requirements_pex_filename)),
     env={'PATH': text_type(os.pathsep.join(python_setup.interpreter_search_paths))},
     input_files=merged_input_files,
-    description='Run pytest for {}'.format(target_root.address.reference()),
+    description='Run pytest for {}'.format(test_target.address.reference()),
   )
 
   result = yield Get(FallibleExecuteProcessResult, ExecuteProcessRequest, request)
   status = Status.SUCCESS if result.exit_code == 0 else Status.FAILURE
 
-  yield PyTestResult(
+  yield TestResult(
     status=status,
     stdout=result.stdout.decode('utf-8'),
     stderr=result.stderr.decode('utf-8'),
@@ -182,6 +174,7 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
 def rules():
   return [
       run_python_test,
+      UnionRule(TestTarget, PythonTestsAdaptor),
       optionable_rule(PyTest),
       optionable_rule(PythonSetup),
       optionable_rule(SourceRootConfig),

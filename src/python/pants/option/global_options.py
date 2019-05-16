@@ -177,8 +177,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                       'pants.backend.python',
                       'pants.backend.jvm',
                       'pants.backend.native',
-                      # TODO: Move into the graph_info backend.
-                      'pants.rules.core',
                       'pants.backend.codegen.antlr.java',
                       'pants.backend.codegen.antlr.python',
                       'pants.backend.codegen.jaxb',
