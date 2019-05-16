@@ -87,7 +87,7 @@ pub struct Link(pub PathBuf);
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Dir(pub PathBuf);
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct File {
   pub path: PathBuf,
   pub is_executable: bool,

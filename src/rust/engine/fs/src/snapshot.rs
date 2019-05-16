@@ -2,15 +2,17 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use crate::glob_matching::GlobMatching;
-use crate::{Dir, File, PathGlobs, PathStat, PosixFS, Store};
+use crate::{Dir, File, FileContent, PathGlobs, PathStat, PosixFS, Store};
 use bazel_protos;
 use boxfuture::{try_future, BoxFuture, Boxable};
+use bytes::Bytes;
 use futures::future::{self, join_all};
 use futures::Future;
 use hashing::{Digest, Fingerprint};
 use indexmap::{self, IndexMap};
 use itertools::Itertools;
 use protobuf;
+use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fmt;
 use std::iter::Iterator;
@@ -496,6 +498,36 @@ impl Snapshot {
       })
       .to_boxed()
   }
+
+  pub fn from_files_content(
+    store: Store,
+    files_content: Vec<FileContent>,
+  ) -> impl Future<Item = Snapshot, Error = String> {
+    let files_content: BTreeMap<File, Bytes> = files_content
+      .into_iter()
+      .map(|fc| {
+        let file = File {
+          path: fc.path,
+          // TODO: Configurable?
+          is_executable: true,
+        };
+        (file, fc.content)
+      })
+      .collect();
+    // TODO: Should there be a way to represent empty directories?
+    let path_stats: Vec<_> = files_content
+      .keys()
+      .map(|file| PathStat::File {
+        path: file.path.clone(),
+        stat: file.clone(),
+      })
+      .collect();
+    let digester = FromMemoryStoreFileByDigest {
+      store: store.clone(),
+      files_content,
+    };
+    Snapshot::from_path_stats(store, &digester, path_stats)
+  }
 }
 
 impl fmt::Debug for Snapshot {
@@ -568,6 +600,30 @@ impl StoreFileByDigest<String> for OneOffStoreFileByDigest {
       .map_err(move |err| format!("Error reading file {:?}: {:?}", file, err))
       .and_then(move |content| store.store_file_bytes(content.content, true))
       .to_boxed()
+  }
+}
+
+///
+/// A StoreFileByDigest which reads in-memory file contents and writes to a Store, with no caching.
+///
+#[derive(Clone)]
+struct FromMemoryStoreFileByDigest {
+  store: Store,
+  files_content: BTreeMap<File, Bytes>,
+}
+
+impl StoreFileByDigest<String> for FromMemoryStoreFileByDigest {
+  fn store_by_digest(&self, file: File) -> BoxFuture<Digest, String> {
+    let store = self.store.clone();
+    futures::future::done(
+      self
+        .files_content
+        .get(&file)
+        .cloned()
+        .ok_or_else(|| format!("File {:?} not known", file)),
+    )
+    .and_then(move |content| store.store_file_bytes(content, true))
+    .to_boxed()
   }
 }
 

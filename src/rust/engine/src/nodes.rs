@@ -21,7 +21,7 @@ use crate::rule_graph;
 use crate::selectors;
 use crate::tasks::{self, Intrinsic};
 use boxfuture::{try_future, BoxFuture, Boxable};
-use bytes::{self, BufMut};
+use bytes::{self, BufMut, Bytes};
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
   PathGlobs, PathStat, StoreFileByDigest, StrictGlobMatching, VFS,
@@ -272,6 +272,24 @@ impl WrappedNode for Select {
             .to_boxed()
         }
         &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+          if product == context.core.types.snapshot
+            && input == context.core.types.files_content =>
+        {
+          let core = context.core.clone();
+          self
+            .select_product(&context, context.core.types.files_content, "intrinsic")
+            .and_then(move |files_content| {
+              let files_content: Vec<_> = externs::project_multi(&files_content, "dependencies")
+                .iter()
+                .map(lift_file_content)
+                .collect();
+              fs::Snapshot::from_files_content(context.core.store(), files_content)
+                .map_err(|str| throw(&str))
+            })
+            .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
+            .to_boxed()
+        }
+        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.process_result
             && input == context.core.types.process_request =>
         {
@@ -332,6 +350,12 @@ pub fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
     hashing::Fingerprint::from_hex_string(&fingerprint)?,
     digest_length_as_usize,
   ))
+}
+
+pub fn lift_file_content(file_content: &Value) -> fs::FileContent {
+  let path = PathBuf::from(externs::project_str(&file_content, "path"));
+  let content = Bytes::from(externs::project_bytes(&file_content, "content"));
+  fs::FileContent { path, content }
 }
 
 ///

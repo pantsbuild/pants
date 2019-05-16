@@ -86,6 +86,10 @@ impl Tasks {
         input: types.directory_digest,
       },
       Intrinsic {
+        product: types.snapshot,
+        input: types.files_content,
+      },
+      Intrinsic {
         product: types.directory_digest,
         input: types.directories_to_merge,
       },

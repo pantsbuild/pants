@@ -15,8 +15,9 @@ from contextlib import contextmanager
 from future.utils import PY2, text_type
 
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, DirectoriesToMerge,
-                             DirectoryToMaterialize, DirectoryWithPrefixToStrip, FilesContent,
-                             PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch, create_fs_rules)
+                             DirectoryToMaterialize, DirectoryWithPrefixToStrip, FileContent,
+                             FilesContent, PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch,
+                             create_fs_rules)
 from pants.engine.scheduler import ExecutionError
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.collections import assert_single_element
@@ -507,6 +508,31 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       self.assertEqual(1, len(all_warnings))
       single_warning = all_warnings[0]
       self.assertEqual("???", str(single_warning))
+
+  def test_files_content_from_bytes(self):
+    # TODO: Should you be allowed to set executable? (currently we always set executable=true)
+    # TODO: Should there be a way to represent empty directories?
+    # TODO: Test with some unicode, some non-unicode byte, and a directory with multiple files
+    files_content = FilesContent((
+      FileContent(
+        path=text_type("cats/roland"),
+        content=b"European Burmese",
+      ),
+      FileContent(
+        path=text_type("treats"),
+        content=b"catnip",
+      )
+    ))
+
+    snapshot = assert_single_element(self.scheduler.product_request(Snapshot, [files_content]))
+    self.assertEquals(("cats/roland", "treats"), snapshot.files)
+    self.assertEquals(
+      snapshot.directory_digest,
+      Digest(
+        fingerprint="1249edd274db4350ce7d295dc2f40768581197f0e13e74d0206a3c408f1c236f",
+        serialized_bytes_length=160,
+      ),
+    )
 
   def prime_store_with_roland_digest(self):
     """This method primes the store with a directory of a file named 'roland' and contents 'European Burmese'."""
