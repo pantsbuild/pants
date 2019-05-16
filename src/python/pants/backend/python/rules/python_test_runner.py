@@ -59,15 +59,18 @@ def run_python_test(test_target, pytest, python_setup, source_root_config):
   all_targets = [t.adaptor for t in transitive_hydrated_targets.closure]
 
   # Produce a pex containing pytest and all transitive 3rdparty requirements.
-  all_requirements = []
+  all_target_requirements = []
   for maybe_python_req_lib in all_targets:
     # This is a python_requirement()-like target.
     if hasattr(maybe_python_req_lib, 'requirement'):
-      all_requirements.append(str(maybe_python_req_lib.requirement))
+      all_target_requirements.append(str(maybe_python_req_lib.requirement))
     # This is a python_requirement_library()-like target.
     if hasattr(maybe_python_req_lib, 'requirements'):
       for py_req in maybe_python_req_lib.requirements:
-        all_requirements.append(str(py_req.requirement))
+        all_target_requirements.append(str(py_req.requirement))
+
+  # Sort all user requirement strings to increase the chance of cache hits across invocations.
+  all_requirements = sorted(all_target_requirements + list(pytest.get_requirement_strings()))
 
   # TODO(#7061): This str() can be removed after we drop py2!
   python_binary = text_type(sys.executable)
@@ -85,17 +88,13 @@ def run_python_test(test_target, pytest, python_setup, source_root_config):
     '-o', output_pytest_requirements_pex_filename,
   ] + interpreter_constraint_args + [
     # TODO(#7061): This text_type() wrapping can be removed after we drop py2!
-    text_type(req)
-    # Sort all user requirement strings to increase the chance of cache hits across invocations.
-    for req in sorted(
-        list(pytest.get_requirement_strings())
-        + list(all_requirements))
+    text_type(req) for req in all_requirements
   ]
   requirements_pex_request = ExecuteProcessRequest(
     argv=tuple(requirements_pex_argv),
     env={'PATH': text_type(os.pathsep.join(python_setup.interpreter_search_paths))},
     input_files=pex_snapshot.directory_digest,
-    description='Resolve requirements for {}'.format(test_target.address.reference()),
+    description='Resolve requirements: {}'.format(", ".join(all_requirements)),
     output_files=(output_pytest_requirements_pex_filename,),
   )
   requirements_pex_response = yield Get(
