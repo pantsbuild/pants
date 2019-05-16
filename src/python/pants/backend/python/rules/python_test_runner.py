@@ -10,11 +10,11 @@ from builtins import str
 
 from future.utils import text_type
 
-from pants.backend.python.subsystems.pex_build_util import identify_missing_init_files
+from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
-from pants.engine.fs import (Digest, DirectoriesToMerge, DirectoryWithPrefixToStrip, FilesContent,
-                             Snapshot, UrlToFetch)
+from pants.engine.fs import (Digest, DirectoriesToMerge, DirectoryWithPrefixToStrip, Snapshot,
+                             UrlToFetch)
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
                                            FallibleExecuteProcessResult)
 from pants.engine.legacy.graph import BuildFileAddresses, TransitiveHydratedTargets
@@ -128,25 +128,13 @@ def run_python_test(test_target, pytest, python_setup, source_root_config):
     Digest, DirectoriesToMerge(directories=tuple(all_sources_digests)),
   )
 
-  # TODO(7716): add a builtin rule to go from DirectoriesToMerge->Snapshot or Digest->Snapshot.
-  # TODO(7715): generalize the injection of __init__.py files.
-  # TODO(7718): add a builtin rule for FilesContent->Snapshot.
-  file_contents = yield Get(FilesContent, Digest, sources_digest)
-  file_paths = [fc.path for fc in file_contents]
-  injected_inits = tuple(sorted(identify_missing_init_files(file_paths)))
-  if injected_inits:
-    touch_init_request = ExecuteProcessRequest(
-      argv=("/usr/bin/touch",) + injected_inits,
-      output_files=injected_inits,
-      description="Inject empty __init__.py into all packages without one already.",
-      input_files=sources_digest,
-    )
-    touch_init_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, touch_init_request)
+  inits_digest = yield Get(InjectedInitDigest, Digest, sources_digest)
 
-  all_input_digests = [sources_digest, requirements_pex_response.output_directory_digest]
-  if injected_inits:
-    all_input_digests.append(touch_init_result.output_directory_digest)
-
+  all_input_digests = [
+    sources_digest,
+    inits_digest.directory_digest,
+    requirements_pex_response.output_directory_digest,
+  ]
   merged_input_files = yield Get(
     Digest,
     DirectoriesToMerge,
