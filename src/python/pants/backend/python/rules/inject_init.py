@@ -27,7 +27,7 @@ def inject_init(snapshot):
     touch_init_request = ExecuteProcessRequest(
       argv=("/usr/bin/touch",) + missing_init_files,
       output_files=missing_init_files,
-      description="Inject empty __init__.py into all packages without one already.",
+      description="Inject missing __init__.py files: {}".format(", ".join(missing_init_files)),
       input_files=snapshot.directory_digest,
     )
     touch_init_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, touch_init_request)
