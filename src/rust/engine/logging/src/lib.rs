@@ -48,6 +48,8 @@ macro_rules! debug_log {
 
 pub mod logger;
 
+pub use logger::{get_destination, set_destination, Destination};
+
 pub type Logger = logger::Logger;
 
 use num_enum::TryFromPrimitive;

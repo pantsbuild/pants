@@ -44,7 +44,7 @@ pub struct Core {
   pub tasks: Tasks,
   pub rule_graph: RuleGraph,
   pub types: Types,
-  pub runtime: Resettable<Arc<RwLock<Runtime>>>,
+  runtime: Resettable<Arc<RwLock<Runtime>>>,
   pub futures_timer_thread: Resettable<futures_timer::HelperThread>,
   store_and_command_runner_and_http_client:
     Resettable<(Store, BoundedCommandRunner, reqwest::r#async::Client)>,
@@ -221,6 +221,53 @@ impl Core {
 
   pub fn http_client(&self) -> reqwest::r#async::Client {
     self.store_and_command_runner_and_http_client.get().2
+  }
+
+  ///
+  /// Start running a Future on a tokio Runtime.
+  ///
+  pub fn spawn<F: Future<Item = (), Error = ()> + Send + 'static>(&self, future: F) {
+    // Make sure to copy our (thread-local) logging destination into the task.
+    // When a daemon thread kicks off a future, it should log like a daemon thread (and similarly
+    // for a user-facing thread).
+    let logging_destination = logging::get_destination();
+    self
+      .runtime
+      .get()
+      .read()
+      .executor()
+      .spawn(futures::future::ok(()).and_then(move |()| {
+        logging::set_destination(logging_destination);
+        future
+      }))
+  }
+
+  ///
+  /// Run a Future and return its resolved Result.
+  ///
+  /// This should never be called from in a Future context, or any context where anyone may want to
+  /// spawn something on the runtime using Core::spawn.
+  ///
+  pub fn block_on<
+    Item: Send + 'static,
+    Error: Send + 'static,
+    F: Future<Item = Item, Error = Error> + Send + 'static,
+  >(
+    &self,
+    future: F,
+  ) -> Result<Item, Error> {
+    // Make sure to copy our (thread-local) logging destination into the task.
+    // When a daemon thread kicks off a future, it should log like a daemon thread (and similarly
+    // for a user-facing thread).
+    let logging_destination = logging::get_destination();
+    self
+      .runtime
+      .get()
+      .write()
+      .block_on(futures::future::ok(()).and_then(move |()| {
+        logging::set_destination(logging_destination);
+        future
+      }))
   }
 }
 
