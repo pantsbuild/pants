@@ -42,7 +42,7 @@ def parse_interpreter_constraints(python_setup, python_target_adaptors):
   }
   constraints_args = []
   for constraint in sorted(constraints):
-    constraints_args.extend(["--interpreter-constraint", constraint])
+    constraints_args.extend(["--interpreter-constraint", text_type(constraint)])
   return constraints_args
 
 
@@ -101,7 +101,7 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
   ]
   requirements_pex_request = ExecuteProcessRequest(
     argv=tuple(requirements_pex_argv),
-    env={'PATH': os.pathsep.join(python_setup.interpreter_search_paths)},
+    env={'PATH': text_type(os.pathsep.join(python_setup.interpreter_search_paths))},
     input_files=pex_snapshot.directory_digest,
     description='Resolve requirements for {}'.format(target_root.address.reference()),
     output_files=(output_pytest_requirements_pex_filename,),
@@ -164,7 +164,7 @@ def run_python_test(transitive_hydrated_target, pytest, python_setup, source_roo
 
   request = ExecuteProcessRequest(
     argv=(python_binary, './{}'.format(output_pytest_requirements_pex_filename)),
-    env={'PATH': os.pathsep.join(python_setup.interpreter_search_paths)},
+    env={'PATH': text_type(os.pathsep.join(python_setup.interpreter_search_paths))},
     input_files=merged_input_files,
     description='Run pytest for {}'.format(target_root.address.reference()),
   )
