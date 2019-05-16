@@ -60,22 +60,25 @@ def always_uses_default_python_platform(tgt):
 
 
 def may_have_explicit_python_platform(tgt):
-  return isinstance(tgt, (PythonBinary, PythonDistribution))
+  return isinstance(tgt, PythonBinary)
 
 
 def targets_by_platform(targets, python_setup):
-  d = defaultdict(OrderedSet)
+  targets_requiring_default_platforms = []
+  explicit_platform_settings = defaultdict(OrderedSet)
   for target in targets:
     if always_uses_default_python_platform(target):
-       # There are currently no tests for this because they're super platform specific and it's hard
-       # for us to express that on CI, but https://github.com/pantsbuild/pants/issues/7616 has an
-       # excellent repro case for why this is necessary.
-      for platform in python_setup.platforms:
-        d[platform].add(target)
+      targets_requiring_default_platforms.append(target)
     elif may_have_explicit_python_platform(target):
       for platform in target.platforms if target.platforms else python_setup.platforms:
-        d[platform].add(target)
-  return d
+        explicit_platform_settings[platform].add(target)
+  # There are currently no tests for this because they're super platform specific and it's hard for
+  # us to express that on CI, but https://github.com/pantsbuild/pants/issues/7616 has an excellent
+  # repro case for why this is necessary.
+  for target in targets_requiring_default_platforms:
+    for platform in python_setup.platforms:
+      explicit_platform_settings[platform].add(target)
+  return dict(explicit_platform_settings)
 
 
 def identify_missing_init_files(sources):
@@ -347,7 +350,7 @@ class PexBuilderWrapper(object):
 
   def build(self, safe_path):
     self.freeze()
-    self._builder.build(safe_path)
+    self._builder.build(safe_path, bytecode_compile=False, deterministic_timestamp=True)
 
   def set_shebang(self, shebang):
     self._builder.set_shebang(shebang)

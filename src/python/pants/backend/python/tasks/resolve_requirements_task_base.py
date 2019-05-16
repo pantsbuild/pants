@@ -13,7 +13,6 @@ from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.subsystems import pex_build_util
 from pants.backend.python.subsystems.pex_build_util import PexBuilderWrapper
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
 from pants.backend.python.subsystems.python_setup import PythonSetup
@@ -61,6 +60,10 @@ class ResolveRequirementsTaskBase(Task):
   def resolve_requirements(self, interpreter, req_libs):
     """Requirements resolution for PEX files.
 
+    NB: This method always resolve all requirements in `req_libs` for the 'current' platform! Tasks
+    such as PythonBinaryCreate which export code meant for other machines to run will need to
+    resolve against the platforms specified by the target or via pants options.
+
     :param interpreter: Resolve against this :class:`PythonInterpreter`.
     :param req_libs: A list of :class:`PythonRequirementLibrary` targets to resolve.
     :returns: a PEX containing target requirements and any specified python dist targets.
@@ -75,13 +78,12 @@ class ResolveRequirementsTaskBase(Task):
       else:
         target_set_id = 'no_targets'
 
-      # We need to ensure that we are resolving for only the current platform if we are
-      # including local python dist targets that have native extensions.
-      targets_by_platform = pex_build_util.targets_by_platform(self.context.targets(), self._python_setup)
-      if self._python_native_code_settings.check_build_for_current_platform_only(targets_by_platform):
-        platforms = ['current']
-      else:
-        platforms = list(sorted(targets_by_platform.keys()))
+      # NB: Since PythonBinaryCreate is the only task that exports python code for use outside the
+      # host system, it's the only python task that needs to resolve for non-'current'
+      # platforms. PythonBinaryCreate will actually validate the platforms itself when resolving
+      # requirements, instead of using this method, so we can always resolve for 'current' here in
+      # order to pull in any binary or universal dists needed for the currently executing host.
+      platforms = ['current']
 
       path = os.path.realpath(os.path.join(self.workdir, str(interpreter.identity), target_set_id))
       # Note that we check for the existence of the directory, instead of for invalid_vts,
