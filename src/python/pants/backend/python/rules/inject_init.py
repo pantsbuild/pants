@@ -23,7 +23,8 @@ def inject_init(snapshot):
   if not missing_init_files:
     new_init_files_digest = EMPTY_DIRECTORY_DIGEST
   else:
-    # TODO(7718): add a builtin rule for FilesContent->Snapshot.
+    # TODO(7718): add a builtin rule for FilesContent->Snapshot, so that we can avoid using touch
+    # and the absolute path and have the engine build the files for us.
     touch_init_request = ExecuteProcessRequest(
       argv=("/usr/bin/touch",) + missing_init_files,
       output_files=missing_init_files,
