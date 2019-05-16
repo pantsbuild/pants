@@ -48,7 +48,7 @@ class LambdexRun(Task):
 
   def execute(self):
     targets = self.get_targets(self._is_python_lambda)
-    with self.invalidated(targets=targets) as invalidation_check:
+    with self.invalidated(targets=targets, invalidate_dependents=True) as invalidation_check:
       python_lambda_product = self.context.products.get_data('python_aws_lambda', dict)
       for vt in invalidation_check.all_vts:
         lambda_path = os.path.join(vt.results_dir, '{}.pex'.format(vt.target.name))
