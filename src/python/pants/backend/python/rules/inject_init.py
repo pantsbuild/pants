@@ -31,11 +31,8 @@ def inject_init(snapshot):
     )
     touch_init_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, touch_init_request)
     new_init_files_digest = touch_init_result.output_directory_digest
-  # TODO: get this to work. Likely related to https://github.com/pantsbuild/pants/issues/7710.
-  # merged_digest = yield Get(
-  #   Digest,
-  #   MergedDirectories(directories=(digest, new_init_files_digest))
-  # )
+  # TODO(#7710): Once this gets fixed, merge the original source digest and the new init digest
+  # into one unified digest.
   yield InitInjectedDigest(directory_digest=new_init_files_digest)
 
 
