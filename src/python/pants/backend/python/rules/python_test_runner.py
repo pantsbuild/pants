@@ -10,7 +10,7 @@ from builtins import str
 
 from future.utils import text_type
 
-from pants.backend.python.rules.inject_init import InitInjectedDigest
+from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.engine.fs import (Digest, DirectoriesToMerge, DirectoryWithPrefixToStrip, Snapshot,
@@ -129,7 +129,7 @@ def run_python_test(test_target, pytest, python_setup, source_root_config):
     Digest, DirectoriesToMerge(directories=tuple(all_sources_digests)),
   )
 
-  inits_digest = yield Get(InitInjectedDigest, Digest, sources_digest)
+  inits_digest = yield Get(InjectedInitDigest, Digest, sources_digest)
 
   all_input_digests = [
     sources_digest,

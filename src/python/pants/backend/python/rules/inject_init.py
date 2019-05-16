@@ -12,10 +12,11 @@ from pants.engine.selectors import Get
 from pants.util.objects import datatype
 
 
-class InitInjectedDigest(datatype([('directory_digest', Digest)])): pass
+# TODO(#7710): Once this gets fixed, rename this to InitInjectedDigest.
+class InjectedInitDigest(datatype([('directory_digest', Digest)])): pass
 
 
-@rule(InitInjectedDigest, [Snapshot])
+@rule(InjectedInitDigest, [Snapshot])
 def inject_init(snapshot):
   """Ensure that every package has an __init__.py file in it."""
   missing_init_files = tuple(sorted(identify_missing_init_files(snapshot.files)))
@@ -33,7 +34,7 @@ def inject_init(snapshot):
     new_init_files_digest = touch_init_result.output_directory_digest
   # TODO(#7710): Once this gets fixed, merge the original source digest and the new init digest
   # into one unified digest.
-  yield InitInjectedDigest(directory_digest=new_init_files_digest)
+  yield InjectedInitDigest(directory_digest=new_init_files_digest)
 
 
 def rules():

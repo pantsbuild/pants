@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.backend.python.rules.inject_init import InitInjectedDigest, inject_init
+from pants.backend.python.rules.inject_init import InjectedInitDigest, inject_init
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, EMPTY_SNAPSHOT, Snapshot
 from pants.engine.rules import RootRule
 from pants.util.collections import assert_single_element
@@ -19,7 +19,7 @@ class TestInjectInit(TestBase):
 
   def assert_result(self, input_snapshot, expected_digest):
     injected_digest = assert_single_element(
-      self.scheduler.product_request(InitInjectedDigest, [input_snapshot])
+      self.scheduler.product_request(InjectedInitDigest, [input_snapshot])
     )
     self.assertEqual(injected_digest.directory_digest, expected_digest)
 
