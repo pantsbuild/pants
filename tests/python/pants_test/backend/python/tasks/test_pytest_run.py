@@ -12,6 +12,7 @@ from textwrap import dedent
 
 import coverage
 
+from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.pytest_prep import PytestPrep
 from pants.backend.python.tasks.pytest_run import PytestResult, PytestRun
@@ -844,3 +845,20 @@ python_tests(
       assert_test_not_run('test_three')
       assert_test_run('test_four')
       assert_test_not_run('test_five')
+
+  @contextmanager
+  def run_with_junit_xml_dir(self, targets):
+    with temporary_dir() as dist:
+      junit_xml_dir = os.path.join(dist, 'test-results')
+      self.run_tests(targets, junit_xml_dir=junit_xml_dir)
+      yield junit_xml_dir
+
+  def test_junit_xml_dir(self):
+    with self.run_with_junit_xml_dir([self.green]) as junit_xml_dir:
+      assert os.path.exists(junit_xml_dir)
+      assert ['TEST-{}.xml'.format(self.green.id)] == os.listdir(junit_xml_dir)
+
+  def test_issue_7749(self):
+    empty_test_target = self.make_target(spec='empty', target_type=PythonTests)
+    with self.run_with_junit_xml_dir([empty_test_target]) as junit_xml_dir:
+      assert not os.path.exists(junit_xml_dir)

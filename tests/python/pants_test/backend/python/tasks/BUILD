@@ -111,6 +111,7 @@ python_tests(
   dependencies = [
     '3rdparty/python:coverage',
     '3rdparty/python:future',
+    'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python/tasks',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
@@ -118,7 +119,6 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:py2_compat',
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test:task_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
     ':python_task_test_base',
