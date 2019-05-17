@@ -513,7 +513,6 @@ impl Snapshot {
         (file, fc.content)
       })
       .collect();
-    // TODO: Should there be a way to represent empty directories?
     let path_stats: Vec<_> = files_content
       .keys()
       .map(|file| PathStat::File {

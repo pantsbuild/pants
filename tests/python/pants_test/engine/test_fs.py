@@ -514,10 +514,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       single_warning = all_warnings[0]
       self.assertEqual("???", str(single_warning))
 
-  def test_files_content_from_bytes(self):
-    # TODO: Should you be allowed to set executable? (currently we always set executable=true)
-    # TODO: Should there be a way to represent empty directories?
-    # TODO: Test with some unicode, some non-unicode byte, and a directory with multiple files
+  def test_files_content_to_directory_digest(self):
     files_content = FilesContent((
       FileContent(
         path=text_type("cats/roland"),
@@ -528,16 +525,22 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
         path=text_type("treats"),
         content=b"catnip",
         is_executable=True,
-      )
+      ),
+      # Intentionally incorrectly sorted - the intrinsic should properly sort directory contents.
+      FileContent(
+        path=text_type("cats/emoji_and_bytes"),
+        content=b"\xf0\x9f\x90\x88\x00\x01\xf0\x9f\x90\xb1",
+        is_executable=False,
+      ),
     ))
 
     snapshot = assert_single_element(self.scheduler.product_request(Snapshot, [files_content]))
-    self.assertEquals(("cats/roland", "treats"), snapshot.files)
+    self.assertEquals(("cats/emoji_and_bytes", "cats/roland", "treats"), snapshot.files)
     self.assertEquals(
       snapshot.directory_digest,
       Digest(
-        fingerprint="25c50a40acbc64af7fbc38cff7cd7c936fe8d73dd8b55ee4f2af70476d116659",
-        serialized_bytes_length=160,
+        fingerprint="000506b8cddcae998b95ca77521409a98288bf116905ad3cd3d3d9f94f84ad76",
+        serialized_bytes_length=161,
       ),
     )
 
