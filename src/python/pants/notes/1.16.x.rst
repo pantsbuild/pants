@@ -2,6 +2,27 @@
 ======================
 This document describes releases leading up to the ``1.16.x`` ``stable`` series.
 
+1.16.0rc1 (5/17/2019)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Confluence publishing uses correct text types (#7746)
+  `PR #7746 <https://github.com/pantsbuild/pants/pull/7746>`_
+
+* Fix 'current' platform check for python_dist() targets with C/C++ sources (#7687)
+  `PR #7687 <https://github.com/pantsbuild/pants/pull/7687>`_
+
+* Fix ordering of args from compiler_option_sets and add test for scalac profiling (#7683)
+  `PR #7683 <https://github.com/pantsbuild/pants/pull/7683>`_
+
+Version updates
+~~~~~~~~~~~~~~~
+
+* Bump pex to 1.6.7 (#7731)
+  `PR #7731 <https://github.com/pantsbuild/pants/pull/7731>`_
+
 1.16.0rc0 (5/7/2019)
 --------------------
 
