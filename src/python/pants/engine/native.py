@@ -343,6 +343,13 @@ class _FFISpecification(object):
     v_str = '' if v is None else text_type(v)
     return c.utf8_buf(v_str)
 
+  @_extern_decl('_Bool', ['ExternContext*', 'Handle*'])
+  def extern_val_to_bool(self, context_handle, val):
+    """Given a Handle for `obj`, write bool(obj) and return it."""
+    c = self._ffi.from_handle(context_handle)
+    v = c.from_value(val[0])
+    return bool(v)
+
   @_extern_decl('Handle', ['ExternContext*', 'Handle**', 'uint64_t'])
   def extern_store_tuple(self, context_handle, vals_ptr, vals_len):
     """Given storage and an array of Handles, return a new Handle to represent the list."""
@@ -687,6 +694,7 @@ class Native(Singleton):
                            self.ffi_lib.extern_store_bool,
                            self.ffi_lib.extern_project_ignoring_type,
                            self.ffi_lib.extern_project_multi,
+                           self.ffi_lib.extern_val_to_bool,
                            self.ffi_lib.extern_create_exception)
       return context
 

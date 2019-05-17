@@ -1517,4 +1517,4 @@ class OptionsTestStringPayloads(OptionsTest):
       self._write_config_to_file(fp, config)
       fp.seek(0)
       payload = fp.read()
-      return Config.load_file_contents(config_payloads=[FileContent('blah', payload)])
+      return Config.load_file_contents(config_payloads=[FileContent('blah', payload, False)])

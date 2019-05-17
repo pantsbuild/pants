@@ -317,7 +317,7 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
 
     self.assertEqual(
       files_content_result.dependencies,
-      (FileContent("roland", b"European Burmese"),)
+      (FileContent("roland", b"European Burmese", False),)
     )
 
   def test_exercise_python_side_of_timeout_implementation(self):

@@ -355,7 +355,12 @@ pub fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
 pub fn lift_file_content(file_content: &Value) -> fs::FileContent {
   let path = PathBuf::from(externs::project_str(&file_content, "path"));
   let content = Bytes::from(externs::project_bytes(&file_content, "content"));
-  fs::FileContent { path, content }
+  let is_executable = externs::project_bool(&file_content, "is_executable");
+  fs::FileContent {
+    path,
+    content,
+    is_executable,
+  }
 }
 
 ///
@@ -630,6 +635,7 @@ impl Snapshot {
       &[
         Self::store_path(&item.path),
         externs::store_bytes(&item.content),
+        externs::store_bool(item.is_executable),
       ],
     )
   }

@@ -508,8 +508,7 @@ impl Snapshot {
       .map(|fc| {
         let file = File {
           path: fc.path,
-          // TODO: Configurable?
-          is_executable: true,
+          is_executable: fc.is_executable,
         };
         (file, fc.content)
       })

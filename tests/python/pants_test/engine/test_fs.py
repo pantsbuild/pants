@@ -522,10 +522,12 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
       FileContent(
         path=text_type("cats/roland"),
         content=b"European Burmese",
+        is_executable=False,
       ),
       FileContent(
         path=text_type("treats"),
         content=b"catnip",
+        is_executable=True,
       )
     ))
 
@@ -534,7 +536,7 @@ class FSTest(TestBase, SchedulerTestBase, AbstractClass):
     self.assertEquals(
       snapshot.directory_digest,
       Digest(
-        fingerprint="1249edd274db4350ce7d295dc2f40768581197f0e13e74d0206a3c408f1c236f",
+        fingerprint="25c50a40acbc64af7fbc38cff7cd7c936fe8d73dd8b55ee4f2af70476d116659",
         serialized_bytes_length=160,
       ),
     )

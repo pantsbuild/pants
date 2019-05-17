@@ -70,7 +70,8 @@ use crate::externs::{
   EqualsExtern, ExternContext, Externs, GeneratorSendExtern, GetTypeForExtern, HandleBuffer,
   IdentifyExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult, RawBuffer,
   StoreBoolExtern, StoreBytesExtern, StoreF64Extern, StoreI64Extern, StoreTupleExtern,
-  StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToBytesExtern, ValToStrExtern,
+  StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToBoolExtern, ValToBytesExtern,
+  ValToStrExtern,
 };
 use crate::handles::Handle;
 use crate::rule_graph::{GraphMaker, RuleGraph};
@@ -131,6 +132,7 @@ pub extern "C" fn externs_set(
   store_bool: StoreBoolExtern,
   project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
+  val_to_bool: ValToBoolExtern,
   create_exception: CreateExceptionExtern,
 ) {
   externs::set_externs(Externs {
@@ -157,6 +159,7 @@ pub extern "C" fn externs_set(
     store_bool,
     project_ignoring_type,
     project_multi,
+    val_to_bool,
     create_exception,
   });
 }

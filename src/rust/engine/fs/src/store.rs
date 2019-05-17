@@ -560,12 +560,17 @@ impl Store {
             .iter()
             .map(move |file_node| {
               let path = path_so_far.join(file_node.get_name());
+              let is_executable = file_node.get_is_executable();
               store
                 .load_file_bytes_with(try_future!(file_node.get_digest().into()), |b| b)
                 .and_then(move |maybe_bytes| {
                   maybe_bytes
                     .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))
-                    .map(|content| FileContent { path, content })
+                    .map(|content| FileContent {
+                      path,
+                      content,
+                      is_executable,
+                    })
                 })
                 .to_boxed()
             })

@@ -16,11 +16,15 @@ from pants.util.dirutil import maybe_read_file, safe_delete, safe_file_dump
 from pants.util.objects import Exactly, datatype
 
 
-class FileContent(datatype([('path', text_type), ('content', binary_type)])):
+class FileContent(datatype([('path', text_type), ('content', binary_type), ('is_executable', bool)])):
   """The content of a file."""
 
   def __repr__(self):
-    return 'FileContent(path={}, content=(len:{}))'.format(self.path, len(self.content))
+    return 'FileContent(path={}, content=(len:{}), is_executable: {})'.format(
+      self.path,
+      len(self.content),
+      self.is_executable,
+    )
 
   def __str__(self):
     return repr(self)

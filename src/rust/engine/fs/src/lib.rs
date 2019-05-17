@@ -621,10 +621,16 @@ impl PosixFS {
     let path = file.path.clone();
     let path_abs = self.root.0.join(&file.path);
     tokio_fs::File::open(path_abs)
-      .and_then(|file| tokio_codec::FramedRead::new(file, tokio_codec::BytesCodec::new()).concat2())
-      .map(|content| FileContent {
+      .and_then(|file| file.metadata())
+      .and_then(|(file, metadata)| {
+        let is_executable = metadata.permissions().mode() & 0o100 == 0o100;
+        let content = tokio_codec::FramedRead::new(file, tokio_codec::BytesCodec::new()).concat2();
+        content.join(futures::future::ok(is_executable))
+      })
+      .map(|(content, is_executable)| FileContent {
         path,
         content: content.freeze(),
+        is_executable,
       })
   }
 
@@ -777,6 +783,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
 pub struct FileContent {
   pub path: PathBuf,
   pub content: Bytes,
+  pub is_executable: bool,
 }
 
 impl fmt::Debug for FileContent {
