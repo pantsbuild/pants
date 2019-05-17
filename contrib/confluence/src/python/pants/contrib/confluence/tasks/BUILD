@@ -4,7 +4,6 @@
 
 python_library(
   dependencies = [
-    '3rdparty/python:future',
     'contrib/confluence/src/python/pants/contrib/confluence/util',
     'src/python/pants/backend/docgen/targets',
     'src/python/pants/backend/docgen/tasks',

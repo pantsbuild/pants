@@ -7,8 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 import textwrap
 
-from future.utils import text_type
-
 from pants.backend.docgen.targets.doc import Page
 from pants.backend.docgen.tasks.markdown_to_html import MarkdownToHtml
 from pants.base.exceptions import TaskError
@@ -46,11 +44,11 @@ class ConfluencePublish(Task):
   def __init__(self, *args, **kwargs):
     super(ConfluencePublish, self).__init__(*args, **kwargs)
     
-    self.url = text_type(self.get_options().url)
+    self.url = str(self.get_options().url)
     self.force = self.get_options().force
     self.open = self.get_options().open
     self._wiki = None
-    self.user = text_type(self.get_options().user)
+    self.user = str(self.get_options().user)
   
   def wiki(self):
     raise NotImplementedError('Subclasses must provide the wiki target they are associated with')
