@@ -18,6 +18,7 @@ from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, DirectoriesToMerge,
                              DirectoryToMaterialize, DirectoryWithPrefixToStrip, FileContent,
                              FilesContent, PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch,
                              create_fs_rules)
+from pants.engine.rules import RootRule
 from pants.engine.scheduler import ExecutionError
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.collections import assert_single_element
@@ -37,6 +38,10 @@ else:
 class FSTest(TestBase, SchedulerTestBase, AbstractClass):
 
   _original_src = os.path.join(os.path.dirname(__file__), 'examples/fs_test/fs_test.tar')
+
+  @classmethod
+  def rules(cls):
+    return TestBase.rules() + [RootRule(FilesContent)]
 
   @contextmanager
   def mk_project_tree(self, ignore_patterns=None):

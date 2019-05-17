@@ -332,9 +332,7 @@ class _FFISpecification(object):
     """Given a Handle for `obj`, write bytes(obj) and return it."""
     c = self._ffi.from_handle(context_handle)
     v = c.from_value(val[0])
-    # Consistently use the empty string to indicate None.
-    v_bytes = b'' if v is None else binary_type(v)
-    return c.buf(v_bytes)
+    return c.buf(binary_type(v))
 
   @_extern_decl('Buffer', ['ExternContext*', 'Handle*'])
   def extern_val_to_str(self, context_handle, val):

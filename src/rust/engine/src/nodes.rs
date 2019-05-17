@@ -284,7 +284,7 @@ impl WrappedNode for Select {
                 .map(lift_file_content)
                 .collect();
               fs::Snapshot::from_files_content(context.core.store(), files_content)
-                .map_err(|str| throw(&str))
+                .map_err(|err| throw(&err))
             })
             .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
             .to_boxed()

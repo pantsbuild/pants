@@ -146,16 +146,16 @@ pub fn project_multi(value: &Value, field: &str) -> Vec<Value> {
 }
 
 pub fn project_bytes(value: &Value, field: &str) -> Vec<u8> {
-  let named_val = with_externs(|e| {
-    (e.project_ignoring_type)(
+  with_externs(|e| {
+    let named_val: Value = (e.project_ignoring_type)(
       e.context,
       value as &Handle,
       field.as_ptr(),
       field.len() as u64,
     )
-    .into()
-  });
-  val_to_bytes(&named_val)
+    .into();
+    (e.val_to_bytes)(e.context, &named_val as &Handle).to_bytes()
+  })
 }
 
 pub fn project_multi_strs(item: &Value, field: &str) -> Vec<String> {
@@ -196,10 +196,6 @@ pub fn val_to_str(val: &Value) -> String {
       .to_string()
       .unwrap_or_else(|e| format!("<failed to decode unicode for {:?}: {}>", val, e))
   })
-}
-
-pub fn val_to_bytes(val: &Value) -> Vec<u8> {
-  with_externs(|e| (e.val_to_bytes)(e.context, val as &Handle).to_bytes())
 }
 
 pub fn create_exception(msg: &str) -> Value {
