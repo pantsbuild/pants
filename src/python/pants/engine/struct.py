@@ -261,6 +261,8 @@ class Struct(Serializable, SerializableFactory, Validatable):
         return tuple(sorted((k, hashable(v)) for k, v in value.items()))
       elif isinstance(value, list):
         return tuple(hashable(v) for v in value)
+      elif isinstance(value, set):
+        return tuple(sorted(hashable(v) for v in value))
       else:
         return value
     return tuple(sorted((k, hashable(v)) for k, v in self._kwargs.items()
