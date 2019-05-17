@@ -5,8 +5,10 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
+import os
 from textwrap import dedent
 
+from pants.backend.native.config.environment import ExtensibleAlgebraic, _algebraic_data, _list_field
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.python.python_requirement import PythonRequirement
@@ -15,17 +17,44 @@ from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.base.exceptions import IncompatiblePlatformsError
 from pants.binaries.executable_pex_tool import ExecutablePexTool
+from pants.engine.rules import optionable_rule, rule
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
-from pants.util.objects import SubclassesOf
+from pants.util.objects import SubclassesOf, TypedCollection, datatype, string_type
+from pants.util.strutil import safe_shlex_join, safe_shlex_split
 
 
 logger = logging.getLogger(__name__)
 
 
+class PexResolveNativeRequirementsBuildEnvironment(ExtensibleAlgebraic):
+
+  @_list_field
+  def cpp_flags(self):
+    """???"""
+
+  @_list_field
+  def ld_flags(self):
+    """???"""
+
+
+@_algebraic_data(PexResolveNativeRequirementsBuildEnvironment)
+class PexBuildEnvironment(datatype([
+    ('cpp_flags', TypedCollection(string_type)),
+    ('ld_flags', TypedCollection(string_type)),
+])):
+  """???"""
+
+  @property
+  def invocation_environment_dict(self):
+    return {
+      'CPPFLAGS': safe_shlex_join(self.cpp_flags),
+      'LDFLAGS': safe_shlex_join(self.ld_flags),
+    }
+
+
 class PythonNativeCode(Subsystem):
   """A subsystem which exposes components of the native backend to the python backend."""
-
   options_scope = 'python-native-code'
 
   default_native_source_extensions = ['.c', '.cpp', '.cc']
@@ -39,6 +68,17 @@ class PythonNativeCode(Subsystem):
     register('--native-source-extensions', type=list, default=cls.default_native_source_extensions,
              fingerprint=True, advanced=True,
              help='The extensions recognized for native source files in `python_dist()` sources.')
+    # TODO(#7735): move this to general subprocess support!
+    # NB: CPPFLAGS and LDFLAGS are necessary on certain systems (i.e. macOS) to get cryptography
+    # properly resolved.
+    register('--cpp-flags', type=list,
+             default=safe_shlex_split(os.environ.get('CPPFLAGS', '')),
+             fingerprint=True, advanced=True,
+             help='???')
+    register('--ld-flags', type=list,
+             default=safe_shlex_split(os.environ.get('LDFLAGS', '')),
+             fingerprint=True, advanced=True,
+             help='???')
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -114,6 +154,14 @@ class PythonNativeCode(Subsystem):
     ))
 
 
+@rule(PexBuildEnvironment, [PythonNativeCode])
+def create_pex_native_build_environment(python_native_code):
+  return PexBuildEnvironment(
+    cpp_flags=python_native_code.get_options().cpp_flags,
+    ld_flags=python_native_code.get_options().ld_flags,
+  )
+
+
 class BuildSetupRequiresPex(ExecutablePexTool):
   options_scope = 'build-setup-requires-pex'
 
@@ -131,3 +179,10 @@ class BuildSetupRequiresPex(ExecutablePexTool):
       PythonRequirement('setuptools=={}'.format(self.get_options().setuptools_version)),
       PythonRequirement('wheel=={}'.format(self.get_options().wheel_version)),
     ]
+
+
+def rules():
+  return [
+    optionable_rule(PythonNativeCode),
+    create_pex_native_build_environment,
+  ]

@@ -12,7 +12,9 @@ from future.utils import text_type
 
 from pants.backend.python.subsystems.pex_build_util import identify_missing_init_files
 from pants.backend.python.subsystems.pytest import PyTest
+from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
 from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import (Digest, DirectoriesToMerge, DirectoryWithPrefixToStrip, FilesContent,
                              Snapshot, UrlToFetch)
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
@@ -23,6 +25,7 @@ from pants.engine.rules import UnionRule, optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.core_test_model import Status, TestResult, TestTarget
 from pants.source.source_root import SourceRootConfig
+from pants.util.strutil import create_path_env_var
 
 
 def parse_interpreter_constraints(python_setup, python_target_adaptors):
@@ -42,8 +45,8 @@ def parse_interpreter_constraints(python_setup, python_target_adaptors):
 # TODO: Support resources
 # TODO(7697): Use a dedicated rule for removing the source root prefix, so that this rule
 # does not have to depend on SourceRootConfig.
-@rule(TestResult, [PythonTestsAdaptor, PyTest, PythonSetup, SourceRootConfig])
-def run_python_test(test_target, pytest, python_setup, source_root_config):
+@rule(TestResult, [PythonTestsAdaptor, PyTest, PythonSetup, SourceRootConfig, PexBuildEnvironment, SubprocessEncodingEnvironment])
+def run_python_test(test_target, pytest, python_setup, source_root_config, pex_build_environment, subprocess_encoding_environment):
   """Runs pytest for one target."""
 
   # TODO: Inject versions and digests here through some option, rather than hard-coding it.
@@ -91,15 +94,13 @@ def run_python_test(test_target, pytest, python_setup, source_root_config):
         list(pytest.get_requirement_strings())
         + list(all_requirements))
   ]
+  pex_resolve_env = {
+    'PATH': text_type(create_path_env_var(python_setup.interpreter_search_paths)),
+  }
+  pex_resolve_env.update(pex_build_environment.invocation_environment_dict)
   requirements_pex_request = ExecuteProcessRequest(
     argv=tuple(requirements_pex_argv),
-    env={
-      'PATH': text_type(os.pathsep.join(python_setup.interpreter_search_paths)),
-      # NB: CPPFLAGS and LDFLAGS are necessary on certain systems (i.e. macOS) to get cryptography
-      # properly resolved.
-      'CPPFLAGS': text_type(os.environ.get('CPPFLAGS', '')),
-      'LDFLAGS': text_type(os.environ.get('LDFLAGS', '')),
-    },
+    env=pex_resolve_env,
     input_files=pex_snapshot.directory_digest,
     description='Resolve requirements for {}'.format(test_target.address.reference()),
     output_files=(output_pytest_requirements_pex_filename,),
@@ -160,13 +161,13 @@ def run_python_test(test_target, pytest, python_setup, source_root_config):
     DirectoriesToMerge(directories=tuple(all_input_digests)),
   )
 
+  pex_exe_env = {
+    'PATH': text_type(create_path_env_var(python_setup.interpreter_search_paths)),
+  }
+  pex_exe_env.update(subprocess_encoding_environment.invocation_environment_dict)
   request = ExecuteProcessRequest(
     argv=(python_binary, './{}'.format(output_pytest_requirements_pex_filename)),
-    env={
-      'PATH': text_type(os.pathsep.join(python_setup.interpreter_search_paths)),
-      'LANG': text_type(os.environ.get('LANG', '')),
-      'LC_ALL': text_type(os.environ.get('LC_ALL', '')),
-    },
+    env=pex_exe_env,
     input_files=merged_input_files,
     description='Run pytest for {}'.format(test_target.address.reference()),
   )
