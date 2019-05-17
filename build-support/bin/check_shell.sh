@@ -20,6 +20,7 @@ bad_output="$(find ./* -name '*.sh' -print0 \
   | xargs -0 grep -H 'curl '| grep -v 'curl --fail' | cut -d: -f1 \
   | grep -v build-support/bin/check_shell.sh \
   || :)"
+
 if [[ -n "${bad_output}" ]]; then
   echo >&2 "Found bash files with curl not followed by --fail."
   echo >&2 "This is bad because 404s and such will end up with error pages in the output files."
