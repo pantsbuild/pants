@@ -9,6 +9,7 @@ import itertools
 import os
 import re
 import signal
+import sys
 import threading
 import time
 import unittest
@@ -400,6 +401,9 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       # Remove the pidfile so that the teardown script doesn't try to kill process 9.
       os.unlink(pidpath)
 
+  @unittest.skipIf(sys.version_info[0] == 2,
+                   reason='Increases by ~0.52 under python 2 as described in '
+                          'https://github.com/pantsbuild/pants/issues/7761.')
   def test_pantsd_memory_usage(self):
     """Validates that after N runs, memory usage has increased by no more than X percent."""
     number_of_runs = 10
