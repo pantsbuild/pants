@@ -32,11 +32,13 @@ from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
 from pants.engine.fs import DirectoryToMaterialize
 from pants.engine.isolated_process import ExecuteProcessRequest
+from pants.option.custom_types import file_option
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath, safe_open
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import classproperty
-from pants.util.strutil import ensure_text
+from pants.util.process_handler import subprocess
+from pants.util.strutil import ensure_text, safe_shlex_join
 
 
 # Well known metadata file required to register scalac plugins with nsc.
@@ -173,6 +175,13 @@ class BaseZincCompile(JvmCompile):
              help='When set, the results of incremental compiles will be written to the cache. '
                   'This is unset by default, because it is generally a good precaution to cache '
                   'only clean/cold builds.')
+
+    register('--native-image-location', advanced=True, type=file_option,
+             help='Location of a compiled zinc native-image to run with --execution-strategy=subprocess.')
+    register('--graal-rt-jar-location', advanced=True, type=file_option,
+             help='Location of the graal rt.jar (necessary to run with native-image).')
+    register('--graal-jce-jar-location', advanced=True, type=file_option,
+             help='Location of the graal jce.jar (necessary to run with native-image).')
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -392,16 +401,46 @@ class BaseZincCompile(JvmCompile):
         fp.write(arg)
         fp.write('\n')
 
+    def maybe_execute_native_image():
+      if self.get_options().native_image_location is not None:
+        return self._compile_native_image(zinc_args)
+      else:
+        return self._compile_nonhermetic(jvm_options, zinc_args)
+
     return self.execution_strategy_enum.resolve_for_enum_variant({
       self.HERMETIC: lambda: self._compile_hermetic(
         jvm_options, ctx, classes_dir, zinc_args, compiler_bridge_classpath_entry,
         dependency_classpath, scalac_classpath_entries),
-      self.SUBPROCESS: lambda: self._compile_nonhermetic(jvm_options, zinc_args),
+      self.SUBPROCESS: maybe_execute_native_image,
       self.NAILGUN: lambda: self._compile_nonhermetic(jvm_options, zinc_args),
     })()
 
   class ZincCompileError(TaskError):
     """An exception type specifically to signal a failed zinc execution."""
+
+  def _compile_native_image(self, zinc_args):
+    scalac_classpath_entries = self.scalac_classpath_entries()
+    scala_path = [classpath_entry.path for classpath_entry in scalac_classpath_entries]
+    argv = [
+      './{}'.format(self.get_options().native_image_location),
+      '-Dscala.boot.class.path={}'.format(os.pathsep.join(
+        scala_path + [
+          './{}'.format(self.get_options().graal_rt_jar_location),
+          './{}'.format(self.get_options().graal_jce_jar_location),
+        ])),
+      '-Dscala.usejavacp=true',
+    ] + zinc_args
+
+    self.context.log.debug('native-image zinc argv: {}'.format(safe_shlex_join(argv)))
+
+    with self.context.new_workunit(name=self.name(),
+                                   labels=[WorkUnitLabel.COMPILER],
+                                   cmd=safe_shlex_join(argv)) as workunit:
+      exit_code = subprocess.call(argv,
+                                  stdout=workunit.output('stdout'),
+                                  stderr=workunit.output('stderr'))
+      if exit_code != 0:
+        raise self.ZincCompileError('Zinc compile failed.', exit_code=exit_code)
 
   def _compile_nonhermetic(self, jvm_options, zinc_args):
     exit_code = self.runjava(classpath=self.get_zinc_compiler_classpath(),
