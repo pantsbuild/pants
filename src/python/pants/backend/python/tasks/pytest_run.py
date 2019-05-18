@@ -652,13 +652,14 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
   def _expose_results(self, invalid_tgts, workdirs):
     external_junit_xml_dir = self.get_options().junit_xml_dir
     if external_junit_xml_dir:
-      # Either we just ran pytest for a set of invalid targets and generated a junit xml file
-      # specific to that (sub)set or else we hit the cache for the whole partition and skipped
-      # running pytest, simply retrieving the partition's full junit xml file.
-      junitxml_path = workdirs.junitxml_path(*invalid_tgts)
-
       safe_mkdir(external_junit_xml_dir)
-      shutil.copy2(junitxml_path, external_junit_xml_dir)
+
+      junitxml_path = workdirs.junitxml_path(*invalid_tgts)
+      if os.path.exists(junitxml_path):
+        # Either we just ran pytest for a set of invalid targets and generated a junit xml file
+        # specific to that (sub)set or else we hit the cache for the whole partition and skipped
+        # running pytest, simply retrieving the partition's full junit xml file.
+        shutil.copy2(junitxml_path, external_junit_xml_dir)
 
     if self.get_options().coverage:
       coverage_output_dir = self.get_options().coverage_output_dir
