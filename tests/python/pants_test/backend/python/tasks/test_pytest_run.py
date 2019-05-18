@@ -851,14 +851,14 @@ python_tests(
     with temporary_dir() as dist:
       junit_xml_dir = os.path.join(dist, 'test-results')
       self.run_tests(targets, junit_xml_dir=junit_xml_dir)
-      yield junit_xml_dir
+      assert os.path.exists(junit_xml_dir)
+      yield os.listdir(junit_xml_dir)
 
   def test_junit_xml_dir(self):
-    with self.run_with_junit_xml_dir([self.green]) as junit_xml_dir:
-      assert os.path.exists(junit_xml_dir)
-      assert ['TEST-{}.xml'.format(self.green.id)] == os.listdir(junit_xml_dir)
+    with self.run_with_junit_xml_dir([self.green]) as junit_xml_files:
+      assert ['TEST-{}.xml'.format(self.green.id)] == junit_xml_files
 
   def test_issue_7749(self):
     empty_test_target = self.make_target(spec='empty', target_type=PythonTests)
-    with self.run_with_junit_xml_dir([empty_test_target]) as junit_xml_dir:
-      assert not os.path.exists(junit_xml_dir)
+    with self.run_with_junit_xml_dir([empty_test_target]) as junit_xml_files:
+      assert [] == junit_xml_files
