@@ -35,7 +35,7 @@ def _toolchain_variants(func):
   return wrapper
 
 
-_IS_OSX = sys.platform.startswith('darwin')
+_IS_OSX = Platform.current == Platform.darwin
 _PYTHON_MAJOR_MINOR = sys.version_info[:2]
 
 
