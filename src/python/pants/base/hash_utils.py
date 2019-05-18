@@ -135,7 +135,7 @@ def json_hash(obj, digest=None, encoder=None):
   :API: public
   """
   json_str = json.dumps(obj, ensure_ascii=True, allow_nan=False, sort_keys=True, cls=encoder)
-  return hash_all(json_str, digest=digest)
+  return hash_all([json_str], digest=digest)
 
 
 # TODO(#6513): something like python 3's @lru_cache decorator could be useful here!
