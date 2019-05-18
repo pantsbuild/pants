@@ -266,7 +266,7 @@ pub fn unsafe_call(func: &Function, args: &[Value]) -> Value {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-/// The remainder of this file deals with the static initialization of the Externs.
+// The remainder of this file deals with the static initialization of the Externs.
 /////////////////////////////////////////////////////////////////////////////////////////
 
 lazy_static! {
