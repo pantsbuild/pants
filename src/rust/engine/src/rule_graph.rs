@@ -6,7 +6,7 @@ use std::io;
 
 use itertools::Itertools;
 
-use crate::core::{Params, TypeId};
+use crate::core::TypeId;
 use crate::selectors::DependencyKey;
 use crate::tasks::Rule;
 
@@ -724,11 +724,7 @@ pub struct RuleGraph {
 }
 
 pub fn params_str(params: &ParamTypes) -> String {
-  let param_names = params
-    .iter()
-    .map(|type_id| format!("{}", *type_id))
-    .collect::<Vec<_>>();
-  Params::display(param_names)
+  TypeId::display(params.iter().cloned())
 }
 
 ///

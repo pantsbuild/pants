@@ -89,7 +89,12 @@ impl Params {
   ///
   /// Given a set of either param type or param value strings: sort, join, and render as one string.
   ///
-  pub fn display(mut params: Vec<String>) -> String {
+  pub fn display<T>(params: T) -> String
+  where
+    T: Iterator,
+    T::Item: fmt::Display,
+  {
+    let mut params: Vec<_> = params.map(|p| format!("{}", p)).collect();
     match params.len() {
       0 => "()".to_string(),
       1 => params.pop().unwrap(),
@@ -103,11 +108,7 @@ impl Params {
 
 impl fmt::Display for Params {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(
-      f,
-      "{}",
-      Self::display(self.0.iter().map(|k| format!("{}", k)).collect())
-    )
+    write!(f, "{}", Self::display(self.0.iter()))
   }
 }
 
@@ -126,6 +127,16 @@ impl TypeId {
     } else {
       write!(f, "{}", externs::type_to_str(self))
     }
+  }
+
+  ///
+  /// Render a string for a collection of TypeIds.
+  ///
+  pub fn display<T>(type_ids: T) -> String
+  where
+    T: Iterator<Item = TypeId>,
+  {
+    Params::display(type_ids)
   }
 }
 
