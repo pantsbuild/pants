@@ -377,7 +377,7 @@ impl<'t> GraphMaker<'t> {
       let fulfillable_candidates = fulfillable_candidates_by_key
         .entry(dependency_key.clone())
         .or_insert_with(Vec::new);
-      for candidate in rhs(&self.tasks, &params, product) {
+      for candidate in self.rhs(&params, product) {
         match candidate {
           Entry::WithDeps(c) => match self.construct_graph_helper(
             rule_dependency_edges,
@@ -688,7 +688,7 @@ impl<'t> GraphMaker<'t> {
   }
 
   fn gen_root_entry(&self, param_types: &ParamTypes, product_type: TypeId) -> Option<RootEntry> {
-    let candidates = rhs(&self.tasks, param_types, product_type);
+    let candidates = self.rhs(param_types, product_type);
     if candidates.is_empty() {
       None
     } else {
@@ -697,6 +697,27 @@ impl<'t> GraphMaker<'t> {
         dependency_key: DependencyKey::new_root(product_type),
       })
     }
+  }
+
+  ///
+  /// Select Entries that can provide the given product type with the given parameters.
+  ///
+  fn rhs(&self, params: &ParamTypes, product_type: TypeId) -> Vec<Entry> {
+    let mut entries = Vec::new();
+    // If the params can provide the type directly, add that.
+    if let Some(type_id) = params.get(&product_type) {
+      entries.push(Entry::Param(*type_id));
+    }
+    // If there are any rules which can produce the desired type, add them.
+    if let Some(matching_rules) = self.tasks.get(&product_type) {
+      entries.extend(matching_rules.iter().map(|rule| {
+        Entry::WithDeps(EntryWithDeps::Inner(InnerEntry {
+          params: params.clone(),
+          rule: rule.clone(),
+        }))
+      }));
+    }
+    entries
   }
 }
 
@@ -984,25 +1005,4 @@ impl RuleEdges {
       .or_insert_with(Vec::new)
       .push(new_dependency);
   }
-}
-
-///
-/// Select Entries that can provide the given product type with the given parameters.
-///
-fn rhs(tasks: &Tasks, params: &ParamTypes, product_type: TypeId) -> Vec<Entry> {
-  let mut entries = Vec::new();
-  // If the params can provide the type directly, add that.
-  if let Some(type_id) = params.get(&product_type) {
-    entries.push(Entry::Param(*type_id));
-  }
-  // If there are any rules which can produce the desired type, add them.
-  if let Some(matching_rules) = tasks.get(&product_type) {
-    entries.extend(matching_rules.iter().map(|rule| {
-      Entry::WithDeps(EntryWithDeps::Inner(InnerEntry {
-        params: params.clone(),
-        rule: rule.clone(),
-      }))
-    }));
-  }
-  entries
 }
