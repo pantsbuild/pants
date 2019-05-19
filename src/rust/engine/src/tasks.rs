@@ -5,8 +5,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 use crate::core::{Function, TypeId};
-use crate::rule_graph::SelectKey;
-use crate::selectors::{Get, Select};
+use crate::selectors::{DependencyKey, Get, Select};
 use crate::types::Types;
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -18,7 +17,7 @@ pub enum Rule {
 }
 
 impl Rule {
-  pub fn dependency_keys(&self) -> Vec<SelectKey> {
+  pub fn dependency_keys(&self) -> Vec<DependencyKey> {
     match self {
       &Rule::Task(Task {
         ref clause,
@@ -26,11 +25,11 @@ impl Rule {
         ..
       }) => clause
         .iter()
-        .map(|s| SelectKey::JustSelect(s.clone()))
-        .chain(gets.iter().map(|g| SelectKey::JustGet(*g)))
+        .map(|s| DependencyKey::JustSelect(s.clone()))
+        .chain(gets.iter().map(|g| DependencyKey::JustGet(*g)))
         .collect(),
       &Rule::Intrinsic(Intrinsic { ref input, .. }) => {
-        vec![SelectKey::JustSelect(Select::new(*input))]
+        vec![DependencyKey::JustSelect(Select::new(*input))]
       }
     }
   }

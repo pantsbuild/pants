@@ -7,7 +7,7 @@ use std::io;
 use itertools::Itertools;
 
 use crate::core::{Params, TypeId};
-use crate::selectors::{Get, Select};
+use crate::selectors::DependencyKey;
 use crate::tasks::Rule;
 
 type Tasks = HashMap<TypeId, Vec<Rule>>;
@@ -47,20 +47,14 @@ impl EntryWithDeps {
   }
 
   ///
-  /// Returns the set of SelectKeys representing the dependencies of this EntryWithDeps.
+  /// Returns the set of DependencyKeys representing the dependencies of this EntryWithDeps.
   ///
-  fn dependency_keys(&self) -> Vec<SelectKey> {
+  fn dependency_keys(&self) -> Vec<DependencyKey> {
     match self {
       &EntryWithDeps::Inner(InnerEntry { ref rule, .. }) => rule.dependency_keys(),
       &EntryWithDeps::Root(RootEntry {
-        ref clause,
-        ref gets,
-        ..
-      }) => clause
-        .iter()
-        .map(|s| SelectKey::JustSelect(s.clone()))
-        .chain(gets.iter().map(|g| SelectKey::JustGet(*g)))
-        .collect(),
+        ref dependency_key, ..
+      }) => vec![dependency_key.clone()],
     }
   }
 
@@ -109,11 +103,7 @@ impl Entry {
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct RootEntry {
   params: ParamTypes,
-  // TODO: A RootEntry can only have one declared `Select`, and no declared `Get`s, but these
-  // are shaped as Vecs to temporarily minimize the re-shuffling in `_construct_graph`. Remove in
-  // a future commit.
-  clause: Vec<Select>,
-  gets: Vec<Get>,
+  dependency_key: DependencyKey,
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -128,19 +118,6 @@ impl InnerEntry {
   }
 }
 
-///
-/// A key for the Selects used from a rule. Rules are only picked up by Select selectors. These keys
-/// uniquely identify the selects used by a particular entry in the rule graph so that they can be
-/// mapped to the dependencies they correspond to.
-///
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
-pub enum SelectKey {
-  // A Get for a particular product/subject pair.
-  JustGet(Get),
-  // A bare select with no projection.
-  JustSelect(Select),
-}
-
 type RuleDependencyEdges = HashMap<EntryWithDeps, RuleEdges>;
 type UnfulfillableRuleMap = HashMap<EntryWithDeps, Vec<Diagnostic>>;
 
@@ -152,7 +129,11 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
-  fn ambiguous(available_params: &ParamTypes, key: &SelectKey, entries: Vec<&Entry>) -> Diagnostic {
+  fn ambiguous(
+    available_params: &ParamTypes,
+    key: &DependencyKey,
+    entries: Vec<&Entry>,
+  ) -> Diagnostic {
     let params_clause = match available_params.len() {
       0 => "",
       1 => " with parameter type ",
@@ -162,7 +143,7 @@ impl Diagnostic {
       params: available_params.clone(),
       reason: format!(
         "Ambiguous rules to compute {}{}{}",
-        select_key_str(&key),
+        key,
         params_clause,
         params_str(&available_params),
       ),
@@ -378,24 +359,23 @@ impl<'t> GraphMaker<'t> {
 
     let dependency_keys = entry.dependency_keys();
 
-    for select_key in dependency_keys {
-      let (params, product, provided_param) = match &select_key {
-        &SelectKey::JustSelect(ref s) => (entry.params().clone(), s.product, None),
-        &SelectKey::JustGet(ref g) => {
-          // Unlike Selects, Gets introduce new parameter values into a subgraph.
-          let get_params = {
-            let mut p = entry.params().clone();
-            p.insert(g.subject);
-            p
-          };
-          (get_params, g.product, Some(g.subject))
-        }
+    for dependency_key in dependency_keys {
+      let product = dependency_key.product();
+      let provided_param = dependency_key.provided_param();
+      let params = if let Some(provided_param) = provided_param {
+        // The dependency key provides a parameter: include it in the Params that are already in
+        // the context.
+        let mut params = entry.params().clone();
+        params.insert(provided_param);
+        params
+      } else {
+        entry.params().clone()
       };
 
       // Collect fulfillable candidates, used parameters, and cyclic deps.
       let mut cycled = false;
       let fulfillable_candidates = fulfillable_candidates_by_key
-        .entry(select_key.clone())
+        .entry(dependency_key.clone())
         .or_insert_with(Vec::new);
       for candidate in rhs(&self.tasks, &params, product) {
         match candidate {
@@ -456,13 +436,12 @@ impl<'t> GraphMaker<'t> {
           reason: if params.is_empty() {
             format!(
               "No rule was available to compute {}. Maybe declare it as a RootRule({})?",
-              select_key_str(&select_key),
-              product,
+              dependency_key, product,
             )
           } else {
             format!(
               "No rule was available to compute {} with parameter type{} {}",
-              select_key_str(&select_key),
+              dependency_key,
               if params.len() > 1 { "s" } else { "" },
               params_str(&params),
             )
@@ -551,22 +530,19 @@ impl<'t> GraphMaker<'t> {
   ///
   fn monomorphize(
     entry: &EntryWithDeps,
-    deps: &[(SelectKey, Vec<Entry>)],
+    deps: &[(DependencyKey, Vec<Entry>)],
   ) -> Result<HashMap<EntryWithDeps, RuleEdges>, Vec<Diagnostic>> {
     // Collect the powerset of the union of used parameters, ordered by set size.
     let params_powerset: Vec<Vec<TypeId>> = {
       let mut all_used_params = BTreeSet::new();
       for (key, inputs) in deps {
-        let provided_param = match &key {
-          &SelectKey::JustSelect(_) => None,
-          &SelectKey::JustGet(ref g) => Some(&g.subject),
-        };
+        let provided_param = key.provided_param();
         for input in inputs {
           all_used_params.extend(
             input
               .params()
               .into_iter()
-              .filter(|p| Some(p) != provided_param),
+              .filter(|p| Some(*p) != provided_param),
           );
         }
       }
@@ -624,21 +600,18 @@ impl<'t> GraphMaker<'t> {
   ///
   fn choose_dependencies<'a>(
     available_params: &ParamTypes,
-    deps: &'a [(SelectKey, Vec<Entry>)],
-  ) -> Result<Option<Vec<(&'a SelectKey, &'a Entry)>>, Diagnostic> {
+    deps: &'a [(DependencyKey, Vec<Entry>)],
+  ) -> Result<Option<Vec<(&'a DependencyKey, &'a Entry)>>, Diagnostic> {
     let mut combination = Vec::new();
     for (key, input_entries) in deps {
-      let provided_param = match &key {
-        &SelectKey::JustSelect(_) => None,
-        &SelectKey::JustGet(ref g) => Some(&g.subject),
-      };
+      let provided_param = key.provided_param();
       let satisfiable_entries = input_entries
         .iter()
         .filter(|input_entry| {
           input_entry
             .params()
             .iter()
-            .all(|p| available_params.contains(p) || Some(p) == provided_param)
+            .all(|p| available_params.contains(p) || Some(*p) == provided_param)
         })
         .collect::<Vec<_>>();
 
@@ -721,8 +694,7 @@ impl<'t> GraphMaker<'t> {
     } else {
       Some(RootEntry {
         params: param_types.clone(),
-        clause: vec![Select::new(product_type)],
-        gets: vec![],
+        dependency_key: DependencyKey::new_root(product_type),
       })
     }
   }
@@ -759,17 +731,6 @@ pub fn params_str(params: &ParamTypes) -> String {
   Params::display(param_names)
 }
 
-pub fn select_key_str(select_key: &SelectKey) -> String {
-  match select_key {
-    &SelectKey::JustSelect(ref s) => s.product.to_string(),
-    &SelectKey::JustGet(ref g) => g.to_string(),
-  }
-}
-
-pub fn select_root_str(select: &Select) -> String {
-  format!("Select({})", select.product)
-}
-
 ///
 /// TODO: Move all of these methods to Display impls.
 ///
@@ -786,16 +747,15 @@ fn entry_with_deps_str(entry: &EntryWithDeps) -> String {
       ref rule,
       ref params,
     }) => format!("{} for {}", rule, params_str(params)),
-    &EntryWithDeps::Root(ref root) => format!(
-      "{} for {}",
-      root
-        .clause
-        .iter()
-        .map(|s| select_root_str(s))
-        .collect::<Vec<_>>()
-        .join(", "),
-      params_str(&root.params)
-    ),
+    &EntryWithDeps::Root(ref root) => {
+      // TODO: Consider dropping this (final) public use of the keyword "Select", while ensuring
+      // that error messages remain sufficiently grokkable.
+      format!(
+        "Select({}) for {}",
+        root.dependency_key,
+        params_str(&root.params),
+      )
+    }
   }
 }
 
@@ -807,14 +767,13 @@ impl RuleGraph {
   pub fn find_root_edges<I: IntoIterator<Item = TypeId>>(
     &self,
     param_inputs: I,
-    select: &Select,
+    product: TypeId,
   ) -> Result<RuleEdges, String> {
     let params: ParamTypes = param_inputs.into_iter().collect();
-    let clause = vec![select.clone()];
+    let dependency_key = DependencyKey::new_root(product);
     let root = RootEntry {
       params: params.clone(),
-      clause: clause.clone(),
-      gets: vec![],
+      dependency_key: dependency_key.clone(),
     };
 
     // Attempt to find an exact match.
@@ -829,7 +788,8 @@ impl RuleGraph {
       .iter()
       .filter_map(|(entry, edges)| match entry {
         &EntryWithDeps::Root(ref root_entry)
-          if root_entry.clause == clause && root_entry.params.is_subset(&params) =>
+          if root_entry.dependency_key == dependency_key
+            && root_entry.params.is_subset(&params) =>
         {
           Some((entry, edges))
         }
@@ -840,8 +800,8 @@ impl RuleGraph {
     match subset_matches.len() {
       1 => Ok(subset_matches[0].1.clone()),
       0 => Err(format!(
-        "No installed @rules can satisfy {} for input Params({}).",
-        select_root_str(&select),
+        "No installed @rules can compute {} for input Params({}).",
+        product,
         params_str(&params),
       )),
       _ => {
@@ -850,8 +810,8 @@ impl RuleGraph {
           .map(|(e, _)| entry_with_deps_str(e))
           .collect::<Vec<_>>();
         Err(format!(
-          "More than one set of @rules can satisfy {} for input Params({}):\n  {}",
-          select_root_str(&select),
+          "More than one set of @rules can compute {} for input Params({}):\n  {}",
+          product,
           params_str(&params),
           match_strs.join("\n  "),
         ))
@@ -1006,14 +966,14 @@ impl RuleGraph {
 ///
 #[derive(Eq, PartialEq, Clone, Debug, Default)]
 pub struct RuleEdges {
-  dependencies: HashMap<SelectKey, Vec<Entry>>,
+  dependencies: HashMap<DependencyKey, Vec<Entry>>,
 }
 
 impl RuleEdges {
-  pub fn entry_for(&self, select_key: &SelectKey) -> Option<&Entry> {
+  pub fn entry_for(&self, dependency_key: &DependencyKey) -> Option<&Entry> {
     self
       .dependencies
-      .get(select_key)
+      .get(dependency_key)
       .and_then(|entries| entries.first())
   }
 
@@ -1021,10 +981,10 @@ impl RuleEdges {
     Itertools::flatten(self.dependencies.values())
   }
 
-  fn add_edge(&mut self, select_key: SelectKey, new_dependency: Entry) {
+  fn add_edge(&mut self, dependency_key: DependencyKey, new_dependency: Entry) {
     self
       .dependencies
-      .entry(select_key)
+      .entry(dependency_key)
       .or_insert_with(Vec::new)
       .push(new_dependency);
   }

@@ -112,10 +112,10 @@ impl Select {
   }
 
   pub fn new_from_edges(params: Params, product: TypeId, edges: &rule_graph::RuleEdges) -> Select {
-    let select_key = rule_graph::SelectKey::JustSelect(selectors::Select::new(product));
+    let dependency_key = selectors::DependencyKey::JustSelect(selectors::Select::new(product));
     // TODO: Is it worth propagating an error here?
     let entry = edges
-      .entry_for(&select_key)
+      .entry_for(&dependency_key)
       .unwrap_or_else(|| panic!("{:?} did not declare a dependency on {:?}", edges, product))
       .clone();
     Select::new(params, product, entry)
@@ -845,7 +845,7 @@ impl Task {
         let context = context.clone();
         let params = params.clone();
         let entry = entry.clone();
-        let select_key = rule_graph::SelectKey::JustGet(selectors::Get {
+        let dependency_key = selectors::DependencyKey::JustGet(selectors::Get {
           product: get.product,
           subject: *get.subject.type_id(),
         });
@@ -855,10 +855,10 @@ impl Task {
           .edges_for_inner(&entry)
           .ok_or_else(|| throw(&format!("no edges for task {:?} exist!", entry)))
           .and_then(|edges| {
-            edges.entry_for(&select_key).cloned().ok_or_else(|| {
+            edges.entry_for(&dependency_key).cloned().ok_or_else(|| {
               throw(&format!(
                 "{:?} did not declare a dependency on {:?}",
-                entry, select_key
+                entry, dependency_key
               ))
             })
           });
