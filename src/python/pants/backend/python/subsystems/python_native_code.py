@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
+import os
 from textwrap import dedent
 
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
@@ -15,9 +16,11 @@ from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.base.exceptions import IncompatiblePlatformsError
 from pants.binaries.executable_pex_tool import ExecutablePexTool
+from pants.engine.rules import optionable_rule, rule
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
-from pants.util.objects import SubclassesOf
+from pants.util.objects import SubclassesOf, TypedCollection, datatype, string_type
+from pants.util.strutil import safe_shlex_join, safe_shlex_split
 
 
 logger = logging.getLogger(__name__)
@@ -39,6 +42,15 @@ class PythonNativeCode(Subsystem):
     register('--native-source-extensions', type=list, default=cls.default_native_source_extensions,
              fingerprint=True, advanced=True,
              help='The extensions recognized for native source files in `python_dist()` sources.')
+    # TODO(#7735): move the --cpp-flags and --ld-flags to a general subprocess support subystem.
+    register('--cpp-flags', type=list,
+             default=safe_shlex_split(os.environ.get('CPPFLAGS', '')),
+             fingerprint=True, advanced=True,
+             help="Override the `CPPFLAGS` environment variable for any forked subprocesses.")
+    register('--ld-flags', type=list,
+             default=safe_shlex_split(os.environ.get('LDFLAGS', '')),
+             fingerprint=True, advanced=True,
+             help="Override the `LDFLAGS` environment variable for any forked subprocesses.")
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -131,3 +143,31 @@ class BuildSetupRequiresPex(ExecutablePexTool):
       PythonRequirement('setuptools=={}'.format(self.get_options().setuptools_version)),
       PythonRequirement('wheel=={}'.format(self.get_options().wheel_version)),
     ]
+
+
+class PexBuildEnvironment(datatype([
+    ('cpp_flags', TypedCollection(string_type)),
+    ('ld_flags', TypedCollection(string_type)),
+])):
+
+  @property
+  def invocation_environment_dict(self):
+    return {
+      'CPPFLAGS': safe_shlex_join(self.cpp_flags),
+      'LDFLAGS': safe_shlex_join(self.ld_flags),
+    }
+
+
+@rule(PexBuildEnvironment, [PythonNativeCode])
+def create_pex_native_build_environment(python_native_code):
+  return PexBuildEnvironment(
+    cpp_flags=python_native_code.get_options().cpp_flags,
+    ld_flags=python_native_code.get_options().ld_flags,
+  )
+
+
+def rules():
+  return [
+    optionable_rule(PythonNativeCode),
+    create_pex_native_build_environment,
+  ]

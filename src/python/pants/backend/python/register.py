@@ -9,6 +9,11 @@ from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_requirements import PythonRequirements
 from pants.backend.python.rules import inject_init, python_test_runner
+from pants.backend.python.subsystems.python_native_code import PythonNativeCode
+from pants.backend.python.subsystems.python_native_code import rules as python_native_code_rules
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
+from pants.backend.python.subsystems.subprocess_environment import \
+  rules as subprocess_environment_rules
 from pants.backend.python.targets.python_app import PythonApp
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
@@ -36,6 +41,10 @@ from pants.backend.python.tasks.unpack_wheels import UnpackWheels
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
 from pants.goal.task_registrar import TaskRegistrar as task
+
+
+def global_subsystems():
+  return (SubprocessEnvironment, PythonNativeCode)
 
 
 def build_file_aliases():
@@ -81,4 +90,4 @@ def register_goals():
 
 
 def rules():
-  return inject_init.rules() + python_test_runner.rules()
+  return inject_init.rules() + python_test_runner.rules() + python_native_code_rules() + subprocess_environment_rules()
