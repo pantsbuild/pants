@@ -248,8 +248,19 @@ fi
 if [[ "${run_cargo_audit:-false}" == "true" ]]; then
   start_travis_section "CargoAudit" "Running cargo audit on rust code"
   (
-    "${REPO_ROOT}/build-support/bin/native/cargo" ensure-installed --package=cargo-audit --version=0.5.2
-    "${REPO_ROOT}/build-support/bin/native/cargo" audit -f "${REPO_ROOT}/src/rust/engine/Cargo.lock"
+    # TODO(John Sirois): Kill --git-url/--git-rev when we upgrade to cargo-audit > 0.6.1.
+    # See: https://github.com/pantsbuild/pants/issues/7760 for context.
+    "${REPO_ROOT}/build-support/bin/native/cargo" ensure-installed \
+      --package=cargo-audit \
+      --version=0.6.1 \
+      --git-url=https://github.com/RustSec/cargo-audit \
+      --git-rev=1c298bcda2c74f4a1bd8f0d8482b3577ee94fbb3
+    # TODO(John Sirois): Kill --ignore RUSTSEC-2019-0003 when we can upgrade to an official released
+    # version of protobuf with a fix.
+    # See: https://github.com/pantsbuild/pants/issues/7760 for context.
+    "${REPO_ROOT}/build-support/bin/native/cargo" audit \
+      -f "${REPO_ROOT}/src/rust/engine/Cargo.lock" \
+      --ignore RUSTSEC-2019-0003
   ) || die "Cargo audit failure"
   end_travis_section
 fi
