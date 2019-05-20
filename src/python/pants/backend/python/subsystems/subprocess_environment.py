@@ -11,19 +11,6 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.objects import datatype, string_optional
 
 
-class SubprocessEncodingEnvironment(datatype([
-    ('lang', string_optional),
-    ('lc_all', string_optional),
-])):
-
-  @property
-  def invocation_environment_dict(self):
-    return {
-      'LANG': self.lang or '',
-      'LC_ALL': self.lc_all or '',
-    }
-
-
 class SubprocessEnvironment(Subsystem):
   options_scope = 'subprocess-environment'
 
@@ -40,6 +27,19 @@ class SubprocessEnvironment(Subsystem):
              default=os.environ.get('LC_ALL'),
              fingerprint=True, advanced=True,
              help='Override the `LC_ALL` environment variable for any forked subprocesses.')
+
+
+class SubprocessEncodingEnvironment(datatype([
+    ('lang', string_optional),
+    ('lc_all', string_optional),
+])):
+
+  @property
+  def invocation_environment_dict(self):
+    return {
+      'LANG': self.lang or '',
+      'LC_ALL': self.lc_all or '',
+    }
 
 
 @rule(SubprocessEncodingEnvironment, [SubprocessEnvironment])

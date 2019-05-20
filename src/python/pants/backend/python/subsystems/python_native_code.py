@@ -26,19 +26,6 @@ from pants.util.strutil import safe_shlex_join, safe_shlex_split
 logger = logging.getLogger(__name__)
 
 
-class PexBuildEnvironment(datatype([
-    ('cpp_flags', TypedCollection(string_type)),
-    ('ld_flags', TypedCollection(string_type)),
-])):
-
-  @property
-  def invocation_environment_dict(self):
-    return {
-      'CPPFLAGS': safe_shlex_join(self.cpp_flags),
-      'LDFLAGS': safe_shlex_join(self.ld_flags),
-    }
-
-
 class PythonNativeCode(Subsystem):
   """A subsystem which exposes components of the native backend to the python backend."""
 
@@ -141,14 +128,6 @@ class PythonNativeCode(Subsystem):
     ))
 
 
-@rule(PexBuildEnvironment, [PythonNativeCode])
-def create_pex_native_build_environment(python_native_code):
-  return PexBuildEnvironment(
-    cpp_flags=python_native_code.get_options().cpp_flags,
-    ld_flags=python_native_code.get_options().ld_flags,
-  )
-
-
 class BuildSetupRequiresPex(ExecutablePexTool):
   options_scope = 'build-setup-requires-pex'
 
@@ -166,6 +145,27 @@ class BuildSetupRequiresPex(ExecutablePexTool):
       PythonRequirement('setuptools=={}'.format(self.get_options().setuptools_version)),
       PythonRequirement('wheel=={}'.format(self.get_options().wheel_version)),
     ]
+
+
+class PexBuildEnvironment(datatype([
+    ('cpp_flags', TypedCollection(string_type)),
+    ('ld_flags', TypedCollection(string_type)),
+])):
+
+  @property
+  def invocation_environment_dict(self):
+    return {
+      'CPPFLAGS': safe_shlex_join(self.cpp_flags),
+      'LDFLAGS': safe_shlex_join(self.ld_flags),
+    }
+
+
+@rule(PexBuildEnvironment, [PythonNativeCode])
+def create_pex_native_build_environment(python_native_code):
+  return PexBuildEnvironment(
+    cpp_flags=python_native_code.get_options().cpp_flags,
+    ld_flags=python_native_code.get_options().ld_flags,
+  )
 
 
 def rules():
