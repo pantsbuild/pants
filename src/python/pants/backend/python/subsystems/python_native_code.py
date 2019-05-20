@@ -42,9 +42,7 @@ class PythonNativeCode(Subsystem):
     register('--native-source-extensions', type=list, default=cls.default_native_source_extensions,
              fingerprint=True, advanced=True,
              help='The extensions recognized for native source files in `python_dist()` sources.')
-    # TODO(#7735): move this to general subprocess support!
-    # NB: CPPFLAGS and LDFLAGS are necessary on certain systems (i.e. macOS) to get cryptography
-    # properly resolved.
+    # TODO(#7735): move the --cpp-flags and --ld-flags to a general subprocess support subystem.
     register('--cpp-flags', type=list,
              default=safe_shlex_split(os.environ.get('CPPFLAGS', '')),
              fingerprint=True, advanced=True,

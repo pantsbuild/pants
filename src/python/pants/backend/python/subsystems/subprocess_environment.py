@@ -18,7 +18,7 @@ class SubprocessEnvironment(Subsystem):
   def register_options(cls, register):
     super(SubprocessEnvironment, cls).register_options(register)
 
-    # TODO(#7735): move this to general subprocess support!
+    # TODO(#7735): move the --lang and --lc-all flags to a general subprocess support subystem.
     register('--lang',
              default=os.environ.get('LANG'),
              fingerprint=True, advanced=True,
