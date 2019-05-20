@@ -365,6 +365,8 @@ mod tests {
   }
 
   #[test]
+  // TODO: un-ignore on OSX: https://github.com/pantsbuild/pants/issues/7756
+  #[cfg_attr(target_os = "macos", ignore)]
   fn reattempts_unhealthy() {
     let s = Serverset::new(
       vec!["good", "bad"],
