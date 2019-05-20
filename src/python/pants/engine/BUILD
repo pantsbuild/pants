@@ -39,6 +39,7 @@ python_library(
   sources=['struct.py'],
   dependencies=[
     '3rdparty/python:future',
+    ':addressable',
     ':objects',
     'src/python/pants/util:objects',
   ]

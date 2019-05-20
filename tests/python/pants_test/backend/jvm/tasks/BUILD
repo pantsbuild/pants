@@ -196,6 +196,7 @@ python_tests(
   sources = ['test_jar_dependency_management_setup.py'],
   dependencies = [
     '3rdparty/python:future',
+    ':jvm_binary_task_test_base',
     'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
     'src/python/pants/backend/jvm/targets:jvm',

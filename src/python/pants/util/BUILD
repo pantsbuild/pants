@@ -118,6 +118,7 @@ python_library(
     ':collections_abc_backport',
     ':memo',
     ':meta',
+    ':strutil',
   ],
 )
 
