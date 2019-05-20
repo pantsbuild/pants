@@ -13,7 +13,7 @@ hashing = { path = "../../hashing" }
 prost = "0.4"
 prost-derive = "0.4"
 prost-types = "0.4"
-protobuf = { version = "2.0.4", features = ["with-bytes"] }
+protobuf = { version = "2.0.6", features = ["with-bytes"] }
 # Waiting for https://github.com/tower-rs/tower-grpc/pull/108 and a first actual release.
 tower-grpc = { git = "https://github.com/pantsbuild/tower-grpc.git", rev = "ef19f2e1715f415ecb699e8f17f5845ad2b45daf", features = ["prost"] }
 
