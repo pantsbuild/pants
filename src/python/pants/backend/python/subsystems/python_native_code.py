@@ -8,8 +8,6 @@ import logging
 import os
 from textwrap import dedent
 
-from pants.backend.native.config.environment import (ExtensibleAlgebraic, _algebraic_data,
-                                                     _list_field)
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.python.python_requirement import PythonRequirement
@@ -28,23 +26,10 @@ from pants.util.strutil import safe_shlex_join, safe_shlex_split
 logger = logging.getLogger(__name__)
 
 
-class PexResolveNativeRequirementsBuildEnvironment(ExtensibleAlgebraic):
-
-  @_list_field
-  def cpp_flags(self):
-    """???"""
-
-  @_list_field
-  def ld_flags(self):
-    """???"""
-
-
-@_algebraic_data(PexResolveNativeRequirementsBuildEnvironment)
 class PexBuildEnvironment(datatype([
     ('cpp_flags', TypedCollection(string_type)),
     ('ld_flags', TypedCollection(string_type)),
 ])):
-  """???"""
 
   @property
   def invocation_environment_dict(self):
@@ -56,6 +41,7 @@ class PexBuildEnvironment(datatype([
 
 class PythonNativeCode(Subsystem):
   """A subsystem which exposes components of the native backend to the python backend."""
+
   options_scope = 'python-native-code'
 
   default_native_source_extensions = ['.c', '.cpp', '.cc']
@@ -75,11 +61,11 @@ class PythonNativeCode(Subsystem):
     register('--cpp-flags', type=list,
              default=safe_shlex_split(os.environ.get('CPPFLAGS', '')),
              fingerprint=True, advanced=True,
-             help='???')
+             help="Override the `CPPFLAGS` environment variable for any forked subprocesses.")
     register('--ld-flags', type=list,
              default=safe_shlex_split(os.environ.get('LDFLAGS', '')),
              fingerprint=True, advanced=True,
-             help='???')
+             help="Override the `LDFLAGS` environment variable for any forked subprocesses.")
 
   @classmethod
   def subsystem_dependencies(cls):

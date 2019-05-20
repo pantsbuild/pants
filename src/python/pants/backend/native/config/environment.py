@@ -45,7 +45,7 @@ def _algebraic_data(metaclass):
 # NB: prototypal inheritance seems *deeply* linked with the idea here!
 # TODO: since we are calling these methods from other files, we should remove the leading underscore
 # and add testing!
-class ExtensibleAlgebraic(AbstractClass):
+class _ExtensibleAlgebraic(AbstractClass):
   """A mixin to make it more concise to coalesce datatypes with related collection fields."""
 
   @memoized_classproperty
@@ -92,7 +92,7 @@ class ExtensibleAlgebraic(AbstractClass):
     List fields will be concatenated.
 
     The return type of this method is the type of `self` (or whatever `.copy()` returns), but the
-    `other` argument can be any `ExtensibleAlgebraic` instance.
+    `other` argument can be any `_ExtensibleAlgebraic` instance.
     """
     exclude_list_fields = frozenset(exclude_list_fields or [])
     overwrite_kwargs = {}
@@ -122,10 +122,7 @@ class ExtensibleAlgebraic(AbstractClass):
     return self.copy(**overwrite_kwargs)
 
 
-# TODO: make parent class that can contain things like CPPFLAGS/LDFLAGS without having any reference
-# to a specific executable or binary path!
-# TODO: put this in objects.py (relation to dataclasses?)
-class _Executable(ExtensibleAlgebraic):
+class _Executable(_ExtensibleAlgebraic):
 
   @_list_field
   def path_entries(self):
