@@ -202,10 +202,19 @@ fi
 
 if [[ "${run_python:-false}" == "true" ]]; then
   start_travis_section "CoreTests" "Running core Python tests"
+  # TODO(#7772): Simplify below to always use V2 and drop the blacklist.
+  known_v2_failures_file="${REPO_ROOT}/build-support/unit_test_v2_blacklist.txt"
   (
-    trap 'rm targets.txt' EXIT
-    ./pants.pex --tag='-integration' --filter-type='python_tests' filter src/python:: tests/python:: > targets.txt
-    ./pants.pex --no-v1 --v2 --target-spec-file=targets.txt test.pytest -- "${PYTEST_PASSTHRU_ARGS[@]}"
+    trap 'rm v2_targets.txt' EXIT
+    ./pants.pex --tag='-integration' --filter-type='python_tests' filter src/python:: tests/python:: > v2_targets.txt
+    v2_targets="$(comm -23 <(sort v2_targets.txt) <(sort "${known_v2_failures_file}"))"
+    # shellcheck disable=SC2086
+    ./pants.pex --no-v1 --v2 test.pytest $v2_targets -- "${PYTEST_PASSTHRU_ARGS[@]}"
+  ) || die "Core Python test failure"
+  (
+    v1_targets="$(cat "${known_v2_failures_file}")"
+    # shellcheck disable=SC2086
+    ./pants.pex test.pytest $v1_targets -- "${PYTEST_PASSTHRU_ARGS[@]}"
   ) || die "Core Python test failure"
   end_travis_section
 fi
