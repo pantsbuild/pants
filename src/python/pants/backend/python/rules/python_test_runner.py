@@ -4,19 +4,18 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import os
 import sys
 from builtins import str
 
 from future.utils import text_type
 
-from pants.backend.python.subsystems.pex_build_util import identify_missing_init_files
+from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.engine.fs import (Digest, DirectoriesToMerge, DirectoryWithPrefixToStrip, FilesContent,
-                             Snapshot, UrlToFetch)
+from pants.engine.fs import (Digest, DirectoriesToMerge, DirectoryWithPrefixToStrip, Snapshot,
+                             UrlToFetch)
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
                                            FallibleExecuteProcessResult)
 from pants.engine.legacy.graph import BuildFileAddresses, TransitiveHydratedTargets
@@ -62,15 +61,18 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, pex_b
   all_targets = [t.adaptor for t in transitive_hydrated_targets.closure]
 
   # Produce a pex containing pytest and all transitive 3rdparty requirements.
-  all_requirements = []
+  all_target_requirements = []
   for maybe_python_req_lib in all_targets:
     # This is a python_requirement()-like target.
     if hasattr(maybe_python_req_lib, 'requirement'):
-      all_requirements.append(str(maybe_python_req_lib.requirement))
+      all_target_requirements.append(str(maybe_python_req_lib.requirement))
     # This is a python_requirement_library()-like target.
     if hasattr(maybe_python_req_lib, 'requirements'):
       for py_req in maybe_python_req_lib.requirements:
-        all_requirements.append(str(py_req.requirement))
+        all_target_requirements.append(str(py_req.requirement))
+
+  # Sort all user requirement strings to increase the chance of cache hits across invocations.
+  all_requirements = sorted(all_target_requirements + list(pytest.get_requirement_strings()))
 
   # TODO(#7061): This str() can be removed after we drop py2!
   python_binary = text_type(sys.executable)
@@ -88,11 +90,7 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, pex_b
     '-o', output_pytest_requirements_pex_filename,
   ] + interpreter_constraint_args + [
     # TODO(#7061): This text_type() wrapping can be removed after we drop py2!
-    text_type(req)
-    # Sort all user requirement strings to increase the chance of cache hits across invocations.
-    for req in sorted(
-        list(pytest.get_requirement_strings())
-        + list(all_requirements))
+    text_type(req) for req in all_requirements
   ]
   pex_resolve_env = {
     'PATH': text_type(create_path_env_var(python_setup.interpreter_search_paths)),
@@ -102,7 +100,7 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, pex_b
     argv=tuple(requirements_pex_argv),
     env=pex_resolve_env,
     input_files=pex_snapshot.directory_digest,
-    description='Resolve requirements for {}'.format(test_target.address.reference()),
+    description='Resolve requirements: {}'.format(", ".join(all_requirements)),
     output_files=(output_pytest_requirements_pex_filename,),
   )
   requirements_pex_response = yield Get(
@@ -136,25 +134,13 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, pex_b
     Digest, DirectoriesToMerge(directories=tuple(all_sources_digests)),
   )
 
-  # TODO(7716): add a builtin rule to go from DirectoriesToMerge->Snapshot or Digest->Snapshot.
-  # TODO(7715): generalize the injection of __init__.py files.
-  # TODO(7718): add a builtin rule for FilesContent->Snapshot.
-  file_contents = yield Get(FilesContent, Digest, sources_digest)
-  file_paths = [fc.path for fc in file_contents]
-  injected_inits = tuple(sorted(identify_missing_init_files(file_paths)))
-  if injected_inits:
-    touch_init_request = ExecuteProcessRequest(
-      argv=("/usr/bin/touch",) + injected_inits,
-      output_files=injected_inits,
-      description="Inject empty __init__.py into all packages without one already.",
-      input_files=sources_digest,
-    )
-    touch_init_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, touch_init_request)
+  inits_digest = yield Get(InjectedInitDigest, Digest, sources_digest)
 
-  all_input_digests = [sources_digest, requirements_pex_response.output_directory_digest]
-  if injected_inits:
-    all_input_digests.append(touch_init_result.output_directory_digest)
-
+  all_input_digests = [
+    sources_digest,
+    inits_digest.directory_digest,
+    requirements_pex_response.output_directory_digest,
+  ]
   merged_input_files = yield Get(
     Digest,
     DirectoriesToMerge,

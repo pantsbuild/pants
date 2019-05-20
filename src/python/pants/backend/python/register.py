@@ -8,11 +8,12 @@ from pants.backend.python.pants_requirement import PantsRequirement
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_requirements import PythonRequirements
-from pants.backend.python.rules import python_test_runner
+from pants.backend.python.rules import inject_init, python_test_runner
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
 from pants.backend.python.subsystems.python_native_code import rules as python_native_code_rules
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
-from pants.backend.python.subsystems.subprocess_environment import rules as subprocess_environment_rules
+from pants.backend.python.subsystems.subprocess_environment import \
+  rules as subprocess_environment_rules
 from pants.backend.python.targets.python_app import PythonApp
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
@@ -89,4 +90,4 @@ def register_goals():
 
 
 def rules():
-  return tuple(python_test_runner.rules() + python_native_code_rules() + subprocess_environment_rules())
+  return inject_init.rules() + python_test_runner.rules() + python_native_code_rules() + subprocess_environment_rules()

@@ -180,21 +180,6 @@ class LegacyBuildGraph(BuildGraph):
     kwargs['dest'] = _DestWrapper((self._target_types[kwargs['dest']],))
     return RemoteSources(build_graph=self, **kwargs)
 
-  def inject_synthetic_target(self,
-                              address,
-                              target_type,
-                              dependencies=None,
-                              derived_from=None,
-                              **kwargs):
-    target = target_type(name=address.target_name,
-                         address=address,
-                         build_graph=self,
-                         **kwargs)
-    self.inject_target(target,
-                       dependencies=dependencies,
-                       derived_from=derived_from,
-                       synthetic=True)
-
   def inject_address_closure(self, address):
     self.inject_addresses_closure([address])
 

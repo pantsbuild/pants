@@ -8,7 +8,8 @@ import logging
 import os
 from textwrap import dedent
 
-from pants.backend.native.config.environment import ExtensibleAlgebraic, _algebraic_data, _list_field
+from pants.backend.native.config.environment import (ExtensibleAlgebraic, _algebraic_data,
+                                                     _list_field)
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.python.python_requirement import PythonRequirement

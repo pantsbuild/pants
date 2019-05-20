@@ -125,8 +125,6 @@ class ExtensibleAlgebraic(AbstractClass):
 # TODO: make parent class that can contain things like CPPFLAGS/LDFLAGS without having any reference
 # to a specific executable or binary path!
 # TODO: put this in objects.py (relation to dataclasses?)
-
-
 class _Executable(ExtensibleAlgebraic):
 
   @_list_field

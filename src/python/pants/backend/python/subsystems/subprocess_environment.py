@@ -6,21 +6,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 import os
-from textwrap import dedent
 
-from pants.backend.native.subsystems.native_toolchain import NativeToolchain
-from pants.backend.native.targets.native_library import NativeLibrary
-from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.subsystems import pex_build_util
-from pants.backend.python.subsystems.python_setup import PythonSetup
-from pants.backend.python.targets.python_distribution import PythonDistribution
-from pants.base.exceptions import IncompatiblePlatformsError
-from pants.binaries.executable_pex_tool import ExecutablePexTool
-from pants.engine.rules import rule, optionable_rule
+from pants.engine.rules import optionable_rule, rule
 from pants.subsystem.subsystem import Subsystem
-from pants.util.memo import memoized_property
-from pants.util.objects import SubclassesOf, datatype, string_optional
-from pants.util.strutil import safe_shlex_join, safe_shlex_split
+from pants.util.objects import datatype, string_optional
 
 
 logger = logging.getLogger(__name__)

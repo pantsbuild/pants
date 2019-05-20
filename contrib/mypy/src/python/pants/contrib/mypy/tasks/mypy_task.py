@@ -27,6 +27,7 @@ from pex.pex_info import PexInfo
 class MypyTask(ResolveRequirementsTaskBase):
   """Invoke the mypy static type analyzer for Python."""
 
+  _MYPY_COMPATIBLE_INTERPETER_CONSTRAINT = '>=3.5'
   _PYTHON_SOURCE_EXTENSION = '.py'
 
   @classmethod
@@ -48,8 +49,10 @@ class MypyTask(ResolveRequirementsTaskBase):
   def subsystem_dependencies(cls):
     return super(MypyTask, cls).subsystem_dependencies() + (PythonInterpreterCache,)
 
-  def find_py3_interpreter(self):
-    interpreters = self._interpreter_cache.setup(filters=['>=3'])
+  def find_mypy_interpreter(self):
+    interpreters = self._interpreter_cache.setup(
+      filters=[self._MYPY_COMPATIBLE_INTERPETER_CONSTRAINT]
+    )
     return min(interpreters) if interpreters else None
 
   @staticmethod
@@ -101,9 +104,10 @@ class MypyTask(ResolveRequirementsTaskBase):
     return pex.run(mypy_args, **kwargs)
 
   def execute(self):
-    py3_interpreter = self.find_py3_interpreter()
-    if not py3_interpreter:
-      raise TaskError('Unable to find a Python 3.x interpreter (required for mypy).')
+    mypy_interpreter = self.find_mypy_interpreter()
+    if not mypy_interpreter:
+      raise TaskError('Unable to find a Python {} interpreter (required for mypy).'
+                      .format(self._MYPY_COMPATIBLE_INTERPETER_CONSTRAINT))
 
     sources = self._calculate_python_sources(self.context.target_roots)
     if not sources:
@@ -111,7 +115,9 @@ class MypyTask(ResolveRequirementsTaskBase):
       return
 
     # Determine interpreter used by the sources so we can tell mypy.
-    interpreter_for_targets = self._interpreter_cache.select_interpreter_for_targets(self.context.target_roots)
+    interpreter_for_targets = self._interpreter_cache.select_interpreter_for_targets(
+      self.context.target_roots
+    )
     if not interpreter_for_targets:
       raise TaskError('No Python interpreter compatible with specified sources.')
 
@@ -141,7 +147,7 @@ class MypyTask(ResolveRequirementsTaskBase):
         log_config=WorkUnit.LogConfig(level=self.get_options().level,
                                       colors=self.get_options().colors),
         cmd=' '.join(cmd)) as workunit:
-        returncode = self._run_mypy(py3_interpreter, cmd,
+        returncode = self._run_mypy(mypy_interpreter, cmd,
           env={'MYPYPATH': mypy_path}, stdout=workunit.output('stdout'), stderr=subprocess.STDOUT)
         if returncode != 0:
           raise TaskError('mypy failed: code={}'.format(returncode))
