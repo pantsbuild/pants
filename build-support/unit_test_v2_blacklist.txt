@@ -1,6 +1,6 @@
 tests/python/pants_test/init
 tests/python/pants_test/backend/jvm/tasks:scalafmt
-tests/python/pants_test/backend/jvm/tasks:coursier_resolve 
+tests/python/pants_test/backend/jvm/tasks:coursier_resolve
 tests/python/pants_test/backend/jvm/tasks:ivy_utils
 tests/python/pants_test/backend/jvm/tasks/reports
 tests/python/pants_test/cache:artifact_cache
