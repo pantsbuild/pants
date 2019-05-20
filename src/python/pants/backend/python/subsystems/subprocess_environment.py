@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import logging
 import os
 
 from pants.engine.rules import optionable_rule, rule
@@ -12,14 +11,10 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.objects import datatype, string_optional
 
 
-logger = logging.getLogger(__name__)
-
-
 class SubprocessEncodingEnvironment(datatype([
     ('lang', string_optional),
     ('lc_all', string_optional),
 ])):
-  """???"""
 
   @property
   def invocation_environment_dict(self):
@@ -30,7 +25,6 @@ class SubprocessEncodingEnvironment(datatype([
 
 
 class SubprocessEnvironment(Subsystem):
-  """???"""
   options_scope = 'subprocess-environment'
 
   @classmethod
@@ -41,11 +35,11 @@ class SubprocessEnvironment(Subsystem):
     register('--lang',
              default=os.environ.get('LANG'),
              fingerprint=True, advanced=True,
-             help='???')
+             help='Override the `LANG` environment variable for any forked subprocesses.')
     register('--lc-all',
              default=os.environ.get('LC_ALL'),
              fingerprint=True, advanced=True,
-             help='???')
+             help='Override the `LC_ALL` environment variable for any forked subprocesses.')
 
 
 @rule(SubprocessEncodingEnvironment, [SubprocessEnvironment])

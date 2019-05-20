@@ -79,6 +79,7 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, pex_b
   interpreter_constraint_args = parse_interpreter_constraints(
     python_setup, python_target_adaptors=all_targets
   )
+  interpreter_search_paths = text_type(create_path_env_var(python_setup.interpreter_search_paths))
 
   # TODO: This is non-hermetic because the requirements will be resolved on the fly by
   # pex27, where it should be hermetically provided in some way.
@@ -92,9 +93,8 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, pex_b
     # TODO(#7061): This text_type() wrapping can be removed after we drop py2!
     text_type(req) for req in all_requirements
   ]
-  pex_resolve_env = {
-    'PATH': text_type(create_path_env_var(python_setup.interpreter_search_paths)),
-  }
+  pex_resolve_env = {'PATH': interpreter_search_paths}
+  # TODO(#6071): merge the two dicts via ** unpacking once we drop Py2.
   pex_resolve_env.update(pex_build_environment.invocation_environment_dict)
   requirements_pex_request = ExecuteProcessRequest(
     argv=tuple(requirements_pex_argv),
@@ -147,10 +147,10 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, pex_b
     DirectoriesToMerge(directories=tuple(all_input_digests)),
   )
 
-  pex_exe_env = {
-    'PATH': text_type(create_path_env_var(python_setup.interpreter_search_paths)),
-  }
+  pex_exe_env = {'PATH': interpreter_search_paths}
+  # TODO(#6071): merge the two dicts via ** unpacking once we drop Py2.
   pex_exe_env.update(subprocess_encoding_environment.invocation_environment_dict)
+
   request = ExecuteProcessRequest(
     argv=(python_binary, './{}'.format(output_pytest_requirements_pex_filename)),
     env=pex_exe_env,
