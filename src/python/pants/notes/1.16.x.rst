@@ -2,6 +2,24 @@
 ======================
 This document describes releases leading up to the ``1.16.x`` ``stable`` series.
 
+1.6.0rc2 (5/20/2019)
+--------------------
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Memoize graph walks on Context (#7758)
+  `PR #7758 <https://github.com/pantsbuild/pants/pull/7758>`_
+
+* Hash an entire json input in one call. (#7759)
+  `PR #7759 <https://github.com/pantsbuild/pants/pull/7759>`_
+
+Bugfixes
+~~~~~~~~
+
+* Use global instance of PythonSetup for resolve requirements task base (#7672)
+  `PR #7672 <https://github.com/pantsbuild/pants/pull/7672>`_
+
 1.16.0rc1 (5/17/2019)
 ---------------------
 
