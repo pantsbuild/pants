@@ -138,8 +138,8 @@ def _tuplify(v):
 class LegacyGraphScheduler(datatype(['scheduler', 'build_file_aliases', 'goal_map'])):
   """A thin wrapper around a Scheduler configured with @rules for a symbol table."""
 
-  def new_session(self, zipkin_trace_v2, v2_ui=False):
-    session = self.scheduler.new_session(zipkin_trace_v2, v2_ui)
+  def new_session(self, v2_ui=False):
+    session = self.scheduler.new_session(v2_ui)
     return LegacyGraphSession(session, self.build_file_aliases, self.goal_map)
 
 
