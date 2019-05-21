@@ -30,8 +30,6 @@ ENV PYENV_BIN "${PYENV_ROOT}/bin/pyenv"
 RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
 
 # Install Python 2.7 and 3.6.
-# Build the Python shared library, as we use it to build the engine.
-ENV PYTHON_CONFIGURE_OPTS="--enable-shared"
 RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_27_VERSION}
 RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_36_VERSION}
 RUN ${PYENV_BIN} global ${PYTHON_27_VERSION} ${PYTHON_36_VERSION}
