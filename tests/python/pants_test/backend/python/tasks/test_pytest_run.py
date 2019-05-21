@@ -105,6 +105,50 @@ class PytestTestEmpty(PytestTestBase):
     self.run_tests(targets=[])
 
 
+class PytestTestConftest(PytestTestBase):
+
+  def setUp(self):
+    super(PytestTestConftest, self).setUp()
+
+    self.create_file('src/python/base/__init__.py')
+    self.create_file('src/python/base/conftest.py', contents=dedent("""
+    import pytest
+    
+    APPS = ['base']
+    INDEX = {}
+    
+    def pytest_configure(config):
+      INDEX.update((app, len(app)) for app in APPS)
+    """))
+    self.add_to_build_file('src/python/base', target='python_library()\n')
+
+    self.create_file('src/python/base/app/__init__.py')
+    self.create_file('src/python/base/app/conftest.py', contents=dedent("""
+    from base.conftest import APPS
+    
+    APPS.append('app')
+    """))
+    self.add_to_build_file('src/python/base/app',
+                           target='python_library(dependencies=["src/python/base"])\n')
+
+    self.create_file('src/python/base/app/conftest_test.py', contents=dedent("""
+    from base.conftest import INDEX
+    
+    def test_conftest_interaction():
+      assert {'base': 4, 'app': 3} == INDEX
+    """))
+    self.add_to_build_file('src/python/base/app',
+                           target='python_tests(name="tests", dependencies=[":app"])\n')
+
+    self.app_tests = self.target('src/python/base/app:tests')
+
+  def test_conftests_discovery_no_coverage(self):
+    self.run_tests([self.app_tests], '-vs', '--trace-config')
+
+  def test_conftests_discovery_with_coverage(self):
+    self.run_tests([self.app_tests], '-vs', '--trace-config', coverage='auto')
+
+
 class PytestTestFailedPexRun(PytestTestBase):
   class AlwaysFailingPexRunPytestRun(PytestRun):
     @classmethod
