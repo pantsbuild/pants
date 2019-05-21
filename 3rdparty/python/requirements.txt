@@ -4,7 +4,7 @@ beautifulsoup4>=4.6.0,<4.7
 cffi==1.11.5
 configparser==3.7.1 ; python_version<'3'
 contextlib2==0.5.5
-coverage>=4.5,<4.6
+coverage==4.5.3
 docutils==0.14
 fasteners==0.14.1
 faulthandler==2.6 ; python_version<'3'
@@ -12,8 +12,6 @@ future==0.17.1
 futures==3.0.5 ; python_version<'3'
 Markdown==2.1.1
 mock==2.0.0
-# TODO(6282): once we can upgrade Pytest to 4.2.1+, we can remove the more-itertools requirement
-more-itertools<6.0.0 ; python_version<'3'
 packaging==16.8
 parameterized==0.6.1
 pathspec==0.5.9
@@ -24,8 +22,7 @@ pyflakes==2.0.0
 Pygments==2.3.1
 pyopenssl==17.3.0
 pystache==0.5.3
-pytest-cov>=2.5,<2.6
-pytest>=3.4,<4.0
+pytest==4.5.0
 python-Levenshtein==0.12.0
 pywatchman==1.4.1
 PyYAML==5.1
