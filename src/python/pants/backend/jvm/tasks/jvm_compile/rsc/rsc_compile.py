@@ -27,12 +27,15 @@ from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, DirectoryToMaterial
                              PathGlobsAndRoot)
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.java.jar.jar_dependency import JarDependency
+from pants.option.custom_types import file_option
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import Timer
 from pants.util.dirutil import fast_relpath, fast_relpath_optional, safe_mkdir
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.objects import enum
+from pants.util.process_handler import subprocess
+from pants.util.strutil import safe_shlex_join
 
 
 #
@@ -178,6 +181,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         Shader.exclude_package('rsc', recursive=True),
       ]
     )
+
+    register('--rsc-native-image-location', advanced=True, type=file_option,
+             help='Location of a compiled rsc native-image to run with --execution-strategy=subprocess.')
 
   # TODO: allow @memoized_method to convert lists into tuples so they can be hashed!
   @memoized_property
@@ -524,18 +530,24 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       )
     ]
 
+  @memoized_property
+  def _digested_rsc_native_image(self):
+    snapshot, = self.context._scheduler.capture_snapshots(tuple([
+      PathGlobsAndRoot(
+        PathGlobs(include=[self.get_options().rsc_native_image_location]),
+        root=get_buildroot(),
+      )
+    ]))
+    return snapshot
+
   def _runtool_hermetic(self, main, tool_name, args, distribution, tgt=None, input_files=tuple(), input_digest=None, output_dir=None):
     tool_classpath_abs = self.tool_classpath(tool_name)
     tool_classpath = fast_relpath_collection(tool_classpath_abs)
 
     # TODO(#6071): Our ExecuteProcessRequest expects a specific string type for arguments,
     # which py2 doesn't default to. This can be removed when we drop python 2.
-    str_jvm_options = [text_type(opt) for opt in self.get_options().jvm_options]
     cmd = [
-            distribution.java,
-          ] + str_jvm_options + [
-            '-cp', os.pathsep.join(tool_classpath),
-            main,
+            './{}'.format(self.get_options().rsc_native_image_location),
           ] + args
 
     pathglobs = list(tool_classpath)
@@ -550,7 +562,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
     epr_input_files = self.context._scheduler.merge_directories(
       ((path_globs_input_digest,) if path_globs_input_digest else ())
-      + ((input_digest,) if input_digest else ()))
+      + ((input_digest,) if input_digest else ())
+      + tuple([self._digested_rsc_native_image.directory_digest]))
 
     epr = ExecuteProcessRequest(
       argv=tuple(cmd),
@@ -583,6 +596,22 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       # TODO drop a file containing the digest, named maybe output_dir.digest
     return res
 
+  def _compile_rsc_native_image(self, tool_name, args):
+    argv = [
+      './{}'.format(self.get_options().rsc_native_image_location),
+    ] + args
+
+    self.context.log.debug('native-image rsc argv: {}'.format(safe_shlex_join(argv)))
+
+    with self.context.new_workunit(name=tool_name,
+                                   labels=[WorkUnitLabel.COMPILER],
+                                   cmd=safe_shlex_join(argv)) as workunit:
+      exit_code = subprocess.call(argv,
+                                  stdout=workunit.output('stdout'),
+                                  stderr=workunit.output('stderr'))
+      if exit_code != 0:
+        raise self.ZincCompileError('Rsc compile failed.', exit_code=exit_code)
+
   # The classpath is parameterized so that we can have a single nailgun instance serving all of our
   # execution requests.
   def _runtool_nonhermetic(self, parent_workunit, classpath, main, tool_name, args, distribution):
@@ -608,14 +637,20 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     return runjava_workunit
 
   def _runtool(self, main, tool_name, args, distribution,
-    tgt=None, input_files=tuple(), input_digest=None, output_dir=None):
+               tgt=None, input_files=tuple(), input_digest=None, output_dir=None):
+    def maybe_execute_native_image():
+      if self.get_options().rsc_native_image_location is not None:
+        return self._compile_rsc_native_image(tool_name, args)
+      else:
+        self._runtool_nonhermetic(
+          wu, self.tool_classpath(tool_name), main, tool_name, args, distribution)
+
     with self.context.new_workunit(tool_name) as wu:
       return self.execution_strategy_enum.resolve_for_enum_variant({
         self.HERMETIC: lambda: self._runtool_hermetic(
           main, tool_name, args, distribution,
           tgt=tgt, input_files=input_files, input_digest=input_digest, output_dir=output_dir),
-        self.SUBPROCESS: lambda: self._runtool_nonhermetic(
-          wu, self.tool_classpath(tool_name), main, tool_name, args, distribution),
+        self.SUBPROCESS: maybe_execute_native_image,
         self.NAILGUN: lambda: self._runtool_nonhermetic(
           wu, self._nailgunnable_combined_classpath, main, tool_name, args, distribution),
       })()

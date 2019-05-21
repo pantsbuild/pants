@@ -30,7 +30,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
-from pants.engine.fs import DirectoryToMaterialize
+from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.option.custom_types import file_option
 from pants.util.contextutil import open_zip
@@ -176,7 +176,8 @@ class BaseZincCompile(JvmCompile):
                   'This is unset by default, because it is generally a good precaution to cache '
                   'only clean/cold builds.')
 
-    register('--native-image-location', advanced=True, type=file_option,
+    # TODO: name it something that doesn't clash with the 'zinc' subsystem options_scope!
+    register('--xxx-native-image-location', advanced=True, type=file_option,
              help='Location of a compiled zinc native-image to run with --execution-strategy=subprocess.')
     register('--graal-rt-jar-location', advanced=True, type=file_option,
              help='Location of the graal rt.jar (necessary to run with native-image).')
@@ -402,7 +403,7 @@ class BaseZincCompile(JvmCompile):
         fp.write('\n')
 
     def maybe_execute_native_image():
-      if self.get_options().native_image_location is not None:
+      if self.get_options().xxx_native_image_location is not None:
         return self._compile_native_image(zinc_args)
       else:
         return self._compile_nonhermetic(jvm_options, zinc_args)
@@ -422,7 +423,7 @@ class BaseZincCompile(JvmCompile):
     scalac_classpath_entries = self.scalac_classpath_entries()
     scala_path = [classpath_entry.path for classpath_entry in scalac_classpath_entries]
     argv = [
-      './{}'.format(self.get_options().native_image_location),
+      './{}'.format(self.get_options().xxx_native_image_location),
       '-Dscala.boot.class.path={}'.format(os.pathsep.join(
         scala_path + [
           './{}'.format(self.get_options().graal_rt_jar_location),
@@ -453,6 +454,20 @@ class BaseZincCompile(JvmCompile):
     if exit_code != 0:
       raise self.ZincCompileError('Zinc compile failed.', exit_code=exit_code)
 
+  @memoized_property
+  def _digested_native_image(self):
+    snapshot, = self.context._scheduler.capture_snapshots(tuple([
+      PathGlobsAndRoot(
+        PathGlobs(include=[
+          self.get_options().xxx_native_image_location,
+          self.get_options().graal_rt_jar_location,
+          self.get_options().graal_jce_jar_location,
+        ]),
+        root=get_buildroot(),
+      )
+    ]))
+    return snapshot
+
   def _compile_hermetic(self, jvm_options, ctx, classes_dir, zinc_args,
                         compiler_bridge_classpath_entry, dependency_classpath,
                         scalac_classpath_entries):
@@ -475,6 +490,12 @@ class BaseZincCompile(JvmCompile):
             "execution".format(dep)
           )
 
+    # TODO: these are `Snapshot`s, not `Digest`s!
+    scala_relpath = [
+      p
+      for cp in scalac_classpath_entries
+      for p in (cp.directory_digest.files + cp.directory_digest.dirs)
+    ]
     snapshots.extend(
       classpath_entry.directory_digest for classpath_entry in scalac_classpath_entries
     )
@@ -482,11 +503,20 @@ class BaseZincCompile(JvmCompile):
     # TODO: Extract something common from Executor._create_command to make the command line
     # TODO: Lean on distribution for the bin/java appending here
     merged_input_digest = self.context._scheduler.merge_directories(
-      tuple(s.directory_digest for s in snapshots) + directory_digests
+      tuple(s.directory_digest for s in snapshots) + directory_digests + tuple([
+        self._digested_native_image.directory_digest,
+      ])
     )
-    argv = ['.jdk/bin/java'] + jvm_options + [
+    argv = [
+      './{}'.format(self.get_options().xxx_native_image_location),
+      '-Dscala.boot.class.path={}'.format(os.pathsep.join(
+        scala_relpath + [
+          './{}'.format(self.get_options().graal_rt_jar_location),
+          './{}'.format(self.get_options().graal_jce_jar_location),
+        ]
+      )),
+      '-Dscala.usejavacp=true',
       '-cp', zinc_relpath,
-      Zinc.ZINC_COMPILE_MAIN
     ] + zinc_args
     # TODO(#6071): Our ExecuteProcessRequest expects a specific string type for arguments,
     # which py2 doesn't default to. This can be removed when we drop python 2.
@@ -497,9 +527,12 @@ class BaseZincCompile(JvmCompile):
       input_files=merged_input_digest,
       output_directories=(classes_dir,),
       description="zinc compile for {}".format(ctx.target.address.spec),
+      env={
+        'PATH': '/Users/dmcclanahan/Downloads/graalvm-ce-19.0.0/Contents/Home/bin',
+      },
       # TODO: These should always be unicodes
       # Since this is always hermetic, we need to use `underlying_dist`
-      jdk_home=text_type(self._zinc.underlying_dist.home),
+      jdk_home=text_type('/Users/dmcclanahan/Downloads/graalvm-ce-19.0.0/Contents/Home'),
     )
     res = self.context.execute_process_synchronously_or_raise(
       req, self.name(), [WorkUnitLabel.COMPILER])
