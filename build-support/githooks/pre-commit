@@ -31,7 +31,7 @@ DIRS_TO_CHECK=(
 set -e
 
 ADDED_FILES=()
-while IFS='' read -r line; do array+=("${line}"); done< <(./build-support/bin/get_added_files.sh)
+while IFS='' read -r line; do ADDED_FILES+=("${line}"); done< <(./build-support/bin/get_added_files.sh)
 MERGE_BASE="$(git_merge_base)"
 
 echo "* Checking packages"
