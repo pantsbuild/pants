@@ -173,6 +173,15 @@ fn main() -> Result<(), CffiBuildError> {
 
   config.compile("libnative_engine_ffi.a");
 
+  if cfg!(target_os = "macos") {
+    // N.B. On OSX, we force weak linking by passing the param `-undefined dynamic_lookup` to
+    // the underlying linker. This avoids "missing symbol" errors for Python symbols
+    // (e.g. `_PyImport_ImportModule`) at build time when bundling the CFFI C sources.
+    // The missing symbols will instead by dynamically resolved in the address space of the parent
+    // binary (e.g. `python`) at runtime - obviating a need to link to libpython.
+    println!("cargo:rustc-link-arg=-undefined dynamic_lookup");
+  }
+
   Ok(())
 }
 
