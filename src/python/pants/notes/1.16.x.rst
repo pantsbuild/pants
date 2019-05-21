@@ -2,8 +2,20 @@
 ======================
 This document describes releases leading up to the ``1.16.x`` ``stable`` series.
 
-1.6.0rc2 (5/20/2019)
---------------------
+1.16.0rc3 (5/21/2019)
+---------------------
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Only python_binary's constraint should be included in a built pex (#7776)
+  `PR #7776 <https://github.com/pantsbuild/pants/pull/7776>`_
+
+* Revert v2 zipkin support due to #7415. (#7773)
+  `PR #7773 <https://github.com/pantsbuild/pants/pull/7773>`_
+
+1.16.0rc2 (5/20/2019)
+---------------------
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
