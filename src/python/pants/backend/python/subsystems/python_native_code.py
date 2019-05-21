@@ -8,6 +8,8 @@ import logging
 import os
 from textwrap import dedent
 
+from future.utils import text_type
+
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.python.python_requirement import PythonRequirement
@@ -161,8 +163,9 @@ class PexBuildEnvironment(datatype([
 @rule(PexBuildEnvironment, [PythonNativeCode])
 def create_pex_native_build_environment(python_native_code):
   return PexBuildEnvironment(
-    cpp_flags=python_native_code.get_options().cpp_flags,
-    ld_flags=python_native_code.get_options().ld_flags,
+    # TODO(#6071): drop the text_type wrapping.
+    cpp_flags=[text_type(v) for v in python_native_code.get_options().cpp_flags],
+    ld_flags=[text_type(v) for v in python_native_code.get_options().ld_flags],
   )
 
 

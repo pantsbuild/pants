@@ -6,6 +6,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 
+from future.utils import text_type
+
 from pants.engine.rules import optionable_rule, rule
 from pants.subsystem.subsystem import Subsystem
 from pants.util.objects import datatype, string_optional
@@ -44,9 +46,10 @@ class SubprocessEncodingEnvironment(datatype([
 
 @rule(SubprocessEncodingEnvironment, [SubprocessEnvironment])
 def create_subprocess_encoding_environment(subprocess_environment):
+  # TODO(#6071): drop the text_type wrapping.
   return SubprocessEncodingEnvironment(
-    lang=subprocess_environment.get_options().lang,
-    lc_all=subprocess_environment.get_options().lc_all,
+    lang=text_type(subprocess_environment.get_options().lang),
+    lc_all=text_type(subprocess_environment.get_options().lc_all),
   )
 
 
