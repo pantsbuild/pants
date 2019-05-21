@@ -8,4 +8,3 @@ tests/python/pants_test/backend/jvm/tasks:scalafmt
 tests/python/pants_test/backend/python/rules:python_test_runner
 tests/python/pants_test/backend/python/tasks:pytest_run
 tests/python/pants_test/cache:artifact_cache
-tests/python/pants_test/init:init
