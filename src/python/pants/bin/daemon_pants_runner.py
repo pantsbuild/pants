@@ -18,7 +18,8 @@ from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE,
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.init.logging import encapsulated_global_logger
 from pants.init.util import clean_global_runtime_state
-from pants.java.nailgun_io import NailgunStreamStdinReader, NailgunStreamWriter
+from pants.java.nailgun_io import (NailgunStreamStdinReader, NailgunStreamWriterError,
+                                   PipedNailgunStreamWriter)
 from pants.java.nailgun_protocol import ChunkType, MaybeShutdownSocket, NailgunProtocol
 from pants.util.contextutil import hermetic_environment_as, stdio_as
 from pants.util.socket import teardown_socket
@@ -117,10 +118,11 @@ class DaemonPantsRunner(object):
 
     try:
       # N.B. This will redirect stdio in the daemon's context to the nailgun session.
-      with cls.nailgunned_stdio(maybe_shutdown_socket, env, handle_stdin=False):
+      with cls.nailgunned_stdio(maybe_shutdown_socket, env, handle_stdin=False) as finalizer:
         options, _, options_bootstrapper = LocalPantsRunner.parse_options(args, env)
         subprocess_dir = options.for_global_scope().pants_subprocessdir
         graph_helper, target_roots, exit_code = scheduler_service.prefork(options, options_bootstrapper)
+        finalizer()
     except Exception:
       graph_helper = None
       target_roots = None
@@ -128,6 +130,7 @@ class DaemonPantsRunner(object):
       # TODO: this should no longer be necessary, remove the creation of subprocess_dir
       subprocess_dir = os.path.join(get_buildroot(), '.pids')
       exit_code = 1
+      # TODO This used to raise the _GracefulTerminationException, and maybe it should again, or notify in some way that the prefork has failed.
 
     return cls(
       maybe_shutdown_socket,
@@ -218,7 +221,7 @@ class DaemonPantsRunner(object):
 
     # TODO https://github.com/pantsbuild/pants/issues/7653
     with maybe_handle_stdin(handle_stdin) as stdin_fd,\
-      NailgunStreamWriter.open_multi(maybe_shutdown_socket.socket, types, ttys) as ((stdout_pipe, stderr_pipe), writer),\
+      PipedNailgunStreamWriter.open_multi(maybe_shutdown_socket.socket, types, ttys) as ((stdout_pipe, stderr_pipe), writer),\
       stdio_as(stdout_fd=stdout_pipe.write_fd, stderr_fd=stderr_pipe.write_fd, stdin_fd=stdin_fd):
       # N.B. This will be passed to and called by the `DaemonExiter` prior to sending an
       # exit chunk, to avoid any socket shutdown vs write races.
@@ -229,10 +232,11 @@ class DaemonPantsRunner(object):
           stderr.flush()
         finally:
           time.sleep(.001)  # HACK: Sleep 1ms in the main thread to free the GIL.
-          writer.stop()
+          stdout_pipe.stop_writing()
+          stderr_pipe.stop_writing()
           writer.join()
-          stdout.close()
-          stderr.close()
+          if writer.isAlive():
+            raise NailgunStreamWriterError("pantsd timed out while waiting for the stdout/err to finish writing to the socket.")
       yield finalizer
 
   @classmethod
