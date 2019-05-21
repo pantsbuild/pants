@@ -17,10 +17,23 @@ from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 
 
 class Pipe(object):
+  """
+  Wrapper around OS pipes, that knows whether its write end is closed.
+
+  Note that this exposes raw file descriptors,
+  which means that we could plausibly close one of the ends and re-open it with a different file,
+  before this class notices. For this reason, it is advised to be very careful with these
+  file descriptors.
+
+  TODO Wrap the read and write operations, so that we don't have to expose raw fds anymore.
+  This is not possible yet, because stdio_as needs to replace the fds at the OS level.
+  """
 
   def __init__(self, read_fd, write_fd):
     self.read_fd = read_fd
     self.write_fd = write_fd
+    # TODO Declare as a datatype when #6374 is merged or we have moved to dataclasses.
+    self.writable = True
 
   def is_writable(self):
     """
@@ -30,20 +43,27 @@ class Pipe(object):
 
     :return: True if the write end of the pipe is open.
     """
+    if not self.writable:
+      return False
+
     try:
       os.fstat(self.write_fd)
     except OSError:
       return False
     return True
 
+  def stop_writing(self):
+    """Mark that you wish to close the write end of this pipe."""
+    self.writable = False
+
   def close(self):
     """Close the reading end of the pipe, which should close the writing end too."""
     os.close(self.read_fd)
+    self.writable = False
 
   @staticmethod
-  def open(isatty):
+  def create(isatty):
     """Open a pipe and create wrapper object."""
-    # TODO This doesn't need to be a contextmanager.
     read_fd, write_fd = os.openpty() if isatty else os.pipe()
     return Pipe(read_fd, write_fd)
 
@@ -51,11 +71,12 @@ class Pipe(object):
   @contextmanager
   def self_closing(isatty):
     """Create a pipe and close it when done."""
-    pipe = Pipe.open(isatty)
+    pipe = Pipe.create(isatty)
     try:
       yield pipe
     finally:
       pipe.close()
+
 
 class _StoppableDaemonThread(threading.Thread):
   """A stoppable daemon threading.Thread."""
@@ -119,7 +140,7 @@ class NailgunStreamStdinReader(_StoppableDaemonThread):
     # The alternative is passing an os.dup(write_fd) to NSSR, but then we have the problem where
     # _self_closing_pipe doens't close the write_fd until the pants run is done, and that generates
     # issues around piping stdin to interactive processes such as REPLs.
-    pipe = Pipe.open(isatty)
+    pipe = Pipe.create(isatty)
     reader = NailgunStreamStdinReader(maybe_shutdown_socket, os.fdopen(pipe.write_fd, 'wb'))
     with reader.running():
       # Instruct the thin client to begin reading and sending stdin.
