@@ -72,7 +72,7 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
 
   def test_cli_option_wins_compatibility_conflict(self):
     # Tests that targets with compatibility conflicts collide.
-    binary_target = '{}:deliberately_conficting_compatibility'.format(self.testproject)
+    binary_target = '{}:deliberately_conflicting_compatibility'.format(self.testproject)
     pants_run = self._build_pex(binary_target)
     self.assert_success(pants_run, 'Failed to build {binary}.'.format(binary=binary_target))
 

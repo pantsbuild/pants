@@ -41,7 +41,7 @@ python_binary(
 
 # Note: Used by tests, but also useful for manual testing.
 python_binary(
-  name = 'deliberately_conficting_compatibility',
+  name = 'deliberately_conflicting_compatibility',
   dependencies = [
     ':echo_interpreter_version_lib',
   ],
