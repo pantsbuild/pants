@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import os
 from builtins import object
 
 import pkg_resources
@@ -72,14 +71,6 @@ class PytestPrep(PythonExecutionTaskBase):
       """
       return self._interpreter
 
-    @property
-    def config_path(self):
-      """Return the absolute path of the `pytest.ini` config file in this pytest binary.
-
-      :rtype: str
-      """
-      return os.path.join(self._pex.path(), 'pytest.ini')
-
   @classmethod
   def implementation_version(cls):
     return super(PytestPrep, cls).implementation_version() + [('PytestPrep', 2)]
@@ -98,7 +89,6 @@ class PytestPrep(PythonExecutionTaskBase):
                          content=pkg_resources.resource_string(__name__, resource_relpath))
 
   def extra_files(self):
-    yield self.ExtraFile.empty('pytest.ini')
     yield self._module_resource(self.PytestBinary.pytest_plugin_module, 'pytest/plugin.py')
     yield self._module_resource(self.PytestBinary.coverage_plugin_module, 'coverage/plugin.py')
 
