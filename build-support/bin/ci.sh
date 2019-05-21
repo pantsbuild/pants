@@ -205,16 +205,13 @@ if [[ "${run_python:-false}" == "true" ]]; then
   # TODO(#7772): Simplify below to always use V2 and drop the blacklist.
   known_v2_failures_file="${REPO_ROOT}/build-support/unit_test_v2_blacklist.txt"
   (
-    trap 'rm v2_targets.txt' EXIT
-    ./pants.pex --tag='-integration' --filter-type='python_tests' filter src/python:: tests/python:: > v2_targets.txt
-    v2_targets="$(comm -23 <(sort v2_targets.txt) <(sort "${known_v2_failures_file}"))"
-    # shellcheck disable=SC2086
-    ./pants.pex --no-v1 --v2 test.pytest $v2_targets -- "${PYTEST_PASSTHRU_ARGS[@]}"
+    trap 'rm all_targets.txt v2_targets.txt' EXIT
+    ./pants.pex --tag='-integration' --filter-type='python_tests' filter src/python:: tests/python:: > all_targets.txt
+    comm -23 <(sort all_targets.txt) <(sort "${known_v2_failures_file}") > v2_targets.txt
+    ./pants.pex --no-v1 --v2 --target-spec-file=v2_targets.txt test.pytest -- "${PYTEST_PASSTHRU_ARGS[@]}"
   ) || die "Core Python test failure"
   (
-    v1_targets="$(cat "${known_v2_failures_file}")"
-    # shellcheck disable=SC2086
-    ./pants.pex test.pytest $v1_targets -- "${PYTEST_PASSTHRU_ARGS[@]}"
+    ./pants.pex --target-spec-file="${known_v2_failures_file}" test.pytest -- "${PYTEST_PASSTHRU_ARGS[@]}"
   ) || die "Core Python test failure"
   end_travis_section
 fi
