@@ -79,7 +79,7 @@ class TestNailgunStreamWriter(unittest.TestCase):
 
 
 class TestPipedNailgunStreamWriter(unittest.TestCase):
-  def setUp(self) -> None:
+  def setUp(self):
     self.mock_socket = mock.Mock()
 
   @mock.patch('os.read')
