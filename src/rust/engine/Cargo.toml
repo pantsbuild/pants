@@ -103,3 +103,8 @@ tempfile = "3"
 ui = { path = "ui" }
 url = "1.7.1"
 tar_api = { path = "tar_api" }
+
+[patch.crates-io]
+# TODO: Remove patch when we can upgrade to an official released version of protobuf with a fix.
+# See: https://github.com/pantsbuild/pants/issues/7760 for context.
+protobuf = { git="https://github.com/pantsbuild/rust-protobuf", rev="171611c33ec92f07e1b7107327f6d0139a7afebf", version="2.0.6", features = ["with-bytes"] }
