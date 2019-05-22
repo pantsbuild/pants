@@ -13,7 +13,6 @@ use futures::future::{self, Future};
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
 use crate::nodes::{NodeKey, Select, Tracer, Visualizer};
-use crate::selectors;
 use graph::{EntryId, Graph, InvalidationResult, NodeContext};
 use indexmap::IndexMap;
 use log::{debug, info, warn};
@@ -113,7 +112,7 @@ impl Scheduler {
     let edges = self
       .core
       .rule_graph
-      .find_root_edges(params.type_ids(), &selectors::Select::new(product))?;
+      .find_root_edges(params.type_ids(), product)?;
     request
       .roots
       .push(Select::new_from_edges(params, product, &edges));

@@ -37,7 +37,6 @@ mod externs;
 mod handles;
 mod interning;
 mod nodes;
-mod rule_graph;
 mod scheduler;
 mod selectors;
 mod tasks;
@@ -73,15 +72,15 @@ use crate::externs::{
   StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
 };
 use crate::handles::Handle;
-use crate::rule_graph::{GraphMaker, RuleGraph};
 use crate::scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
-use crate::tasks::Tasks;
+use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 use futures::Future;
 use hashing::Digest;
 use log::{error, Log};
 use logging::logger::LOGGER;
 use logging::{Destination, Logger};
+use rule_graph::{GraphMaker, RuleGraph};
 
 // TODO: Consider renaming and making generic for collections of PyResults.
 #[repr(C)]
@@ -854,17 +853,17 @@ pub extern "C" fn override_thread_logging_destination(destination: Destination) 
   logging::set_destination(destination);
 }
 
-fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {
-  let graph_maker = GraphMaker::new(&scheduler.core.tasks, subject_types);
+fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph<Rule> {
+  let graph_maker = GraphMaker::new(scheduler.core.tasks.as_map(), subject_types);
   graph_maker.full_graph()
 }
 
-fn graph_sub(scheduler: &Scheduler, subject_type: TypeId, product_type: TypeId) -> RuleGraph {
-  let graph_maker = GraphMaker::new(&scheduler.core.tasks, vec![subject_type]);
+fn graph_sub(scheduler: &Scheduler, subject_type: TypeId, product_type: TypeId) -> RuleGraph<Rule> {
+  let graph_maker = GraphMaker::new(scheduler.core.tasks.as_map(), vec![subject_type]);
   graph_maker.sub_graph(subject_type, product_type)
 }
 
-fn write_to_file(path: &Path, graph: &RuleGraph) -> io::Result<()> {
+fn write_to_file(path: &Path, graph: &RuleGraph<Rule>) -> io::Result<()> {
   let file = File::create(path)?;
   let mut f = io::BufWriter::new(file);
   graph.visualize(&mut f)

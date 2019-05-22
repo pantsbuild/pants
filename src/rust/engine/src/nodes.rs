@@ -17,9 +17,8 @@ use url::Url;
 use crate::context::{Context, Core};
 use crate::core::{throw, Failure, Key, Params, TypeId, Value};
 use crate::externs;
-use crate::rule_graph;
 use crate::selectors;
-use crate::tasks::{self, Intrinsic};
+use crate::tasks::{self, Intrinsic, Rule};
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::{self, BufMut};
 use fs::{
@@ -28,6 +27,7 @@ use fs::{
 };
 use hashing;
 use process_execution::{self, CommandRunner};
+use rule_graph;
 
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
 
@@ -95,11 +95,11 @@ pub trait WrappedNode: Into<NodeKey> {
 pub struct Select {
   pub params: Params,
   pub product: TypeId,
-  entry: rule_graph::Entry,
+  entry: rule_graph::Entry<Rule>,
 }
 
 impl Select {
-  pub fn new(mut params: Params, product: TypeId, entry: rule_graph::Entry) -> Select {
+  pub fn new(mut params: Params, product: TypeId, entry: rule_graph::Entry<Rule>) -> Select {
     params.retain(|k| match &entry {
       &rule_graph::Entry::Param(ref type_id) => type_id == k.type_id(),
       &rule_graph::Entry::WithDeps(ref with_deps) => with_deps.params().contains(k.type_id()),
@@ -111,11 +111,15 @@ impl Select {
     }
   }
 
-  pub fn new_from_edges(params: Params, product: TypeId, edges: &rule_graph::RuleEdges) -> Select {
-    let select_key = rule_graph::SelectKey::JustSelect(selectors::Select::new(product));
+  pub fn new_from_edges(
+    params: Params,
+    product: TypeId,
+    edges: &rule_graph::RuleEdges<Rule>,
+  ) -> Select {
+    let dependency_key = selectors::DependencyKey::JustSelect(selectors::Select::new(product));
     // TODO: Is it worth propagating an error here?
     let entry = edges
-      .entry_for(&select_key)
+      .entry_for(&dependency_key)
       .unwrap_or_else(|| panic!("{:?} did not declare a dependency on {:?}", edges, product))
       .clone();
     Select::new(params, product, entry)
@@ -152,13 +156,13 @@ impl WrappedNode for Select {
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => match inner
         .rule()
       {
-        &rule_graph::Rule::Task(ref task) => context.get(Task {
+        &tasks::Rule::Task(ref task) => context.get(Task {
           params: self.params.clone(),
           product: self.product,
           task: task.clone(),
           entry: Arc::new(self.entry.clone()),
         }),
-        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+        &tasks::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.snapshot && input == context.core.types.path_globs =>
         {
           let context = context.clone();
@@ -169,7 +173,7 @@ impl WrappedNode for Select {
             .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
             .to_boxed()
         }
-        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+        &tasks::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.snapshot && input == context.core.types.url_to_fetch =>
         {
           let context = context.clone();
@@ -180,7 +184,7 @@ impl WrappedNode for Select {
             .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
             .to_boxed()
         }
-        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+        &tasks::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.directory_digest
             && input == context.core.types.directories_to_merge =>
         {
@@ -204,7 +208,7 @@ impl WrappedNode for Select {
             })
             .to_boxed()
         }
-        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+        &tasks::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.snapshot
             && input == context.core.types.directory_digest =>
         {
@@ -221,7 +225,7 @@ impl WrappedNode for Select {
             .to_boxed()
         }
 
-        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+        &tasks::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.directory_digest
             && input == context.core.types.directory_with_prefix_to_strip =>
         {
@@ -248,7 +252,7 @@ impl WrappedNode for Select {
             })
             .to_boxed()
         }
-        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+        &tasks::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.files_content
             && input == context.core.types.directory_digest =>
         {
@@ -268,7 +272,7 @@ impl WrappedNode for Select {
             })
             .to_boxed()
         }
-        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+        &tasks::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.process_result
             && input == context.core.types.process_request =>
         {
@@ -294,7 +298,7 @@ impl WrappedNode for Select {
             })
             .to_boxed()
         }
-        &rule_graph::Rule::Intrinsic(i) => panic!("Unrecognized intrinsic: {:?}", i),
+        &tasks::Rule::Intrinsic(i) => panic!("Unrecognized intrinsic: {:?}", i),
       },
       &rule_graph::Entry::Param(type_id) => {
         if let Some(key) = self.params.find(type_id) {
@@ -829,14 +833,14 @@ pub struct Task {
   params: Params,
   product: TypeId,
   task: tasks::Task,
-  entry: Arc<rule_graph::Entry>,
+  entry: Arc<rule_graph::Entry<Rule>>,
 }
 
 impl Task {
   fn gen_get(
     context: &Context,
     params: &Params,
-    entry: &Arc<rule_graph::Entry>,
+    entry: &Arc<rule_graph::Entry<Rule>>,
     gets: Vec<externs::Get>,
   ) -> NodeFuture<Vec<Value>> {
     let get_futures = gets
@@ -845,7 +849,7 @@ impl Task {
         let context = context.clone();
         let params = params.clone();
         let entry = entry.clone();
-        let select_key = rule_graph::SelectKey::JustGet(selectors::Get {
+        let dependency_key = selectors::DependencyKey::JustGet(selectors::Get {
           product: get.product,
           subject: *get.subject.type_id(),
         });
@@ -855,10 +859,10 @@ impl Task {
           .edges_for_inner(&entry)
           .ok_or_else(|| throw(&format!("no edges for task {:?} exist!", entry)))
           .and_then(|edges| {
-            edges.entry_for(&select_key).cloned().ok_or_else(|| {
+            edges.entry_for(&dependency_key).cloned().ok_or_else(|| {
               throw(&format!(
                 "{:?} did not declare a dependency on {:?}",
-                entry, select_key
+                entry, dependency_key
               ))
             })
           });
@@ -880,7 +884,7 @@ impl Task {
   fn generate(
     context: Context,
     params: Params,
-    entry: Arc<rule_graph::Entry>,
+    entry: Arc<rule_graph::Entry<Rule>>,
     generator: Value,
   ) -> NodeFuture<Value> {
     future::loop_fn(Value::from(externs::none()), move |input| {
