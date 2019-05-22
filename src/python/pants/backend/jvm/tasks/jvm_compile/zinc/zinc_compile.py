@@ -517,6 +517,7 @@ class BaseZincCompile(JvmCompile):
       )),
       '-Dscala.usejavacp=true',
       '-cp', zinc_relpath,
+      '-java-home', '.jdk',
     ] + zinc_args
     # TODO(#6071): Our ExecuteProcessRequest expects a specific string type for arguments,
     # which py2 doesn't default to. This can be removed when we drop python 2.
@@ -527,12 +528,7 @@ class BaseZincCompile(JvmCompile):
       input_files=merged_input_digest,
       output_directories=(classes_dir,),
       description="zinc compile for {}".format(ctx.target.address.spec),
-      env={
-        'PATH': '/Users/dmcclanahan/Downloads/graalvm-ce-19.0.0/Contents/Home/bin',
-      },
-      # TODO: These should always be unicodes
-      # Since this is always hermetic, we need to use `underlying_dist`
-      jdk_home=text_type('/Users/dmcclanahan/Downloads/graalvm-ce-19.0.0/Contents/Home'),
+      jdk_home=self._zinc.underlying_dist.home,
     )
     res = self.context.execute_process_synchronously_or_raise(
       req, self.name(), [WorkUnitLabel.COMPILER])
