@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import os
 import unittest
 from builtins import object, str
 
@@ -21,7 +20,8 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.scm.scm import Scm
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_walk
+from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_walk
+from pants.util.memo import memoized_classproperty
 from pants_test.task_test_base import TaskTestBase
 
 
@@ -37,11 +37,12 @@ class JarPublishTest(TaskTestBase):
       task = self.create_task(self.context())
       task.execute()
 
+  @memoized_classproperty
+  def push_db_basedir(cls):
+    return safe_mkdtemp()
+
   @classmethod
   def alias_groups(cls):
-    cls.push_db_basedir = os.path.join(cls._build_root(), "pushdb")
-    safe_mkdir(cls.push_db_basedir)
-
     return BuildFileAliases(
       targets={
         'jar_library': JarLibrary,
@@ -51,10 +52,17 @@ class JarPublishTest(TaskTestBase):
       objects={
         'artifact': Artifact,
         'scala_artifact': ScalaArtifact,
-        'internal': Repository(name='internal', url='http://example.com',
-                               push_db_basedir=cls.push_db_basedir),
+      },
+      context_aware_object_factories={
+        'internal': lambda _: Repository(name='internal',
+                                         url='http://example.com',
+                                         push_db_basedir=cls.push_db_basedir),
       },
     )
+
+  def setUp(self):
+    super(JarPublishTest, self).setUp()
+    safe_mkdir(self.push_db_basedir, clean=True)
 
   def _prepare_for_publishing(self, with_alias=False):
     targets = []

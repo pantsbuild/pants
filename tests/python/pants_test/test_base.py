@@ -346,21 +346,19 @@ class TestBase(unittest.TestCase, AbstractClass):
       self._build_graph.reset()
       self._scheduler.invalidate_all_files()
 
-  @classmethod
-  def aggressively_reset_scheduler(cls):
-    cls._scheduler = None
-    if cls._local_store_dir is not None:
-      safe_rmtree(cls._local_store_dir)
+  def aggressively_reset_scheduler(self):
+    self._scheduler = None
+    if self._local_store_dir is not None:
+      safe_rmtree(self._local_store_dir)
 
-  @classmethod
   @contextmanager
-  def isolated_local_store(cls):
-    cls.aggressively_reset_scheduler()
-    cls._init_engine()
+  def isolated_local_store(self):
+    self.aggressively_reset_scheduler()
+    self._init_engine()
     try:
       yield
     finally:
-      cls.aggressively_reset_scheduler()
+      self.aggressively_reset_scheduler()
 
   @property
   def build_root(self):
@@ -370,41 +368,38 @@ class TestBase(unittest.TestCase, AbstractClass):
   def pants_workdir(self):
     return self._pants_workdir()
 
-  @classmethod
   @memoized_method
-  def _build_root(cls):
-    cls.real_build_root = BuildRoot().path
+  def _build_root(self):
+    self.real_build_root = BuildRoot().path
     return os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
 
-  @classmethod
   @memoized_method
-  def _pants_workdir(cls):
-    return os.path.join(cls._build_root(), '.pants.d')
+  def _pants_workdir(self):
+    return os.path.join(self._build_root(), '.pants.d')
 
-  @classmethod
-  def _init_engine(cls):
-    if cls._scheduler is not None:
+  def _init_engine(self):
+    if self._scheduler is not None:
       return
 
-    cls._local_store_dir = os.path.realpath(safe_mkdtemp())
-    safe_mkdir(cls._local_store_dir)
+    self._local_store_dir = os.path.realpath(safe_mkdtemp())
+    safe_mkdir(self._local_store_dir)
 
     # NB: This uses the long form of initialization because it needs to directly specify
     # `cls.alias_groups` rather than having them be provided by bootstrap options.
     graph_session = EngineInitializer.setup_legacy_graph_extended(
       pants_ignore_patterns=None,
-      workdir=cls._pants_workdir(),
-      local_store_dir=cls._local_store_dir,
+      workdir=self._pants_workdir(),
+      local_store_dir=self._local_store_dir,
       build_file_imports_behavior='allow',
       native=init_native(),
       options_bootstrapper=OptionsBootstrapper.create(args=['--pants-config-files=[]']),
-      build_configuration=cls.build_config(),
+      build_configuration=self.build_config(),
       build_ignore_patterns=None,
     ).new_session()
-    cls._scheduler = graph_session.scheduler_session
-    cls._build_graph, cls._address_mapper = graph_session.create_build_graph(
-        TargetRoots([]), cls._build_root()
-      )
+    self._scheduler = graph_session.scheduler_session
+    self._build_graph, self._address_mapper = graph_session.create_build_graph(
+      TargetRoots([]), self._build_root()
+    )
 
   @property
   def scheduler(self):
