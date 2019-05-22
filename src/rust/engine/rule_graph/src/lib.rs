@@ -31,8 +31,6 @@ mod rules;
 use std::collections::{hash_map, BTreeSet, HashMap, HashSet};
 use std::io;
 
-use itertools::Itertools;
-
 pub use crate::rules::{DependencyKey, Rule, TypeId};
 
 // TODO: Consider switching to HashSet and dropping the Ord bound from TypeId.
@@ -271,7 +269,10 @@ impl<'t, R: Rule> GraphMaker<'t, R> {
       })
       .collect();
 
-    Itertools::flatten(self.tasks.values().map(|r| r.iter()))
+    self
+      .tasks
+      .values()
+      .flat_map(|r| r.iter())
       .filter(|r| r.require_reachable() && !reachable_rules.contains(r))
       .map(|r| UnreachableError::new(r.clone()))
       .collect()
@@ -472,7 +473,7 @@ impl<'t, R: Rule> GraphMaker<'t, R> {
     // No dependencies were completely unfulfillable (although some may have been cyclic).
     let flattened_fulfillable_candidates_by_key = fulfillable_candidates_by_key
       .into_iter()
-      .map(|(k, candidate_group)| (k, Itertools::flatten(candidate_group.into_iter()).collect()))
+      .map(|(k, candidate_group)| (k, candidate_group.into_iter().flatten().collect()))
       .collect::<Vec<_>>();
 
     // Generate one Entry per legal combination of parameters.
@@ -1032,7 +1033,7 @@ impl<R: Rule> RuleEdges<R> {
   }
 
   pub fn all_dependencies(&self) -> impl Iterator<Item = &Entry<R>> {
-    Itertools::flatten(self.dependencies.values())
+    self.dependencies.values().flatten()
   }
 
   fn add_edge(&mut self, dependency_key: R::DependencyKey, new_dependency: Entry<R>) {
