@@ -73,11 +73,6 @@ class ShardingPlugin(object):
 
 def pytest_addoption(parser):
   group = parser.getgroup('pants', 'Pants testing support')
-  group.addoption('--pants-rootdir-comm-path',
-                  dest='rootdir_comm_path',
-                  action='store',
-                  metavar='PATH',
-                  help='Path to a file to write the pytest rootdir to.')
   group.addoption('--pants-sources-map-path',
                   dest='sources_map_path',
                   action='store',
@@ -105,9 +100,6 @@ def pytest_configure(config):
     return
 
   rootdir = str(config.rootdir)
-  rootdir_comm_path = config.getoption('rootdir_comm_path')
-  with open(rootdir_comm_path, 'w') as fp:
-    fp.write(rootdir)
 
   sources_map_path = config.getoption('sources_map_path')
   with open(sources_map_path) as fp:

@@ -80,7 +80,7 @@ class PytestResult(TestResult):
     # This is returned by pytest when no tests are collected (EXIT_NOTESTSCOLLECTED).
     # We already short-circuit test runs with no test _targets_ to return 0 emulated exit codes and
     # we should do the same for cases when there are test targets but tests themselves have been
-    # de-selected out of band via `py.test -k`.
+    # de-selected out of band via `pytest -k`.
     5
   )
 
@@ -378,34 +378,33 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     # uses all arguments that look like paths to compute its rootdir, and we want
     # it to pick the buildroot.
     with temporary_dir(root_dir=self.workdir) as comm_dir:
-      rootdir_comm_path = os.path.join(comm_dir, 'pytest_rootdir.path')
-
-      def get_pytest_rootdir():
-        with open(rootdir_comm_path, 'r') as fp:
-          return fp.read()
-
       sources_map_path = os.path.join(comm_dir, 'sources_map.json')
       mode = 'w' if PY3 else 'wb'
       with open(sources_map_path, mode) as fp:
         json.dump(sources_map, fp)
 
       renaming_args = [
-        '--pants-rootdir-comm-path', rootdir_comm_path,
         '--pants-sources-map-path', sources_map_path
       ]
 
-      yield renaming_args + self._get_sharding_args(), get_pytest_rootdir
+      yield renaming_args + self._get_sharding_args()
 
   @contextmanager
   def _test_runner(self, workdirs, test_targets, sources_map):
     pytest_binary = self.context.products.get_data(PytestPrep.PytestBinary)
-    with self._pants_pytest_plugin_args(sources_map) as (plugin_args, get_pytest_rootdir):
+    with self._pants_pytest_plugin_args(sources_map) as plugin_args:
       with self._maybe_emit_coverage_data(workdirs,
                                           test_targets,
                                           pytest_binary.pex) as coverage_args:
-        yield (pytest_binary,
-               ['-p', pytest_binary.pytest_plugin_module] + plugin_args + coverage_args,
-               get_pytest_rootdir)
+        pytest_rootdir = get_buildroot()
+        yield (
+          pytest_binary,
+          [
+            '--rootdir', pytest_rootdir,
+            '-p', pytest_binary.pytest_plugin_module
+          ] + plugin_args + coverage_args,
+          pytest_rootdir
+        )
 
   def _constrain_pytest_interpreter_search_path(self):
     """Return an environment for invoking a pex which ensures the use of the selected interpreter.
@@ -427,11 +426,11 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     try:
       env = dict(os.environ)
 
-      # Ensure we don't leak source files or undeclared 3rdparty requirements into the py.test PEX
+      # Ensure we don't leak source files or undeclared 3rdparty requirements into the pytest PEX
       # environment.
       pythonpath = env.pop('PYTHONPATH', None)
       if pythonpath:
-        self.context.log.warn('scrubbed PYTHONPATH={} from py.test environment'.format(pythonpath))
+        self.context.log.warn('scrubbed PYTHONPATH={} from pytest environment'.format(pythonpath))
       # But allow this back door for users who do want to force something onto the test pythonpath,
       # e.g., modules required during a debugging session.
       extra_pythonpath = self.get_options().extra_pythonpath
@@ -502,9 +501,9 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
           test_failed = testcase.getElementsByTagName('failure')
           test_errored = testcase.getElementsByTagName('error')
           if test_failed or test_errored:
-            # The file attribute is always relative to the py.test rootdir.
+            # The file attribute is always relative to the pytest rootdir.
             pytest_relpath = testcase.getAttribute('file')
-            relsrc = os.path.join(buildroot_relpath, pytest_relpath)
+            relsrc = os.path.normpath(os.path.join(buildroot_relpath, pytest_relpath))
             failed_target = relsrc_to_target.get(relsrc)
             if failed_target:
               failed_targets.add(failed_target)
@@ -521,7 +520,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     relsrc_to_target = self._map_relsrc_to_targets(targets)
     buildroot_relpath = os.path.relpath(pytest_rootdir, get_buildroot())
     pytest_relpath = test_info['file']
-    relsrc = os.path.join(buildroot_relpath, pytest_relpath)
+    relsrc = os.path.normpath(os.path.join(buildroot_relpath, pytest_relpath))
     return relsrc_to_target.get(relsrc)
 
   @contextmanager
@@ -610,7 +609,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
     with self._test_runner(workdirs, test_targets, sources_map) as (pytest_binary,
                                                                     test_args,
-                                                                    get_pytest_rootdir):
+                                                                    pytest_rootdir):
       # Validate that the user didn't provide any passthru args that conflict
       # with those we must set ourselves.
       for arg in self.get_passthru_args():
@@ -622,7 +621,8 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       # N.B. the `--confcutdir` here instructs pytest to stop scanning for conftest.py files at the
       # top of the buildroot. This prevents conftest.py files from outside (e.g. in users home dirs)
       # from leaking into pants test runs. See: https://github.com/pantsbuild/pants/issues/2726
-      args = ['-c', pytest_binary.config_path,
+      args = ['-c', os.devnull,  # Force an empty pytest.ini
+              '-o' 'cache_dir={}'.format(os.path.join(self.workdir, '.pytest_cache')),
               '--junitxml', junitxml_path,
               '--confcutdir', get_buildroot(),
               '--continue-on-collection-errors']
@@ -654,7 +654,6 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       if not os.path.exists(junitxml_path):
         return result
 
-      pytest_rootdir = get_pytest_rootdir()
       failed_targets = self._get_failed_targets_from_junitxml(junitxml_path,
                                                               test_targets,
                                                               pytest_rootdir)
