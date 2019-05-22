@@ -4,6 +4,153 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.17.0.dev1 (5/21/2019)
+-----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Turn on reproducible PEX builds, e.g. for `./pants binary` command (#7734)
+  `PR #7734 <https://github.com/pantsbuild/pants/pull/7734>`_
+
+* Support running Kythe on recent JVMs. (#7703)
+  `PR #7703 <https://github.com/pantsbuild/pants/pull/7703>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix PytestRun to honor user `conftest.py` plugins. (#7784)
+  `PR #7784 <https://github.com/pantsbuild/pants/pull/7784>`_
+
+* Only python_binary's constraint should be included in a built pex (#7776)
+  `PR #7776 <https://github.com/pantsbuild/pants/pull/7776>`_
+
+* Revert v2 zipkin support due to #7415. (#7773)
+  `PR #7773 <https://github.com/pantsbuild/pants/pull/7773>`_
+
+* Use patched protobuf with RUSTSEC-2019-0003 fix. (#7770)
+  `PR #7770 <https://github.com/pantsbuild/pants/pull/7770>`_
+
+* Fix hermetic environment issues with V2 tasks (#7721)
+  `PR #7721 <https://github.com/pantsbuild/pants/pull/7721>`_
+
+* Handle empty test targets for `junit_xml_dir`. (#7752)
+  `PR #7752 <https://github.com/pantsbuild/pants/pull/7752>`_
+
+* Align mypy interpreter constraint with reality. (#7754)
+  `PR #7754 <https://github.com/pantsbuild/pants/pull/7754>`_
+
+* Fix using sets with V2 `Struct` causing unhashable TypeError (#7747)
+  `PR #7747 <https://github.com/pantsbuild/pants/pull/7747>`_
+
+* Confluence publishing uses correct text types (#7746)
+  `PR #7746 <https://github.com/pantsbuild/pants/pull/7746>`_
+
+* Fix invalidation of awslambda bundling. (#7744)
+  `PR #7744 <https://github.com/pantsbuild/pants/pull/7744>`_
+
+* Fix Python 2 regression for V2 pytest (#7736)
+  `PR #7736 <https://github.com/pantsbuild/pants/pull/7736>`_
+
+* Fix 'current' platform check for python_dist() targets with C/C++ sources (#7687)
+  `PR #7687 <https://github.com/pantsbuild/pants/pull/7687>`_
+
+* Bump pex to 1.6.7 (#7731)
+  `PR #7731 <https://github.com/pantsbuild/pants/pull/7731>`_
+
+* Fixes for pants release 1.17.0.dev0 (#7727)
+  `PR #7727 <https://github.com/pantsbuild/pants/pull/7727>`_
+
+* Fix ordering of args from compiler_option_sets and add test for scalac profiling (#7683)
+  `PR #7683 <https://github.com/pantsbuild/pants/pull/7683>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Create Pipe wrapper around pipes (#7740)
+  `PR #7740 <https://github.com/pantsbuild/pants/pull/7740>`_
+
+* OSX ignore serverset::tests::reattempts_unhealthy. (#7774)
+  `PR #7774 <https://github.com/pantsbuild/pants/pull/7774>`_
+
+* Ignore `RUSTSEC-2019-0003`. (#7766)
+  `PR #7766 <https://github.com/pantsbuild/pants/pull/7766>`_
+
+* Memoize graph walks on Context (#7758)
+  `PR #7758 <https://github.com/pantsbuild/pants/pull/7758>`_
+
+* Skip broken test_pantsd_memory_usage for python2. (#7765)
+  `PR #7765 <https://github.com/pantsbuild/pants/pull/7765>`_
+
+* Skip broken `CTypesIntegrationTest` methods. (#7764)
+  `PR #7764 <https://github.com/pantsbuild/pants/pull/7764>`_
+
+* Hash an entire json input in one call. (#7759)
+  `PR #7759 <https://github.com/pantsbuild/pants/pull/7759>`_
+
+* Fix doc comment locations (#7757)
+  `PR #7757 <https://github.com/pantsbuild/pants/pull/7757>`_
+
+* Don't require `ack`, `grep` can do the job. (#7753)
+  `PR #7753 <https://github.com/pantsbuild/pants/pull/7753>`_
+
+* Extract a generalized V2 rule to inject `__init__.py` files (#7722)
+  `PR #7722 <https://github.com/pantsbuild/pants/pull/7722>`_
+
+* Tweak V2 pytest's execute process description to get more cache hits (#7737)
+  `PR #7737 <https://github.com/pantsbuild/pants/pull/7737>`_
+
+* Use @union to make the v2 test runner generic (#7661)
+  `PR #7661 <https://github.com/pantsbuild/pants/pull/7661>`_
+
+* Thread-local logging (#7690)
+  `PR #7690 <https://github.com/pantsbuild/pants/pull/7690>`_
+
+* Tone down logging when making ShardedLmdbs (#7733)
+  `PR #7733 <https://github.com/pantsbuild/pants/pull/7733>`_
+
+* Add logging for V2 test scheduler as temporary workaround until V2 UI is finished (#7729)
+  `PR #7729 <https://github.com/pantsbuild/pants/pull/7729>`_
+
+* Apply more shellcheck fixes to build-support scripts (#7719)
+  `PR #7719 <https://github.com/pantsbuild/pants/pull/7719>`_
+
+* Rename V2's `MergedDirectories` to `DirectoriesToMerge` (#7730)
+  `PR #7730 <https://github.com/pantsbuild/pants/pull/7730>`_
+
+* Always use curl --fail (#7717)
+  `PR #7717 <https://github.com/pantsbuild/pants/pull/7717>`_
+
+* Pipe LineOriented through the console (#7723)
+  `PR #7723 <https://github.com/pantsbuild/pants/pull/7723>`_
+
+* Properly resolve transitive dependencies in V2 Pytest runner (#7720)
+  `PR #7720 <https://github.com/pantsbuild/pants/pull/7720>`_
+
+* Add intrinsic to lift a Digest to a Snapshot (#7725)
+  `PR #7725 <https://github.com/pantsbuild/pants/pull/7725>`_
+
+* Add support for source roots in V2 `./pants test` (#7696)
+  `PR #7696 <https://github.com/pantsbuild/pants/pull/7696>`_
+
+* Add support in `check_header.py` for Python 3-style headers (#7713)
+  `PR #7713 <https://github.com/pantsbuild/pants/pull/7713>`_
+
+* Add `shellcheck.py` and apply first round of fixes (#7698)
+  `PR #7698 <https://github.com/pantsbuild/pants/pull/7698>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Release notes for 1.16.0rc3 (#7778)
+  `PR #7778 <https://github.com/pantsbuild/pants/pull/7778>`_
+
+* Release notes for 1.16.0rc2 (#7768)
+  `PR #7768 <https://github.com/pantsbuild/pants/pull/7768>`_
+
+* Release notes for 1.16.0rc1 (#7748)
+  `PR #7748 <https://github.com/pantsbuild/pants/pull/7748>`_
+
 1.17.0.dev0 (5/13/2019)
 -----------------------
 
