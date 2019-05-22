@@ -365,8 +365,6 @@ mod tests {
   }
 
   #[test]
-  // TODO: un-ignore on OSX: https://github.com/pantsbuild/pants/issues/7756
-  #[cfg_attr(target_os = "macos", ignore)]
   fn reattempts_unhealthy() {
     let s = Serverset::new(
       vec!["good", "bad"],
@@ -480,15 +478,24 @@ mod tests {
     let buffer = Duration::from_millis(1);
 
     let start = std::time::Instant::now();
-    while start.elapsed() < duration - buffer {
+    let mut should_break = false;
+    let mut did_get_at_least_one_good = false;
+    while !should_break {
       s.next()
         .map(|(server, token)| {
-          assert_eq!("good", server);
+          if start.elapsed() < duration - buffer {
+            assert_eq!("good", server);
+            did_get_at_least_one_good = true;
+          } else {
+            should_break = true;
+          }
           s.report_health(token, Health::Healthy);
         })
         .wait()
         .unwrap();
     }
+
+    assert!(did_get_at_least_one_good);
 
     std::thread::sleep(buffer * 2);
   }
