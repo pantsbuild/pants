@@ -8,6 +8,7 @@ import logging
 import socket
 import threading
 import traceback
+from contextlib import contextmanager
 
 from six.moves.socketserver import BaseRequestHandler, BaseServer, TCPServer, ThreadingMixIn
 
@@ -54,15 +55,21 @@ class PailgunHandlerBase(BaseRequestHandler):
 class PailgunHandler(PailgunHandlerBase):
   """A nailgun protocol handler for use with forking, SocketServer-based servers."""
 
+  @contextmanager
+  def _temporarily_log_to_stderr(self):
+    # TODO Figure out a way to get the logging target in Native, and turn this into a general `with_logging_destination`
+    try:
+      Native().override_thread_logging_destination_to_just_stderr()
+      yield
+    finally:
+      Native.override_thread_logging_destination_to_just_pantsd()
+
   def _run_pants(self, sock, arguments, environment):
     """Execute a given run with a pants runner."""
     # For the pants run, we want to log to stderr.
     # TODO Might be worth to make contextmanagers for this?
-    Native().override_thread_logging_destination_to_just_stderr()
-
-    self.server.runner_factory(sock, arguments, environment).run()
-
-    Native().override_thread_logging_destination_to_just_pantsd()
+    with self._temporarily_log_to_stderr():
+      self.server.runner_factory(sock, arguments, environment).run()
 
   def handle(self):
     """Request handler for a single Pailgun request."""
