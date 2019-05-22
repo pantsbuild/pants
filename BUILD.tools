@@ -41,7 +41,7 @@ jar_library(
 )
 
 # Running Kythe on JDK8 requires a standalone javac 9 on the bootclasspath.
-# This jar is published to the same custom rpeo as the Kythe jars.
+# This jar is published to the same custom repo as the Kythe jars.
 jar_library(
   name='javac9',
   jars = [jar(org='java', name='javac', rev='9+181-r4173-1')]

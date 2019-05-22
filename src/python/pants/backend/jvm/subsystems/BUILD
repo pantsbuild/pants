@@ -141,6 +141,7 @@ python_library(
     ':jvm_tool_mixin',
     ':shader',
     'src/python/pants/subsystem',
+    'src/python/pants/util:dirutil',
   ]
 )
 
