@@ -479,11 +479,13 @@ mod tests {
 
     let start = std::time::Instant::now();
     let mut should_break = false;
+    let mut did_get_at_least_one_good = false;
     while !should_break {
       s.next()
         .map(|(server, token)| {
           if start.elapsed() < duration - buffer {
             assert_eq!("good", server);
+            did_get_at_least_one_good = true;
           } else {
             should_break = true;
           }
@@ -492,6 +494,8 @@ mod tests {
         .wait()
         .unwrap();
     }
+
+    assert!(did_get_at_least_one_good);
 
     std::thread::sleep(buffer * 2);
   }
