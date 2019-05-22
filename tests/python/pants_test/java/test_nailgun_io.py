@@ -87,7 +87,7 @@ class TestPipedNailgunStreamWriter(unittest.TestCase):
   @mock.patch.object(NailgunProtocol, 'write_chunk')
   def test_auto_shutdown_on_write_end_closed(self, mock_writer, mock_select, mock_read):
     pipe = Pipe.create(False)
-    test_data = [b"A"] * 100000 + [b'']
+    test_data = [b"A"] * 1000 + [b'']
     mock_read.side_effect = test_data
     mock_select.side_effect = [([pipe.read_fd], [], [])] * len(test_data)
 
@@ -102,7 +102,6 @@ class TestPipedNailgunStreamWriter(unittest.TestCase):
     with writer.running():
       pipe.stop_writing()
       writer.join(1)
-
-    self.assertFalse(writer.is_alive())
+      self.assertFalse(writer.is_alive())
 
     mock_writer.assert_has_calls([mock.call(mock.ANY, ChunkType.STDOUT, b'A')] * (len(test_data) - 1))
