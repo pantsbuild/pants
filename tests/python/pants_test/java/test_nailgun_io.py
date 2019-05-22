@@ -105,5 +105,4 @@ class TestPipedNailgunStreamWriter(unittest.TestCase):
 
     self.assertFalse(writer.is_alive())
 
-    self.assertEqual(mock_read.call_count, len(test_data))
     mock_writer.assert_has_calls([mock.call(mock.ANY, ChunkType.STDOUT, b'A')] * (len(test_data) - 1))
