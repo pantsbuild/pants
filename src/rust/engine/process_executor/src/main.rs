@@ -33,13 +33,13 @@ use fs;
 use process_execution;
 
 use clap::{value_t, App, AppSettings, Arg};
-use futures::future::Future;
 use hashing::{Digest, Fingerprint};
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter::Iterator;
 use std::path::PathBuf;
 use std::process::exit;
 use std::time::Duration;
+use tokio::runtime::Runtime;
 
 /// A binary which takes args of format:
 ///  process_executor --env=FOO=bar --env=SOME=value --input-digest=abc123 --input-digest-length=80
@@ -315,12 +315,15 @@ fn main() {
     )) as Box<dyn process_execution::CommandRunner>,
   };
 
-  let result = runner.run(request).wait().expect("Error executing");
+  let mut runtime = Runtime::new().unwrap();
+
+  let result = runtime
+    .block_on(runner.run(request))
+    .expect("Error executing");
 
   if let Some(output) = args.value_of("materialize-output-to").map(PathBuf::from) {
-    store
-      .materialize_directory(output, result.output_directory)
-      .wait()
+    runtime
+      .block_on(store.materialize_directory(output, result.output_directory))
       .unwrap();
   }
 
