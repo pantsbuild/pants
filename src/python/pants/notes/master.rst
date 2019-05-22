@@ -4,7 +4,7 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
-1.17.0.dev1 (5/21/2019)
+1.17.0.dev1 (5/22/2019)
 -----------------------
 
 New Features
