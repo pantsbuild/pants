@@ -62,7 +62,7 @@ class PailgunHandler(PailgunHandlerBase):
       Native().override_thread_logging_destination_to_just_stderr()
       yield
     finally:
-      Native.override_thread_logging_destination_to_just_pantsd()
+      Native().override_thread_logging_destination_to_just_pantsd()
 
   def _run_pants(self, sock, arguments, environment):
     """Execute a given run with a pants runner."""
