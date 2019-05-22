@@ -40,6 +40,7 @@ members = [
   "process_execution",
   "process_executor",
   "resettable",
+  "rule_graph",
   "serverset",
   "tar_api",
   "testutil",
@@ -68,6 +69,7 @@ default-members = [
   "process_execution",
   "process_executor",
   "resettable",
+  "rule_graph",
   "serverset",
   "tar_api",
   "testutil",
@@ -87,7 +89,6 @@ futures-timer = { git = "https://github.com/pantsbuild/futures-timer", rev = "0b
 graph = { path = "graph" }
 hashing = { path = "hashing" }
 indexmap = "1.0.2"
-itertools = "0.7.2"
 lazy_static = "1"
 log = "0.4"
 logging = { path = "logging" }
@@ -97,6 +98,7 @@ process_execution = { path = "process_execution" }
 rand = "0.6"
 reqwest = { version = "0.9.10", default_features = false, features = ["rustls-tls"] }
 resettable = { path = "resettable" }
+rule_graph = { path = "rule_graph" }
 smallvec = "0.6"
 tokio = "0.1"
 tempfile = "3"
