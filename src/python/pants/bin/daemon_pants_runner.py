@@ -234,7 +234,7 @@ class DaemonPantsRunner(object):
           time.sleep(.001)  # HACK: Sleep 1ms in the main thread to free the GIL.
           stdout_pipe.stop_writing()
           stderr_pipe.stop_writing()
-          writer.join()
+          writer.join(timeout=60)
           if writer.isAlive():
             raise NailgunStreamWriterError("pantsd timed out while waiting for the stdout/err to finish writing to the socket.")
       yield finalizer

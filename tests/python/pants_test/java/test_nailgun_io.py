@@ -85,11 +85,11 @@ class TestPipedNailgunStreamWriter(unittest.TestCase):
   @mock.patch('os.read')
   @mock.patch('select.select')
   @mock.patch.object(NailgunProtocol, 'write_chunk')
-  def test_auto_shutsdown_on_write_end_closed(self, mock_writer, mock_select, mock_read):
+  def test_auto_shutdown_on_write_end_closed(self, mock_writer, mock_select, mock_read):
     pipe = Pipe.create(False)
-    input = [b"A"] * 100000 + [b'']
-    mock_read.side_effect = input
-    mock_select.side_effect = [([pipe.read_fd], [], [])] * len(input)
+    test_data = [b"A"] * 100000 + [b'']
+    mock_read.side_effect = test_data
+    mock_select.side_effect = [([pipe.read_fd], [], [])] * len(test_data)
 
     writer = PipedNailgunStreamWriter(
       pipes=[pipe],
@@ -100,9 +100,10 @@ class TestPipedNailgunStreamWriter(unittest.TestCase):
     )
 
     with writer.running():
-      pipe.close()
+      pipe.stop_writing()
+      writer.join(1)
 
-    writer.join()
-    assert not writer.is_alive()
+    self.assertFalse(writer.is_alive())
 
-    mock_writer.assert_has_calls([mock.call(mock.ANY, ChunkType.STDOUT, b'A')] * (len(input) - 1))
+    self.assertEqual(mock_read.call_count, len(test_data))
+    mock_writer.assert_has_calls([mock.call(mock.ANY, ChunkType.STDOUT, b'A')] * (len(test_data) - 1))

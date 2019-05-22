@@ -225,13 +225,13 @@ class NailgunStreamWriter(_StoppableDaemonThread):
 
   def run(self):
     while self._in_fds and not self.is_stopped:
-      readable, _, errored = select.select(self._in_fds, [], self._in_fds, self._select_timeout)
-      self.do_run(readable, errored)
+      readable_fds, _, errored_fds = select.select(self._in_fds, [], self._in_fds, self._select_timeout)
+      self.do_run(readable_fds, errored_fds)
 
-  def do_run(self, readable, errored):
+  def do_run(self, readable_fds, errored_fds):
     """Represents one iteration of the infinite reading cycle. Subclasses should override this."""
-    if readable:
-      for fileno in readable:
+    if readable_fds:
+      for fileno in readable_fds:
         data = os.read(fileno, self._buf_size)
         if not data:
           self._handle_closed_input_stream(fileno)
@@ -242,8 +242,8 @@ class NailgunStreamWriter(_StoppableDaemonThread):
             data
           )
 
-    if errored:
-      for fileno in errored:
+    if errored_fds:
+      for fileno in errored_fds:
         self.stop_reading_from_fd(fileno)
 
 
@@ -257,7 +257,7 @@ class PipedNailgunStreamWriter(NailgunStreamWriter):
     in_fds = tuple(pipe.read_fd for pipe in pipes)
     super(PipedNailgunStreamWriter, self).__init__(in_fds, socket, chunk_type, *args, **kwargs)
 
-  def do_run(self, readables, errored):
+  def do_run(self, readable_fds, errored_fds):
     """
     Overrides the superclass.
 
@@ -267,14 +267,14 @@ class PipedNailgunStreamWriter(NailgunStreamWriter):
     does not want to write any more, and so it will remove that pipe from the available pipes to read from.
     When there are no more pipes to read from, it will stop.
     """
-    super(PipedNailgunStreamWriter, self).do_run(readables, errored)
-    if not readables:
+    if not readable_fds:
       for pipe in self._pipes:
         if not pipe.is_writable():
           self.stop_reading_from_fd(pipe.read_fd)
           self._pipes.remove(pipe)
     if not self._pipes:
       self.stop()
+    super(PipedNailgunStreamWriter, self).do_run(readable_fds, errored_fds)
 
   @classmethod
   @contextmanager
