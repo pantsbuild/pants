@@ -173,6 +173,10 @@ class NailgunStreamStdinReader(_StoppableDaemonThread):
         pass
 
 
+class NailgunStreamWriterError(Exception):
+  pass
+
+
 class NailgunStreamWriter(_StoppableDaemonThread):
   """Reads input from an input fd and writes Nailgun chunks on a socket.
 
@@ -205,6 +209,73 @@ class NailgunStreamWriter(_StoppableDaemonThread):
   def _assert_aligned(self, *iterables):
     assert len({len(i) for i in iterables}) == 1, 'inputs are not aligned'
 
+  def _handle_closed_input_stream(self, fileno):
+    # We've reached EOF.
+    try:
+      if self._chunk_eof_type is not None:
+        NailgunProtocol.write_chunk(self._socket, self._chunk_eof_type)
+    finally:
+      try:
+        os.close(fileno)
+      finally:
+        self.stop_reading_from_fd(fileno)
+
+  def stop_reading_from_fd(self, fileno):
+    self._in_fds.remove(fileno)
+
+  def run(self):
+    while self._in_fds and not self.is_stopped:
+      readable_fds, _, errored_fds = select.select(self._in_fds, [], self._in_fds, self._select_timeout)
+      self.do_run(readable_fds, errored_fds)
+
+  def do_run(self, readable_fds, errored_fds):
+    """Represents one iteration of the infinite reading cycle. Subclasses should override this."""
+    if readable_fds:
+      for fileno in readable_fds:
+        data = os.read(fileno, self._buf_size)
+        if not data:
+          self._handle_closed_input_stream(fileno)
+        else:
+          NailgunProtocol.write_chunk(
+            self._socket,
+            self._fileno_chunk_type_map[fileno],
+            data
+          )
+
+    if errored_fds:
+      for fileno in errored_fds:
+        self.stop_reading_from_fd(fileno)
+
+
+class PipedNailgunStreamWriter(NailgunStreamWriter):
+  """
+  Represents a NailgunStreamWriter that reads from a pipe.
+  """
+
+  def __init__(self, pipes, socket, chunk_type, *args, **kwargs):
+    self._pipes = pipes
+    in_fds = tuple(pipe.read_fd for pipe in pipes)
+    super(PipedNailgunStreamWriter, self).__init__(in_fds, socket, chunk_type, *args, **kwargs)
+
+  def do_run(self, readable_fds, errored_fds):
+    """
+    Overrides the superclass.
+
+    Wraps the running logic of the parent class to handle pipes that have been closed on the write end.
+    If no file descriptors are readable (i.e. there is no more to read from any pipe for now),
+    it will check each of its pipes. If a pipe is not writable, it will interpret that the writer class
+    does not want to write any more, and so it will remove that pipe from the available pipes to read from.
+    When there are no more pipes to read from, it will stop.
+    """
+    if not readable_fds:
+      for pipe in self._pipes:
+        if not pipe.is_writable():
+          self.stop_reading_from_fd(pipe.read_fd)
+          self._pipes.remove(pipe)
+    if not self._pipes:
+      self.stop()
+    super(PipedNailgunStreamWriter, self).do_run(readable_fds, errored_fds)
+
   @classmethod
   @contextmanager
   def open(cls, sock, chunk_type, isatty, chunk_eof_type=None, buf_size=None, select_timeout=None):
@@ -231,8 +302,8 @@ class NailgunStreamWriter(_StoppableDaemonThread):
         # Allocate one pipe pair per chunk type provided.
         (stack.enter_context(Pipe.self_closing(isatty)) for isatty in isattys)
       )
-      writer = NailgunStreamWriter(
-        tuple(pipe.read_fd for pipe in pipes),
+      writer = PipedNailgunStreamWriter(
+        pipes,
         sock,
         chunk_types,
         chunk_eof_type,
@@ -241,31 +312,3 @@ class NailgunStreamWriter(_StoppableDaemonThread):
       )
       with writer.running():
         yield pipes, writer
-
-  def run(self):
-    while self._in_fds and not self.is_stopped:
-      readable, _, errored = select.select(self._in_fds, [], self._in_fds, self._select_timeout)
-
-      if readable:
-        for fileno in readable:
-          data = os.read(fileno, self._buf_size)
-          if not data:
-            # We've reached EOF.
-            try:
-              if self._chunk_eof_type is not None:
-                NailgunProtocol.write_chunk(self._socket, self._chunk_eof_type)
-            finally:
-              try:
-                os.close(fileno)
-              finally:
-                self._in_fds.remove(fileno)
-          else:
-            NailgunProtocol.write_chunk(
-              self._socket,
-              self._fileno_chunk_type_map[fileno],
-              data
-            )
-
-      if errored:
-        for fileno in errored:
-          self._in_fds.remove(fileno)
