@@ -22,14 +22,17 @@ from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
 from pants.base.workunit import WorkUnitLabel
+from pants.binaries.binary_tool import NativeTool
 from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.distribution.distribution import Distribution
 from pants.java.jar.jar_dependency import JarDependency
-from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir
 from pants.util.fileutil import safe_hardlink_or_copy
 from pants.util.memo import memoized_method, memoized_property
+
+
+_ZINC_COMPILER_VERSION = '0.0.9'
 
 
 class Zinc(object):
@@ -46,8 +49,26 @@ class Zinc(object):
 
   _lock = Lock()
 
-  class Factory(Subsystem, JvmToolMixin):
+  # This is both a NativeTool (for the graal native image of zinc), _and_ a Subsystem by its own
+  # right. We're not allowed to explicitly inherit from both because of MRO.
+  class Factory(JvmToolMixin, NativeTool):
     options_scope = 'zinc'
+
+    # version and allow_version_override need to be set like this so that Zinc can act as a
+    # NativeTool.
+    # NativeTool requires that there is an options scope with at least one option registered on the
+    # class.
+    # Because we don't want to allow version overrides, and instead want to pin the Zinc
+    # native-image version to be the same as the Zinc version we use everywhere else, we either need
+    # to put the NativeTool on an existing options scope (this one makes sense!), or we'd need to
+    # make an options scope with a dummy option just for the ZincNativeImage NativeTool.
+    # Because the native image's version is tightly coupled to this class, and zinc is the options
+    # scope we'd want to pick for it, we just put these details here.
+
+    allow_version_override = False
+
+    def version(self, context=None):
+      return _ZINC_COMPILER_VERSION
 
     @classmethod
     def subsystem_dependencies(cls):
@@ -85,7 +106,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_COMPILER_TOOL_NAME,
                             classpath=[
-                              JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.9'),
+                              JarDependency('org.pantsbuild', 'zinc-compiler_2.11', _ZINC_COMPILER_VERSION),
                             ],
                             main=Zinc.ZINC_COMPILE_MAIN,
                             custom_rules=shader_rules)
@@ -195,6 +216,10 @@ class Zinc(object):
     :rtype: list of str
     """
     return self._zinc_factory._zinc(self._products)
+
+  @memoized_method
+  def native_image(self, context):
+    return self._zinc_factory.hackily_snapshot(context)
 
   @memoized_property
   def dist(self):
