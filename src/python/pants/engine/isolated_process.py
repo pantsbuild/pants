@@ -104,7 +104,11 @@ stderr:
     self.stderr = stderr
 
     msg = self.MSG_FMT.format(
-      desc=process_description, code=exit_code, stdout=stdout, stderr=stderr)
+      desc=process_description,
+      code=exit_code,
+      stdout=stdout.decode('utf-8'),
+      stderr=stderr.decode('utf-8')
+    )
 
     super(ProcessExecutionFailure, self).__init__(msg)
 

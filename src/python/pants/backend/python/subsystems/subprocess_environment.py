@@ -46,16 +46,12 @@ class SubprocessEncodingEnvironment(datatype([
 
 @rule(SubprocessEncodingEnvironment, [SubprocessEnvironment])
 def create_subprocess_encoding_environment(subprocess_environment):
-  # TODO(#6071): drop the text_type wrapping.
-  lang_opt = subprocess_environment.get_options().lang
-  lc_all_opt = subprocess_environment.get_options().lc_all
-  if lang_opt is not None:
-    lang_opt = text_type(lang_opt)
-  if lc_all_opt is not None:
-    lc_all_opt = text_type(lc_all_opt)
+  def ensure_string_optional(value):
+    return text_type(value) if value is not None else None
+
   return SubprocessEncodingEnvironment(
-    lang=lang_opt,
-    lc_all=lc_all_opt,
+    lang=ensure_string_optional(subprocess_environment.get_options().lang),
+    lc_all=ensure_string_optional(subprocess_environment.get_options().lc_all),
   )
 
 

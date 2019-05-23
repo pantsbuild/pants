@@ -116,9 +116,9 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:future',
     ':collections_abc_backport',
+    ':strutil',
     ':memo',
     ':meta',
-    ':strutil',
   ],
 )
 

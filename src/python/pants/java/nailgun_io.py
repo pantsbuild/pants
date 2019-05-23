@@ -16,20 +16,66 @@ from contextlib2 import ExitStack
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 
 
-@contextmanager
-def _pipe(isatty):
-  r_fd, w_fd = os.openpty() if isatty else os.pipe()
-  yield (r_fd, w_fd)
+class Pipe(object):
+  """
+  Wrapper around OS pipes, that knows whether its write end is closed.
 
+  Note that this exposes raw file descriptors,
+  which means that we could plausibly close one of the ends and re-open it with a different file,
+  before this class notices. For this reason, it is advised to be very careful with these
+  file descriptors.
 
-@contextmanager
-def _self_closing_pipe(isatty):
-  with _pipe(isatty) as (r_fd, w_fd):
+  TODO Wrap the read and write operations, so that we don't have to expose raw fds anymore.
+  This is not possible yet, because stdio_as needs to replace the fds at the OS level.
+  """
+
+  def __init__(self, read_fd, write_fd):
+    self.read_fd = read_fd
+    self.write_fd = write_fd
+    # TODO Declare as a datatype when #6374 is merged or we have moved to dataclasses.
+    self.writable = True
+
+  def is_writable(self):
+    """
+    If the write end of a pipe closes, the read end might still be open, to allow
+    readers to finish reading before closing it.
+    However, there are cases where we still want to know if the write end is closed.
+
+    :return: True if the write end of the pipe is open.
+    """
+    if not self.writable:
+      return False
+
     try:
-      yield (r_fd, w_fd)
+      os.fstat(self.write_fd)
+    except OSError:
+      return False
+    return True
+
+  def stop_writing(self):
+    """Mark that you wish to close the write end of this pipe."""
+    self.writable = False
+
+  def close(self):
+    """Close the reading end of the pipe, which should close the writing end too."""
+    os.close(self.read_fd)
+    self.writable = False
+
+  @staticmethod
+  def create(isatty):
+    """Open a pipe and create wrapper object."""
+    read_fd, write_fd = os.openpty() if isatty else os.pipe()
+    return Pipe(read_fd, write_fd)
+
+  @staticmethod
+  @contextmanager
+  def self_closing(isatty):
+    """Create a pipe and close it when done."""
+    pipe = Pipe.create(isatty)
+    try:
+      yield pipe
     finally:
-      os.close(r_fd)
-      os.close(w_fd)
+      pipe.close()
 
 
 class _StoppableDaemonThread(threading.Thread):
@@ -94,16 +140,16 @@ class NailgunStreamStdinReader(_StoppableDaemonThread):
     # The alternative is passing an os.dup(write_fd) to NSSR, but then we have the problem where
     # _self_closing_pipe doens't close the write_fd until the pants run is done, and that generates
     # issues around piping stdin to interactive processes such as REPLs.
-    with _pipe(isatty) as (read_fd, write_fd):
-      reader = NailgunStreamStdinReader(maybe_shutdown_socket, os.fdopen(write_fd, 'wb'))
-      with reader.running():
-        # Instruct the thin client to begin reading and sending stdin.
-        with maybe_shutdown_socket.lock:
-          NailgunProtocol.send_start_reading_input(maybe_shutdown_socket.socket)
-        try:
-          yield read_fd
-        finally:
-          os.close(read_fd)
+    pipe = Pipe.create(isatty)
+    reader = NailgunStreamStdinReader(maybe_shutdown_socket, os.fdopen(pipe.write_fd, 'wb'))
+    with reader.running():
+      # Instruct the thin client to begin reading and sending stdin.
+      with maybe_shutdown_socket.lock:
+        NailgunProtocol.send_start_reading_input(maybe_shutdown_socket.socket)
+      try:
+        yield pipe.read_fd
+      finally:
+        pipe.close()
 
   def run(self):
     try:
@@ -125,6 +171,10 @@ class NailgunStreamStdinReader(_StoppableDaemonThread):
         self._write_handle.close()
       except (OSError, IOError):
         pass
+
+
+class NailgunStreamWriterError(Exception):
+  pass
 
 
 class NailgunStreamWriter(_StoppableDaemonThread):
@@ -159,6 +209,73 @@ class NailgunStreamWriter(_StoppableDaemonThread):
   def _assert_aligned(self, *iterables):
     assert len({len(i) for i in iterables}) == 1, 'inputs are not aligned'
 
+  def _handle_closed_input_stream(self, fileno):
+    # We've reached EOF.
+    try:
+      if self._chunk_eof_type is not None:
+        NailgunProtocol.write_chunk(self._socket, self._chunk_eof_type)
+    finally:
+      try:
+        os.close(fileno)
+      finally:
+        self.stop_reading_from_fd(fileno)
+
+  def stop_reading_from_fd(self, fileno):
+    self._in_fds.remove(fileno)
+
+  def run(self):
+    while self._in_fds and not self.is_stopped:
+      readable_fds, _, errored_fds = select.select(self._in_fds, [], self._in_fds, self._select_timeout)
+      self.do_run(readable_fds, errored_fds)
+
+  def do_run(self, readable_fds, errored_fds):
+    """Represents one iteration of the infinite reading cycle. Subclasses should override this."""
+    if readable_fds:
+      for fileno in readable_fds:
+        data = os.read(fileno, self._buf_size)
+        if not data:
+          self._handle_closed_input_stream(fileno)
+        else:
+          NailgunProtocol.write_chunk(
+            self._socket,
+            self._fileno_chunk_type_map[fileno],
+            data
+          )
+
+    if errored_fds:
+      for fileno in errored_fds:
+        self.stop_reading_from_fd(fileno)
+
+
+class PipedNailgunStreamWriter(NailgunStreamWriter):
+  """
+  Represents a NailgunStreamWriter that reads from a pipe.
+  """
+
+  def __init__(self, pipes, socket, chunk_type, *args, **kwargs):
+    self._pipes = pipes
+    in_fds = tuple(pipe.read_fd for pipe in pipes)
+    super(PipedNailgunStreamWriter, self).__init__(in_fds, socket, chunk_type, *args, **kwargs)
+
+  def do_run(self, readable_fds, errored_fds):
+    """
+    Overrides the superclass.
+
+    Wraps the running logic of the parent class to handle pipes that have been closed on the write end.
+    If no file descriptors are readable (i.e. there is no more to read from any pipe for now),
+    it will check each of its pipes. If a pipe is not writable, it will interpret that the writer class
+    does not want to write any more, and so it will remove that pipe from the available pipes to read from.
+    When there are no more pipes to read from, it will stop.
+    """
+    if not readable_fds:
+      for pipe in self._pipes:
+        if not pipe.is_writable():
+          self.stop_reading_from_fd(pipe.read_fd)
+          self._pipes.remove(pipe)
+    if not self._pipes:
+      self.stop()
+    super(PipedNailgunStreamWriter, self).do_run(readable_fds, errored_fds)
+
   @classmethod
   @contextmanager
   def open(cls, sock, chunk_type, isatty, chunk_eof_type=None, buf_size=None, select_timeout=None):
@@ -181,12 +298,12 @@ class NailgunStreamWriter(_StoppableDaemonThread):
 
     # N.B. This is purely to permit safe handling of a dynamic number of contextmanagers.
     with ExitStack() as stack:
-      read_fds, write_fds = list(zip(
+      pipes = list(
         # Allocate one pipe pair per chunk type provided.
-        *(stack.enter_context(_self_closing_pipe(isatty)) for isatty in isattys)
-      ))
-      writer = NailgunStreamWriter(
-        read_fds,
+        (stack.enter_context(Pipe.self_closing(isatty)) for isatty in isattys)
+      )
+      writer = PipedNailgunStreamWriter(
+        pipes,
         sock,
         chunk_types,
         chunk_eof_type,
@@ -194,32 +311,4 @@ class NailgunStreamWriter(_StoppableDaemonThread):
         select_timeout=select_timeout
       )
       with writer.running():
-        yield write_fds, writer
-
-  def run(self):
-    while self._in_fds and not self.is_stopped:
-      readable, _, errored = select.select(self._in_fds, [], self._in_fds, self._select_timeout)
-
-      if readable:
-        for fileno in readable:
-          data = os.read(fileno, self._buf_size)
-          if not data:
-            # We've reached EOF.
-            try:
-              if self._chunk_eof_type is not None:
-                NailgunProtocol.write_chunk(self._socket, self._chunk_eof_type)
-            finally:
-              try:
-                os.close(fileno)
-              finally:
-                self._in_fds.remove(fileno)
-          else:
-            NailgunProtocol.write_chunk(
-              self._socket,
-              self._fileno_chunk_type_map[fileno],
-              data
-            )
-
-      if errored:
-        for fileno in errored:
-          self._in_fds.remove(fileno)
+        yield pipes, writer
