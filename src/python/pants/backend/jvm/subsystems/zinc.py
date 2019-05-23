@@ -27,7 +27,7 @@ from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.distribution.distribution import Distribution
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
-from pants.util.dirutil import fast_relpath, safe_mkdir, safe_delete
+from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir
 from pants.util.fileutil import safe_hardlink_or_copy
 from pants.util.memo import memoized_method, memoized_property
 
@@ -212,14 +212,11 @@ class Zinc(object):
       # Since this code can be run in multi-threading mode due to multiple
       # zinc workers, we need to make sure the file operations below are atomic.
       with self._lock:
-        # Create the symlink if it does not exist (or points to a file that doesn't exist,
-        # e.g., a JDK that is no longer present).
-        if not os.path.exists(jdk_home_symlink):
-          safe_delete(jdk_home_symlink)  # In case it's a broken symlink.
-          os.symlink(underlying_dist.home, jdk_home_symlink)
-        # Recreate if the symlink exists but does not match `underlying_dist.home`.
-        elif os.readlink(jdk_home_symlink) != underlying_dist.home:
-          os.remove(jdk_home_symlink)
+        # Create the symlink if it does not exist, or points to a file that doesn't exist,
+        # (e.g., a JDK that is no longer present), or points to the wrong JDK.
+        if (not os.path.exists(jdk_home_symlink) or
+            os.readlink(jdk_home_symlink) != underlying_dist.home):
+          safe_delete(jdk_home_symlink)  # Safe-delete, in case it's a broken symlink.
           os.symlink(underlying_dist.home, jdk_home_symlink)
 
       return Distribution(home_path=jdk_home_symlink)
