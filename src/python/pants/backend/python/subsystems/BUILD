@@ -9,6 +9,8 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/backend/python/targets',
+    'src/python/pants/backend/native/targets',
+    'src/python/pants/backend/native/subsystems',
     'src/python/pants/build_graph',
     'src/python/pants/option',
     'src/python/pants/subsystem',
