@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.backend.native.subsystems.conan import Conan
+from pants.backend.native.subsystems.packaging.conan import Conan
 from pants.backend.native.targets.external_native_library import ExternalNativeLibrary
 from pants.backend.python.tasks.python_tool_prep_base import PythonToolInstance, PythonToolPrepBase
 

@@ -7,6 +7,7 @@ python_library(
     '3rdparty/python:future',
     'src/python/pants/backend/native/config',
     'src/python/pants/backend/native/subsystems',
+    'src/python/pants/backend/native/subsystems/packaging',
     'src/python/pants/backend/native/targets',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
