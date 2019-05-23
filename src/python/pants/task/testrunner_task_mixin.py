@@ -94,7 +94,7 @@ class TestResult(object):
 class TestRunnerTaskMixin(object):
   """A mixin to combine with test runner tasks.
 
-  The intent is to migrate logic over time out of JUnitRun and PytestRun, so the functionality
+  The intent is to migrate logic over time out of JUnitRun and pytestRun, so the functionality
   expressed can support both languages, and any additional languages that are added to pants.
   """
 
@@ -409,7 +409,7 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
 
     register('--fast', type=bool, default=True, fingerprint=True,
              help='Run all tests in a single invocation. If turned off, each test target '
-                  'will run in its own pytest invocation, which will be slower, but isolates '
+                'will run in its own invocation, which will be slower, but isolates '
                   'tests from process-wide state created by tests in other targets.')
     register('--chroot', advanced=True, fingerprint=True, type=bool, default=False,
              help='Run tests in a chroot. Any loose files tests depend on via `{}` dependencies '
