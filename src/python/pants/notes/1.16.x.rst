@@ -2,6 +2,21 @@
 ======================
 This document describes releases leading up to the ``1.16.x`` ``stable`` series.
 
+1.16.0rc4 (5/22/2019)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Have the daemon wait until we stop writing to the socket. (#7782)
+  `PR #7782 <https://github.com/pantsbuild/pants/pull/7782>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Create Pipe wrapper around pipes (#7740)
+  `PR #7740 <https://github.com/pantsbuild/pants/pull/7740>`_
+
 1.16.0rc3 (5/21/2019)
 ---------------------
 
