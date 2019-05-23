@@ -36,7 +36,7 @@ from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath, safe_open
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import classproperty
-from pants.util.strutil import ensure_text, safe_shlex_join
+from pants.util.strutil import ensure_text
 
 
 # Well known metadata file required to register scalac plugins with nsc.
@@ -392,23 +392,10 @@ class BaseZincCompile(JvmCompile):
         fp.write(arg)
         fp.write('\n')
 
-    def compile_hermetic():
-      if jvm_options:
-        raise ValueError(
-          "zinc_compile got non-empty jvm_options when running with a graal native-image, but this "
-          "is unsupported. jvm_options received: {}".format(safe_shlex_join(jvm_options))
-        )
-      return self._compile_hermetic(
-        ctx,
-        classes_dir,
-        zinc_args,
-        compiler_bridge_classpath_entry,
-        dependency_classpath,
-        scalac_classpath_entries,
-      )
-
     return self.execution_strategy_enum.resolve_for_enum_variant({
-      self.HERMETIC: compile_hermetic,
+      self.HERMETIC: lambda: self._compile_hermetic(
+        jvm_options, ctx, classes_dir, zinc_args, compiler_bridge_classpath_entry,
+        dependency_classpath, scalac_classpath_entries),
       self.SUBPROCESS: lambda: self._compile_nonhermetic(jvm_options, zinc_args),
       self.NAILGUN: lambda: self._compile_nonhermetic(jvm_options, zinc_args),
     })()
@@ -427,7 +414,7 @@ class BaseZincCompile(JvmCompile):
     if exit_code != 0:
       raise self.ZincCompileError('Zinc compile failed.', exit_code=exit_code)
 
-  def _compile_hermetic(self, ctx, classes_dir, zinc_args,
+  def _compile_hermetic(self, jvm_options, ctx, classes_dir, zinc_args,
                         compiler_bridge_classpath_entry, dependency_classpath,
                         scalac_classpath_entries):
     zinc_relpath = fast_relpath(self._zinc.zinc, get_buildroot())
@@ -453,20 +440,30 @@ class BaseZincCompile(JvmCompile):
       classpath_entry.directory_digest for classpath_entry in scalac_classpath_entries
     )
 
-    native_image_path, native_image_snapshot = self._zinc.native_image(self.context)
+    if self._zinc.use_native_image:
+      native_image_path, native_image_snapshot = self._zinc.native_image(self.context)
+      additional_snapshots = (native_image_snapshot.directory_digest,)
+      image_specific_argv =  [
+        native_image_path,
+        '-java-home', '.jdk',
+      ]
+    else:
+      additional_snapshots = ()
+      image_specific_argv =  ['.jdk/bin/java'] + jvm_options + [
+        '-cp', zinc_relpath,
+        Zinc.ZINC_COMPILE_MAIN
+      ]
 
     # TODO: Extract something common from Executor._create_command to make the command line
     # TODO: Lean on distribution for the bin/java appending here
     merged_input_digest = self.context._scheduler.merge_directories(
       tuple(s.directory_digest for s in snapshots) +
       directory_digests +
-      (native_image_snapshot.directory_digest,)
+      additional_snapshots
     )
-    argv = [
-      native_image_path,
-      '-cp', zinc_relpath,
-      '-java-home', '.jdk',
-    ] + zinc_args
+
+
+    argv = image_specific_argv + zinc_args
     # TODO(#6071): Our ExecuteProcessRequest expects a specific string type for arguments,
     # which py2 doesn't default to. This can be removed when we drop python 2.
     argv = [text_type(arg) for arg in argv]

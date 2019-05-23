@@ -79,6 +79,8 @@ class Zinc(object):
     @classmethod
     def register_options(cls, register):
       super(Zinc.Factory, cls).register_options(register)
+      register('--native-image', fingerprint=True, type=bool,
+        help='Use a pre-compiled native-image for zinc. Requires running in hermetic mode')
 
       zinc_rev = '1.0.3'
 
@@ -216,6 +218,10 @@ class Zinc(object):
     :rtype: list of str
     """
     return self._zinc_factory._zinc(self._products)
+
+  @property
+  def use_native_image(self):
+    return self._zinc_factory.get_options().native_image
 
   @memoized_method
   def native_image(self, context):
