@@ -21,5 +21,6 @@ python_tests(
   dependencies=[
     'src/python/pants/base:build_environment',
     'src/python/pants/util:process_handler',
-  ]
+  ],
+  tags = {'integration'},
 )
