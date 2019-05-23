@@ -94,7 +94,7 @@ class TestResult(object):
 class TestRunnerTaskMixin(object):
   """A mixin to combine with test runner tasks.
 
-  The intent is to migrate logic over time out of JUnitRun and pytestRun, so the functionality
+  The intent is to migrate logic over time out of JUnitRun and PytestRun, so the functionality
   expressed can support both languages, and any additional languages that are added to pants.
   """
 
