@@ -182,6 +182,17 @@ class BinaryToolBase(Subsystem):
     binary_request = self._make_binary_request(version)
     return self._binary_util.select(binary_request)
 
+  def hackily_snapshot(self, context):
+    bootstrapdir = self.get_options().pants_bootstrapdir
+    relpath = os.path.relpath(self.select(context), bootstrapdir)
+    snapshot = context._scheduler.capture_snapshots((
+      PathGlobsAndRoot(
+        PathGlobs((relpath,)),
+        text_type(bootstrapdir),
+      ),
+    ))[0]
+    return (relpath, snapshot)
+
 
 class NativeTool(BinaryToolBase):
   """A base class for native-code tools.
@@ -197,17 +208,6 @@ class Script(BinaryToolBase):
   :API: public
   """
   platform_dependent = False
-
-  def hackily_snapshot(self, context):
-    bootstrapdir = self.get_options().pants_bootstrapdir
-    script_relpath = os.path.relpath(self.select(context), bootstrapdir)
-    snapshot = context._scheduler.capture_snapshots((
-      PathGlobsAndRoot(
-        PathGlobs((script_relpath,)),
-        text_type(bootstrapdir),
-      ),
-    ))[0]
-    return (script_relpath, snapshot)
 
 
 class XZ(NativeTool):
