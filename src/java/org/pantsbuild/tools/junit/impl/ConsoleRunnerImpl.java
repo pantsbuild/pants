@@ -28,6 +28,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.output.TeeOutputStream;
 import org.junit.runner.Computer;
 import org.junit.runner.Description;
@@ -315,6 +317,11 @@ public class ConsoleRunnerImpl {
     public byte[] readErr(Class<?> testClass) throws IOException {
       return suiteCaptures.get(testClass).readErr();
     }
+
+    @Override
+    public void close(Class<?> testClass) throws IOException {
+      suiteCaptures.get(testClass).close();
+    }
   }
 
   /**
@@ -375,6 +382,8 @@ public class ConsoleRunnerImpl {
   private final boolean useExperimentalRunner;
   private final SwappableStream<PrintStream> swappableOut;
   private final SwappableStream<PrintStream> swappableErr;
+  private final Set<Thread> shutdownHooks = Sets.newHashSet(); // for use in tests
+  private Collection<String> testsToRun;
 
   ConsoleRunnerImpl(
       boolean failFast,
@@ -411,11 +420,24 @@ public class ConsoleRunnerImpl {
     this.useExperimentalRunner = useExperimentalRunner;
   }
 
+  private void setTestsToRun(Collection<String> tests) {
+    this.testsToRun = tests;
+  }
+
   void run(Collection<String> tests) {
+    setTestsToRun(tests);
+    run();
+  }
+
+  @VisibleForTesting
+  public void run() {
     System.setOut(new PrintStream(swappableOut));
     System.setErr(new PrintStream(swappableErr));
 
     JUnitCore core = new JUnitCore();
+
+     // number of hooks: 1 consoleShutdownListener + 1 xmlShutdownListener if writing XML output
+    final CountDownLatch haltAfterUnexpectedShutdown = new CountDownLatch(1 + (xmlReport ? 1 : 0));
 
     if (testListener != null) {
       core.addListener(testListener);
@@ -430,7 +452,19 @@ public class ConsoleRunnerImpl {
     core.addListener(streamCapturingListener);
 
     if (xmlReport) {
-      core.addListener(new AntJunitXmlReportListener(outdir, streamCapturingListener));
+      RunListener xmlListener = new AntJunitXmlReportListener(outdir, streamCapturingListener);
+      core.addListener(xmlListener);
+
+      // handle writing output when the tests time out and are terminated by pants
+      final ShutdownListener xmlShutdownListener = new ShutdownListener(xmlListener);
+      core.addListener(xmlShutdownListener);
+      Thread xmlShutdownHook = new Thread() {
+        @Override public void run() {
+          xmlShutdownListener.unexpectedShutdown();
+          haltAfterUnexpectedShutdown.countDown();
+        }
+      };
+      addShutdownHook(xmlShutdownHook);
     }
 
     if (perTestTimer) {
@@ -439,17 +473,20 @@ public class ConsoleRunnerImpl {
       core.addListener(new ConsoleListener(swappableOut.getOriginal()));
     }
 
-    ShutdownListener shutdownListener = new ShutdownListener(swappableOut.getOriginal());
-    core.addListener(shutdownListener);
+    ShutdownListener consoleShutdownListener =
+      new ShutdownListener(new ConsoleListener(swappableOut.getOriginal()));
+    core.addListener(consoleShutdownListener);
     // Wrap test execution with registration of a shutdown hook that will ensure we
     // never exit silently if the VM does.
-    final Thread unexpectedExitHook =
-        createUnexpectedExitHook(shutdownListener, swappableOut.getOriginal());
-    Runtime.getRuntime().addShutdownHook(unexpectedExitHook);
+    final Thread unexpectedExitHook = createUnexpectedExitHook(
+      consoleShutdownListener,
+      swappableOut.getOriginal(),
+      haltAfterUnexpectedShutdown);
+    addShutdownHook(unexpectedExitHook);
 
     int failures = 1;
     try {
-      Collection<Spec> parsedTests = new SpecParser(tests).parse();
+      Collection<Spec> parsedTests = new SpecParser(testsToRun).parse();
       if (useExperimentalRunner) {
         failures = runExperimental(parsedTests, core);
       } else {
@@ -462,15 +499,20 @@ public class ConsoleRunnerImpl {
     } finally {
       // If we're exiting via a thrown exception, we'll get a better message by letting it
       // propagate than by halt()ing.
-      Runtime.getRuntime().removeShutdownHook(unexpectedExitHook);
+      removeShutdownHook(unexpectedExitHook);
     }
     exit(failures == 0 ? 0 : 1);
   }
 
   /**
-   * Returns a thread that records a system exit to the listener, and then halts(1).
+   * Returns a thread that records a system exit to the listener,
+   * and then halts(1) after other unexpected exit hooks that use the given CountDownLatch.
    */
-  private Thread createUnexpectedExitHook(final ShutdownListener listener, final PrintStream out) {
+  private Thread createUnexpectedExitHook(
+    final ShutdownListener listener,
+    final PrintStream out,
+    final CountDownLatch haltAfter
+  ) {
     return new Thread() {
       @Override public void run() {
         try {
@@ -484,9 +526,31 @@ public class ConsoleRunnerImpl {
         // not want to go unnoticed.
         out.println("FATAL: VM exiting unexpectedly.");
         out.flush();
-        Runtime.getRuntime().halt(1);
+        try {
+          // Other shutdown hooks might still need to write test results,
+          // so wait for them (up to 2 seconds) to finish before halting.
+          haltAfter.countDown();
+          haltAfter.await(2, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+          out.println(e);
+          e.printStackTrace(out);
+        } finally {
+          if (callSystemExitOnFinish) {
+            Runtime.getRuntime().halt(1);
+          }
+        }
       }
     };
+  }
+
+  private void addShutdownHook(Thread hook) {
+    shutdownHooks.add(hook);
+    Runtime.getRuntime().addShutdownHook(hook);
+  }
+
+  private void removeShutdownHook(Thread hook) {
+    shutdownHooks.remove(hook);
+    Runtime.getRuntime().removeShutdownHook(hook);
   }
 
   private int runExperimental(Collection<Spec> parsedTests, JUnitCore core)
@@ -695,12 +759,32 @@ public class ConsoleRunnerImpl {
     return filteredRequests;
   }
 
+  @VisibleForTesting
+  void runShutdownHooks() throws InterruptedException {
+    for(Thread hook: shutdownHooks) {
+      hook.start();
+    }
+    for(Thread hook: shutdownHooks) {
+      hook.join(1000); // wait for all hooks to complete, up to 1 second
+    }
+  }
+
   /**
    * Launcher for JUnitConsoleRunner.
    *
    * @param args options from the command line
    */
   public static void main(String[] args) {
+    mainImpl(args).run();
+  }
+
+  /**
+   * As main, but returns the ConsoleRunnerImpl instance and doesn't begin the test run.
+   * For use in tests.
+   *
+   * @param args options from the command line
+   */
+  public static ConsoleRunnerImpl mainImpl(String[] args) {
     /**
      * Command line option bean.
      */
@@ -846,7 +930,8 @@ public class ConsoleRunnerImpl {
         tests.add(test);
       }
     }
-    runner.run(tests);
+    runner.setTestsToRun(tests);
+    return runner;
   }
 
   /**

@@ -13,8 +13,6 @@ import java.io.File;
 import java.io.FilterWriter;
 import java.io.IOException;
 import java.io.Writer;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -305,9 +303,9 @@ class AntJunitXmlReportListener extends RunListener {
     }
 
     public void finished() {
-      tests++;
       if (startNs != 0) {
         time = convertTimeSpanNs(System.nanoTime() - startNs);
+        tests++;
       } else {
         time = "0";
       }
@@ -489,6 +487,7 @@ class AntJunitXmlReportListener extends RunListener {
   public void testRunFinished(Result result) throws java.lang.Exception {
     for (TestSuite suite : suites.values()) {
       if (suite.wasStarted() && suite.testClass != null) {
+        streamSource.close(suite.testClass); // may not be closed if we're abnormally terminating
         suite.setOut(new String(streamSource.readOut(suite.testClass), Charsets.UTF_8));
         suite.setErr(new String(streamSource.readErr(suite.testClass), Charsets.UTF_8));
       }
