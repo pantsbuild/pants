@@ -424,6 +424,7 @@ class AntJunitXmlReportListener extends RunListener {
         if (suite != null) {
           suite.testCases.clear();
           suite.testCases.add(testCase);
+          suite.tests = 1;
           suite.finished();
         }
       } else {
@@ -452,6 +453,7 @@ class AntJunitXmlReportListener extends RunListener {
     if (suite != null) {
       suite.incrementSkipped();
       // Ignored tests don't have testStarted and testFinished callbacks so call finish here.
+      if (!suite.wasStarted()) suite.tests++;
       suite.finished();
     }
 
