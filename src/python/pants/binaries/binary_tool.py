@@ -50,8 +50,6 @@ class BinaryToolBase(Subsystem):
   # Subclasses may set this to provide extra register() kwargs for the --version option.
   extra_version_option_kwargs = None
 
-  allow_version_override = True
-
   @classmethod
   def subsystem_dependencies(cls):
     sub_deps = super(BinaryToolBase, cls).subsystem_dependencies() + (BinaryUtil.Factory,)
@@ -101,22 +99,21 @@ class BinaryToolBase(Subsystem):
   def register_options(cls, register):
     super(BinaryToolBase, cls).register_options(register)
 
-    if cls.allow_version_override:
-      version_registration_kwargs = {
-        'type': str,
-        'default': cls.default_version,
-      }
-      if cls.extra_version_option_kwargs:
-        version_registration_kwargs.update(cls.extra_version_option_kwargs)
-      version_registration_kwargs['help'] = (
-        version_registration_kwargs.get('help') or
-        'Version of the {} {} to use'.format(cls._get_name(),
-                                             'binary' if cls.platform_dependent else 'script')
-      )
-      # The default for fingerprint in register() is False, but we want to default to True.
-      if 'fingerprint' not in version_registration_kwargs:
-        version_registration_kwargs['fingerprint'] = True
-      register('--version', **version_registration_kwargs)
+    version_registration_kwargs = {
+      'type': str,
+      'default': cls.default_version,
+    }
+    if cls.extra_version_option_kwargs:
+      version_registration_kwargs.update(cls.extra_version_option_kwargs)
+    version_registration_kwargs['help'] = (
+      version_registration_kwargs.get('help') or
+      'Version of the {} {} to use'.format(cls._get_name(),
+                                           'binary' if cls.platform_dependent else 'script')
+    )
+    # The default for fingerprint in register() is False, but we want to default to True.
+    if 'fingerprint' not in version_registration_kwargs:
+      version_registration_kwargs['fingerprint'] = True
+    register('--version', **version_registration_kwargs)
 
   @memoized_method
   def select(self, context=None):
