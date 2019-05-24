@@ -443,9 +443,19 @@ class BaseZincCompile(JvmCompile):
     if self._zinc.use_native_image:
       native_image_path, native_image_snapshot = self._zinc.native_image(self.context)
       additional_snapshots = (native_image_snapshot.directory_digest,)
+      scala_boot_classpath = [
+          classpath_entry.path for classpath_entry in scalac_classpath_entries
+        ] + [
+          # We include rt.jar on the scala boot classpath because the compiler usually gets its
+          # contents from the VM it is executing in, but not in the case of a native image. This
+          # resolves a `object java.lang.Object in compiler mirror not found.` error.
+          '.jdk/jre/lib/rt.jar',
+        ]
       image_specific_argv =  [
         native_image_path,
         '-java-home', '.jdk',
+        '-Dscala.boot.class.path={}'.format(os.pathsep.join(scala_boot_classpath)),
+        '-Dscala.usejavacp=true',
       ]
     else:
       additional_snapshots = ()

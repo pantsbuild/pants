@@ -53,7 +53,10 @@ class Zinc(object):
   # right. We're not allowed to explicitly inherit from both because of MRO.
   class Factory(JvmToolMixin, NativeTool):
     options_scope = 'zinc'
+
+    # NB: These two properties are consumed by the NativeTool mixin.
     default_version = _ZINC_COMPILER_VERSION
+    name = 'zinc-pants-native-image'
 
     @classmethod
     def subsystem_dependencies(cls):
