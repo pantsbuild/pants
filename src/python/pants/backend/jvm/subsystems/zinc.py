@@ -53,22 +53,7 @@ class Zinc(object):
   # right. We're not allowed to explicitly inherit from both because of MRO.
   class Factory(JvmToolMixin, NativeTool):
     options_scope = 'zinc'
-
-    # version and allow_version_override need to be set like this so that Zinc can act as a
-    # NativeTool.
-    # NativeTool requires that there is an options scope with at least one option registered on the
-    # class.
-    # Because we don't want to allow version overrides, and instead want to pin the Zinc
-    # native-image version to be the same as the Zinc version we use everywhere else, we either need
-    # to put the NativeTool on an existing options scope (this one makes sense!), or we'd need to
-    # make an options scope with a dummy option just for the ZincNativeImage NativeTool.
-    # Because the native image's version is tightly coupled to this class, and zinc is the options
-    # scope we'd want to pick for it, we just put these details here.
-
-    allow_version_override = False
-
-    def version(self, context=None):
-      return _ZINC_COMPILER_VERSION
+    default_version = _ZINC_COMPILER_VERSION
 
     @classmethod
     def subsystem_dependencies(cls):
