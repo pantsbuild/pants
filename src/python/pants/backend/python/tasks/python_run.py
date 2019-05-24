@@ -40,12 +40,15 @@ class PythonRun(PythonExecutionTaskBase):
         args.extend(safe_shlex_split(arg))
       args += self.get_passthru_args()
 
+      env = os.environ.copy()
+      env.update(self.ensure_interpreter_search_path_env())
+
       self.context.release_lock()
       cmdline = ' '.join(pex.cmdline(args))
       with self.context.new_workunit(name='run',
                                      cmd=cmdline,
                                      labels=[WorkUnitLabel.TOOL, WorkUnitLabel.RUN]):
-        po = pex.run(blocking=False, args=args, env=os.environ.copy())
+        po = pex.run(blocking=False, args=args, env=env)
         try:
           result = po.wait()
           if result != 0:

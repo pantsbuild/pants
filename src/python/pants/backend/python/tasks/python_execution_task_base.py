@@ -24,6 +24,31 @@ from pants.util.contextutil import temporary_file
 from pants.util.objects import datatype
 
 
+def ensure_interpreter_search_path_env(interpreter):
+  """Produces an environment dict that ensures that the given interpreter is discovered at runtime.
+
+  At build time, a pex contains constraints on which interpreter version ranges are legal, but
+  at runtime it will apply those constraints to the current (PEX_PYTHON_)PATH to locate a
+  relevant interpreter.
+
+  This environment is for use at runtime to ensure that a particular interpreter (which should
+  match the constraints that were provided at build time) is locatable. PEX no longer allows
+  for forcing use of a particular interpreter (the PEX_PYTHON_PATH is additive), so use
+  of this method does not guarantee that the given interpreter is used: rather, that it is
+  definitely considered for use.
+
+  Subclasses of PythonExecutionTaskBase can use `self.ensure_interpreter_search_path_env`
+  to get the relevant interpreter, but this method is exposed as static for cases where
+  the building of the pex is separated from the execution of the pex.
+  """
+  chosen_interpreter_binary_path = interpreter.binary
+  return {
+    'PEX_IGNORE_RCFILES': '1',
+    'PEX_PYTHON': chosen_interpreter_binary_path,
+    'PEX_PYTHON_PATH': chosen_interpreter_binary_path,
+  }
+
+
 class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
   """Base class for tasks that execute user Python code in a PEX environment.
 
@@ -81,6 +106,10 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     :rtype: :class:`collections.Iterable` of :class:`PythonExecutionTaskBase.ExtraFile`
     """
     return ()
+
+  def ensure_interpreter_search_path_env(self):
+    """See ensure_interpreter_search_path_env."""
+    return ensure_interpreter_search_path_env(self.context.products.get_data(PythonInterpreter))
 
   def create_pex(self, pex_info=None):
     """Returns a wrapped pex that "merges" other pexes produced in previous tasks via PEX_PATH.
