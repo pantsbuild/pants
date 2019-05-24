@@ -1045,6 +1045,8 @@ mod local {
       trace!("Initializing ShardedLmdb at root {:?}", root_path);
       let mut lmdbs = HashMap::new();
 
+      #[allow(clippy::identity_conversion)]
+      // False positive: https://github.com/rust-lang/rust-clippy/issues/3913
       for (env, dir, fingerprint_prefix) in ShardedLmdb::envs(&root_path)? {
         trace!("Making ShardedLmdb content database for {:?}", dir);
         let content_database = env
@@ -1139,6 +1141,7 @@ mod local {
       self.lmdbs.values().cloned().collect()
     }
 
+    #[allow(clippy::identity_conversion)] // False positive: https://github.com/rust-lang/rust-clippy/issues/3913
     pub fn compact(&self) -> Result<(), String> {
       for (env, old_dir, _) in ShardedLmdb::envs(&self.root_path)? {
         let new_dir = TempDir::new_in(old_dir.parent().unwrap()).expect("TODO");
