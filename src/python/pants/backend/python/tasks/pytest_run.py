@@ -19,6 +19,7 @@ from textwrap import dedent
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.pytest_prep import PytestPrep
+from pants.backend.python.tasks.python_execution_task_base import ensure_interpreter_search_path_env
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import ErrorWhileTesting, TaskError
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
@@ -483,7 +484,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
                                           pytest_binary.pex) as coverage_args:
         yield pytest_binary, [conftest] + coverage_args, get_pytest_rootdir
 
-  def _constrain_pytest_interpreter_search_path(self):
+  def _ensure_pytest_interpreter_search_path(self):
     """Return an environment for invoking a pex which ensures the use of the selected interpreter.
 
     When creating the merged pytest pex, we already have an interpreter, and we only invoke that pex
@@ -492,12 +493,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     compatible with the interpreter being used to invoke the merged pytest pex.
     """
     pytest_binary = self.context.products.get_data(PytestPrep.PytestBinary)
-    chosen_interpreter_binary_path = pytest_binary.interpreter.binary
-    return {
-      'PEX_IGNORE_RCFILES': '1',
-      'PEX_PYTHON': chosen_interpreter_binary_path,
-      'PEX_PYTHON_PATH': chosen_interpreter_binary_path,
-    }
+    return ensure_interpreter_search_path_env(pytest_binary.interpreter)
 
   def _do_run_tests_with_args(self, pex, args):
     try:
@@ -535,7 +531,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
                                      cmd=safe_shlex_join(pex.cmdline(args)),
                                      labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
         # NB: Constrain the pex environment to ensure the use of the selected interpreter!
-        env.update(self._constrain_pytest_interpreter_search_path())
+        env.update(self._ensure_pytest_interpreter_search_path())
         rc = self.spawn_and_wait(pex, workunit=workunit, args=args, setsid=True, env=env)
         return PytestResult.rc(rc)
     except ErrorWhileTesting:
@@ -756,7 +752,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
                                    cmd=' '.join(pex.cmdline(args)),
                                    labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
       # NB: Constrain the pex environment to ensure the use of the selected interpreter!
-      env.update(self._constrain_pytest_interpreter_search_path())
+      env.update(self._ensure_pytest_interpreter_search_path())
       process = self._spawn(pex, workunit, args, setsid=False, env=env)
       return process.wait()
 

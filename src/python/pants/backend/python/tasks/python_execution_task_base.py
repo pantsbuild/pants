@@ -11,7 +11,6 @@ from future.utils import binary_type, text_type
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 
-from pants.backend.python.subsystems.pex_build_util import is_python_target
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -23,6 +22,31 @@ from pants.build_graph.files import Files
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.util.contextutil import temporary_file
 from pants.util.objects import datatype
+
+
+def ensure_interpreter_search_path_env(interpreter):
+  """Produces an environment dict that ensures that the given interpreter is discovered at runtime.
+
+  At build time, a pex contains constraints on which interpreter version ranges are legal, but
+  at runtime it will apply those constraints to the current (PEX_PYTHON_)PATH to locate a
+  relevant interpreter.
+
+  This environment is for use at runtime to ensure that a particular interpreter (which should
+  match the constraints that were provided at build time) is locatable. PEX no longer allows
+  for forcing use of a particular interpreter (the PEX_PYTHON_PATH is additive), so use
+  of this method does not guarantee that the given interpreter is used: rather, that it is
+  definitely considered for use.
+
+  Subclasses of PythonExecutionTaskBase can use `self.ensure_interpreter_search_path_env`
+  to get the relevant interpreter, but this method is exposed as static for cases where
+  the building of the pex is separated from the execution of the pex.
+  """
+  chosen_interpreter_binary_path = interpreter.binary
+  return {
+    'PEX_IGNORE_RCFILES': '1',
+    'PEX_PYTHON': chosen_interpreter_binary_path,
+    'PEX_PYTHON_PATH': chosen_interpreter_binary_path,
+  }
 
 
 class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
@@ -83,12 +107,16 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     """
     return ()
 
-  # TODO: remove `pin_selected_interpreter` arg and constrain all resulting pexes to a single ==
-  # interpreter constraint for the globally selected interpreter! This also requries porting
-  # `PythonRun` to set 'PEX_PYTHON_PATH' and 'PEX_PYTHON' when invoking the resulting pex, see
-  # https://github.com/pantsbuild/pants/pull/7563.
-  def create_pex(self, pex_info=None, pin_selected_interpreter=False):
+  def ensure_interpreter_search_path_env(self):
+    """See ensure_interpreter_search_path_env."""
+    return ensure_interpreter_search_path_env(self.context.products.get_data(PythonInterpreter))
+
+  def create_pex(self, pex_info=None):
     """Returns a wrapped pex that "merges" other pexes produced in previous tasks via PEX_PATH.
+
+    This method always creates a PEX to run locally on the current platform and selected
+    interpreter: to create a pex that is distributable to other environments, use the pex_build_util
+    Subsystem.
 
     The returned pex will have the pexes from the ResolveRequirements and GatherSources tasks mixed
     into it via PEX_PATH. Any 3rdparty requirements declared with self.extra_requirements() will
@@ -96,9 +124,6 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
 
     :param pex_info: An optional PexInfo instance to provide to self.merged_pex().
     :type pex_info: :class:`pex.pex_info.PexInfo`, or None
-    :param bool pin_selected_interpreter: If True, the produced pex will have a single ==
-                                          interpreter constraint applied to it, for the global
-                                          interpreter selected by the SelectInterpreter
     task. Otherwise, all of the interpreter constraints from all python targets will applied.
     :rtype: :class:`pex.pex.PEX`
     """
@@ -134,16 +159,8 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
           # in the target set's dependency closure.
           pexes = [extra_requirements_pex] + pexes
 
-        if pin_selected_interpreter:
-          constraints = {str(interpreter.identity.requirement)}
-        else:
-          constraints = {
-            constraint for rt in relevant_targets if is_python_target(rt)
-            for constraint in PythonSetup.global_instance().compatibility_or_constraints(rt)
-          }
-          self.context.log.debug('target set {} has constraints: {}'
-                                 .format(relevant_targets, constraints))
-
+        # NB: See docstring. We always use the previous selected interpreter.
+        constraints = {str(interpreter.identity.requirement)}
 
         with self.merged_pex(path, pex_info, interpreter, pexes, constraints) as builder:
           for extra_file in self.extra_files():
