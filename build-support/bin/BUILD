@@ -21,6 +21,8 @@ python_binary(
   sources='check_header.py',
   dependencies=[
     ':common',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:meta',
   ],
   compatibility=['CPython>=3.6'],
 )
@@ -41,14 +43,3 @@ python_binary(
     ':common',
   ],
   compatibility=['CPython>=3.6'],
-
-python_binary(
-  name='check-file-headers',
-  sources='check_header_helper.py',
-  dependencies=[
-    '3rdparty/python:future',
-    '3rdparty/python:packaging',
-    '3rdparty/python:six',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-  ],
-)

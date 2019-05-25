@@ -95,10 +95,7 @@ subdir/__init__.py
         # This should be the only entry in the index, and it is a newly added file.
         full_expected_output="{}\n".format(rel_new_file))
 
-  def test_check_headers(self):
-    header_check_script = os.path.join(
-      self.pants_repo_root, 'build-support/bin/check_header.py'
-    )
+  def test_check_python_headers(self):
     cur_year_num = datetime.datetime.now().year
     cur_year = str(cur_year_num)
     with self._create_tiny_git_repo() as (_, worktree, _):
@@ -107,7 +104,8 @@ subdir/__init__.py
       def assert_header_check(added_files, expected_excerpt):
         self._assert_subprocess_error(
           worktree=worktree,
-          cmd=[header_check_script, 'subdir', '--files-added'] + added_files,
+          cmd=(['./pants', 'run', 'build-support/bin:check_header', '--',
+                'subdir', '--files-added'] + added_files),
           expected_excerpt=expected_excerpt
         )
 
@@ -166,7 +164,15 @@ subdir/__init__.py
         expected_excerpt="subdir/file.py: copyright year must be {} (was {})".format(cur_year, last_year)
       )
 
-      # Check that we also support Python 2-style headers.
+      # Check that a file isn't checked against the current year if it is not passed as an
+      # arg to the script.
+      # Use the same file as last time, with last year's copyright date.
+      self._assert_subprocess_success(
+        worktree,
+        cmd=(['./pants', 'run', 'build-support/bin:check_header', '--', 'subdir']))
+
+      # Check that we also support Python 2-style headers (while still checking the current year's
+      # copyright date!).
       safe_file_dump(new_py_path, dedent("""\
         # coding=utf-8
         # Copyright {} Pants project contributors (see CONTRIBUTORS.md).
@@ -176,9 +182,7 @@ subdir/__init__.py
 
         """.format(cur_year))
       )
-      self._assert_subprocess_success(worktree, [header_check_script, 'subdir'])
-
-      # Check that a file isn't checked against the current year if it is not passed as an
-      # arg to the script.
-      # Use the same file as last time, with last year's copyright date.
-      self._assert_subprocess_success(worktree, [header_check_script, 'subdir'])
+      self._assert_subprocess_success(
+        worktree,
+        cmd=(['./pants', 'run', 'build-support/bin:check_header', '--',
+              'subdir', '--files-added', rel_new_py_path]))

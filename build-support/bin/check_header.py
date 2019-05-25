@@ -9,6 +9,9 @@ import re
 from textwrap import dedent
 from typing import Iterable, List
 
+from pants.util.dirutil import read_file
+from pants.util.meta import AbstractClass, classproperty
+
 from common import die
 
 
@@ -137,11 +140,10 @@ def check_dir(directory: str, newly_created_files: Iterable[str]) -> List[Header
   header_parse_failures: List[HeaderCheckFailure] = []
   for root, dirs, files in os.walk(directory):
     for f in files:
-      if not f.endswith('.py') or os.path.basename(f) == '__init__.py':
-        continue
       filename = os.path.join(root, f)
       try:
-        check_header(filename, is_newly_created=filename in newly_created_files)
+        if f.endswith('.py') and os.path.basename(f) != '__init__.py':
+          check_header(filename, is_newly_created=filename in newly_created_files)
       except HeaderCheckFailure as e:
         header_parse_failures.append(e)
   return header_parse_failures
