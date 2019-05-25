@@ -36,7 +36,7 @@ from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath, safe_open
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import classproperty
-from pants.util.strutil import ensure_text
+from pants.util.strutil import ensure_text, safe_shlex_join
 
 
 # Well known metadata file required to register scalac plugins with nsc.
@@ -441,6 +441,11 @@ class BaseZincCompile(JvmCompile):
     )
 
     if self._zinc.use_native_image:
+      if jvm_options:
+        raise ValueError(
+          "`{}` got non-empty jvm_options when running with a graal native-image, but this is "
+          "unsupported. jvm_options received: {}".format(self.options_scope, safe_shlex_join(jvm_options))
+        )
       native_image_path, native_image_snapshot = self._zinc.native_image(self.context)
       additional_snapshots = (native_image_snapshot.directory_digest,)
       scala_boot_classpath = [
@@ -450,6 +455,8 @@ class BaseZincCompile(JvmCompile):
           # contents from the VM it is executing in, but not in the case of a native image. This
           # resolves a `object java.lang.Object in compiler mirror not found.` error.
           '.jdk/jre/lib/rt.jar',
+          # The same goes for the rce.jar, which provides javax.crypto.
+          '.jdk/jre/lib/jce.jar',
         ]
       image_specific_argv =  [
         native_image_path,
