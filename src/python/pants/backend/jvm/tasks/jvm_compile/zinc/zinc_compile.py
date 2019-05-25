@@ -36,7 +36,7 @@ from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath, safe_open
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import classproperty
-from pants.util.strutil import ensure_text
+from pants.util.strutil import ensure_text, safe_shlex_join
 
 
 # Well known metadata file required to register scalac plugins with nsc.
@@ -440,15 +440,47 @@ class BaseZincCompile(JvmCompile):
       classpath_entry.directory_digest for classpath_entry in scalac_classpath_entries
     )
 
+    if self._zinc.use_native_image:
+      if jvm_options:
+        raise ValueError(
+          "`{}` got non-empty jvm_options when running with a graal native-image, but this is "
+          "unsupported. jvm_options received: {}".format(self.options_scope, safe_shlex_join(jvm_options))
+        )
+      native_image_path, native_image_snapshot = self._zinc.native_image(self.context)
+      additional_snapshots = (native_image_snapshot.directory_digest,)
+      scala_boot_classpath = [
+          classpath_entry.path for classpath_entry in scalac_classpath_entries
+        ] + [
+          # We include rt.jar on the scala boot classpath because the compiler usually gets its
+          # contents from the VM it is executing in, but not in the case of a native image. This
+          # resolves a `object java.lang.Object in compiler mirror not found.` error.
+          '.jdk/jre/lib/rt.jar',
+          # The same goes for the rce.jar, which provides javax.crypto.
+          '.jdk/jre/lib/jce.jar',
+        ]
+      image_specific_argv =  [
+        native_image_path,
+        '-java-home', '.jdk',
+        '-Dscala.boot.class.path={}'.format(os.pathsep.join(scala_boot_classpath)),
+        '-Dscala.usejavacp=true',
+      ]
+    else:
+      additional_snapshots = ()
+      image_specific_argv =  ['.jdk/bin/java'] + jvm_options + [
+        '-cp', zinc_relpath,
+        Zinc.ZINC_COMPILE_MAIN
+      ]
+
     # TODO: Extract something common from Executor._create_command to make the command line
     # TODO: Lean on distribution for the bin/java appending here
     merged_input_digest = self.context._scheduler.merge_directories(
-      tuple(s.directory_digest for s in snapshots) + directory_digests
+      tuple(s.directory_digest for s in snapshots) +
+      directory_digests +
+      additional_snapshots
     )
-    argv = ['.jdk/bin/java'] + jvm_options + [
-      '-cp', zinc_relpath,
-      Zinc.ZINC_COMPILE_MAIN
-    ] + zinc_args
+
+
+    argv = image_specific_argv + zinc_args
     # TODO(#6071): Our ExecuteProcessRequest expects a specific string type for arguments,
     # which py2 doesn't default to. This can be removed when we drop python 2.
     argv = [text_type(arg) for arg in argv]
@@ -458,9 +490,7 @@ class BaseZincCompile(JvmCompile):
       input_files=merged_input_digest,
       output_directories=(classes_dir,),
       description="zinc compile for {}".format(ctx.target.address.spec),
-      # TODO: These should always be unicodes
-      # Since this is always hermetic, we need to use `underlying_dist`
-      jdk_home=text_type(self._zinc.underlying_dist.home),
+      jdk_home=self._zinc.underlying_dist.home,
     )
     res = self.context.execute_process_synchronously_or_raise(
       req, self.name(), [WorkUnitLabel.COMPILER])
