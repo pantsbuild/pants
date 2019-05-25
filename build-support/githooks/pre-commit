@@ -42,7 +42,7 @@ echo "* Checking packages"
 echo "* Checking headers"
 ./pants run build-support/bin:check_header -- \
         "${DIRS_TO_CHECK[@]}" \
-        --files-added "${ADDED_FILES[@]}"
+        --newly-created-files "${ADDED_FILES[@]}"
 
 echo "* Checking for banned imports"
 ./build-support/bin/check_banned_imports.py

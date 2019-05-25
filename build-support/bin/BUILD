@@ -23,6 +23,7 @@ python_binary(
     ':common',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
   ],
   compatibility=['CPython>=3.6'],
 )

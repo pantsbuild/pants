@@ -105,7 +105,7 @@ subdir/__init__.py
         self._assert_subprocess_error(
           worktree=worktree,
           cmd=(['./pants', 'run', 'build-support/bin:check_header', '--',
-                'subdir', '--files-added'] + added_files),
+                'subdir', '--newly-created-files'] + added_files),
           expected_excerpt=expected_excerpt
         )
 
@@ -185,4 +185,7 @@ subdir/__init__.py
       self._assert_subprocess_success(
         worktree,
         cmd=(['./pants', 'run', 'build-support/bin:check_header', '--',
-              'subdir', '--files-added', rel_new_py_path]))
+              'subdir', '--newly-created-files', rel_new_py_path]))
+
+  def test_build_file_headers(self):
+    self.assertTrue(False, 'TODO!')
