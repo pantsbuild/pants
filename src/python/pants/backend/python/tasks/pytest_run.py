@@ -113,8 +113,14 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
                   "emitted to that file (prefix). Note that tests may run in a different cwd, so "
                   "it's best to use an absolute path to make it easy to find the subprocess "
                   "profiles later.")
+
+    # TODO(John Sirois): Remove this option. The cleanup work is tracked in:
+    #   https://github.com/pantsbuild/pants/issues/7802
     register('--options', type=list, fingerprint=True,
+             removal_version='1.19.0.dev2',
+             removal_hint='Use the `--passthrough-args` option instead.',
              help='Pass these options to pytest. You can also use pass-through args.')
+
     register('--coverage', fingerprint=True,
              help='Emit coverage information for specified packages or directories (absolute or '
                   'relative to the build root).  The special value "auto" indicates that Pants '
