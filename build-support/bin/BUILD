@@ -44,3 +44,4 @@ python_binary(
     ':common',
   ],
   compatibility=['CPython>=3.6'],
+)

@@ -95,9 +95,9 @@ class PythonSourceHeaderChecker(HeaderChecker):
 
   @classproperty
   def help_message_on_failure(cls):
-    return dedent("""\
-      All {} files other than __init__.py should start with the following header:\n{}\
-      """.format(cls.python_source_description, cls.expected_header))
+    return (
+      "All {} files other than __init__.py should start with the following header:\n{}"
+      .format(cls.python_source_description, cls.expected_header))
 
   @abstractproperty
   @classproperty
@@ -164,6 +164,8 @@ class Python2Checker(PythonSourceHeaderChecker):
   expected_header_lines = 6
   copyright_line_index = 1
 
+  python_source_description = 'python 2 source files'
+
   def matches_file_path(self, file_path):
     return super(Python2Checker, self).matches_file_path(file_path) and not self._is_py3(file_path)
 
@@ -179,8 +181,10 @@ class Python3Checker(PythonSourceHeaderChecker):
   expected_header_lines = 3
   copyright_line_index = 0
 
+  python_source_description = 'python 3 source files'
+
   def matches_file_path(self, file_path):
-    return super(Python2Checker, self).matches_file_path(file_path) and self._is_py3(file_path)
+    return super(Python3Checker, self).matches_file_path(file_path) and self._is_py3(file_path)
 
 
 def check_dir(directory, newly_created_files, header_checkers):
