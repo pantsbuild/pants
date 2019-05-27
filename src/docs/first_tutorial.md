@@ -228,7 +228,7 @@ BUILD Files
 -----------
 
 When we ran the `pants test` goal, we told pants what target to build, but where are these
-targets defined? Scattered around the source tree are `BUILD` files. These `BUILD` files
+targets defined? Scattered around the source tree as `BUILD` files. These `BUILD` files
 define targets. For example, this code snippet of `java/org/pantsbuild/example/hello/main/BUILD`
 defines two targets: the app we ran and the binary that contains its code.
 These targets are named `main` (of type `jvm_app`) and and `main-bin` (of type `jvm_binary`):
