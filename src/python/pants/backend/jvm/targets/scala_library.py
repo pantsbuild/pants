@@ -77,9 +77,11 @@ class ScalaLibrary(ExportableJvmLibrary):
 
   @property
   def java_sources(self):
+    targets = []
     for spec in self.payload.java_sources:
       address = Address.parse(spec, relative_to=self.address.spec_path)
       target = self._build_graph.get_target(address)
       if target is None:
         raise TargetDefinitionException(self, 'No such java target: {}'.format(spec))
-      yield target
+      targets.append(target)
+    return targets
