@@ -4,6 +4,7 @@ python_library(
     '3rdparty/python:future',
     'src/python/pants/backend/jvm/subsystems:java',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
+    'src/python/pants/backend/jvm/subsystems:rsc_native_image',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/subsystems:zinc',
