@@ -104,7 +104,7 @@ class TestPailgunServer(unittest.TestCase):
       if self.threads_running == self.threads_to_start:
         self.threads_running_cond.notify_all()
       else:
-        while not self.threads_running == self.threads_to_start:
+        while self.threads_running != self.threads_to_start:
           self.threads_running_cond.wait()
 
 
@@ -119,7 +119,7 @@ class TestPailgunServer(unittest.TestCase):
       if self.threads_running == 0:
         self.threads_running_cond.notify_all()
       else:
-        while not self.threads_running == 0:
+        while self.threads_running != 0:
           self.threads_running_cond.wait()
 
       threaded_assert_equal(self.threads_running, 0, "handle_thread_finished exited when there still were threads running.")
@@ -185,10 +185,6 @@ class TestPailgunServer(unittest.TestCase):
     for thread in threads:
       # If this fails because it times out, it's definitely a legitimate error.
       thread.join(10)
-      self.assertTrue(self.thread_errors.empty(), "There were some errors in the threads:\n {}".format(self.thread_errors))
-
-    for thread in threads:
-      self.assertFalse(thread.is_alive())
       self.assertTrue(self.thread_errors.empty(), "There were some errors in the threads:\n {}".format(self.thread_errors))
 
 
