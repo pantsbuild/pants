@@ -225,7 +225,7 @@ class PantsDaemon(FingerprintedProcessManager):
         (bootstrap_options.pantsd_pailgun_host, bootstrap_options.pantsd_pailgun_port),
         DaemonPantsRunner,
         scheduler_service,
-        should_shutdown_after_run
+        should_shutdown_after_run,
       )
 
       store_gc_service = StoreGCService(legacy_graph_scheduler.scheduler)
