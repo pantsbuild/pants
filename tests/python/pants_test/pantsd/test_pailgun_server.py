@@ -8,6 +8,7 @@ import socket
 import threading
 import unittest
 from contextlib import contextmanager
+from queue import Queue
 from socketserver import TCPServer
 
 import mock
@@ -86,6 +87,14 @@ class TestPailgunServer(unittest.TestCase):
     """Launch many requests, assert that every one is trying to enter the critical section, and assert that only one is doing so at a time."""
     self.threads_to_start = 10
 
+    # Queues are thread safe (https://docs.python.org/2/library/queue.html)
+    self.thread_errors = Queue()
+    def threaded_assert_equal(one, other, message):
+      try:
+        self.assertEqual(one, other, message)
+      except AssertionError as error:
+        self.thread_errors.put(error)
+
     self.threads_running_cond = threading.Condition()
     self.threads_running = 0
     def handle_thread_tried_to_handle_request():
@@ -98,7 +107,8 @@ class TestPailgunServer(unittest.TestCase):
         while not self.threads_running == self.threads_to_start:
           self.threads_running_cond.wait()
 
-      self.assertEqual(self.threads_running, self.threads_to_start, "This thread is unblocked before all the threads had started.")
+
+      threaded_assert_equal(self.threads_running, self.threads_to_start, "This thread is unblocked before all the threads had started.")
       self.threads_running_cond.release()
 
     def handle_thread_finished():
@@ -112,7 +122,7 @@ class TestPailgunServer(unittest.TestCase):
         while not self.threads_running == 0:
           self.threads_running_cond.wait()
 
-      self.assertEquals(self.threads_running, 0, "handle_thread_finished exited when there still were threads running.")
+      threaded_assert_equal(self.threads_running, 0, "handle_thread_finished exited when there still were threads running.")
       self.threads_running_cond.release()
 
     self.threads_handling_requests = 0
@@ -121,19 +131,18 @@ class TestPailgunServer(unittest.TestCase):
     def handle_thread_starts_handling_request():
       with self.threads_handling_requests_lock:
         self.threads_handling_requests += 1
-        self.assertEquals(self.threads_handling_requests, 1, "A thread is already handling a request!")
+        threaded_assert_equal(self.threads_handling_requests, 1, "A thread is already handling a request!")
 
     def check_only_one_thread_is_handling_a_request():
       """Assert that there's only ever one thread inside the lock."""
       with self.threads_handling_requests_lock:
-        self.assertEquals(self.threads_handling_requests, 1, "A thread is already handling a request!")
+        threaded_assert_equal(self.threads_handling_requests, 1, "A thread is already handling a request!")
 
     def handle_thread_finishing_handling_request():
       """Assert that I was the only thread handling a request."""
       with self.threads_handling_requests_lock:
         self.threads_handling_requests -= 1
-        self.assertLessEqual(self.threads_handling_requests, 0, "There were multiple threads handling a request when a thread finished")
-        self.assertGreater(self.threads_handling_requests, -1, "Somehow there were 0 threads handling requests when this completed.")
+        threaded_assert_equal(self.threads_handling_requests, 0, "There were multiple threads handling a request when a thread finished")
 
     # Wrap ensure_request_is_exclusive to notify when we acquire and release the lock.
     def mock_ensure_request_is_exclusive(request_lock_under_test):
@@ -171,13 +180,16 @@ class TestPailgunServer(unittest.TestCase):
     threads = [create_request_thread(33330 + i) for i in range(0, self.threads_to_start)]
     for thread in threads:
       thread.start()
+      self.assertTrue(self.thread_errors.empty(), "There were some errors in the threads:\n {}".format(self.thread_errors))
 
     for thread in threads:
       # If this fails because it times out, it's definitely a legitimate error.
       thread.join(10)
+      self.assertTrue(self.thread_errors.empty(), "There were some errors in the threads:\n {}".format(self.thread_errors))
 
     for thread in threads:
       self.assertFalse(thread.is_alive())
+      self.assertTrue(self.thread_errors.empty(), "There were some errors in the threads:\n {}".format(self.thread_errors))
 
 
 class TestPailgunHandler(unittest.TestCase):
