@@ -120,7 +120,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   @classmethod
   def subsystem_dependencies(cls):
     return super(RscCompile, cls).subsystem_dependencies() + (
-      RscNativeImage.scoped(cls),
+      RscNativeImage,
     )
 
   @memoized_property
@@ -190,8 +190,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     )
 
   @memoized_property
-  def _rsc_native_image(self):
-    return RscNativeImage.scoped_instance(self)
+  def _rsc(self):
+    return RscNativeImage.global_instance()
 
   @memoized_property
   def _rsc_classpath(self):
@@ -582,13 +582,14 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
     jvm_options = self._jvm_options
 
-    if self._rsc_native_image.use_native_image:
+    if self._rsc.use_native_image:
+      #jvm_options = []
       if jvm_options:
         raise ValueError(
           "`{}` got non-empty jvm_options when running with a graal native-image, but this is "
           "unsupported. jvm_options received: {}".format(self.options_scope, safe_shlex_join(jvm_options))
         )
-      native_image_path, native_image_snapshot = self._rsc_native_image.native_image(self.context)
+      native_image_path, native_image_snapshot = self._rsc.native_image(self.context)
       additional_snapshots = [native_image_snapshot]
       initial_args = [native_image_path]
     else:

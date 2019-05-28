@@ -164,7 +164,7 @@ python_library(
 )
 
 python_library(
-  name='rsc_native_image',
+  name='rsc',
   sources=['rsc_native_image.py'],
   dependencies=[
     '3rdparty/python:future',

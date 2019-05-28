@@ -10,7 +10,7 @@ from pants.util.memo import memoized_method
 
 
 class RscNativeImage(NativeTool):
-  options_scope = 'rsc-native-image'
+  options_scope = 'rsc'
 
   default_version = _ZINC_COMPILER_VERSION
   name = 'rsc-pants-native-image'
