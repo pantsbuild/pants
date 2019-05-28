@@ -9,7 +9,7 @@ from pants.binaries.binary_tool import NativeTool
 from pants.util.memo import memoized_method
 
 
-class RscNativeImage(NativeTool):
+class Rsc(NativeTool):
   options_scope = 'rsc'
 
   default_version = _ZINC_COMPILER_VERSION
@@ -17,7 +17,7 @@ class RscNativeImage(NativeTool):
 
   @classmethod
   def register_options(cls, register):
-    super(RscNativeImage, cls).register_options(register)
+    super(Rsc, cls).register_options(register)
 
     register('--native-image', fingerprint=True, type=bool,
              help='Use a pre-compiled native-image for rsc. Requires running in hermetic mode')

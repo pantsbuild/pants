@@ -165,7 +165,7 @@ python_library(
 
 python_library(
   name='rsc',
-  sources=['rsc_native_image.py'],
+  sources=['rsc.py'],
   dependencies=[
     '3rdparty/python:future',
     ':jvm_tool_mixin',
