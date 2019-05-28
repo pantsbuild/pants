@@ -90,6 +90,44 @@ class PailgunHandler(PailgunHandlerBase):
     NailgunProtocol.send_exit_with_code(self.request, failure_code)
 
 
+class PailgunHandleRequestLock(object):
+  """Convenience lock to implement Lock.acquire(timeout), which is not available in Python 2."""
+  # TODO remove and replace for the py3 Lock() when we don't have to support py2 anymore.
+
+  def __init__(self):
+    self.cond = threading.Condition()
+    self.available = True
+
+  def acquire(self, timeout=0.0):
+    """
+    Try to acquire the lock, blocking until the timeout is reached. Will return immediately if the lock is acquired.
+
+    :return True if the lock was aquired, False if the timeout was reached.
+    """
+    self.cond.acquire()
+    if self.available:
+      self.available = False
+      self.cond.release()
+      return True
+    else:
+      self.cond.wait(timeout=timeout)
+      # We have the lock!
+      if not self.available:
+        self.cond.release()
+        return False
+      else:
+        self.available = False
+        self.cond.release()
+        return True
+
+  def release(self):
+    """Release the lock."""
+    self.cond.acquire()
+    self.available = True
+    self.cond.notify()
+    self.cond.release()
+
+
 class PailgunServer(ThreadingMixIn, TCPServer):
   """A pants nailgun server.
 
