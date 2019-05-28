@@ -173,7 +173,8 @@ class TestPailgunServer(unittest.TestCase):
       thread.start()
 
     for thread in threads:
-      thread.join()
+      # If this fails because it times out, it's definitely a legitimate error.
+      thread.join(10)
 
     for thread in threads:
       self.assertFalse(thread.is_alive())
