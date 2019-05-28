@@ -678,7 +678,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
   def _runtool(self, args, distribution,
                tgt=None, input_files=tuple(), input_digest=None, output_dir=None):
-    main = 'rsc.cli.Main',
+    main = 'rsc.cli.Main'
     tool_name = 'rsc'
     with self.context.new_workunit(tool_name) as wu:
       return self.execution_strategy_enum.resolve_for_enum_variant({
