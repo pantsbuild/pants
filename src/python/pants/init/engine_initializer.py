@@ -200,10 +200,7 @@ class LegacyGraphSession(datatype(['scheduler_session', 'build_file_aliases', 'g
       use_colors=options_bootstrapper.bootstrap_options.for_global_scope().colors
     )
     for goal in goals:
-      try:
-        goal_product = self.goal_map[goal]
-      except KeyError:
-        continue
+      goal_product = self.goal_map[goal]
       params = Params(subject, options_bootstrapper, console)
       logger.debug('requesting {} to satisfy execution of `{}` goal'.format(goal_product, goal))
       try:
