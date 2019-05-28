@@ -22,6 +22,10 @@ PATCH_OPTS = dict(autospec=True, spec_set=True)
 class TestPailgunServer(unittest.TestCase):
   def setUp(self):
     self.mock_handler_inst = mock.Mock()
+     # Add a fake environment for this to not timeout.
+    self.fake_environment = {"PANTSD_REQUEST_TIMEOUT_LIMIT": "-1"}
+    self.mock_handler_inst.parsed_request.return_value = (None, None, [], self.fake_environment)
+
     self.mock_runner_factory = mock.Mock(side_effect=Exception('this should never be called'))
     self.mock_handler_class = mock.Mock(return_value=self.mock_handler_inst)
     self.lock = threading.RLock()
@@ -43,7 +47,7 @@ class TestPailgunServer(unittest.TestCase):
         runner_factory=self.mock_runner_factory,
         handler_class=self.mock_handler_class,
         lifecycle_lock=lock,
-        request_complete_callback=after_request_callback
+        request_complete_callback=after_request_callback,
       )
 
   @mock.patch.object(TCPServer, 'server_bind', **PATCH_OPTS)
@@ -77,6 +81,102 @@ class TestPailgunServer(unittest.TestCase):
     self.assertIs(self.mock_handler_inst.handle_request.called, True)
     self.assertIs(self.mock_handler_inst.handle_error.called, True)
     mock_shutdown_request.assert_called_once_with(self.server, mock_request)
+
+  def test_ensure_request_is_exclusive(self):
+    """Launch many requests, assert that every one is trying to enter the critical section, and assert that only one is doing so at a time."""
+    self.threads_to_start = 10
+
+    self.threads_running_cond = threading.Condition()
+    self.threads_running = 0
+    def handle_thread_tried_to_handle_request():
+      """Mark a thread as started, and block until every thread has been marked as starting."""
+      self.threads_running_cond.acquire()
+      self.threads_running += 1
+      if self.threads_running == self.threads_to_start:
+        self.threads_running_cond.notify_all()
+      else:
+        while not self.threads_running == self.threads_to_start:
+          self.threads_running_cond.wait()
+
+      self.assertEqual(self.threads_running, self.threads_to_start, "This thread is unblocked before all the threads had started.")
+      self.threads_running_cond.release()
+
+    def handle_thread_finished():
+      """Mark a thread as finished, and block until there are no more threads running."""
+      self.threads_running_cond.acquire()
+      self.threads_running -= 1
+      print("Handle_thread_finished, threads_running are {}".format(self.threads_running))
+      if self.threads_running == 0:
+        self.threads_running_cond.notify_all()
+      else:
+        while not self.threads_running == 0:
+          self.threads_running_cond.wait()
+
+      self.assertEquals(self.threads_running, 0, "handle_thread_finished exited when there still were threads running.")
+      self.threads_running_cond.release()
+
+    self.threads_handling_requests = 0
+    self.threads_handling_requests_lock = threading.Lock()
+
+    def handle_thread_starts_handling_request():
+      with self.threads_handling_requests_lock:
+        self.threads_handling_requests += 1
+        self.assertEquals(self.threads_handling_requests, 1, "A thread is already handling a request!")
+
+    def check_only_one_thread_is_handling_a_request():
+      """Assert that there's only ever one thread inside the lock."""
+      with self.threads_handling_requests_lock:
+        self.assertEquals(self.threads_handling_requests, 1, "A thread is already handling a request!")
+
+    def handle_thread_finishing_handling_request():
+      """Assert that I was the only thread handling a request."""
+      with self.threads_handling_requests_lock:
+        self.threads_handling_requests -= 1
+        self.assertLessEqual(self.threads_handling_requests, 0, "There were multiple threads handling a request when a thread finished")
+        self.assertGreater(self.threads_handling_requests, -1, "Somehow there were 0 threads handling requests when this completed.")
+
+    # Wrap ensure_request_is_exclusive to notify when we acquire and release the lock.
+    def mock_ensure_request_is_exclusive(request_lock_under_test):
+      """Wrap the lock under test. Every thread that calls this function has reached the critical section."""
+      @contextmanager
+      def wrapper(environment, request):
+        # Assert that all threads are trying to handle a request.
+        handle_thread_tried_to_handle_request()
+        with request_lock_under_test(environment, request):
+          try:
+            # Assert that only one is allowed to handle a request.
+            print("Thread has entered the request handling code.")
+            handle_thread_starts_handling_request()
+            check_only_one_thread_is_handling_a_request()
+            yield
+            check_only_one_thread_is_handling_a_request()
+            print("Thread has exited the request handling code.")
+          finally:
+            # Account for a thread finishing a request.
+            handle_thread_finishing_handling_request()
+        # Notify that a thread is shutting down.
+        handle_thread_finished()
+        # At this point, we have asserted that all threads are finished.
+      return wrapper
+
+    self.server.ensure_request_is_exclusive = mock_ensure_request_is_exclusive(self.server.ensure_request_is_exclusive)
+
+    # Create as many mock threads as needed. Lauch all of them, and wait for all of them to finish.
+    mock_request = mock.Mock()
+    def create_request_thread(port):
+      return threading.Thread(target = self.server.process_request_thread,
+                              args = (mock_request, ('1.2.3.4', port)),
+                              name="MockThread-{}".format(port))
+
+    threads = [create_request_thread(33330 + i) for i in range(0, self.threads_to_start)]
+    for thread in threads:
+      thread.start()
+
+    for thread in threads:
+      thread.join()
+
+    for thread in threads:
+      self.assertFalse(thread.is_alive())
 
 
 class TestPailgunHandler(unittest.TestCase):
