@@ -8,12 +8,14 @@ import logging
 import socket
 import threading
 import traceback
+from contextlib import contextmanager
 
 from six.moves.socketserver import BaseRequestHandler, BaseServer, TCPServer, ThreadingMixIn
 
 from pants.engine.native import Native
 from pants.java.nailgun_protocol import NailgunProtocol
 from pants.util.contextutil import maybe_profiled
+from pants.util.memo import memoized
 from pants.util.socket import RecvBufferedSocket, safe_select
 
 
@@ -50,6 +52,10 @@ class PailgunHandlerBase(BaseRequestHandler):
   def handle_error(self, exc):
     """Main error handler entrypoint for subclasses."""
 
+  @memoized
+  def parsed_request(self):
+    return NailgunProtocol.parse_request(self.request)
+
 
 class PailgunHandler(PailgunHandlerBase):
   """A nailgun protocol handler for use with forking, SocketServer-based servers."""
@@ -61,7 +67,7 @@ class PailgunHandler(PailgunHandlerBase):
   def handle(self):
     """Request handler for a single Pailgun request."""
     # Parse the Nailgun request portion.
-    _, _, arguments, environment = NailgunProtocol.parse_request(self.request)
+    _, _, arguments, environment = self.parsed_request()
 
     # N.B. the first and second nailgun request arguments (working_dir and command) are currently
     # ignored in favor of a get_buildroot() call within LocalPantsRunner.run() and an assumption
@@ -88,6 +94,10 @@ class PailgunHandler(PailgunHandlerBase):
       NailgunProtocol.send_stderr(self.request, traceback.format_exc())
     failure_code = 1
     NailgunProtocol.send_exit_with_code(self.request, failure_code)
+
+
+class ExclusiveRequestTimeout(Exception):
+  """Represents a timeout while waiting for another request to complete."""
 
 
 class PailgunHandleRequestLock(object):
@@ -234,7 +244,7 @@ class PailgunServer(ThreadingMixIn, TCPServer):
     """
     # TODO add `did_poll` to pantsd metrics
 
-    timeout = 10.0 # TODO get from the environment!
+    timeout = float(environment['PANTSD_REQUEST_TIMEOUT_LIMIT'])
 
     @contextmanager
     def yield_and_release(time_waited):
@@ -271,11 +281,13 @@ class PailgunServer(ThreadingMixIn, TCPServer):
   def process_request_thread(self, request, client_address):
     """Override of ThreadingMixIn.process_request_thread() that delegates to the request handler."""
     # Instantiate the request handler.
-    Native().override_thread_logging_destination_to_just_stderr()
+    Native().override_thread_logging_destination_to_just_pantsd()
     handler = self.RequestHandlerClass(request, client_address, self)
 
+    _, _, _, environment = handler.parsed_request()
+
     try:
-      with self.ensure_request_is_exclusive(None, request):
+      with self.ensure_request_is_exclusive(environment, request):
         # Attempt to handle a request with the handler.
         handler.handle_request()
         self.request_complete_callback()

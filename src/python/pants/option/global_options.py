@@ -273,6 +273,16 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
       help='Create a new pantsd server, and use it, and shut it down immediately after. '
            'If pantsd is already running, it will shut it down and spawn a new instance (Beta)')
 
+    # NB: We really don't want this option to invalidate the daemon, because different clients might have
+    # different needs. For instance, an IDE might have a very long timeout because it only wants to refresh
+    # a project in the background, while a user might want a shorter timeout for interactivity.
+    register('--pantsd-timeout-when-multiple-invocations', advanced=True, type=float, default=60.0, daemon=False,
+             help='The maximum amount of time to wait for the invocation to start until '
+                  'raising a timeout exception. '
+                  'Because pantsd currently does not support parallel runs, '
+                  'any prior running Pants command must be finished for the current one to start. '
+                  'To never timeout, use the value -1.')
+
     # These facilitate configuring the native engine.
     register('--native-engine-visualize-to', advanced=True, default=None, type=dir_option, daemon=False,
              help='A directory to write execution and rule graphs to as `dot` files. The contents '
