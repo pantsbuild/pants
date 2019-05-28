@@ -177,7 +177,7 @@ class TestPailgunServer(unittest.TestCase):
                               args = (mock_request, ('1.2.3.4', port)),
                               name="MockThread-{}".format(port))
 
-    threads = [create_request_thread(33330 + i) for i in range(0, self.threads_to_start)]
+    threads = [create_request_thread(0) for _ in range(0, self.threads_to_start)]
     for thread in threads:
       thread.start()
       self.assertTrue(self.thread_errors.empty(), "There were some errors in the threads:\n {}".format(self.thread_errors))
