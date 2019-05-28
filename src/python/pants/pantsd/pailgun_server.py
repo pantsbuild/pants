@@ -62,7 +62,11 @@ class PailgunHandler(PailgunHandlerBase):
 
   def _run_pants(self, sock, arguments, environment):
     """Execute a given run with a pants runner."""
+    # For the pants run, we want to log to stderr.
+    # TODO Might be worth to make contextmanagers for this?
+    Native().override_thread_logging_destination_to_just_stderr()
     self.server.runner_factory(sock, arguments, environment).run()
+    Native().override_thread_logging_destination_to_just_pantsd()
 
   def handle(self):
     """Request handler for a single Pailgun request."""
