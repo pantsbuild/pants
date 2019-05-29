@@ -13,6 +13,7 @@ from future.utils import PY3, text_type
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext  # noqa
+from pants.backend.jvm.subsystems.rsc import Rsc
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
@@ -33,6 +34,7 @@ from pants.util.contextutil import Timer
 from pants.util.dirutil import fast_relpath, fast_relpath_optional, safe_mkdir
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.objects import datatype, enum
+from pants.util.strutil import safe_shlex_join
 
 
 #
@@ -115,6 +117,12 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   _name = 'mixed' # noqa
   compiler_name = 'rsc'
 
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(RscCompile, cls).subsystem_dependencies() + (
+      Rsc,
+    )
+
   @memoized_property
   def mirrored_target_option_actions(self):
     return {
@@ -181,6 +189,14 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       ]
     )
 
+  @memoized_property
+  def _rsc(self):
+    return Rsc.global_instance()
+
+  @memoized_property
+  def _rsc_classpath(self):
+    return self.tool_classpath('rsc')
+
   # TODO: allow @memoized_method to convert lists into tuples so they can be hashed!
   @memoized_property
   def _nailgunnable_combined_classpath(self):
@@ -190,7 +206,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     #7092). We still invoke their classpaths separately when not using nailgun, however.
     """
     cp = []
-    cp.extend(self.tool_classpath('rsc'))
+    cp.extend(self._rsc_classpath)
     # Add zinc's classpath so that it can be invoked from the same nailgun instance.
     cp.extend(super(RscCompile, self).get_zinc_compiler_classpath())
     return cp
@@ -384,8 +400,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
                  ] + target_sources
 
           self._runtool(
-            'rsc.cli.Main',
-            'rsc',
             args,
             distribution,
             tgt=tgt,
@@ -563,18 +577,34 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       ))
 
   def _runtool_hermetic(self, main, tool_name, args, distribution, tgt=None, input_files=tuple(), input_digest=None, output_dir=None):
-    tool_classpath_abs = self.tool_classpath(tool_name)
+    tool_classpath_abs = self._rsc_classpath
     tool_classpath = fast_relpath_collection(tool_classpath_abs)
 
-    # TODO(#6071): Our ExecuteProcessRequest expects a specific string type for arguments,
-    # which py2 doesn't default to. This can be removed when we drop python 2.
-    str_jvm_options = [text_type(opt) for opt in self.get_options().jvm_options]
-    cmd = [
-            distribution.java,
-          ] + str_jvm_options + [
-            '-cp', os.pathsep.join(tool_classpath),
-            main,
-          ] + args
+    jvm_options = self._jvm_options
+
+    if self._rsc.use_native_image:
+      #jvm_options = []
+      if jvm_options:
+        raise ValueError(
+          "`{}` got non-empty jvm_options when running with a graal native-image, but this is "
+          "unsupported. jvm_options received: {}".format(self.options_scope, safe_shlex_join(jvm_options))
+        )
+      native_image_path, native_image_snapshot = self._rsc.native_image(self.context)
+      additional_snapshots = [native_image_snapshot]
+      initial_args = [native_image_path]
+    else:
+      # TODO(#6071): Our ExecuteProcessRequest expects a specific string type for arguments,
+      # which py2 doesn't default to. This can be removed when we drop python 2.
+      str_jvm_options = [text_type(opt) for opt in self.get_options().jvm_options]
+      additional_snapshots = []
+      initial_args = [
+        distribution.java,
+      ] + str_jvm_options + [
+        '-cp', os.pathsep.join(tool_classpath),
+        main,
+      ]
+
+    cmd = initial_args + args
 
     pathglobs = list(tool_classpath)
     pathglobs.extend(f if os.path.isfile(f) else '{}/**'.format(f) for f in input_files)
@@ -588,7 +618,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
     epr_input_files = self.context._scheduler.merge_directories(
       ((path_globs_input_digest,) if path_globs_input_digest else ())
-      + ((input_digest,) if input_digest else ()))
+      + ((input_digest,) if input_digest else ())
+      + tuple(s.directory_digest for s in additional_snapshots))
 
     epr = ExecuteProcessRequest(
       argv=tuple(cmd),
@@ -645,15 +676,17 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       raise Exception('couldnt find work unit for underlying execution')
     return runjava_workunit
 
-  def _runtool(self, main, tool_name, args, distribution,
-    tgt=None, input_files=tuple(), input_digest=None, output_dir=None):
+  def _runtool(self, args, distribution,
+               tgt=None, input_files=tuple(), input_digest=None, output_dir=None):
+    main = 'rsc.cli.Main'
+    tool_name = 'rsc'
     with self.context.new_workunit(tool_name) as wu:
       return self.execution_strategy_enum.resolve_for_enum_variant({
         self.HERMETIC: lambda: self._runtool_hermetic(
           main, tool_name, args, distribution,
           tgt=tgt, input_files=input_files, input_digest=input_digest, output_dir=output_dir),
         self.SUBPROCESS: lambda: self._runtool_nonhermetic(
-          wu, self.tool_classpath(tool_name), main, tool_name, args, distribution),
+          wu, self._rsc_classpath, main, tool_name, args, distribution),
         self.NAILGUN: lambda: self._runtool_nonhermetic(
           wu, self._nailgunnable_combined_classpath, main, tool_name, args, distribution),
       })()
