@@ -62,6 +62,8 @@ class Reporting(Subsystem):
                    'or not set when running a Pants command.')
     register('--zipkin-sample-rate', advanced=True, default=100.0,
               help='Rate at which to sample Zipkin traces. Value 0.0 - 100.0.')
+    register('--zipkin-trace-v2', advanced=True, type=bool, default=False,
+              help='If enabled, the zipkin spans are tracked for v2 engine execution progress.')
 
   def initialize(self, run_tracker, all_options, start_time=None):
     """Initialize with the given RunTracker.

@@ -16,6 +16,7 @@ use crate::core::{Failure, TypeId};
 use crate::handles::maybe_drop_handles;
 use crate::nodes::{NodeKey, WrappedNode};
 use crate::tasks::{Rule, Tasks};
+use crate::scheduler::Session;
 use crate::types::Types;
 use boxfuture::{BoxFuture, Boxable};
 use core::clone::Clone;
@@ -274,13 +275,15 @@ impl Core {
 pub struct Context {
   pub entry_id: EntryId,
   pub core: Arc<Core>,
+  pub session: Session,
 }
 
 impl Context {
-  pub fn new(entry_id: EntryId, core: Arc<Core>) -> Context {
+  pub fn new(entry_id: EntryId, core: Arc<Core>, session: Session) -> Context {
     Context {
       entry_id: entry_id,
       core: core,
+      session: session,
     }
   }
 
@@ -314,6 +317,7 @@ impl NodeContext for Context {
     Context {
       entry_id: entry_id,
       core: self.core.clone(),
+      session: self.session.clone(),
     }
   }
 
