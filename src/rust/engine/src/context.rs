@@ -143,7 +143,7 @@ impl Core {
           // Allow for some overhead for bookkeeping threads (if any).
           process_execution_parallelism + 2,
           store.clone(),
-          futures_timer_thread2.clone(), // TODO remove once the store and http are not resettables
+          futures_timer_thread2.clone(), // TODO remove clone once the store and http are not resettables
         )),
         None => Box::new(process_execution::local::CommandRunner::new(
           store.clone(),

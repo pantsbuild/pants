@@ -1483,7 +1483,7 @@ mod tests {
       BTreeMap::new(),
       1,
       store,
-      timer_thread.clone(),
+      timer_thread,
     );
     let result = runtime
       .block_on(cmd_runner.run(echo_roland_request()))
@@ -1854,7 +1854,7 @@ mod tests {
       BTreeMap::new(),
       1,
       store,
-      timer_thread.clone(),
+      timer_thread,
     );
 
     let result = runtime
@@ -1951,7 +1951,7 @@ mod tests {
       BTreeMap::new(),
       1,
       store,
-      timer_thread.clone(),
+      timer_thread,
     )
     .run(cat_roland_request())
     .wait();
@@ -2020,7 +2020,7 @@ mod tests {
       BTreeMap::new(),
       1,
       store,
-      timer_thread.clone(),
+      timer_thread,
     );
 
     let error = runtime
@@ -2629,7 +2629,7 @@ mod tests {
       BTreeMap::new(),
       1,
       store,
-      timer_thread.clone(),
+      timer_thread,
     )
   }
 
