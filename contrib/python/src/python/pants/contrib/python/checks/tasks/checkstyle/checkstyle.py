@@ -111,7 +111,7 @@ class Checkstyle(LintTaskMixin, Task):
 
   def checker_pex(self, interpreter):
     # TODO(John Sirois): Formalize in pants.base?
-    pants_dev_mode = os.environ.get('PANTS_DEV')
+    pants_dev_mode = os.environ.get('PANTS_DEV', '0') != '0'
 
     if pants_dev_mode:
       checker_id = self.checker_target.transitive_invalidation_hash()
