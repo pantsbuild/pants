@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from collections import defaultdict
+
 import json
 import os.path
 import re
@@ -177,7 +179,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       num_of_traces = len(ZipkinHandler.traces)
       self.assertEqual(num_of_traces, 1)
 
-      trace = ZipkinHandler.traces[-1]
+      trace = next(iter(ZipkinHandler.traces.values()))
       main_span = self.find_spans_by_name(trace, 'main')
       self.assertEqual(len(main_span), 1)
 
@@ -206,7 +208,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       num_of_traces = len(ZipkinHandler.traces)
       self.assertEqual(num_of_traces, 1)
 
-      trace = ZipkinHandler.traces[-1]
+      trace = next(iter(ZipkinHandler.traces.values()))
       main_span = self.find_spans_by_name(trace, 'main')
       self.assertEqual(len(main_span), 1)
 
@@ -254,12 +256,44 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       num_of_traces = len(ZipkinHandler.traces)
       self.assertEqual(num_of_traces, 1)
 
-      trace = ZipkinHandler.traces[-1]
+      trace = next(iter(ZipkinHandler.traces.values()))
       v2_span_name_part = "Scandir"
       self.assertTrue(any(v2_span_name_part in span['name'] for span in trace),
         "There is no span that contains '{}' in it's name. The trace:{}".format(
         v2_span_name_part, trace
         ))
+
+  def test_zipkin_reporter_multi_threads(self):
+    ZipkinHandler = zipkin_handler()
+    with http_server(ZipkinHandler) as port:
+      endpoint = "http://localhost:{}".format(port)
+      command = [
+        '--reporting-zipkin-endpoint={}'.format(endpoint),
+        'compile',
+        'examples/src/scala/org/pantsbuild/example/several_scala_targets::'
+      ]
+
+      pants_run = self.run_pants(command)
+      self.assert_success(pants_run)
+      num_of_traces = len(ZipkinHandler.traces)
+      self.assertEqual(num_of_traces, 1)
+
+      trace = next(iter(ZipkinHandler.traces.values()))
+      zinc_task_span = self.find_spans_by_name_and_service_name(trace, 'zinc', 'pants task')
+      self.assertEqual(len(zinc_task_span), 1)
+      zinc_task_span_id = zinc_task_span[0]['id']
+
+      compile_workunit_spans = self.find_spans_by_name_and_service_name(
+        trace, 'compile', 'pants workunit'
+      )
+      self.assertEqual(len(compile_workunit_spans), 3)
+      self.assertTrue(all(span['parentId'] == zinc_task_span_id for span in compile_workunit_spans))
+
+  @staticmethod
+  def find_spans_by_name_and_service_name(trace, name, service_name):
+    return [span for span in trace
+      if span['name'] == name and
+         span['annotations'][0]['endpoint']['serviceName'] == service_name]
 
   @staticmethod
   def find_spans_by_name(trace, name):
@@ -272,13 +306,15 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
 def zipkin_handler():
   class ZipkinHandler(BaseHTTPRequestHandler):
-    traces = []
+    traces = defaultdict(list)
 
     def do_POST(self):
       content_length = self.headers.get('content-length') if PY3 else self.headers.getheader('content-length')
       thrift_trace = self.rfile.read(int(content_length))
       json_trace = convert_spans(thrift_trace, Encoding.V1_JSON, Encoding.V1_THRIFT)
       trace = json.loads(json_trace)
-      self.__class__.traces.append(trace)
+      for span in trace:
+        trace_id = span["traceId"]
+        self.__class__.traces[trace_id].append(span)
       self.send_response(200)
   return ZipkinHandler

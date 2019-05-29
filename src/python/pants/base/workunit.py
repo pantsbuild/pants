@@ -109,6 +109,8 @@ class WorkUnit(object):
     self.parent = parent
     self.children = []
 
+    self.zipkin_attrs = None
+
     self.name = name
     self.labels = set(labels or ())
     self.cmd = cmd
