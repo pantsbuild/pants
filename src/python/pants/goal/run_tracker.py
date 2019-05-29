@@ -568,7 +568,8 @@ class RunTracker(Subsystem):
     if self._background_worker_pool is None:  # Initialize lazily.
       self._background_worker_pool = WorkerPool(parent_workunit=self.get_background_root_workunit(),
                                                 run_tracker=self,
-                                                num_workers=self._num_background_workers)
+                                                num_workers=self._num_background_workers,
+                                                thread_name_prefix="background")
     return self._background_worker_pool
 
   def shutdown_worker_pool(self):
