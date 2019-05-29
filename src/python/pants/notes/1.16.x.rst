@@ -2,6 +2,30 @@
 ======================
 This document describes releases leading up to the ``1.16.x`` ``stable`` series.
 
+1.16.0rc5 (5/29/2019)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Force sequential runs under pantsd (#7781)
+  `PR #7781 <https://github.com/pantsbuild/pants/pull/7781>`_
+
+* make assorted rsc task fixes (#7742)
+  `PR #7742 <https://github.com/pantsbuild/pants/pull/7742>`_
+
+* Always use the global interpreter for PythonExecutionTaskBase. (#7801)
+  `PR #7801 <https://github.com/pantsbuild/pants/pull/7801>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Rsc native image support (#7809)
+  `PR #7809 <https://github.com/pantsbuild/pants/pull/7809>`_
+
+* Hermetic zinc runs with a native-image (#7796)
+  `PR #7796 <https://github.com/pantsbuild/pants/pull/7796>`_
+
 1.16.0rc4 (5/22/2019)
 ---------------------
 
