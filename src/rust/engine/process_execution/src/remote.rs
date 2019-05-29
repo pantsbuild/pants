@@ -45,7 +45,7 @@ pub struct CommandRunner {
   execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
   operations_client: Arc<bazel_protos::operations_grpc::OperationsClient>,
   store: Store,
-  futures_timer_thread: resettable::Resettable<futures_timer::HelperThread>,
+  futures_timer_thread: Arc<futures_timer::HelperThread>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -248,7 +248,7 @@ impl super::CommandRunner for CommandRunner {
                         // maybe the delay here should be the min of remaining time and the backoff period
                         Delay::new_handle(
                           Instant::now() + Duration::from_millis(backoff_period),
-                          futures_timer_thread.with(futures_timer::HelperThread::handle),
+                          futures_timer_thread.handle(),
                         )
                         .map_err(move |e| {
                           format!(
@@ -312,7 +312,7 @@ impl CommandRunner {
     platform_properties: BTreeMap<String, String>,
     thread_count: usize,
     store: Store,
-    futures_timer_thread: resettable::Resettable<futures_timer::HelperThread>,
+    futures_timer_thread: Arc<futures_timer::HelperThread>,
   ) -> CommandRunner {
     let env = Arc::new(grpcio::Environment::new(thread_count));
     let channel = {
@@ -926,6 +926,7 @@ mod tests {
   use std::iter::{self, FromIterator};
   use std::ops::Sub;
   use std::path::PathBuf;
+  use std::sync::Arc;
   use std::time::Duration;
 
   #[derive(Debug, PartialEq)]
@@ -1469,7 +1470,7 @@ mod tests {
       Duration::from_secs(1),
       fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      timer_thread.with(|t| t.handle()),
+      timer_thread.handle(),
     )
     .expect("Failed to make store");
 
@@ -1482,7 +1483,7 @@ mod tests {
       BTreeMap::new(),
       1,
       store,
-      timer_thread,
+      timer_thread.clone(),
     );
     let result = runtime
       .block_on(cmd_runner.run(echo_roland_request()))
@@ -1835,7 +1836,7 @@ mod tests {
       Duration::from_secs(1),
       fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      timer_thread.with(|t| t.handle()),
+      timer_thread.handle(),
     )
     .expect("Failed to make store");
     runtime
@@ -1853,7 +1854,7 @@ mod tests {
       BTreeMap::new(),
       1,
       store,
-      timer_thread,
+      timer_thread.clone(),
     );
 
     let result = runtime
@@ -1933,7 +1934,7 @@ mod tests {
       Duration::from_secs(1),
       fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      timer_thread.with(|t| t.handle()),
+      timer_thread.handle(),
     )
     .expect("Failed to make store");
     store
@@ -1950,7 +1951,7 @@ mod tests {
       BTreeMap::new(),
       1,
       store,
-      timer_thread,
+      timer_thread.clone(),
     )
     .run(cat_roland_request())
     .wait();
@@ -2005,7 +2006,7 @@ mod tests {
       Duration::from_secs(1),
       fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      timer_thread.with(|t| t.handle()),
+      timer_thread.handle(),
     )
     .expect("Failed to make store");
 
@@ -2019,7 +2020,7 @@ mod tests {
       BTreeMap::new(),
       1,
       store,
-      timer_thread,
+      timer_thread.clone(),
     );
 
     let error = runtime
@@ -2615,7 +2616,7 @@ mod tests {
       Duration::from_secs(1),
       fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      timer_thread.with(|t| t.handle()),
+      timer_thread.handle(),
     )
     .expect("Failed to make store");
 
@@ -2628,12 +2629,12 @@ mod tests {
       BTreeMap::new(),
       1,
       store,
-      timer_thread,
+      timer_thread.clone(),
     )
   }
 
-  fn timer_thread() -> resettable::Resettable<futures_timer::HelperThread> {
-    resettable::Resettable::new(|| futures_timer::HelperThread::new().unwrap())
+  fn timer_thread() -> Arc<futures_timer::HelperThread> {
+    Arc::new(futures_timer::HelperThread::new().unwrap())
   }
 
   fn extract_execute_response(
