@@ -118,7 +118,8 @@ class ThriftLinter(LintTaskMixin, NailgunTask):
       with self.context.new_workunit('parallel-thrift-linter') as workunit:
         worker_pool = WorkerPool(workunit.parent,
                                  self.context.run_tracker,
-                                 self.get_options().worker_count)
+                                 self.get_options().worker_count,
+                                 workunit.name)
 
         scrooge_linter_classpath = self.tool_classpath('scrooge-linter')
         results = []

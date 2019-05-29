@@ -36,12 +36,20 @@ class WorkerPool(object):
   may not be effective. Use this class primarily for IO-bound work.
   """
 
-  def __init__(self, parent_workunit, run_tracker, num_workers):
+  def __init__(self, parent_workunit, run_tracker, num_workers, thread_name_prefix):
     self._run_tracker = run_tracker
+    self.thread_lock = threading.Lock()
+    self.thread_counter = 0
+    def intitialize():
+      with self.thread_lock:
+        threading.current_thread().name = "{}-{}".format(thread_name_prefix, self.thread_counter)
+        self.thread_counter += 1
+      self._run_tracker.register_thread(parent_workunit)
+
     # All workers accrue work to the same root.
     self._pool = ThreadPool(processes=num_workers,
-                            initializer=self._run_tracker.register_thread,
-                            initargs=(parent_workunit, ))
+                            initializer=intitialize,
+                            )
     # We mustn't shutdown when there are pending workchains, as they may need to submit work
     # in the future, and the pool doesn't know about this yet.
     self._pending_workchains = 0
