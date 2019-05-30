@@ -131,8 +131,9 @@ whether a release is needed from a stable branch.
 3. Create and land a review for the notes changes in master.
 4. Cherry pick the merged notes changes from master to the release branch.
 5. In your release branch: edit and commit the version number in `src/python/pants/VERSION`.
-6. Execute the release as described later on this page.
-7. Remove the [needs-cherrypick][needs-cherrypick] label from the changes cherry-picked into the new release.
+6. Manually publish the release notes pages by checking out master and running `build-support/bin/publish_docs.sh -p`.
+7. Execute the release as described later on this page.
+8. Remove the [needs-cherrypick][needs-cherrypick] label from the changes cherry-picked into the new release.
 
 2. (Optional) Dry Run
 ---------------------
