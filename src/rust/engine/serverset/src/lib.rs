@@ -404,7 +404,9 @@ mod tests {
 
     runtime.block_on(s.next()).unwrap();
 
-    assert!(start.elapsed() > Duration::from_millis(10))
+    // The serverset is configured to block for 10ms; make sure we waited for at least 9ms for
+    // stability.
+    assert!(start.elapsed() > Duration::from_millis(9))
   }
 
   fn expect_both(
