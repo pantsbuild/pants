@@ -1470,7 +1470,6 @@ mod tests {
       Duration::from_secs(1),
       fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      timer_thread.handle(),
     )
     .expect("Failed to make store");
 
@@ -1836,7 +1835,6 @@ mod tests {
       Duration::from_secs(1),
       fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      timer_thread.handle(),
     )
     .expect("Failed to make store");
     runtime
@@ -1934,7 +1932,6 @@ mod tests {
       Duration::from_secs(1),
       fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      timer_thread.handle(),
     )
     .expect("Failed to make store");
     store
@@ -2006,7 +2003,6 @@ mod tests {
       Duration::from_secs(1),
       fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      timer_thread.handle(),
     )
     .expect("Failed to make store");
 
@@ -2616,7 +2612,6 @@ mod tests {
       Duration::from_secs(1),
       fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      timer_thread.handle(),
     )
     .expect("Failed to make store");
 

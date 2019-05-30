@@ -126,7 +126,6 @@ impl Core {
               fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10))
                 .unwrap(),
               remote_store_rpc_retries,
-              futures_timer_thread2.handle(),
             )
           }
         })

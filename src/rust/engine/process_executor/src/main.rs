@@ -255,7 +255,6 @@ fn main() {
         // TODO: Take a command line arg.
         fs::BackoffConfig::new(Duration::from_secs(1), 1.2, Duration::from_secs(20)).unwrap(),
         3,
-        timer_thread.handle(),
       )
     }
     (None, None) => fs::Store::local_only(local_store_path),

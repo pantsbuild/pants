@@ -30,7 +30,6 @@ use clap;
 use env_logger;
 use fs;
 use futures;
-use futures_timer;
 
 use rand;
 
@@ -313,7 +312,6 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
               std::time::Duration::from_secs(20),
             )?,
             value_t!(top_match.value_of("rpc-attempts"), usize).expect("Bad rpc-attempts flag"),
-            futures_timer::TimerHandle::default(),
           ),
           true,
         )

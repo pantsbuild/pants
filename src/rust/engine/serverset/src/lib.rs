@@ -27,15 +27,14 @@
 #![allow(clippy::mutex_atomic)]
 
 use futures;
-use futures_timer;
 
 use boxfuture::{BoxFuture, Boxable};
 use futures::Future;
-use futures_timer::Delay;
 use parking_lot::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tokio_timer::Delay;
 
 mod retry;
 pub use crate::retry::Retry;
@@ -79,8 +78,6 @@ struct Inner<T> {
   pub(crate) next: AtomicUsize,
 
   backoff_config: BackoffConfig,
-
-  timer_handle: futures_timer::TimerHandle,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -182,11 +179,7 @@ impl BackoffConfig {
 }
 
 impl<T: Clone + Send + Sync + 'static> Serverset<T> {
-  pub fn new(
-    servers: Vec<T>,
-    backoff_config: BackoffConfig,
-    timer_handle: futures_timer::TimerHandle,
-  ) -> Result<Self, String> {
+  pub fn new(servers: Vec<T>, backoff_config: BackoffConfig) -> Result<Self, String> {
     if servers.is_empty() {
       return Err("Must supply some servers".to_owned());
     }
@@ -202,7 +195,6 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
           .collect(),
         next: AtomicUsize::new(0),
         backoff_config,
-        timer_handle,
       }),
     })
   }
@@ -258,7 +250,7 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
     let (index, instant) = earliest_future.unwrap();
     let server = self.inner.servers[index].server.clone();
     // Note that Delay::new_at(time in the past) gets immediately scheduled.
-    Delay::new_handle(instant, self.inner.timer_handle.clone())
+    Delay::new(instant)
       .map_err(|err| format!("Error delaying for serverset: {}", err))
       .map(move |()| (server, HealthReportToken { index }))
       .to_boxed()
@@ -298,7 +290,6 @@ impl<T: std::fmt::Debug> std::fmt::Debug for Serverset<T> {
 mod tests {
   use super::{BackoffConfig, Health, Serverset};
   use futures::{self, Future};
-  use futures_timer::TimerHandle;
   use parking_lot::Mutex;
   use std;
   use std::collections::HashSet;
@@ -313,35 +304,26 @@ mod tests {
   #[test]
   fn no_servers_is_error() {
     let servers: Vec<String> = vec![];
-    Serverset::new(servers, backoff_config(), TimerHandle::default())
-      .expect_err("Want error constructing with no servers");
+    Serverset::new(servers, backoff_config()).expect_err("Want error constructing with no servers");
   }
 
   #[test]
   fn round_robins() {
-    let s = Serverset::new(
-      vec!["good", "bad"],
-      backoff_config(),
-      TimerHandle::default(),
-    )
-    .unwrap();
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let s = Serverset::new(vec!["good", "bad"], backoff_config()).unwrap();
 
-    expect_both(&s, 2);
+    expect_both(&mut rt, &s, 2);
   }
 
   #[test]
   fn handles_overflow_internally() {
-    let s = Serverset::new(
-      vec!["good", "bad"],
-      backoff_config(),
-      TimerHandle::default(),
-    )
-    .unwrap();
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let s = Serverset::new(vec!["good", "bad"], backoff_config()).unwrap();
     s.inner.next.store(std::usize::MAX, Ordering::SeqCst);
 
     // 3 because we may skip some values if the number of servers isn't a factor of
     // std::usize::MAX, so we make sure to go around them all again after overflowing.
-    expect_both(&s, 3)
+    expect_both(&mut rt, &s, 3)
   }
 
   fn unwrap<T: std::fmt::Debug>(wrapped: Arc<Mutex<T>>) -> T {
@@ -352,150 +334,157 @@ mod tests {
 
   #[test]
   fn skips_unhealthy() {
-    let s = Serverset::new(
-      vec!["good", "bad"],
-      backoff_config(),
-      TimerHandle::default(),
-    )
-    .unwrap();
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let s = Serverset::new(vec!["good", "bad"], backoff_config()).unwrap();
 
-    mark_bad_as_bad(&s, Health::Unhealthy);
+    mark_bad_as_bad(&mut rt, &s, Health::Unhealthy);
 
-    expect_only_good(&s, Duration::from_millis(10));
+    expect_only_good(&mut rt, &s, Duration::from_millis(10));
   }
 
   #[test]
   fn reattempts_unhealthy() {
-    let s = Serverset::new(
-      vec!["good", "bad"],
-      backoff_config(),
-      TimerHandle::default(),
-    )
-    .unwrap();
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let s = Serverset::new(vec!["good", "bad"], backoff_config()).unwrap();
 
-    mark_bad_as_bad(&s, Health::Unhealthy);
+    mark_bad_as_bad(&mut rt, &s, Health::Unhealthy);
 
-    expect_only_good(&s, Duration::from_millis(10));
+    expect_only_good(&mut rt, &s, Duration::from_millis(10));
 
-    expect_both(&s, 2);
+    expect_both(&mut rt, &s, 2);
   }
 
   #[test]
   fn backoff_when_unhealthy() {
-    let s = Serverset::new(
-      vec!["good", "bad"],
-      backoff_config(),
-      TimerHandle::default(),
-    )
-    .unwrap();
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let s = Serverset::new(vec!["good", "bad"], backoff_config()).unwrap();
 
-    mark_bad_as_bad(&s, Health::Unhealthy);
+    mark_bad_as_bad(&mut rt, &s, Health::Unhealthy);
 
-    expect_only_good(&s, Duration::from_millis(10));
+    expect_only_good(&mut rt, &s, Duration::from_millis(10));
 
-    mark_bad_as_bad(&s, Health::Unhealthy);
+    mark_bad_as_bad(&mut rt, &s, Health::Unhealthy);
 
-    expect_only_good(&s, Duration::from_millis(20));
+    expect_only_good(&mut rt, &s, Duration::from_millis(20));
 
-    mark_bad_as_bad(&s, Health::Unhealthy);
+    mark_bad_as_bad(&mut rt, &s, Health::Unhealthy);
 
-    expect_only_good(&s, Duration::from_millis(40));
+    expect_only_good(&mut rt, &s, Duration::from_millis(40));
 
-    mark_bad_as_bad(&s, Health::Healthy);
+    mark_bad_as_bad(&mut rt, &s, Health::Healthy);
 
-    expect_only_good(&s, Duration::from_millis(20));
+    expect_only_good(&mut rt, &s, Duration::from_millis(20));
 
-    mark_bad_as_bad(&s, Health::Healthy);
+    mark_bad_as_bad(&mut rt, &s, Health::Healthy);
 
-    expect_only_good(&s, Duration::from_millis(10));
+    expect_only_good(&mut rt, &s, Duration::from_millis(10));
 
-    mark_bad_as_bad(&s, Health::Healthy);
+    mark_bad_as_bad(&mut rt, &s, Health::Healthy);
 
-    expect_both(&s, 2);
+    expect_both(&mut rt, &s, 2);
   }
 
   #[test]
   fn waits_if_all_unhealthy() {
     let backoff_config = backoff_config();
-    let s = Serverset::new(vec!["good", "bad"], backoff_config, TimerHandle::default()).unwrap();
+    let s = Serverset::new(vec!["good", "bad"], backoff_config).unwrap();
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
     for _ in 0..2 {
-      s.next()
-        .map(|(_server, token)| s.report_health(token, Health::Unhealthy))
-        .wait()
+      let s = s.clone();
+      runtime
+        .block_on(
+          s.next()
+            .map(move |(_server, token)| s.report_health(token, Health::Unhealthy)),
+        )
         .unwrap();
     }
 
     let start = std::time::Instant::now();
 
-    s.next().wait().unwrap();
+    runtime.block_on(s.next()).unwrap();
 
     assert!(start.elapsed() > Duration::from_millis(10))
   }
 
-  fn expect_both(s: &Serverset<&'static str>, repetitions: usize) {
+  fn expect_both(
+    runtime: &mut tokio::runtime::Runtime,
+    s: &Serverset<&'static str>,
+    repetitions: usize,
+  ) {
     let visited = Arc::new(Mutex::new(HashSet::new()));
 
-    futures::future::join_all(
-      (0..repetitions)
-        .into_iter()
-        .map(|_| {
-          let saw = visited.clone();
-          let s = s.clone();
-          s.next().map(move |(server, token)| {
-            saw.lock().insert(server);
-            s.report_health(token, Health::Healthy)
+    runtime
+      .block_on(futures::future::join_all(
+        (0..repetitions)
+          .into_iter()
+          .map(|_| {
+            let saw = visited.clone();
+            let s = s.clone();
+            s.next().map(move |(server, token)| {
+              saw.lock().insert(server);
+              s.report_health(token, Health::Healthy)
+            })
           })
-        })
-        .collect::<Vec<_>>(),
-    )
-    .wait()
-    .unwrap();
+          .collect::<Vec<_>>(),
+      ))
+      .unwrap();
 
     let expect: HashSet<_> = vec!["good", "bad"].into_iter().collect();
     assert_eq!(unwrap(visited), expect);
   }
 
-  fn mark_bad_as_bad(s: &Serverset<&'static str>, health: Health) {
-    let mut mark_bad_as_baded_bad = false;
+  fn mark_bad_as_bad(
+    runtime: &mut tokio::runtime::Runtime,
+    s: &Serverset<&'static str>,
+    health: Health,
+  ) {
+    let mark_bad_as_baded_bad = Arc::new(Mutex::new(false));
     for _ in 0..2 {
-      s.next()
-        .map(|(server, token)| {
+      let s = s.clone();
+      let mark_bad_as_baded_bad = mark_bad_as_baded_bad.clone();
+      runtime
+        .block_on(s.next().map(move |(server, token)| {
           if server == "bad" {
-            mark_bad_as_baded_bad = true;
+            *mark_bad_as_baded_bad.lock() = true;
             s.report_health(token, health);
           } else {
             s.report_health(token, Health::Healthy);
           }
-        })
-        .wait()
+        }))
         .unwrap();
     }
-    assert!(mark_bad_as_baded_bad);
+    assert!(*mark_bad_as_baded_bad.lock());
   }
 
-  fn expect_only_good(s: &Serverset<&'static str>, duration: Duration) {
+  fn expect_only_good(
+    runtime: &mut tokio::runtime::Runtime,
+    s: &Serverset<&'static str>,
+    duration: Duration,
+  ) {
     let buffer = Duration::from_millis(1);
 
     let start = std::time::Instant::now();
-    let mut should_break = false;
-    let mut did_get_at_least_one_good = false;
-    while !should_break {
-      s.next()
-        .map(|(server, token)| {
+    let should_break = Arc::new(Mutex::new(false));
+    let did_get_at_least_one_good = Arc::new(Mutex::new(false));
+    while !*should_break.lock() {
+      let s = s.clone();
+      let should_break = should_break.clone();
+      let did_get_at_least_one_good = did_get_at_least_one_good.clone();
+      runtime
+        .block_on(s.next().map(move |(server, token)| {
           if start.elapsed() < duration - buffer {
             assert_eq!("good", server);
-            did_get_at_least_one_good = true;
+            *did_get_at_least_one_good.lock() = true;
           } else {
-            should_break = true;
+            *should_break.lock() = true;
           }
           s.report_health(token, Health::Healthy);
-        })
-        .wait()
+        }))
         .unwrap();
     }
 
-    assert!(did_get_at_least_one_good);
+    assert!(*did_get_at_least_one_good.lock());
 
     std::thread::sleep(buffer * 2);
   }
