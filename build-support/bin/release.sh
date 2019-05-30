@@ -456,7 +456,7 @@ readonly BINARY_BASE_URL=https://binaries.pantsbuild.org
 function list_prebuilt_wheels() {
   # List prebuilt wheels as tab-separated tuples of filename and URL-encoded name.
   wheel_listing="$(mktemp -t pants.wheels.XXXXX)"
-  trap 'rm -f ${wheel_listing}"' RETURN
+  trap 'rm -f "${wheel_listing}"' RETURN
 
   for wheels_path in "${DEPLOY_PANTS_WHEELS_PATH}" "${DEPLOY_3RDPARTY_WHEELS_PATH}"; do
     curl --fail -sSL "${BINARY_BASE_URL}/?prefix=${wheels_path}" > "${wheel_listing}"
