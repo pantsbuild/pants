@@ -420,6 +420,8 @@ public class ConsoleRunnerImpl {
     this.useExperimentalRunner = useExperimentalRunner;
   }
 
+  // by holding on to the tests to run, we can create a runner that is ready to go
+  // without beginning the run (which is useful in the tests for the runner itself)
   private void setTestsToRun(Collection<String> tests) {
     this.testsToRun = tests;
   }
@@ -436,8 +438,7 @@ public class ConsoleRunnerImpl {
 
     JUnitCore core = new JUnitCore();
 
-     // number of hooks: 1 consoleShutdownListener + 1 xmlShutdownListener if writing XML output
-    final CountDownLatch haltAfterUnexpectedShutdown = new CountDownLatch(1 + (xmlReport ? 1 : 0));
+    int numShutdownHooks = 0;
 
     if (testListener != null) {
       core.addListener(testListener);
@@ -451,20 +452,11 @@ public class ConsoleRunnerImpl {
         new StreamCapturingListener(outdir, outputMode, swappableOut, swappableErr);
     core.addListener(streamCapturingListener);
 
+    RunListener xmlListener = null;
     if (xmlReport) {
-      RunListener xmlListener = new AntJunitXmlReportListener(outdir, streamCapturingListener);
+      xmlListener = new AntJunitXmlReportListener(outdir, streamCapturingListener);
       core.addListener(xmlListener);
-
-      // handle writing output when the tests time out and are terminated by pants
-      final ShutdownListener xmlShutdownListener = new ShutdownListener(xmlListener);
-      core.addListener(xmlShutdownListener);
-      Thread xmlShutdownHook = new Thread() {
-        @Override public void run() {
-          xmlShutdownListener.unexpectedShutdown();
-          haltAfterUnexpectedShutdown.countDown();
-        }
-      };
-      addShutdownHook(xmlShutdownHook);
+      numShutdownHooks++; // later we will register a shutdown hook for writing XML output
     }
 
     if (perTestTimer) {
@@ -476,13 +468,31 @@ public class ConsoleRunnerImpl {
     ShutdownListener consoleShutdownListener =
       new ShutdownListener(new ConsoleListener(swappableOut.getOriginal()));
     core.addListener(consoleShutdownListener);
+
     // Wrap test execution with registration of a shutdown hook that will ensure we
     // never exit silently if the VM does.
+    numShutdownHooks++;
+    final CountDownLatch haltAfterUnexpectedShutdown = new CountDownLatch(numShutdownHooks);
     final Thread unexpectedExitHook = createUnexpectedExitHook(
       consoleShutdownListener,
       swappableOut.getOriginal(),
       haltAfterUnexpectedShutdown);
     addShutdownHook(unexpectedExitHook);
+
+    // handle writing XML output when the tests time out and are terminated by pants
+    if (xmlListener != null) {
+      final ShutdownListener xmlShutdownListener = new ShutdownListener(xmlListener);
+      core.addListener(xmlShutdownListener);
+
+      Thread xmlShutdownHook = new Thread() {
+        @Override
+        public void run() {
+          xmlShutdownListener.unexpectedShutdown();
+          haltAfterUnexpectedShutdown.countDown();
+        }
+      };
+      addShutdownHook(xmlShutdownHook);
+    }
 
     int failures = 1;
     try {
@@ -522,20 +532,22 @@ public class ConsoleRunnerImpl {
           out.println(e);
           e.printStackTrace(out);
         }
-        // This error might be a call to `System.exit(0)` in a test, which we definitely do
-        // not want to go unnoticed.
-        out.println("FATAL: VM exiting unexpectedly.");
-        out.flush();
         try {
           // Other shutdown hooks might still need to write test results,
-          // so wait for them (up to 2 seconds) to finish before halting.
+          // so wait for them (up to 15 seconds) to finish before halting.
           haltAfter.countDown();
-          haltAfter.await(2, TimeUnit.SECONDS);
+          long awaiting = haltAfter.getCount();
+          if (awaiting > 0) out.println("Waiting for " + awaiting + "shutdown hooks to complete");
+          haltAfter.await(15, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
           out.println(e);
           e.printStackTrace(out);
         } finally {
           if (callSystemExitOnFinish) {
+            // This error might be a call to `System.exit(0)` in a test, which we definitely do
+            // not want to go unnoticed.
+            out.println("FATAL: VM exiting unexpectedly.");
+            out.flush();
             Runtime.getRuntime().halt(1);
           }
         }
@@ -765,7 +777,7 @@ public class ConsoleRunnerImpl {
       hook.start();
     }
     for(Thread hook: shutdownHooks) {
-      hook.join(1000); // wait for all hooks to complete, up to 1 second
+      hook.join(10000); // wait for all hooks to complete, up to 10 seconds each
     }
   }
 

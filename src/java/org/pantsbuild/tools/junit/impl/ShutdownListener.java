@@ -16,11 +16,11 @@ import org.junit.runner.notification.RunListener;
 public class ShutdownListener extends RunListener {
   private final Result result = new Result();
   private final RunListener resultListener = result.createListener();
+  // holds running tests: Descriptions are added on testStarted and removed on testFinished
   private ConcurrentHashMap.KeySetView<Description, Boolean> currentDescriptions =
     ConcurrentHashMap.newKeySet();
   private RunListener underlying;
-  private static Throwable abnormalExit =
-    new UnknownError("Abnormal VM exit - test crashed. The test run may have timed out.");
+
 
   public ShutdownListener(RunListener underlying) {
     this.underlying = underlying;
@@ -40,7 +40,8 @@ public class ShutdownListener extends RunListener {
   }
 
   private void completeTestWithFailure(Description description) {
-    Failure shutdownFailure = new Failure(description, abnormalExit);
+    Failure shutdownFailure = new Failure(description,
+      new UnknownError("Abnormal VM exit - test crashed. The test run may have timed out."));
 
     try {
       // Mark this test as completed with a failure (finish its lifecycle)

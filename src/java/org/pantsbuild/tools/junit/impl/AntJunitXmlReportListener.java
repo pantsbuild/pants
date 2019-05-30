@@ -453,8 +453,9 @@ class AntJunitXmlReportListener extends RunListener {
     if (suite != null) {
       suite.incrementSkipped();
       // Ignored tests don't have testStarted and testFinished callbacks so call finish here.
-      if (!suite.wasStarted()) suite.tests++;
       suite.finished();
+      // finished() counts only started tests, so count ignored tests here so the totals are correct
+      if (!suite.wasStarted()) suite.tests++;
     }
 
     TestCase testCase = getTestCaseFor(description);
