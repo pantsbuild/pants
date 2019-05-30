@@ -703,3 +703,19 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   @memoized_method
   def _jdk_libs_abs(self, nonhermetic_dist):
     return nonhermetic_dist.find_libs(self._JDK_LIB_NAMES)
+
+  def _on_invalid_compile_dependency(self, dep, compile_target, contexts):
+    """Decide whether to continue searching for invalid targets to use in the execution graph.
+
+    If a necessary dep is a rsc-then-zinc dep and the root is a zinc-only one, continue to recurse
+    because otherwise we'll drop the path between Zinc compile of the zinc-only target and a Zinc
+    compile of a transitive rsc-then-zinc dependency.
+
+    This is only an issue for graphs like J -> S1 -> S2, where J is a zinc-only target,
+    S1/2 are rsc-then-zinc targets and S2 must be on the classpath to compile J successfully.
+    """
+    return contexts[compile_target][0].workflow.resolve_for_enum_variant({
+      'zinc-java': lambda: contexts[dep][0].workflow == self.JvmCompileWorkflowType.rsc_and_zinc,
+      'zinc-only': lambda: contexts[dep][0].workflow == self.JvmCompileWorkflowType.rsc_and_zinc,
+      'rsc-and-zinc': lambda: False
+    })()
