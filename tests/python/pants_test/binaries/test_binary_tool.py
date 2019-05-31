@@ -85,6 +85,7 @@ class BinaryToolBaseTest(TestBase):
       options={
         GLOBAL_SCOPE: {
           'binaries_baseurls': ['https://binaries.example.org'],
+          'pants_bootstrapdir': str(temporary_dir()),
         },
         'another-tool': {
           'version': '0.0.2',
