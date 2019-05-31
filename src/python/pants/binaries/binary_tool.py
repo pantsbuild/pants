@@ -53,7 +53,7 @@ class BinaryToolBase(Subsystem):
 
   def __init__(self, *args, **kwargs):
     super(BinaryToolBase, self).__init__(*args, **kwargs)
-    self._snapshot_lock = threading.RLock()
+    self._snapshot_lock = threading.Lock()
 
   @classmethod
   def subsystem_dependencies(cls):
