@@ -83,6 +83,5 @@ class RscCompileIntegration(BaseCompileIT):
   @_for_all_supported_execution_environments
   def test_java_with_transitive_exported_scala_dep(self, config):
     self.do_command(
-      'compile', 'testprojects/src/scala/org/pantsbuild/testproject/javadepsonscalatransitive:scala',
+      'compile', 'testprojects/src/scala/org/pantsbuild/testproject/javadepsonscalatransitive:java-in-different-package',
       config=config)
-    # TODO: ???/add doubly transitive dep!!!
