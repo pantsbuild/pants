@@ -28,7 +28,7 @@ class TestEngineOptionsParsing(TestBase):
 
   def test_options_parse_scoped(self):
     options_bootstrapper = self._ob(
-        args=['./pants', '-ldebug', '--python-setup-wheel-version=3.13.37', 'binary', 'src/python::'],
+        args=['./pants', '-ldebug', 'binary', 'src/python::'],
         env=dict(PANTS_ENABLE_PANTSD='True', PANTS_BINARIES_BASEURLS='["https://bins.com"]'),
       )
 
@@ -43,7 +43,7 @@ class TestEngineOptionsParsing(TestBase):
     self.assertEqual(global_options.options.enable_pantsd, True)
     self.assertEqual(global_options.options.binaries_baseurls, ['https://bins.com'])
 
-    self.assertEqual(python_setup_options.options.wheel_version, '3.13.37')
+    self.assertEqual(python_setup_options.options.wheel_version, '0.31.1')
 
   def test_options_parse_memoization(self):
     # Confirm that re-executing with a new-but-identical Options object results in memoization.
