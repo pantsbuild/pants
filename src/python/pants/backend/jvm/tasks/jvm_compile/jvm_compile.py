@@ -6,7 +6,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import functools
 import os
-from abc import abstractproperty
 from builtins import object, open, str
 from multiprocessing import cpu_count
 
@@ -43,10 +42,9 @@ from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_mkdir
                                 safe_walk)
 from pants.util.fileutil import create_size_estimators
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.meta import AbstractClass
 
 
-class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase, AbstractClass):
+class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
   """A common framework for JVM compilation.
 
   To subclass for a specific JVM language, implement the static values and methods
@@ -158,13 +156,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase, AbstractClass):
   # Subclasses must implement.
   # --------------------------
   _name = None
-
-  @abstractproperty
-  def compiler_name(self):
-    """The name used in JvmPlatform to refer to this compiler task.
-
-    :rtype: :class:`JvmPlatform.CompilerChoices`
-    """
+  # The name used in JvmPlatform to refer to this compiler task.
+  compiler_name = None
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -755,7 +748,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase, AbstractClass):
     record('incremental', is_incremental)
 
   def _collect_invalid_compile_dependencies(self, compile_target, invalid_target_set,
-                                            compile_contexts):
+    compile_contexts):
     # Collects all invalid dependencies that are not dependencies of other invalid dependencies
     # within the closure of compile_target.
     invalid_dependencies = OrderedSet()

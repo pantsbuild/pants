@@ -4,26 +4,17 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from abc import abstractmethod, abstractproperty
 from builtins import next
 
-from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.base.build_environment import get_buildroot
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.java.jar.jar_dependency_utils import ResolvedJar
 from pants.task.task import TaskBase
 from pants.util.dirutil import fast_relpath
-from pants.util.meta import AbstractClass
 
 
-class JvmResolverBase(TaskBase, AbstractClass):
+class JvmResolverBase(TaskBase):
   """Common methods for both Ivy and Coursier resolves."""
-
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super(JvmResolverBase, cls).subsystem_dependencies() + (
-      JvmResolveSubsystem,
-    )
 
   @classmethod
   def register_options(cls, register):
@@ -74,20 +65,3 @@ class JvmResolverBase(TaskBase, AbstractClass):
       snapshotted_targets_and_jars.append((target, snapshotted_jars))
 
     return snapshotted_targets_and_jars
-
-  @abstractproperty
-  def resolver_name(self):
-    """Return the type of resolver used in order to select the correct resolve task to run.
-
-    :rtype: :class:`JvmResolveSubsystem.ResolverChoices`
-    """
-
-  @abstractmethod
-  def execute_resolve(self):
-    """Invoked to execute this resolve task if it matches the selected resolver."""
-
-  def execute(self):
-    if JvmResolveSubsystem.global_instance().get_options().resolver != self.resolver_name:
-      return
-
-    self.execute_resolve()

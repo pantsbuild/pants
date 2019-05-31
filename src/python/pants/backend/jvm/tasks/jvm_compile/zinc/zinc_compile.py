@@ -651,7 +651,7 @@ class BaseZincCompile(JvmCompile):
 class ZincCompile(BaseZincCompile):
   """Compile Scala and Java code to classfiles using Zinc."""
 
-  compiler_name = JvmPlatform.CompilerChoices.zinc
+  compiler_name = 'zinc'
 
   @classmethod
   def product_types(cls):

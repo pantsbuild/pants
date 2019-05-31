@@ -8,7 +8,6 @@ import os
 from builtins import open
 from unittest import skipIf
 
-from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
@@ -373,13 +372,13 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         with self.with_overwritten_file_content(file_abs_path):
 
           new_temp_test = '''package org.pantsbuild.example.hello.exe
-
+                              
                               import java.io.{BufferedReader, InputStreamReader}
-
+                              
                               import org.pantsbuild.example.hello.welcome
-
+                              
                               // A simple jvm binary to illustrate Scala BUILD targets
-
+                              
                               object Exe {
                                 /** Test that resources are properly namespaced. */
                                 def getWorld: String = {
@@ -393,7 +392,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
                                     is.close()
                                   }
                                 }
-
+                              
                                 def main(args: Array[String]) {
                                   println("Num args passed: " + args.size + ". Stand by for welcome...")
                                   if (args.size <= 0) {
@@ -464,7 +463,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         'incremental': False,
       },
       'resolver': {
-        'resolver': JvmResolveSubsystem.ResolverChoices.ivy,
+        'resolver': 'ivy',
       }
     }
 
@@ -493,7 +492,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         'incremental': False,
       },
       'resolver': {
-        'resolver': JvmResolveSubsystem.ResolverChoices.coursier,
+        'resolver': 'coursier',
       }
     }
 

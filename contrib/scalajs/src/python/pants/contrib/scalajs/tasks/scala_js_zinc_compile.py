@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import BaseZincCompile
 from pants.util.memo import memoized_method
 
@@ -16,10 +15,9 @@ class ScalaJSZincCompile(BaseZincCompile):
 
   _name = 'scala-js'
   _file_suffix = '.scala'
+  compiler_name = 'zinc'
 
   scalac_plugins = ['scalajs']
-
-  compiler_name = JvmPlatform.CompilerChoices.zinc
 
   @classmethod
   def register_options(cls, register):

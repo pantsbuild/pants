@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 from functools import wraps
 
-from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.tasks.jvm_compile.rsc.rsc_compile import RscCompile
 from pants.util.contextutil import temporary_dir
@@ -18,18 +17,18 @@ def _for_all_supported_execution_environments(func):
   @wraps(func)
   def wrapper_self(*args, **kwargs):
     for worker_count in [1, 2]:
-      for resolver in JvmResolveSubsystem.ResolverChoices.all_variants:
+      for resolver in JvmResolveSubsystem.CHOICES:
         for execution_strategy in RscCompile.ExecutionStrategy.all_variants:
           with temporary_dir() as cache_dir:
             config = {
               'cache.compile.rsc': {'write_to': [cache_dir]},
-              'jvm-platform': {'compiler': JvmPlatform.CompilerChoices.rsc.value},
+              'jvm-platform': {'compiler': 'rsc'},
               'compile.rsc': {
                 'execution_strategy': execution_strategy.value,
                 'worker_count': worker_count,
               },
               'resolver': {
-                'resolver': resolver.value,
+                'resolver': resolver,
               }
             }
 
@@ -38,13 +37,15 @@ def _for_all_supported_execution_environments(func):
                 'incremental': False,
                 'use_classpath_jars': False,
               })
-              resolver_scope = resolver.resolve_for_enum_variant({
-                'ivy': 'resolve.ivy',
-                'coursier': 'resolve.coursier',
-              })
+              if resolver == 'ivy':
+                resolver_scope = 'resolve.ivy'
+              else:
+                assert resolver == 'coursier'
+                resolver_scope = 'resolve.coursier'
               config[resolver_scope] = {
                 'capture_snapshots': True,
               }
+
             execution_strategy.resolve_for_enum_variant({
               'nailgun': lambda: None,
               'subprocess': lambda: None,

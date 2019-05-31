@@ -40,7 +40,7 @@ class JavacCompile(JvmCompile):
   """Compile Java code using Javac."""
 
   _name = 'java'
-  compiler_name = JvmPlatform.CompilerChoices.javac
+  compiler_name = 'javac'
 
   @staticmethod
   def _write_javac_plugin_info(resources_dir, javac_plugin_target):

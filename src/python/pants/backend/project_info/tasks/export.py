@@ -149,17 +149,16 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
 
     if confs:
       compile_classpath = ClasspathProducts(self.get_options().pants_workdir)
-
-      JvmResolveSubsystem.global_instance().get_options().resolver.resolve_for_enum_variant({
-        'ivy': lambda: IvyTaskMixin.resolve(self, executor=executor,
-                                            targets=targets,
-                                            classpath_products=compile_classpath,
-                                            confs=confs),
-        'coursier': lambda: CoursierMixin.resolve(self, targets, compile_classpath,
-                                                  sources=self.get_options().libraries_sources,
-                                                  javadoc=self.get_options().libraries_javadocs,
-                                                  executor=executor)
-      })()
+      if JvmResolveSubsystem.global_instance().get_options().resolver == 'ivy':
+        IvyTaskMixin.resolve(self, executor=executor,
+                                          targets=targets,
+                                          classpath_products=compile_classpath,
+                                          confs=confs)
+      else:
+        CoursierMixin.resolve(self, targets, compile_classpath,
+                              sources=self.get_options().libraries_sources,
+                              javadoc=self.get_options().libraries_javadocs,
+                              executor=executor)
 
     return compile_classpath
 

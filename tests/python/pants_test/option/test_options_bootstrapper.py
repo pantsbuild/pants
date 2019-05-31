@@ -9,7 +9,6 @@ import unittest
 from builtins import open
 from textwrap import dedent
 
-from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.base.build_environment import get_buildroot
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import ScopeInfo
@@ -222,8 +221,7 @@ class BootstrapOptionsTest(unittest.TestCase):
       ])
       opts_single_config.register('', '--pantsrc-files', type=list)
       opts_single_config.register('resolver', '--resolver')
-      self.assertEqual(JvmResolveSubsystem.ResolverChoices.coursier,
-                       opts_single_config.for_scope('resolver').resolver)
+      self.assertEqual('coursier', opts_single_config.for_scope('resolver').resolver)
 
   def test_full_options_caching(self):
     with temporary_file_path() as config:
