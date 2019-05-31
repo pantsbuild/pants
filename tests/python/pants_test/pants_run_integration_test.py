@@ -615,7 +615,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
       yield Manager(write_file, dir_context, tmp_dir)
 
-  def do_command(self, *args, success=True, **kwargs):
+  def do_command(self, *args, **kwargs):
     """Wrapper around run_pants method.
 
     :param args: command line arguments used to run pants
@@ -623,6 +623,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :return: a PantsResult object
     """
     cmd = list(args)
+    success = kwargs.pop('success', True)
     pants_run = self.run_pants(cmd, **kwargs)
     if success:
       self.assert_success(pants_run)
@@ -631,8 +632,9 @@ class PantsRunIntegrationTest(unittest.TestCase):
     return pants_run
 
   @contextmanager
-  def do_command_yielding_workdir(self, *args, success=True, **kwargs):
+  def do_command_yielding_workdir(self, *args, **kwargs):
     cmd = list(args)
+    success = kwargs.pop('success', True)
     with self.pants_results(cmd, **kwargs) as pants_run:
       if success:
         self.assert_success(pants_run)
