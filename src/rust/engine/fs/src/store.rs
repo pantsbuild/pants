@@ -106,7 +106,6 @@ impl Store {
     upload_timeout: Duration,
     backoff_config: BackoffConfig,
     rpc_retries: usize,
-    futures_timer_thread: futures_timer::TimerHandle,
   ) -> Result<Store, String> {
     Ok(Store {
       local: local::ByteStore::new(path)?,
@@ -120,7 +119,6 @@ impl Store {
         upload_timeout,
         backoff_config,
         rpc_retries,
-        futures_timer_thread,
       )?),
     })
   }
@@ -1696,7 +1694,6 @@ mod remote {
       upload_timeout: Duration,
       backoff_config: BackoffConfig,
       rpc_retries: usize,
-      futures_timer_thread: futures_timer::TimerHandle,
     ) -> Result<ByteStore, String> {
       let env = Arc::new(grpcio::Environment::new(thread_count));
 
@@ -1715,7 +1712,7 @@ mod remote {
         })
         .collect();
 
-      let serverset = Serverset::new(channels, backoff_config, futures_timer_thread)?;
+      let serverset = Serverset::new(channels, backoff_config)?;
 
       Ok(ByteStore {
         instance_name,
@@ -1996,7 +1993,6 @@ mod remote {
     use super::super::EntryType;
     use super::ByteStore;
     use bytes::Bytes;
-    use futures_timer::TimerHandle;
     use hashing::Digest;
     use mock::StubCAS;
     use serverset::BackoffConfig;
@@ -2153,7 +2149,6 @@ mod remote {
         Duration::from_secs(5),
         BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
         1,
-        TimerHandle::default(),
       )
       .unwrap();
 
@@ -2229,7 +2224,6 @@ mod remote {
         Duration::from_secs(1),
         BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
         1,
-        TimerHandle::default(),
       )
       .unwrap();
       let error = block_on(store.store_bytes(TestData::roland().bytes())).expect_err("Want error");
@@ -2303,7 +2297,6 @@ mod remote {
         Duration::from_secs(1),
         BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
         1,
-        TimerHandle::default(),
       )
       .unwrap();
 
@@ -2332,7 +2325,6 @@ mod remote {
         Duration::from_secs(1),
         BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
         1,
-        TimerHandle::default(),
       )
       .unwrap()
     }
@@ -2366,7 +2358,6 @@ mod tests {
   use bytes::Bytes;
   use digest::{Digest as DigestTrait, FixedOutput};
   use futures::Future;
-  use futures_timer::TimerHandle;
   use hashing::{Digest, Fingerprint};
   use mock::StubCAS;
   use protobuf::Message;
@@ -2456,7 +2447,6 @@ mod tests {
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      TimerHandle::default(),
     )
     .unwrap()
   }
@@ -3125,7 +3115,6 @@ mod tests {
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      TimerHandle::default(),
     )
     .unwrap();
 
@@ -3152,7 +3141,6 @@ mod tests {
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      TimerHandle::default(),
     )
     .unwrap();
 
@@ -3190,7 +3178,6 @@ mod tests {
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      TimerHandle::default(),
     )
     .unwrap();
 
@@ -3217,7 +3204,6 @@ mod tests {
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      TimerHandle::default(),
     )
     .unwrap();
 
