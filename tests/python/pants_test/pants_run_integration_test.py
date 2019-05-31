@@ -23,7 +23,7 @@ from pants.fs.archive import ZIP
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import fast_relpath, safe_mkdir, safe_mkdir_for, safe_open
-from pants.util.objects import Exactly, datatype
+from pants.util.objects import Exactly, datatype, string_list, string_type
 from pants.util.osutil import IntegerForPid
 from pants.util.process_handler import SubprocessProcessHandler, subprocess
 from pants.util.py2_compat import configparser
@@ -32,17 +32,22 @@ from pants_test.testutils.file_test_util import check_symlinks, contains_exact_f
 
 
 class PantsResult(datatype([
-    'command',
+    ('command', string_list),
     ('returncode', int),
-    'stdout_data',
-    'stderr_data',
-    'workdir',
+    ('stdout_data', string_type),
+    ('stderr_data', string_type),
+    ('workdir', string_type),
     ('pid', Exactly(*IntegerForPid)),
 ])):
   pass
 
 
-class PantsJoinHandle(datatype(['command', 'process', 'workdir'])):
+class PantsJoinHandle(datatype([
+    ('command', string_list),
+    'process',
+    ('workdir', string_type),
+])):
+
   def join(self, stdin_data=None, tee_output=False):
     """Wait for the pants process to complete, and return a PantsResult for it."""
 
@@ -373,12 +378,14 @@ class PantsRunIntegrationTest(unittest.TestCase):
     handle = self.run_pants_with_workdir_without_waiting(command, workdir, **kwargs)
     return handle.join(stdin_data=stdin_data, tee_output=tee_output)
 
-  def run_pants(self, command, config=None, stdin_data=None, extra_env=None, **kwargs):
+  def run_pants(self, command, config=None, stdin_data=None, extra_env=None, cleanup_workdir=True,
+                **kwargs):
     """Runs pants in a subprocess.
 
     :param list command: A list of command line arguments coming after `./pants`.
     :param config: Optional data for a generated ini file. A map of <section-name> ->
     map of key -> value. If order in the ini file matters, this should be an OrderedDict.
+    # TODO: ???
     :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
     :returns a PantsResult instance.
     """
@@ -608,15 +615,13 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
       yield Manager(write_file, dir_context, tmp_dir)
 
-  def do_command(self, *args, **kwargs):
+  def do_command(self, *args, success=True, **kwargs):
     """Wrapper around run_pants method.
 
     :param args: command line arguments used to run pants
-    :param kwargs: handles 1 key
-      success - indicate whether to expect pants run to succeed or fail.
+    # TODO: ???
     :return: a PantsResult object
     """
-    success = kwargs.pop('success', True)
     cmd = list(args)
     pants_run = self.run_pants(cmd, **kwargs)
     if success:
@@ -624,3 +629,16 @@ class PantsRunIntegrationTest(unittest.TestCase):
     else:
       self.assert_failure(pants_run)
     return pants_run
+
+  @contextmanager
+  def do_command_yielding_workdir(self, *args, success=True, **kwargs):
+    cmd = list(args)
+    with self.pants_results(cmd, **kwargs) as pants_run:
+      if success:
+        self.assert_success(pants_run)
+      else:
+        self.assert_failure(pants_run)
+      yield pants_run
+
+  def assertIsFile(self, file_path):
+    self.assertTrue(os.path.isfile(file_path), 'file path {} does not exist!'.format(file_path))
