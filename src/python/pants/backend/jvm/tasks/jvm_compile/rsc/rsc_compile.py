@@ -13,6 +13,7 @@ from future.utils import PY3, text_type
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext  # noqa
+from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.rsc import Rsc
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -115,7 +116,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   """Compile Scala and Java code to classfiles using Rsc."""
 
   _name = 'mixed' # noqa
-  compiler_name = 'rsc'
+  compiler_name = JvmPlatform.CompilerChoices.rsc
 
   @classmethod
   def subsystem_dependencies(cls):

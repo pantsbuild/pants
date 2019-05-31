@@ -85,13 +85,12 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     for arg in self.get_options().args:
       self._args.extend(safe_shlex_split(arg))
 
-  def execute(self):
+  resolver_name = JvmResolveSubsystem.ResolverChoices.ivy
+
+  def execute_resolve(self):
     """Resolves the specified confs for the configured targets and returns an iterator over
     tuples of (conf, jar path).
     """
-    if JvmResolveSubsystem.global_instance().get_options().resolver != 'ivy':
-      return
-
     compile_classpath = self.context.products.get_data('compile_classpath',
         init_func=ClasspathProducts.init_func(self.get_options().pants_workdir))
 

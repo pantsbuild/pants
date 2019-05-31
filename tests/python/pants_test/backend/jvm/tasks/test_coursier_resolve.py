@@ -15,6 +15,7 @@ from psutil.tests import safe_rmpath
 
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
                                                                     PinnedJarArtifactSet)
+from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -48,7 +49,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     self.set_options_for_scope('cache.{}'.format(self.options_scope),
                                read_from=None,
                                write_to=None)
-    self.set_options_for_scope('resolver', resolver='coursier')
+    self.set_options_for_scope('resolver', resolver=JvmResolveSubsystem.coursier)
 
   def _cache_dir_regex(self, cache_type):
     # One component for the task name, and one for the version.
@@ -69,22 +70,22 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     compile_classpath = self.resolve([jar_lib, scala_lib])
     self.assertEqual(1, len(compile_classpath.get_for_target(jar_lib)))
     self.assertEqual(0, len(compile_classpath.get_for_target(scala_lib)))
-    
+
   def test_resolve_with_remote_url(self):
     dep_with_url = JarDependency('a', 'b', 'c',
                                  url='http://central.maven.org/maven2/junit/junit/4.12/junit-4.12.jar')
     dep_with_url_lib = self.make_target('//:a', JarLibrary, jars=[dep_with_url])
-    
+
     compile_classpath = self.resolve([dep_with_url_lib])
     # Get paths on compile classpath and assert that it starts with '.../coursier/cache/relative'
     paths = [tup[1] for tup in compile_classpath.get_for_target(dep_with_url_lib)]
     self.assertTrue(any(self._cache_dir_regex('relative').search(path) for path in paths), str(paths))
-  
+
   def test_resolve_with_local_url(self):
     with temporary_file_path(suffix='.jar') as url:
       dep_with_url = JarDependency('commons-lang', 'commons-lang', '2.5', url='file://' + url)
       dep_with_url_lib = self.make_target('//:a', JarLibrary, jars=[dep_with_url])
-      
+
       compile_classpath = self.resolve([dep_with_url_lib])
       # Get paths on compile classpath and assert that it starts with '.../coursier/cache/absolute'
       paths = [tup[1] for tup in compile_classpath.get_for_target(dep_with_url_lib)]

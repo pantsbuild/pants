@@ -237,17 +237,26 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):
         default option was provided to use for bootstrap.
         """.format(jvm_tool.key)))
 
+  @property
+  def resolver_name(self):
+    raise NotImplementedError('This method from JvmResolverBase must be implemented, but is not used!')
+
+  def execute_resolve(self):
+    raise NotImplementedError('This method from JvmResolverBase must be implemented, but is not used!')
+
   def _bootstrap_classpath(self, jvm_tool, targets):
     self._check_underspecified_tools(jvm_tool, targets)
     workunit_name = 'bootstrap-{}'.format(jvm_tool.key)
-    if JvmResolveSubsystem.global_instance().get_options().resolver == 'ivy':
-      ivy_classpath = self.ivy_classpath(targets, silent=True, workunit_name=workunit_name)
-      return ivy_classpath
-    else:
+
+    def coursier_classpath():
       classpath_holder = ClasspathProducts(self.get_options().pants_workdir)
       CoursierMixin.resolve(self, targets, classpath_holder, sources=False, javadoc=False, executor=None)
-      coursier_classpath = [cp_entry for _, cp_entry in classpath_holder.get_for_targets(targets)]
-      return coursier_classpath
+      return [cp_entry for _, cp_entry in classpath_holder.get_for_targets(targets)]
+
+    return JvmResolveSubsystem.global_instance().get_options().resolver.resolve_for_enum_variant({
+      'ivy': lambda: self.ivy_classpath(targets, silent=True, workunit_name=workunit_name),
+      'coursier': coursier_classpath,
+    })()
 
   @memoized_property
   def shader(self):

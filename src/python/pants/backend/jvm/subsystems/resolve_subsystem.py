@@ -4,12 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import logging
-
 from pants.subsystem.subsystem import Subsystem
-
-
-logger = logging.getLogger(__name__)
+from pants.util.objects import enum
 
 
 class JvmResolveSubsystem(Subsystem):
@@ -19,7 +15,10 @@ class JvmResolveSubsystem(Subsystem):
   """
   options_scope = 'resolver'
 
+  class ResolverChoices(enum(['ivy', 'coursier'])): pass
+
   @classmethod
   def register_options(cls, register):
     super(JvmResolveSubsystem, cls).register_options(register)
-    register('--resolver', choices=['ivy', 'coursier'], default='ivy', help='Resolver to use for external jvm dependencies.')
+    register('--resolver', type=cls.ResolverChoices, default=cls.ResolverChoices.ivy,
+             help='Resolver to use for external jvm dependencies.')

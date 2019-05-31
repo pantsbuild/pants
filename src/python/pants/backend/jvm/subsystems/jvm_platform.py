@@ -13,6 +13,7 @@ from pants.base.revision import Revision
 from pants.java.distribution.distribution import DistributionLocator
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
+from pants.util.objects import enum
 
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ class JvmPlatform(Subsystem):
   # strictly (eg, if Java 10 != 1.10, simply leave it out).
   SUPPORTED_CONVERSION_VERSIONS = (6, 7, 8,)
 
-  _COMPILER_CHOICES = ['zinc', 'javac', 'rsc']
+  class CompilerChoices(enum(['zinc', 'javac', 'rsc'])): pass
 
   class IllegalDefaultPlatform(TaskError):
     """The --default-platform option was set, but isn't defined in --platforms."""
@@ -60,7 +61,8 @@ class JvmPlatform(Subsystem):
              help='Compile settings that can be referred to by name in jvm_targets.')
     register('--default-platform', advanced=True, type=str, default=None, fingerprint=True,
              help='Name of the default platform to use if none are specified.')
-    register('--compiler', advanced=True, choices=cls._COMPILER_CHOICES, default='zinc', fingerprint=True,
+    register('--compiler', type=cls.CompilerChoices, default=cls.CompilerChoices.zinc,
+             fingerprint=True,
              help='Java compiler implementation to use.')
 
   @classmethod

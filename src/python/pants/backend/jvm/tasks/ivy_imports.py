@@ -27,6 +27,13 @@ class IvyImports(IvyTaskMixin, NailgunTask):
   def has_imports(target):
     return isinstance(target, ImportJarsMixin) and target.imported_targets
 
+  @property
+  def resolver_name(self):
+    raise NotImplementedError('???')
+
+  def execute_resolve(self):
+    raise NotImplementedError('???')
+
   def execute(self):
     jar_import_products = self.context.products.get_data(JarImportProducts,
                                                          init_func=JarImportProducts)
