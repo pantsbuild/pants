@@ -99,6 +99,13 @@ public abstract class ConsoleRunnerTestBase {
    * test runner.
    */
   protected void invokeConsoleRunner(String argsString) {
+    prepareConsoleRunner(argsString).run();
+  }
+
+  /**
+   * As invokeConsoleRunner, but returns a ConsoleRunnerImpl ready for calling run() on.
+   */
+  protected ConsoleRunnerImpl prepareConsoleRunner(String argsString) {
     List<String> testArgs = new ArrayList<String>();
     for (String arg : Splitter.on(" ").split(argsString)) {
       // Prepend the package name to tests to allow shorthand command line invocation
@@ -123,9 +130,9 @@ public abstract class ConsoleRunnerTestBase {
     if (!testArgs.contains(USE_EXPERIMENTAL_RUNNER_FLAG) && parameters.useExperimentalRunner) {
       testArgs.add(USE_EXPERIMENTAL_RUNNER_FLAG);
     }
-    System.out.println("Invoking ConsoleRunnerImpl.main(\""
+    System.out.println("Invoking ConsoleRunnerImpl.mainImpl(\""
         + Joiner.on(' ').join(testArgs) + "\")");
 
-    ConsoleRunnerImpl.main(testArgs.toArray(new String[testArgs.size()]));
+    return ConsoleRunnerImpl.mainImpl(testArgs.toArray(new String[testArgs.size()]));
   }
 }

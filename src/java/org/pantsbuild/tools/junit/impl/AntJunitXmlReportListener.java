@@ -13,8 +13,6 @@ import java.io.File;
 import java.io.FilterWriter;
 import java.io.IOException;
 import java.io.Writer;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -305,9 +303,9 @@ class AntJunitXmlReportListener extends RunListener {
     }
 
     public void finished() {
-      tests++;
       if (startNs != 0) {
         time = convertTimeSpanNs(System.nanoTime() - startNs);
+        tests++;
       } else {
         time = "0";
       }
@@ -426,6 +424,7 @@ class AntJunitXmlReportListener extends RunListener {
         if (suite != null) {
           suite.testCases.clear();
           suite.testCases.add(testCase);
+          suite.tests = 1;
           suite.finished();
         }
       } else {
@@ -455,6 +454,8 @@ class AntJunitXmlReportListener extends RunListener {
       suite.incrementSkipped();
       // Ignored tests don't have testStarted and testFinished callbacks so call finish here.
       suite.finished();
+      // finished() counts only started tests, so count ignored tests here so the totals are correct
+      if (!suite.wasStarted()) suite.tests++;
     }
 
     TestCase testCase = getTestCaseFor(description);
@@ -489,6 +490,7 @@ class AntJunitXmlReportListener extends RunListener {
   public void testRunFinished(Result result) throws java.lang.Exception {
     for (TestSuite suite : suites.values()) {
       if (suite.wasStarted() && suite.testClass != null) {
+        streamSource.close(suite.testClass); // may not be closed if we're abnormally terminating
         suite.setOut(new String(streamSource.readOut(suite.testClass), Charsets.UTF_8));
         suite.setErr(new String(streamSource.readErr(suite.testClass), Charsets.UTF_8));
       }
