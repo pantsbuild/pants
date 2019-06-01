@@ -30,8 +30,8 @@ DIRS_TO_CHECK=(
 # integration test!
 set -e
 
-ADDED_FILES=()
-while IFS='' read -r line; do ADDED_FILES+=("${line}"); done< <(./build-support/bin/get_added_files.sh)
+# shellcheck disable=SC2207
+ADDED_FILES=($(./build-support/bin/get_added_files.sh))
 MERGE_BASE="$(git_merge_base)"
 
 echo "* Checking packages"
