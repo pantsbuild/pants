@@ -114,6 +114,12 @@ def datatype(field_decls, superclass_name=None, **kwargs):
       # more ergonomic.
       type_failure_msgs = []
       for field_name, field_constraint in fields_with_constraints.items():
+        # TODO: figure out how to disallow users from accessing datatype fields by index!
+        # TODO: gettattr() with a specific `field_name` against a `namedtuple` is apparently
+        # converted into a __getitem__() call with the argument being the integer index of the field
+        # with that name -- this indirection is not shown in the stack trace when overriding
+        # __getitem__() to raise on `int` inputs. See https://stackoverflow.com/a/6738724 for the
+        # greater context of how `namedtuple` differs from other "normal" python classes.
         field_value = getattr(this_object, field_name)
         try:
           field_constraint.validate_satisfied_by(field_value)

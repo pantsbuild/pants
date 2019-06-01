@@ -202,7 +202,8 @@ class RscCompileTest(TaskTestBase):
                      zinc[rsc-and-zinc](scala/classpath:scala_lib) -> {}
                      rsc(scala/classpath:scala_dep) -> {
                        rsc(scala/classpath:scala_lib),
-                       zinc[rsc-and-zinc](scala/classpath:scala_lib)
+                       zinc[rsc-and-zinc](scala/classpath:scala_lib),
+                       zinc[zinc-only](scala/classpath:scala_test)
                      }
                      zinc[rsc-and-zinc](scala/classpath:scala_dep) -> {
                        zinc[zinc-java](java/classpath:java_lib)
