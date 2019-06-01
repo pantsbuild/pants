@@ -75,7 +75,7 @@ function bootstrap_rust() {
         fi
       done
 
-      ln -fs "$(dirname "${cargo_bin_dir}")/lib/rustlib/src/rust/src"
+      ln -fs "$(dirname "${cargo_bin_dir}")/lib/rustlib/src/rust/src" .
       ln -fs cargo.sh cargo
       ln -fs cargo.sh ".${cargo_versioned}"
     )
