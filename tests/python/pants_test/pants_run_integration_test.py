@@ -23,7 +23,7 @@ from pants.fs.archive import ZIP
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import fast_relpath, safe_mkdir, safe_mkdir_for, safe_open
-from pants.util.objects import Exactly, datatype, string_list, string_type
+from pants.util.objects import Exactly, datatype, string_type
 from pants.util.osutil import IntegerForPid
 from pants.util.process_handler import SubprocessProcessHandler, subprocess
 from pants.util.py2_compat import configparser
@@ -32,7 +32,8 @@ from pants_test.testutils.file_test_util import check_symlinks, contains_exact_f
 
 
 class PantsResult(datatype([
-    ('command', string_list),
+    # NB: May be either a string list or string (in the case of `shell=True`).
+    'command',
     ('returncode', int),
     ('stdout_data', string_type),
     ('stderr_data', string_type),
@@ -43,7 +44,8 @@ class PantsResult(datatype([
 
 
 class PantsJoinHandle(datatype([
-    ('command', string_list),
+    # NB: May be either a string list or string (in the case of `shell=True`).
+    'command',
     'process',
     ('workdir', string_type),
 ])):
@@ -385,7 +387,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :param list command: A list of command line arguments coming after `./pants`.
     :param config: Optional data for a generated ini file. A map of <section-name> ->
     map of key -> value. If order in the ini file matters, this should be an OrderedDict.
-    # TODO: ???
     :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
     :returns a PantsResult instance.
     """
@@ -619,7 +620,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
     """Wrapper around run_pants method.
 
     :param args: command line arguments used to run pants
-    # TODO: ???
     :return: a PantsResult object
     """
     cmd = list(args)
