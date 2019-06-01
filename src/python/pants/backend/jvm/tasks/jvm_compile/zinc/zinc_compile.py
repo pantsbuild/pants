@@ -201,12 +201,6 @@ class BaseZincCompile(JvmCompile):
           )
         )
 
-      if self.get_options().use_classpath_jars:
-        # TODO: Make this work by capturing the correct Digest and passing them around the
-        # right places.
-        # See https://github.com/pantsbuild/pants/issues/6432
-        raise TaskError("Hermetic zinc execution currently doesn't work with classpath jars")
-
   def select(self, target):
     raise NotImplementedError()
 
@@ -278,11 +272,9 @@ class BaseZincCompile(JvmCompile):
       # TODO: Support workdirs not nested under buildroot by path-rewriting.
       return fast_relpath(path, get_buildroot())
 
-    classes_dir = ctx.classes_dir.path
-    analysis_cache = ctx.analysis_file
-
-    analysis_cache = relative_to_exec_root(analysis_cache)
-    classes_dir = relative_to_exec_root(classes_dir)
+    analysis_cache = relative_to_exec_root(ctx.analysis_file)
+    classes_dir = relative_to_exec_root(ctx.classes_dir.path)
+    jar_file = relative_to_exec_root(ctx.jar_file.path)
     # TODO: Have these produced correctly, rather than having to relativize them here
     relative_classpath = tuple(relative_to_exec_root(c) for c in absolute_classpath)
 
@@ -296,6 +288,7 @@ class BaseZincCompile(JvmCompile):
       '-analysis-cache', analysis_cache,
       '-classpath', ':'.join(relative_classpath),
       '-d', classes_dir,
+      '-jar', jar_file,
     ])
     if not self.get_options().colors:
       zinc_args.append('-no-color')
@@ -368,7 +361,7 @@ class BaseZincCompile(JvmCompile):
 
     return self.execution_strategy_enum.resolve_for_enum_variant({
       self.HERMETIC: lambda: self._compile_hermetic(
-        jvm_options, ctx, classes_dir, zinc_args, compiler_bridge_classpath_entry,
+        jvm_options, ctx, classes_dir, jar_file, zinc_args, compiler_bridge_classpath_entry,
         dependency_classpath, scalac_classpath_entries),
       self.SUBPROCESS: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir, zinc_args),
       self.NAILGUN: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir, zinc_args),
@@ -391,7 +384,7 @@ class BaseZincCompile(JvmCompile):
       DirectoryToMaterialize(text_type(classes_directory), self.extra_resources_digest(ctx)),
     ))
 
-  def _compile_hermetic(self, jvm_options, ctx, classes_dir, zinc_args,
+  def _compile_hermetic(self, jvm_options, ctx, classes_dir, jar_file, zinc_args,
                         compiler_bridge_classpath_entry, dependency_classpath,
                         scalac_classpath_entries):
     zinc_relpath = fast_relpath(self._zinc.zinc, get_buildroot())
@@ -466,7 +459,8 @@ class BaseZincCompile(JvmCompile):
     req = ExecuteProcessRequest(
       argv=tuple(argv),
       input_files=merged_input_digest,
-      output_directories=(classes_dir,),
+      output_files=(jar_file,) if self.get_options().use_classpath_jars else (),
+      output_directories=() if self.get_options().use_classpath_jars else (classes_dir,),
       description="zinc compile for {}".format(ctx.target.address.spec),
       jdk_home=self._zinc.underlying_dist.home,
     )

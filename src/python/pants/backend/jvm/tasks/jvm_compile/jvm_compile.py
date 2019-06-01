@@ -40,7 +40,7 @@ from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import Timer, temporary_dir
 from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_file_dump, safe_mkdir,
-                                safe_rmtree, safe_walk)
+                                safe_rmtree)
 from pants.util.fileutil import create_size_estimators
 from pants.util.memo import memoized_method, memoized_property
 
@@ -484,22 +484,26 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       f.write(text)
 
   def _set_directory_digests_for_valid_target_classpath_directories(self, valid_targets, compile_contexts):
+    def _get_relative_classpath_for_target(target):
+      cc = self.select_runtime_context(compile_contexts[target])
+      if self.get_options().use_classpath_jars:
+        return fast_relpath(cc.jar_file.path, get_buildroot())
+      else:
+        return fast_relpath(cc.classes_dir.path, get_buildroot()) + '/**'
+
     snapshots = self.context._scheduler.capture_snapshots(
       tuple(PathGlobsAndRoot(PathGlobs(
-        [self._get_relative_classes_dir_from_target(target, compile_contexts)]
+        [_get_relative_classpath_for_target(target)]
       ), get_buildroot()) for target in valid_targets))
-    [self._set_directory_digest_for_compile_context(
-      snapshot.directory_digest, target, compile_contexts)
-      for target, snapshot in list(zip(valid_targets, snapshots))]
+    for target, snapshot in list(zip(valid_targets, snapshots)):
+      cc = self.select_runtime_context(compile_contexts[target])
+      self._set_directory_digest_for_compile_context(cc, snapshot.directory_digest)
 
-  def _get_relative_classes_dir_from_target(self, target, compile_contexts):
-    cc = self.select_runtime_context(compile_contexts[target])
-    return fast_relpath(cc.classes_dir.path, get_buildroot()) + '/**'
-
-  def _set_directory_digest_for_compile_context(self, directory_digest, target, compile_contexts):
-    cc = self.select_runtime_context(compile_contexts[target])
-    new_classpath_entry = ClasspathEntry(cc.classes_dir.path, directory_digest)
-    cc.classes_dir = new_classpath_entry
+  def _set_directory_digest_for_compile_context(self, ctx, directory_digest):
+    if self.get_options().use_classpath_jars:
+      ctx.jar_file = ClasspathEntry(ctx.jar_file.path, directory_digest)
+    else:
+      ctx.classes_dir = ClasspathEntry(ctx.classes_dir.path, directory_digest)
 
   def _compile_vts(self, vts, ctx, upstream_analysis, dependency_classpath, progress_message, settings,
                    compiler_option_sets, zinc_file_manager, counter):
@@ -806,22 +810,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     Override to adjust this behavior."""
     return False
 
-  def _create_context_jar(self, compile_context):
-    """Jar up the compile_context to its output jar location.
-
-    TODO(stuhood): In the medium term, we hope to add compiler support for this step, which would
-    allow the jars to be used as compile _inputs_ as well. Currently using jar'd compile outputs as
-    compile inputs would make the compiler's analysis useless.
-      see https://github.com/twitter-forks/sbt/tree/stuhood/output-jars
-    """
-    root = compile_context.classes_dir.path
-    with compile_context.open_jar(mode='w') as jar:
-      for abs_sub_dir, dirnames, filenames in safe_walk(root):
-        for name in dirnames + filenames:
-          abs_filename = os.path.join(abs_sub_dir, name)
-          arcname = fast_relpath(abs_filename, root)
-          jar.write(abs_filename, arcname)
-
   def _compute_sources_for_target(self, target):
     """Computes and returns the sources (relative to buildroot) for the given target."""
     def resolve_target_sources(target_sources):
@@ -953,7 +941,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                           zinc_file_manager,
                           counter)
 
-      ctx.classes_dir = ClasspathEntry(ctx.classes_dir.path, directory_digest)
+      # Store the produced Digest (if any).
+      self._set_directory_digest_for_compile_context(ctx, directory_digest)
 
       self._record_target_stats(tgt,
                                 len(dependency_cp_entries),
@@ -961,9 +950,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                                 timer.elapsed,
                                 is_incremental,
                                 'compile')
-
-      # Jar the compiled output.
-      self._create_context_jar(ctx)
 
     # Update the products with the latest classes.
     output_classpath_product.add_for_target(

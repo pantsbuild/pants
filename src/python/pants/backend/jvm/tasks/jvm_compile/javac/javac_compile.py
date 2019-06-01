@@ -20,6 +20,7 @@ from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.engine.fs import DirectoryToMaterialize
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.distribution.distribution import DistributionLocator
+from pants.util.dirutil import fast_relpath, safe_walk
 from pants.util.meta import classproperty
 from pants.util.process_handler import subprocess
 
@@ -72,6 +73,12 @@ class JavacCompile(JvmCompile):
   def __init__(self, *args, **kwargs):
     super(JavacCompile, self).__init__(*args, **kwargs)
     self.set_distribution(jdk=True)
+
+    if self.get_options().use_classpath_jars:
+      # TODO: Make this work by capturing the correct Digest and passing them around the
+      # right places.
+      # See https://github.com/pantsbuild/pants/issues/6432
+      raise TaskError("Hermetic javac execution currently doesn't work with classpath jars")
 
   def select(self, target):
     if not isinstance(target, JvmTarget):
@@ -171,6 +178,18 @@ class JavacCompile(JvmCompile):
         self.context._scheduler.materialize_directories((
           DirectoryToMaterialize(text_type(ctx.classes_dir.path), self.extra_resources_digest(ctx)),
         ))
+
+    self._create_context_jar(ctx)
+
+  def _create_context_jar(self, compile_context):
+    """Jar up the compile_context to its output jar location."""
+    root = compile_context.classes_dir.path
+    with compile_context.open_jar(mode='w') as jar:
+      for abs_sub_dir, dirnames, filenames in safe_walk(root):
+        for name in dirnames + filenames:
+          abs_filename = os.path.join(abs_sub_dir, name)
+          arcname = fast_relpath(abs_filename, root)
+          jar.write(abs_filename, arcname)
 
   @classmethod
   def _javac_plugin_args(cls, javac_plugin_map):
