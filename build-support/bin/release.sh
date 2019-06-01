@@ -561,6 +561,7 @@ function adjust_wheel_platform() {
   local src_plat="$1"
   local dst_plat="$2"
   local dir="$3"
+  # shellcheck disable=SC2044
   for src_whl in $(find "${dir}" -name '*'"${src_plat}.whl"); do
     local dst_whl=${src_whl/$src_plat/$dst_plat}
     mv -f "${src_whl}" "${dst_whl}"
