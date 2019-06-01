@@ -42,6 +42,7 @@ if [[ "${check}" == "true" ]]; then
   cmd=("${cmd[@]}" "--check")
 fi
 
+# shellcheck disable=SC2207
 bad_files=(
   $(
     cd "${NATIVE_ROOT}" || exit "${PIPESTATUS[0]}"

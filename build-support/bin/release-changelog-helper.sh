@@ -74,6 +74,7 @@ do
   echo "* ${subject}"
 
   urls=()
+  # shellcheck disable=SC2207
   urls=(
     "${urls[@]}"
     $(
@@ -82,6 +83,7 @@ do
         sed -Ee "s|^\(#([0-9]+)\)$|https://github.com/pantsbuild/pants/pull/\1|"
     )
   )
+  # shellcheck disable=SC2207
   urls=(
     "${urls[@]}"
     $(
