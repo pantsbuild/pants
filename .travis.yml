@@ -148,6 +148,7 @@ base_linux_config: &base_linux_config
         - libssl-dev
         - jq
         - unzip
+        - shellcheck
   language: python
   before_install:
     - ./build-support/bin/install_aws_cli_for_ci.sh
