@@ -43,14 +43,14 @@ object OutputUtils {
   }
 
   /**
-   * Create a JAR of of filePaths provided.
+   * Create a JAR from the file and directory paths provided.
    *
-   * @param filePaths set of all paths to be added to the JAR
+   * @param paths set of all paths to be added to the JAR
    * @param outputJarPath Absolute Path to the output JAR being created
    * @param jarEntryTime time to be set for each JAR entry
    */
   def createJar(
-    base: String, filePaths: mutable.TreeSet[Path], outputJarPath: Path, jarEntryTime: Long) {
+    base: String, paths: mutable.TreeSet[Path], outputJarPath: Path, jarEntryTime: Long) {
 
     val target = new JarOutputStream(Files.newOutputStream(outputJarPath))
 
@@ -72,8 +72,12 @@ object OutputUtils {
       target.closeEntry()
     }
 
-    for (filePath <- filePaths) {
-      addToJar(filePath, relativize(base, filePath))
+    for (
+      path <- paths;
+      relativePath = relativize(base, path)
+      if relativePath.nonEmpty
+    ) {
+      addToJar(path, relativePath)
     }
     target.close()
   }
