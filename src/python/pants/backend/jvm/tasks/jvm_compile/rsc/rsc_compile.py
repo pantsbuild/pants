@@ -414,8 +414,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
           False,
           'rsc'
         )
-        # Write any additional resources for this target to the target workdir.
-        self.write_extra_resources(ctx)
 
       # Update the products with the latest classes.
       self.register_extra_products_from_contexts([ctx.target], compile_contexts)

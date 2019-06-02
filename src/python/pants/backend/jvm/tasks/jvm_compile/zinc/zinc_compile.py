@@ -14,14 +14,12 @@ from collections import defaultdict
 from contextlib import closing
 from xml.etree import ElementTree
 
-from future.utils import PY2, PY3, text_type
+from future.utils import PY2, text_type
 
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.zinc import Zinc
-from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
-from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
@@ -33,7 +31,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.engine.fs import DirectoryToMaterialize
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.util.contextutil import open_zip
-from pants.util.dirutil import fast_relpath, safe_open
+from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import classproperty
 from pants.util.strutil import ensure_text, safe_shlex_join
@@ -41,12 +39,6 @@ from pants.util.strutil import ensure_text, safe_shlex_join
 
 # Well known metadata file required to register scalac plugins with nsc.
 _SCALAC_PLUGIN_INFO_FILE = 'scalac-plugin.xml'
-
-# Well known metadata file to register javac plugins.
-_JAVAC_PLUGIN_INFO_FILE = 'META-INF/services/com.sun.source.util.Plugin'
-
-# Well known metadata file to register annotation processors with a java 1.6+ compiler.
-_PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 
 
 logger = logging.getLogger(__name__)
@@ -56,24 +48,6 @@ class BaseZincCompile(JvmCompile):
   """An abstract base class for zinc compilation tasks."""
 
   _name = 'zinc'
-
-  @staticmethod
-  def _write_scalac_plugin_info(resources_dir, scalac_plugin_target):
-    scalac_plugin_info_file = os.path.join(resources_dir, _SCALAC_PLUGIN_INFO_FILE)
-    with safe_open(scalac_plugin_info_file, 'w') as f:
-      f.write(textwrap.dedent("""
-        <plugin>
-          <name>{}</name>
-          <classname>{}</classname>
-        </plugin>
-      """.format(scalac_plugin_target.plugin, scalac_plugin_target.classname)).strip())
-
-  @staticmethod
-  def _write_javac_plugin_info(resources_dir, javac_plugin_target):
-    javac_plugin_info_file = os.path.join(resources_dir, _JAVAC_PLUGIN_INFO_FILE)
-    with safe_open(javac_plugin_info_file, 'w') as f:
-      classname = javac_plugin_target.classname if PY3 else javac_plugin_target.classname.decode('utf-8')
-      f.write(classname)
 
   @staticmethod
   def validate_arguments(log, whitelisted_args, args):
@@ -263,6 +237,21 @@ class BaseZincCompile(JvmCompile):
     if self.context.products.is_required_data('zinc_args'):
       self.context.products.safe_create_data('zinc_args', lambda: defaultdict(list))
 
+  def extra_resources(self, compile_context):
+    """Override `extra_resources` to additionally include scalac_plugin info."""
+    result = super(BaseZincCompile, self).extra_resources(compile_context)
+    target = compile_context.target
+
+    if isinstance(target, ScalacPlugin):
+      result[_SCALAC_PLUGIN_INFO_FILE] = textwrap.dedent("""
+          <plugin>
+            <name>{}</name>
+            <classname>{}</classname>
+          </plugin>
+        """.format(target.plugin, target.classname))
+
+    return result
+
   def javac_classpath(self):
     # Note that if this classpath is empty then Zinc will automatically use the javac from
     # the JDK it was invoked with.
@@ -272,22 +261,6 @@ class BaseZincCompile(JvmCompile):
     """Returns classpath entries for the scalac classpath."""
     return ScalaPlatform.global_instance().compiler_classpath_entries(
       self.context.products, self.context._scheduler)
-
-  def write_extra_resources(self, compile_context):
-    """Override write_extra_resources to produce plugin and annotation processor files."""
-    target = compile_context.target
-    if isinstance(target, ScalacPlugin):
-      self._write_scalac_plugin_info(compile_context.classes_dir.path, target)
-    elif isinstance(target, JavacPlugin):
-      self._write_javac_plugin_info(compile_context.classes_dir.path, target)
-    elif isinstance(target, AnnotationProcessor) and target.processors:
-      processor_info_file = os.path.join(compile_context.classes_dir.path, _PROCESSOR_INFO_FILE)
-      self._write_processor_info(processor_info_file, target.processors)
-
-  def _write_processor_info(self, processor_info_file, processors):
-    with safe_open(processor_info_file, 'w') as f:
-      for processor in processors:
-        f.write('{}\n'.format(processor.strip()))
 
   def compile(self, ctx, args, dependency_classpath, upstream_analysis,
               settings, compiler_option_sets, zinc_file_manager,
@@ -397,14 +370,14 @@ class BaseZincCompile(JvmCompile):
       self.HERMETIC: lambda: self._compile_hermetic(
         jvm_options, ctx, classes_dir, zinc_args, compiler_bridge_classpath_entry,
         dependency_classpath, scalac_classpath_entries),
-      self.SUBPROCESS: lambda: self._compile_nonhermetic(jvm_options, zinc_args),
-      self.NAILGUN: lambda: self._compile_nonhermetic(jvm_options, zinc_args),
+      self.SUBPROCESS: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir, zinc_args),
+      self.NAILGUN: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir, zinc_args),
     })()
 
   class ZincCompileError(TaskError):
     """An exception type specifically to signal a failed zinc execution."""
 
-  def _compile_nonhermetic(self, jvm_options, zinc_args):
+  def _compile_nonhermetic(self, jvm_options, ctx, classes_directory, zinc_args):
     exit_code = self.runjava(classpath=self.get_zinc_compiler_classpath(),
                              main=Zinc.ZINC_COMPILE_MAIN,
                              jvm_options=jvm_options,
@@ -414,6 +387,9 @@ class BaseZincCompile(JvmCompile):
                              dist=self._zinc.dist)
     if exit_code != 0:
       raise self.ZincCompileError('Zinc compile failed.', exit_code=exit_code)
+    self.context._scheduler.materialize_directories((
+      DirectoryToMaterialize(text_type(classes_directory), self.extra_resources_digest(ctx)),
+    ))
 
   def _compile_hermetic(self, jvm_options, ctx, classes_dir, zinc_args,
                         compiler_bridge_classpath_entry, dependency_classpath,
@@ -466,18 +442,19 @@ class BaseZincCompile(JvmCompile):
         '-Dscala.usejavacp=true',
       ]
     else:
+      # TODO: Extract something common from Executor._create_command to make the command line
+      # TODO: Lean on distribution for the bin/java appending here
       additional_snapshots = ()
       image_specific_argv =  ['.jdk/bin/java'] + jvm_options + [
         '-cp', zinc_relpath,
         Zinc.ZINC_COMPILE_MAIN
       ]
 
-    # TODO: Extract something common from Executor._create_command to make the command line
-    # TODO: Lean on distribution for the bin/java appending here
     merged_input_digest = self.context._scheduler.merge_directories(
       tuple(s.directory_digest for s in snapshots) +
       directory_digests +
-      additional_snapshots
+      additional_snapshots +
+      (self.extra_resources_digest(ctx),)
     )
 
 

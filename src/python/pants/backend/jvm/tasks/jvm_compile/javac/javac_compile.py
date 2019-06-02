@@ -13,8 +13,6 @@ from future.utils import text_type
 from pants.backend.jvm import argfile
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
-from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
-from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.base.exceptions import TaskError
@@ -22,16 +20,9 @@ from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.engine.fs import DirectoryToMaterialize
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.distribution.distribution import DistributionLocator
-from pants.util.dirutil import safe_open
 from pants.util.meta import classproperty
 from pants.util.process_handler import subprocess
 
-
-# Well known metadata file to register javac plugins.
-_JAVAC_PLUGIN_INFO_FILE = 'META-INF/services/com.sun.source.util.Plugin'
-
-# Well known metadata file to register annotation processors with a java 1.6+ compiler.
-_PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 
 logger = logging.getLogger(__name__)
 
@@ -41,12 +32,6 @@ class JavacCompile(JvmCompile):
 
   _name = 'java'
   compiler_name = 'javac'
-
-  @staticmethod
-  def _write_javac_plugin_info(resources_dir, javac_plugin_target):
-    javac_plugin_info_file = os.path.join(resources_dir, _JAVAC_PLUGIN_INFO_FILE)
-    with safe_open(javac_plugin_info_file, 'w') as f:
-      f.write(javac_plugin_target.classname)
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
@@ -100,20 +85,6 @@ class JavacCompile(JvmCompile):
     # Note that if this classpath is empty then Javac will automatically use the javac from
     # the JDK it was invoked with.
     return Java.global_javac_classpath(self.context.products)
-
-  def write_extra_resources(self, compile_context):
-    """Override write_extra_resources to produce plugin and annotation processor files."""
-    target = compile_context.target
-    if isinstance(target, JavacPlugin):
-      self._write_javac_plugin_info(compile_context.classes_dir.path, target)
-    elif isinstance(target, AnnotationProcessor) and target.processors:
-      processor_info_file = os.path.join(compile_context.classes_dir.path, _PROCESSOR_INFO_FILE)
-      self._write_processor_info(processor_info_file, target.processors)
-
-  def _write_processor_info(self, processor_info_file, processors):
-    with safe_open(processor_info_file, 'w') as f:
-      for processor in processors:
-        f.write('{}\n'.format(processor.strip()))
 
   def compile(self, ctx, args, dependency_classpath, upstream_analysis,
               settings, compiler_option_sets, zinc_file_manager,
@@ -197,6 +168,9 @@ class JavacCompile(JvmCompile):
           workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
           if return_code:
             raise TaskError('javac exited with return code {rc}'.format(rc=return_code))
+        self.context._scheduler.materialize_directories((
+          DirectoryToMaterialize(text_type(ctx.classes_dir.path), self.extra_resources_digest(ctx)),
+        ))
 
   @classmethod
   def _javac_plugin_args(cls, javac_plugin_map):
@@ -241,7 +215,11 @@ class JavacCompile(JvmCompile):
     )
 
     # Dump the output to the .pants.d directory where it's expected by downstream tasks.
+    merged_directories = self.context._scheduler.merge_directories([
+        exec_result.output_directory_digest,
+        self.extra_resources_digest(ctx),
+      ])
     classes_directory = ctx.classes_dir.path
     self.context._scheduler.materialize_directories((
-      DirectoryToMaterialize(text_type(classes_directory), exec_result.output_directory_digest),
+      DirectoryToMaterialize(text_type(classes_directory), merged_directories),
     ))
