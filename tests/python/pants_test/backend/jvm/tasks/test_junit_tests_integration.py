@@ -99,7 +99,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         'testprojects/src/java/org/pantsbuild/testproject/junit/earlyexit:tests'])
     self.assert_failure(pants_run)
     self.assertIn('java.lang.UnknownError: Abnormal VM exit - test crashed.', pants_run.stdout_data)
-    self.assertIn('Tests run: 0,  Failures: 1', pants_run.stdout_data)
+    self.assertIn('Tests run: 1,  Failures: 1', pants_run.stdout_data)
     self.assertIn('FATAL: VM exiting unexpectedly.', pants_run.stdout_data)
 
   def test_junit_test_target_cwd(self):
