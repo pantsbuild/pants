@@ -19,16 +19,12 @@ object OutputUtils {
    * @param dir File handle containing the contents to sort
    * @return sorted set of all paths within the `dir`
    */
-  def sort(dir:File): mutable.TreeSet[Path] = {
+  def sort(dir: File): mutable.TreeSet[Path] = {
     val sorted = new mutable.TreeSet[Path]()
 
     val fileSortVisitor = new SimpleFileVisitor[Path]() {
       override def preVisitDirectory(path: Path, attrs: BasicFileAttributes): FileVisitResult = {
-        if (!path.endsWith("/")) {
-          sorted.add(Paths.get(path.toString, "/"))
-        } else {
-          sorted.add(path)
-        }
+        sorted.add(path)
         FileVisitResult.CONTINUE
       }
 
@@ -66,19 +62,19 @@ object OutputUtils {
       jarEntry
     }
 
-    def addToJar(source: Path, entryName: String): FileVisitResult = {
+    def addToJar(source: Path, entryName: String) {
       if (source.toFile.isDirectory) {
-        target.putNextEntry(jarEntry(entryName))
+        target.putNextEntry(jarEntry(if (entryName.endsWith("/")) entryName else entryName + '/'))
       } else {
         target.putNextEntry(jarEntry(entryName))
         Files.copy(source, target)
       }
       target.closeEntry()
-      FileVisitResult.CONTINUE
     }
 
-    val pathToName = filePaths.zipWithIndex.map{case(k, v) => (k, relativize(base, k))}.toMap
-    pathToName.map(e => addToJar(e._1, e._2))
+    for (filePath <- filePaths) {
+      addToJar(filePath, relativize(base, filePath))
+    }
     target.close()
   }
 
