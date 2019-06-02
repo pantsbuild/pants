@@ -180,8 +180,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       classpath=[
         JarDependency(
           org='com.twitter',
-          name='rsc_2.11',
-          rev='0.0.0-734-e57e96eb',
+          name='rsc_2.12',
+          rev='0.0.0-768-7357aa0a',
         ),
       ],
       custom_rules=[
