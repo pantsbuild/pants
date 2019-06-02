@@ -1,3 +1,5 @@
+set -x
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 
 # Defines:
