@@ -11,6 +11,7 @@ from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.build_graph.address import Address
+from pants.engine.fs import Snapshot
 
 
 class ScalaLibrary(ExportableJvmLibrary):
@@ -85,3 +86,30 @@ class ScalaLibrary(ExportableJvmLibrary):
         raise TargetDefinitionException(self, 'No such java target: {}'.format(spec))
       targets.append(target)
     return targets
+
+  def sources_snapshot(self, scheduler=None):
+    scala_sources = super(ScalaLibrary, self).sources_snapshot(scheduler=scheduler)
+    all_java_sources = [
+      java_target.sources_snapshot(scheduler=scheduler)
+      for java_target in self.java_sources
+    ]
+    all_merged_sources_digest = scheduler.merge_directories(tuple([
+      scala_sources.directory_digest,
+    ] + [
+      java_sources_snapshot.directory_digest
+      for java_sources_snapshot in all_java_sources
+    ]))
+    # TODO: make this .files/.dirs merging process into a helper method in the Scheduler(Session)?!
+    return Snapshot(
+      directory_digest=all_merged_sources_digest,
+      files=tuple([
+        scala_sources.files
+      ] + [
+        j.files for j in all_java_sources
+      ]),
+      dirs=tuple([
+        scala_sources.dirs
+      ] + [
+        j.dirs for j in all_java_sources
+      ]),
+    )
