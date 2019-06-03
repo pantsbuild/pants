@@ -1659,6 +1659,7 @@ matrix:
 
     - <<: *py27_linux_test_config
       name: "Python contrib tests - shard 0 (Py2.7 PEX)"
+      stage: *test
       env:
         - *py27_linux_test_config_env
         - CACHE_NAME=contrib.py27.shard0
@@ -1667,6 +1668,7 @@ matrix:
 
     - <<: *py27_linux_test_config
       name: "Python contrib tests - shard 1 (Py2.7 PEX)"
+      stage: *test
       env:
         - *py27_linux_test_config_env
         - CACHE_NAME=contrib.py27.shard1
@@ -1691,6 +1693,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Python contrib tests with Pantsd - shard 0 (Py3.6 PEX)"
+      stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
@@ -1700,6 +1703,7 @@ matrix:
 
     - <<: *py36_linux_test_config
       name: "Python contrib tests with Pantsd - shard 1 (Py3.6 PEX)"
+      stage: *test_cron
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
