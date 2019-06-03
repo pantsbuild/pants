@@ -10,7 +10,6 @@ from pex.interpreter import PythonInterpreter
 from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
-from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.pex_build_util import (PexBuilderWrapper,
                                                             has_python_requirements,
                                                             has_python_sources, has_resources,
@@ -36,7 +35,6 @@ class PythonBinaryCreate(Task):
     return super(PythonBinaryCreate, cls).subsystem_dependencies() + (
       PexBuilderWrapper.Factory,
       PythonNativeCode.scoped(cls),
-      PythonInterpreterCache,
     )
 
   @memoized_property
@@ -104,18 +102,6 @@ class PythonBinaryCreate(Task):
         atomic_copy(pex_path, pex_copy)
         self.context.log.info('created pex {}'.format(os.path.relpath(pex_copy, get_buildroot())))
 
-  def _validate_interpreter_constraints(self, constraint_tgts):
-    """Validate that the transitive constraints of the given PythonBinary target are compatible.
-
-    If no (local) interpreter can satisfy all of the given targets, raises
-    PythonInterpreterCache.UnsatisfiableInterpreterConstraintsError.
-
-    TODO: This currently does so by finding a concrete local interpreter that matches all of the
-    constraints, but it is possible to do this in memory instead.
-      see https://github.com/pantsbuild/pants/issues/7775
-    """
-    PythonInterpreterCache.global_instance().select_interpreter_for_targets(constraint_tgts)
-
   def _create_binary(self, binary_tgt, results_dir):
     """Create a .pex file for the specified binary target."""
     # Note that we rebuild a chroot from scratch, instead of using the REQUIREMENTS_PEX
@@ -154,9 +140,10 @@ class PythonBinaryCreate(Task):
         if is_python_target(tgt):
           constraint_tgts.append(tgt)
 
-      # Add interpreter compatibility constraints to pex info. This will first check the targets for any
-      # constraints, and if they do not have any will resort to the global constraints.
-      self._validate_interpreter_constraints(constraint_tgts)
+      # Add interpreter compatibility constraints to pex info. Note that we only add the constraints for the final
+      # binary target itself, not its dependencies. The upstream interpreter selection tasks will already validate that
+      # there are no compatibility conflicts among the dependencies and target. If the binary target does not have
+      # `compatibility` in its BUILD entry, the global --python-setup-interpreter-constraints will be used.
       pex_builder.add_interpreter_constraints_from([binary_tgt])
 
       # Dump everything into the builder's chroot.
