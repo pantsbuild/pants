@@ -108,7 +108,7 @@ class RscCompileContext(CompileContext):
     self.rsc_jar_file = rsc_jar_file
 
   def ensure_output_dirs_exist(self):
-    safe_mkdir(os.path.dirname(self.rsc_jar_file))
+    safe_mkdir(os.path.dirname(self.rsc_jar_file.path))
 
 
 class RscCompile(ZincCompile, MirroredTargetOptionMixin):
@@ -222,28 +222,13 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   # NB: Override of ZincCompile/JvmCompile method!
   def register_extra_products_from_contexts(self, targets, compile_contexts):
     super(RscCompile, self).register_extra_products_from_contexts(targets, compile_contexts)
-    def pathglob_for(filename):
-      return PathGlobsAndRoot(
-        PathGlobs(
-          (fast_relpath_optional(filename, get_buildroot()),)),
-        text_type(get_buildroot()))
 
-    def to_classpath_entries(paths, scheduler):
-      # list of path ->
-      # list of (path, optional<digest>) ->
-      path_and_digests = [(p, Digest.load(os.path.dirname(p))) for p in paths]
+    def validate_classpath_entries(cp_entries):
       # partition: list of path, list of tuples
-      paths_without_digests = [p for (p, d) in path_and_digests if not d]
-      if paths_without_digests:
-        self.context.log.debug('Expected to find digests for {}, capturing them.'
-          .format(paths_without_digests))
-      paths_with_digests = [(p, d) for (p, d) in path_and_digests if d]
-      # list of path -> list path, captured snapshot -> list of path with digest
-      snapshots = scheduler.capture_snapshots(tuple(pathglob_for(p) for p in paths_without_digests))
-      captured_paths_and_digests = [(p, s.directory_digest)
-        for (p, s) in zip(paths_without_digests, snapshots)]
-      # merge and classpath ify
-      return [ClasspathEntry(p, d) for (p, d) in paths_with_digests + captured_paths_and_digests]
+      paths_without_digests = [entry for entry in cp_entries if not entry.directory_digest]
+      if paths_without_digests and self.execution_strategy_enum == self.ExecutionStrategy.hermetic:
+        raise TaskError('Expected to find digests for {}!'.format(paths_without_digests))
+      return cp_entries
 
     def confify(entries):
       return [(conf, e) for e in entries for conf in self._confs]
@@ -257,8 +242,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         cp_entries = rsc_cc.workflow.resolve_for_enum_variant({
           'zinc-only': lambda: confify([zinc_cc.jar_file]),
           'zinc-java': lambda: confify([zinc_cc.jar_file]),
-          'rsc-and-zinc': lambda: confify(
-            to_classpath_entries([rsc_cc.rsc_jar_file], self.context._scheduler)),
+          'rsc-and-zinc': lambda: confify(validate_classpath_entries([rsc_cc.rsc_jar_file])),
         })()
         self.context.products.get_data('rsc_mixed_compile_classpath').add_for_target(
           target,
@@ -371,7 +355,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         with Timer() as timer:
           # Outline Scala sources into SemanticDB / scalac compatible header jars.
           # ---------------------------------------------
-          rsc_jar_file = fast_relpath(ctx.rsc_jar_file, get_buildroot())
+          rsc_jar_file = fast_relpath(ctx.rsc_jar_file.path, get_buildroot())
 
           sources_snapshot = ctx.target.sources_snapshot(scheduler=self.context._scheduler)
 
@@ -399,13 +383,16 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
                    '-d', rsc_jar_file,
                  ] + target_sources
 
-          self._runtool(
+          directory_digest = self._runtool(
             args,
             distribution,
             tgt=tgt,
             input_files=tuple(compile_classpath_rel),
             input_digest=input_digest,
             output_dir=os.path.dirname(rsc_jar_file))
+
+        # TODO: why are we mutating this?
+        ctx.rsc_jar_file = ClasspathEntry(ctx.rsc_jar_file.path, directory_digest)
 
         self._record_target_stats(tgt,
           len(compile_classpath_rel),
@@ -561,7 +548,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         classes_dir=None,
         jar_file=None,
         zinc_args_file=None,
-        rsc_jar_file=os.path.join(rsc_dir, 'm.jar'),
+        rsc_jar_file=ClasspathEntry(os.path.join(rsc_dir, 'm.jar'), None),
         log_dir=os.path.join(rsc_dir, 'logs'),
         sources=sources,
         workflow=self._classify_target_compile_workflow(target),
@@ -575,6 +562,24 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         zinc_args_file=os.path.join(zinc_dir, 'zinc_args'),
         sources=sources,
       ))
+
+  # TODO: This overrides the same method in jvm_compile.py, and that method should be refactored to
+  # allow fetching the digests for valid targets in a batch instead of one of a time.
+  def _classpath_for_context(self, context):
+    cp = super(RscCompile, self)._classpath_for_context(context)
+    assert isinstance(cp, ClasspathEntry)
+    if cp.directory_digest is not None:
+      return cp
+
+    cp_digest = Digest.load(os.path.dirname(cp.path))
+    if cp_digest is None:
+      cp_globs = PathGlobsAndRoot(
+        PathGlobs((fast_relpath(cp.path, get_buildroot()),)),
+        text_type(get_buildroot()))
+      cp_snapshot, = self.context._scheduler.capture_snapshots((cp_globs,))
+      cp_digest = cp_snapshot.directory_digest
+
+    return ClasspathEntry(cp.path, cp_digest)
 
   def _runtool_hermetic(self, main, tool_name, args, distribution, tgt=None, input_files=tuple(), input_digest=None, output_dir=None):
     tool_classpath_abs = self._rsc_classpath
@@ -650,7 +655,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
           res.output_directory_digest),
       ))
       # TODO drop a file containing the digest, named maybe output_dir.digest
-    return res
+    return res.output_directory_digest
 
   # The classpath is parameterized so that we can have a single nailgun instance serving all of our
   # execution requests.
@@ -674,7 +679,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     # TODO: figure out and document when would this happen.
     if runjava_workunit is None:
       raise Exception('couldnt find work unit for underlying execution')
-    return runjava_workunit
 
   def _runtool(self, args, distribution,
                tgt=None, input_files=tuple(), input_digest=None, output_dir=None):
