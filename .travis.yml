@@ -1658,39 +1658,71 @@ matrix:
     - <<: *osx_rust_tests
 
     - <<: *py27_linux_test_config
-      name: "Python contrib tests (Py2.7 PEX)"
-      stage: *test
+      name: "Python contrib tests - shard 0 (Py2.7 PEX)"
       env:
         - *py27_linux_test_config_env
-        - CACHE_NAME=linuxcontribtests.py27
+        - CACHE_NAME=contrib.py27.shard0
       script:
-        - ./build-support/bin/ci.sh -2n
+        - ./build-support/bin/ci.sh -2n -y 0/2
+
+    - <<: *py27_linux_test_config
+      name: "Python contrib tests - shard 1 (Py2.7 PEX)"
+      env:
+        - *py27_linux_test_config_env
+        - CACHE_NAME=contrib.py27.shard1
+      script:
+        - ./build-support/bin/ci.sh -2n -y 1/2
 
     - <<: *py36_linux_test_config
-      name: "Python contrib tests (Py3.6 PEX)"
+      name: "Python contrib tests - shard 0 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
-        - CACHE_NAME=linuxcontribtests.py36
+        - CACHE_NAME=contrib.py36.shard0
       script:
-        - ./build-support/bin/ci.sh -n
+        - ./build-support/bin/ci.sh -n -y 0/2
 
     - <<: *py36_linux_test_config
-      name: "Python contrib tests with Pantsd (Py3.6 PEX)"
-      stage: *test_cron
+      name: "Python contrib tests - shard 1 (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - CACHE_NAME=contrib.py36.shard1
+      script:
+        - ./build-support/bin/ci.sh -n -y 1/2
+
+    - <<: *py36_linux_test_config
+      name: "Python contrib tests with Pantsd - shard 0 (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
         - *run_tests_under_pantsd
-        - CACHE_NAME=linuxcontribtests.py36
+        - CACHE_NAME=contrib.py36.pantsd.shard0
       script:
-        - ./build-support/bin/ci.sh -n
+        - ./build-support/bin/ci.sh -n -y 0/2
+
+    - <<: *py36_linux_test_config
+      name: "Python contrib tests with Pantsd - shard 1 (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - *run_tests_under_pantsd
+        - CACHE_NAME=contrib.py36.pantsd.shard1
+      script:
+        - ./build-support/bin/ci.sh -n -y 1/2
 
     - <<: *py37_linux_test_config
-      name: "Python contrib tests (Py3.7 PEX)"
+      name: "Python contrib tests - shard 0 (Py3.7 PEX)"
       env:
         - *py37_linux_test_config_env
-        - CACHE_NAME=linuxcontribtests.py37
+        - CACHE_NAME=contrib.py37.shard0
       script:
-        - ./build-support/bin/ci.sh -7n
+        - ./build-support/bin/ci.sh -7n -y 0/2
+
+    - <<: *py37_linux_test_config
+      name: "Python contrib tests - shard 1 (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=contrib.py37.shard1
+      script:
+        - ./build-support/bin/ci.sh -7n -y 1/2
+
 
     - <<: *py27_osx_10_12_sanity_check
     - <<: *py36_osx_10_12_sanity_check

@@ -9,6 +9,7 @@ import pystache
 
 
 num_integration_shards = 20
+num_contrib_shards = 2
 
 
 HEADER = """
@@ -37,6 +38,8 @@ def generate_travis_yml():
     'header': HEADER,
     'integration_shards': range(0, num_integration_shards),
     'integration_shards_length': num_integration_shards,
+    'contrib_shards': range(0, num_contrib_shards),
+    'contrib_shards_length': num_contrib_shards,
   }
   renderer = pystache.Renderer(partials={
     'before_install_linux': before_install_linux,
