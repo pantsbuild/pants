@@ -20,7 +20,7 @@ class JUnit(JvmToolMixin, InjectablesMixin, Subsystem):
   RUNNER_MAIN = 'org.pantsbuild.tools.junit.ConsoleRunner'
 
   LIBRARY_JAR = JarDependency(org='junit', name='junit', rev=LIBRARY_REV)
-  _RUNNER_JAR = JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.24')
+  _RUNNER_JAR = JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.26')
 
   @classmethod
   def register_options(cls, register):
