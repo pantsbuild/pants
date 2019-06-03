@@ -228,6 +228,7 @@ function build_pants_packages() {
   pants_version_set "${version}"
 
   start_travis_section "${NAME}" "Building packages"
+  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
   # shellcheck disable=SC2207
   packages=(
     $(run_packages_script build_and_print "${version}")
@@ -316,6 +317,7 @@ function install_and_test_packages() {
   export PANTS_PLUGIN_CACHE_DIR
   trap 'rm -rf "${PANTS_PLUGIN_CACHE_DIR}"' EXIT
 
+  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
   # shellcheck disable=SC2207
   packages=(
     $(run_packages_script list | grep '.' | awk '{print $1}')
@@ -517,11 +519,13 @@ function fetch_and_check_prebuilt_wheels() {
   fetch_prebuilt_wheels "${check_dir}"
 
   local missing=()
+  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
   # shellcheck disable=SC2207
   RELEASE_PACKAGES=(
     $(run_packages_script list | grep '.' | awk '{print $1}')
   ) || die "Failed to get a list of packages to release!"
   for PACKAGE in "${RELEASE_PACKAGES[@]}"; do
+    # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
     # shellcheck disable=SC2207
     packages=($(find_pkg "${PACKAGE}" "${PANTS_UNSTABLE_VERSION}" "${check_dir}"))
     if [ ${#packages[@]} -eq 0 ]; then

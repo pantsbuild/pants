@@ -42,6 +42,7 @@ if [[ "${check}" == "true" ]]; then
   cmd=("${cmd[@]}" "--check")
 fi
 
+# WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
 # shellcheck disable=SC2207
 bad_files=(
   $(

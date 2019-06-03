@@ -67,12 +67,14 @@ export PY="${PY:-python3}"
 # Pants will try to use Python 2 for subprocesses. Without setting minor version constraints, when using Python 3
 # we could end up using a different Python minor version for subprocesses than we do for Pants.
 py_major_minor_patch=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:3])))')
+# NB: We intentionally don't want quote expansion here. See https://github.com/koalaman/shellcheck/wiki/SC2016.
 # shellcheck disable=SC2016
 export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor_patch}']}"
 
 PANTS_EXE="${HERE}/src/python/pants/bin/pants_loader.py"
 
 if [[ -n "${WRAPPER_REQUIREMENTS}" ]]; then
+  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
   # shellcheck disable=SC2207
   REQUIREMENTS=(
     $(echo "${WRAPPER_REQUIREMENTS}" | tr : ' ')
@@ -84,6 +86,7 @@ PANTS_SRCPATH=(
   "${HERE}/src/python"
 )
 if [[ -n "${WRAPPER_SRCPATH}" ]]; then
+  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
   # shellcheck disable=SC2207
   PANTS_SRCPATH=(
     $(echo "${WRAPPER_SRCPATH}" | tr : ' ')

@@ -30,6 +30,7 @@ DIRS_TO_CHECK=(
 # integration test!
 set -e
 
+# WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
 # shellcheck disable=SC2207
 ADDED_FILES=($(./build-support/bin/get_added_files.sh))
 MERGE_BASE="$(git_merge_base)"
