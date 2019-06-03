@@ -2,8 +2,6 @@ set -x
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)"
 
-export PY=${PY:-python}
-
 # Defines:
 # + CACHE_ROOT: The pants cache directory, ie: ~/.cache/pants.
 # Exposes:
@@ -54,7 +52,7 @@ function bootstrap_rust() {
     "${RUSTUP}" toolchain install "${RUST_TOOLCHAIN}"
     "${RUSTUP}" component add --toolchain "${RUST_TOOLCHAIN}" "${RUST_COMPONENTS[@]}" >&2
 
-    symlink_target="$("$PY" -c 'import os, sys; print(os.path.relpath(*sys.argv[1:]))' "$(RUSTUP_TOOLCHAIN="${RUST_TOOLCHAIN}" cargo_bin)" "${rust_toolchain_root}")"
+    symlink_target="$(python -c 'import os, sys; print(os.path.relpath(*sys.argv[1:]))' "$(RUSTUP_TOOLCHAIN="${RUST_TOOLCHAIN}" cargo_bin)" "${rust_toolchain_root}")"
     ln -fs "${symlink_target}" "${rust_toolchain_root}/${cargo_versioned}"
   fi
 
