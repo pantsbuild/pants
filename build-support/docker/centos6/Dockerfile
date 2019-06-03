@@ -30,6 +30,9 @@ ENV PYENV_BIN "${PYENV_ROOT}/bin/pyenv"
 RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
 
 # Install Python 2.7 and 3.6.
+# NB: We intentionally do not use `--enable-shared`, as it results in our shipped wheels for the PEX release
+# using `libpython.X.Y.so.1`, which means that the PEX will not work for any consumer interpreters that were statically
+# built, i.e. compiled without `--enable-shared`. See https://github.com/pantsbuild/pants/pull/7794.
 RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_27_VERSION}
 RUN /usr/bin/scl enable devtoolset-7 -- ${PYENV_BIN} install ${PYTHON_36_VERSION}
 RUN ${PYENV_BIN} global ${PYTHON_27_VERSION} ${PYTHON_36_VERSION}

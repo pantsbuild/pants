@@ -69,10 +69,6 @@ ENV LC_ALL="en_US.UTF-8"
 
 WORKDIR ${TRAVIS_WORK_DIR_PATH}
 
-# TODO: these are only useful for local testing.
-#RUN git clone https://github.com/Eric-Arellano/pants.git
-#RUN (cd pants; git checkout fix-libpython-so-issues)
-
 # Execute any args passed to `docker run` in the context of the devtoolset-7 software collection
 # used in the base image to install requirements.
 ENTRYPOINT ["/usr/bin/scl", "enable" , "devtoolset-7", "--"]
