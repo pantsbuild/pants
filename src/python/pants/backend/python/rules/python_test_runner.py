@@ -73,7 +73,7 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, pex_b
   # Sort all user requirement strings to increase the chance of cache hits across invocations.
   all_requirements = sorted(all_target_requirements + list(pytest.get_requirement_strings()))
 
-  # NB: we use the generic bin name `python`, rather than something hardcoded like
+  # NB: we use the hardcoded and generic bin name `python`, rather than something dynamic like
   # `sys.executable`, to ensure that the python_binary may be discovered both locally and in remote
   # execution. This is only used to run the downloaded PEX tool; it is not necessarily the
   # interpreter that PEX will use to execute the generated .pex files.
