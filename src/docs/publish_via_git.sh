@@ -23,7 +23,7 @@ set -eo pipefail
 # If a file "went away", this won't remove it.
 
 root=$(
-  cd "$(dirname $0)"
+  cd "$(dirname "$0")"
   /bin/pwd
 )
 
@@ -32,7 +32,7 @@ path_within_url=$2
 out=/tmp/pantsdoc.$$
 
 # When done, clean up tmp dir:
-trap "rm -fr $out" 0 1 2
+trap 'rm -fr $out' 0 1 2
 
 mkdir -p $out
 cd $out

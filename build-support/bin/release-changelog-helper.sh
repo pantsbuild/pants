@@ -74,6 +74,8 @@ do
   echo "* ${subject}"
 
   urls=()
+  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
+  # shellcheck disable=SC2207
   urls=(
     "${urls[@]}"
     $(
@@ -82,6 +84,8 @@ do
         sed -Ee "s|^\(#([0-9]+)\)$|https://github.com/pantsbuild/pants/pull/\1|"
     )
   )
+  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
+  # shellcheck disable=SC2207
   urls=(
     "${urls[@]}"
     $(

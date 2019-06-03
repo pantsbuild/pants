@@ -2,6 +2,7 @@
 
 exit_code=0
 
+# NB: we intentionally don't want quote expansion here. See https://github.com/koalaman/shellcheck/wiki/SC2016.
 # shellcheck disable=SC2016
 bad_output="$(find ./* -name '*.sh' -print0 \
   | xargs -0 grep '^ *\(readonly\|declare\) .*\(\$(\|`\)' \

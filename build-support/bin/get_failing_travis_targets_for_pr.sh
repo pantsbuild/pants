@@ -23,6 +23,8 @@ for job in ${jobs}; do
       ;;
     "failed")
       "${curl[@]}" "https://api.travis-ci.org/job/${job}/log.txt" > "logs/jobs/${job}/txt"
+      # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
+      # shellcheck disable=SC2207
       targets=("${targets[@]}" $(cat -v "logs/jobs/${job}/txt" | awk '$2 == "....." && $3 ~ /^FAILURE/ {print $1}'))
       ;;
     *)

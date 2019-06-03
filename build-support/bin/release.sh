@@ -228,6 +228,8 @@ function build_pants_packages() {
   pants_version_set "${version}"
 
   start_travis_section "${NAME}" "Building packages"
+  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
+  # shellcheck disable=SC2207
   packages=(
     $(run_packages_script build_and_print "${version}")
   ) || die "Failed to build packages at ${version}!"
@@ -315,6 +317,8 @@ function install_and_test_packages() {
   export PANTS_PLUGIN_CACHE_DIR
   trap 'rm -rf "${PANTS_PLUGIN_CACHE_DIR}"' EXIT
 
+  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
+  # shellcheck disable=SC2207
   packages=(
     $(run_packages_script list | grep '.' | awk '{print $1}')
   ) || die "Failed to list packages!"
@@ -515,11 +519,14 @@ function fetch_and_check_prebuilt_wheels() {
   fetch_prebuilt_wheels "${check_dir}"
 
   local missing=()
+  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
+  # shellcheck disable=SC2207
   RELEASE_PACKAGES=(
     $(run_packages_script list | grep '.' | awk '{print $1}')
   ) || die "Failed to get a list of packages to release!"
-  for PACKAGE in "${RELEASE_PACKAGES[@]}"
-  do
+  for PACKAGE in "${RELEASE_PACKAGES[@]}"; do
+    # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
+    # shellcheck disable=SC2207
     packages=($(find_pkg "${PACKAGE}" "${PANTS_UNSTABLE_VERSION}" "${check_dir}"))
     if [ ${#packages[@]} -eq 0 ]; then
       missing+=("${PACKAGE}")
@@ -528,8 +535,7 @@ function fetch_and_check_prebuilt_wheels() {
 
     # Confirm that if the package is not cross platform that we have whls for two platforms.
     local cross_platform=""
-    for package in "${packages[@]}"
-    do
+    for package in "${packages[@]}"; do
       if [[ "${package}" =~ -none-any.whl ]]
       then
         cross_platform="true"
@@ -559,7 +565,7 @@ function adjust_wheel_platform() {
   local src_plat="$1"
   local dst_plat="$2"
   local dir="$3"
-  for src_whl in $(find "${dir}" -name '*'"${src_plat}.whl"); do
+  find "$dir" -type f -name "*${src_plat}.whl" | while read -r src_whl; do
     local dst_whl=${src_whl/$src_plat/$dst_plat}
     mv -f "${src_whl}" "${dst_whl}"
   done

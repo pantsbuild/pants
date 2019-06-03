@@ -6,7 +6,7 @@ import shutil
 import subprocess
 from glob import glob
 
-from common import die, green
+from common import die
 
 
 def main() -> None:
@@ -37,8 +37,6 @@ def run_shellcheck() -> None:
     subprocess.run(command, check=True)
   except subprocess.CalledProcessError:
     die("Please fix the above errors and run again.")
-  else:
-    green("./pants passed the shellcheck!")
 
 
 if __name__ == "__main__":

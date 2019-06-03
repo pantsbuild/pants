@@ -120,6 +120,7 @@ else
 fi
 export PY="${PY:-python${py_major_minor}}"
 
+# NB: we intentionally don't want quote expansion here. See https://github.com/koalaman/shellcheck/wiki/SC2016.
 # shellcheck disable=SC2016
 export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor}.*']}"
 banner "Setting interpreter constraints to ${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS}"

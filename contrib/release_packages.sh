@@ -19,8 +19,8 @@ function pkg_scrooge_install_test() {
 function pkg_buildgen_install_test() {
   local version=$1
   shift
-  local PIP_ARGS="$@"
-  pip install ${PIP_ARGS} "pantsbuild.pants.contrib.buildgen==${version}" && \
+  local PIP_ARGS=("$@")
+  pip install "${PIP_ARGS[@]}" "pantsbuild.pants.contrib.buildgen==${version}" && \
   python -c "from pants.contrib.buildgen.build_file_manipulator import *"
 }
 
