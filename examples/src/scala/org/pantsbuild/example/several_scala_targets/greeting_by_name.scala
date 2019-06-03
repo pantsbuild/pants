@@ -3,6 +3,6 @@
 
 object GreetingByName {
   def greeting_by_name(name: String): String = {
-    "Hello %s! How are you?".format(name)
+    s"Hello {name}! How are you?"
   }
 }

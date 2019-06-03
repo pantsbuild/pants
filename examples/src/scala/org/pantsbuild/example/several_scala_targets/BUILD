@@ -1,7 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-# This BUILD file contains several targets with scala libraries that will be compiled in parallel.
+# This BUILD file contains several targets with scala libraries that can be compiled in parallel.
 
 scala_library(
   name='simple_greeting',

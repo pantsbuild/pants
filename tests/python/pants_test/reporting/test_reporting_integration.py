@@ -4,13 +4,12 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from collections import defaultdict
-
 import json
 import os.path
 import re
 import unittest
 from builtins import open
+from collections import defaultdict
 from http.server import BaseHTTPRequestHandler
 
 from future.utils import PY3
@@ -18,6 +17,7 @@ from parameterized import parameterized
 from py_zipkin import Encoding
 from py_zipkin.encoding import convert_spans
 
+from pants.util.collections import assert_single_element
 from pants.util.contextutil import http_server
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -176,10 +176,8 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       pants_run = self.run_pants(command)
       self.assert_success(pants_run)
 
-      num_of_traces = len(ZipkinHandler.traces)
-      self.assertEqual(num_of_traces, 1)
+      trace = assert_single_element(ZipkinHandler.traces.values())
 
-      trace = next(iter(ZipkinHandler.traces.values()))
       main_span = self.find_spans_by_name(trace, 'main')
       self.assertEqual(len(main_span), 1)
 
@@ -205,10 +203,8 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       pants_run = self.run_pants(command)
       self.assert_success(pants_run)
 
-      num_of_traces = len(ZipkinHandler.traces)
-      self.assertEqual(num_of_traces, 1)
+      trace = assert_single_element(ZipkinHandler.traces.values())
 
-      trace = next(iter(ZipkinHandler.traces.values()))
       main_span = self.find_spans_by_name(trace, 'main')
       self.assertEqual(len(main_span), 1)
 
@@ -253,10 +249,8 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       pants_run = self.run_pants(command)
       self.assert_success(pants_run)
 
-      num_of_traces = len(ZipkinHandler.traces)
-      self.assertEqual(num_of_traces, 1)
+      trace = assert_single_element(ZipkinHandler.traces.values())
 
-      trace = next(iter(ZipkinHandler.traces.values()))
       v2_span_name_part = "Scandir"
       self.assertTrue(any(v2_span_name_part in span['name'] for span in trace),
         "There is no span that contains '{}' in it's name. The trace:{}".format(
@@ -275,10 +269,9 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
       pants_run = self.run_pants(command)
       self.assert_success(pants_run)
-      num_of_traces = len(ZipkinHandler.traces)
-      self.assertEqual(num_of_traces, 1)
 
-      trace = next(iter(ZipkinHandler.traces.values()))
+      trace = assert_single_element(ZipkinHandler.traces.values())
+
       zinc_task_span = self.find_spans_by_name_and_service_name(trace, 'zinc', 'pants task')
       self.assertEqual(len(zinc_task_span), 1)
       zinc_task_span_id = zinc_task_span[0]['id']

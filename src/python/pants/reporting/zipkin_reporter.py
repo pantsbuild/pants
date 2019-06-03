@@ -56,8 +56,6 @@ class ZipkinReporter(Reporter):
     :param float sample_rate: Rate at which to sample Zipkin traces. Value 0.0 - 100.0.
     """
     super(ZipkinReporter, self).__init__(run_tracker, settings)
-    # We keep track of connection between workunits and spans
-    self._workunits_to_spans = {}
     # Create a transport handler
     self.handler = HTTPTransportHandler(endpoint)
     self.trace_id = trace_id
@@ -77,12 +75,13 @@ class ZipkinReporter(Reporter):
       service_name = "pants workunit"
 
     # Set local_tracer. Tracer stores spans and span's zipkin_attrs.
-    # If start_workunit is called from the root thread than local_tracer is the same as self.tracer.
-    # If start_workunit is called from a new thread than local_tracer will be empty.
+    # If start_workunit is called from the root thread then local_tracer is the same as self.tracer.
+    # If start_workunit is called from a new thread then local_tracer will have an empty span
+    # storage and stack.
     local_tracer = get_default_tracer()
 
     # Check if it is the first workunit
-    first_span = not self._workunits_to_spans
+    first_span = self.run_tracker.is_main_root_workunit(workunit)
     if first_span:
       # If trace_id and parent_id are given as flags create zipkin_attrs
       if self.trace_id is not None and self.parent_id is not None:
@@ -118,7 +117,7 @@ class ZipkinReporter(Reporter):
       # If start_workunit is called from a new thread local_tracer doesn't have zipkin attributes.
       # Parent's attributes need to be added to the local_tracer zipkin_attrs storage.
       if not local_tracer.get_zipkin_attrs():
-        parent_attrs = workunit.parent.zipkin_attrs
+        parent_attrs = workunit.parent.zipkin_span.zipkin_attrs
         local_tracer.push_zipkin_attrs(parent_attrs)
         local_tracer.set_transport_configured(configured=True)
       span = local_tracer.zipkin_span(
@@ -127,33 +126,28 @@ class ZipkinReporter(Reporter):
       )
     # For all spans except the first span zipkin_attrs for span are created at this point
     span.start()
-    if workunit.name == 'background' and workunit.parent == None:
-      span.zipkin_attrs = ZipkinAttrs(
-        trace_id=span.zipkin_attrs.trace_id,
-        span_id=span.zipkin_attrs.span_id,
-        parent_span_id=self.run_tracker._main_root_workunit.zipkin_attrs.span_id,
-        flags='0', # flags: stores flags header. Currently unused
-        is_sampled=True,
+    if workunit.name == 'background' and self.run_tracker.is_main_root_workunit(workunit.parent):
+      span.zipkin_attrs = span.zipkin_attrs._replace(
+        parent_span_id=workunit.parent.zipkin_span.zipkin_attrs.span_id
       )
       span.service_name = "pants background workunit"
-    workunit.zipkin_attrs = span.zipkin_attrs
+
     # Goals and tasks save their start time at the beginning of their run.
     # This start time is passed to workunit, because the workunit may be created much later.
     span.start_timestamp = workunit.start_time
     if first_span and span.zipkin_attrs.is_sampled:
       span.logging_context.start_timestamp = workunit.start_time
-    self._workunits_to_spans[workunit] = span
+    workunit.zipkin_span = span
 
   def end_workunit(self, workunit):
     """Implementation of Reporter callback."""
-    if workunit in self._workunits_to_spans:
-      span = self._workunits_to_spans.pop(workunit)
-      span.stop()
-      span_tracer = span.get_tracer()
-      if span_tracer is not self.tracer:
-        for span in span_tracer.get_spans():
-          self.tracer.add_span(span)
-        span_tracer.clear()
+    span = workunit.zipkin_span
+    span.stop()
+    span_tracer = span.get_tracer()
+    if span_tracer is not self.tracer:
+      for span in span_tracer.get_spans():
+        self.tracer.add_span(span)
+      span_tracer.clear()
 
 
   def close(self):

@@ -58,7 +58,11 @@ def assert_single_element(iterable):
   :raise: :class:`ValueError` if there is more than one element.
   """
   it = iter(iterable)
-  first_item = next(it)
+
+  try:
+    first_item = next(it)
+  except StopIteration:
+    raise ValueError("iterable {!r} is empty.".format(iterable))
 
   try:
     next(it)

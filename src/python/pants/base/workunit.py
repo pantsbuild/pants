@@ -109,7 +109,11 @@ class WorkUnit(object):
     self.parent = parent
     self.children = []
 
-    self.zipkin_attrs = None
+    # When a workunit is created the zipkin_span parameter is set to None.
+    # The zipkin_span parameter gets value when run_tracker.report.start_workunit(workunit)
+    # is called. The zipkin_span parameter cannot be set when the workunit is created because of
+    # specifics of the py_zipkin API and how info about workunits is recorded.
+    self.zipkin_span = None
 
     self.name = name
     self.labels = set(labels or ())
