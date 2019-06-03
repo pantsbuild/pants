@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import sys
 from builtins import str
 
 from future.utils import text_type
@@ -74,8 +73,13 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, pex_b
   # Sort all user requirement strings to increase the chance of cache hits across invocations.
   all_requirements = sorted(all_target_requirements + list(pytest.get_requirement_strings()))
 
-  # TODO(#7061): This str() can be removed after we drop py2!
-  python_binary = text_type(sys.executable)
+  # NB: we use the generic bin name `python`, rather than something hardcoded like
+  # `sys.executable`, to ensure that the python_binary may be discovered both locally and in remote
+  # execution. This is only used to run the downloaded PEX tool; it is not necessarily the
+  # interpreter that PEX will use to execute the generated .pex files.
+  # Because PEX works with Python 2.7 and 3.4+, we do not need to worry about `python` pointing to
+  # a specific interpreter version.
+  python_binary = "python"
   interpreter_constraint_args = parse_interpreter_constraints(
     python_setup, python_target_adaptors=all_targets
   )
