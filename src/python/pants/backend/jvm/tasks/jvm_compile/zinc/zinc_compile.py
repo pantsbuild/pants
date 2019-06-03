@@ -475,11 +475,6 @@ class BaseZincCompile(JvmCompile):
     res = self.context.execute_process_synchronously_or_raise(
       req, self.name(), [WorkUnitLabel.COMPILER])
 
-    # TODO: Materialize as a batch in do_compile or somewhere
-    self.context._scheduler.materialize_directories((
-      DirectoryToMaterialize(get_buildroot(), res.output_directory_digest),
-    ))
-
     # TODO: This should probably return a ClasspathEntry rather than a Digest
     return res.output_directory_digest
 

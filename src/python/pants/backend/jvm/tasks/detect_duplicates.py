@@ -110,7 +110,7 @@ class DuplicateDetector(JvmBinaryTask):
     # Select classfiles from the classpath - we want all the direct products of internal targets,
     # no external JarLibrary products.
     def record_file_ownership(target):
-      entries = ClasspathUtil.internal_classpath([target], classpath_products)
+      entries = ClasspathUtil.internal_classpath([target], classpath_products, context=self.context)
       for f in ClasspathUtil.classpath_entries_contents(entries):
         artifacts_by_file_name[f].add(target.address.reference())
 

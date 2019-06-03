@@ -74,7 +74,19 @@ class ClasspathUtil(object):
     :returns: The classpath as a list of path elements.
     :rtype: list of string
     """
-    classpath_iter = cls._classpath_iter(classpath_products.get_for_targets(targets), confs=confs)
+    return [entry.path for entry in cls.classpath_entries(targets, classpath_products, confs)]
+
+  @classmethod
+  def classpath_entries(cls, targets, classpath_products, confs=('default',), context=None):
+    """Return the classpath as a list of ClasspathEntries covering all the passed targets.
+
+    :param targets: Targets to build an aggregated classpath for.
+    :param ClasspathProducts classpath_products: Product containing classpath elements.
+    :param confs: The list of confs for use by this classpath.
+    :returns: The classpath as a list of path elements.
+    :rtype: list of ClasspathEntry
+    """
+    classpath_iter = cls._classpath_iter(classpath_products.get_classpath_entries_for_targets(targets, context=context), confs=confs)
     return list(classpath_iter)
 
   @classmethod
@@ -86,7 +98,7 @@ class ClasspathUtil(object):
     return cls._entries_iter(filtered_tuples_iter)
 
   @classmethod
-  def internal_classpath(cls, targets, classpath_products, confs=('default',)):
+  def internal_classpath(cls, targets, classpath_products, confs=('default',), context=None):
     """Return the list of internal classpath entries for a classpath covering all `targets`.
 
     Any classpath entries contributed by external dependencies will be omitted.
@@ -97,7 +109,7 @@ class ClasspathUtil(object):
     :returns: The classpath as a list of path elements.
     :rtype: list of string
     """
-    classpath_tuples = classpath_products.get_internal_classpath_entries_for_targets(targets)
+    classpath_tuples = classpath_products.get_internal_classpath_entries_for_targets(targets, context=context)
     filtered_tuples_iter = cls._filtered_classpath_by_confs_iter(classpath_tuples, confs)
     return [entry.path for entry in cls._entries_iter(filtered_tuples_iter)]
 

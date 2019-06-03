@@ -140,7 +140,7 @@ class FindBugs(NailgunTask):
 
   def findbugs(self, target):
     runtime_classpaths = self.context.products.get_data('runtime_classpath')
-    runtime_classpath = runtime_classpaths.get_for_targets(target.closure(bfs=True))
+    runtime_classpath = runtime_classpaths.get_for_targets(target.closure(bfs=True), self.context)
     aux_classpath = OrderedSet(jar for conf, jar in runtime_classpath if conf == 'default')
 
     target_jars = OrderedSet(jar for conf, jar in runtime_classpaths.get_for_target(target) if conf == 'default')

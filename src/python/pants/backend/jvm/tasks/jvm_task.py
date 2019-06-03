@@ -46,8 +46,8 @@ class JvmTask(Task):
     self.confs = self.get_options().confs
     self.synthetic_classpath = self.jvm.get_options().synthetic_classpath
 
-  def classpath(self, targets, classpath_prefix=None, classpath_product=None, exclude_scopes=None,
-                include_scopes=None):
+  def classpath_entries(self, targets, classpath_prefix=None, classpath_product=None,
+                        exclude_scopes=None, include_scopes=None):
     """Builds a transitive classpath for the given targets.
 
     Optionally includes a classpath prefix or building from a non-default classpath product.
@@ -67,7 +67,32 @@ class JvmTask(Task):
     closure = BuildGraph.closure(targets, bfs=True, include_scopes=include_scopes,
                                  exclude_scopes=exclude_scopes, respect_intransitive=True)
 
-    classpath_for_targets = ClasspathUtil.classpath(closure, classpath_product, self.confs)
+    classpath_for_targets = ClasspathUtil.classpath_entries(closure, classpath_product, self.confs, context=self.context)
     classpath = list(classpath_prefix or ())
     classpath.extend(classpath_for_targets)
+    return classpath
+
+  def classpath(self, targets, classpath_prefix=None, classpath_product=None, exclude_scopes=None,
+    include_scopes=None):
+    """Builds a transitive classpath for the given targets.
+
+    Optionally includes a classpath prefix or building from a non-default classpath product.
+
+    :param targets: the targets for which to build the transitive classpath.
+    :param classpath_prefix: optional additional entries to prepend to the classpath.
+    :param classpath_product: an optional ClasspathProduct from which to build the classpath. if not
+    specified, the runtime_classpath will be used.
+    :param :class:`pants.build_graph.target_scopes.Scope` exclude_scopes: Exclude targets which
+      have at least one of these scopes on the classpath.
+    :param :class:`pants.build_graph.target_scopes.Scope` include_scopes: Only include targets which
+      have at least one of these scopes on the classpath. Defaults to Scopes.JVM_RUNTIME_SCOPES.
+    :return: a list of classpath strings.
+    """
+    classpath = list(classpath_prefix or ())
+    classpath.extend(entry.path for entry in self.classpath_entries(
+      targets,
+      classpath_product=classpath_product,
+      exclude_scopes=exclude_scopes,
+      include_scopes=include_scopes
+    ))
     return classpath

@@ -4,6 +4,8 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import threading
+
 
 class ClasspathEntry(object):
   """Represents a java classpath entry.
@@ -14,6 +16,9 @@ class ClasspathEntry(object):
   def __init__(self, path, directory_digest=None):
     self._path = path
     self._directory_digest = directory_digest
+
+    self._has_been_materialized_lock = threading.Lock()
+    self._has_been_materialized = False
 
   @property
   def path(self):
@@ -45,6 +50,15 @@ class ClasspathEntry(object):
     :rtype: bool
     """
     return False
+
+  @property
+  def has_been_materialized(self):
+    with self._has_been_materialized_lock:
+      return self._has_been_materialized
+
+  def mark_as_materialized(self):
+    with self._has_been_materialized_lock:
+      self._has_been_materialized = True
 
   def __hash__(self):
     return hash((self.path, self.directory_digest))

@@ -60,19 +60,17 @@ class RscCompileIntegration(BaseCompileIT):
 
   @_for_all_supported_execution_environments
   def test_basic_binary(self, config):
-    with self.do_command_yielding_workdir(
-        'compile', 'testprojects/src/scala/org/pantsbuild/testproject/mutual:bin',
-        config=config) as pants_run:
-      zinc_compiled_classfile = os.path.join(
-        pants_run.workdir,
-        'compile/rsc/current/testprojects.src.scala.org.pantsbuild.testproject.mutual.mutual/current/zinc',
-        'classes/org/pantsbuild/testproject/mutual/A.class')
-      self.assertIsFile(zinc_compiled_classfile)
-      rsc_header_jar = os.path.join(
-        pants_run.workdir,
-        'compile/rsc/current/testprojects.src.scala.org.pantsbuild.testproject.mutual.mutual/current/rsc',
-        'm.jar')
-      self.assertIsFile(rsc_header_jar)
+    with temporary_dir() as temp_dir:
+      pants_run = self.run_pants(
+        [
+          '--pants-distdir={}'.format(temp_dir),
+          'binary',
+          'testprojects/src/scala/org/pantsbuild/testproject/mutual:bin',
+        ],
+        config=config,
+      )
+      self.assert_success(pants_run)
+      self.assertIsFile(os.path.join(temp_dir, 'bin.jar'))
 
   @_for_all_supported_execution_environments
   def test_executing_multi_target_binary(self, config):

@@ -23,8 +23,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.mirrored_target_option_mixin import MirroredTargetOptionMixin
-from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryToMaterialize, PathGlobs,
-                             PathGlobsAndRoot)
+from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, PathGlobsAndRoot
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.java.jar.jar_dependency import JarDependency
 from pants.reporting.reporting_utils import items_to_report_element
@@ -629,13 +628,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     res.output_directory_digest.dump(ctx.rsc_jar_file.path)
 
     ctx.rsc_jar_file = ClasspathEntry(ctx.rsc_jar_file.path, res.output_directory_digest)
-
-    self.context._scheduler.materialize_directories((
-      DirectoryToMaterialize(
-        # NB the first element here is the root to materialize into, not the dir to snapshot
-        text_type(get_buildroot()),
-        res.output_directory_digest),
-    ))
 
     return res
 

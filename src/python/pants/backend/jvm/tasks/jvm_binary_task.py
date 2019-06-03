@@ -61,7 +61,7 @@ class JvmBinaryTask(JarBuilderTask):
     classpath_products = self.context.products.get_data('runtime_classpath')
     classpath_entries = classpath_products.get_artifact_classpath_entries_for_targets(
         binary.closure(bfs=True, include_scopes=Scopes.JVM_RUNTIME_SCOPES,
-                       respect_intransitive=True))
+                       respect_intransitive=True), context=self.context)
     external_jars = OrderedSet(jar_entry for conf, jar_entry in classpath_entries
                                if conf == 'default')
     return [(entry.path, entry.coordinate) for entry in external_jars
