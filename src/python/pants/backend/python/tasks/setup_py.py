@@ -464,7 +464,7 @@ class SetupPy(Task):
           """).strip().format(declares_namespace_package_code=declares_namespace_package_code))
           fp.close()
           builder.set_executable(filename=fp.name, env_filename='main.py')
-          builder.freeze()
+          builder.freeze(bytecode_compile=False)
     return PEX(pex=chroot, interpreter=interpreter)
 
   def filter_namespace_packages(self, root_target, inits):

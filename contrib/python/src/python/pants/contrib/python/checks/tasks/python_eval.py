@@ -157,7 +157,7 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
           pex_info.entry_point = self._EXEC_NAME
           pex_info.pex_path = ':'.join(pex.path() for pex in (reqs_pex, srcs_pex) if pex)
           builder = PEXBuilder(safe_path, interpreter, pex_info=pex_info)
-          builder.freeze()
+          builder.freeze(bytecode_compile=False)
 
       pex = PEX(exec_pex_path, interpreter)
 
