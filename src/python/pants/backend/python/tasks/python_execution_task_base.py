@@ -165,6 +165,6 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
         with self.merged_pex(path, pex_info, interpreter, pexes, constraints) as builder:
           for extra_file in self.extra_files():
             extra_file.add_to(builder)
-          builder.freeze()
+          builder.freeze(bytecode_compile=False)
 
     return PEX(path, interpreter)

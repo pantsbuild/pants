@@ -141,4 +141,4 @@ class ResolveRequirementsTaskBase(Task):
   def merge_pexes(cls, path, pex_info, interpreter, pexes, interpeter_constraints=None):
     """Generates a merged pex at path."""
     with cls.merged_pex(path, pex_info, interpreter, pexes, interpeter_constraints) as builder:
-      builder.freeze()
+      builder.freeze(bytecode_compile=False)
