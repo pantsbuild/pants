@@ -143,14 +143,14 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
           config=pants_ini_config
         )
         self.assert_success(pants_run_27)
-        self.assertIn(py27_path, pants_run_27.stdout_data)
+        self.assertIn('I am a python 2 library method.', pants_run_27.stdout_data)
         pants_run_3 = self.run_pants(
           command=['run', '{}:main_py3'.format(os.path.join(self.testproject,
                                                             'python_3_selection_testing'))],
           config=pants_ini_config
         )
         self.assert_success(pants_run_3)
-        self.assertIn(py3_path, pants_run_3.stdout_data)
+        self.assertIn('I am a python 3 library method.', pants_run_3.stdout_data)
 
   @skip_unless_python27_and_python3_present
   def test_pants_binary_interpreter_selection_with_pexrc(self):

@@ -4,7 +4,7 @@
 
 # This bootstrap script invokes Pants using a Python 2 interpreter.
 
-REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd -P)
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 
 export PY="${PY:-python2.7}"
 
@@ -13,4 +13,4 @@ export PY="${PY:-python2.7}"
 # interpreter selection will default to using Python 2 as this is the minimum acceptable interpreter.
 export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython>=2.7,<3','CPython>=3.6,<4']}"
 
-exec ${REPO_ROOT}/pants "$@"
+exec "${REPO_ROOT}/pants" "$@"

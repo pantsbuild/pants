@@ -24,7 +24,7 @@ from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file, safe_mkdir, safe_mkdtemp
 from pants.util.memo import memoized_classproperty, memoized_property
 from pants.util.meta import Singleton
-from pants.util.objects import datatype
+from pants.util.objects import SubclassesOf, datatype
 
 
 logger = logging.getLogger(__name__)
@@ -250,11 +250,22 @@ class _FFISpecification(object):
       + '\n'.join(extern_decls)
       + '\n}\n')
 
-  def register_cffi_externs(self):
-    """Registers the @_extern_decl methods with our ffi instance."""
+  def register_cffi_externs(self, native):
+    """Registers the @_extern_decl methods with our ffi instance.
+
+    Also establishes an `onerror` handler for each extern method which stores any exception in the
+    `native` object so that it can be retrieved later. See
+    https://cffi.readthedocs.io/en/latest/using.html#extern-python-reference for more info.
+    """
+    native.reset_cffi_extern_method_runtime_exceptions()
+
+    def exc_handler(exc_type, exc_value, traceback):
+      error_info = native.CFFIExternMethodRuntimeErrorInfo(exc_type, exc_value, traceback)
+      native.add_cffi_extern_method_runtime_exception(error_info)
+
     for field_name, _ in self._extern_fields.items():
       bound_method = getattr(self, field_name)
-      self._ffi.def_extern()(bound_method)
+      self._ffi.def_extern(onerror=exc_handler)(bound_method)
 
   def to_py_str(self, msg_ptr, msg_len):
     return bytes(self._ffi.buffer(msg_ptr, msg_len)).decode('utf-8')
@@ -562,6 +573,36 @@ class ExternContext(object):
 class Native(Singleton):
   """Encapsulates fetching a platform specific version of the native portion of the engine."""
 
+  _errors_during_execution = None
+
+  class CFFIExternMethodRuntimeErrorInfo(datatype([
+      ('exc_type', type),
+      ('exc_value', SubclassesOf(Exception)),
+      'traceback',
+  ])):
+    """Encapsulates an exception raised when a CFFI extern is called so that it can be displayed.
+
+    When an exception is raised in the body of a CFFI extern, the `onerror` handler is used to
+    capture it, storing the exception info as an instance of `CFFIExternMethodRuntimeErrorInfo` with
+    `.add_cffi_extern_method_runtime_exception()`. The scheduler will then check whether any
+    exceptions were stored by calling `.cffi_extern_method_runtime_exceptions()` after specific
+    calls to the native library which may raise. `.reset_cffi_extern_method_runtime_exceptions()`
+    should be called after the stored exception has been handled or before it is re-raised.
+
+    Some ways that exceptions in CFFI extern methods can be handled are described in
+    https://cffi.readthedocs.io/en/latest/using.html#extern-python-reference.
+    """
+
+  def reset_cffi_extern_method_runtime_exceptions(self):
+    self._errors_during_execution = []
+
+  def cffi_extern_method_runtime_exceptions(self):
+    return self._errors_during_execution
+
+  def add_cffi_extern_method_runtime_exception(self, error_info):
+    assert isinstance(error_info, self.CFFIExternMethodRuntimeErrorInfo)
+    self._errors_during_execution.append(error_info)
+
   class BinaryLocationError(Exception): pass
 
   @memoized_property
@@ -588,7 +629,7 @@ class Native(Singleton):
   def lib(self):
     """Load and return the native engine module."""
     lib = self.ffi.dlopen(self.binary)
-    _FFISpecification(self.ffi, lib).register_cffi_externs()
+    _FFISpecification(self.ffi, lib).register_cffi_externs(self)
     return lib
 
   @memoized_property
@@ -686,6 +727,12 @@ class Native(Singleton):
   def flush_log(self):
     return self.lib.flush_log()
 
+  def override_thread_logging_destination_to_just_pantsd(self):
+    self.lib.override_thread_logging_destination(self.lib.Pantsd)
+
+  def override_thread_logging_destination_to_just_stderr(self):
+    self.lib.override_thread_logging_destination(self.lib.Stderr)
+
   def match_path_globs(self, path_globs, paths):
     path_globs = self.context.to_value(path_globs)
     paths_buf = self.context.utf8_buf_buf(tuple(paths))
@@ -700,8 +747,8 @@ class Native(Singleton):
       self.lib.execution_request_create(),
       self.lib.execution_request_destroy)
 
-  def new_session(self, scheduler, should_record_zipkin_spans, should_render_ui, ui_worker_count):
-    return self.gc(self.lib.session_create(scheduler, should_record_zipkin_spans, should_render_ui, ui_worker_count), self.lib.session_destroy)
+  def new_session(self, scheduler, should_render_ui, ui_worker_count):
+    return self.gc(self.lib.session_create(scheduler, should_render_ui, ui_worker_count), self.lib.session_destroy)
 
   def new_scheduler(self,
                     tasks,
@@ -721,6 +768,7 @@ class Native(Singleton):
                     type_directory_digest,
                     type_snapshot,
                     type_merge_snapshots_request,
+                    type_directory_with_prefix_to_strip,
                     type_files_content,
                     type_dir,
                     type_file,
@@ -750,6 +798,7 @@ class Native(Singleton):
         ti(type_directory_digest),
         ti(type_snapshot),
         ti(type_merge_snapshots_request),
+        ti(type_directory_with_prefix_to_strip),
         ti(type_files_content),
         ti(type_dir),
         ti(type_file),

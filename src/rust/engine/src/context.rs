@@ -15,9 +15,7 @@ use futures::Future;
 use crate::core::{Failure, TypeId};
 use crate::handles::maybe_drop_handles;
 use crate::nodes::{NodeKey, WrappedNode};
-use crate::rule_graph::RuleGraph;
-use crate::scheduler::Session;
-use crate::tasks::Tasks;
+use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 use boxfuture::{BoxFuture, Boxable};
 use core::clone::Clone;
@@ -29,6 +27,7 @@ use process_execution::{self, BoundedCommandRunner, CommandRunner};
 use rand::seq::SliceRandom;
 use reqwest;
 use resettable::Resettable;
+use rule_graph::RuleGraph;
 use std::collections::btree_map::BTreeMap;
 
 ///
@@ -42,10 +41,9 @@ use std::collections::btree_map::BTreeMap;
 pub struct Core {
   pub graph: Graph<NodeKey>,
   pub tasks: Tasks,
-  pub rule_graph: RuleGraph,
+  pub rule_graph: RuleGraph<Rule>,
   pub types: Types,
-  pub runtime: Resettable<Arc<RwLock<Runtime>>>,
-  pub futures_timer_thread: Resettable<futures_timer::HelperThread>,
+  runtime: Resettable<Arc<RwLock<Runtime>>>,
   store_and_command_runner_and_http_client:
     Resettable<(Store, BoundedCommandRunner, reqwest::r#async::Client)>,
   pub vfs: PosixFS,
@@ -104,8 +102,6 @@ impl Core {
       None
     };
 
-    let futures_timer_thread = Resettable::new(|| futures_timer::HelperThread::new().unwrap());
-    let futures_timer_thread2 = futures_timer_thread.clone();
     let store_and_command_runner_and_http_client = Resettable::new(move || {
       let local_store_dir = local_store_dir.clone();
       let store = safe_create_dir_all_ioerror(&local_store_dir)
@@ -127,7 +123,6 @@ impl Core {
               fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10))
                 .unwrap(),
               remote_store_rpc_retries,
-              futures_timer_thread2.with(futures_timer::HelperThread::handle),
             )
           }
         })
@@ -144,7 +139,6 @@ impl Core {
           // Allow for some overhead for bookkeeping threads (if any).
           process_execution_parallelism + 2,
           store.clone(),
-          futures_timer_thread2.clone(),
         )),
         None => Box::new(process_execution::local::CommandRunner::new(
           store.clone(),
@@ -161,7 +155,7 @@ impl Core {
       (store, command_runner, http_client)
     });
 
-    let rule_graph = RuleGraph::new(&tasks, root_subject_types);
+    let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);
 
     Core {
       graph: Graph::new(),
@@ -169,7 +163,6 @@ impl Core {
       rule_graph: rule_graph,
       types: types,
       runtime: runtime,
-      futures_timer_thread: futures_timer_thread,
       store_and_command_runner_and_http_client: store_and_command_runner_and_http_client,
       // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
@@ -197,12 +190,10 @@ impl Core {
       debug!("Waiting to enter fork_context...");
       thread::sleep(Duration::from_millis(10));
     }
-    let t = self.futures_timer_thread.with_reset(|| {
-      self.runtime.with_reset(|| {
-        self
-          .graph
-          .with_exclusive(|| self.store_and_command_runner_and_http_client.with_reset(f))
-      })
+    let t = self.runtime.with_reset(|| {
+      self
+        .graph
+        .with_exclusive(|| self.store_and_command_runner_and_http_client.with_reset(f))
     });
     self
       .graph
@@ -222,21 +213,66 @@ impl Core {
   pub fn http_client(&self) -> reqwest::r#async::Client {
     self.store_and_command_runner_and_http_client.get().2
   }
+
+  ///
+  /// Start running a Future on a tokio Runtime.
+  ///
+  pub fn spawn<F: Future<Item = (), Error = ()> + Send + 'static>(&self, future: F) {
+    // Make sure to copy our (thread-local) logging destination into the task.
+    // When a daemon thread kicks off a future, it should log like a daemon thread (and similarly
+    // for a user-facing thread).
+    let logging_destination = logging::get_destination();
+    self
+      .runtime
+      .get()
+      .read()
+      .executor()
+      .spawn(futures::future::ok(()).and_then(move |()| {
+        logging::set_destination(logging_destination);
+        future
+      }))
+  }
+
+  ///
+  /// Run a Future and return its resolved Result.
+  ///
+  /// This should never be called from in a Future context, or any context where anyone may want to
+  /// spawn something on the runtime using Core::spawn.
+  ///
+  pub fn block_on<
+    Item: Send + 'static,
+    Error: Send + 'static,
+    F: Future<Item = Item, Error = Error> + Send + 'static,
+  >(
+    &self,
+    future: F,
+  ) -> Result<Item, Error> {
+    // Make sure to copy our (thread-local) logging destination into the task.
+    // When a daemon thread kicks off a future, it should log like a daemon thread (and similarly
+    // for a user-facing thread).
+    let logging_destination = logging::get_destination();
+    self
+      .runtime
+      .get()
+      .write()
+      .block_on(futures::future::ok(()).and_then(move |()| {
+        logging::set_destination(logging_destination);
+        future
+      }))
+  }
 }
 
 #[derive(Clone)]
 pub struct Context {
   pub entry_id: EntryId,
   pub core: Arc<Core>,
-  pub session: Session,
 }
 
 impl Context {
-  pub fn new(entry_id: EntryId, core: Arc<Core>, session: Session) -> Context {
+  pub fn new(entry_id: EntryId, core: Arc<Core>) -> Context {
     Context {
       entry_id: entry_id,
       core: core,
-      session: session,
     }
   }
 
@@ -270,7 +306,6 @@ impl NodeContext for Context {
     Context {
       entry_id: entry_id,
       core: self.core.clone(),
-      session: self.session.clone(),
     }
   }
 

@@ -4,6 +4,7 @@ import sbt.io.IO
 
 import java.io.File
 import java.nio.file.{Files, Path, Paths}
+import java.util.jar.{JarInputStream, JarEntry}
 import scala.collection.mutable
 import org.junit.runner.RunWith
 import org.scalatest.WordSpec
@@ -42,6 +43,23 @@ class JarCreationSpec extends WordSpec with MustMatchers {
         }
       }
     }
+
+    "should result in a sorted jar" in {
+      IO.withTemporaryDirectory { tempInputDir =>
+        val filePaths =
+          mutable.TreeSet(
+            (0 to 100).map { _ => File.createTempFile("Temp", ".class", tempInputDir).toPath}: _*
+          )
+
+        IO.withTemporaryDirectory { tempOutputDir =>
+          val jarOutputPath = Paths.get(tempOutputDir.toString, "output.jar")
+
+          OutputUtils.createJar(tempInputDir.toString, filePaths, jarOutputPath, System.currentTimeMillis())
+
+          isSortedJar(jarOutputPath) must be(true)
+        }
+      }
+    }
   }
 
   "JarCreationWithNestedClasses" should {
@@ -58,6 +76,25 @@ class JarCreationSpec extends WordSpec with MustMatchers {
           OutputUtils.existsClass(jarOutputPath, OutputUtils.relativize(tempInputDir.toString, nestedTempClass.toPath)) must be(true)
         }
       }
+    }
+  }
+
+  def isSortedJar(jarPath: Path): Boolean = {
+    val is = new JarInputStream(Files.newInputStream(jarPath))
+
+    try {
+      var nextEntry: JarEntry = null
+      // An impossible name for a jar entry.
+      var previousName = ""
+      while ({nextEntry = is.getNextJarEntry(); nextEntry ne null}) {
+        if (nextEntry.getName() <= previousName) {
+          return false
+        }
+        previousName = nextEntry.getName()
+      }
+      return true
+    } finally {
+      is.close()
     }
   }
 }

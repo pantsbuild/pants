@@ -10,6 +10,7 @@ use std::{fmt, hash};
 use crate::externs;
 use crate::handles::Handle;
 
+use rule_graph;
 use smallvec::{smallvec, SmallVec};
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
@@ -89,7 +90,12 @@ impl Params {
   ///
   /// Given a set of either param type or param value strings: sort, join, and render as one string.
   ///
-  pub fn display(mut params: Vec<String>) -> String {
+  pub fn display<T>(params: T) -> String
+  where
+    T: Iterator,
+    T::Item: fmt::Display,
+  {
+    let mut params: Vec<_> = params.map(|p| format!("{}", p)).collect();
     match params.len() {
       0 => "()".to_string(),
       1 => params.pop().unwrap(),
@@ -103,11 +109,7 @@ impl Params {
 
 impl fmt::Display for Params {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(
-      f,
-      "{}",
-      Self::display(self.0.iter().map(|k| format!("{}", k)).collect())
-    )
+    write!(f, "{}", Self::display(self.0.iter()))
   }
 }
 
@@ -126,6 +128,18 @@ impl TypeId {
     } else {
       write!(f, "{}", externs::type_to_str(self))
     }
+  }
+}
+
+impl rule_graph::TypeId for TypeId {
+  ///
+  /// Render a string for a collection of TypeIds.
+  ///
+  fn display<I>(type_ids: I) -> String
+  where
+    I: Iterator<Item = TypeId>,
+  {
+    Params::display(type_ids)
   }
 }
 

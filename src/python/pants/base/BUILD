@@ -116,6 +116,7 @@ python_library(
     '3rdparty/python:future',
     ':deprecated',
     'src/python/pants/util:collections_abc_backport',
+    'src/python/pants/util:objects',
   ]
 )
 
@@ -213,6 +214,7 @@ python_library(
   sources = ['worker_pool.py'],
   dependencies = [
     '3rdparty/python:future',
+    ':workunit',
     'src/python/pants/reporting:report', # TODO(pl): Bust this out
   ],
 )

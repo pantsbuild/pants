@@ -46,7 +46,14 @@ class Context(object):
                address_mapper=None, console_outstream=None, scm=None,
                workspace=None, invalidation_report=None, scheduler=None):
     self._options = options
+
+    # We register a callback that will cause build graph edits to invalidate our caches, and we hold
+    # a handle directly to the callback function to ensure that it is not GC'd until the context is.
     self.build_graph = build_graph
+    self._clear_target_cache_handle = self._clear_target_cache
+    self._targets_cache = dict()
+    self.build_graph.add_invalidation_callback(self._clear_target_cache_handle)
+
     self._build_file_parser = build_file_parser
     self.build_configuration = build_configuration
     self.address_mapper = address_mapper
@@ -149,11 +156,7 @@ class Context(object):
     """A contextmanager that sets metrics in the context of a (v1) engine execution."""
     self._set_target_root_count_in_runtracker()
     yield
-    metrics = self._scheduler.metrics()
-    self.run_tracker.pantsd_stats.set_scheduler_metrics(metrics)
-    engine_workunits = self._scheduler.engine_workunits(metrics)
-    if engine_workunits:
-      self.run_tracker.report.bulk_record_workunits(engine_workunits)
+    self.run_tracker.pantsd_stats.set_scheduler_metrics(self._scheduler.metrics())
     self._set_affected_target_count_in_runtracker()
 
   def _set_target_root_count_in_runtracker(self):
@@ -269,6 +272,14 @@ class Context(object):
     # only 1 remaining known use case in the Foursquare codebase that will be able to go away with
     # the post RoundEngine engine - kill the method at that time.
     self._target_roots = list(target_roots)
+    self._clear_target_cache()
+
+  def _clear_target_cache(self):
+    """A callback for cases where the graph or target roots have been mutated.
+
+    See BuildGraph.add_invalidation_callback.
+    """
+    self._targets_cache.clear()
 
   def add_new_target(self, address, target_type, target_base=None, dependencies=None,
                      derived_from=None, **kwargs):
@@ -279,6 +290,7 @@ class Context(object):
 
     :API: public
     """
+    self._clear_target_cache()
     rel_target_base = target_base or address.spec_path
     abs_target_base = os.path.join(get_buildroot(), rel_target_base)
     if not os.path.exists(abs_target_base):
@@ -317,21 +329,28 @@ class Context(object):
                           `False` or preorder by default.
     :returns: A list of matching targets.
     """
-    target_set = self._collect_targets(self.target_roots, **kwargs)
+    targets_cache_key = tuple(sorted(kwargs))
+    targets = self._targets_cache.get(targets_cache_key)
+    if targets is None:
+      self._targets_cache[targets_cache_key] = targets = self._unfiltered_targets(**kwargs)
+    return list(filter(predicate, targets))
+
+  def _unfiltered_targets(self, **kwargs):
+    def _collect_targets(root_targets, **kwargs):
+      return Target.closure_for_targets(
+        target_roots=root_targets,
+        **kwargs
+      )
+
+    target_set = _collect_targets(self.target_roots, **kwargs)
 
     synthetics = OrderedSet()
     for synthetic_address in self.build_graph.synthetic_addresses:
       if self.build_graph.get_concrete_derived_from(synthetic_address) in target_set:
         synthetics.add(self.build_graph.get_target(synthetic_address))
-    target_set.update(self._collect_targets(synthetics, **kwargs))
+    target_set.update(_collect_targets(synthetics, **kwargs))
 
-    return list(filter(predicate, target_set))
-
-  def _collect_targets(self, root_targets, **kwargs):
-    return Target.closure_for_targets(
-      target_roots=root_targets,
-      **kwargs
-    )
+    return target_set
 
   def dependents(self, on_predicate=None, from_predicate=None):
     """Returns  a map from targets that satisfy the from_predicate to targets they depend on that

@@ -1,0 +1,11 @@
+tests/python/pants_test/backend/codegen/antlr/java:java
+tests/python/pants_test/backend/graph_info/tasks:list_targets
+tests/python/pants_test/backend/jvm/tasks/reports:reports
+tests/python/pants_test/backend/jvm/tasks:consolidate_classpath
+tests/python/pants_test/backend/jvm/tasks:coursier_resolve
+tests/python/pants_test/backend/jvm/tasks:ivy_utils
+tests/python/pants_test/backend/jvm/tasks:scalafmt
+tests/python/pants_test/backend/jvm/tasks:scalastyle
+tests/python/pants_test/backend/python/tasks:pytest_run
+tests/python/pants_test/cache:artifact_cache
+tests/python/pants_test/pantsd:pailgun_server

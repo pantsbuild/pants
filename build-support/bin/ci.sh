@@ -4,8 +4,8 @@
 # fails the build.
 set -o pipefail
 
-REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
-cd ${REPO_ROOT}
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd "$(git rev-parse --show-toplevel)" && pwd)
+cd "${REPO_ROOT}" || exit 1
 
 source build-support/common.sh
 
@@ -13,7 +13,7 @@ function usage() {
   cat <<EOF
 Runs commons tests for local or hosted CI.
 
-Usage: $0 (-h|-2fxbkmrjlpuecitzsw)
+Usage: $0 (-h|-2fxbkmrjlpecitzsw)
  -h           print out this help message
  -2           Run using Python 2.7 (defaults to using Python 3.6).
  -7           Run using Python 3.7 (defaults to using Python 3.6).
@@ -27,10 +27,6 @@ Usage: $0 (-h|-2fxbkmrjlpuecitzsw)
  -j           run core jvm tests
  -l           run internal backends python tests
  -p           run core python tests
- -u SHARD_NUMBER/TOTAL_SHARDS
-              if running core python tests, divide them into
-              TOTAL_SHARDS shards and just run those in SHARD_NUMBER
-              to run only even tests: '-u 0/2', odd: '-u 1/2'
  -e           run rust tests
  -s           run clippy on rust code
  -a           run cargo audit of rust dependencies
@@ -53,7 +49,7 @@ EOF
 python_unit_shard="0/1"
 python_intg_shard="0/1"
 
-while getopts "h27fxbmrjlpeasu:ci:tz" opt; do
+while getopts "h27fxbmrjlpeasci:tz" opt; do
   case ${opt} in
     h) usage ;;
     2) python_two="true" ;;
@@ -66,7 +62,6 @@ while getopts "h27fxbmrjlpeasu:ci:tz" opt; do
     j) run_jvm="true" ;;
     l) run_internal_backends="true" ;;
     p) run_python="true" ;;
-    u) python_unit_shard=${OPTARG} ;;
     e) run_rust_tests="true" ;;
     a) run_cargo_audit="true" ;;
     s) run_rust_clippy="true" ;;
@@ -77,11 +72,11 @@ while getopts "h27fxbmrjlpeasu:ci:tz" opt; do
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
-shift $((${OPTIND} - 1))
+shift $((OPTIND - 1))
 
 echo
-if [[ $# > 0 ]]; then
-  banner "CI BEGINS: $@"
+if [[ $# -gt 0 ]]; then
+  banner "CI BEGINS: $*"
 else
   banner "CI BEGINS"
 fi
@@ -98,7 +93,7 @@ export PANTS_DEV=1
 
 # We only want to output failures and skips.
 # See https://docs.pytest.org/en/latest/usage.html#detailed-summary-report.
-export PYTEST_PASSTHRU_ARGS="-q -rfa"
+export PYTEST_PASSTHRU_ARGS=(-q -rfa)
 
 # Determine the Python version to use for bootstrapping pants.pex. This would usually not be
 # necessary to set when developing locally, because the `./pants` and `./pants2` scripts set
@@ -114,6 +109,8 @@ else
 fi
 export PY="${PY:-python${py_major_minor}}"
 
+# NB: we intentionally don't want quote expansion here. See https://github.com/koalaman/shellcheck/wiki/SC2016.
+# shellcheck disable=SC2016
 export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS:-['CPython==${py_major_minor}.*']}"
 banner "Setting interpreter constraints to ${PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS}"
 
@@ -188,21 +185,24 @@ if [[ "${run_internal_backends:-false}" == "true" ]]; then
   start_travis_section "BackendTests" "Running internal backend python tests"
   (
     ./pants.pex test.pytest \
-    pants-plugins/src/python:: pants-plugins/tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
+    pants-plugins/src/python:: pants-plugins/tests/python:: -- "${PYTEST_PASSTHRU_ARGS[@]}"
   ) || die "Internal backend python test failure"
   end_travis_section
 fi
 
 if [[ "${run_python:-false}" == "true" ]]; then
-  if [[ "0/1" != "${python_unit_shard}" ]]; then
-    shard_desc=" [shard ${python_unit_shard}]"
-  fi
-  start_travis_section "CoreTests" "Running core python tests${shard_desc}"
+  start_travis_section "CoreTests" "Running core Python tests"
+  # TODO(#7772): Simplify below to always use V2 and drop the blacklist.
+  known_v2_failures_file="${REPO_ROOT}/build-support/unit_test_v2_blacklist.txt"
   (
-    ./pants.pex --tag='-integration' --exclude-target-regexp='.*/testprojects/.*' \
-      test.pytest --test-pytest-chroot --test-pytest-test-shard=${python_unit_shard} \
-      src/python:: tests/python:: contrib:: -- ${PYTEST_PASSTHRU_ARGS}
-  ) || die "Core python test failure"
+    trap 'rm all_targets.txt v2_targets.txt' EXIT
+    ./pants.pex --tag='-integration' --filter-type='python_tests' filter src/python:: tests/python:: > all_targets.txt
+    comm -23 <(sort all_targets.txt) <(sort "${known_v2_failures_file}") > v2_targets.txt
+    ./pants.pex --no-v1 --v2 --target-spec-file=v2_targets.txt test.pytest -- "${PYTEST_PASSTHRU_ARGS[@]}"
+  ) || die "Core Python test failure"
+  (
+    ./pants.pex --target-spec-file="${known_v2_failures_file}" test.pytest -- "${PYTEST_PASSTHRU_ARGS[@]}"
+  ) || die "Core Python test failure"
   end_travis_section
 fi
 
@@ -226,8 +226,19 @@ fi
 if [[ "${run_cargo_audit:-false}" == "true" ]]; then
   start_travis_section "CargoAudit" "Running cargo audit on rust code"
   (
-    "${REPO_ROOT}/build-support/bin/native/cargo" ensure-installed --package=cargo-audit --version=0.5.2
-    "${REPO_ROOT}/build-support/bin/native/cargo" audit -f "${REPO_ROOT}/src/rust/engine/Cargo.lock"
+    # TODO(John Sirois): Kill --git-url/--git-rev when we upgrade to cargo-audit > 0.6.1.
+    # See: https://github.com/pantsbuild/pants/issues/7760 for context.
+    "${REPO_ROOT}/build-support/bin/native/cargo" ensure-installed \
+      --package=cargo-audit \
+      --version=0.6.1 \
+      --git-url=https://github.com/RustSec/cargo-audit \
+      --git-rev=1c298bcda2c74f4a1bd8f0d8482b3577ee94fbb3
+    # TODO(John Sirois): Kill --ignore RUSTSEC-2019-0003 when we can upgrade to an official released
+    # version of protobuf with a fix.
+    # See: https://github.com/pantsbuild/pants/issues/7760 for context.
+    "${REPO_ROOT}/build-support/bin/native/cargo" audit \
+      -f "${REPO_ROOT}/src/rust/engine/Cargo.lock" \
+      --ignore RUSTSEC-2019-0003
   ) || die "Cargo audit failure"
   end_travis_section
 fi
@@ -248,7 +259,7 @@ if [[ "${test_platform_specific_behavior:-false}" == 'true' ]]; then
                        "Running platform-specific testing on platform: $(uname)"
   (
     ./pants.pex --tag='+platform_specific_behavior' test \
-                src/python/:: tests/python:: -- ${PYTEST_PASSTHRU_ARGS}
+                src/python/:: tests/python:: -- "${PYTEST_PASSTHRU_ARGS[@]}"
   ) || die "Pants platform-specific test failure"
   end_travis_section
 fi
@@ -263,8 +274,8 @@ if [[ "${run_integration:-false}" == "true" ]]; then
     # NB: We use test_testprojects_integration.py to specifically run the ones that
     # we care about, and skip the rest.
     ./pants.pex --tag='+integration' --exclude-target-regexp='.*/testprojects/.*' \
-      test.pytest --test-pytest-test-shard=${python_intg_shard} \
-      src/python:: tests/python:: contrib:: -- ${PYTEST_PASSTHRU_ARGS}
+      test.pytest "--test-pytest-test-shard=${python_intg_shard}" \
+      src/python:: tests/python:: contrib:: -- "${PYTEST_PASSTHRU_ARGS[@]}"
   ) || die "Pants Integration test failure"
   end_travis_section
 fi

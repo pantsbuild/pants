@@ -58,9 +58,5 @@ class PythonDistribution(PythonTarget):
     return self.has_sources(extension=tuple(self.native_source_extensions))
 
   @property
-  def platforms(self):
-    return ['current']
-
-  @property
   def setup_requires(self):
     return self.payload.setup_requires

@@ -13,10 +13,10 @@ from textwrap import dedent
 from future.utils import PY2, PY3, text_type
 
 from pants.util.collections_abc_backport import OrderedDict
-from pants.util.objects import (EnumVariantSelectionError, Exactly, SubclassesOf, SuperclassesOf,
-                                TypeCheckError, TypeConstraintError, TypedCollection,
-                                TypedDatatypeInstanceConstructionError, _string_type_constraint,
-                                datatype, enum)
+from pants.util.objects import (EnumVariantSelectionError, Exactly, HashableTypedCollection,
+                                SubclassesOf, SuperclassesOf, TypeCheckError, TypeConstraintError,
+                                TypedCollection, TypedDatatypeInstanceConstructionError,
+                                _string_type_constraint, datatype, enum)
 from pants_test.test_base import TestBase
 
 
@@ -217,7 +217,7 @@ class TypedCollectionTest(TypeConstraintTestBase):
     self.assertEqual(['xxx'], StringCollectionField(hello_strings=['xxx']).hello_strings)
 
     with self.assertRaisesWithMessage(TypeCheckError, dedent("""\
-        type check error in class StringCollectionField: error(s) type checking constructor arguments:
+        type check error in class StringCollectionField: 1 error type checking constructor arguments:
         field 'hello_strings' was invalid: in wrapped constraint TypedCollection(Exactly({string_type})): value {u}'xxx' (with type '{input_string_type}') must satisfy this type constraint: SubclassesOf(Iterable).
         Note that objects matching {exclude_constraint} are not considered iterable.""")
                                       .format(string_type=text_type.__name__,
@@ -225,6 +225,22 @@ class TypedCollectionTest(TypeConstraintTestBase):
                                               input_string_type=type('xxx').__name__,
                                               exclude_constraint=_string_type_constraint)):
       StringCollectionField(hello_strings='xxx')
+
+  def test_hashable_collection(self):
+    class NormalCollection(datatype(['value'])):
+      pass
+
+    with self.assertRaisesWithMessage(
+        TypeError,
+        "For datatype object NormalCollection(value=[]) (type 'NormalCollection'): in field 'value': unhashable type: 'list'"):
+      hash(NormalCollection([]))
+
+    class HashableIntVector(datatype([('value', HashableTypedCollection(Exactly(int)))])):
+      pass
+
+    vec = HashableIntVector((1, 2, 3,))
+    self.assertEqual(vec.value, (1, 2, 3,))
+    self.assertIsInstance(hash(vec), int)
 
 
 class ExportedDatatype(datatype(['val'])):
@@ -620,7 +636,7 @@ class TypedDatatypeTest(TestBase):
       SomeTypedDatatype(3, 4)
 
     expected_msg = (
-      """type check error in class CamelCaseWrapper: error(s) type checking constructor arguments:
+      """type check error in class CamelCaseWrapper: 1 error type checking constructor arguments:
 field 'nonneg_int' was invalid: value 3 (with type 'int') must satisfy this type constraint: Exactly(NonNegativeInt).""")
     with self.assertRaisesWithMessage(TypedDatatypeInstanceConstructionError,
                                                 expected_msg):
@@ -641,28 +657,28 @@ field 'nonneg_int' was invalid: value 3 (with type 'int') must satisfy this type
 
     # single type checking failure
     expected_msg = (
-      """type check error in class SomeTypedDatatype: error(s) type checking constructor arguments:
+      """type check error in class SomeTypedDatatype: 1 error type checking constructor arguments:
 field 'val' was invalid: value [] (with type 'list') must satisfy this type constraint: Exactly(int).""")
     with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       SomeTypedDatatype([])
 
     # type checking failure with multiple arguments (one is correct)
     expected_msg = format_string_type_check_message(
-      """type check error in class AnotherTypedDatatype: error(s) type checking constructor arguments:
+      """type check error in class AnotherTypedDatatype: 1 error type checking constructor arguments:
 field 'elements' was invalid: value {u}'should be list' (with type '{str_type}') must satisfy this type constraint: Exactly(list).""")
     with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       AnotherTypedDatatype(text_type('correct'), text_type('should be list'))
 
     # type checking failure on both arguments
     expected_msg = format_string_type_check_message(
-        """type check error in class AnotherTypedDatatype: error(s) type checking constructor arguments:
+        """type check error in class AnotherTypedDatatype: 2 errors type checking constructor arguments:
 field 'string' was invalid: value 3 (with type 'int') must satisfy this type constraint: Exactly({str_type}).
 field 'elements' was invalid: value {u}'should be list' (with type '{str_type}') must satisfy this type constraint: Exactly(list).""")
     with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       AnotherTypedDatatype(3, text_type('should be list'))
 
     expected_msg = format_string_type_check_message(
-        """type check error in class NonNegativeInt: error(s) type checking constructor arguments:
+        """type check error in class NonNegativeInt: 1 error type checking constructor arguments:
 field 'an_int' was invalid: value {u}'asdf' (with type '{str_type}') must satisfy this type constraint: Exactly(int).""")
     with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       NonNegativeInt(text_type('asdf'))
@@ -672,20 +688,20 @@ field 'an_int' was invalid: value {u}'asdf' (with type '{str_type}') must satisf
       NonNegativeInt(-3)
 
     expected_msg = (
-      """type check error in class WithSubclassTypeConstraint: error(s) type checking constructor arguments:
+      """type check error in class WithSubclassTypeConstraint: 1 error type checking constructor arguments:
 field 'some_value' was invalid: value 3 (with type 'int') must satisfy this type constraint: SubclassesOf(SomeBaseClass).""")
     with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       WithSubclassTypeConstraint(3)
 
     expected_msg = """\
-type check error in class WithCollectionTypeConstraint: error(s) type checking constructor arguments:
+type check error in class WithCollectionTypeConstraint: 1 error type checking constructor arguments:
 field 'dependencies' was invalid: in wrapped constraint TypedCollection(Exactly(int)): value 3 (with type 'int') must satisfy this type constraint: SubclassesOf(Iterable).
 Note that objects matching {} are not considered iterable.""".format(_string_type_constraint)
     with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       WithCollectionTypeConstraint(3)
 
     expected_msg = format_string_type_check_message("""\
-type check error in class WithCollectionTypeConstraint: error(s) type checking constructor arguments:
+type check error in class WithCollectionTypeConstraint: 1 error type checking constructor arguments:
 field 'dependencies' was invalid: in wrapped constraint TypedCollection(Exactly(int)) matching iterable object [3, {u}'asdf']: value {u}'asdf' (with type '{str_type}') must satisfy this type constraint: Exactly(int).""")
     with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       WithCollectionTypeConstraint([3, "asdf"])
@@ -707,7 +723,7 @@ field 'dependencies' was invalid: in wrapped constraint TypedCollection(Exactly(
       obj.copy(nonexistent_field=3)
 
     expected_msg = (
-      """type check error in class AnotherTypedDatatype: error(s) type checking constructor arguments:
+      """type check error in class AnotherTypedDatatype: 1 error type checking constructor arguments:
 field 'elements' was invalid: value 3 (with type 'int') must satisfy this type constraint: Exactly(list).""")
     with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       obj.copy(elements=3)

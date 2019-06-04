@@ -33,13 +33,13 @@ use fs;
 use process_execution;
 
 use clap::{value_t, App, AppSettings, Arg};
-use futures::future::Future;
 use hashing::{Digest, Fingerprint};
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter::Iterator;
 use std::path::PathBuf;
 use std::process::exit;
 use std::time::Duration;
+use tokio::runtime::Runtime;
 
 /// A binary which takes args of format:
 ///  process_executor --env=FOO=bar --env=SOME=value --input-digest=abc123 --input-digest-length=80
@@ -211,7 +211,6 @@ fn main() {
     .value_of("local-store-path")
     .map(PathBuf::from)
     .unwrap_or_else(fs::Store::default_path);
-  let timer_thread = resettable::Resettable::new(|| futures_timer::HelperThread::new().unwrap());
   let server_arg = args.value_of("server");
   let remote_instance_arg = args.value_of("remote-instance-name").map(str::to_owned);
   let output_files = if let Some(values) = args.values_of("output-file-path") {
@@ -254,7 +253,6 @@ fn main() {
         // TODO: Take a command line arg.
         fs::BackoffConfig::new(Duration::from_secs(1), 1.2, Duration::from_secs(20)).unwrap(),
         3,
-        timer_thread.with(futures_timer::HelperThread::handle),
       )
     }
     (None, None) => fs::Store::local_only(local_store_path),
@@ -308,7 +306,6 @@ fn main() {
         platform_properties,
         1,
         store.clone(),
-        timer_thread,
       )) as Box<dyn process_execution::CommandRunner>
     }
     None => Box::new(process_execution::local::CommandRunner::new(
@@ -318,12 +315,15 @@ fn main() {
     )) as Box<dyn process_execution::CommandRunner>,
   };
 
-  let result = runner.run(request).wait().expect("Error executing");
+  let mut runtime = Runtime::new().unwrap();
+
+  let result = runtime
+    .block_on(runner.run(request))
+    .expect("Error executing");
 
   if let Some(output) = args.value_of("materialize-output-to").map(PathBuf::from) {
-    store
-      .materialize_directory(output, result.output_directory)
-      .wait()
+    runtime
+      .block_on(store.materialize_directory(output, result.output_directory))
       .unwrap();
   }
 

@@ -10,6 +10,7 @@ from builtins import next
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
+from pants.base.revision import Revision
 
 from pants.contrib.codeanalysis.tasks.indexable_java_targets import IndexableJavaTargets
 
@@ -18,6 +19,7 @@ from pants.contrib.codeanalysis.tasks.indexable_java_targets import IndexableJav
 class ExtractJava(JvmToolTaskMixin):
   cache_target_dirs = True
 
+  # Despite the name this is a valid entry point for higher versions of Javac.
   _KYTHE_JAVA_EXTRACTOR_MAIN = 'com.google.devtools.kythe.extractors.java.standalone.Javac8Wrapper'
 
   @classmethod
@@ -31,8 +33,7 @@ class ExtractJava(JvmToolTaskMixin):
 
   @classmethod
   def product_types(cls):
-    # TODO: Support indexpack files?
-    return ['kindex_files']
+    return ['kzip_files']
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -45,11 +46,14 @@ class ExtractJava(JvmToolTaskMixin):
     cls.register_jvm_tool(register,
                           'kythe-java-extractor',
                           custom_rules=[
-                            # These need to remain unshaded so that Kythe can interact with the
-                            # javac embedded in its jar.
-                            Shader.exclude_package('com.sun', recursive=True),
                           ],
                           main=cls._KYTHE_JAVA_EXTRACTOR_MAIN)
+    cls.register_jvm_tool(register,
+                          'javac9',
+                          custom_rules=[
+                            Shader.exclude_package('com.sun', recursive=True),
+                          ],
+                          main='com.sun.tools.javac.main.Main')
 
   def execute(self):
     indexable_targets = IndexableJavaTargets.global_instance().get(self.context)
@@ -60,10 +64,11 @@ class ExtractJava(JvmToolTaskMixin):
       for vt in invalidation_check.invalid_vts:
         self.context.log.info('Kythe extracting from {}\n'.format(vt.target.address.spec))
         javac_args = self._get_javac_args_from_zinc_args(targets_to_zinc_args[vt.target])
-        # Kythe jars embed a copy of Java 9's com.sun.tools.javac and javax.tools, for use on JDK8.
-        # We must put these jars on the bootclasspath, ahead of any others, to ensure that we load
-        # the Java 9 versions, and not the runtime's versions.
-        jvm_options = ['-Xbootclasspath/p:{}'.format(':'.join(extractor_cp))]
+        jvm_options = []
+        if self.dist.version < Revision.lenient('9'):
+          # When run on JDK8, Kythe requires javac9 on the bootclasspath.
+          javac9_cp = self.tool_classpath('javac9')
+          jvm_options.append('-Xbootclasspath/p:{}'.format(':'.join(javac9_cp)))
         jvm_options.extend(self.get_options().jvm_options)
         jvm_options.extend([
           '-DKYTHE_CORPUS={}'.format(vt.target.address.spec),
@@ -73,7 +78,8 @@ class ExtractJava(JvmToolTaskMixin):
 
         result = self.dist.execute_java(
           classpath=extractor_cp, main=self._KYTHE_JAVA_EXTRACTOR_MAIN,
-          jvm_options=jvm_options, args=javac_args, workunit_name='kythe-extract')
+          jvm_options=jvm_options, args=javac_args, create_synthetic_jar=False,
+          workunit_factory=self.context.new_workunit, workunit_name='kythe-extract')
         if result != 0:
           raise TaskError('java {main} ... exited non-zero ({result})'.format(
             main=self._KYTHE_JAVA_EXTRACTOR_MAIN, result=result))
@@ -81,10 +87,10 @@ class ExtractJava(JvmToolTaskMixin):
     for vt in invalidation_check.all_vts:
       created_files = os.listdir(vt.results_dir)
       if len(created_files) != 1:
-        raise TaskError('Expected a single .kindex file in {}. Got: {}.'.format(
+        raise TaskError('Expected a single .kzip file in {}. Got: {}.'.format(
           vt.results_dir, ', '.join(created_files) if created_files else 'none'))
-      kindex_files = self.context.products.get_data('kindex_files', dict)
-      kindex_files[vt.target] = os.path.join(vt.results_dir, created_files[0])
+      kzip_files = self.context.products.get_data('kzip_files', dict)
+      kzip_files[vt.target] = os.path.join(vt.results_dir, created_files[0])
 
   @staticmethod
   def _get_javac_args_from_zinc_args(zinc_args):

@@ -29,6 +29,18 @@ PATCH_OPTS = dict(autospec=True, spec_set=True)
 
 class ContextutilTest(unittest.TestCase):
 
+  @contextmanager
+  def ensure_user_defined_in_environment(self):
+    """Utility to test for hermetic environments."""
+    original_env = os.environ.copy()
+    if "USER" not in original_env:
+      os.environ["USER"] = "pantsbuild"
+    try:
+      yield
+    finally:
+      os.environ.clear()
+      os.environ.update(original_env)
+
   def test_empty_environment(self):
     with environment_as():
       pass
@@ -60,27 +72,27 @@ class ContextutilTest(unittest.TestCase):
           self.assertEqual('False\n', output.read())
 
   def test_hermetic_environment(self):
-    self.assertIn('USER', os.environ)
-    with hermetic_environment_as(**{}):
-      self.assertNotIn('USER', os.environ)
+    with self.ensure_user_defined_in_environment():
+      with hermetic_environment_as():
+        self.assertNotIn('USER', os.environ)
 
   def test_hermetic_environment_subprocesses(self):
-    self.assertIn('USER', os.environ)
-    with hermetic_environment_as(**dict(AAA='333')):
-      output = subprocess.check_output('env', shell=True).decode('utf-8')
-      self.assertNotIn('USER=', output)
-      self.assertIn('AAA', os.environ)
-      self.assertEqual(os.environ['AAA'], '333')
-    self.assertIn('USER', os.environ)
-    self.assertNotIn('AAA', os.environ)
+    with self.ensure_user_defined_in_environment():
+      with hermetic_environment_as(AAA='333'):
+        output = subprocess.check_output('env', shell=True).decode('utf-8')
+        self.assertNotIn('USER=', output)
+        self.assertIn('AAA', os.environ)
+        self.assertEqual(os.environ['AAA'], '333')
+      self.assertIn('USER', os.environ)
+      self.assertNotIn('AAA', os.environ)
 
   def test_hermetic_environment_unicode(self):
     UNICODE_CHAR = '¡'
     ENCODED_CHAR = UNICODE_CHAR.encode('utf-8')
     expected_output = UNICODE_CHAR if PY3 else ENCODED_CHAR
-    with environment_as(**dict(XXX=UNICODE_CHAR)):
+    with environment_as(XXX=UNICODE_CHAR):
       self.assertEqual(os.environ['XXX'], expected_output)
-      with hermetic_environment_as(**dict(AAA=UNICODE_CHAR)):
+      with hermetic_environment_as(AAA=UNICODE_CHAR):
         self.assertIn('AAA', os.environ)
         self.assertEqual(os.environ['AAA'], expected_output)
       self.assertEqual(os.environ['XXX'], expected_output)

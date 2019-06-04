@@ -141,6 +141,7 @@ python_library(
     ':jvm_tool_mixin',
     ':shader',
     'src/python/pants/subsystem',
+    'src/python/pants/util:dirutil',
   ]
 )
 
@@ -159,5 +160,18 @@ python_library(
   sources=['resolve_subsystem.py'],
   dependencies=[
     'src/python/pants/subsystem',
+  ],
+)
+
+python_library(
+  name='rsc',
+  sources=['rsc.py'],
+  dependencies=[
+    '3rdparty/python:future',
+    ':jvm_tool_mixin',
+    ':shader',
+    ':zinc',
+    'src/python/pants/subsystem',
+    'src/python/pants/util:dirutil',
   ],
 )

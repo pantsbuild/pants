@@ -224,6 +224,9 @@ class SpecsMatcher(datatype([('tags', tuple), ('exclude_patterns', tuple)])):
     return self._target_tag_matches(target) and not self._excluded_by_pattern(address)
 
 
+# TODO: we can't yet express a type in terms of itself, because datatype field types are evaluated
+# eagerly (so we can't yet type-check the individual items of a tuple provided as the `dependencies`
+# field).
 class Specs(datatype([('dependencies', tuple), ('matcher', SpecsMatcher)])):
   """A collection of Specs representing Spec subclasses, and a SpecsMatcher to filter results."""
 

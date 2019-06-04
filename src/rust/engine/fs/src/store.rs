@@ -106,7 +106,6 @@ impl Store {
     upload_timeout: Duration,
     backoff_config: BackoffConfig,
     rpc_retries: usize,
-    futures_timer_thread: futures_timer::TimerHandle,
   ) -> Result<Store, String> {
     Ok(Store {
       local: local::ByteStore::new(path)?,
@@ -120,7 +119,6 @@ impl Store {
         upload_timeout,
         backoff_config,
         rpc_retries,
-        futures_timer_thread,
       )?),
     })
   }
@@ -689,7 +687,7 @@ mod local {
     self, Cursor, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
     RwTransaction, Transaction, WriteFlags,
   };
-  use log::{debug, error};
+  use log::{error, trace};
   use sha2::Sha256;
   use std;
   use std::collections::{BinaryHeap, HashMap};
@@ -1042,11 +1040,13 @@ mod local {
 
   impl ShardedLmdb {
     pub fn new(root_path: PathBuf) -> Result<ShardedLmdb, String> {
-      debug!("Initializing ShardedLmdb at root {:?}", root_path);
+      trace!("Initializing ShardedLmdb at root {:?}", root_path);
       let mut lmdbs = HashMap::new();
 
+      #[allow(clippy::identity_conversion)]
+      // False positive: https://github.com/rust-lang/rust-clippy/issues/3913
       for (env, dir, fingerprint_prefix) in ShardedLmdb::envs(&root_path)? {
-        debug!("Making ShardedLmdb content database for {:?}", dir);
+        trace!("Making ShardedLmdb content database for {:?}", dir);
         let content_database = env
           .create_db(Some("content"), DatabaseFlags::empty())
           .map_err(|e| {
@@ -1056,7 +1056,7 @@ mod local {
             )
           })?;
 
-        debug!("Making ShardedLmdb lease database for {:?}", dir);
+        trace!("Making ShardedLmdb lease database for {:?}", dir);
         let lease_database = env
           .create_db(Some("leases"), DatabaseFlags::empty())
           .map_err(|e| {
@@ -1139,6 +1139,7 @@ mod local {
       self.lmdbs.values().cloned().collect()
     }
 
+    #[allow(clippy::identity_conversion)] // False positive: https://github.com/rust-lang/rust-clippy/issues/3913
     pub fn compact(&self) -> Result<(), String> {
       for (env, old_dir, _) in ShardedLmdb::envs(&self.root_path)? {
         let new_dir = TempDir::new_in(old_dir.parent().unwrap()).expect("TODO");
@@ -1693,7 +1694,6 @@ mod remote {
       upload_timeout: Duration,
       backoff_config: BackoffConfig,
       rpc_retries: usize,
-      futures_timer_thread: futures_timer::TimerHandle,
     ) -> Result<ByteStore, String> {
       let env = Arc::new(grpcio::Environment::new(thread_count));
 
@@ -1712,7 +1712,7 @@ mod remote {
         })
         .collect();
 
-      let serverset = Serverset::new(channels, backoff_config, futures_timer_thread)?;
+      let serverset = Serverset::new(channels, backoff_config)?;
 
       Ok(ByteStore {
         instance_name,
@@ -1993,7 +1993,6 @@ mod remote {
     use super::super::EntryType;
     use super::ByteStore;
     use bytes::Bytes;
-    use futures_timer::TimerHandle;
     use hashing::Digest;
     use mock::StubCAS;
     use serverset::BackoffConfig;
@@ -2150,7 +2149,6 @@ mod remote {
         Duration::from_secs(5),
         BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
         1,
-        TimerHandle::default(),
       )
       .unwrap();
 
@@ -2226,7 +2224,6 @@ mod remote {
         Duration::from_secs(1),
         BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
         1,
-        TimerHandle::default(),
       )
       .unwrap();
       let error = block_on(store.store_bytes(TestData::roland().bytes())).expect_err("Want error");
@@ -2300,7 +2297,6 @@ mod remote {
         Duration::from_secs(1),
         BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
         1,
-        TimerHandle::default(),
       )
       .unwrap();
 
@@ -2329,7 +2325,6 @@ mod remote {
         Duration::from_secs(1),
         BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
         1,
-        TimerHandle::default(),
       )
       .unwrap()
     }
@@ -2363,7 +2358,6 @@ mod tests {
   use bytes::Bytes;
   use digest::{Digest as DigestTrait, FixedOutput};
   use futures::Future;
-  use futures_timer::TimerHandle;
   use hashing::{Digest, Fingerprint};
   use mock::StubCAS;
   use protobuf::Message;
@@ -2453,7 +2447,6 @@ mod tests {
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      TimerHandle::default(),
     )
     .unwrap()
   }
@@ -3122,7 +3115,6 @@ mod tests {
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      TimerHandle::default(),
     )
     .unwrap();
 
@@ -3149,7 +3141,6 @@ mod tests {
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      TimerHandle::default(),
     )
     .unwrap();
 
@@ -3187,7 +3178,6 @@ mod tests {
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      TimerHandle::default(),
     )
     .unwrap();
 
@@ -3214,7 +3204,6 @@ mod tests {
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      TimerHandle::default(),
     )
     .unwrap();
 

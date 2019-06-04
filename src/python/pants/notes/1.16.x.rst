@@ -2,6 +2,96 @@
 ======================
 This document describes releases leading up to the ``1.16.x`` ``stable`` series.
 
+1.16.0rc5 (5/29/2019)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Force sequential runs under pantsd (#7781)
+  `PR #7781 <https://github.com/pantsbuild/pants/pull/7781>`_
+
+* make assorted rsc task fixes (#7742)
+  `PR #7742 <https://github.com/pantsbuild/pants/pull/7742>`_
+
+* Always use the global interpreter for PythonExecutionTaskBase. (#7801)
+  `PR #7801 <https://github.com/pantsbuild/pants/pull/7801>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Rsc native image support (#7809)
+  `PR #7809 <https://github.com/pantsbuild/pants/pull/7809>`_
+
+* Hermetic zinc runs with a native-image (#7796)
+  `PR #7796 <https://github.com/pantsbuild/pants/pull/7796>`_
+
+1.16.0rc4 (5/22/2019)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Have the daemon wait until we stop writing to the socket. (#7782)
+  `PR #7782 <https://github.com/pantsbuild/pants/pull/7782>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Create Pipe wrapper around pipes (#7740)
+  `PR #7740 <https://github.com/pantsbuild/pants/pull/7740>`_
+
+1.16.0rc3 (5/21/2019)
+---------------------
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Only python_binary's constraint should be included in a built pex (#7776)
+  `PR #7776 <https://github.com/pantsbuild/pants/pull/7776>`_
+
+* Revert v2 zipkin support due to #7415. (#7773)
+  `PR #7773 <https://github.com/pantsbuild/pants/pull/7773>`_
+
+1.16.0rc2 (5/20/2019)
+---------------------
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Memoize graph walks on Context (#7758)
+  `PR #7758 <https://github.com/pantsbuild/pants/pull/7758>`_
+
+* Hash an entire json input in one call. (#7759)
+  `PR #7759 <https://github.com/pantsbuild/pants/pull/7759>`_
+
+Bugfixes
+~~~~~~~~
+
+* Use global instance of PythonSetup for resolve requirements task base (#7672)
+  `PR #7672 <https://github.com/pantsbuild/pants/pull/7672>`_
+
+1.16.0rc1 (5/17/2019)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Confluence publishing uses correct text types (#7746)
+  `PR #7746 <https://github.com/pantsbuild/pants/pull/7746>`_
+
+* Fix 'current' platform check for python_dist() targets with C/C++ sources (#7687)
+  `PR #7687 <https://github.com/pantsbuild/pants/pull/7687>`_
+
+* Fix ordering of args from compiler_option_sets and add test for scalac profiling (#7683)
+  `PR #7683 <https://github.com/pantsbuild/pants/pull/7683>`_
+
+Version updates
+~~~~~~~~~~~~~~~
+
+* Bump pex to 1.6.7 (#7731)
+  `PR #7731 <https://github.com/pantsbuild/pants/pull/7731>`_
+
 1.16.0rc0 (5/7/2019)
 --------------------
 

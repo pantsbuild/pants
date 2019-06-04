@@ -62,16 +62,23 @@ class CompilerOptionSetsMixin(object):
       compiler_option_sets = self.get_options().default_compiler_option_sets
       logger.debug('using default option sets: {}'.format(compiler_option_sets))
 
-    compiler_options = set()
+    compiler_options = []
+
+    # Set values for disabled options (they will come before the enabled options). This allows
+    # enabled option sets to override the disabled ones, if the underlying command has later
+    # options supersede earlier options.
+    compiler_options.extend(
+      disabled_arg
+      for option_set_key, disabled_args in self.get_options().compiler_option_sets_disabled_args.items()
+      if option_set_key not in compiler_option_sets
+      for disabled_arg in disabled_args
+    )
 
     # Set values for enabled options.
-    for option_set_key in compiler_option_sets:
-      val = self.get_options().compiler_option_sets_enabled_args.get(option_set_key, ())
-      compiler_options.update(val)
+    compiler_options.extend(
+      enabled_arg
+      for option_set_key in compiler_option_sets
+      for enabled_arg in self.get_options().compiler_option_sets_enabled_args.get(option_set_key, [])
+    )
 
-    # Set values for disabled options.
-    for option_set_key, disabled_args in self.get_options().compiler_option_sets_disabled_args.items():
-      if not option_set_key in compiler_option_sets:
-        compiler_options.update(disabled_args)
-
-    return list(compiler_options)
+    return compiler_options

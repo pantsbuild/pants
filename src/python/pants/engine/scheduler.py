@@ -7,15 +7,19 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import multiprocessing
 import os
+import sys
 import time
+import traceback
 from builtins import object, open, str, zip
+from textwrap import dedent
 from types import GeneratorType
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
-from pants.engine.fs import (Digest, DirectoryToMaterialize, FileContent, FilesContent,
-                             MergedDirectories, PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch)
+from pants.engine.fs import (Digest, DirectoriesToMerge, DirectoryToMaterialize,
+                             DirectoryWithPrefixToStrip, FileContent, FilesContent, PathGlobs,
+                             PathGlobsAndRoot, Snapshot, UrlToFetch)
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.native import Function, TypeId
 from pants.engine.nodes import Return, Throw
@@ -108,7 +112,8 @@ class Scheduler(object):
       type_path_globs=PathGlobs,
       type_directory_digest=Digest,
       type_snapshot=Snapshot,
-      type_merge_snapshots_request=MergedDirectories,
+      type_merge_snapshots_request=DirectoriesToMerge,
+      type_directory_with_prefix_to_strip=DirectoryWithPrefixToStrip,
       type_files_content=FilesContent,
       type_dir=Dir,
       type_file=File,
@@ -197,10 +202,9 @@ class Scheduler(object):
       self._native.lib.tasks_add_get(self._tasks, self._to_type(product), self._to_type(subject))
 
     for the_get in rule.input_gets:
-      union_members = union_rules.get(the_get.subject_declared_type, None)
-      if union_members:
+      if getattr(the_get.subject_declared_type, '_is_union', False):
         # If the registered subject type is a union, add Get edges to all registered union members.
-        for union_member in union_members:
+        for union_member in union_rules.get(the_get.subject_declared_type, []):
           add_get_edge(the_get.product, union_member)
       else:
         # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
@@ -339,11 +343,9 @@ class Scheduler(object):
   def garbage_collect_store(self):
     self._native.lib.garbage_collect_store(self._scheduler)
 
-  def new_session(self, zipkin_trace_v2, v2_ui=False):
+  def new_session(self, v2_ui=False):
     """Creates a new SchedulerSession for this Scheduler."""
-    return SchedulerSession(self, self._native.new_session(
-      self._scheduler, zipkin_trace_v2, v2_ui, multiprocessing.cpu_count())
-    )
+    return SchedulerSession(self, self._native.new_session(self._scheduler, v2_ui, multiprocessing.cpu_count()))
 
 
 _PathGlobsAndRootCollection = Collection.of(PathGlobsAndRoot)
@@ -431,10 +433,6 @@ class SchedulerSession(object):
     """Returns metrics for this SchedulerSession as a dict of metric name to metric value."""
     return self._scheduler._metrics(self._session)
 
-  @staticmethod
-  def engine_workunits(metrics):
-    return metrics.get("engine_workunits")
-
   def with_fork_context(self, func):
     return self._scheduler.with_fork_context(func)
 
@@ -506,7 +504,56 @@ class SchedulerSession(object):
     :param list subjects: A list of subjects or Params instances for the request.
     :returns: A list of the requested products, with length match len(subjects).
     """
-    request = self.execution_request([product], subjects)
+    request = None
+    raised_exception = None
+    try:
+      request = self.execution_request([product], subjects)
+    except:                     # noqa: T803
+      # If there are any exceptions during CFFI extern method calls, we want to return an error with
+      # them and whatever failure results from it. This typically results from unhashable types.
+      if self._scheduler._native.cffi_extern_method_runtime_exceptions():
+        raised_exception = sys.exc_info()[0:3]
+      else:
+        # Otherwise, this is likely an exception coming from somewhere else, and we don't want to
+        # swallow that, so re-raise.
+        raise
+
+    # We still want to raise whenever there are any exceptions in any CFFI extern methods, even if
+    # that didn't lead to an exception in generating the execution request for some reason, so we
+    # check the extern exceptions list again.
+    internal_errors = self._scheduler._native.cffi_extern_method_runtime_exceptions()
+    if internal_errors:
+      error_tracebacks = [
+        ''.join(
+          traceback.format_exception(etype=error_info.exc_type,
+                                     value=error_info.exc_value,
+                                     tb=error_info.traceback))
+        for error_info in internal_errors
+      ]
+
+      raised_exception_message = None
+      if raised_exception:
+        exc_type, exc_value, tb = raised_exception
+        raised_exception_message = dedent("""\
+          The engine execution request raised this error, which is probably due to the errors in the
+          CFFI extern methods listed above, as CFFI externs return None upon error:
+          {}
+        """).format(''.join(traceback.format_exception(etype=exc_type, value=exc_value, tb=tb)))
+
+      # Zero out the errors raised in CFFI callbacks in case this one is caught and pants doesn't
+      # exit.
+      self._scheduler._native.reset_cffi_extern_method_runtime_exceptions()
+
+      raise ExecutionError(dedent("""\
+        {error_description} raised in CFFI extern methods:
+        {joined_tracebacks}{raised_exception_message}
+        """).format(
+          error_description=pluralize(len(internal_errors), 'Exception'),
+          joined_tracebacks='\n+++++++++\n'.join(formatted_tb for formatted_tb in error_tracebacks),
+          raised_exception_message=(
+            '\n\n{}'.format(raised_exception_message) if raised_exception_message else '')
+        ))
+
     returns, throws = self.execute(request)
 
     # Throw handling.

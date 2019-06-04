@@ -6,26 +6,28 @@ set -e
 VIRTUALENV_VERSION=15.2.0
 VIRTUALENV_PACKAGE_LOCATION=${VIRTUALENV_PACKAGE_LOCATION:-https://pypi.io/packages/source/v/virtualenv}
 
-REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && git rev-parse --show-toplevel)
-source ${REPO_ROOT}/build-support/common.sh
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && git rev-parse --show-toplevel)
+
+# shellcheck source=build-support/common.sh
+source "${REPO_ROOT}/build-support/common.sh"
 
 # Locate the binary's path to log to user or die gracefully if not found.
-if which "${PY}" >/dev/null; then
-  PY=`which ${PY}`
+if command -v "${PY}" >/dev/null; then
+  PY="$(command -v "${PY}")"
 else
   die "No ${PY} interpreter found on the path. Python will not work!"
 fi
 
 log "Using python at ${PY}"
 
-HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 if ! [ -f "${HERE}/virtualenv.dist/BOOTSTRAPPED-${VIRTUALENV_VERSION}" ]; then
   pushd "${HERE}" >/dev/null
     VIRTUALENV_PACKAGE_FULL_URL="${VIRTUALENV_PACKAGE_LOCATION}/virtualenv-${VIRTUALENV_VERSION}.tar.gz"
     log "Downloading ${VIRTUALENV_PACKAGE_FULL_URL}..."
-    curl -#L -O ${VIRTUALENV_PACKAGE_FULL_URL} || \
+    curl -#L -O "${VIRTUALENV_PACKAGE_FULL_URL}" || \
       die "Failed to download ${VIRTUALENV_PACKAGE_FULL_URL}."
-    rm -rf virtualenv-${VIRTUALENV_VERSION} && \
+    rm -rf virtualenv-${VIRTUALENV_VERSION}
     tar zxf virtualenv-${VIRTUALENV_VERSION}.tar.gz || \
       die "Failed to extract ${VIRTUALENV_PACKAGE_FULL_URL}."
     # TODO(ksweeney): Checksum

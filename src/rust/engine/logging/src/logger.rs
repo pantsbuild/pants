@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use crate::PythonLogLevel;
+use futures::task_local;
 use lazy_static::lazy_static;
 use log::{log, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
 use parking_lot::Mutex;
@@ -120,8 +121,11 @@ impl Log for Logger {
   }
 
   fn log(&self, record: &Record) {
-    self.stderr_log.lock().log(record);
-    self.pantsd_log.lock().log(record);
+    let destination = get_destination();
+    match destination {
+      Destination::Stderr => self.stderr_log.lock().log(record),
+      Destination::Pantsd => self.pantsd_log.lock().log(record),
+    }
   }
 
   fn flush(&self) {
@@ -203,5 +207,62 @@ impl<W: Write + Send + 'static> Log for MaybeWriteLogger<W> {
     if let Some(ref logger) = self.inner {
       logger.flush();
     }
+  }
+}
+
+///
+/// Thread- or task-local context for where the Logger should send log statements.
+///
+/// We do this in a per-thread way because we find that Pants threads generally are either
+/// daemon-specific or user-facing. We make sure that every time we spawn a thread on the Python
+/// side, we set the thread-local information, and every time we submit a Future to a tokio Runtime
+/// on the rust side, we set the task-local information.
+///
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[repr(C)]
+pub enum Destination {
+  Pantsd,
+  Stderr,
+}
+
+thread_local! {
+  pub static THREAD_DESTINATION: Mutex<Destination> = Mutex::new(Destination::Stderr)
+}
+
+task_local! {
+  static TASK_DESTINATION: Mutex<Option<Destination>> = Mutex::new(None)
+}
+
+pub fn set_destination(destination: Destination) {
+  if futures::task::is_in_task() {
+    TASK_DESTINATION.with(|task_destination| {
+      *task_destination.lock() = Some(destination);
+    })
+  } else {
+    THREAD_DESTINATION.with(|thread_destination| {
+      *thread_destination.lock() = destination;
+    })
+  }
+}
+
+pub fn get_destination() -> Destination {
+  let ret = {
+    if futures::task::is_in_task() {
+      TASK_DESTINATION.with(|destination| {
+        let destination = destination.lock();
+        if let Some(destination) = destination.as_ref() {
+          Some(*destination)
+        } else {
+          None
+        }
+      })
+    } else {
+      None
+    }
+  };
+  if let Some(ret) = ret {
+    ret
+  } else {
+    THREAD_DESTINATION.with(|destination| *destination.lock())
   }
 }

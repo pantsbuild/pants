@@ -60,22 +60,41 @@ def always_uses_default_python_platform(tgt):
 
 
 def may_have_explicit_python_platform(tgt):
-  return isinstance(tgt, (PythonBinary, PythonDistribution))
+  return isinstance(tgt, PythonBinary)
 
 
 def targets_by_platform(targets, python_setup):
-  d = defaultdict(OrderedSet)
+  targets_requiring_default_platforms = []
+  explicit_platform_settings = defaultdict(OrderedSet)
   for target in targets:
     if always_uses_default_python_platform(target):
-       # There are currently no tests for this because they're super platform specific and it's hard
-       # for us to express that on CI, but https://github.com/pantsbuild/pants/issues/7616 has an
-       # excellent repro case for why this is necessary.
-      for platform in python_setup.platforms:
-        d[platform].add(target)
+      targets_requiring_default_platforms.append(target)
     elif may_have_explicit_python_platform(target):
       for platform in target.platforms if target.platforms else python_setup.platforms:
-        d[platform].add(target)
-  return d
+        explicit_platform_settings[platform].add(target)
+  # There are currently no tests for this because they're super platform specific and it's hard for
+  # us to express that on CI, but https://github.com/pantsbuild/pants/issues/7616 has an excellent
+  # repro case for why this is necessary.
+  for target in targets_requiring_default_platforms:
+    for platform in python_setup.platforms:
+      explicit_platform_settings[platform].add(target)
+  return dict(explicit_platform_settings)
+
+
+def identify_missing_init_files(sources):
+  """Return the list of paths that would need to be added to ensure that every package has
+  an __init__.py. """
+  packages = set()
+  for source in sources:
+    if source.endswith('.py'):
+      pkg_dir = os.path.dirname(source)
+      if pkg_dir and pkg_dir not in packages:
+        package = ''
+        for component in pkg_dir.split(os.sep):
+          package = os.path.join(package, component)
+          packages.add(package)
+
+  return {os.path.join(package, '__init__.py') for package in packages} - set(sources)
 
 
 def _create_source_dumper(builder, tgt):
@@ -305,31 +324,14 @@ class PexBuilderWrapper(object):
   def _prepare_inits(self):
     chroot = self._builder.chroot()
     sources = chroot.get('source') | chroot.get('resource')
-
-    packages = set()
-    for source in sources:
-      if source.endswith('.py'):
-        pkg_dir = os.path.dirname(source)
-        if pkg_dir and pkg_dir not in packages:
-          package = ''
-          for component in pkg_dir.split(os.sep):
-            package = os.path.join(package, component)
-            packages.add(package)
-
-    missing_pkg_files = []
-    for package in packages:
-      pkg_file = os.path.join(package, '__init__.py')
-      if pkg_file not in sources:
-        missing_pkg_files.append(pkg_file)
-
-    if missing_pkg_files:
+    missing_init_files = identify_missing_init_files(sources)
+    if missing_init_files:
       with temporary_file() as ns_package:
         ns_package.write(b'__import__("pkg_resources").declare_namespace(__name__)')
         ns_package.flush()
-        for missing_pkg_file in missing_pkg_files:
-          self._builder.add_source(ns_package.name, missing_pkg_file)
-
-    return missing_pkg_files
+        for missing_init_file in missing_init_files:
+          self._builder.add_source(ns_package.name, missing_init_file)
+    return missing_init_files
 
   def set_emit_warnings(self, emit_warnings):
     self._builder.info.emit_warnings = emit_warnings
@@ -348,7 +350,7 @@ class PexBuilderWrapper(object):
 
   def build(self, safe_path):
     self.freeze()
-    self._builder.build(safe_path)
+    self._builder.build(safe_path, bytecode_compile=False, deterministic_timestamp=True)
 
   def set_shebang(self, shebang):
     self._builder.set_shebang(shebang)

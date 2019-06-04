@@ -408,8 +408,8 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
     # https://github.com/pantsbuild/pants/issues/5073
 
     register('--fast', type=bool, default=True, fingerprint=True,
-             help='Run all tests in a single pytest invocation. If turned off, each test target '
-                  'will run in its own pytest invocation, which will be slower, but isolates '
+             help='Run all tests in a single invocation. If turned off, each test target '
+                  'will run in its own invocation, which will be slower, but isolates '
                   'tests from process-wide state created by tests in other targets.')
     register('--chroot', advanced=True, fingerprint=True, type=bool, default=False,
              help='Run tests in a chroot. Any loose files tests depend on via `{}` dependencies '

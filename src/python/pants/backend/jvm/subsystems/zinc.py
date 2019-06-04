@@ -22,14 +22,17 @@ from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
 from pants.base.workunit import WorkUnitLabel
+from pants.binaries.binary_tool import NativeTool
 from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.distribution.distribution import Distribution
 from pants.java.jar.jar_dependency import JarDependency
-from pants.subsystem.subsystem import Subsystem
-from pants.util.dirutil import fast_relpath, safe_mkdir
+from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir
 from pants.util.fileutil import safe_hardlink_or_copy
 from pants.util.memo import memoized_method, memoized_property
+
+
+_ZINC_COMPILER_VERSION = '0.0.9'
 
 
 class Zinc(object):
@@ -46,8 +49,14 @@ class Zinc(object):
 
   _lock = Lock()
 
-  class Factory(Subsystem, JvmToolMixin):
+  # This is both a NativeTool (for the graal native image of zinc), _and_ a Subsystem by its own
+  # right. We're not allowed to explicitly inherit from both because of MRO.
+  class Factory(JvmToolMixin, NativeTool):
     options_scope = 'zinc'
+
+    # NB: These two properties are consumed by the NativeTool mixin.
+    default_version = _ZINC_COMPILER_VERSION
+    name = 'zinc-pants-native-image'
 
     @classmethod
     def subsystem_dependencies(cls):
@@ -58,6 +67,8 @@ class Zinc(object):
     @classmethod
     def register_options(cls, register):
       super(Zinc.Factory, cls).register_options(register)
+      register('--native-image', fingerprint=True, type=bool,
+        help='Use a pre-compiled native-image for zinc. Requires running in hermetic mode')
 
       zinc_rev = '1.0.3'
 
@@ -85,7 +96,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_COMPILER_TOOL_NAME,
                             classpath=[
-                              JarDependency('org.pantsbuild', 'zinc-compiler_2.11', '0.0.9'),
+                              JarDependency('org.pantsbuild', 'zinc-compiler_2.11', _ZINC_COMPILER_VERSION),
                             ],
                             main=Zinc.ZINC_COMPILE_MAIN,
                             custom_rules=shader_rules)
@@ -196,6 +207,14 @@ class Zinc(object):
     """
     return self._zinc_factory._zinc(self._products)
 
+  @property
+  def use_native_image(self):
+    return self._zinc_factory.get_options().native_image
+
+  @memoized_method
+  def native_image(self, context):
+    return self._zinc_factory.hackily_snapshot(context)
+
   @memoized_property
   def dist(self):
     """Return the `Distribution` selected for Zinc based on execution strategy.
@@ -210,14 +229,13 @@ class Zinc(object):
         get_buildroot())
 
       # Since this code can be run in multi-threading mode due to multiple
-      # zinc workers, we need to make sure the file operations below is atomic.
+      # zinc workers, we need to make sure the file operations below are atomic.
       with self._lock:
-        # Create the symlink if it does not exist
-        if not os.path.exists(jdk_home_symlink):
-          os.symlink(underlying_dist.home, jdk_home_symlink)
-        # Recreate if the symlink exists but does not match `underlying_dist.home`.
-        elif os.readlink(jdk_home_symlink) != underlying_dist.home:
-          os.remove(jdk_home_symlink)
+        # Create the symlink if it does not exist, or points to a file that doesn't exist,
+        # (e.g., a JDK that is no longer present), or points to the wrong JDK.
+        if (not os.path.exists(jdk_home_symlink) or
+            os.readlink(jdk_home_symlink) != underlying_dist.home):
+          safe_delete(jdk_home_symlink)  # Safe-delete, in case it's a broken symlink.
           os.symlink(underlying_dist.home, jdk_home_symlink)
 
       return Distribution(home_path=jdk_home_symlink)

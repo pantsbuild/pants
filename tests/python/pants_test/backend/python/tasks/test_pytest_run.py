@@ -12,6 +12,7 @@ from textwrap import dedent
 
 import coverage
 
+from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.pytest_prep import PytestPrep
 from pants.backend.python.tasks.pytest_run import PytestResult, PytestRun
@@ -102,6 +103,50 @@ class PytestTestBase(PythonTaskTestBase, DeclarativeTaskTestMixin):
 class PytestTestEmpty(PytestTestBase):
   def test_empty(self):
     self.run_tests(targets=[])
+
+
+class PytestTestConftest(PytestTestBase):
+
+  def setUp(self):
+    super(PytestTestConftest, self).setUp()
+
+    self.create_file('src/python/base/__init__.py')
+    self.create_file('src/python/base/conftest.py', contents=dedent("""
+    import pytest
+    
+    APPS = ['base']
+    INDEX = {}
+    
+    def pytest_configure(config):
+      INDEX.update((app, len(app)) for app in APPS)
+    """))
+    self.add_to_build_file('src/python/base', target='python_library()\n')
+
+    self.create_file('src/python/base/app/__init__.py')
+    self.create_file('src/python/base/app/conftest.py', contents=dedent("""
+    from base.conftest import APPS
+    
+    APPS.append('app')
+    """))
+    self.add_to_build_file('src/python/base/app',
+                           target='python_library(dependencies=["src/python/base"])\n')
+
+    self.create_file('src/python/base/app/conftest_test.py', contents=dedent("""
+    from base.conftest import INDEX
+    
+    def test_conftest_interaction():
+      assert {'base': 4, 'app': 3} == INDEX
+    """))
+    self.add_to_build_file('src/python/base/app',
+                           target='python_tests(name="tests", dependencies=[":app"])\n')
+
+    self.app_tests = self.target('src/python/base/app:tests')
+
+  def test_conftests_discovery_no_coverage(self):
+    self.run_tests([self.app_tests], '-vs', '--trace-config')
+
+  def test_conftests_discovery_with_coverage(self):
+    self.run_tests([self.app_tests], '-vs', '--trace-config', coverage='auto')
 
 
 class PytestTestFailedPexRun(PytestTestBase):
@@ -844,3 +889,20 @@ python_tests(
       assert_test_not_run('test_three')
       assert_test_run('test_four')
       assert_test_not_run('test_five')
+
+  @contextmanager
+  def run_with_junit_xml_dir(self, targets):
+    with temporary_dir() as dist:
+      junit_xml_dir = os.path.join(dist, 'test-results')
+      self.run_tests(targets, junit_xml_dir=junit_xml_dir)
+      assert os.path.exists(junit_xml_dir)
+      yield os.listdir(junit_xml_dir)
+
+  def test_junit_xml_dir(self):
+    with self.run_with_junit_xml_dir([self.green]) as junit_xml_files:
+      assert ['TEST-{}.xml'.format(self.green.id)] == junit_xml_files
+
+  def test_issue_7749(self):
+    empty_test_target = self.make_target(spec='empty', target_type=PythonTests)
+    with self.run_with_junit_xml_dir([empty_test_target]) as junit_xml_files:
+      assert [] == junit_xml_files

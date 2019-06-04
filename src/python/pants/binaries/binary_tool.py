@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import logging
 import os
+import threading
 from builtins import str
 
 from future.utils import text_type
@@ -49,6 +50,10 @@ class BinaryToolBase(Subsystem):
 
   # Subclasses may set this to provide extra register() kwargs for the --version option.
   extra_version_option_kwargs = None
+
+  def __init__(self, *args, **kwargs):
+    super(BinaryToolBase, self).__init__(*args, **kwargs)
+    self._snapshot_lock = threading.Lock()
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -179,6 +184,29 @@ class BinaryToolBase(Subsystem):
     binary_request = self._make_binary_request(version)
     return self._binary_util.select(binary_request)
 
+  @memoized_method
+  def _hackily_snapshot_exclusive(self, context):
+    bootstrapdir = self.get_options().pants_bootstrapdir
+    relpath = os.path.relpath(self.select(context), bootstrapdir)
+    snapshot = context._scheduler.capture_snapshots((
+      PathGlobsAndRoot(
+        PathGlobs((relpath,)),
+        text_type(bootstrapdir),
+      ),
+    ))[0]
+    return (relpath, snapshot)
+
+  def hackily_snapshot(self, context):
+    """Returns a Snapshot of this tool after downloading it.
+
+    TODO: See https://github.com/pantsbuild/pants/issues/7790, which would make this unnecessary
+    due to the engine's memoization and caching.
+    """
+    # We call a memoized method under a lock in order to avoid doing a bunch of redundant
+    # fetching and snapshotting.
+    with self._snapshot_lock:
+      return self._hackily_snapshot_exclusive(context)
+
 
 class NativeTool(BinaryToolBase):
   """A base class for native-code tools.
@@ -194,17 +222,6 @@ class Script(BinaryToolBase):
   :API: public
   """
   platform_dependent = False
-
-  def hackily_snapshot(self, context):
-    bootstrapdir = self.get_options().pants_bootstrapdir
-    script_relpath = os.path.relpath(self.select(context), bootstrapdir)
-    snapshot = context._scheduler.capture_snapshots((
-      PathGlobsAndRoot(
-        PathGlobs((script_relpath,)),
-        text_type(bootstrapdir),
-      ),
-    ))[0]
-    return (script_relpath, snapshot)
 
 
 class XZ(NativeTool):

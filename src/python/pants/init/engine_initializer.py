@@ -10,7 +10,6 @@ from builtins import object
 from pants.backend.docgen.targets.doc import Page
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
-from pants.backend.python.rules import python_test_runner
 from pants.backend.python.targets.python_app import PythonApp
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -30,8 +29,8 @@ from pants.engine.legacy.graph import (LegacyBuildGraph, TransitiveHydratedTarge
                                        create_legacy_graph_tasks)
 from pants.engine.legacy.options_parsing import create_options_parsing_rules
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
-from pants.engine.legacy.structs import (AppAdaptor, JvmBinaryAdaptor, PageAdaptor,
-                                         PantsPluginAdaptor, PythonBinaryAdaptor,
+from pants.engine.legacy.structs import (JvmAppAdaptor, JvmBinaryAdaptor, PageAdaptor,
+                                         PantsPluginAdaptor, PythonAppAdaptor, PythonBinaryAdaptor,
                                          PythonTargetAdaptor, PythonTestsAdaptor,
                                          RemoteSourcesAdaptor, TargetAdaptor)
 from pants.engine.legacy.structs import rules as structs_rules
@@ -47,6 +46,47 @@ from pants.util.objects import datatype
 
 
 logger = logging.getLogger(__name__)
+
+
+def _tuplify(v):
+  if v is None:
+    return None
+  if isinstance(v, tuple):
+    return v
+  if isinstance(v, (list, set)):
+    return tuple(v)
+  return (v,)
+
+
+def _compute_default_sources_globs(base_class, target_type):
+  """Look up the default source globs for the type, and return as a tuple of (globs, excludes)."""
+  if not target_type.supports_default_sources() or target_type.default_sources_globs is None:
+    return (None, None)
+
+  globs = _tuplify(target_type.default_sources_globs)
+  excludes = _tuplify(target_type.default_sources_exclude_globs)
+
+  return (globs, excludes)
+
+
+def _apply_default_sources_globs(base_class, target_type):
+  """Mutates the given TargetAdaptor subclass to apply default sources from the given legacy target type."""
+  globs, excludes = _compute_default_sources_globs(base_class, target_type)
+  base_class.default_sources_globs = globs
+  base_class.default_sources_exclude_globs = excludes
+
+
+# TODO: These calls mutate the adaptor classes for some known library types to copy over
+# their default source globs while preserving their concrete types. As with the alias replacement
+# below, this is a delaying tactic to avoid elevating the TargetAdaptor API.
+_apply_default_sources_globs(JvmAppAdaptor, JvmApp)
+_apply_default_sources_globs(PythonAppAdaptor, PythonApp)
+_apply_default_sources_globs(JvmBinaryAdaptor, JvmBinary)
+_apply_default_sources_globs(PageAdaptor, Page)
+_apply_default_sources_globs(PythonBinaryAdaptor, PythonBinary)
+_apply_default_sources_globs(PythonTargetAdaptor, PythonLibrary)
+_apply_default_sources_globs(PythonTestsAdaptor, PythonTests)
+_apply_default_sources_globs(RemoteSourcesAdaptor, RemoteSources)
 
 
 def _legacy_symbol_table(build_file_aliases):
@@ -79,15 +119,14 @@ def _legacy_symbol_table(build_file_aliases):
   # API until after https://github.com/pantsbuild/pants/issues/3560 has been completed.
   # These should likely move onto Target subclasses as the engine gets deeper into beta
   # territory.
-  table['python_library'] = _make_target_adaptor(PythonTargetAdaptor, PythonLibrary)
-
-  table['jvm_app'] = _make_target_adaptor(AppAdaptor, JvmApp)
-  table['jvm_binary'] = _make_target_adaptor(JvmBinaryAdaptor, JvmBinary)
-  table['python_app'] = _make_target_adaptor(AppAdaptor, PythonApp)
-  table['python_tests'] = _make_target_adaptor(PythonTestsAdaptor, PythonTests)
-  table['python_binary'] = _make_target_adaptor(PythonBinaryAdaptor, PythonBinary)
-  table['remote_sources'] = _make_target_adaptor(RemoteSourcesAdaptor, RemoteSources)
-  table['page'] = _make_target_adaptor(PageAdaptor, Page)
+  table['python_library'] = PythonTargetAdaptor
+  table['jvm_app'] = JvmAppAdaptor
+  table['jvm_binary'] = JvmBinaryAdaptor
+  table['python_app'] = PythonAppAdaptor
+  table['python_tests'] = PythonTestsAdaptor
+  table['python_binary'] = PythonBinaryAdaptor
+  table['remote_sources'] = RemoteSourcesAdaptor
+  table['page'] = PageAdaptor
 
   # Note that these don't call _make_target_adaptor because we don't have a handy reference to the
   # types being constructed. They don't have any default_sources behavior, so this should be ok,
@@ -100,46 +139,23 @@ def _legacy_symbol_table(build_file_aliases):
 
 
 def _make_target_adaptor(base_class, target_type):
-  """Look up the default source globs for the type, and apply them to parsing through the engine."""
-  if not target_type.supports_default_sources() or target_type.default_sources_globs is None:
+  """Create an adaptor subclass for the given TargetAdaptor base class and legacy target type."""
+  globs, excludes = _compute_default_sources_globs(base_class, target_type)
+  if globs is None:
     return base_class
 
-  globs = _tuplify(target_type.default_sources_globs)
-  excludes = _tuplify(target_type.default_sources_exclude_globs)
-
   class GlobsHandlingTargetAdaptor(base_class):
-    @property
-    def default_sources_globs(self):
-      if globs is None:
-        return super(GlobsHandlingTargetAdaptor, self).default_sources_globs
-      else:
-        return globs
-
-    @property
-    def default_sources_exclude_globs(self):
-      if excludes is None:
-        return super(GlobsHandlingTargetAdaptor, self).default_sources_exclude_globs
-      else:
-        return excludes
+    default_sources_globs = globs
+    default_sources_exclude_globs = excludes
 
   return GlobsHandlingTargetAdaptor
-
-
-def _tuplify(v):
-  if v is None:
-    return None
-  if isinstance(v, tuple):
-    return v
-  if isinstance(v, (list, set)):
-    return tuple(v)
-  return (v,)
 
 
 class LegacyGraphScheduler(datatype(['scheduler', 'build_file_aliases', 'goal_map'])):
   """A thin wrapper around a Scheduler configured with @rules for a symbol table."""
 
-  def new_session(self, zipkin_trace_v2, v2_ui=False):
-    session = self.scheduler.new_session(zipkin_trace_v2, v2_ui)
+  def new_session(self, v2_ui=False):
+    session = self.scheduler.new_session(v2_ui)
     return LegacyGraphSession(session, self.build_file_aliases, self.goal_map)
 
 
@@ -355,8 +371,6 @@ class EngineInitializer(object):
       create_graph_rules(address_mapper) +
       create_options_parsing_rules() +
       structs_rules() +
-      # TODO: This should happen automatically, but most tests (e.g. tests/python/pants_test/auth) fail if it's not here:
-      python_test_runner.rules() +
       rules
     )
 

@@ -17,9 +17,8 @@ use url::Url;
 use crate::context::{Context, Core};
 use crate::core::{throw, Failure, Key, Params, TypeId, Value};
 use crate::externs;
-use crate::rule_graph;
 use crate::selectors;
-use crate::tasks::{self, Intrinsic};
+use crate::tasks::{self, Intrinsic, Rule};
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::{self, BufMut};
 use fs::{
@@ -28,11 +27,9 @@ use fs::{
 };
 use hashing;
 use process_execution::{self, CommandRunner};
+use rule_graph;
 
-use crate::scheduler::WorkUnit;
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
-use rand::thread_rng;
-use rand::Rng;
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
@@ -98,11 +95,11 @@ pub trait WrappedNode: Into<NodeKey> {
 pub struct Select {
   pub params: Params,
   pub product: TypeId,
-  entry: rule_graph::Entry,
+  entry: rule_graph::Entry<Rule>,
 }
 
 impl Select {
-  pub fn new(mut params: Params, product: TypeId, entry: rule_graph::Entry) -> Select {
+  pub fn new(mut params: Params, product: TypeId, entry: rule_graph::Entry<Rule>) -> Select {
     params.retain(|k| match &entry {
       &rule_graph::Entry::Param(ref type_id) => type_id == k.type_id(),
       &rule_graph::Entry::WithDeps(ref with_deps) => with_deps.params().contains(k.type_id()),
@@ -114,11 +111,15 @@ impl Select {
     }
   }
 
-  pub fn new_from_edges(params: Params, product: TypeId, edges: &rule_graph::RuleEdges) -> Select {
-    let select_key = rule_graph::SelectKey::JustSelect(selectors::Select::new(product));
+  pub fn new_from_edges(
+    params: Params,
+    product: TypeId,
+    edges: &rule_graph::RuleEdges<Rule>,
+  ) -> Select {
+    let dependency_key = selectors::DependencyKey::JustSelect(selectors::Select::new(product));
     // TODO: Is it worth propagating an error here?
     let entry = edges
-      .entry_for(&select_key)
+      .entry_for(&dependency_key)
       .unwrap_or_else(|| panic!("{:?} did not declare a dependency on {:?}", edges, product))
       .clone();
     Select::new(params, product, entry)
@@ -155,13 +156,13 @@ impl WrappedNode for Select {
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => match inner
         .rule()
       {
-        &rule_graph::Rule::Task(ref task) => context.get(Task {
+        &tasks::Rule::Task(ref task) => context.get(Task {
           params: self.params.clone(),
           product: self.product,
           task: task.clone(),
           entry: Arc::new(self.entry.clone()),
         }),
-        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+        &tasks::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.snapshot && input == context.core.types.path_globs =>
         {
           let context = context.clone();
@@ -172,7 +173,7 @@ impl WrappedNode for Select {
             .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
             .to_boxed()
         }
-        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+        &tasks::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.snapshot && input == context.core.types.url_to_fetch =>
         {
           let context = context.clone();
@@ -183,12 +184,15 @@ impl WrappedNode for Select {
             .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
             .to_boxed()
         }
-        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+        &tasks::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.directory_digest
-            && input == context.core.types.merged_directories =>
+            && input == context.core.types.directories_to_merge =>
         {
-          let request =
-            self.select_product(&context, context.core.types.merged_directories, "intrinsic");
+          let request = self.select_product(
+            &context,
+            context.core.types.directories_to_merge,
+            "intrinsic",
+          );
           let core = context.core.clone();
           request
             .and_then(move |request| {
@@ -204,7 +208,51 @@ impl WrappedNode for Select {
             })
             .to_boxed()
         }
-        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+        &tasks::Rule::Intrinsic(Intrinsic { product, input })
+          if product == context.core.types.snapshot
+            && input == context.core.types.directory_digest =>
+        {
+          let core = context.core.clone();
+          self
+            .select_product(&context, context.core.types.directory_digest, "intrinsic")
+            .and_then(|directory_digest_val| {
+              lift_digest(&directory_digest_val).map_err(|str| throw(&str))
+            })
+            .and_then(move |digest| {
+              fs::Snapshot::from_digest(context.core.store(), digest).map_err(|str| throw(&str))
+            })
+            .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
+            .to_boxed()
+        }
+
+        &tasks::Rule::Intrinsic(Intrinsic { product, input })
+          if product == context.core.types.directory_digest
+            && input == context.core.types.directory_with_prefix_to_strip =>
+        {
+          let request = self.select_product(
+            &context,
+            context.core.types.directory_with_prefix_to_strip,
+            "intrinsic",
+          );
+          let core = context.core.clone();
+          request
+            .and_then(move |request| {
+              let digest = lift_digest(&externs::project_ignoring_type(
+                &request,
+                "directory_digest",
+              ))
+              .map_err(|str| throw(&str))?;
+              let prefix = externs::project_str(&request, "prefix");
+              Ok((digest, prefix))
+            })
+            .and_then(|(digest, prefix)| {
+              fs::Snapshot::strip_prefix(core.store(), digest, PathBuf::from(prefix))
+                .map_err(|err| throw(&err))
+                .map(move |digest| Snapshot::store_directory(&core, &digest))
+            })
+            .to_boxed()
+        }
+        &tasks::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.files_content
             && input == context.core.types.directory_digest =>
         {
@@ -224,7 +272,7 @@ impl WrappedNode for Select {
             })
             .to_boxed()
         }
-        &rule_graph::Rule::Intrinsic(Intrinsic { product, input })
+        &tasks::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.process_result
             && input == context.core.types.process_request =>
         {
@@ -250,7 +298,7 @@ impl WrappedNode for Select {
             })
             .to_boxed()
         }
-        &rule_graph::Rule::Intrinsic(i) => panic!("Unrecognized intrinsic: {:?}", i),
+        &tasks::Rule::Intrinsic(i) => panic!("Unrecognized intrinsic: {:?}", i),
       },
       &rule_graph::Entry::Param(type_id) => {
         if let Some(key) = self.params.find(type_id) {
@@ -785,14 +833,14 @@ pub struct Task {
   params: Params,
   product: TypeId,
   task: tasks::Task,
-  entry: Arc<rule_graph::Entry>,
+  entry: Arc<rule_graph::Entry<Rule>>,
 }
 
 impl Task {
   fn gen_get(
     context: &Context,
     params: &Params,
-    entry: &Arc<rule_graph::Entry>,
+    entry: &Arc<rule_graph::Entry<Rule>>,
     gets: Vec<externs::Get>,
   ) -> NodeFuture<Vec<Value>> {
     let get_futures = gets
@@ -801,7 +849,7 @@ impl Task {
         let context = context.clone();
         let params = params.clone();
         let entry = entry.clone();
-        let select_key = rule_graph::SelectKey::JustGet(selectors::Get {
+        let dependency_key = selectors::DependencyKey::JustGet(selectors::Get {
           product: get.product,
           subject: *get.subject.type_id(),
         });
@@ -811,10 +859,10 @@ impl Task {
           .edges_for_inner(&entry)
           .ok_or_else(|| throw(&format!("no edges for task {:?} exist!", entry)))
           .and_then(|edges| {
-            edges.entry_for(&select_key).cloned().ok_or_else(|| {
+            edges.entry_for(&dependency_key).cloned().ok_or_else(|| {
               throw(&format!(
                 "{:?} did not declare a dependency on {:?}",
-                entry, select_key
+                entry, dependency_key
               ))
             })
           });
@@ -836,7 +884,7 @@ impl Task {
   fn generate(
     context: Context,
     params: Params,
-    entry: Arc<rule_graph::Entry>,
+    entry: Arc<rule_graph::Entry<Rule>>,
     generator: Value,
   ) -> NodeFuture<Value> {
     future::loop_fn(Value::from(externs::none()), move |input| {
@@ -1041,17 +1089,6 @@ impl Node for NodeKey {
   type Error = Failure;
 
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
-    let node_name_and_start_timestamp = if context.session.should_record_zipkin_spans() {
-      let node_name = format!("{}", self);
-      let start_timestamp_duration = std::time::SystemTime::now()
-        .duration_since(std::time::SystemTime::UNIX_EPOCH)
-        .unwrap();
-      let start_timestamp = duration_as_float_secs(&start_timestamp_duration);
-      Some((node_name, start_timestamp))
-    } else {
-      None
-    };
-    let context2 = context.clone();
     match self {
       NodeKey::DigestFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
       NodeKey::DownloadedFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
@@ -1062,22 +1099,6 @@ impl Node for NodeKey {
       NodeKey::Snapshot(n) => n.run(context).map(NodeResult::from).to_boxed(),
       NodeKey::Task(n) => n.run(context).map(NodeResult::from).to_boxed(),
     }
-    .inspect(move |_: &NodeResult| {
-      if let Some((node_name, start_timestamp)) = node_name_and_start_timestamp {
-        let end_timestamp_duration = std::time::SystemTime::now()
-          .duration_since(std::time::SystemTime::UNIX_EPOCH)
-          .unwrap();
-        let end_timestamp = duration_as_float_secs(&end_timestamp_duration);
-        let workunit = WorkUnit {
-          name: node_name,
-          start_timestamp: start_timestamp,
-          end_timestamp: end_timestamp,
-          span_id: generate_random_64bit_string(),
-        };
-        context2.session.add_workunit(workunit)
-      };
-    })
-    .to_boxed()
   }
 
   fn digest(res: NodeResult) -> Option<hashing::Digest> {
@@ -1099,21 +1120,6 @@ impl Node for NodeKey {
       _ => true,
     }
   }
-}
-
-fn duration_as_float_secs(duration: &Duration) -> f64 {
-  //  Returning value is formed by representing duration as a hole number of seconds (u64) plus
-  //  a hole number of microseconds (u32) turned into a f64 type.
-  //  Reverting time from duration to f64 decrease precision.
-  let whole_secs_in_duration = duration.as_secs() as f64;
-  let fract_part_of_duration_in_micros = f64::from(duration.subsec_micros());
-  whole_secs_in_duration + fract_part_of_duration_in_micros / 1_000_000.0
-}
-
-fn generate_random_64bit_string() -> String {
-  let mut rng = thread_rng();
-  let random_u64: u64 = rng.gen();
-  format!("{:16.x}", random_u64)
 }
 
 impl Display for NodeKey {

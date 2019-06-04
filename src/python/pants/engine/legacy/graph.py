@@ -25,8 +25,7 @@ from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.engine.legacy.structs import (BundleAdaptor, BundlesField, HydrateableField,
-                                         SourcesField, TargetAdaptor)
+from pants.engine.legacy.structs import BundleAdaptor, BundlesField, HydrateableField, SourcesField
 from pants.engine.mapper import AddressMapper
 from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct
@@ -180,21 +179,6 @@ class LegacyBuildGraph(BuildGraph):
     """For RemoteSources target, convert "dest" field to its real target type."""
     kwargs['dest'] = _DestWrapper((self._target_types[kwargs['dest']],))
     return RemoteSources(build_graph=self, **kwargs)
-
-  def inject_synthetic_target(self,
-                              address,
-                              target_type,
-                              dependencies=None,
-                              derived_from=None,
-                              **kwargs):
-    target = target_type(name=address.target_name,
-                         address=address,
-                         build_graph=self,
-                         **kwargs)
-    self.inject_target(target,
-                       dependencies=dependencies,
-                       derived_from=derived_from,
-                       synthetic=True)
 
   def inject_address_closure(self, address):
     self.inject_addresses_closure([address])
@@ -505,8 +489,8 @@ def hydrate_target(hydrated_struct):
   for field in hydrated_fields:
     kwargs[field.name] = field.value
   yield HydratedTarget(target_adaptor.address,
-                        TargetAdaptor(**kwargs),
-                        tuple(target_adaptor.dependencies))
+                       type(target_adaptor)(**kwargs),
+                       tuple(target_adaptor.dependencies))
 
 
 def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):

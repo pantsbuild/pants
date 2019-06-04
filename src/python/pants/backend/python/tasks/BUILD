@@ -17,6 +17,7 @@ python_library(
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python/tasks/coverage:plugin',
+    'src/python/pants/backend/python/tasks/pytest:plugin',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:fingerprint_strategy',

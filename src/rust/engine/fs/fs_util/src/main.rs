@@ -30,7 +30,6 @@ use clap;
 use env_logger;
 use fs;
 use futures;
-use futures_timer;
 
 use rand;
 
@@ -313,7 +312,6 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
               std::time::Duration::from_secs(20),
             )?,
             value_t!(top_match.value_of("rpc-attempts"), usize).expect("Bad rpc-attempts flag"),
-            futures_timer::TimerHandle::default(),
           ),
           true,
         )
@@ -340,9 +338,9 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             .parse::<usize>()
             .expect("size_bytes must be a non-negative number");
           let digest = Digest(fingerprint, size_bytes);
-          let write_result = store
-            .load_file_bytes_with(digest, |bytes| io::stdout().write_all(&bytes).unwrap())
-            .wait()?;
+          let write_result = runtime.block_on(
+            store.load_file_bytes_with(digest, |bytes| io::stdout().write_all(&bytes).unwrap()),
+          )?;
           write_result.ok_or_else(|| {
             ExitError(
               format!("File with digest {:?} not found", digest),
@@ -365,12 +363,16 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             .unwrap();
           match file {
             fs::Stat::File(f) => {
-              let digest = fs::OneOffStoreFileByDigest::new(store.clone(), Arc::new(posix_fs))
-                .store_by_digest(f)
-                .wait()
+              let digest = runtime
+                .block_on(
+                  fs::OneOffStoreFileByDigest::new(store.clone(), Arc::new(posix_fs))
+                    .store_by_digest(f),
+                )
                 .unwrap();
 
-              let report = ensure_uploaded_to_remote(&store, store_has_remote, digest);
+              let report = runtime
+                .block_on(ensure_uploaded_to_remote(&store, store_has_remote, digest))
+                .unwrap();
               print_upload_summary(args.value_of("output-mode"), &report);
 
               Ok(())
@@ -397,9 +399,8 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           .parse::<usize>()
           .expect("size_bytes must be a non-negative number");
         let digest = Digest(fingerprint, size_bytes);
-        store
-          .materialize_directory(destination, digest)
-          .wait()
+        runtime
+          .block_on(store.materialize_directory(destination, digest))
           .map_err(|err| {
             if err.contains("not found") {
               ExitError(err, ExitCode::NotFound)
@@ -411,31 +412,34 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
       ("save", Some(args)) => {
         let posix_fs = Arc::new(make_posix_fs(args.value_of("root").unwrap()));
         let store_copy = store.clone();
-        let digest = posix_fs
-          .expand(fs::PathGlobs::create(
-            &args
-              .values_of("globs")
-              .unwrap()
-              .map(str::to_string)
-              .collect::<Vec<String>>(),
-            &[],
-            // By using `Ignore`, we assume all elements of the globs will definitely expand to
-            // something here, or we don't care. Is that a valid assumption?
-            fs::StrictGlobMatching::Ignore,
-            fs::GlobExpansionConjunction::AllMatch,
-          )?)
-          .map_err(|e| format!("Error expanding globs: {:?}", e))
-          .and_then(move |paths| {
-            Snapshot::from_path_stats(
-              store_copy.clone(),
-              &fs::OneOffStoreFileByDigest::new(store_copy, posix_fs),
-              paths,
-            )
-          })
-          .map(|snapshot| snapshot.digest)
-          .wait()?;
+        let digest = runtime.block_on(
+          posix_fs
+            .expand(fs::PathGlobs::create(
+              &args
+                .values_of("globs")
+                .unwrap()
+                .map(str::to_string)
+                .collect::<Vec<String>>(),
+              &[],
+              // By using `Ignore`, we assume all elements of the globs will definitely expand to
+              // something here, or we don't care. Is that a valid assumption?
+              fs::StrictGlobMatching::Ignore,
+              fs::GlobExpansionConjunction::AllMatch,
+            )?)
+            .map_err(|e| format!("Error expanding globs: {:?}", e))
+            .and_then(move |paths| {
+              Snapshot::from_path_stats(
+                store_copy.clone(),
+                &fs::OneOffStoreFileByDigest::new(store_copy, posix_fs),
+                paths,
+              )
+            })
+            .map(|snapshot| snapshot.digest),
+        )?;
 
-        let report = ensure_uploaded_to_remote(&store, store_has_remote, digest);
+        let report = runtime
+          .block_on(ensure_uploaded_to_remote(&store, store_has_remote, digest))
+          .unwrap();
         print_upload_summary(args.value_of("output-mode"), &report);
 
         Ok(())
@@ -448,40 +452,43 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           .parse::<usize>()
           .expect("size_bytes must be a non-negative number");
         let digest = Digest(fingerprint, size_bytes);
-        let proto_bytes = match args.value_of("output-format").unwrap() {
-          "binary" => store
-            .load_directory(digest)
-            .wait()
-            .map(|maybe_d| maybe_d.map(|d| d.write_to_bytes().unwrap())),
-          "text" => store
-            .load_directory(digest)
-            .wait()
-            .map(|maybe_p| maybe_p.map(|p| format!("{:?}\n", p).as_bytes().to_vec())),
-          "recursive-file-list" => expand_files(store, digest).map(|maybe_v| {
-            maybe_v
-              .map(|v| {
-                v.into_iter()
-                  .map(|(name, _digest)| format!("{}\n", name))
-                  .collect::<Vec<String>>()
-                  .join("")
-              })
-              .map(String::into_bytes)
-          }),
-          "recursive-file-list-with-digests" => expand_files(store, digest).map(|maybe_v| {
-            maybe_v
-              .map(|v| {
-                v.into_iter()
-                  .map(|(name, digest)| format!("{} {} {}\n", name, digest.0, digest.1))
-                  .collect::<Vec<String>>()
-                  .join("")
-              })
-              .map(String::into_bytes)
-          }),
-          format => Err(format!(
-            "Unexpected value of --output-format arg: {}",
-            format
-          )),
-        }?;
+        let proto_bytes =
+          match args.value_of("output-format").unwrap() {
+            "binary" => runtime
+              .block_on(store.load_directory(digest))
+              .map(|maybe_d| maybe_d.map(|d| d.write_to_bytes().unwrap())),
+            "text" => runtime
+              .block_on(store.load_directory(digest))
+              .map(|maybe_p| maybe_p.map(|p| format!("{:?}\n", p).as_bytes().to_vec())),
+            "recursive-file-list" => runtime
+              .block_on(expand_files(store, digest))
+              .map(|maybe_v| {
+                maybe_v
+                  .map(|v| {
+                    v.into_iter()
+                      .map(|(name, _digest)| format!("{}\n", name))
+                      .collect::<Vec<String>>()
+                      .join("")
+                  })
+                  .map(String::into_bytes)
+              }),
+            "recursive-file-list-with-digests" => runtime
+              .block_on(expand_files(store, digest))
+              .map(|maybe_v| {
+                maybe_v
+                  .map(|v| {
+                    v.into_iter()
+                      .map(|(name, digest)| format!("{} {} {}\n", name, digest.0, digest.1))
+                      .collect::<Vec<String>>()
+                      .join("")
+                  })
+                  .map(String::into_bytes)
+              }),
+            format => Err(format!(
+              "Unexpected value of --output-format arg: {}",
+              format
+            )),
+          }?;
         match proto_bytes {
           Some(bytes) => {
             io::stdout().write_all(&bytes).unwrap();
@@ -503,19 +510,16 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         .parse::<usize>()
         .expect("size_bytes must be a non-negative number");
       let digest = Digest(fingerprint, size_bytes);
-      let v = match store.load_file_bytes_with(digest, |bytes| bytes).wait()? {
-        None => store
-          .load_directory(digest)
-          .map(|maybe_dir| {
-            maybe_dir.map(|dir| {
-              Bytes::from(
-                dir
-                  .write_to_bytes()
-                  .expect("Error serializing Directory proto"),
-              )
-            })
+      let v = match runtime.block_on(store.load_file_bytes_with(digest, |bytes| bytes))? {
+        None => runtime.block_on(store.load_directory(digest).map(|maybe_dir| {
+          maybe_dir.map(|dir| {
+            Bytes::from(
+              dir
+                .write_to_bytes()
+                .expect("Error serializing Directory proto"),
+            )
           })
-          .wait()?,
+        }))?,
         some => some,
       };
       match v {
@@ -540,17 +544,18 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
   }
 }
 
-fn expand_files(store: Store, digest: Digest) -> Result<Option<Vec<(String, Digest)>>, String> {
+fn expand_files(
+  store: Store,
+  digest: Digest,
+) -> impl Future<Item = Option<Vec<(String, Digest)>>, Error = String> {
   let files = Arc::new(Mutex::new(Vec::new()));
-  expand_files_helper(store, digest, String::new(), files.clone())
-    .wait()
-    .map(|maybe| {
-      maybe.map(|()| {
-        let mut v = Arc::try_unwrap(files).unwrap().into_inner();
-        v.sort_by(|(l, _), (r, _)| l.cmp(r));
-        v
-      })
+  expand_files_helper(store, digest, String::new(), files.clone()).map(|maybe| {
+    maybe.map(|()| {
+      let mut v = Arc::try_unwrap(files).unwrap().into_inner();
+      v.sort_by(|(l, _), (r, _)| l.cmp(r));
+      v
     })
+  })
 }
 
 fn expand_files_helper(
@@ -601,18 +606,16 @@ fn ensure_uploaded_to_remote(
   store: &Store,
   store_has_remote: bool,
   digest: Digest,
-) -> SummaryWithDigest {
+) -> impl Future<Item = SummaryWithDigest, Error = String> {
   let summary = if store_has_remote {
-    Some(
-      store
-        .ensure_remote_has_recursive(vec![digest])
-        .wait()
-        .unwrap(),
-    )
+    store
+      .ensure_remote_has_recursive(vec![digest])
+      .map(Some)
+      .to_boxed()
   } else {
-    None
+    futures::future::ok(None).to_boxed()
   };
-  SummaryWithDigest { digest, summary }
+  summary.map(move |summary| SummaryWithDigest { digest, summary })
 }
 
 fn print_upload_summary(mode: Option<&str>, report: &SummaryWithDigest) {

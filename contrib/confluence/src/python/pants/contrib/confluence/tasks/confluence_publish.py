@@ -44,11 +44,11 @@ class ConfluencePublish(Task):
   def __init__(self, *args, **kwargs):
     super(ConfluencePublish, self).__init__(*args, **kwargs)
     
-    self.url = self.get_options().url
+    self.url = str(self.get_options().url)
     self.force = self.get_options().force
     self.open = self.get_options().open
     self._wiki = None
-    self.user = self.get_options().user
+    self.user = str(self.get_options().user)
   
   def wiki(self):
     raise NotImplementedError('Subclasses must provide the wiki target they are associated with')

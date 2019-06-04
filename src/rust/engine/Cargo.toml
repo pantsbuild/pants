@@ -18,8 +18,9 @@ crate-type = ["cdylib"]
 
 [build-dependencies]
 build_utils = { path = "build_utils" }
-cbindgen = "0.6.7"
+cbindgen = "0.8.6"
 cc = "1.0"
+walkdir = "2"
 
 [workspace]
 # These are the packages which are built/tested when the --all flag is passed to cargo.
@@ -39,6 +40,7 @@ members = [
   "process_execution",
   "process_executor",
   "resettable",
+  "rule_graph",
   "serverset",
   "tar_api",
   "testutil",
@@ -67,6 +69,7 @@ default-members = [
   "process_execution",
   "process_executor",
   "resettable",
+  "rule_graph",
   "serverset",
   "tar_api",
   "testutil",
@@ -80,13 +83,10 @@ boxfuture = { path = "boxfuture" }
 bytes = "0.4.5"
 fnv = "1.0.5"
 fs = { path = "fs" }
-futures = "^0.1.16"
-# TODO: Switch to a release once https://github.com/alexcrichton/futures-timer/pull/11 and https://github.com/alexcrichton/futures-timer/pull/12 merge
-futures-timer = { git = "https://github.com/pantsbuild/futures-timer", rev = "0b747e565309a58537807ab43c674d8951f9e5a0" }
+futures = "0.1.27"
 graph = { path = "graph" }
 hashing = { path = "hashing" }
 indexmap = "1.0.2"
-itertools = "0.7.2"
 lazy_static = "1"
 log = "0.4"
 logging = { path = "logging" }
@@ -96,9 +96,15 @@ process_execution = { path = "process_execution" }
 rand = "0.6"
 reqwest = { version = "0.9.10", default_features = false, features = ["rustls-tls"] }
 resettable = { path = "resettable" }
+rule_graph = { path = "rule_graph" }
 smallvec = "0.6"
 tokio = "0.1"
 tempfile = "3"
 ui = { path = "ui" }
 url = "1.7.1"
 tar_api = { path = "tar_api" }
+
+[patch.crates-io]
+# TODO: Remove patch when we can upgrade to an official released version of protobuf with a fix.
+# See: https://github.com/pantsbuild/pants/issues/7760 for context.
+protobuf = { git="https://github.com/pantsbuild/rust-protobuf", rev="171611c33ec92f07e1b7107327f6d0139a7afebf", version="2.0.6", features = ["with-bytes"] }

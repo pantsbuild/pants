@@ -69,6 +69,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
              help='When set, any invalid/incompatible analysis files will be deleted '
                   'automatically.  When unset, an error is raised instead.')
 
+    # TODO(#7682): convert these into option sets!
     register('--warnings', default=True, type=bool, fingerprint=True,
              help='Compile with all configured warnings enabled.')
 
@@ -423,7 +424,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       # workunit is on the bottom of the page rather than possibly in the middle.
       worker_pool = WorkerPool(workunit.parent,
                                self.context.run_tracker,
-                               self._worker_count)
+                               self._worker_count,
+                               workunit.name)
 
     # Prepare the output directory for each invalid target, and confirm that analysis is valid.
     for target in invalid_targets:

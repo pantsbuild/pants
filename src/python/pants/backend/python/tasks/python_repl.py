@@ -56,6 +56,7 @@ class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
 
   def _run_repl(self, pex, **pex_run_kwargs):
     env = pex_run_kwargs.pop('env', os.environ).copy()
+    env.update(self.ensure_interpreter_search_path_env())
     pex.run(env=env, **pex_run_kwargs)
 
   # N.B. **pex_run_kwargs is used by tests only.

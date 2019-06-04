@@ -78,31 +78,31 @@ class Digest(datatype([('fingerprint', text_type), ('serialized_bytes_length', i
   """
 
   @classmethod
-  def _path(cls, directory):
-    return '{}.digest'.format(directory.rstrip(os.sep))
+  def _path(cls, digested_path):
+    return '{}.digest'.format(digested_path.rstrip(os.sep))
 
   @classmethod
-  def clear(cls, directory):
-    """Clear any existing Digest file adjacent to the given directory."""
-    safe_delete(cls._path(directory))
+  def clear(cls, digested_path):
+    """Clear any existing Digest file adjacent to the given digested_path."""
+    safe_delete(cls._path(digested_path))
 
   @classmethod
-  def load(cls, directory):
-    """Load a Digest from a `.digest` file adjacent to the given directory.
+  def load(cls, digested_path):
+    """Load a Digest from a `.digest` file adjacent to the given digested_path.
 
     :return: A Digest, or None if the Digest did not exist.
     """
-    read_file = maybe_read_file(cls._path(directory))
+    read_file = maybe_read_file(cls._path(digested_path))
     if read_file:
       fingerprint, length = read_file.split(':')
       return Digest(fingerprint, int(length))
     else:
       return None
 
-  def dump(self, directory):
-    """Dump this Digest object adjacent to the given directory."""
+  def dump(self, digested_path):
+    """Dump this Digest object adjacent to the given digested_path."""
     payload = '{}:{}'.format(self.fingerprint, self.serialized_bytes_length)
-    safe_file_dump(self._path(directory), payload=payload)
+    safe_file_dump(self._path(digested_path), payload=payload)
 
   def __repr__(self):
     return '''Digest(fingerprint={}, serialized_bytes_length={})'''.format(
@@ -144,7 +144,11 @@ class Snapshot(datatype([('directory_digest', Digest), ('files', tuple), ('dirs'
     return self == EMPTY_SNAPSHOT
 
 
-class MergedDirectories(datatype([('directories', tuple)])):
+class DirectoriesToMerge(datatype([('directories', tuple)])):
+  pass
+
+
+class DirectoryWithPrefixToStrip(datatype([('directory_digest', Digest), ('prefix', text_type)])):
   pass
 
 
@@ -180,7 +184,8 @@ def create_fs_rules():
   """Creates rules that consume the intrinsic filesystem types."""
   return [
     RootRule(Digest),
-    RootRule(MergedDirectories),
+    RootRule(DirectoriesToMerge),
     RootRule(PathGlobs),
+    RootRule(DirectoryWithPrefixToStrip),
     RootRule(UrlToFetch),
   ]

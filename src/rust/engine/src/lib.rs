@@ -37,7 +37,6 @@ mod externs;
 mod handles;
 mod interning;
 mod nodes;
-mod rule_graph;
 mod scheduler;
 mod selectors;
 mod tasks;
@@ -73,15 +72,15 @@ use crate::externs::{
   StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
 };
 use crate::handles::Handle;
-use crate::rule_graph::{GraphMaker, RuleGraph};
 use crate::scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
-use crate::tasks::Tasks;
+use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 use futures::Future;
 use hashing::Digest;
 use log::{error, Log};
 use logging::logger::LOGGER;
-use logging::Logger;
+use logging::{Destination, Logger};
+use rule_graph::{GraphMaker, RuleGraph};
 
 // TODO: Consider renaming and making generic for collections of PyResults.
 #[repr(C)]
@@ -188,6 +187,7 @@ pub extern "C" fn scheduler_create(
   type_directory_digest: TypeId,
   type_snapshot: TypeId,
   type_merge_directories_request: TypeId,
+  type_directory_with_prefix_to_strip: TypeId,
   type_files_content: TypeId,
   type_dir: TypeId,
   type_file: TypeId,
@@ -231,7 +231,8 @@ pub extern "C" fn scheduler_create(
     path_globs: type_path_globs,
     directory_digest: type_directory_digest,
     snapshot: type_snapshot,
-    merged_directories: type_merge_directories_request,
+    directories_to_merge: type_merge_directories_request,
+    directory_with_prefix_to_strip: type_directory_with_prefix_to_strip,
     files_content: type_files_content,
     dir: type_dir,
     file: type_file,
@@ -335,33 +336,11 @@ pub extern "C" fn scheduler_metrics(
 ) -> Handle {
   with_scheduler(scheduler_ptr, |scheduler| {
     with_session(session_ptr, |session| {
-      let mut values = scheduler
+      let values = scheduler
         .metrics(session)
         .into_iter()
         .flat_map(|(metric, value)| vec![externs::store_utf8(metric), externs::store_i64(value)])
         .collect::<Vec<_>>();
-      if session.should_record_zipkin_spans() {
-        let workunits = session
-          .get_workunits()
-          .lock()
-          .iter()
-          .map(|workunit| {
-            let workunit_zipkin_trace_info = vec![
-              externs::store_utf8("name"),
-              externs::store_utf8(&workunit.name),
-              externs::store_utf8("start_timestamp"),
-              externs::store_f64(workunit.start_timestamp),
-              externs::store_utf8("end_timestamp"),
-              externs::store_f64(workunit.end_timestamp),
-              externs::store_utf8("span_id"),
-              externs::store_utf8(&workunit.span_id),
-            ];
-            externs::store_dict(&workunit_zipkin_trace_info)
-          })
-          .collect::<Vec<_>>();
-        values.push(externs::store_utf8("engine_workunits"));
-        values.push(externs::store_tuple(&workunits));
-      };
       externs::store_dict(&values).into()
     })
   })
@@ -567,14 +546,12 @@ pub extern "C" fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
 #[no_mangle]
 pub extern "C" fn session_create(
   scheduler_ptr: *mut Scheduler,
-  should_record_zipkin_spans: bool,
   should_render_ui: bool,
   ui_worker_count: u64,
 ) -> *const Session {
   with_scheduler(scheduler_ptr, |scheduler| {
     Box::into_raw(Box::new(Session::new(
       scheduler,
-      should_record_zipkin_spans,
       should_render_ui,
       ui_worker_count as usize,
     )))
@@ -738,7 +715,7 @@ pub extern "C" fn capture_snapshots(
 
   with_scheduler(scheduler_ptr, |scheduler| {
     let core = scheduler.core.clone();
-    core.runtime.get().write().block_on(
+    core.block_on(
       futures::future::join_all(
         path_globs_and_roots
           .into_iter()
@@ -781,9 +758,6 @@ pub extern "C" fn merge_directories(
   with_scheduler(scheduler_ptr, |scheduler| {
     scheduler
       .core
-      .runtime
-      .get()
-      .write()
       .block_on(fs::Snapshot::merge_directories(
         scheduler.core.store(),
         digests,
@@ -818,7 +792,7 @@ pub extern "C" fn materialize_directories(
   };
 
   with_scheduler(scheduler_ptr, |scheduler| {
-    scheduler.core.runtime.get().write().block_on(
+    scheduler.core.block_on(
       futures::future::join_all(
         dir_and_digests
           .into_iter()
@@ -839,6 +813,8 @@ pub extern "C" fn init_logging(level: u64, show_rust_3rdparty_logs: bool) {
 
 #[no_mangle]
 pub extern "C" fn setup_pantsd_logger(log_file_ptr: *const raw::c_char, level: u64) -> PyResult {
+  logging::set_destination(Destination::Pantsd);
+
   let path_str = unsafe { CStr::from_ptr(log_file_ptr).to_string_lossy().into_owned() };
   let path = PathBuf::from(path_str);
   LOGGER
@@ -851,6 +827,7 @@ pub extern "C" fn setup_pantsd_logger(log_file_ptr: *const raw::c_char, level: u
 // Might be called before externs are set, therefore can't return a PyResult
 #[no_mangle]
 pub extern "C" fn setup_stderr_logger(level: u64) {
+  logging::set_destination(Destination::Stderr);
   LOGGER
     .set_stderr_logger(level)
     .expect("Error setting up STDERR logger");
@@ -871,17 +848,22 @@ pub extern "C" fn flush_log() {
   LOGGER.flush();
 }
 
-fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {
-  let graph_maker = GraphMaker::new(&scheduler.core.tasks, subject_types);
+#[no_mangle]
+pub extern "C" fn override_thread_logging_destination(destination: Destination) {
+  logging::set_destination(destination);
+}
+
+fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph<Rule> {
+  let graph_maker = GraphMaker::new(scheduler.core.tasks.as_map(), subject_types);
   graph_maker.full_graph()
 }
 
-fn graph_sub(scheduler: &Scheduler, subject_type: TypeId, product_type: TypeId) -> RuleGraph {
-  let graph_maker = GraphMaker::new(&scheduler.core.tasks, vec![subject_type]);
+fn graph_sub(scheduler: &Scheduler, subject_type: TypeId, product_type: TypeId) -> RuleGraph<Rule> {
+  let graph_maker = GraphMaker::new(scheduler.core.tasks.as_map(), vec![subject_type]);
   graph_maker.sub_graph(subject_type, product_type)
 }
 
-fn write_to_file(path: &Path, graph: &RuleGraph) -> io::Result<()> {
+fn write_to_file(path: &Path, graph: &RuleGraph<Rule>) -> io::Result<()> {
   let file = File::create(path)?;
   let mut f = io::BufWriter::new(file);
   graph.visualize(&mut f)

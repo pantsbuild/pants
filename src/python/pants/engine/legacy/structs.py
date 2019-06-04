@@ -20,7 +20,7 @@ from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
 from pants.util.collections_abc_backport import MutableSequence, MutableSet
 from pants.util.contextutil import exception_logging
-from pants.util.meta import AbstractClass
+from pants.util.meta import AbstractClass, classproperty
 from pants.util.objects import Exactly, SubclassesOf, datatype
 
 
@@ -103,12 +103,12 @@ class TargetAdaptor(StructWithDeps):
         self.validate_sources,
       ),)
 
-  @property
-  def default_sources_globs(self):
+  @classproperty
+  def default_sources_globs(cls):
     return None
 
-  @property
-  def default_sources_exclude_globs(self):
+  @classproperty
+  def default_sources_exclude_globs(cls):
     return None
 
   def validate_sources(self, sources):
@@ -126,17 +126,13 @@ class TargetAdaptor(StructWithDeps):
     pass
 
 
-class Field(object):
+@union
+class HydrateableField(object):
   """A marker for Target(Adaptor) fields for which the engine might perform extra construction."""
 
 
-@union
-class HydrateableField(object): pass
-
-
 class SourcesField(
-  datatype(['address', 'arg', 'filespecs', 'base_globs', 'path_globs', 'validate_fn']),
-  Field
+  datatype(['address', 'arg', 'filespecs', 'base_globs', 'path_globs', 'validate_fn'])
 ):
   """Represents the `sources` argument for a particular Target.
 
@@ -188,7 +184,7 @@ class PageAdaptor(TargetAdaptor):
       )
 
 
-class BundlesField(datatype(['address', 'bundles', 'filespecs_list', 'path_globs_list']), Field):
+class BundlesField(datatype(['address', 'bundles', 'filespecs_list', 'path_globs_list'])):
   """Represents the `bundles` argument, each of which has a PathGlobs to represent its `fileset`."""
 
   def __hash__(self):
@@ -250,6 +246,12 @@ class AppAdaptor(TargetAdaptor):
                         path_globs_list)
 
 
+class JvmAppAdaptor(AppAdaptor): pass
+
+
+class PythonAppAdaptor(AppAdaptor): pass
+
+
 class RemoteSourcesAdaptor(TargetAdaptor):
   def __init__(self, dest=None, **kwargs):
     """
@@ -289,12 +291,7 @@ class PythonBinaryAdaptor(PythonTargetAdaptor):
       )
 
 
-class PythonTestsAdaptor(PythonTargetAdaptor):
-  python_test_globs = ('test_*.py', '*_test.py')
-
-  @property
-  def default_sources_globs(self):
-    return self.python_test_globs
+class PythonTestsAdaptor(PythonTargetAdaptor): pass
 
 
 class PantsPluginAdaptor(PythonTargetAdaptor):

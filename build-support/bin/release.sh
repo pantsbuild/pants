@@ -4,8 +4,10 @@
 
 set -e
 
-ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
-source ${ROOT}/build-support/common.sh
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd "$(git rev-parse --show-toplevel)" && pwd)
+
+# shellcheck source=build-support/common.sh
+source "${ROOT}/build-support/common.sh"
 
 # Note we parse some options here, but parse most at the bottom. This is due to execution order.
 # If the option must be used right away, we parse at the top of the script, whereas if it
@@ -34,7 +36,7 @@ fi
 # Note we allow the user to predefine this value so that they may point to a specific interpreter,
 # e.g. 2.7.13 vs. 2.7.15.
 export PY="${PY:-${default_interpreter}}"
-if ! which "${PY}" >/dev/null; then
+if ! command -v "${PY}" >/dev/null; then
   die "Python interpreter ${PY} not discoverable on your PATH."
 fi
 py_major_minor=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:2])))')
@@ -45,7 +47,7 @@ fi
 export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['${interpreter_constraint}']"
 
 function run_local_pants() {
-  ${ROOT}/pants "$@"
+  "${ROOT}/pants" "$@"
 }
 
 # NB: Pants core does not have the ability to change its own version, so we compute the
@@ -66,12 +68,13 @@ readonly DEPLOY_PANTS_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_WHEELS_PATH}"
 
 # A space-separated list of pants packages to include in any pexes that are built: by default,
 # only pants core is included.
-: ${PANTS_PEX_PACKAGES:="pantsbuild.pants"}
+: "${PANTS_PEX_PACKAGES:="pantsbuild.pants"}"
 
 # URL from which pex release binaries can be downloaded.
-: ${PEX_DOWNLOAD_PREFIX:="https://github.com/pantsbuild/pex/releases/download"}
+: "${PEX_DOWNLOAD_PREFIX:="https://github.com/pantsbuild/pex/releases/download"}"
 
-source ${ROOT}/contrib/release_packages.sh
+# shellcheck source=contrib/release_packages.sh
+source "${ROOT}/contrib/release_packages.sh"
 
 function requirement() {
   package="$1"
@@ -84,11 +87,11 @@ function run_pex() {
     PEX_VERSION="$(requirement pex | sed -e "s|pex==||")"
 
     pexdir="$(mktemp -d -t build_pex.XXXXX)"
-    trap "rm -rf ${pexdir}" EXIT
+    trap 'rm -rf "${pexdir}"' EXIT
 
     pex="${pexdir}/pex"
 
-    curl -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/pex" > "${pex}"
+    curl --fail -sSL "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/pex" > "${pex}"
     # We use `PEX_PYTHON_PATH="${PY}" "${PY}" "${pex}"` instead of either of:
     # 1. PEX_PYTHON_PATH="${PY}" "${pex}"
     # 2. "${PY}" "${pex}"
@@ -105,7 +108,7 @@ function run_packages_script() {
     cd "${ROOT}"
     args=("$@")
     if [[ "${python_two:-false}" == "true" ]]; then
-      args=("--py2" ${args[@]})
+      args=("--py2" "${args[@]}")
     fi
     requirements=("$(requirement future)" "$(requirement beautifulsoup4)" "$(requirement configparser)" "$(requirement subprocess32)")
     run_pex "${requirements[@]}" -- "${ROOT}/src/python/pants/releases/packages.py" "${args[@]}"
@@ -122,8 +125,8 @@ function find_pkg() {
 function pkg_pants_install_test() {
   local version=$1
   shift
-  local PIP_ARGS="$@"
-  pip install ${PIP_ARGS} "pantsbuild.pants==${version}" || \
+  local PIP_ARGS=("$@")
+  pip install "${PIP_ARGS[@]}" "pantsbuild.pants==${version}" || \
     die "pip install of pantsbuild.pants failed!"
   execute_packaged_pants_with_internal_backends list src:: || \
     die "'pants list src::' failed in venv!"
@@ -134,8 +137,8 @@ function pkg_pants_install_test() {
 function pkg_testinfra_install_test() {
   local version=$1
   shift
-  local PIP_ARGS="$@"
-  pip install ${PIP_ARGS} "pantsbuild.pants.testinfra==${version}" && \
+  local PIP_ARGS=("$@")
+  pip install "${PIP_ARGS[@]}" "pantsbuild.pants.testinfra==${version}" && \
   python -c "import pants_test"
 }
 
@@ -161,7 +164,6 @@ function execute_packaged_pants_with_internal_backends() {
     --no-verify-config \
     --pythonpath="['pants-plugins/src/python']" \
     --backend-packages="[\
-        'pants.rules.core',\
         'pants.backend.codegen',\
         'pants.backend.docgen',\
         'pants.backend.graph_info',\
@@ -177,8 +179,8 @@ function execute_packaged_pants_with_internal_backends() {
 }
 
 function pants_version_reset() {
-  pushd ${ROOT} > /dev/null
-    git checkout -- ${VERSION_FILE}
+  pushd "${ROOT}" > /dev/null
+    git checkout -- "${VERSION_FILE}"
   popd > /dev/null
   unset _PANTS_VERSION_OVERRIDE
 }
@@ -203,15 +205,15 @@ function build_3rdparty_packages() {
   rm -rf "${DEPLOY_3RDPARTY_WHEEL_DIR}"
   mkdir -p "${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}"
 
-  local req_args=""
+  local req_args=()
   for req_file in "${REQUIREMENTS_3RDPARTY_FILES[@]}"; do
-    req_args="${req_args} -r ${ROOT}/$req_file"
+    req_args=("${req_args[@]}" -r "${ROOT}/$req_file")
   done
 
-  start_travis_section "3rdparty" "Building 3rdparty whls from ${REQUIREMENTS_3RDPARTY_FILES[@]}"
+  start_travis_section "3rdparty" "Building 3rdparty whls from ${REQUIREMENTS_3RDPARTY_FILES[*]}"
   activate_tmp_venv
 
-  pip wheel --wheel-dir="${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}" ${req_args}
+  pip wheel --wheel-dir="${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}" "${req_args[@]}"
 
   deactivate
   end_travis_section
@@ -226,13 +228,15 @@ function build_pants_packages() {
   pants_version_set "${version}"
 
   start_travis_section "${NAME}" "Building packages"
+  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
+  # shellcheck disable=SC2207
   packages=(
     $(run_packages_script build_and_print "${version}")
   ) || die "Failed to build packages at ${version}!"
   for package in "${packages[@]}"
   do
     (
-      wheel=$(find_pkg ${package} ${version} "${ROOT}/dist") && \
+      wheel=$(find_pkg "${package}" "${version}" "${ROOT}/dist") && \
       cp -p "${wheel}" "${DEPLOY_PANTS_WHEEL_DIR}/${version}"
     ) || die "Failed to find package ${package}-${version}!"
   done
@@ -261,9 +265,12 @@ function build_fs_util() {
 }
 
 function activate_tmp_venv() {
+  # Because the venv/bin/activate script's location is dynamic and not located in a fixed
+  # place, Shellcheck will not be able to find it so we tell Shellcheck to ignore the file.
+  # shellcheck source=/dev/null
   VENV_DIR=$(mktemp -d -t pants.XXXXX) && \
-  ${ROOT}/build-support/virtualenv $VENV_DIR && \
-  source $VENV_DIR/bin/activate
+  "${ROOT}/build-support/virtualenv" "$VENV_DIR" && \
+  source "$VENV_DIR/bin/activate"
 }
 
 function pre_install() {
@@ -287,7 +294,7 @@ From there, you can run 'pants' (not './pants') to do some testing.
 
 When you're done testing, press enter to continue.
 EOM
-    read
+    read -r
   fi
   deactivate
 }
@@ -306,9 +313,12 @@ function install_and_test_packages() {
   pre_install || die "Failed to setup virtualenv while testing ${NAME}-${VERSION}!"
 
   # Avoid caching plugin installs.
-  export PANTS_PLUGIN_CACHE_DIR=$(mktemp -d -t plugins_cache.XXXXX)
-  trap "rm -rf ${PANTS_PLUGIN_CACHE_DIR}" EXIT
+  PANTS_PLUGIN_CACHE_DIR=$(mktemp -d -t plugins_cache.XXXXX)
+  export PANTS_PLUGIN_CACHE_DIR
+  trap 'rm -rf "${PANTS_PLUGIN_CACHE_DIR}"' EXIT
 
+  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
+  # shellcheck disable=SC2207
   packages=(
     $(run_packages_script list | grep '.' | awk '{print $1}')
   ) || die "Failed to list packages!"
@@ -317,7 +327,8 @@ function install_and_test_packages() {
   for package in "${packages[@]}"
   do
     start_travis_section "${package}" "Installing and testing package ${package}-${VERSION}"
-    eval pkg_${package##*\.}_install_test ${PIP_ARGS[@]} || \
+    # shellcheck disable=SC2086
+    eval pkg_${package##*\.}_install_test "${PIP_ARGS[@]}" || \
       die "Failed to install and test package ${package}-${VERSION}!"
     end_travis_section
   done
@@ -393,8 +404,8 @@ EOM
 )
   get_pgp_keyid &> /dev/null || die "${msg}"
   echo "Found the following key for release signing:"
-  $(get_pgp_program) -k $(get_pgp_keyid)
-  read -p "Is this the correct key? [Yn]: " answer
+  "$(get_pgp_program)" -k "$(get_pgp_keyid)"
+  read -rp "Is this the correct key? [Yn]: " answer
   [[ "${answer:-y}" =~ [Yy]([Ee][Ss])? ]] || die "${msg}"
 }
 
@@ -410,16 +421,16 @@ function tag_release() {
   release_version="${PANTS_STABLE_VERSION}" && \
   tag_name="release_${release_version}" && \
   git tag -f \
-    --local-user=$(get_pgp_keyid) \
+    "--local-user=$(get_pgp_keyid)" \
     -m "pantsbuild.pants release ${release_version}" \
-    ${tag_name} && \
-  git push -f git@github.com:pantsbuild/pants.git ${tag_name}
+    "${tag_name}" && \
+  git push -f git@github.com:pantsbuild/pants.git "${tag_name}"
 }
 
 function publish_docs_if_master() {
   branch=$(get_branch)
   if [[ "${branch}" == "master" ]]; then
-    ${ROOT}/build-support/bin/publish_docs.sh -p -y
+    "${ROOT}/build-support/bin/publish_docs.sh" -p -y
   else
     echo "Skipping docsite publishing on non-master branch (${branch})."
   fi
@@ -436,7 +447,7 @@ function reversion_whls() {
   local dest_dir=$2
   local output_version=$3
 
-  for whl in `ls -1 "${src_dir}"/*.whl`; do
+  for whl in "${src_dir}"/*.whl; do
     run_local_pants -q run src/python/pants/releases:reversion -- \
       --glob='pants/VERSION' \
       "${whl}" "${dest_dir}" "${output_version}" \
@@ -449,10 +460,10 @@ readonly BINARY_BASE_URL=https://binaries.pantsbuild.org
 function list_prebuilt_wheels() {
   # List prebuilt wheels as tab-separated tuples of filename and URL-encoded name.
   wheel_listing="$(mktemp -t pants.wheels.XXXXX)"
-  trap "rm -f ${wheel_listing}" RETURN
+  trap 'rm -f "${wheel_listing}"' RETURN
 
   for wheels_path in "${DEPLOY_PANTS_WHEELS_PATH}" "${DEPLOY_3RDPARTY_WHEELS_PATH}"; do
-    curl -sSL "${BINARY_BASE_URL}/?prefix=${wheels_path}" > "${wheel_listing}"
+    curl --fail -sSL "${BINARY_BASE_URL}/?prefix=${wheels_path}" > "${wheel_listing}"
     "${PY}" << EOF
 from __future__ import print_function
 import sys
@@ -479,10 +490,12 @@ function fetch_prebuilt_wheels() {
   (
     cd "${to_dir}"
     list_prebuilt_wheels | {
-      while read path_tuple
+      while read -r path_tuple
       do
-        local file_path=$(echo "$path_tuple" | awk -F'\t' '{print $1}')
-        local url_path=$(echo "$path_tuple" | awk -F'\t' '{print $2}')
+        local file_path
+        file_path=$(echo "$path_tuple" | awk -F'\t' '{print $1}')
+        local url_path
+        url_path=$(echo "$path_tuple" | awk -F'\t' '{print $2}')
         echo "${BINARY_BASE_URL}/${url_path}:"
         local dest="${to_dir}/${file_path}"
         mkdir -p "$(dirname "${dest}")"
@@ -499,18 +512,21 @@ function fetch_and_check_prebuilt_wheels() {
   if [[ -z "${check_dir}" ]]
   then
     check_dir=$(mktemp -d -t pants.wheel_check.XXXXX)
-    trap "rm -rf ${check_dir}" RETURN
+    trap 'rm -rf "${check_dir}"' RETURN
   fi
 
   banner "Checking prebuilt wheels for ${PANTS_UNSTABLE_VERSION}"
   fetch_prebuilt_wheels "${check_dir}"
 
   local missing=()
+  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
+  # shellcheck disable=SC2207
   RELEASE_PACKAGES=(
     $(run_packages_script list | grep '.' | awk '{print $1}')
   ) || die "Failed to get a list of packages to release!"
-  for PACKAGE in "${RELEASE_PACKAGES[@]}"
-  do
+  for PACKAGE in "${RELEASE_PACKAGES[@]}"; do
+    # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
+    # shellcheck disable=SC2207
     packages=($(find_pkg "${PACKAGE}" "${PANTS_UNSTABLE_VERSION}" "${check_dir}"))
     if [ ${#packages[@]} -eq 0 ]; then
       missing+=("${PACKAGE}")
@@ -519,9 +535,8 @@ function fetch_and_check_prebuilt_wheels() {
 
     # Confirm that if the package is not cross platform that we have whls for two platforms.
     local cross_platform=""
-    for package in "${packages[@]}"
-    do
-      if [[ "${package}" =~ "-none-any.whl" ]]
+    for package in "${packages[@]}"; do
+      if [[ "${package}" =~ -none-any.whl ]]
       then
         cross_platform="true"
       fi
@@ -550,7 +565,7 @@ function adjust_wheel_platform() {
   local src_plat="$1"
   local dst_plat="$2"
   local dir="$3"
-  for src_whl in `find "${dir}" -name '*'"${src_plat}.whl"`; do
+  find "$dir" -type f -name "*${src_plat}.whl" | while read -r src_whl; do
     local dst_whl=${src_whl/$src_plat/$dst_plat}
     mv -f "${src_whl}" "${dst_whl}"
   done
@@ -561,6 +576,9 @@ function activate_twine() {
 
   rm -rf "${venv_dir}"
   "${ROOT}/build-support/virtualenv" "${venv_dir}"
+  # Because the venv/bin/activate script's location is dynamic and not located in a fixed
+  # place, Shellcheck will not be able to find it so we tell Shellcheck to ignore the file.
+  # shellcheck source=/dev/null
   source "${venv_dir}/bin/activate"
   pip install twine
 }
@@ -595,10 +613,10 @@ function build_pex() {
         # NB: When building locally, we use a platform that does not refer to the ABI version, to
         # avoid needing to introspect the python ABI for this machine.
         Darwin)
-          local platform=("${osx_platform_noabi}")
+          local platform="${osx_platform_noabi}"
           ;;
         Linux)
-          local platform=("${linux_platform_noabi}")
+          local platform="${linux_platform_noabi}"
           ;;
         *)
           echo >&2 "Unknown uname"
@@ -689,7 +707,7 @@ function publish_packages() {
   activate_twine
   trap deactivate RETURN
 
-  twine upload --sign --sign-with=$(get_pgp_program) --identity=$(get_pgp_keyid) \
+  twine upload --sign "--sign-with=$(get_pgp_program)" "--identity=$(get_pgp_keyid)" \
     "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_STABLE_VERSION}"/*.whl
 
   end_travis_section
@@ -753,19 +771,19 @@ fi
 if [[ "${dry_run}" == "true" && "${test_release}" == "true" ]]; then
   usage "The dry run and test options are mutually exclusive, pick one."
 elif [[ "${dry_run}" == "true" ]]; then
-  banner "Performing a dry run release" && \
+  banner "Performing a dry run release"
   (
     dry_run_install && \
     banner "Dry run release succeeded"
   ) || die "Dry run release failed."
 elif [[ "${test_release}" == "true" ]]; then
-  banner "Installing and testing the latest released packages" && \
+  banner "Installing and testing the latest released packages"
   (
     install_and_test_packages "${PANTS_STABLE_VERSION}" && \
     banner "Successfully installed and tested the latest released packages"
   ) || die "Failed to install and test the latest released packages."
 else
-  banner "Releasing packages to PyPi" && \
+  banner "Releasing packages to PyPi"
   (
     check_origin && check_clean_branch && check_pgp && check_owners && \
       publish_packages && tag_release && publish_docs_if_master && \

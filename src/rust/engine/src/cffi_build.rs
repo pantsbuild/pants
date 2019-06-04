@@ -82,30 +82,6 @@ impl From<cbindgen::Error> for CffiBuildError {
 
 // A message is printed to stderr, and the script fails, if main() results in a CffiBuildError.
 fn main() -> Result<(), CffiBuildError> {
-  // We depend on grpcio, which uses C++.
-  // On Linux, with g++, some part of that compilation depends on
-  // __gxx_personality_v0 which is present in the C++ standard library.
-  // I don't know why. It shouldn't, and before grpcio 0.2.0, it didn't.
-  //
-  // So we need to link against the C++ standard library. Nothing under us
-  // in the dependency tree appears to export this fact.
-  // Ideally, we would be linking dynamically, because statically linking
-  // against libstdc++ is kind of scary. But we're only doing it to pull in a
-  // bogus symbol anyway, so what's the worst that can happen?
-  //
-  // The only way I can find to dynamically link against libstdc++ is to pass
-  // `-C link-args=lstdc++` to rustc, but we can only do this from a
-  // .cargo/config file, which applies that argument to every compile/link which
-  // happens in a subdirectory of that directory, which isn't what we want to do.
-  // So we'll statically link. Because what's the worst that can happen?
-  //
-  // The following do not work:
-  //  * Using the link argument in Cargo.toml to specify stdc++.
-  //  * Specifying `rustc-flags=-lstdc++`
-  //    (which is equivalent to `-ldylib=stdc++`).
-  //  * Specifying `rustc-link-lib=stdc++`
-  //    (which is equivalent to `rustc-link-lib=dylib=stdc++).
-
   // NB: When built with Python 3, `native_engine.so` only works with a Python 3 interpreter.
   // When built with Python 2, it works with both Python 2 and Python 3.
   // So, we check to see if the under-the-hood interpreter has changed and rebuild the native engine
@@ -113,12 +89,19 @@ fn main() -> Result<(), CffiBuildError> {
   println!("cargo:rerun-if-env-changed=PY");
 
   if cfg!(target_os = "linux") {
-    println!("cargo:rustc-link-lib=static=stdc++");
+    // We depend on grpcio, which uses C++.
+    // On Linux, with g++, some part of that compilation depends on
+    // __gxx_personality_v0 which is present in the C++ standard library.
+    // I don't know why. It shouldn't, and before grpcio 0.2.0, it didn't.
+    println!("cargo:rustc-cdylib-link-arg=-lstdc++");
   }
 
   // Generate the scheduler.h bindings from the rust code in this crate.
   let bindings_config_path = Path::new("cbindgen.toml");
   mark_for_change_detection(&bindings_config_path);
+  mark_for_change_detection(Path::new("src"));
+  // Explicitly re-run if logging is modified because it's a hard-coded dep in cbindgen.toml.
+  mark_for_change_detection(Path::new("logging"));
 
   let scheduler_file_path = Path::new("src/cffi/scheduler.h");
   let crate_dir = env::var("CARGO_MANIFEST_DIR")?;
@@ -134,13 +117,7 @@ fn main() -> Result<(), CffiBuildError> {
   // changed and avoid rebuilding the engine crate if we are just iterating on the implementations.
   mark_for_change_detection(&build_root.join("src/python/pants/engine/native.py"));
 
-  // N.B. The filename of this source code - at generation time - must line up 1:1 with the
-  // python import name, as python keys the initialization function name off of the import name.
   let cffi_dir = Path::new("src/cffi");
-  let c_path = cffi_dir.join("native_engine.c");
-  mark_for_change_detection(&c_path);
-  let env_script_path = cffi_dir.join("native_engine.cflags");
-  mark_for_change_detection(&env_script_path);
 
   let result = Command::new(&cffi_bootstrapper)
     .arg(cffi_dir)
@@ -154,6 +131,13 @@ fn main() -> Result<(), CffiBuildError> {
     );
     exit(exit_code.unwrap_or(1));
   }
+
+  // N.B. The filename of this source code - at generation time - must line up 1:1 with the
+  // python import name, as python keys the initialization function name off of the import name.
+  let c_path = cffi_dir.join("native_engine.c");
+  mark_for_change_detection(&c_path);
+  let env_script_path = cffi_dir.join("native_engine.cflags");
+  mark_for_change_detection(&env_script_path);
 
   // Now compile the cffi c sources.
   let mut config = cc::Build::new();
@@ -169,13 +153,32 @@ fn main() -> Result<(), CffiBuildError> {
 
   config.compile("libnative_engine_ffi.a");
 
+  if cfg!(target_os = "macos") {
+    // N.B. On OSX, we force weak linking by passing the param `-undefined dynamic_lookup` to
+    // the underlying linker. This avoids "missing symbol" errors for Python symbols
+    // (e.g. `_PyImport_ImportModule`) at build time when bundling the CFFI C sources.
+    // The missing symbols will instead by dynamically resolved in the address space of the parent
+    // binary (e.g. `python`) at runtime. We do this to avoid needing to link to libpython
+    // (which would constrain us to specific versions of Python).
+    println!("cargo:rustc-cdylib-link-arg=-undefined");
+    println!("cargo:rustc-cdylib-link-arg=dynamic_lookup");
+  }
+
   Ok(())
 }
 
 fn mark_for_change_detection(path: &Path) {
   // Restrict re-compilation check to just our input files.
   // See: http://doc.crates.io/build-script.html#outputs-of-the-build-script
-  println!("cargo:rerun-if-changed={}", path.to_str().unwrap());
+  if !path.exists() {
+    panic!(
+      "Cannot mark non-existing path for change detection: {}",
+      path.display()
+    );
+  }
+  for file in walkdir::WalkDir::new(path) {
+    println!("cargo:rerun-if-changed={}", file.unwrap().path().display());
+  }
 }
 
 fn make_flags(env_script_path: &Path) -> Result<Vec<String>, io::Error> {
