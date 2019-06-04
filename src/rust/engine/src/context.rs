@@ -44,7 +44,7 @@ pub struct Core {
   pub rule_graph: RuleGraph<Rule>,
   pub types: Types,
   pub fs_pool: Arc<ResettablePool>,
-  runtime: Resettable<Arc<RwLock<Runtime>>>,
+  runtime: Arc<RwLock<Runtime>>,
   pub futures_timer_thread: Arc<futures_timer::HelperThread>,
   store_and_command_runner_and_http_client:
     Resettable<(Store, BoundedCommandRunner, reqwest::r#async::Client)>,
@@ -80,11 +80,10 @@ impl Core {
     remote_store_servers.shuffle(&mut rand::thread_rng());
 
     let fs_pool = Arc::new(ResettablePool::new("io-".to_string()));
-    let runtime = Resettable::new(|| {
+    let runtime =
       Arc::new(RwLock::new(Runtime::new().unwrap_or_else(|e| {
         panic!("Could not initialize Runtime: {:?}", e)
-      })))
-    });
+      })));
     // We re-use these certs for both the execution and store service; they're generally tied together.
     let root_ca_certs = if let Some(path) = remote_root_ca_certs_path {
       Some(
@@ -151,6 +150,7 @@ impl Core {
         )),
         None => Box::new(process_execution::local::CommandRunner::new(
           store.clone(),
+          fs_pool2.clone(),
           work_dir.clone(),
           process_execution_cleanup_local_dirs,
         )),
@@ -171,13 +171,13 @@ impl Core {
       tasks: tasks,
       rule_graph: rule_graph,
       types: types,
-      fs_pool: fs_pool,
+      fs_pool: fs_pool.clone(),
       runtime: runtime,
       futures_timer_thread: futures_timer_thread,
       store_and_command_runner_and_http_client: store_and_command_runner_and_http_client,
       // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
-      vfs: PosixFS::new(&build_root, &ignore_patterns).unwrap_or_else(|e| {
+      vfs: PosixFS::new(&build_root, fs_pool, &ignore_patterns).unwrap_or_else(|e| {
         panic!("Could not initialize VFS: {:?}", e);
       }),
       build_root: build_root,
@@ -201,12 +201,10 @@ impl Core {
       debug!("Waiting to enter fork_context...");
       thread::sleep(Duration::from_millis(10));
     }
-    let t = self.runtime.with_reset(|| {
-      self.graph.with_exclusive(|| {
-        self
-          .fs_pool
-          .with_shutdown(|| self.store_and_command_runner_and_http_client.with_reset(f))
-      })
+    let t = self.graph.with_exclusive(|| {
+      self
+        .fs_pool
+        .with_shutdown(|| self.store_and_command_runner_and_http_client.with_reset(f))
     });
     self
       .graph
@@ -237,7 +235,6 @@ impl Core {
     let logging_destination = logging::get_destination();
     self
       .runtime
-      .get()
       .read()
       .executor()
       .spawn(futures::future::ok(()).and_then(move |()| {
@@ -266,7 +263,6 @@ impl Core {
     let logging_destination = logging::get_destination();
     self
       .runtime
-      .get()
       .write()
       .block_on(futures::future::ok(()).and_then(move |()| {
         logging::set_destination(logging_destination);
@@ -330,6 +326,6 @@ impl NodeContext for Context {
   where
     F: Future<Item = (), Error = ()> + Send + 'static,
   {
-    self.core.runtime.get().read().executor().spawn(future);
+    self.core.runtime.write().executor().spawn(future);
   }
 }

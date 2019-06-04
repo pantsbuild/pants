@@ -290,7 +290,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         (
           Store::with_remote(
             &store_dir,
-            pool,
+            pool.clone(),
             &cas_addresses,
             top_match
               .value_of("remote-instance-name")
@@ -320,7 +320,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           true,
         )
       }
-      None => (Store::local_only(&store_dir, pool), false),
+      None => (Store::local_only(&store_dir, pool.clone()), false),
     };
     let store = store_result.map_err(|e| {
       format!(
@@ -361,9 +361,10 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
               .map_err(|e| format!("Error canonicalizing path {:?}: {:?}", path, e))?
               .parent()
               .ok_or_else(|| format!("File being saved must have parent but {:?} did not", path))?,
+            pool,
           );
-          let file = runtime
-            .block_on(posix_fs.stat(PathBuf::from(path.file_name().unwrap())))
+          let file = posix_fs
+            .stat(PathBuf::from(path.file_name().unwrap()))
             .unwrap();
           match file {
             fs::Stat::File(f) => {
@@ -414,7 +415,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           })
       }
       ("save", Some(args)) => {
-        let posix_fs = Arc::new(make_posix_fs(args.value_of("root").unwrap()));
+        let posix_fs = Arc::new(make_posix_fs(args.value_of("root").unwrap(), pool));
         let store_copy = store.clone();
         let digest = runtime.block_on(
           posix_fs
@@ -602,8 +603,8 @@ fn expand_files_helper(
     .to_boxed()
 }
 
-fn make_posix_fs<P: AsRef<Path>>(root: P) -> fs::PosixFS {
-  fs::PosixFS::new(&root, &[]).unwrap()
+fn make_posix_fs<P: AsRef<Path>>(root: P, pool: Arc<ResettablePool>) -> fs::PosixFS {
+  fs::PosixFS::new(&root, pool, &[]).unwrap()
 }
 
 fn ensure_uploaded_to_remote(
