@@ -148,7 +148,8 @@ python_tests(
   sources = ['test_strutil.py'],
   dependencies = [
     'src/python/pants/util:strutil',
-  ]
+  ],
+  tags={'type_checked'},
 )
 
 python_tests(
