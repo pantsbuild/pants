@@ -53,12 +53,12 @@ class TestResolveRequirements(TestBase):
     return json.loads(pex_info_content)
 
   def test_resolves_dependencies(self):
-    requirements = {"", "", ""}
+    requirements = {"six==1.12.0", "jsonschema==2.6.0", "requests==2.22.0"}
     pex_info = self.create_pex_and_get_pex_info(requirements=requirements)
-    self.assertEqual(set(pex_info[""]), requirements)
+    self.assertEqual(set(pex_info["requirements"]), requirements)
 
   def test_entry_point(self):
-    entry_point = ""
+    entry_point = "pydoc"
     pex_info = self.create_pex_and_get_pex_info(entry_point=entry_point)
     self.assertEqual(pex_info["entry_point"], entry_point)
 
