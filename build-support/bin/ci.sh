@@ -275,12 +275,17 @@ if [[ "${run_integration:-false}" == "true" ]]; then
   fi
   start_travis_section "IntegrationTests" "Running Pants Integration tests${shard_desc}"
   (
+    ./pants.pex --tag='+integration' test.pytest \
+      "--test-pytest-test-shard=${python_intg_shard}" \
+      src/python:: tests/python:: -- "${PYTEST_PASSTHRU_ARGS[@]}"
+  ) || die "Pants integration test failure"
+  (
     # NB: We use test_testprojects_integration.py to specifically run the ones that
     # we care about, and skip the rest.
     ./pants.pex --tag='+integration' --exclude-target-regexp='.*/testprojects/.*' \
       test.pytest "--test-pytest-test-shard=${python_intg_shard}" \
-      src/python:: tests/python:: contrib:: -- "${PYTEST_PASSTHRU_ARGS[@]}"
-  ) || die "Pants Integration test failure"
+      contrib:: -- "${PYTEST_PASSTHRU_ARGS[@]}"
+  ) || die "Contrib integration test failure"
   end_travis_section
 fi
 
