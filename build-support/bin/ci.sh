@@ -46,7 +46,6 @@ EOF
 }
 
 # No python test sharding (1 shard) by default.
-python_unit_shard="0/1"
 python_intg_shard="0/1"
 
 while getopts "h27fxbmrjlpeasci:tz" opt; do
@@ -199,10 +198,15 @@ if [[ "${run_python:-false}" == "true" ]]; then
     ./pants.pex --tag='-integration' --filter-type='python_tests' filter src/python:: tests/python:: > all_targets.txt
     comm -23 <(sort all_targets.txt) <(sort "${known_v2_failures_file}") > v2_targets.txt
     ./pants.pex --no-v1 --v2 --target-spec-file=v2_targets.txt test.pytest -- "${PYTEST_PASSTHRU_ARGS[@]}"
-  ) || die "Core Python test failure"
+  ) || die "Core Python test failure (V2 test runner)"
   (
-    ./pants.pex --target-spec-file="${known_v2_failures_file}" test.pytest -- "${PYTEST_PASSTHRU_ARGS[@]}"
-  ) || die "Core Python test failure"
+    ./pants.pex --target-spec-file="${known_v2_failures_file}" \
+      test.pytest --chroot -- "${PYTEST_PASSTHRU_ARGS[@]}"
+  ) || die "Core Python test failure (V1 test runner)"
+  (
+    ./pants.pex --tag='-integration' --exclude-target-regexp='.*/testprojects/.*' \
+      test.pytest contrib:: -- "${PYTEST_PASSTHRU_ARGS[@]}"
+  ) || die "Contrib Python test failure"
   end_travis_section
 fi
 
