@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import sys
 from builtins import str
 
 from future.utils import text_type
@@ -40,8 +39,6 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
   )
   all_targets = [t.adaptor for t in transitive_hydrated_targets.closure]
 
-  # TODO(#7061): This str() can be removed after we drop py2!
-  python_binary = text_type(sys.executable)
   interpreter_constraints = {
     constraint
     for target_adaptor in all_targets
@@ -117,8 +114,12 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
   # TODO(#6071): merge the two dicts via ** unpacking once we drop Py2.
   pex_exe_env.update(subprocess_encoding_environment.invocation_environment_dict)
 
+  # NB: we use the hardcoded and generic bin name `python`, rather than something dynamic like
+  # `sys.executable`, to ensure that the interpreter may be discovered both locally and in remote
+  # execution. This is only used to run the downloaded PEX tool; it is not necessarily the
+  # interpreter that PEX will use to execute the generated .pex file.
   request = ExecuteProcessRequest(
-    argv=(python_binary, './{}'.format(output_pytest_requirements_pex_filename)),
+    argv=("python", './{}'.format(output_pytest_requirements_pex_filename)),
     env=pex_exe_env,
     input_files=merged_input_files,
     description='Run pytest for {}'.format(test_target.address.reference()),
