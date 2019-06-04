@@ -44,6 +44,7 @@ pub struct Core {
   pub rule_graph: RuleGraph<Rule>,
   pub types: Types,
   runtime: Resettable<Arc<RwLock<Runtime>>>,
+  pub futures_timer_thread: Arc<futures_timer::HelperThread>,
   store_and_command_runner_and_http_client:
     Resettable<(Store, BoundedCommandRunner, reqwest::r#async::Client)>,
   pub vfs: PosixFS,
@@ -102,6 +103,8 @@ impl Core {
       None
     };
 
+    let futures_timer_thread = Arc::new(futures_timer::HelperThread::new().unwrap());
+    let futures_timer_thread2 = futures_timer_thread.clone();
     let store_and_command_runner_and_http_client = Resettable::new(move || {
       let local_store_dir = local_store_dir.clone();
       let store = safe_create_dir_all_ioerror(&local_store_dir)
@@ -123,6 +126,7 @@ impl Core {
               fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10))
                 .unwrap(),
               remote_store_rpc_retries,
+              futures_timer_thread2.handle(),
             )
           }
         })
@@ -139,6 +143,7 @@ impl Core {
           // Allow for some overhead for bookkeeping threads (if any).
           process_execution_parallelism + 2,
           store.clone(),
+          futures_timer_thread2.clone(), // TODO remove clone once the store and http are not resettables
         )),
         None => Box::new(process_execution::local::CommandRunner::new(
           store.clone(),
@@ -163,6 +168,7 @@ impl Core {
       rule_graph: rule_graph,
       types: types,
       runtime: runtime,
+      futures_timer_thread: futures_timer_thread,
       store_and_command_runner_and_http_client: store_and_command_runner_and_http_client,
       // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.

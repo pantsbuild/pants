@@ -34,6 +34,8 @@ use errno;
 use fs;
 use fuse;
 
+use futures_timer;
+
 use libc;
 
 use serverset;
@@ -702,6 +704,7 @@ fn main() {
       )
       .expect("Error making BackoffConfig"),
       1,
+      futures_timer::TimerHandle::default(),
     ),
     None => fs::Store::local_only(&store_path),
   }

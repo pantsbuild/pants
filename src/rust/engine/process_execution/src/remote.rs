@@ -10,13 +10,13 @@ use bytes::Bytes;
 use digest::{Digest as DigestTrait, FixedOutput};
 use fs::{self, File, PathStat, Store};
 use futures::{future, Future, Stream};
+use futures_timer::Delay;
 use grpcio;
 use hashing::{Digest, Fingerprint};
 use log::{debug, trace, warn};
 use protobuf::{self, Message, ProtobufEnum};
 use sha2::Sha256;
 use time;
-use tokio_timer::Delay;
 
 use super::{ExecuteProcessRequest, ExecutionStats, FallibleExecuteProcessResult};
 use std;
@@ -45,6 +45,7 @@ pub struct CommandRunner {
   execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
   operations_client: Arc<bazel_protos::operations_grpc::OperationsClient>,
   store: Store,
+  futures_timer_thread: Arc<futures_timer::HelperThread>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -152,6 +153,7 @@ impl super::CommandRunner for CommandRunner {
         let command_runner3 = self.clone();
         let execute_request = Arc::new(execute_request);
         let execute_request2 = execute_request.clone();
+        let futures_timer_thread = self.futures_timer_thread.clone();
 
         let store2 = store.clone();
         let mut history = ExecutionHistory::default();
@@ -186,6 +188,7 @@ impl super::CommandRunner for CommandRunner {
                 let operations_client = operations_client.clone();
                 let command_runner2 = command_runner2.clone();
                 let command_runner3 = command_runner3.clone();
+                let futures_timer_thread = futures_timer_thread.clone();
                 let f = command_runner2.extract_execute_response(operation, &mut history);
                 f.map(future::Loop::Break).or_else(move |value| {
                   match value {
@@ -243,32 +246,32 @@ impl super::CommandRunner for CommandRunner {
                         .to_boxed()
                       } else {
                         // maybe the delay here should be the min of remaining time and the backoff period
-                        Delay::new(Instant::now() + Duration::from_millis(backoff_period))
-                          .map_err(move |e| {
-                            format!(
-                              "Future-Delay errored at operation result polling for {}, {}: {}",
-                              operation_name, description, e
-                            )
-                          })
-                          .and_then(move |_| {
-                            future::done(
-                              operations_client
-                                .get_operation_opt(
-                                  &operation_request,
-                                  command_runner3.call_option(),
-                                )
-                                .or_else(move |err| {
-                                  rpcerror_recover_cancelled(operation_request.take_name(), err)
-                                })
-                                .map(OperationOrStatus::Operation)
-                                .map_err(rpcerror_to_string),
-                            )
-                            .map(move |operation| {
-                              future::Loop::Continue((history, operation, iter_num + 1))
-                            })
-                            .to_boxed()
+                        Delay::new_handle(
+                          Instant::now() + Duration::from_millis(backoff_period),
+                          futures_timer_thread.handle(),
+                        )
+                        .map_err(move |e| {
+                          format!(
+                            "Future-Delay errored at operation result polling for {}, {}: {}",
+                            operation_name, description, e
+                          )
+                        })
+                        .and_then(move |_| {
+                          future::done(
+                            operations_client
+                              .get_operation_opt(&operation_request, command_runner3.call_option())
+                              .or_else(move |err| {
+                                rpcerror_recover_cancelled(operation_request.take_name(), err)
+                              })
+                              .map(OperationOrStatus::Operation)
+                              .map_err(rpcerror_to_string),
+                          )
+                          .map(move |operation| {
+                            future::Loop::Continue((history, operation, iter_num + 1))
                           })
                           .to_boxed()
+                        })
+                        .to_boxed()
                       }
                     }
                   }
@@ -309,6 +312,7 @@ impl CommandRunner {
     platform_properties: BTreeMap<String, String>,
     thread_count: usize,
     store: Store,
+    futures_timer_thread: Arc<futures_timer::HelperThread>,
   ) -> CommandRunner {
     let env = Arc::new(grpcio::Environment::new(thread_count));
     let channel = {
@@ -339,6 +343,7 @@ impl CommandRunner {
       execution_client,
       operations_client,
       store,
+      futures_timer_thread,
     }
   }
 
@@ -921,6 +926,7 @@ mod tests {
   use std::iter::{self, FromIterator};
   use std::ops::Sub;
   use std::path::PathBuf;
+  use std::sync::Arc;
   use std::time::Duration;
 
   #[derive(Debug, PartialEq)]
@@ -1452,6 +1458,7 @@ mod tests {
     let store_dir_path = store_dir.path();
 
     let cas = mock::StubCAS::empty();
+    let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       &store_dir_path,
       &[cas.address()],
@@ -1463,6 +1470,7 @@ mod tests {
       Duration::from_secs(1),
       fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
+      timer_thread.handle(),
     )
     .expect("Failed to make store");
 
@@ -1475,6 +1483,7 @@ mod tests {
       BTreeMap::new(),
       1,
       store,
+      timer_thread,
     );
     let result = runtime
       .block_on(cmd_runner.run(echo_roland_request()))
@@ -1815,6 +1824,7 @@ mod tests {
     let cas = mock::StubCAS::builder()
       .directory(&TestDirectory::containing_roland())
       .build();
+    let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       store_dir,
       &[cas.address()],
@@ -1826,6 +1836,7 @@ mod tests {
       Duration::from_secs(1),
       fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
+      timer_thread.handle(),
     )
     .expect("Failed to make store");
     runtime
@@ -1843,6 +1854,7 @@ mod tests {
       BTreeMap::new(),
       1,
       store,
+      timer_thread,
     );
 
     let result = runtime
@@ -1910,6 +1922,7 @@ mod tests {
     let cas = mock::StubCAS::builder()
       .directory(&TestDirectory::containing_roland())
       .build();
+    let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       store_dir,
       &[cas.address()],
@@ -1921,6 +1934,7 @@ mod tests {
       Duration::from_secs(1),
       fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
+      timer_thread.handle(),
     )
     .expect("Failed to make store");
     store
@@ -1937,6 +1951,7 @@ mod tests {
       BTreeMap::new(),
       1,
       store,
+      timer_thread,
     )
     .run(cat_roland_request())
     .wait();
@@ -1979,6 +1994,7 @@ mod tests {
       .file(&TestData::roland())
       .directory(&TestDirectory::containing_roland())
       .build();
+    let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       store_dir,
       &[cas.address()],
@@ -1990,6 +2006,7 @@ mod tests {
       Duration::from_secs(1),
       fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
+      timer_thread.handle(),
     )
     .expect("Failed to make store");
 
@@ -2003,6 +2020,7 @@ mod tests {
       BTreeMap::new(),
       1,
       store,
+      timer_thread,
     );
 
     let error = runtime
@@ -2586,6 +2604,7 @@ mod tests {
 
   fn create_command_runner(address: String, cas: &mock::StubCAS) -> CommandRunner {
     let store_dir = TempDir::new().unwrap();
+    let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       store_dir,
       &[cas.address()],
@@ -2597,10 +2616,25 @@ mod tests {
       Duration::from_secs(1),
       fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
+      timer_thread.handle(),
     )
     .expect("Failed to make store");
 
-    CommandRunner::new(&address, None, None, None, None, BTreeMap::new(), 1, store)
+    CommandRunner::new(
+      &address,
+      None,
+      None,
+      None,
+      None,
+      BTreeMap::new(),
+      1,
+      store,
+      timer_thread,
+    )
+  }
+
+  fn timer_thread() -> Arc<futures_timer::HelperThread> {
+    Arc::new(futures_timer::HelperThread::new().unwrap())
   }
 
   fn extract_execute_response(
