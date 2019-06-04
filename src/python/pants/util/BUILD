@@ -4,6 +4,7 @@
 python_library(
   name = 'argutil',
   sources = ['argutil.py'],
+  tags={'type_checked'},
 )
 
 python_library(

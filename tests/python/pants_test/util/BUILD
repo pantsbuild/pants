@@ -8,6 +8,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:argutil',
   ],
+  tags={'type_checked'},
 )
 
 python_tests(

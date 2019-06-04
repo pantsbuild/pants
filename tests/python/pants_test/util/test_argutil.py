@@ -8,7 +8,7 @@ from pants.util.argutil import ensure_arg, remove_arg
 
 class ArgutilTest(unittest.TestCase):
 
-  def test_ensure_arg(self):
+  def test_ensure_arg(self) -> None:
     self.assertEqual(['foo'], ensure_arg([], 'foo'))
     self.assertEqual(['foo'], ensure_arg(['foo'], 'foo'))
     self.assertEqual(['bar', 'foo'], ensure_arg(['bar'], 'foo'))
@@ -19,7 +19,7 @@ class ArgutilTest(unittest.TestCase):
     self.assertEqual(['foo', 'baz'], ensure_arg(['foo', 'bar'], 'foo', param='baz'))
     self.assertEqual(['qux', 'foo', 'baz', 'foobar'], ensure_arg(['qux', 'foo', 'bar', 'foobar'], 'foo', param='baz'))
 
-  def test_remove_arg(self):
+  def test_remove_arg(self) -> None:
     self.assertEqual([], remove_arg([], 'foo'))
     self.assertEqual([], remove_arg(['foo'], 'foo'))
     self.assertEqual(['bar'], remove_arg(['foo', 'bar'], 'foo'))
@@ -30,4 +30,4 @@ class ArgutilTest(unittest.TestCase):
     self.assertEqual([], remove_arg(['foo', 'bar'], 'foo', has_param=True))
     self.assertEqual(['baz'], remove_arg(['baz', 'foo', 'bar'], 'foo', has_param=True))
     self.assertEqual(['baz'], remove_arg(['foo', 'bar', 'baz'], 'foo', has_param=True))
-    self.assertEqual(['qux', 'foobar'], remove_arg(['qux', 'foo', 'bar', 'foobar'], 'foo', has_param='baz'))
+    self.assertEqual(['qux', 'foobar'], remove_arg(['qux', 'foo', 'bar', 'foobar'], 'foo', has_param=True))
