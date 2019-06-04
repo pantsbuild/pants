@@ -13,3 +13,16 @@ python_tests(
   ]
 )
 
+python_tests(
+  name='resolve_requirements',
+  sources=['test_resolve_requirements.py'],
+  dependencies=[
+    'src/python/pants/backend/python/rules',
+    'src/python/pants/backend/python/subsystems',
+    'src/python/pants/engine:fs',
+    'src/python/pants/engine:rules',
+    'src/python/pants/util:collections',
+    'tests/python/pants_test:test_base',
+  ]
+)
+
