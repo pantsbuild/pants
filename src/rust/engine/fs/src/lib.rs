@@ -34,6 +34,8 @@ pub use crate::snapshot::{
 };
 mod store;
 pub use crate::store::{ShrinkBehavior, Store, UploadSummary, DEFAULT_LOCAL_STORE_GC_TARGET_BYTES};
+mod pool;
+pub use crate::pool::ResettablePool;
 
 pub use serverset::BackoffConfig;
 

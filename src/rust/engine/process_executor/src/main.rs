@@ -212,6 +212,7 @@ fn main() {
     .value_of("local-store-path")
     .map(PathBuf::from)
     .unwrap_or_else(fs::Store::default_path);
+  let pool = Arc::new(fs::ResettablePool::new("process-executor-".to_owned()));
   let timer_thread = Arc::new(futures_timer::HelperThread::new().unwrap());
   let server_arg = args.value_of("server");
   let remote_instance_arg = args.value_of("remote-instance-name").map(str::to_owned);
@@ -245,6 +246,7 @@ fn main() {
 
       fs::Store::with_remote(
         local_store_path,
+        pool,
         &[cas_server.to_owned()],
         remote_instance_arg.clone(),
         &root_ca_certs,
@@ -258,7 +260,7 @@ fn main() {
         timer_thread.handle(),
       )
     }
-    (None, None) => fs::Store::local_only(local_store_path),
+    (None, None) => fs::Store::local_only(local_store_path, pool.clone()),
     _ => panic!("Must specify either both --server and --cas-server or neither."),
   }
   .expect("Error making store");

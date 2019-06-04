@@ -42,6 +42,7 @@ use serverset;
 
 use time;
 
+use futures::future::Future;
 use hashing::{Digest, Fingerprint};
 use log::{debug, error, warn};
 use parking_lot::Mutex;
@@ -125,7 +126,6 @@ enum Node {
 }
 
 struct BuildResultFS {
-  runtime: tokio::runtime::Runtime,
   store: fs::Store,
   inode_digest_cache: HashMap<Inode, InodeDetails>,
   digest_inode_cache: HashMap<Digest, (Inode, Inode)>,
@@ -134,9 +134,8 @@ struct BuildResultFS {
 }
 
 impl BuildResultFS {
-  pub fn new(runtime: tokio::runtime::Runtime, store: fs::Store) -> BuildResultFS {
+  pub fn new(store: fs::Store) -> BuildResultFS {
     BuildResultFS {
-      runtime: runtime,
       store: store,
       inode_digest_cache: HashMap::new(),
       digest_inode_cache: HashMap::new(),
@@ -179,10 +178,7 @@ impl BuildResultFS {
           non_executable_inode
         }))
       }
-      Vacant(entry) => match self
-        .runtime
-        .block_on(self.store.load_file_bytes_with(digest, |_| ()))
-      {
+      Vacant(entry) => match self.store.load_file_bytes_with(digest, |_| ()).wait() {
         Ok(Some(())) => {
           let executable_inode = self.next_inode;
           self.next_inode += 1;
@@ -220,7 +216,7 @@ impl BuildResultFS {
   pub fn inode_for_directory(&mut self, digest: Digest) -> Result<Option<Inode>, String> {
     match self.directory_inode_cache.entry(digest) {
       Occupied(entry) => Ok(Some(*entry.get())),
-      Vacant(entry) => match self.runtime.block_on(self.store.load_directory(digest)) {
+      Vacant(entry) => match self.store.load_directory(digest).wait() {
         Ok(Some(_)) => {
           // TODO: Kick off some background futures to pre-load the contents of this Directory into
           // an in-memory cache. Keep a background CPU pool driving those Futures.
@@ -309,7 +305,7 @@ impl BuildResultFS {
           entry_type: EntryType::Directory,
           ..
         }) => {
-          let maybe_directory = self.runtime.block_on(self.store.load_directory(digest));
+          let maybe_directory = self.store.load_directory(digest).wait();
 
           match maybe_directory {
             Ok(Some(directory)) => {
@@ -438,8 +434,9 @@ impl fuse::Filesystem for BuildResultFS {
           .and_then(|cache_entry| {
             let parent_digest = cache_entry.digest;
             self
-              .runtime
-              .block_on(self.store.load_directory(parent_digest))
+              .store
+              .load_directory(parent_digest)
+              .wait()
               .map_err(|err| {
                 error!("Error reading directory {:?}: {}", parent_digest, err);
                 libc::EINVAL
@@ -527,13 +524,13 @@ impl fuse::Filesystem for BuildResultFS {
         // TODO: Read from a cache of Futures driven from a CPU pool, so we can merge in-flight
         // requests, rather than reading from the store directly here.
         let result: Result<(), ()> = self
-          .runtime
-          .block_on(self.store.load_file_bytes_with(digest, move |bytes| {
+          .store
+          .load_file_bytes_with(digest, move |bytes| {
             let begin = std::cmp::min(offset as usize, bytes.len());
             let end = std::cmp::min(offset as usize + size as usize, bytes.len());
             let mut reply = reply.lock();
             reply.take().unwrap().data(&bytes.slice(begin, end));
-          }))
+          })
           .map(|v| {
             if v.is_none() {
               let maybe_reply = reply2.lock().take();
@@ -549,7 +546,8 @@ impl fuse::Filesystem for BuildResultFS {
               reply.error(libc::EINVAL);
             }
             Ok(())
-          });
+          })
+          .wait();
         result.expect("Error from read future which should have been handled in the future ");
       }
       _ => reply.error(libc::ENOENT),
@@ -599,7 +597,6 @@ impl fuse::Filesystem for BuildResultFS {
 pub fn mount<'a, P: AsRef<Path>>(
   mount_path: P,
   store: fs::Store,
-  runtime: tokio::runtime::Runtime,
 ) -> std::io::Result<fuse::BackgroundSession<'a>> {
   // TODO: Work out how to disable caching in the filesystem
   let options = ["-o", "ro", "-o", "fsname=brfs", "-o", "noapplexattr"]
@@ -609,7 +606,7 @@ pub fn mount<'a, P: AsRef<Path>>(
 
   debug!("About to spawn_mount with options {:?}", options);
 
-  let fs = unsafe { fuse::spawn_mount(BuildResultFS::new(runtime, store), &mount_path, &options) };
+  let fs = unsafe { fuse::spawn_mount(BuildResultFS::new(store), &mount_path, &options) };
   // fuse::spawn_mount doesn't always fully initialise the filesystem before returning.
   // Bluntly sleep for a bit here. If this poses a problem, we should maybe start doing some polling
   // stats or something until the filesystem seems to be correct.
@@ -686,9 +683,11 @@ fn main() {
     None
   };
 
+  let pool = Arc::new(fs::ResettablePool::new("brfs-".to_owned()));
   let store = match args.value_of("server-address") {
     Some(address) => fs::Store::with_remote(
       &store_path,
+      pool,
       &[address.to_owned()],
       args.value_of("remote-instance-name").map(str::to_owned),
       &root_ca_certs,
@@ -706,12 +705,11 @@ fn main() {
       1,
       futures_timer::TimerHandle::default(),
     ),
-    None => fs::Store::local_only(&store_path),
+    None => fs::Store::local_only(&store_path, pool),
   }
   .expect("Error making store");
 
-  let runtime = tokio::runtime::Runtime::new().expect("Making runtime");
-  let _fs = mount(mount_path, store, runtime).expect("Error mounting");
+  let _fs = mount(mount_path, store).expect("Error mounting");
   loop {
     std::thread::sleep(std::time::Duration::from_secs(1));
   }
@@ -740,7 +738,9 @@ mod test {
 
   use super::mount;
   use fs;
+  use futures::future::Future;
   use hashing;
+  use std::sync::Arc;
   use testutil::{
     data::{TestData, TestDirectory},
     file,
@@ -750,11 +750,13 @@ mod test {
   fn missing_digest() {
     let (store_dir, mount_dir) = make_dirs();
 
-    let store = fs::Store::local_only(store_dir.path()).expect("Error creating local store");
+    let store = fs::Store::local_only(
+      store_dir.path(),
+      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
+    )
+    .expect("Error creating local store");
 
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-
-    let _fs = mount(mount_dir.path(), store, runtime).expect("Mounting");
+    let _fs = mount(mount_dir.path(), store).expect("Mounting");
     assert!(!&mount_dir
       .path()
       .join("digest")
@@ -765,17 +767,21 @@ mod test {
   #[test]
   fn read_file_by_digest() {
     let (store_dir, mount_dir) = make_dirs();
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let store = fs::Store::local_only(store_dir.path()).expect("Error creating local store");
+    let store = fs::Store::local_only(
+      store_dir.path(),
+      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
+    )
+    .expect("Error creating local store");
 
     let test_bytes = TestData::roland();
 
-    runtime
-      .block_on(store.store_file_bytes(test_bytes.bytes(), false))
+    store
+      .store_file_bytes(test_bytes.bytes(), false)
+      .wait()
       .expect("Storing bytes");
 
-    let _fs = mount(mount_dir.path(), store, runtime).expect("Mounting");
+    let _fs = mount(mount_dir.path(), store).expect("Mounting");
     let file_path = mount_dir
       .path()
       .join("digest")
@@ -787,21 +793,26 @@ mod test {
   #[test]
   fn list_directory() {
     let (store_dir, mount_dir) = make_dirs();
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let store = fs::Store::local_only(store_dir.path()).expect("Error creating local store");
+    let store = fs::Store::local_only(
+      store_dir.path(),
+      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
+    )
+    .expect("Error creating local store");
 
     let test_bytes = TestData::roland();
     let test_directory = TestDirectory::containing_roland();
 
-    runtime
-      .block_on(store.store_file_bytes(test_bytes.bytes(), false))
+    store
+      .store_file_bytes(test_bytes.bytes(), false)
+      .wait()
       .expect("Storing bytes");
-    runtime
-      .block_on(store.record_directory(&test_directory.directory(), false))
+    store
+      .record_directory(&test_directory.directory(), false)
+      .wait()
       .expect("Storing directory");
 
-    let _fs = mount(mount_dir.path(), store, runtime).expect("Mounting");
+    let _fs = mount(mount_dir.path(), store).expect("Mounting");
     let virtual_dir = mount_dir
       .path()
       .join("directory")
@@ -812,21 +823,26 @@ mod test {
   #[test]
   fn read_file_from_directory() {
     let (store_dir, mount_dir) = make_dirs();
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let store = fs::Store::local_only(store_dir.path()).expect("Error creating local store");
+    let store = fs::Store::local_only(
+      store_dir.path(),
+      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
+    )
+    .expect("Error creating local store");
 
     let test_bytes = TestData::roland();
     let test_directory = TestDirectory::containing_roland();
 
-    runtime
-      .block_on(store.store_file_bytes(test_bytes.bytes(), false))
+    store
+      .store_file_bytes(test_bytes.bytes(), false)
+      .wait()
       .expect("Storing bytes");
-    runtime
-      .block_on(store.record_directory(&test_directory.directory(), false))
+    store
+      .record_directory(&test_directory.directory(), false)
+      .wait()
       .expect("Storing directory");
 
-    let _fs = mount(mount_dir.path(), store, runtime).expect("Mounting");
+    let _fs = mount(mount_dir.path(), store).expect("Mounting");
     let roland = mount_dir
       .path()
       .join("directory")
@@ -839,29 +855,36 @@ mod test {
   #[test]
   fn list_recursive_directory() {
     let (store_dir, mount_dir) = make_dirs();
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let store = fs::Store::local_only(store_dir.path()).expect("Error creating local store");
+    let store = fs::Store::local_only(
+      store_dir.path(),
+      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
+    )
+    .expect("Error creating local store");
 
     let test_bytes = TestData::roland();
     let treat_bytes = TestData::catnip();
     let test_directory = TestDirectory::containing_roland();
     let recursive_directory = TestDirectory::recursive();
 
-    runtime
-      .block_on(store.store_file_bytes(test_bytes.bytes(), false))
+    store
+      .store_file_bytes(test_bytes.bytes(), false)
+      .wait()
       .expect("Storing bytes");
-    runtime
-      .block_on(store.store_file_bytes(treat_bytes.bytes(), false))
+    store
+      .store_file_bytes(treat_bytes.bytes(), false)
+      .wait()
       .expect("Storing bytes");
-    runtime
-      .block_on(store.record_directory(&test_directory.directory(), false))
+    store
+      .record_directory(&test_directory.directory(), false)
+      .wait()
       .expect("Storing directory");
-    runtime
-      .block_on(store.record_directory(&recursive_directory.directory(), false))
+    store
+      .record_directory(&recursive_directory.directory(), false)
+      .wait()
       .expect("Storing directory");
 
-    let _fs = mount(mount_dir.path(), store, runtime).expect("Mounting");
+    let _fs = mount(mount_dir.path(), store).expect("Mounting");
     let virtual_dir = mount_dir
       .path()
       .join("directory")
@@ -873,29 +896,36 @@ mod test {
   #[test]
   fn read_file_from_recursive_directory() {
     let (store_dir, mount_dir) = make_dirs();
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let store = fs::Store::local_only(store_dir.path()).expect("Error creating local store");
+    let store = fs::Store::local_only(
+      store_dir.path(),
+      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
+    )
+    .expect("Error creating local store");
 
     let test_bytes = TestData::roland();
     let treat_bytes = TestData::catnip();
     let test_directory = TestDirectory::containing_roland();
     let recursive_directory = TestDirectory::recursive();
 
-    runtime
-      .block_on(store.store_file_bytes(test_bytes.bytes(), false))
+    store
+      .store_file_bytes(test_bytes.bytes(), false)
+      .wait()
       .expect("Storing bytes");
-    runtime
-      .block_on(store.store_file_bytes(treat_bytes.bytes(), false))
+    store
+      .store_file_bytes(treat_bytes.bytes(), false)
+      .wait()
       .expect("Storing bytes");
-    runtime
-      .block_on(store.record_directory(&test_directory.directory(), false))
+    store
+      .record_directory(&test_directory.directory(), false)
+      .wait()
       .expect("Storing directory");
-    runtime
-      .block_on(store.record_directory(&recursive_directory.directory(), false))
+    store
+      .record_directory(&recursive_directory.directory(), false)
+      .wait()
       .expect("Storing directory");
 
-    let _fs = mount(mount_dir.path(), store, runtime).expect("Mounting");
+    let _fs = mount(mount_dir.path(), store).expect("Mounting");
     let virtual_dir = mount_dir
       .path()
       .join("directory")
@@ -912,21 +942,26 @@ mod test {
   #[test]
   fn files_are_correctly_executable() {
     let (store_dir, mount_dir) = make_dirs();
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let store = fs::Store::local_only(store_dir.path()).expect("Error creating local store");
+    let store = fs::Store::local_only(
+      store_dir.path(),
+      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
+    )
+    .expect("Error creating local store");
 
     let treat_bytes = TestData::catnip();
     let directory = TestDirectory::with_mixed_executable_files();
 
-    runtime
-      .block_on(store.store_file_bytes(treat_bytes.bytes(), false))
+    store
+      .store_file_bytes(treat_bytes.bytes(), false)
+      .wait()
       .expect("Storing bytes");
-    runtime
-      .block_on(store.record_directory(&directory.directory(), false))
+    store
+      .record_directory(&directory.directory(), false)
+      .wait()
       .expect("Storing directory");
 
-    let _fs = mount(mount_dir.path(), store, runtime).expect("Mounting");
+    let _fs = mount(mount_dir.path(), store).expect("Mounting");
     let virtual_dir = mount_dir
       .path()
       .join("directory")
@@ -955,25 +990,31 @@ mod syscall_tests {
   use super::test::digest_to_filepath;
   use crate::test::make_dirs;
   use fs;
+  use futures::Future;
   use libc;
   use std::ffi::CString;
   use std::path::Path;
+  use std::sync::Arc;
   use testutil::data::TestData;
 
   #[test]
   fn read_file_by_digest_exact_bytes() {
     let (store_dir, mount_dir) = make_dirs();
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let store = fs::Store::local_only(store_dir.path()).expect("Error creating local store");
+    let store = fs::Store::local_only(
+      store_dir.path(),
+      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
+    )
+    .expect("Error creating local store");
 
     let test_bytes = TestData::roland();
 
-    runtime
-      .block_on(store.store_file_bytes(test_bytes.bytes(), false))
+    store
+      .store_file_bytes(test_bytes.bytes(), false)
+      .wait()
       .expect("Storing bytes");
 
-    let _fs = mount(mount_dir.path(), store, runtime).expect("Mounting");
+    let _fs = mount(mount_dir.path(), store).expect("Mounting");
 
     let path = mount_dir
       .path()

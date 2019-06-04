@@ -581,7 +581,7 @@ mod tests {
 
   use super::super::{
     Dir, File, GlobExpansionConjunction, GlobMatching, Path, PathGlobs, PathStat, PosixFS,
-    Snapshot, Store, StrictGlobMatching,
+    ResettablePool, Snapshot, Store, StrictGlobMatching,
   };
   use super::OneOffStoreFileByDigest;
 
@@ -598,12 +598,14 @@ mod tests {
     OneOffStoreFileByDigest,
     tokio::runtime::Runtime,
   ) {
+    let pool = Arc::new(ResettablePool::new("test-pool-".to_string()));
     // TODO: Pass a remote CAS address through.
     let store = Store::local_only(
       tempfile::Builder::new()
         .prefix("lmdb_store")
         .tempdir()
         .unwrap(),
+      pool.clone(),
     )
     .unwrap();
     let dir = tempfile::Builder::new().prefix("root").tempdir().unwrap();
@@ -739,22 +741,25 @@ mod tests {
 
   #[test]
   fn merge_directories_two_files() {
-    let (store, _, _, _, mut runtime) = setup();
+    let (store, _, _, _, _) = setup();
 
     let containing_roland = TestDirectory::containing_roland();
     let containing_treats = TestDirectory::containing_treats();
 
-    runtime
-      .block_on(store.record_directory(&containing_roland.directory(), false))
+    store
+      .record_directory(&containing_roland.directory(), false)
+      .wait()
       .expect("Storing roland directory");
-    runtime
-      .block_on(store.record_directory(&containing_treats.directory(), false))
+    store
+      .record_directory(&containing_treats.directory(), false)
+      .wait()
       .expect("Storing treats directory");
 
-    let result = runtime.block_on(Snapshot::merge_directories(
+    let result = Snapshot::merge_directories(
       store,
       vec![containing_treats.digest(), containing_roland.digest()],
-    ));
+    )
+    .wait();
 
     assert_eq!(
       result,
@@ -764,24 +769,26 @@ mod tests {
 
   #[test]
   fn merge_directories_clashing_files() {
-    let (store, _, _, _, mut runtime) = setup();
+    let (store, _, _, _, _) = setup();
 
     let containing_roland = TestDirectory::containing_roland();
     let containing_wrong_roland = TestDirectory::containing_wrong_roland();
 
-    runtime
-      .block_on(store.record_directory(&containing_roland.directory(), false))
+    store
+      .record_directory(&containing_roland.directory(), false)
+      .wait()
       .expect("Storing roland directory");
-    runtime
-      .block_on(store.record_directory(&containing_wrong_roland.directory(), false))
+    store
+      .record_directory(&containing_wrong_roland.directory(), false)
+      .wait()
       .expect("Storing wrong roland directory");
 
-    let err = runtime
-      .block_on(Snapshot::merge_directories(
-        store,
-        vec![containing_roland.digest(), containing_wrong_roland.digest()],
-      ))
-      .expect_err("Want error merging");
+    let err = Snapshot::merge_directories(
+      store,
+      vec![containing_roland.digest(), containing_wrong_roland.digest()],
+    )
+    .wait()
+    .expect_err("Want error merging");
 
     assert!(
       err.contains("roland"),
@@ -792,25 +799,28 @@ mod tests {
 
   #[test]
   fn merge_directories_same_files() {
-    let (store, _, _, _, mut runtime) = setup();
+    let (store, _, _, _, _) = setup();
 
     let containing_roland = TestDirectory::containing_roland();
     let containing_roland_and_treats = TestDirectory::containing_roland_and_treats();
 
-    runtime
-      .block_on(store.record_directory(&containing_roland.directory(), false))
+    store
+      .record_directory(&containing_roland.directory(), false)
+      .wait()
       .expect("Storing roland directory");
-    runtime
-      .block_on(store.record_directory(&containing_roland_and_treats.directory(), false))
+    store
+      .record_directory(&containing_roland_and_treats.directory(), false)
+      .wait()
       .expect("Storing treats directory");
 
-    let result = runtime.block_on(Snapshot::merge_directories(
+    let result = Snapshot::merge_directories(
       store,
       vec![
         containing_roland.digest(),
         containing_roland_and_treats.digest(),
       ],
-    ));
+    )
+    .wait();
 
     assert_eq!(
       result,
@@ -855,13 +865,10 @@ mod tests {
       ))
       .unwrap();
 
-    let merged = runtime
-      .block_on(Snapshot::merge(store.clone(), &[snapshot1, snapshot2]))
+    let merged = Snapshot::merge(store.clone(), &[snapshot1, snapshot2])
+      .wait()
       .unwrap();
-    let merged_root_directory = runtime
-      .block_on(store.load_directory(merged.digest))
-      .unwrap()
-      .unwrap();
+    let merged_root_directory = store.load_directory(merged.digest).wait().unwrap().unwrap();
 
     assert_eq!(merged.path_stats, vec![dir, file1, file2]);
     assert_eq!(merged_root_directory.files.len(), 0);
@@ -870,8 +877,9 @@ mod tests {
     let merged_child_dirnode = merged_root_directory.directories[0].clone();
     let merged_child_dirnode_digest: Result<Digest, String> =
       merged_child_dirnode.get_digest().into();
-    let merged_child_directory = runtime
-      .block_on(store.load_directory(merged_child_dirnode_digest.unwrap()))
+    let merged_child_directory = store
+      .load_directory(merged_child_dirnode_digest.unwrap())
+      .wait()
       .unwrap()
       .unwrap();
 

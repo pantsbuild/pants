@@ -16,6 +16,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use crate::pool::ResettablePool;
 use parking_lot::Mutex;
 
 // This is the maximum size any particular local LMDB store file is allowed to grow to.
@@ -84,9 +85,9 @@ impl Store {
   ///
   /// Make a store which only uses its local storage.
   ///
-  pub fn local_only<P: AsRef<Path>>(path: P) -> Result<Store, String> {
+  pub fn local_only<P: AsRef<Path>>(path: P, pool: Arc<ResettablePool>) -> Result<Store, String> {
     Ok(Store {
-      local: local::ByteStore::new(path)?,
+      local: local::ByteStore::new(path, pool)?,
       remote: None,
     })
   }
@@ -97,6 +98,7 @@ impl Store {
   ///
   pub fn with_remote<P: AsRef<Path>>(
     path: P,
+    pool: Arc<ResettablePool>,
     cas_addresses: &[String],
     instance_name: Option<String>,
     root_ca_certs: &Option<Vec<u8>>,
@@ -109,7 +111,7 @@ impl Store {
     futures_timer_thread: futures_timer::TimerHandle,
   ) -> Result<Store, String> {
     Ok(Store {
-      local: local::ByteStore::new(path)?,
+      local: local::ByteStore::new(path, pool)?,
       remote: Some(remote::ByteStore::new(
         cas_addresses,
         instance_name,
@@ -682,7 +684,7 @@ mod local {
   use boxfuture::{BoxFuture, Boxable};
   use bytes::Bytes;
   use digest::{Digest as DigestTrait, FixedOutput};
-  use futures::future::{self, Future};
+  use futures::future;
   use hashing::{Digest, Fingerprint};
   use lmdb::Error::{KeyExist, NotFound};
   use lmdb::{
@@ -701,6 +703,7 @@ mod local {
 
   use super::super::EMPTY_DIGEST;
   use super::MAX_LOCAL_STORE_SIZE_BYTES;
+  use crate::pool::ResettablePool;
 
   #[derive(Clone)]
   pub struct ByteStore {
@@ -708,6 +711,7 @@ mod local {
   }
 
   struct InnerStore {
+    pool: Arc<ResettablePool>,
     // Store directories separately from files because:
     //  1. They may have different lifetimes.
     //  2. It's nice to know whether we should be able to parse something as a proto.
@@ -716,12 +720,13 @@ mod local {
   }
 
   impl ByteStore {
-    pub fn new<P: AsRef<Path>>(path: P) -> Result<ByteStore, String> {
+    pub fn new<P: AsRef<Path>>(path: P, pool: Arc<ResettablePool>) -> Result<ByteStore, String> {
       let root = path.as_ref();
       let files_root = root.join("files");
       let directories_root = root.join("directories");
       Ok(ByteStore {
         inner: Arc::new(InnerStore {
+          pool: pool,
           file_dbs: ShardedLmdb::new(files_root.clone()).map(Arc::new),
           directory_dbs: ShardedLmdb::new(directories_root.clone()).map(Arc::new),
         }),
@@ -941,8 +946,10 @@ mod local {
       };
 
       let bytestore = self.clone();
-      futures::future::poll_fn(move || {
-        tokio_threadpool::blocking(|| {
+      self
+        .inner
+        .pool
+        .spawn_fn(move || {
           let fingerprint = {
             let mut hasher = Sha256::default();
             hasher.input(&bytes);
@@ -975,15 +982,7 @@ mod local {
             Err(err) => Err(format!("Error storing digest {:?}: {}", digest, err)),
           }
         })
-      })
-      .then(|blocking_result| match blocking_result {
-        Ok(v) => v,
-        Err(blocking_err) => Err(format!(
-          "Unable to run blocking task to store_bytes in local ByteStore on tokio runtime: {}",
-          blocking_err
-        )),
-      })
-      .to_boxed()
+        .to_boxed()
     }
 
     pub fn load_bytes_with<T: Send + 'static, F: Fn(Bytes) -> T + Send + Sync + 'static>(
@@ -1004,7 +1003,10 @@ mod local {
         EntryType::File => self.inner.file_dbs.clone(),
       };
 
-      futures::future::poll_fn(move || tokio_threadpool::blocking( || {
+      self
+        .inner
+        .pool
+        .spawn_fn(move || {
           let (env, db, _) = dbs.clone()?.get(&digest.0);
           let ro_txn = env
             .begin_ro_txn()
@@ -1021,12 +1023,7 @@ mod local {
             Err(NotFound) => Ok(None),
             Err(err) => Err(format!("Error loading digest {:?}: {}", digest, err,)),
           })
-        })).then(|blocking_result| {
-        match blocking_result {
-          Ok(v) => v,
-          Err(blocking_err) => Err(format!("Unable to run blocking task to load_bytes in local ByteStore on tokio runtime: {}", blocking_err)),
-        }
-      }).to_boxed()
+        }).to_boxed()
     }
   }
 
@@ -1184,11 +1181,12 @@ mod local {
 
   #[cfg(test)]
   pub mod tests {
-    use super::super::tests::block_on;
-    use super::{ByteStore, EntryType, ShrinkBehavior};
+    use super::{ByteStore, EntryType, ResettablePool, ShrinkBehavior};
     use bytes::{BufMut, Bytes, BytesMut};
+    use futures::Future;
     use hashing::{Digest, Fingerprint};
     use std::path::Path;
+    use std::sync::Arc;
     use tempfile::TempDir;
     use testutil::data::{TestData, TestDirectory};
     use walkdir::WalkDir;
@@ -1199,7 +1197,9 @@ mod local {
 
       let testdata = TestData::roland();
       assert_eq!(
-        block_on(new_store(dir.path()).store_bytes(EntryType::File, testdata.bytes(), false)),
+        new_store(dir.path())
+          .store_bytes(EntryType::File, testdata.bytes(), false)
+          .wait(),
         Ok(testdata.digest())
       );
     }
@@ -1209,10 +1209,14 @@ mod local {
       let dir = TempDir::new().unwrap();
 
       let testdata = TestData::roland();
-      block_on(new_store(dir.path()).store_bytes(EntryType::File, testdata.bytes(), false))
+      new_store(dir.path())
+        .store_bytes(EntryType::File, testdata.bytes(), false)
+        .wait()
         .unwrap();
       assert_eq!(
-        block_on(new_store(dir.path()).store_bytes(EntryType::File, testdata.bytes(), false)),
+        new_store(dir.path())
+          .store_bytes(EntryType::File, testdata.bytes(), false)
+          .wait(),
         Ok(testdata.digest())
       );
     }
@@ -1223,7 +1227,10 @@ mod local {
       let dir = TempDir::new().unwrap();
 
       let store = new_store(dir.path());
-      let hash = prime_store_with_file_bytes(&store, testdata.bytes());
+      let hash = store
+        .store_bytes(EntryType::File, testdata.bytes(), false)
+        .wait()
+        .unwrap();
       assert_eq!(load_file_bytes(&store, hash), Ok(Some(testdata.bytes())));
     }
 
@@ -1242,8 +1249,10 @@ mod local {
       let testdir = TestDirectory::containing_roland();
 
       assert_eq!(
-        block_on(new_store(dir.path()).store_bytes(EntryType::Directory, testdir.bytes(), false)),
-        Ok(testdir.digest())
+        &new_store(dir.path())
+          .store_bytes(EntryType::Directory, testdir.bytes(), false)
+          .wait(),
+        &Ok(testdir.digest())
       );
 
       assert_eq!(
@@ -1268,7 +1277,9 @@ mod local {
       let dir = TempDir::new().unwrap();
       let testdata = TestData::roland();
 
-      block_on(new_store(dir.path()).store_bytes(EntryType::File, testdata.bytes(), false))
+      new_store(dir.path())
+        .store_bytes(EntryType::File, testdata.bytes(), false)
+        .wait()
         .unwrap();
 
       assert_eq!(
@@ -1282,7 +1293,10 @@ mod local {
       let dir = TempDir::new().unwrap();
       let store = new_store(dir.path());
       let bytes = Bytes::from("0123456789");
-      block_on(store.store_bytes(EntryType::File, bytes.clone(), false)).expect("Error storing");
+      store
+        .store_bytes(EntryType::File, bytes.clone(), false)
+        .wait()
+        .expect("Error storing");
       store
         .shrink(10, ShrinkBehavior::Fast)
         .expect("Error shrinking");
@@ -1307,7 +1321,10 @@ mod local {
       let dir = TempDir::new().unwrap();
       let store = new_store(dir.path());
       let bytes = Bytes::from("0123456789");
-      block_on(store.store_bytes(EntryType::File, bytes.clone(), false)).expect("Error storing");
+      store
+        .store_bytes(EntryType::File, bytes.clone(), false)
+        .wait()
+        .expect("Error storing");
       let file_fingerprint = Fingerprint::from_hex_string(
         "84d89877f0d4041efb6bf91a16f0248f2fd573e6af05c19f96bedb9f882f7882",
       )
@@ -1341,8 +1358,14 @@ mod local {
       )
       .unwrap();
       let digest_2 = Digest(fingerprint_2, 10);
-      block_on(store.store_bytes(EntryType::File, bytes_1.clone(), false)).expect("Error storing");
-      block_on(store.store_bytes(EntryType::File, bytes_2.clone(), false)).expect("Error storing");
+      store
+        .store_bytes(EntryType::File, bytes_1.clone(), false)
+        .wait()
+        .expect("Error storing");
+      store
+        .store_bytes(EntryType::File, bytes_2.clone(), false)
+        .wait()
+        .expect("Error storing");
       store
         .shrink(10, ShrinkBehavior::Fast)
         .expect("Error shrinking");
@@ -1373,8 +1396,14 @@ mod local {
       )
       .unwrap();
       let digest_2 = Digest(fingerprint_2, 10);
-      block_on(store.store_bytes(EntryType::File, bytes_1.clone(), false)).expect("Error storing");
-      block_on(store.store_bytes(EntryType::File, bytes_2.clone(), false)).expect("Error storing");
+      store
+        .store_bytes(EntryType::File, bytes_1.clone(), false)
+        .wait()
+        .expect("Error storing");
+      store
+        .store_bytes(EntryType::File, bytes_2.clone(), false)
+        .wait()
+        .expect("Error storing");
       store
         .shrink(1, ShrinkBehavior::Fast)
         .expect("Error shrinking");
@@ -1400,9 +1429,13 @@ mod local {
       let other_testdir = TestDirectory::containing_dnalor();
 
       let store = new_store(dir.path());
-      block_on(store.store_bytes(EntryType::Directory, testdir.bytes(), false))
+      store
+        .store_bytes(EntryType::Directory, testdir.bytes(), false)
+        .wait()
         .expect("Error storing");
-      block_on(store.store_bytes(EntryType::Directory, other_testdir.bytes(), false))
+      store
+        .store_bytes(EntryType::Directory, other_testdir.bytes(), false)
+        .wait()
         .expect("Error storing");
       store
         .shrink(80, ShrinkBehavior::Fast)
@@ -1431,10 +1464,15 @@ mod local {
       let testdir = TestDirectory::containing_roland();
       let testdata = TestData::fourty_chars();
 
-      block_on(store.store_bytes(EntryType::Directory, testdir.bytes(), true))
+      store
+        .store_bytes(EntryType::Directory, testdir.bytes(), true)
+        .wait()
         .expect("Error storing");
 
-      block_on(store.store_bytes(EntryType::File, testdata.bytes(), false)).expect("Error storing");
+      store
+        .store_bytes(EntryType::File, testdata.bytes(), false)
+        .wait()
+        .expect("Error storing");
 
       store
         .shrink(80, ShrinkBehavior::Fast)
@@ -1459,10 +1497,14 @@ mod local {
 
       let testdir = TestDirectory::containing_roland();
 
-      block_on(store.store_bytes(EntryType::Directory, testdir.bytes(), false))
+      store
+        .store_bytes(EntryType::Directory, testdir.bytes(), false)
+        .wait()
         .expect("Error storing");
       let fourty_chars = TestData::fourty_chars();
-      block_on(store.store_bytes(EntryType::File, fourty_chars.bytes(), true))
+      store
+        .store_bytes(EntryType::File, fourty_chars.bytes(), true)
+        .wait()
         .expect("Error storing");
 
       store
@@ -1489,12 +1531,18 @@ mod local {
       let testdir = TestDirectory::containing_roland();
       let fourty_chars = TestData::fourty_chars();
 
-      block_on(store.store_bytes(EntryType::Directory, testdir.bytes(), true))
+      store
+        .store_bytes(EntryType::Directory, testdir.bytes(), true)
+        .wait()
         .expect("Error storing");
-      block_on(store.store_bytes(EntryType::File, fourty_chars.bytes(), true))
+      store
+        .store_bytes(EntryType::File, fourty_chars.bytes(), true)
+        .wait()
         .expect("Error storing");
 
-      block_on(store.store_bytes(EntryType::File, TestData::roland().bytes(), false))
+      store
+        .store_bytes(EntryType::File, TestData::roland().bytes(), false)
+        .wait()
         .expect("Error storing");
 
       assert_eq!(store.shrink(80, ShrinkBehavior::Fast), Ok(160));
@@ -1522,7 +1570,10 @@ mod local {
         for _ in 0..1024 * 1024 {
           bytes.put(byte);
         }
-        block_on(store.store_bytes(EntryType::File, bytes.freeze(), false)).expect("Error storing");
+        store
+          .store_bytes(EntryType::File, bytes.freeze(), false)
+          .wait()
+          .expect("Error storing");
       };
 
       write_one_meg(b'0');
@@ -1554,9 +1605,14 @@ mod local {
       let testdir = TestDirectory::containing_roland();
       let dir = TempDir::new().unwrap();
       let store = new_store(dir.path());
-      block_on(store.store_bytes(EntryType::Directory, testdir.bytes(), false))
+      store
+        .store_bytes(EntryType::Directory, testdir.bytes(), false)
+        .wait()
         .expect("Error storing");
-      prime_store_with_file_bytes(&store, testdata.bytes());
+      store
+        .store_bytes(EntryType::File, testdata.bytes(), false)
+        .wait()
+        .expect("Error storing");
       assert_eq!(
         store.entry_type(&testdata.fingerprint()),
         Ok(Some(EntryType::File))
@@ -1569,9 +1625,14 @@ mod local {
       let testdir = TestDirectory::containing_roland();
       let dir = TempDir::new().unwrap();
       let store = new_store(dir.path());
-      block_on(store.store_bytes(EntryType::Directory, testdir.bytes(), false))
+      store
+        .store_bytes(EntryType::Directory, testdir.bytes(), false)
+        .wait()
         .expect("Error storing");
-      prime_store_with_file_bytes(&store, testdata.bytes());
+      store
+        .store_bytes(EntryType::File, testdata.bytes(), false)
+        .wait()
+        .expect("Error storing");
       assert_eq!(
         store.entry_type(&testdir.fingerprint()),
         Ok(Some(EntryType::Directory))
@@ -1584,9 +1645,14 @@ mod local {
       let testdir = TestDirectory::containing_roland();
       let dir = TempDir::new().unwrap();
       let store = new_store(dir.path());
-      block_on(store.store_bytes(EntryType::Directory, testdir.bytes(), false))
+      store
+        .store_bytes(EntryType::Directory, testdir.bytes(), false)
+        .wait()
         .expect("Error storing");
-      prime_store_with_file_bytes(&store, testdata.bytes());
+      store
+        .store_bytes(EntryType::File, testdata.bytes(), false)
+        .wait()
+        .expect("Error storing");
       assert_eq!(
         store.entry_type(&TestDirectory::recursive().fingerprint()),
         Ok(None)
@@ -1599,7 +1665,9 @@ mod local {
       let store = new_store(dir.path());
       let empty_file = TestData::empty();
       assert_eq!(
-        block_on(store.load_bytes_with(EntryType::File, empty_file.digest(), |b| b)),
+        store
+          .load_bytes_with(EntryType::File, empty_file.digest(), |b| b)
+          .wait(),
         Ok(Some(empty_file.bytes())),
       )
     }
@@ -1610,13 +1678,15 @@ mod local {
       let store = new_store(dir.path());
       let empty_dir = TestDirectory::empty();
       assert_eq!(
-        block_on(store.load_bytes_with(EntryType::Directory, empty_dir.digest(), |b| b)),
+        store
+          .load_bytes_with(EntryType::Directory, empty_dir.digest(), |b| b)
+          .wait(),
         Ok(Some(empty_dir.bytes())),
       )
     }
 
     pub fn new_store<P: AsRef<Path>>(dir: P) -> ByteStore {
-      ByteStore::new(dir).unwrap()
+      ByteStore::new(dir, Arc::new(ResettablePool::new("test-pool-".to_string()))).unwrap()
     }
 
     pub fn load_file_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
@@ -1635,11 +1705,7 @@ mod local {
       entry_type: EntryType,
       digest: Digest,
     ) -> Result<Option<Bytes>, String> {
-      block_on(store.load_bytes_with(entry_type, digest, |b| b))
-    }
-
-    fn prime_store_with_file_bytes(store: &ByteStore, bytes: Bytes) -> Digest {
-      block_on(store.store_bytes(EntryType::File, bytes, false)).expect("Error storing file bytes")
+      store.load_bytes_with(entry_type, digest, |b| b).wait()
     }
 
     fn get_directory_size(path: &Path) -> usize {
@@ -1996,6 +2062,7 @@ mod remote {
     use super::super::EntryType;
     use super::ByteStore;
     use bytes::Bytes;
+    use futures::Future;
     use futures_timer::TimerHandle;
     use hashing::Digest;
     use mock::StubCAS;
@@ -2004,9 +2071,7 @@ mod remote {
     use std::time::Duration;
     use testutil::data::{TestData, TestDirectory};
 
-    use super::super::tests::{
-      big_file_bytes, big_file_digest, big_file_fingerprint, block_on, new_cas,
-    };
+    use super::super::tests::{big_file_bytes, big_file_digest, big_file_fingerprint, new_cas};
 
     #[test]
     fn loads_file() {
@@ -2131,7 +2196,7 @@ mod remote {
 
       let store = new_byte_store(&cas);
       assert_eq!(
-        block_on(store.store_bytes(testdata.bytes())),
+        store.store_bytes(testdata.bytes()).wait(),
         Ok(testdata.digest())
       );
 
@@ -2162,7 +2227,7 @@ mod remote {
       let fingerprint = big_file_fingerprint();
 
       assert_eq!(
-        block_on(store.store_bytes(all_the_henries.clone())),
+        store.store_bytes(all_the_henries.clone()).wait(),
         Ok(big_file_digest())
       );
 
@@ -2190,7 +2255,7 @@ mod remote {
 
       let store = new_byte_store(&cas);
       assert_eq!(
-        block_on(store.store_bytes(empty_file.bytes())),
+        store.store_bytes(empty_file.bytes()).wait(),
         Ok(empty_file.digest())
       );
 
@@ -2206,7 +2271,10 @@ mod remote {
       let cas = StubCAS::always_errors();
 
       let store = new_byte_store(&cas);
-      let error = block_on(store.store_bytes(TestData::roland().bytes())).expect_err("Want error");
+      let error = store
+        .store_bytes(TestData::roland().bytes())
+        .wait()
+        .expect_err("Want error");
       assert!(
         error.contains("Error from server"),
         format!("Bad error message, got: {}", error)
@@ -2232,7 +2300,10 @@ mod remote {
         TimerHandle::default(),
       )
       .unwrap();
-      let error = block_on(store.store_bytes(TestData::roland().bytes())).expect_err("Want error");
+      let error = store
+        .store_bytes(TestData::roland().bytes())
+        .wait()
+        .expect_err("Want error");
       assert!(
         error.contains("Error attempting to upload digest"),
         format!("Bad error message, got: {}", error)
@@ -2245,9 +2316,11 @@ mod remote {
 
       let store = new_byte_store(&cas);
       assert_eq!(
-        block_on(store.list_missing_digests(
-          store.find_missing_blobs_request(vec![TestData::roland().digest()].iter())
-        )),
+        store
+          .list_missing_digests(
+            store.find_missing_blobs_request(vec![TestData::roland().digest()].iter())
+          )
+          .wait(),
         Ok(HashSet::new())
       );
     }
@@ -2264,7 +2337,9 @@ mod remote {
       digest_set.insert(digest);
 
       assert_eq!(
-        block_on(store.list_missing_digests(store.find_missing_blobs_request(vec![digest].iter()))),
+        store
+          .list_missing_digests(store.find_missing_blobs_request(vec![digest].iter()))
+          .wait(),
         Ok(digest_set)
       );
     }
@@ -2275,10 +2350,12 @@ mod remote {
 
       let store = new_byte_store(&cas);
 
-      let error = block_on(store.list_missing_digests(
-        store.find_missing_blobs_request(vec![TestData::roland().digest()].iter()),
-      ))
-      .expect_err("Want error");
+      let error = store
+        .list_missing_digests(
+          store.find_missing_blobs_request(vec![TestData::roland().digest()].iter()),
+        )
+        .wait()
+        .expect_err("Want error");
       assert!(
         error.contains("StubCAS is configured to always fail"),
         format!("Bad error message, got: {}", error)
@@ -2353,7 +2430,7 @@ mod remote {
       entry_type: EntryType,
       digest: Digest,
     ) -> Result<Option<Bytes>, String> {
-      block_on(store.load_bytes_with(entry_type, digest, |b| b))
+      store.load_bytes_with(entry_type, digest, |b| b).wait()
     }
   }
 }
@@ -2362,6 +2439,7 @@ mod remote {
 mod tests {
   use super::{local, EntryType, FileContent, Store, UploadSummary};
 
+  use crate::pool::ResettablePool;
   use bazel_protos;
   use bytes::Bytes;
   use digest::{Digest as DigestTrait, FixedOutput};
@@ -2378,6 +2456,7 @@ mod tests {
   use std::io::Read;
   use std::os::unix::fs::PermissionsExt;
   use std::path::{Path, PathBuf};
+  use std::sync::Arc;
   use std::time::Duration;
   use tempfile::TempDir;
   use testutil::data::{TestData, TestDirectory};
@@ -2420,7 +2499,7 @@ mod tests {
   }
 
   pub fn load_file_bytes(store: &Store, digest: Digest) -> Result<Option<Bytes>, String> {
-    block_on(store.load_file_bytes_with(digest, |bytes| bytes))
+    store.load_file_bytes_with(digest, |bytes| bytes).wait()
   }
 
   ///
@@ -2438,7 +2517,8 @@ mod tests {
   /// Create a new local store with whatever was already serialized in dir.
   ///
   fn new_local_store<P: AsRef<Path>>(dir: P) -> Store {
-    Store::local_only(dir).expect("Error creating local store")
+    Store::local_only(dir, Arc::new(ResettablePool::new("test-pool-".to_string())))
+      .expect("Error creating local store")
   }
 
   ///
@@ -2447,6 +2527,7 @@ mod tests {
   fn new_store<P: AsRef<Path>>(dir: P, cas_address: String) -> Store {
     Store::with_remote(
       dir,
+      Arc::new(ResettablePool::new("test-pool-".to_string())),
       &[cas_address],
       None,
       &None,
@@ -2467,12 +2548,10 @@ mod tests {
 
     let testdata = TestData::roland();
 
-    block_on(local::tests::new_store(dir.path()).store_bytes(
-      EntryType::File,
-      testdata.bytes(),
-      false,
-    ))
-    .expect("Store failed");
+    local::tests::new_store(dir.path())
+      .store_bytes(EntryType::File, testdata.bytes(), false)
+      .wait()
+      .expect("Store failed");
 
     let cas = new_cas(1024);
     assert_eq!(
@@ -2488,16 +2567,16 @@ mod tests {
 
     let testdir = TestDirectory::containing_roland();
 
-    block_on(local::tests::new_store(dir.path()).store_bytes(
-      EntryType::Directory,
-      testdir.bytes(),
-      false,
-    ))
-    .expect("Store failed");
+    local::tests::new_store(dir.path())
+      .store_bytes(EntryType::Directory, testdir.bytes(), false)
+      .wait()
+      .expect("Store failed");
 
     let cas = new_cas(1024);
     assert_eq!(
-      block_on(new_store(dir.path(), cas.address()).load_directory(testdir.digest())),
+      new_store(dir.path(), cas.address())
+        .load_directory(testdir.digest())
+        .wait(),
       Ok(Some(testdir.directory()))
     );
     assert_eq!(0, cas.read_request_count());
@@ -2532,7 +2611,9 @@ mod tests {
     let testdir = TestDirectory::containing_roland();
 
     assert_eq!(
-      block_on(new_store(dir.path(), cas.address()).load_directory(testdir.digest())),
+      new_store(dir.path(), cas.address())
+        .load_directory(testdir.digest())
+        .wait(),
       Ok(Some(testdir.directory()))
     );
     assert_eq!(1, cas.read_request_count());
@@ -2565,11 +2646,10 @@ mod tests {
       .directory(&recursive_testdir)
       .build();
 
-    block_on(
-      new_store(dir.path(), cas.address())
-        .ensure_local_has_recursive_directory(recursive_testdir_digest),
-    )
-    .expect("Downloading recursive directory should have succeeded.");
+    new_store(dir.path(), cas.address())
+      .ensure_local_has_recursive_directory(recursive_testdir_digest)
+      .wait()
+      .expect("Downloading recursive directory should have succeeded.");
 
     assert_eq!(
       load_file_bytes(&new_local_store(dir.path()), roland.digest()),
@@ -2580,11 +2660,15 @@ mod tests {
       Ok(Some(catnip.bytes()))
     );
     assert_eq!(
-      block_on(new_local_store(dir.path()).load_directory(testdir_digest)),
+      new_local_store(dir.path())
+        .load_directory(testdir_digest)
+        .wait(),
       Ok(Some(testdir_directory))
     );
     assert_eq!(
-      block_on(new_local_store(dir.path()).load_directory(recursive_testdir_digest)),
+      new_local_store(dir.path())
+        .load_directory(recursive_testdir_digest)
+        .wait(),
       Ok(Some(recursive_testdir_directory))
     );
   }
@@ -2610,10 +2694,9 @@ mod tests {
 
     let cas = StubCAS::empty();
     assert_eq!(
-      block_on(
-        new_store(dir.path(), cas.address())
-          .load_directory(TestDirectory::containing_roland().digest())
-      ),
+      new_store(dir.path(), cas.address())
+        .load_directory(TestDirectory::containing_roland().digest())
+        .wait(),
       Ok(None)
     );
     assert_eq!(1, cas.read_request_count());
@@ -2645,9 +2728,10 @@ mod tests {
     let dir = TempDir::new().unwrap();
 
     let cas = StubCAS::always_errors();
-    let error =
-      block_on(new_store(dir.path(), cas.address()).load_directory(TestData::roland().digest()))
-        .expect_err("Want error");
+    let error = new_store(dir.path(), cas.address())
+      .load_directory(TestData::roland().digest())
+      .wait()
+      .expect_err("Want error");
     assert!(
       cas.read_request_count() > 0,
       "Want read_request_count > 0 but got {}",
@@ -2666,7 +2750,9 @@ mod tests {
     let testdata = TestData::roland();
 
     let cas = new_cas(1024);
-    block_on(new_store(dir.path(), cas.address()).load_directory(testdata.digest()))
+    new_store(dir.path(), cas.address())
+      .load_directory(testdata.digest())
+      .wait()
       .expect_err("Want error");
 
     assert_eq!(
@@ -2710,7 +2796,9 @@ mod tests {
         non_canonical_directory_bytes,
       )
       .build();
-    block_on(new_store(dir.path(), cas.address()).load_directory(directory_digest.clone()))
+    new_store(dir.path(), cas.address())
+      .load_directory(directory_digest.clone())
+      .wait()
       .expect_err("Want error");
 
     assert_eq!(
@@ -2770,7 +2858,9 @@ mod tests {
 
     let empty_dir = TestDirectory::empty();
 
-    let expanded = block_on(new_local_store(dir.path()).expand_directory(empty_dir.digest()))
+    let expanded = new_local_store(dir.path())
+      .expand_directory(empty_dir.digest())
+      .wait()
       .expect("Error expanding directory");
     let want: HashMap<Digest, EntryType> = vec![(empty_dir.digest(), EntryType::Directory)]
       .into_iter()
@@ -2785,10 +2875,14 @@ mod tests {
     let roland = TestData::roland();
     let testdir = TestDirectory::containing_roland();
 
-    block_on(new_local_store(dir.path()).record_directory(&testdir.directory(), false))
+    new_local_store(dir.path())
+      .record_directory(&testdir.directory(), false)
+      .wait()
       .expect("Error storing directory locally");
 
-    let expanded = block_on(new_local_store(dir.path()).expand_directory(testdir.digest()))
+    let expanded = new_local_store(dir.path())
+      .expand_directory(testdir.digest())
+      .wait()
       .expect("Error expanding directory");
     let want: HashMap<Digest, EntryType> = vec![
       (testdir.digest(), EntryType::Directory),
@@ -2808,14 +2902,19 @@ mod tests {
     let testdir = TestDirectory::containing_roland();
     let recursive_testdir = TestDirectory::recursive();
 
-    block_on(new_local_store(dir.path()).record_directory(&recursive_testdir.directory(), false))
+    new_local_store(dir.path())
+      .record_directory(&recursive_testdir.directory(), false)
+      .wait()
       .expect("Error storing directory locally");
-    block_on(new_local_store(dir.path()).record_directory(&testdir.directory(), false))
+    new_local_store(dir.path())
+      .record_directory(&testdir.directory(), false)
+      .wait()
       .expect("Error storing directory locally");
 
-    let expanded =
-      block_on(new_local_store(dir.path()).expand_directory(recursive_testdir.digest()))
-        .expect("Error expanding directory");
+    let expanded = new_local_store(dir.path())
+      .expand_directory(recursive_testdir.digest())
+      .wait()
+      .expect("Error expanding directory");
     let want: HashMap<Digest, EntryType> = vec![
       (recursive_testdir.digest(), EntryType::Directory),
       (testdir.digest(), EntryType::Directory),
@@ -2831,8 +2930,10 @@ mod tests {
   fn expand_missing_directory() {
     let dir = TempDir::new().unwrap();
     let digest = TestDirectory::containing_roland().digest();
-    let error =
-      block_on(new_local_store(dir.path()).expand_directory(digest)).expect_err("Want error");
+    let error = new_local_store(dir.path())
+      .expand_directory(digest)
+      .wait()
+      .expect_err("Want error");
     assert!(
       error.contains(&format!("{:?}", digest)),
       "Bad error message: {}",
@@ -2846,10 +2947,14 @@ mod tests {
 
     let recursive_testdir = TestDirectory::recursive();
 
-    block_on(new_local_store(dir.path()).record_directory(&recursive_testdir.directory(), false))
+    new_local_store(dir.path())
+      .record_directory(&recursive_testdir.directory(), false)
+      .wait()
       .expect("Error storing directory locally");
 
-    let error = block_on(new_local_store(dir.path()).expand_directory(recursive_testdir.digest()))
+    let error = new_local_store(dir.path())
+      .expand_directory(recursive_testdir.digest())
+      .wait()
       .expect_err("Want error");
     assert!(
       error.contains(&format!(
@@ -2868,15 +2973,17 @@ mod tests {
 
     let testdata = TestData::roland();
 
-    block_on(new_local_store(dir.path()).store_file_bytes(testdata.bytes(), false))
+    new_local_store(dir.path())
+      .store_file_bytes(testdata.bytes(), false)
+      .wait()
       .expect("Error storing file locally");
 
     assert_eq!(cas.blobs.lock().get(&testdata.fingerprint()), None);
 
-    block_on(
-      new_store(dir.path(), cas.address()).ensure_remote_has_recursive(vec![testdata.digest()]),
-    )
-    .expect("Error uploading file");
+    new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![testdata.digest()])
+      .wait()
+      .expect("Error uploading file");
 
     assert_eq!(
       cas.blobs.lock().get(&testdata.fingerprint()),
@@ -2892,18 +2999,22 @@ mod tests {
     let testdata = TestData::roland();
     let testdir = TestDirectory::containing_roland();
 
-    block_on(new_local_store(dir.path()).record_directory(&testdir.directory(), false))
+    new_local_store(dir.path())
+      .record_directory(&testdir.directory(), false)
+      .wait()
       .expect("Error storing directory locally");
-    block_on(new_local_store(dir.path()).store_file_bytes(testdata.bytes(), false))
+    new_local_store(dir.path())
+      .store_file_bytes(testdata.bytes(), false)
+      .wait()
       .expect("Error storing file locally");
 
     assert_eq!(cas.blobs.lock().get(&testdata.fingerprint()), None);
     assert_eq!(cas.blobs.lock().get(&testdir.fingerprint()), None);
 
-    block_on(
-      new_store(dir.path(), cas.address()).ensure_remote_has_recursive(vec![testdir.digest()]),
-    )
-    .expect("Error uploading directory");
+    new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![testdir.digest()])
+      .wait()
+      .expect("Error uploading directory");
 
     assert_eq!(
       cas.blobs.lock().get(&testdir.fingerprint()),
@@ -2923,15 +3034,19 @@ mod tests {
     let testdata = TestData::roland();
     let testdir = TestDirectory::containing_roland();
 
-    block_on(new_local_store(dir.path()).record_directory(&testdir.directory(), false))
+    new_local_store(dir.path())
+      .record_directory(&testdir.directory(), false)
+      .wait()
       .expect("Error storing directory locally");
-    block_on(new_local_store(dir.path()).store_file_bytes(testdata.bytes(), false))
+    new_local_store(dir.path())
+      .store_file_bytes(testdata.bytes(), false)
+      .wait()
       .expect("Error storing file locally");
 
-    block_on(
-      new_store(dir.path(), cas.address()).ensure_remote_has_recursive(vec![testdata.digest()]),
-    )
-    .expect("Error uploading file");
+    new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![testdata.digest()])
+      .wait()
+      .expect("Error uploading file");
 
     assert_eq!(cas.write_message_sizes.lock().len(), 1);
     assert_eq!(
@@ -2940,10 +3055,10 @@ mod tests {
     );
     assert_eq!(cas.blobs.lock().get(&testdir.fingerprint()), None);
 
-    block_on(
-      new_store(dir.path(), cas.address()).ensure_remote_has_recursive(vec![testdir.digest()]),
-    )
-    .expect("Error uploading directory");
+    new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![testdir.digest()])
+      .wait()
+      .expect("Error uploading directory");
 
     assert_eq!(cas.write_message_sizes.lock().len(), 3);
     assert_eq!(
@@ -2961,17 +3076,23 @@ mod tests {
     let roland = TestData::roland();
     let testdir = TestDirectory::containing_roland();
 
-    block_on(new_local_store(dir.path()).record_directory(&testdir.directory(), false))
+    new_local_store(dir.path())
+      .record_directory(&testdir.directory(), false)
+      .wait()
       .expect("Error storing directory locally");
-    block_on(new_local_store(dir.path()).store_file_bytes(roland.bytes(), false))
+    new_local_store(dir.path())
+      .store_file_bytes(roland.bytes(), false)
+      .wait()
       .expect("Error storing file locally");
-    block_on(new_local_store(dir.path()).store_file_bytes(catnip.bytes(), false))
+    new_local_store(dir.path())
+      .store_file_bytes(catnip.bytes(), false)
+      .wait()
       .expect("Error storing file locally");
 
-    block_on(
-      new_store(dir.path(), cas.address()).ensure_remote_has_recursive(vec![roland.digest()]),
-    )
-    .expect("Error uploading big file");
+    new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![roland.digest()])
+      .wait()
+      .expect("Error uploading big file");
 
     assert_eq!(cas.write_message_sizes.lock().len(), 1);
     assert_eq!(
@@ -2981,11 +3102,10 @@ mod tests {
     assert_eq!(cas.blobs.lock().get(&catnip.fingerprint()), None);
     assert_eq!(cas.blobs.lock().get(&testdir.fingerprint()), None);
 
-    block_on(
-      new_store(dir.path(), cas.address())
-        .ensure_remote_has_recursive(vec![testdir.digest(), catnip.digest()]),
-    )
-    .expect("Error uploading directory");
+    new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![testdir.digest(), catnip.digest()])
+      .wait()
+      .expect("Error uploading directory");
 
     assert_eq!(cas.write_message_sizes.lock().len(), 3);
     assert_eq!(
@@ -3003,14 +3123,15 @@ mod tests {
     let dir = TempDir::new().unwrap();
     let cas = StubCAS::empty();
 
-    block_on(new_local_store(dir.path()).store_file_bytes(extra_big_file_bytes(), false))
+    new_local_store(dir.path())
+      .store_file_bytes(extra_big_file_bytes(), false)
+      .wait()
       .expect("Error storing file locally");
 
-    block_on(
-      new_store(dir.path(), cas.address())
-        .ensure_remote_has_recursive(vec![extra_big_file_digest()]),
-    )
-    .expect("Error uploading directory");
+    new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![extra_big_file_digest()])
+      .wait()
+      .expect("Error uploading directory");
 
     assert_eq!(cas.write_message_sizes.lock().len(), 1);
     assert_eq!(
@@ -3018,11 +3139,10 @@ mod tests {
       Some(&extra_big_file_bytes())
     );
 
-    block_on(
-      new_store(dir.path(), cas.address())
-        .ensure_remote_has_recursive(vec![extra_big_file_digest()]),
-    )
-    .expect("Error uploading directory");
+    new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![extra_big_file_digest()])
+      .wait()
+      .expect("Error uploading directory");
 
     assert_eq!(cas.write_message_sizes.lock().len(), 1);
     assert_eq!(
@@ -3040,10 +3160,10 @@ mod tests {
 
     assert_eq!(cas.blobs.lock().get(&testdata.fingerprint()), None);
 
-    let error = block_on(
-      new_store(dir.path(), cas.address()).ensure_remote_has_recursive(vec![testdata.digest()]),
-    )
-    .expect_err("Want error");
+    let error = new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![testdata.digest()])
+      .wait()
+      .expect_err("Want error");
     assert_eq!(
       error,
       format!("Failed to upload digest {:?}: Not found", testdata.digest())
@@ -3057,16 +3177,18 @@ mod tests {
 
     let testdir = TestDirectory::containing_roland();
 
-    block_on(new_local_store(dir.path()).record_directory(&testdir.directory(), false))
+    new_local_store(dir.path())
+      .record_directory(&testdir.directory(), false)
+      .wait()
       .expect("Error storing directory locally");
 
     assert_eq!(cas.blobs.lock().get(&testdir.fingerprint()), None);
     assert_eq!(cas.blobs.lock().get(&testdir.fingerprint()), None);
 
-    let error = block_on(
-      new_store(dir.path(), cas.address()).ensure_remote_has_recursive(vec![testdir.digest()]),
-    )
-    .expect_err("Want error");
+    let error = new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![testdir.digest()])
+      .wait()
+      .expect_err("Want error");
     assert_eq!(
       error,
       format!(
@@ -3084,14 +3206,18 @@ mod tests {
 
     let testdata = TestData::roland();
 
-    block_on(new_local_store(dir.path()).store_file_bytes(testdata.bytes(), false))
+    new_local_store(dir.path())
+      .store_file_bytes(testdata.bytes(), false)
+      .wait()
       .expect("Error storing file locally");
 
     assert_eq!(cas.blobs.lock().get(&testdata.fingerprint()), None);
 
     let wrong_digest = Digest(testdata.fingerprint(), testdata.len() + 1);
 
-    block_on(new_store(dir.path(), cas.address()).ensure_remote_has_recursive(vec![wrong_digest]))
+    new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![wrong_digest])
+      .wait()
       .expect_err("Expect error uploading file");
 
     assert_eq!(cas.blobs.lock().get(&testdata.fingerprint()), None);
@@ -3107,15 +3233,22 @@ mod tests {
     // 3 is enough digests to trigger a FindMissingBlobs request
     let testdir = TestDirectory::containing_roland_and_treats();
 
-    block_on(new_local_store(dir.path()).record_directory(&testdir.directory(), false))
+    new_local_store(dir.path())
+      .record_directory(&testdir.directory(), false)
+      .wait()
       .expect("Error storing directory locally");
-    block_on(new_local_store(dir.path()).store_file_bytes(TestData::roland().bytes(), false))
+    new_local_store(dir.path())
+      .store_file_bytes(TestData::roland().bytes(), false)
+      .wait()
       .expect("Error storing roland locally");
-    block_on(new_local_store(dir.path()).store_file_bytes(TestData::catnip().bytes(), false))
+    new_local_store(dir.path())
+      .store_file_bytes(TestData::catnip().bytes(), false)
+      .wait()
       .expect("Error storing catnip locally");
 
     let store_with_remote = Store::with_remote(
       dir.path(),
+      Arc::new(ResettablePool::new("test-pool-".to_string())),
       &[cas.address()],
       Some("dark-tower".to_owned()),
       &None,
@@ -3129,7 +3262,9 @@ mod tests {
     )
     .unwrap();
 
-    block_on(store_with_remote.ensure_remote_has_recursive(vec![testdir.digest()]))
+    store_with_remote
+      .ensure_remote_has_recursive(vec![testdir.digest()])
+      .wait()
       .expect("Error uploading");
   }
 
@@ -3143,6 +3278,7 @@ mod tests {
 
     let store_with_remote = Store::with_remote(
       dir.path(),
+      Arc::new(ResettablePool::new("test-pool-".to_string())),
       &[cas.address()],
       Some("dark-tower".to_owned()),
       &None,
@@ -3157,7 +3293,9 @@ mod tests {
     .unwrap();
 
     assert_eq!(
-      block_on(store_with_remote.load_file_bytes_with(TestData::roland().digest(), |b| b)),
+      store_with_remote
+        .load_file_bytes_with(TestData::roland().digest(), |b| b)
+        .wait(),
       Ok(Some(TestData::roland().bytes()))
     )
   }
@@ -3172,15 +3310,22 @@ mod tests {
     // 3 is enough digests to trigger a FindMissingBlobs request
     let testdir = TestDirectory::containing_roland_and_treats();
 
-    block_on(new_local_store(dir.path()).record_directory(&testdir.directory(), false))
+    new_local_store(dir.path())
+      .record_directory(&testdir.directory(), false)
+      .wait()
       .expect("Error storing directory locally");
-    block_on(new_local_store(dir.path()).store_file_bytes(TestData::roland().bytes(), false))
+    new_local_store(dir.path())
+      .store_file_bytes(TestData::roland().bytes(), false)
+      .wait()
       .expect("Error storing roland locally");
-    block_on(new_local_store(dir.path()).store_file_bytes(TestData::catnip().bytes(), false))
+    new_local_store(dir.path())
+      .store_file_bytes(TestData::catnip().bytes(), false)
+      .wait()
       .expect("Error storing catnip locally");
 
     let store_with_remote = Store::with_remote(
       dir.path(),
+      Arc::new(ResettablePool::new("test-pool-".to_string())),
       &[cas.address()],
       None,
       &None,
@@ -3194,7 +3339,9 @@ mod tests {
     )
     .unwrap();
 
-    block_on(store_with_remote.ensure_remote_has_recursive(vec![testdir.digest()]))
+    store_with_remote
+      .ensure_remote_has_recursive(vec![testdir.digest()])
+      .wait()
       .expect("Error uploading");
   }
 
@@ -3208,6 +3355,7 @@ mod tests {
 
     let store_with_remote = Store::with_remote(
       dir.path(),
+      Arc::new(ResettablePool::new("test-pool-".to_string())),
       &[cas.address()],
       None,
       &None,
@@ -3222,7 +3370,9 @@ mod tests {
     .unwrap();
 
     assert_eq!(
-      block_on(store_with_remote.load_file_bytes_with(TestData::roland().digest(), |b| b)),
+      store_with_remote
+        .load_file_bytes_with(TestData::roland().digest(), |b| b)
+        .wait(),
       Ok(Some(TestData::roland().bytes()))
     )
   }
@@ -3234,7 +3384,9 @@ mod tests {
 
     let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
-    block_on(store.materialize_file(file.clone(), TestData::roland().digest(), false))
+    store
+      .materialize_file(file.clone(), TestData::roland().digest(), false)
+      .wait()
       .expect_err("Want unknown digest error");
   }
 
@@ -3247,8 +3399,13 @@ mod tests {
 
     let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
-    block_on(store.store_file_bytes(testdata.bytes(), false)).expect("Error saving bytes");
-    block_on(store.materialize_file(file.clone(), testdata.digest(), false))
+    store
+      .store_file_bytes(testdata.bytes(), false)
+      .wait()
+      .expect("Error saving bytes");
+    store
+      .materialize_file(file.clone(), testdata.digest(), false)
+      .wait()
       .expect("Error materializing file");
     assert_eq!(file_contents(&file), testdata.bytes());
     assert!(!is_executable(&file));
@@ -3263,8 +3420,13 @@ mod tests {
 
     let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
-    block_on(store.store_file_bytes(testdata.bytes(), false)).expect("Error saving bytes");
-    block_on(store.materialize_file(file.clone(), testdata.digest(), true))
+    store
+      .store_file_bytes(testdata.bytes(), false)
+      .wait()
+      .expect("Error saving bytes");
+    store
+      .materialize_file(file.clone(), testdata.digest(), true)
+      .wait()
       .expect("Error materializing file");
     assert_eq!(file_contents(&file), testdata.bytes());
     assert!(is_executable(&file));
@@ -3276,11 +3438,13 @@ mod tests {
 
     let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
-    block_on(store.materialize_directory(
-      materialize_dir.path().to_owned(),
-      TestDirectory::recursive().digest(),
-    ))
-    .expect_err("Want unknown digest error");
+    store
+      .materialize_directory(
+        materialize_dir.path().to_owned(),
+        TestDirectory::recursive().digest(),
+      )
+      .wait()
+      .expect_err("Want unknown digest error");
   }
 
   #[test]
@@ -3294,18 +3458,30 @@ mod tests {
 
     let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
-    block_on(store.record_directory(&recursive_testdir.directory(), false))
+    store
+      .record_directory(&recursive_testdir.directory(), false)
+      .wait()
       .expect("Error saving recursive Directory");
-    block_on(store.record_directory(&testdir.directory(), false)).expect("Error saving Directory");
-    block_on(store.store_file_bytes(roland.bytes(), false)).expect("Error saving file bytes");
-    block_on(store.store_file_bytes(catnip.bytes(), false))
+    store
+      .record_directory(&testdir.directory(), false)
+      .wait()
+      .expect("Error saving Directory");
+    store
+      .store_file_bytes(roland.bytes(), false)
+      .wait()
+      .expect("Error saving file bytes");
+    store
+      .store_file_bytes(catnip.bytes(), false)
+      .wait()
       .expect("Error saving catnip file bytes");
 
-    block_on(store.materialize_directory(
-      materialize_dir.path().to_owned(),
-      recursive_testdir.digest(),
-    ))
-    .expect("Error materializing");
+    store
+      .materialize_directory(
+        materialize_dir.path().to_owned(),
+        recursive_testdir.digest(),
+      )
+      .wait()
+      .expect("Error materializing");
 
     assert_eq!(list_dir(materialize_dir.path()), vec!["cats", "treats"]);
     assert_eq!(
@@ -3331,11 +3507,18 @@ mod tests {
 
     let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
-    block_on(store.record_directory(&testdir.directory(), false)).expect("Error saving Directory");
-    block_on(store.store_file_bytes(catnip.bytes(), false))
+    store
+      .record_directory(&testdir.directory(), false)
+      .wait()
+      .expect("Error saving Directory");
+    store
+      .store_file_bytes(catnip.bytes(), false)
+      .wait()
       .expect("Error saving catnip file bytes");
 
-    block_on(store.materialize_directory(materialize_dir.path().to_owned(), testdir.digest()))
+    store
+      .materialize_directory(materialize_dir.path().to_owned(), testdir.digest())
+      .wait()
       .expect("Error materializing");
 
     assert_eq!(list_dir(materialize_dir.path()), vec!["feed", "food"]);
@@ -3356,7 +3539,9 @@ mod tests {
     let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
 
-    let file_contents = block_on(store.contents_for_directory(TestDirectory::empty().digest()))
+    let file_contents = store
+      .contents_for_directory(TestDirectory::empty().digest())
+      .wait()
       .expect("Getting FileContents");
 
     assert_same_filecontents(file_contents, vec![]);
@@ -3371,14 +3556,26 @@ mod tests {
 
     let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
-    block_on(store.record_directory(&recursive_testdir.directory(), false))
+    store
+      .record_directory(&recursive_testdir.directory(), false)
+      .wait()
       .expect("Error saving recursive Directory");
-    block_on(store.record_directory(&testdir.directory(), false)).expect("Error saving Directory");
-    block_on(store.store_file_bytes(roland.bytes(), false)).expect("Error saving file bytes");
-    block_on(store.store_file_bytes(catnip.bytes(), false))
+    store
+      .record_directory(&testdir.directory(), false)
+      .wait()
+      .expect("Error saving Directory");
+    store
+      .store_file_bytes(roland.bytes(), false)
+      .wait()
+      .expect("Error saving file bytes");
+    store
+      .store_file_bytes(catnip.bytes(), false)
+      .wait()
       .expect("Error saving catnip file bytes");
 
-    let file_contents = block_on(store.contents_for_directory(recursive_testdir.digest()))
+    let file_contents = store
+      .contents_for_directory(recursive_testdir.digest())
+      .wait()
       .expect("Getting FileContents");
 
     assert_same_filecontents(
@@ -3461,17 +3658,6 @@ mod tests {
       == 0o100
   }
 
-  pub fn block_on<
-    Item: Send + 'static,
-    Error: Send + 'static,
-    Fut: Future<Item = Item, Error = Error> + Send + 'static,
-  >(
-    f: Fut,
-  ) -> Result<Item, Error> {
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
-    runtime.block_on(f)
-  }
-
   #[test]
   fn returns_upload_summary_on_empty_cas() {
     let dir = TempDir::new().unwrap();
@@ -3482,16 +3668,22 @@ mod tests {
     let testdir = TestDirectory::containing_roland_and_treats();
 
     let local_store = new_local_store(dir.path());
-    block_on(local_store.record_directory(&testdir.directory(), false))
+    local_store
+      .record_directory(&testdir.directory(), false)
+      .wait()
       .expect("Error storing directory locally");
-    block_on(local_store.store_file_bytes(testroland.bytes(), false))
+    local_store
+      .store_file_bytes(testroland.bytes(), false)
+      .wait()
       .expect("Error storing file locally");
-    block_on(local_store.store_file_bytes(testcatnip.bytes(), false))
+    local_store
+      .store_file_bytes(testcatnip.bytes(), false)
+      .wait()
       .expect("Error storing file locally");
-    let mut summary = block_on(
-      new_store(dir.path(), cas.address()).ensure_remote_has_recursive(vec![testdir.digest()]),
-    )
-    .expect("Error uploading file");
+    let mut summary = new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![testdir.digest()])
+      .wait()
+      .expect("Error uploading file");
 
     // We store all 3 files, and so we must sum their digests
     let test_data = vec![
@@ -3524,18 +3716,24 @@ mod tests {
 
     // Store everything locally
     let local_store = new_local_store(dir.path());
-    block_on(local_store.record_directory(&testdir.directory(), false))
+    local_store
+      .record_directory(&testdir.directory(), false)
+      .wait()
       .expect("Error storing directory locally");
-    block_on(local_store.store_file_bytes(testroland.bytes(), false))
+    local_store
+      .store_file_bytes(testroland.bytes(), false)
+      .wait()
       .expect("Error storing file locally");
-    block_on(local_store.store_file_bytes(testcatnip.bytes(), false))
+    local_store
+      .store_file_bytes(testcatnip.bytes(), false)
+      .wait()
       .expect("Error storing file locally");
 
     // Store testroland first, which should return a summary of one file
-    let mut data_summary = block_on(
-      new_store(dir.path(), cas.address()).ensure_remote_has_recursive(vec![testroland.digest()]),
-    )
-    .expect("Error uploading file");
+    let mut data_summary = new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![testroland.digest()])
+      .wait()
+      .expect("Error uploading file");
     data_summary.upload_wall_time = Duration::default();
 
     assert_eq!(
@@ -3552,10 +3750,10 @@ mod tests {
     // Store the directory and catnip.
     // It should see the digest of testroland already in cas,
     // and not report it in uploads.
-    let mut dir_summary = block_on(
-      new_store(dir.path(), cas.address()).ensure_remote_has_recursive(vec![testdir.digest()]),
-    )
-    .expect("Error uploading directory");
+    let mut dir_summary = new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![testdir.digest()])
+      .wait()
+      .expect("Error uploading directory");
 
     dir_summary.upload_wall_time = Duration::default();
 

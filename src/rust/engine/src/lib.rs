@@ -756,12 +756,8 @@ pub extern "C" fn merge_directories(
   };
 
   with_scheduler(scheduler_ptr, |scheduler| {
-    scheduler
-      .core
-      .block_on(fs::Snapshot::merge_directories(
-        scheduler.core.store(),
-        digests,
-      ))
+    fs::Snapshot::merge_directories(scheduler.core.store(), digests)
+      .wait()
       .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
       .into()
   })
@@ -792,16 +788,15 @@ pub extern "C" fn materialize_directories(
   };
 
   with_scheduler(scheduler_ptr, |scheduler| {
-    scheduler.core.block_on(
-      futures::future::join_all(
-        dir_and_digests
-          .into_iter()
-          .map(|(dir, digest)| scheduler.core.store().materialize_directory(dir, digest))
-          .collect::<Vec<_>>(),
-      )
-      .map(|_| ()),
+    futures::future::join_all(
+      dir_and_digests
+        .into_iter()
+        .map(|(dir, digest)| scheduler.core.store().materialize_directory(dir, digest))
+        .collect::<Vec<_>>(),
     )
   })
+  .map(|_| ())
+  .wait()
   .into()
 }
 
