@@ -149,7 +149,6 @@ class ZipkinReporter(Reporter):
         self.tracer.add_span(span)
       span_tracer.clear()
 
-
   def close(self):
     """End the report."""
     endpoint = self.endpoint.replace("/api/v1/spans", "")
