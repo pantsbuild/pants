@@ -13,13 +13,3 @@ python_tests(
   ]
 )
 
-python_tests(
-  name='python_test_runner',
-  sources=['test_python_test_runner.py'],
-  dependencies=[
-    'src/python/pants/backend/python/rules',
-    'src/python/pants/backend/python/subsystems',
-    'src/python/pants/engine/legacy:structs',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-  ]
-)
