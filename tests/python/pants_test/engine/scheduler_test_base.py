@@ -63,7 +63,7 @@ class SchedulerTestBase(object):
                           union_rules,
                           DEFAULT_EXECUTION_OPTIONS,
                           include_trace_on_error=include_trace_on_error)
-    return scheduler.new_session()
+    return scheduler.new_session(zipkin_trace_v2=False)
 
   def context_with_scheduler(self, scheduler, *args, **kwargs):
     return self.context(*args, scheduler=scheduler, **kwargs)
