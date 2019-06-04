@@ -49,7 +49,11 @@ impl ResettablePool {
     let pool = pool_opt
       .as_ref()
       .unwrap_or_else(|| panic!("A CpuPool cannot be used inside the fork context."));
-    pool.spawn_fn(f)
+    let logging_destination = logging::get_destination();
+    pool.spawn_fn(move || {
+      logging::set_destination(logging_destination);
+      f()
+    })
   }
 
   ///
