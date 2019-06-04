@@ -10,12 +10,13 @@ from builtins import str
 from future.utils import text_type
 
 from pants.backend.python.rules.inject_init import InjectedInitDigest
+from pants.backend.python.rules.resolve_requirements import (ResolvedRequirementsPex,
+                                                             ResolveRequirementsRequest)
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryWithPrefixToStrip
-from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
-                                           FallibleExecuteProcessResult)
+from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import BuildFileAddresses, TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonTestsAdaptor
 from pants.engine.rules import UnionRule, optionable_rule, rule
@@ -39,18 +40,6 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
   )
   all_targets = [t.adaptor for t in transitive_hydrated_targets.closure]
 
-  # Produce a pex containing pytest and all transitive 3rdparty requirements.
-  all_target_requirements = []
-  for maybe_python_req_lib in all_targets:
-    # This is a python_requirement()-like target.
-    if hasattr(maybe_python_req_lib, 'requirement'):
-      all_target_requirements.append(str(maybe_python_req_lib.requirement))
-    # This is a python_requirement_library()-like target.
-    if hasattr(maybe_python_req_lib, 'requirements'):
-      for py_req in maybe_python_req_lib.requirements:
-        all_target_requirements.append(str(py_req.requirement))
-  all_requirements = all_target_requirements + list(pytest.get_requirement_strings())
-
   # TODO(#7061): This str() can be removed after we drop py2!
   python_binary = text_type(sys.executable)
   interpreter_constraints = {
@@ -61,11 +50,25 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
     )
   }
 
+  # Produce a pex containing pytest and all transitive 3rdparty requirements.
   output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
-  requirements_pex_response = yield Get(
-    ExecuteProcessResult, ExecuteProcessRequest, [
-      all_requirements, output_pytest_requirements_pex_filename, "pytest:main", interpreter_constraints
-    ]
+  all_target_requirements = []
+  for maybe_python_req_lib in all_targets:
+    # This is a python_requirement()-like target.
+    if hasattr(maybe_python_req_lib, 'requirement'):
+      all_target_requirements.append(str(maybe_python_req_lib.requirement))
+    # This is a python_requirement_library()-like target.
+    if hasattr(maybe_python_req_lib, 'requirements'):
+      for py_req in maybe_python_req_lib.requirements:
+        all_target_requirements.append(str(py_req.requirement))
+  all_requirements = all_target_requirements + list(pytest.get_requirement_strings())
+  resolved_requirements_pex = yield Get(
+    ResolvedRequirementsPex, ResolveRequirementsRequest(
+      requirements=tuple(all_requirements),
+      output_filename=output_pytest_requirements_pex_filename,
+      entry_point="pytest:main",
+      interpreter_constraints=tuple(interpreter_constraints)
+    )
   )
 
   source_roots = source_root_config.get_source_roots()
@@ -101,7 +104,7 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
   all_input_digests = [
     sources_digest,
     inits_digest.directory_digest,
-    requirements_pex_response.output_directory_digest,
+    resolved_requirements_pex.directory_digest,
   ]
   merged_input_files = yield Get(
     Digest,
