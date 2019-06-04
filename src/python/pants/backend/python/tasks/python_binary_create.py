@@ -31,6 +31,15 @@ class PythonBinaryCreate(Task):
   """Create an executable .pex file."""
 
   @classmethod
+  def register_options(cls, register):
+    super(PythonBinaryCreate, cls).register_options(register)
+    register('--include-run-information', type=bool, default=False,
+             help="Include run information in the PEX's PEX-INFO for information like the timestamp the PEX was "
+                  "created and the command line used to create it. This information may be helpful to you, but means "
+                  "that the generated PEX will not be reproducible; that is, future runs of `./pants binary` will not "
+                  "create the same byte-for-byte identical .pex files.")
+
+  @classmethod
   def subsystem_dependencies(cls):
     return super(PythonBinaryCreate, cls).subsystem_dependencies() + (
       PexBuilderWrapper.Factory,
@@ -111,9 +120,10 @@ class PythonBinaryCreate(Task):
     interpreter = self.context.products.get_data(PythonInterpreter)
     with temporary_dir() as tmpdir:
       # Create the pex_info for the binary.
-      run_info_dict = self.context.run_tracker.run_info.get_as_dict()
       build_properties = PexInfo.make_build_properties()
-      build_properties.update(run_info_dict)
+      if self.get_options().include_run_information:
+        run_info_dict = self.context.run_tracker.run_info.get_as_dict()
+        build_properties.update(run_info_dict)
       pex_info = binary_tgt.pexinfo.copy()
       pex_info.build_properties = build_properties
 
