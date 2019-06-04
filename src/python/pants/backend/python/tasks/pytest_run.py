@@ -118,7 +118,8 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     #   https://github.com/pantsbuild/pants/issues/7802
     register('--options', type=list, fingerprint=True,
              removal_version='1.19.0.dev2',
-             removal_hint='Use the `--passthrough-args` option instead.',
+             removal_hint='Use the `--passthrough-args` option instead. You my need to remove'
+                          'some argument quoting when converting.',
              help='Pass these options to pytest. You can also use pass-through args.')
 
     register('--coverage', fingerprint=True,

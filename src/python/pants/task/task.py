@@ -31,7 +31,6 @@ from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.dirutil import safe_mkdir, safe_rm_oldest_items_in_dir
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import AbstractClass, classproperty
-from pants.util.strutil import safe_shlex_split
 
 
 class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
@@ -214,8 +213,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       raise TaskError('{} Does not support passthru args.'.format(self.stable_name()))
 
     passthru_args = []
-    for arg in self.get_options().get('passthrough_args', default=()):
-      passthru_args.extend(safe_shlex_split(arg))
+    passthru_args.extend(self.get_options().get('passthrough_args', default=()))
     passthru_args.extend(self.context.options.passthru_args_for_scope(self.options_scope))
     return passthru_args
 

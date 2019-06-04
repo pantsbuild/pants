@@ -549,20 +549,20 @@ files(
     versioned_fake = self._synth_fp(_impls=[('asdf', 0)])
     base_version_other_fake = self._synth_fp(
       cls=OtherFakeTask,
-       _impls=[('asdf', 0)],
+      _impls=[('asdf', 0)],
       _other_impls=[],
     )
     self.assertNotEqual(base_version_other_fake, versioned_fake)
     extended_version_other_fake = self._synth_fp(
       cls=OtherFakeTask,
-       _impls=[('asdf', 0)],
+      _impls=[('asdf', 0)],
       _other_impls=[('xxx', 0)],
     )
     self.assertNotEqual(extended_version_other_fake, base_version_other_fake)
 
     extended_version_copy = self._synth_fp(
       cls=OtherFakeTask,
-       _impls=[('asdf', 1)],
+      _impls=[('asdf', 1)],
       _other_impls=[('xxx', 0)],
     )
     self.assertNotEqual(extended_version_copy, extended_version_other_fake)
@@ -638,11 +638,9 @@ files(
                               passthrough_args=['a', 'b'],
                               passthrough_args_option=['c', 'd'])
 
-  def test_passthru_args_option_shlexed(self):
-    self.assert_passthru_args(expected=['c', 'd e'], passthrough_args_option=['c "d e"'])
-
-  def test_passthru_args_not_shlexed(self):
+  def test_passthru_args_option_shlex_ignored(self):
     self.assert_passthru_args(expected=['a b'], passthrough_args=['a b'])
+    self.assert_passthru_args(expected=['c "d e"'], passthrough_args_option=['c "d e"'])
 
   def test_fingerprint_passthru_args(self):
     """Passthrough arguments should affect fingerprints iff the task
