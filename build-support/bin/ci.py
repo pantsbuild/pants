@@ -89,27 +89,15 @@ def create_parser() -> argparse.ArgumentParser:
     "-m", "--sanity-checks", action="store_true",
     help="Run sanity checks of bootstrapped Pants and repo BUILD files."
   )
-  parser.add_argument(
-    "-t", "--lint", action="store_true", help="Run lint over whole codebase."
-  )
-  parser.add_argument(
-    "-r", "--doc-gen", action="store_true", help="Run doc generation tests."
-  )
-  parser.add_argument(
-    "-s", "--clippy", action="store_true", help="Run Clippy on Rust code."
-  )
+  parser.add_argument("-t", "--lint", action="store_true", help="Run lint over whole codebase.")
+  parser.add_argument("-r", "--doc-gen", action="store_true", help="Run doc generation tests.")
+  parser.add_argument("-s", "--clippy", action="store_true", help="Run Clippy on Rust code.")
   parser.add_argument(
     "-a", "--cargo-audit", action="store_true", help="Run Cargo audit of Rust dependencies."
   )
-  parser.add_argument(
-    "-p", "--python-tests", action="store_true", help="Run core Python unit tests."
-  )
-  parser.add_argument(
-    "-e", "--rust-tests", action="store_true", help="Run Rust tests."
-  )
-  parser.add_argument(
-    "-j", "--jvm-tests", action="store_true", help="Run JVM tests."
-  )
+  parser.add_argument("-p", "--python-tests", action="store_true", help="Run Python unit tests.")
+  parser.add_argument("-e", "--rust-tests", action="store_true", help="Run Rust tests.")
+  parser.add_argument("-j", "--jvm-tests", action="store_true", help="Run JVM tests.")
   parser.add_argument(
     "-c", "--integration-tests", action="store_true", help="Run Python integration tests."
   )
@@ -124,7 +112,6 @@ def create_parser() -> argparse.ArgumentParser:
   parser.add_argument(
     "-z", "--platform-specific-tests", action="store_true", help="Test platform-specific behavior."
   )
-
   return parser
 
 # -------------------------------------------------------------------------
@@ -174,6 +161,7 @@ def bootstrap(*, clean: bool, python_version: PythonVersion) -> None:
         subprocess.run(["./build-support/python/clean.sh"], check=True)
       except subprocess.CalledProcessError:
         die("Failed to clean before bootstrapping Pants.")
+
     try:
       subprocess.run(["./pants", "binary", "src/python/pants/bin:pants_local_binary"], check=True)
       Path("dist/pants_local_binary.pex").rename("pants.pex")
@@ -393,6 +381,7 @@ def run_integration_tests(shard: Optional[str]) -> None:
       subprocess.run(main_command, check=True)
     except subprocess.CalledProcessError:
       die("Integration test failure.")
+
     try:
       subprocess.run(contrib_command, check=True)
     except subprocess.CalledProcessError:
