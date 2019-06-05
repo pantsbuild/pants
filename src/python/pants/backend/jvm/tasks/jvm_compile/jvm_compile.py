@@ -787,6 +787,9 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   def _record_target_stats(self, target, classpath_len, sources_len, compiletime, is_incremental,
     stats_key):
+    # TODO: classpath_len doesn't *really* capture what we're looking for -- the cumulative size of
+    # classpath files might be, though. Capturing the digest of the input classpath might give us
+    # that, though (as well as the source files?).
     def record(k, v):
       self.context.run_tracker.report_target_info(self.options_scope, target, [stats_key, k], v)
     record('time', compiletime)

@@ -169,6 +169,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       default=cls.JvmCompileWorkflowType.rsc_and_zinc, metavar='<workflow>',
       help='The workflow to use to compile JVM targets.')
 
+    register('--extra-rsc-args', type=list, default=[],
+             help='Extra arguments to pass to the rsc invocation.')
+
     cls.register_jvm_tool(
       register,
       'rsc',
@@ -378,7 +381,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
           args = [
                    '-cp', os.pathsep.join(classpath_entry_paths),
                    '-d', rsc_jar_file_relative_path,
-                 ] + target_sources
+                 ] + self.get_options().extra_rsc_args + target_sources
 
           self.write_argsfile(ctx, args)
 
@@ -618,7 +621,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     res = self.context.execute_process_synchronously_without_raising(
       epr,
       self.name(),
-      [WorkUnitLabel.TOOL])
+      [WorkUnitLabel.COMPILER])
 
     if res.exit_code != 0:
       raise TaskError(res.stderr, exit_code=res.exit_code)
@@ -645,7 +648,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       jvm_options=self.get_options().jvm_options,
       args=['@{}'.format(ctx.args_file)],
       workunit_name=tool_name,
-      workunit_labels=[WorkUnitLabel.TOOL],
+      workunit_labels=[WorkUnitLabel.COMPILER],
       dist=distribution
     )
     if result != 0:
