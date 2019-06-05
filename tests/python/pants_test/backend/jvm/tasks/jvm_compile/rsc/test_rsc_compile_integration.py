@@ -86,3 +86,9 @@ class RscCompileIntegration(BaseCompileIT):
     self.do_command(
       'compile', 'testprojects/src/scala/org/pantsbuild/testproject/javadepsonscalatransitive:java-in-different-package',
       config=config)
+
+  @_for_all_supported_execution_environments
+  def test_java_sources(self, config):
+    self.do_command(
+      'compile', 'testprojects/src/scala/org/pantsbuild/testproject/javasources',
+      config=config)

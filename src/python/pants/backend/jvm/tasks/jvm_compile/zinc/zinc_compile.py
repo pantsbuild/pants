@@ -394,6 +394,17 @@ class BaseZincCompile(JvmCompile):
       ctx.target.sources_snapshot(self.context._scheduler),
     ]
 
+    # scala_library() targets with java_sources have circular dependencies on those java source
+    # files, and we provide them to the same zinc command line that compiles the scala, so we need
+    # to make sure those source files are available in the hermetic execution sandbox.
+    java_sources_targets = getattr(ctx.target, 'java_sources', [])
+    java_sources_snapshots = [
+      tgt.sources_snapshot(self.context._scheduler)
+      for tgt in java_sources_targets
+    ]
+    snapshots.extend(java_sources_snapshots)
+
+    # Ensure the dependencies and compiler bridge jars are available in the execution sandbox.
     relevant_classpath_entries = dependency_classpath + [compiler_bridge_classpath_entry]
     directory_digests = tuple(
       entry.directory_digest for entry in relevant_classpath_entries if entry.directory_digest
@@ -405,7 +416,6 @@ class BaseZincCompile(JvmCompile):
             "ClasspathEntry {} didn't have a Digest, so won't be present for hermetic "
             "execution".format(dep)
           )
-
     snapshots.extend(
       classpath_entry.directory_digest for classpath_entry in scalac_classpath_entries
     )
@@ -417,7 +427,7 @@ class BaseZincCompile(JvmCompile):
           "unsupported. jvm_options received: {}".format(self.options_scope, safe_shlex_join(jvm_options))
         )
       native_image_path, native_image_snapshot = self._zinc.native_image(self.context)
-      additional_snapshots = (native_image_snapshot.directory_digest,)
+      native_image_snapshots = (native_image_snapshot.directory_digest,)
       scala_boot_classpath = [
           classpath_entry.path for classpath_entry in scalac_classpath_entries
         ] + [
@@ -425,7 +435,7 @@ class BaseZincCompile(JvmCompile):
           # contents from the VM it is executing in, but not in the case of a native image. This
           # resolves a `object java.lang.Object in compiler mirror not found.` error.
           '.jdk/jre/lib/rt.jar',
-          # The same goes for the rce.jar, which provides javax.crypto.
+          # The same goes for the jce.jar, which provides javax.crypto.
           '.jdk/jre/lib/jce.jar',
         ]
       image_specific_argv =  [
@@ -437,7 +447,7 @@ class BaseZincCompile(JvmCompile):
     else:
       # TODO: Extract something common from Executor._create_command to make the command line
       # TODO: Lean on distribution for the bin/java appending here
-      additional_snapshots = ()
+      native_image_snapshots = ()
       image_specific_argv =  ['.jdk/bin/java'] + jvm_options + [
         '-cp', zinc_relpath,
         Zinc.ZINC_COMPILE_MAIN
@@ -446,7 +456,7 @@ class BaseZincCompile(JvmCompile):
     merged_input_digest = self.context._scheduler.merge_directories(
       tuple(s.directory_digest for s in snapshots) +
       directory_digests +
-      additional_snapshots +
+      native_image_snapshots +
       (self.extra_resources_digest(ctx),)
     )
 
