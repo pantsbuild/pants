@@ -2,6 +2,27 @@
 ======================
 This document describes releases leading up to the ``1.16.x`` ``stable`` series.
 
+1.16.0rc6 (6/05/2019)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix zipkin multithreading issue #7415 (#7826)
+  `PR #7826 <https://github.com/pantsbuild/pants/pull/7826>`_
+
+* Fix rsc compile transitive dep bug introduced in #7742 (#7825)
+  `PR #7825 <https://github.com/pantsbuild/pants/pull/7825>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Use `--no-enabled-shared` for Linux wheel-builder interpreter so that the released PEX works with statically built interpreters (#7794)
+  `PR #7794 <https://github.com/pantsbuild/pants/pull/7794>`_
+
+* Avoid redundant work while hackily_snapshot()ing. (#7829)
+  `PR #7829 <https://github.com/pantsbuild/pants/pull/7829>`_
+
 1.16.0rc5 (5/29/2019)
 ---------------------
 
