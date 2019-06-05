@@ -113,7 +113,7 @@ class RscCompileContext(CompileContext):
     # compile, failing to find this directory. Since rsc doesn't output to the classes dir, this
     # shouldn't matter, but this line avoids that failure. Intended to fix
     #     https://github.com/pantsbuild/pants/issues/7856.
-    safe_mkdir(self.classes_dir)
+    safe_mkdir(self.classes_dir.path)
 
 
 class RscCompile(ZincCompile, MirroredTargetOptionMixin):
@@ -561,7 +561,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       rsc_cc=RscCompileContext(
         target=target,
         analysis_file=None,
-        classes_dir=None,
+        classes_dir=ClasspathEntry(os.path.join(zinc_dir, 'classes'), None),
         jar_file=None,
         zinc_args_file=None,
         rsc_jar_file=os.path.join(rsc_dir, 'm.jar'),
