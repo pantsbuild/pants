@@ -17,6 +17,7 @@ from pants.engine.fs import Snapshot
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.util.collections import assert_single_element
+from pants_test.subsystem.subsystem_util import init_subsystems
 from pants_test.test_base import TestBase
 
 
@@ -26,11 +27,15 @@ class TestResolveRequirements(TestBase):
   def rules(cls):
     return super(TestResolveRequirements, cls).rules() + [
       resolve_requirements,
+      RootRule(ResolveRequirementsRequest),
       RootRule(PythonSetup),
       RootRule(PythonNativeCode),
       create_pex_native_build_environment,
-      RootRule(ResolveRequirementsRequest),
     ]
+
+  def setUp(self):
+    super(TestResolveRequirements, self).setUp()
+    init_subsystems([PythonSetup, PythonNativeCode])
 
   def create_pex_and_get_pex_info(
     self, requirements=None, entry_point=None, interpreter_constraints=None

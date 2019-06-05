@@ -32,5 +32,6 @@ python_tests(
     'src/python/pants/engine:rules',
     'src/python/pants/util:collections',
     'tests/python/pants_test:test_base',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
