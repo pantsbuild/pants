@@ -23,8 +23,8 @@ def main() -> None:
     bootstrap(clean=args.bootstrap_clean, python_version=args.python_version)
   set_run_from_pex()
 
-  if args.precommit_checks:
-    run_precommit_checks()
+  if args.githooks:
+    run_githooks()
   if args.sanity_checks:
     run_sanity_checks()
   if args.lint:
@@ -43,8 +43,8 @@ def main() -> None:
     run_jvm_tests()
   if args.integration_tests:
     run_integration_tests(shard=args.integration_shard)
-  if args.internal_backend_tests:
-    run_internal_backend_tests()
+  if args.plugin_tests:
+    run_plugin_tests()
   if args.platform_specific_tests:
     run_platform_specific_tests()
 
@@ -66,7 +66,6 @@ class PythonVersion(Enum):
 
 
 def create_parser() -> argparse.ArgumentParser:
-  # TODO: reassign the short CLI flag names to reflect the long names.
   parser = argparse.ArgumentParser(description="Runs commons tests for local or hosted CI.")
   parser.add_argument(
     "-v", "--python-version",
@@ -83,31 +82,31 @@ def create_parser() -> argparse.ArgumentParser:
     help="Before bootstrapping, clean the environment so that it's like a fresh git clone."
   )
   parser.add_argument(
-    "-f", "--precommit-checks", action="store_true", help="Run pre-commit githook."
+    "-g", "--githooks", action="store_true", help="Run pre-commit githook."
   )
   parser.add_argument(
-    "-m", "--sanity-checks", action="store_true",
+    "-s", "--sanity-checks", action="store_true",
     help="Run sanity checks of bootstrapped Pants and repo BUILD files."
   )
-  parser.add_argument("-t", "--lint", action="store_true", help="Run lint over whole codebase.")
-  parser.add_argument("-r", "--doc-gen", action="store_true", help="Run doc generation tests.")
-  parser.add_argument("-s", "--clippy", action="store_true", help="Run Clippy on Rust code.")
+  parser.add_argument("-l", "--lint", action="store_true", help="Run lint over whole codebase.")
+  parser.add_argument("-d", "--doc-gen", action="store_true", help="Run doc generation tests.")
+  parser.add_argument("-c", "--clippy", action="store_true", help="Run Clippy on Rust code.")
   parser.add_argument(
     "-a", "--cargo-audit", action="store_true", help="Run Cargo audit of Rust dependencies."
   )
   parser.add_argument("-p", "--python-tests", action="store_true", help="Run Python unit tests.")
-  parser.add_argument("-e", "--rust-tests", action="store_true", help="Run Rust tests.")
+  parser.add_argument("-r", "--rust-tests", action="store_true", help="Run Rust tests.")
   parser.add_argument("-j", "--jvm-tests", action="store_true", help="Run JVM tests.")
   parser.add_argument(
-    "-c", "--integration-tests", action="store_true", help="Run Python integration tests."
+    "-i", "--integration-tests", action="store_true", help="Run Python integration tests."
   )
   parser.add_argument(
-    "-i", "--integration-shard", metavar="SHARD_NUMBER/TOTAL_SHARDS", default=None,
+    "-n", "--integration-shard", metavar="SHARD_NUMBER/TOTAL_SHARDS", default=None,
     help="Divide integration tests into TOTAL_SHARDS shards and just run those in SHARD_NUMBER. "
          "E.g. `-i 0/2` and `-i 1/2` will split the tests in half."
   )
   parser.add_argument(
-    "-l", "--internal-backend-tests", action="store_true", help="Run internal backend Python tests."
+    "-y", "--plugin-tests", action="store_true", help="Run tests for pants-plugins."
   )
   parser.add_argument(
     "-z", "--platform-specific-tests", action="store_true", help="Test platform-specific behavior."
@@ -186,7 +185,7 @@ def _run_command(command: List[str], *, slug: str, start_message: str, die_messa
       die(die_message)
 
 
-def run_precommit_checks() -> None:
+def run_githooks() -> None:
   _run_command(
     ["./build-support/githooks/pre-commit"],
     slug="PreCommit",
@@ -355,7 +354,7 @@ def run_jvm_tests() -> None:
   )
 
 
-def run_integration_tests(shard: Optional[str]) -> None:
+def run_integration_tests(*, shard: Optional[str]) -> None:
   main_command = [
     "./pants.pex",
     "--tag=+integration",
@@ -388,7 +387,7 @@ def run_integration_tests(shard: Optional[str]) -> None:
       die("Contrib integration test failure.")
 
 
-def run_internal_backend_tests() -> None:
+def run_plugin_tests() -> None:
   _run_command(
     ["./pants.pex",
      "test.pytest",

@@ -419,7 +419,7 @@ py27_lint: &py27_lint
     - *py27_linux_test_config_env
     - CACHE_NAME=linuxselfchecks.py27
   script:
-    - ./build-support/bin/ci.py --precommit-checks --sanity-checks --doc-gen --lint --python-version 2.7
+    - ./build-support/bin/ci.py --githooks --sanity-checks --doc-gen --lint --python-version 2.7
 
 py36_lint: &py36_lint
   <<: *py36_linux_test_config
@@ -428,7 +428,7 @@ py36_lint: &py36_lint
     - *py36_linux_test_config_env
     - CACHE_NAME=linuxselfchecks.py36
   script:
-    - ./build-support/bin/ci.py --precommit-checks --sanity-checks --doc-gen --lint
+    - ./build-support/bin/ci.py --githooks --sanity-checks --doc-gen --lint
 
 py37_lint: &py37_lint
   <<: *py37_linux_test_config
@@ -437,7 +437,7 @@ py37_lint: &py37_lint
     - *py37_linux_test_config_env
     - CACHE_NAME=linuxselfchecks.py37
   script:
-    - ./build-support/bin/ci.py --precommit-checks --sanity-checks --doc-gen --lint --python-version 3.7
+    - ./build-support/bin/ci.py --githooks --sanity-checks --doc-gen --lint --python-version 3.7
 
 # -------------------------------------------------------------------------
 # Rust lints
@@ -888,7 +888,7 @@ matrix:
         - *py27_linux_test_config_env
         - CACHE_NAME=linuxunittests.py27
       script:
-        - ./build-support/bin/ci.py --internal-backend-tests --python-version 2.7
+        - ./build-support/bin/ci.py --plugin-tests --python-version 2.7
         - travis_wait 60 ./build-support/bin/ci.py --python-tests --python-version 2.7
 
     - <<: *py36_linux_test_config
@@ -897,7 +897,7 @@ matrix:
         - *py36_linux_test_config_env
         - CACHE_NAME=linuxunittests.py36
       script:
-        - ./build-support/bin/ci.py --internal-backend-tests
+        - ./build-support/bin/ci.py --plugin-tests
         - travis_wait 60 ./build-support/bin/ci.py --python-tests
 
     - <<: *py37_linux_test_config
@@ -906,7 +906,7 @@ matrix:
         - *py37_linux_test_config_env
         - CACHE_NAME=linuxunittests.py37
       script:
-       - ./build-support/bin/ci.py --internal-backend-tests --python-version 3.7
+       - ./build-support/bin/ci.py --plugin-tests --python-version 3.7
        - travis_wait 60 ./build-support/bin/ci.py --python-tests --python-version 3.7
 
     - <<: *py27_linux_build_wheels_ucs2
