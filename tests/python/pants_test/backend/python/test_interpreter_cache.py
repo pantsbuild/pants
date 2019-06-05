@@ -15,9 +15,8 @@ from pants.backend.python.interpreter_cache import PythonInterpreter, PythonInte
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir
-from pants_test.backend.python.interpreter_selection_utils import (PY_27, PY_36,
-                                                                   python_interpreter_path,
-                                                                   skip_unless_python27_and_python36_present)
+from pants_test.backend.python.interpreter_selection_utils import (
+  PY_27, PY_36, python_interpreter_path, skip_unless_python27_and_python36_present)
 from pants_test.test_base import TestBase
 from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
