@@ -35,6 +35,15 @@ python_binary(
 )
 
 python_binary(
+  name = 'ci',
+  sources = 'ci.py',
+  dependencies = [
+    ':common',
+  ],
+  compatibility = ['CPython>=3.6'],
+)
+
+python_binary(
   name = 'shellcheck',
   sources = 'shellcheck.py',
   dependencies = [
