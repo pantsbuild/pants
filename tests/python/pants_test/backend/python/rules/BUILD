@@ -3,7 +3,7 @@
 
 python_tests(
   name='inject_init',
-  sources=['test_inject_init.py'],
+  source='test_inject_init.py',
   dependencies=[
     'src/python/pants/backend/python/rules',
     'src/python/pants/engine:fs',
@@ -14,8 +14,17 @@ python_tests(
 )
 
 python_tests(
+  name='python_test_runner_integration',
+  source='test_python_test_runner_integration.py',
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ],
+  tags={'integration'},
+)
+
+python_tests(
   name='resolve_requirements',
-  sources=['test_resolve_requirements.py'],
+  source='test_resolve_requirements.py',
   dependencies=[
     'src/python/pants/backend/python/rules',
     'src/python/pants/backend/python/subsystems',
@@ -25,4 +34,3 @@ python_tests(
     'tests/python/pants_test:test_base',
   ]
 )
-

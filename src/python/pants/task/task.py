@@ -121,6 +121,18 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     return False
 
   @classmethod
+  def register_options(cls, register):
+    super(TaskBase, cls).register_options(register)
+    if cls.supports_passthru_args():
+      register('--passthrough-args',
+               type=list,
+               advanced=True,
+               fingerprint=True,
+               help='Pass these options as pass-through args; ie: as if by appending '
+                    '`-- <passthrough arg> ...` to the command line. Any passthrough args actually'
+                    'supplied on the command line will be used as well.')
+
+  @classmethod
   def _scoped_options(cls, options):
     return options[cls.options_scope]
 
@@ -198,9 +210,12 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     :API: public
     """
     if not self.supports_passthru_args():
-      raise TaskError('{0} Does not support passthru args.'.format(self.stable_name()))
-    else:
-      return self.context.options.passthru_args_for_scope(self.options_scope)
+      raise TaskError('{} Does not support passthru args.'.format(self.stable_name()))
+
+    passthru_args = []
+    passthru_args.extend(self.get_options().get('passthrough_args', default=()))
+    passthru_args.extend(self.context.options.passthru_args_for_scope(self.options_scope))
+    return passthru_args
 
   @property
   def skip_execution(self):
@@ -255,7 +270,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     if not self.target_filtering_enabled:
       return initial_targets
-    else: 
+    else:
       return self._filter_targets(initial_targets)
 
   def _filter_targets(self, targets):
