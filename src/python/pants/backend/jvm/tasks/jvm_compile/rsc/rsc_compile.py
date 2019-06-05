@@ -103,12 +103,17 @@ class RscCompileContext(CompileContext):
                sources,
                workflow):
     super(RscCompileContext, self).__init__(target, analysis_file, classes_dir, jar_file,
-                                               log_dir, zinc_args_file, sources)
+                                            log_dir, zinc_args_file, sources)
     self.workflow = workflow
     self.rsc_jar_file = rsc_jar_file
 
   def ensure_output_dirs_exist(self):
     safe_mkdir(os.path.dirname(self.rsc_jar_file))
+    # NB: The background cache insert workunit will nondeterministically fail after a successful rsc
+    # compile, failing to find this directory. Since rsc doesn't output to the classes dir, this
+    # shouldn't matter, but this line avoids that failure. Intended to fix
+    #     https://github.com/pantsbuild/pants/issues/7856.
+    safe_mkdir(self.classes_dir)
 
 
 class RscCompile(ZincCompile, MirroredTargetOptionMixin):
