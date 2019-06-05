@@ -21,6 +21,7 @@ def main() -> None:
 
   if args.bootstrap:
     bootstrap(clean=args.bootstrap_clean, python_version=args.python_version)
+  check_pants_pex_exists()
   set_run_from_pex()
 
   if args.githooks:
@@ -167,6 +168,12 @@ def bootstrap(*, clean: bool, python_version: PythonVersion) -> None:
       subprocess.run(["./pants.pex", "--version"], check=True)
     except subprocess.CalledProcessError:
       die("Failed to bootstrap Pants.")
+
+
+def check_pants_pex_exists() -> None:
+  if not Path("pants.pex").is_file():
+    die("pants.pex not found! Either run `./build-support/bin/ci.py --bootstrap` or check that "
+        "AWS is properly downloading the uploaded `pants.pex`.")
 
 # -------------------------------------------------------------------------
 # Test commands
