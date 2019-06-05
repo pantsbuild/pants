@@ -140,12 +140,16 @@ class AnalysisExtraction(NailgunTask):
     if classes_by_source is not None:
       buildroot = get_buildroot()
       for abs_src, classes in summary_json['products'].items():
-        source = os.path.relpath(abs_src, buildroot)
+        source = os.path.relpath(os.path.normpath(abs_src), buildroot)
+        classes = [os.path.normpath(c) for c in classes]
         classes_by_source[source].add_abs_paths(target_cp_entry, classes)
 
     # Register classfile product dependencies (if requested).
     if product_deps_by_src is not None:
-      product_deps_by_src[target] = summary_json['dependencies']
+      product_deps_by_src[target] = {
+          os.path.normpath(src): [os.path.normpath(dep) for dep in deps]
+          for src, deps in summary_json['dependencies'].items()
+        }
 
   def _parse_summary_json(self, summary_json_file):
     with open(summary_json_file, 'r') as f:

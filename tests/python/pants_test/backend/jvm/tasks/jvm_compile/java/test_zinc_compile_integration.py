@@ -431,60 +431,34 @@ class ZincCompileIntegrationTest(BaseCompileIT):
             path = os.path.join(compile_dir, path_suffix)
             self.assertTrue(os.path.exists(path), "Want path {} to exist".format(path))
 
-  def test_hermetic_binary_with_3rdparty_dependencies_ivy(self):
-    config = {
-      'resolve.ivy': {'capture_snapshots': True},
-      'compile.zinc': {
-        'execution_strategy': 'hermetic',
-        'use_classpath_jars': False,
-        'incremental': False,
-      },
-      'resolver': {
-        'resolver': 'ivy',
-      }
-    }
+  def test_hermetic_binary_with_3rdparty_dependencies(self):
+    for resolver in ('ivy', 'coursier'):
+      for use_classpath_jars in (False, True):
+        config = {
+          'resolve.ivy': {'capture_snapshots': True},
+          'resolve.coursier': {'capture_snapshots': True},
+          'compile.zinc': {
+            'execution_strategy': 'hermetic',
+            'use_classpath_jars': use_classpath_jars,
+            'incremental': False,
+          },
+          'resolver': {
+            'resolver': resolver,
+          }
+        }
 
-    with self.temporary_workdir() as workdir:
-      with self.temporary_file_content("readme.txt", b"yo"):
-        pants_run = self.run_pants_with_workdir(
-          [
-            'run',
-            'testprojects/src/java/org/pantsbuild/testproject/cwdexample',
-          ],
-          workdir,
-          config,
-        )
-        self.assert_success(pants_run)
-        self.assertIn(
-          'Found readme.txt',
-          pants_run.stdout_data,
-        )
-
-  def test_hermetic_binary_with_3rdparty_dependencies_coursier(self):
-    config = {
-      'resolve.coursier': {'capture_snapshots': True},
-      'compile.zinc': {
-        'execution_strategy': 'hermetic',
-        'use_classpath_jars': False,
-        'incremental': False,
-      },
-      'resolver': {
-        'resolver': 'coursier',
-      }
-    }
-
-    with self.temporary_workdir() as workdir:
-      with self.temporary_file_content("readme.txt", b"yo"):
-        pants_run = self.run_pants_with_workdir(
-          [
-            'run',
-            'testprojects/src/java/org/pantsbuild/testproject/cwdexample',
-          ],
-          workdir,
-          config,
-        )
-        self.assert_success(pants_run)
-        self.assertIn(
-          'Found readme.txt',
-          pants_run.stdout_data,
-        )
+        with self.temporary_workdir() as workdir:
+          with self.temporary_file_content("readme.txt", b"yo"):
+            pants_run = self.run_pants_with_workdir(
+              [
+                'run',
+                'testprojects/src/java/org/pantsbuild/testproject/cwdexample',
+              ],
+              workdir,
+              config,
+            )
+            self.assert_success(pants_run)
+            self.assertIn(
+              'Found readme.txt',
+              pants_run.stdout_data,
+            )
