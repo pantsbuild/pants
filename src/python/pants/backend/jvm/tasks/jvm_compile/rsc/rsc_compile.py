@@ -10,7 +10,6 @@ import os
 import re
 
 from future.utils import PY3, text_type
-from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext  # noqa
 from pants.backend.jvm.subsystems.rsc import Rsc
