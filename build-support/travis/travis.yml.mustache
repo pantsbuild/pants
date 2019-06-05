@@ -888,8 +888,8 @@ matrix:
         - *py27_linux_test_config_env
         - CACHE_NAME=linuxunittests.py27
       script:
-        - ./build-support/bin/ci.sh -2l
-        - travis_wait 60 ./build-support/bin/ci.sh -2p
+        - ./build-support/bin/ci.py --internal-backend-tests --python-version 2.7
+        - travis_wait 60 ./build-support/bin/ci.py --python-tests --python-version 2.7
 
     - <<: *py36_linux_test_config
       name: "Unit tests (Py3.6 PEX)"
@@ -897,8 +897,8 @@ matrix:
         - *py36_linux_test_config_env
         - CACHE_NAME=linuxunittests.py36
       script:
-        - ./build-support/bin/ci.sh -l
-        - travis_wait 60 ./build-support/bin/ci.sh -p
+        - ./build-support/bin/ci.py --internal-backend-tests
+        - travis_wait 60 ./build-support/bin/ci.py --python-tests
 
     - <<: *py37_linux_test_config
       name: "Unit tests (Py3.7 PEX)"
@@ -906,8 +906,8 @@ matrix:
         - *py37_linux_test_config_env
         - CACHE_NAME=linuxunittests.py37
       script:
-        - ./build-support/bin/ci.sh -7l
-        - travis_wait 60 ./build-support/bin/ci.sh -7p
+       - ./build-support/bin/ci.py --internal-backend-tests --python-version 3.7
+       - travis_wait 60 ./build-support/bin/ci.py --python-tests --python-version 3.7
 
     - <<: *py27_linux_build_wheels_ucs2
     - <<: *py27_linux_build_wheels_ucs4
@@ -924,7 +924,9 @@ matrix:
         - *py36_linux_test_config_env
         - CACHE_NAME=integrationshard{{.}}
       script:
-        - ./build-support/bin/ci.sh -c -i {{.}}/{{integration_shards_length}}
+        - >
+          ./build-support/bin/ci.py --integration-tests
+          --integration-shard {{.}}/{{integration_shards_length}}
 
 {{/integration_shards}}
 {{#integration_shards}}
@@ -936,7 +938,9 @@ matrix:
         - *run_tests_under_pantsd
         - CACHE_NAME=integrationshard{{.}}_pantsd
       script:
-        - ./build-support/bin/ci.sh -c -i {{.}}/{{integration_shards_length}}
+        - >
+          ./build-support/bin/ci.py --integration-tests
+          --integration-shard {{.}}/{{integration_shards_length}}
 
 {{/integration_shards}}
 {{#integration_shards}}
@@ -946,7 +950,10 @@ matrix:
         - *py37_linux_test_config_env
         - CACHE_NAME=integrationshard{{.}}
       script:
-        - ./build-support/bin/ci.sh -c7 -i {{.}}/{{integration_shards_length}}
+        - >
+          ./build-support/bin/ci.py --integration-tests
+          --integration-shard {{.}}/{{integration_shards_length}}
+          --python-version 3.7
 
 {{/integration_shards}}
 {{#integration_shards}}
@@ -956,7 +963,10 @@ matrix:
         - *py27_linux_test_config_env
         - CACHE_NAME=cronshard{{.}}
       script:
-        - ./build-support/bin/ci.sh -c2 -i {{.}}/{{integration_shards_length}}
+        - >
+          ./build-support/bin/ci.py --integration-tests
+          --integration-shard {{.}}/{{integration_shards_length}}
+          --python-version 2.7
 
 {{/integration_shards}}
 
