@@ -13,7 +13,7 @@ function usage() {
   cat <<EOF
 Runs commons tests for local or hosted CI.
 
-Usage: $0 (-h|-2fxbkmrjlpuneycitzsw)
+Usage: $0 (-h|-2fxbkmrjlpecitzsw)
  -h           print out this help message
  -2           Run using Python 2.7 (defaults to using Python 3.6).
  -7           Run using Python 3.7 (defaults to using Python 3.6).
@@ -27,18 +27,9 @@ Usage: $0 (-h|-2fxbkmrjlpuneycitzsw)
  -j           run core jvm tests
  -l           run internal backends python tests
  -p           run core python tests
- -u SHARD_NUMBER/TOTAL_SHARDS
-              if running core python tests, divide them into
-              TOTAL_SHARDS shards and just run those in SHARD_NUMBER
-              to run only even tests: '-u 0/2', odd: '-u 1/2'
- -n           run contrib python tests
  -e           run rust tests
  -s           run clippy on rust code
  -a           run cargo audit of rust dependencies
- -y SHARD_NUMBER/TOTAL_SHARDS
-              if running contrib python tests, divide them into
-              TOTAL_SHARDS shards and just run those in SHARD_NUMBER
-              to run only even tests: '-u 0/2', odd: '-u 1/2'
  -c           run pants integration tests (includes examples and testprojects)
  -i SHARD_NUMBER/TOTAL_SHARDS
               if running integration tests, divide them into
@@ -55,10 +46,9 @@ EOF
 }
 
 # No python test sharding (1 shard) by default.
-python_contrib_shard="0/1"
 python_intg_shard="0/1"
 
-while getopts "h27fxbmrjlpeasny:ci:tz" opt; do
+while getopts "h27fxbmrjlpeasci:tz" opt; do
   case ${opt} in
     h) usage ;;
     2) python_two="true" ;;
@@ -74,8 +64,6 @@ while getopts "h27fxbmrjlpeasny:ci:tz" opt; do
     e) run_rust_tests="true" ;;
     a) run_cargo_audit="true" ;;
     s) run_rust_clippy="true" ;;
-    n) run_contrib="true" ;;
-    y) python_contrib_shard=${OPTARG} ;;
     c) run_integration="true" ;;
     i) python_intg_shard=${OPTARG} ;;
     t) run_lint="true" ;;
@@ -210,23 +198,15 @@ if [[ "${run_python:-false}" == "true" ]]; then
     ./pants.pex --tag='-integration' --filter-type='python_tests' filter src/python:: tests/python:: > all_targets.txt
     comm -23 <(sort all_targets.txt) <(sort "${known_v2_failures_file}") > v2_targets.txt
     ./pants.pex --no-v1 --v2 --target-spec-file=v2_targets.txt test.pytest -- "${PYTEST_PASSTHRU_ARGS[@]}"
-  ) || die "Core Python test failure"
+  ) || die "Core Python test failure (V2 test runner)"
   (
-    ./pants.pex --target-spec-file="${known_v2_failures_file}" test.pytest -- "${PYTEST_PASSTHRU_ARGS[@]}"
-  ) || die "Core Python test failure"
-  end_travis_section
-fi
-
-if [[ "${run_contrib:-false}" == "true" ]]; then
-  if [[ "0/1" != "${python_contrib_shard}" ]]; then
-    shard_desc=" [shard ${python_contrib_shard}]"
-  fi
-  start_travis_section "ContribTests" "Running contrib python tests${shard_desc}"
+    ./pants.pex --target-spec-file="${known_v2_failures_file}" \
+      test.pytest --chroot -- "${PYTEST_PASSTHRU_ARGS[@]}"
+  ) || die "Core Python test failure (V1 test runner)"
   (
-    ./pants.pex --exclude-target-regexp='.*/testprojects/.*' test.pytest \
-    "--test-pytest-test-shard=${python_contrib_shard}" \
-    contrib:: -- "${PYTEST_PASSTHRU_ARGS[@]}"
-  ) || die "Contrib python test failure"
+    ./pants.pex --tag='-integration' --exclude-target-regexp='.*/testprojects/.*' \
+      test.pytest contrib:: -- "${PYTEST_PASSTHRU_ARGS[@]}"
+  ) || die "Contrib Python test failure"
   end_travis_section
 fi
 
@@ -298,7 +278,12 @@ if [[ "${run_integration:-false}" == "true" ]]; then
     ./pants.pex --tag='+integration' test.pytest \
       "--test-pytest-test-shard=${python_intg_shard}" \
       src/python:: tests/python:: -- "${PYTEST_PASSTHRU_ARGS[@]}"
-  ) || die "Pants Integration test failure"
+  ) || die "Pants integration test failure"
+  (
+    ./pants.pex --tag='+integration' --exclude-target-regexp='.*/testprojects/.*' \
+      test.pytest --test-pytest-test-shard="${python_intg_shard}" \
+      contrib:: -- "${PYTEST_PASSTHRU_ARGS[@]}"
+  ) || die "Contrib integration test failure"
   end_travis_section
 fi
 
