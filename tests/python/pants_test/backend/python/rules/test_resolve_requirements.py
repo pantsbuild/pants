@@ -10,10 +10,12 @@ import zipfile
 from pants.backend.python.rules.resolve_requirements import (ResolvedRequirementsPex,
                                                              ResolveRequirementsRequest,
                                                              resolve_requirements)
-from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
+from pants.backend.python.subsystems.python_native_code import (PythonNativeCode,
+                                                                create_pex_native_build_environment)
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.engine.fs import Snapshot
 from pants.engine.rules import RootRule
+from pants.engine.selectors import Params
 from pants.util.collections import assert_single_element
 from pants_test.test_base import TestBase
 
@@ -25,7 +27,8 @@ class TestResolveRequirements(TestBase):
     return super(TestResolveRequirements, cls).rules() + [
       resolve_requirements,
       RootRule(PythonSetup),
-      RootRule(PexBuildEnvironment),
+      RootRule(PythonNativeCode),
+      create_pex_native_build_environment,
       RootRule(ResolveRequirementsRequest),
     ]
 
@@ -42,7 +45,11 @@ class TestResolveRequirements(TestBase):
       interpreter_constraints=hashify_optional_collection(interpreter_constraints),
     )
     requirements_pex = assert_single_element(
-      self.scheduler.product_request(ResolvedRequirementsPex, [request])
+      self.scheduler.product_request(ResolvedRequirementsPex, [Params(
+        request,
+        PythonSetup.global_instance(),
+        PythonNativeCode.global_instance()
+      )])
     )
     snapshot = assert_single_element(
       self.scheduler.product_request(Snapshot, [requirements_pex.directory_digest])

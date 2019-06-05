@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from future.utils import text_type
 
-from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
+from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment, PythonNativeCode
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.engine.fs import Digest, Snapshot, UrlToFetch
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
@@ -86,4 +86,5 @@ def rules():
   return [
     resolve_requirements,
     optionable_rule(PythonSetup),
+    optionable_rule(PythonNativeCode),
   ]
