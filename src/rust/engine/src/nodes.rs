@@ -19,6 +19,7 @@ use crate::core::{throw, Failure, Key, Params, TypeId, Value};
 use crate::externs;
 use crate::selectors;
 use crate::tasks::{self, Intrinsic, Rule};
+use crate::workunit_store::{WorkUnit, WorkUnitStore};
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::{self, BufMut};
 use fs::{
@@ -29,7 +30,6 @@ use hashing;
 use process_execution::{self, CommandRunner};
 use rule_graph;
 
-use crate::scheduler::WorkUnit;
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
 use rand::thread_rng;
 use rand::Rng;

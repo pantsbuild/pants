@@ -593,6 +593,7 @@ dependencies = [
  "ui 0.0.1",
  "url 1.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "walkdir 2.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "workunit_store 0.0.1",
 ]
 
 [[package]]
@@ -3010,6 +3011,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "winapi 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi-util 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "workunit_store"
+version = "0.0.1"
+dependencies = [
+ "parking_lot 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

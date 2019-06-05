@@ -13,6 +13,7 @@ use futures::future::{self, Future};
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
 use crate::nodes::{NodeKey, Select, Tracer, Visualizer};
+use crate::workunit_store::{WorkUnit, WorkUnitStore};
 use graph::{EntryId, Graph, InvalidationResult, NodeContext};
 use indexmap::IndexMap;
 use log::{debug, info, warn};
@@ -42,11 +43,18 @@ struct InnerSession {
 #[derive(Clone)]
 pub struct Session(Arc<InnerSession>);
 
-pub struct WorkUnit {
-  pub name: String,
-  pub start_timestamp: f64,
-  pub end_timestamp: f64,
-  pub span_id: String,
+impl WorkUnitStore for Session {
+  fn should_record_zipkin_spans(&self) -> bool {
+    self.0.should_record_zipkin_spans
+  }
+
+  fn get_workunits(&self) -> &Mutex<Vec<WorkUnit>> {
+    &self.0.workunits
+  }
+
+  fn add_workunit(&self, workunit: WorkUnit) {
+    self.0.workunits.lock().push(workunit);
+  }
 }
 
 impl Session {
@@ -82,18 +90,6 @@ impl Session {
 
   pub fn display(&self) -> &Option<Mutex<EngineDisplay>> {
     &self.0.display
-  }
-
-  pub fn should_record_zipkin_spans(&self) -> bool {
-    self.0.should_record_zipkin_spans
-  }
-
-  pub fn get_workunits(&self) -> &Mutex<Vec<WorkUnit>> {
-    &self.0.workunits
-  }
-
-  pub fn add_workunit(&self, workunit: WorkUnit) {
-    self.0.workunits.lock().push(workunit);
   }
 }
 

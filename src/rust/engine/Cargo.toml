@@ -46,7 +46,8 @@ members = [
   "testutil",
   "testutil/mock",
   "testutil/local_cas",
-  "ui"
+  "ui",
+  "workunit_store"
 ]
 
 # These are the packages which are built/tested when no special selector flags are passed to cargo.
@@ -75,7 +76,8 @@ default-members = [
   "testutil",
   "testutil/mock",
   "testutil/local_cas",
-  "ui"
+  "ui",
+  "workunit_store"
 ]
 
 [dependencies]
@@ -105,6 +107,7 @@ tempfile = "3"
 ui = { path = "ui" }
 url = "1.7.1"
 tar_api = { path = "tar_api" }
+workunit_store = { path = "workunit_store" }
 
 [patch.crates-io]
 # TODO: Remove patch when we can upgrade to an official released version of protobuf with a fix.

@@ -51,6 +51,8 @@ use log;
 
 use tar_api;
 
+use workunit_store;
+
 use std::borrow::Borrow;
 use std::collections::BTreeMap;
 use std::ffi::CStr;
@@ -75,6 +77,7 @@ use crate::handles::Handle;
 use crate::scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
+use crate::workunit_store::WorkUnitStore;
 use futures::Future;
 use hashing::Digest;
 use log::{error, Log};

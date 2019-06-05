@@ -1,0 +1,9 @@
+[package]
+version = "0.0.1"
+edition = "2018"
+name = "workunit_store"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+publish = false
+
+[dependencies]
+parking_lot = "0.6"
