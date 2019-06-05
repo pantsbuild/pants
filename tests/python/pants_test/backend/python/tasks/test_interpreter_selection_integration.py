@@ -26,7 +26,7 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
   @classmethod
   def hermetic(cls):
     # We must set as true to ignore `PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS`
-    # preconfiguring the interpreter_constraint. For example, in `ci.sh` we set
+    # preconfiguring the interpreter_constraint. For example, in `ci.py` we set
     # this environment variable to Python 3, which overrides any config defined
     # in the below tests.
     return True
