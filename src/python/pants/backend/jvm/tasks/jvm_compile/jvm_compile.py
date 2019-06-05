@@ -9,7 +9,7 @@ import os
 from builtins import object, open, str
 from multiprocessing import cpu_count
 
-from future.utils import text_type
+from future.utils import PY3, text_type
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
@@ -17,6 +17,7 @@ from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.zinc import Zinc
+from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.classpath_products import ClasspathEntry
@@ -33,15 +34,22 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnitLabel
-from pants.engine.fs import PathGlobs, PathGlobsAndRoot
+from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, PathGlobsAndRoot
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.reporting.reporting_utils import items_to_report_element
-from pants.util.contextutil import Timer
-from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_mkdir, safe_rmtree,
-                                safe_walk)
+from pants.util.contextutil import Timer, temporary_dir
+from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_file_dump, safe_mkdir,
+                                safe_rmtree)
 from pants.util.fileutil import create_size_estimators
 from pants.util.memo import memoized_method, memoized_property
+
+
+# Well known metadata file to register javac plugins.
+_JAVAC_PLUGIN_INFO_FILE = 'META-INF/services/com.sun.source.util.Plugin'
+
+# Well known metadata file to register annotation processors with a java 1.6+ compiler.
+_PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 
 
 class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
@@ -257,14 +265,36 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     """Classpath entries containing scalac plugins."""
     return []
 
-  def write_extra_resources(self, compile_context):
-    """Writes any extra, out-of-band resources for a target to its classes directory.
+  def extra_resources(self, compile_context):
+    """Produces a dictionary of any extra, out-of-band resources for a target.
 
     E.g., targets that produce scala compiler plugins or annotation processor files
     produce an info file. The resources will be added to the runtime_classpath.
-    Returns a list of pairs (root, [absolute paths of files under root]).
+    :return: A dict from classpath-relative filename to file content.
     """
-    pass
+    result = {}
+    target = compile_context.target
+
+    if isinstance(target, JavacPlugin):
+      result[_JAVAC_PLUGIN_INFO_FILE] = target.classname if PY3 else target.classname.decode('utf-8')
+    elif isinstance(target, AnnotationProcessor) and target.processors:
+      result[_PROCESSOR_INFO_FILE] = '{}\n'.format('\n'.join(p.strip() for p in target.processors))
+
+    return result
+
+  def extra_resources_digest(self, compile_context):
+    """Compute a Digest for the extra_resources for the given context."""
+    # TODO: Switch to using #7739 once it is available.
+    extra_resources = self.extra_resources(compile_context)
+    if not extra_resources:
+      return EMPTY_DIRECTORY_DIGEST
+    with temporary_dir() as tmpdir:
+      for filename, filecontent in extra_resources.items():
+        safe_file_dump(os.path.join(tmpdir, filename), filecontent)
+      snapshot, = self.context._scheduler.capture_snapshots([
+          PathGlobsAndRoot(PathGlobs(extra_resources), tmpdir)
+        ])
+      return snapshot.directory_digest
 
   def create_empty_extra_products(self):
     """Create any products the subclass task supports in addition to the runtime_classpath.
@@ -454,22 +484,26 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       f.write(text)
 
   def _set_directory_digests_for_valid_target_classpath_directories(self, valid_targets, compile_contexts):
+    def _get_relative_classpath_for_target(target):
+      cc = self.select_runtime_context(compile_contexts[target])
+      if self.get_options().use_classpath_jars:
+        return fast_relpath(cc.jar_file.path, get_buildroot())
+      else:
+        return fast_relpath(cc.classes_dir.path, get_buildroot()) + '/**'
+
     snapshots = self.context._scheduler.capture_snapshots(
       tuple(PathGlobsAndRoot(PathGlobs(
-        [self._get_relative_classes_dir_from_target(target, compile_contexts)]
+        [_get_relative_classpath_for_target(target)]
       ), get_buildroot()) for target in valid_targets))
-    [self._set_directory_digest_for_compile_context(
-      snapshot.directory_digest, target, compile_contexts)
-      for target, snapshot in list(zip(valid_targets, snapshots))]
+    for target, snapshot in list(zip(valid_targets, snapshots)):
+      cc = self.select_runtime_context(compile_contexts[target])
+      self._set_directory_digest_for_compile_context(cc, snapshot.directory_digest)
 
-  def _get_relative_classes_dir_from_target(self, target, compile_contexts):
-    cc = self.select_runtime_context(compile_contexts[target])
-    return fast_relpath(cc.classes_dir.path, get_buildroot()) + '/**'
-
-  def _set_directory_digest_for_compile_context(self, directory_digest, target, compile_contexts):
-    cc = self.select_runtime_context(compile_contexts[target])
-    new_classpath_entry = ClasspathEntry(cc.classes_dir.path, directory_digest)
-    cc.classes_dir = new_classpath_entry
+  def _set_directory_digest_for_compile_context(self, ctx, directory_digest):
+    if self.get_options().use_classpath_jars:
+      ctx.jar_file = ClasspathEntry(ctx.jar_file.path, directory_digest)
+    else:
+      ctx.classes_dir = ClasspathEntry(ctx.classes_dir.path, directory_digest)
 
   def _compile_vts(self, vts, ctx, upstream_analysis, dependency_classpath, progress_message, settings,
                    compiler_option_sets, zinc_file_manager, counter):
@@ -776,22 +810,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     Override to adjust this behavior."""
     return False
 
-  def _create_context_jar(self, compile_context):
-    """Jar up the compile_context to its output jar location.
-
-    TODO(stuhood): In the medium term, we hope to add compiler support for this step, which would
-    allow the jars to be used as compile _inputs_ as well. Currently using jar'd compile outputs as
-    compile inputs would make the compiler's analysis useless.
-      see https://github.com/twitter-forks/sbt/tree/stuhood/output-jars
-    """
-    root = compile_context.classes_dir.path
-    with compile_context.open_jar(mode='w') as jar:
-      for abs_sub_dir, dirnames, filenames in safe_walk(root):
-        for name in dirnames + filenames:
-          abs_filename = os.path.join(abs_sub_dir, name)
-          arcname = fast_relpath(abs_filename, root)
-          jar.write(abs_filename, arcname)
-
   def _compute_sources_for_target(self, target):
     """Computes and returns the sources (relative to buildroot) for the given target."""
     def resolve_target_sources(target_sources):
@@ -923,7 +941,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                           zinc_file_manager,
                           counter)
 
-      ctx.classes_dir = ClasspathEntry(ctx.classes_dir.path, directory_digest)
+      # Store the produced Digest (if any).
+      self._set_directory_digest_for_compile_context(ctx, directory_digest)
 
       self._record_target_stats(tgt,
                                 len(dependency_cp_entries),
@@ -931,12 +950,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                                 timer.elapsed,
                                 is_incremental,
                                 'compile')
-
-      # Write any additional resources for this target to the target workdir.
-      self.write_extra_resources(ctx)
-
-      # Jar the compiled output.
-      self._create_context_jar(ctx)
 
     # Update the products with the latest classes.
     output_classpath_product.add_for_target(

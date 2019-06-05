@@ -1,26 +1,38 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-INTEGRATION_SOURCES = globs('*_integration.py')
 
 python_tests(
-  sources=globs('*.py', exclude=[INTEGRATION_SOURCES]),
+  name='filedeps',
+  source='test_filedeps.py',
   dependencies=[
-    '3rdparty/python:future',
     '3rdparty/python:mock',
-    'src/python/pants/backend/python/rules',
-    'src/python/pants/util:objects',
+    'src/python/pants/build_graph',
+    'src/python/pants/engine/legacy:graph',
+    'src/python/pants/rules/core',
     'tests/python/pants_test:test_base',
-    'tests/python/pants_test/engine:scheduler_test_base',
-    'tests/python/pants_test/engine/examples:scheduler_inputs',
+    'tests/python/pants_test/engine:util',
   ]
 )
 
 python_tests(
-  name='integration',
-  sources=INTEGRATION_SOURCES,
+  name='filedeps_integration',
+  source='test_filedeps_integration.py',
   dependencies=[
     'tests/python/pants_test:int-test',
   ],
   tags={'integration'},
+)
+
+python_tests(
+  name='test',
+  source='test_test.py',
+  dependencies=[
+    'src/python/pants/build_graph',
+    'src/python/pants/engine/legacy:graph',
+    'src/python/pants/engine/legacy:structs',
+    'src/python/pants/rules/core',
+    'tests/python/pants_test:test_base',
+    'tests/python/pants_test/engine:util',
+  ]
 )

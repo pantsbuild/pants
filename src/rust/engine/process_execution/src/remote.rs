@@ -10,13 +10,13 @@ use bytes::Bytes;
 use digest::{Digest as DigestTrait, FixedOutput};
 use fs::{self, File, PathStat, Store};
 use futures::{future, Future, Stream};
+use futures_timer::Delay;
 use grpcio;
 use hashing::{Digest, Fingerprint};
 use log::{debug, trace, warn};
 use protobuf::{self, Message, ProtobufEnum};
 use sha2::Sha256;
 use time;
-use tokio_timer::Delay;
 
 use super::{ExecuteProcessRequest, ExecutionStats, FallibleExecuteProcessResult};
 use std;
@@ -45,6 +45,7 @@ pub struct CommandRunner {
   execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
   operations_client: Arc<bazel_protos::operations_grpc::OperationsClient>,
   store: Store,
+  futures_timer_thread: Arc<futures_timer::HelperThread>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -152,6 +153,7 @@ impl super::CommandRunner for CommandRunner {
         let command_runner3 = self.clone();
         let execute_request = Arc::new(execute_request);
         let execute_request2 = execute_request.clone();
+        let futures_timer_thread = self.futures_timer_thread.clone();
 
         let store2 = store.clone();
         let mut history = ExecutionHistory::default();
@@ -186,6 +188,7 @@ impl super::CommandRunner for CommandRunner {
                 let operations_client = operations_client.clone();
                 let command_runner2 = command_runner2.clone();
                 let command_runner3 = command_runner3.clone();
+                let futures_timer_thread = futures_timer_thread.clone();
                 let f = command_runner2.extract_execute_response(operation, &mut history);
                 f.map(future::Loop::Break).or_else(move |value| {
                   match value {
@@ -243,32 +246,32 @@ impl super::CommandRunner for CommandRunner {
                         .to_boxed()
                       } else {
                         // maybe the delay here should be the min of remaining time and the backoff period
-                        Delay::new(Instant::now() + Duration::from_millis(backoff_period))
-                          .map_err(move |e| {
-                            format!(
-                              "Future-Delay errored at operation result polling for {}, {}: {}",
-                              operation_name, description, e
-                            )
-                          })
-                          .and_then(move |_| {
-                            future::done(
-                              operations_client
-                                .get_operation_opt(
-                                  &operation_request,
-                                  command_runner3.call_option(),
-                                )
-                                .or_else(move |err| {
-                                  rpcerror_recover_cancelled(operation_request.take_name(), err)
-                                })
-                                .map(OperationOrStatus::Operation)
-                                .map_err(rpcerror_to_string),
-                            )
-                            .map(move |operation| {
-                              future::Loop::Continue((history, operation, iter_num + 1))
-                            })
-                            .to_boxed()
+                        Delay::new_handle(
+                          Instant::now() + Duration::from_millis(backoff_period),
+                          futures_timer_thread.handle(),
+                        )
+                        .map_err(move |e| {
+                          format!(
+                            "Future-Delay errored at operation result polling for {}, {}: {}",
+                            operation_name, description, e
+                          )
+                        })
+                        .and_then(move |_| {
+                          future::done(
+                            operations_client
+                              .get_operation_opt(&operation_request, command_runner3.call_option())
+                              .or_else(move |err| {
+                                rpcerror_recover_cancelled(operation_request.take_name(), err)
+                              })
+                              .map(OperationOrStatus::Operation)
+                              .map_err(rpcerror_to_string),
+                          )
+                          .map(move |operation| {
+                            future::Loop::Continue((history, operation, iter_num + 1))
                           })
                           .to_boxed()
+                        })
+                        .to_boxed()
                       }
                     }
                   }
@@ -309,6 +312,7 @@ impl CommandRunner {
     platform_properties: BTreeMap<String, String>,
     thread_count: usize,
     store: Store,
+    futures_timer_thread: Arc<futures_timer::HelperThread>,
   ) -> CommandRunner {
     let env = Arc::new(grpcio::Environment::new(thread_count));
     let channel = {
@@ -339,6 +343,7 @@ impl CommandRunner {
       execution_client,
       operations_client,
       store,
+      futures_timer_thread,
     }
   }
 
@@ -921,6 +926,7 @@ mod tests {
   use std::iter::{self, FromIterator};
   use std::ops::Sub;
   use std::path::PathBuf;
+  use std::sync::Arc;
   use std::time::Duration;
 
   #[derive(Debug, PartialEq)]
@@ -1426,8 +1432,6 @@ mod tests {
 
   #[test]
   fn ensure_inline_stdio_is_stored() {
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
-
     let test_stdout = TestData::roland();
     let test_stderr = TestData::catnip();
 
@@ -1452,8 +1456,10 @@ mod tests {
     let store_dir_path = store_dir.path();
 
     let cas = mock::StubCAS::empty();
+    let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       &store_dir_path,
+      Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       &[cas.address()],
       None,
       &None,
@@ -1463,6 +1469,7 @@ mod tests {
       Duration::from_secs(1),
       fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
+      timer_thread.handle(),
     )
     .expect("Failed to make store");
 
@@ -1475,10 +1482,9 @@ mod tests {
       BTreeMap::new(),
       1,
       store,
+      timer_thread,
     );
-    let result = runtime
-      .block_on(cmd_runner.run(echo_roland_request()))
-      .unwrap();
+    let result = cmd_runner.run(echo_roland_request()).wait().unwrap();
     assert_eq!(
       result.without_execution_attempts(),
       FallibleExecuteProcessResult {
@@ -1490,17 +1496,23 @@ mod tests {
       }
     );
 
-    let local_store = fs::Store::local_only(&store_dir_path).expect("Error creating local store");
+    let local_store = fs::Store::local_only(
+      &store_dir_path,
+      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
+    )
+    .expect("Error creating local store");
     {
       assert_eq!(
-        runtime
-          .block_on(local_store.load_file_bytes_with(test_stdout.digest(), |v| v))
+        local_store
+          .load_file_bytes_with(test_stdout.digest(), |v| v)
+          .wait()
           .unwrap(),
         Some(test_stdout.bytes())
       );
       assert_eq!(
-        runtime
-          .block_on(local_store.load_file_bytes_with(test_stderr.digest(), |v| v))
+        local_store
+          .load_file_bytes_with(test_stderr.digest(), |v| v)
+          .wait()
           .unwrap(),
         Some(test_stderr.bytes())
       );
@@ -1784,8 +1796,6 @@ mod tests {
 
   #[test]
   fn execute_missing_file_uploads_if_known() {
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
-
     let roland = TestData::roland();
 
     let mock_server = {
@@ -1815,8 +1825,10 @@ mod tests {
     let cas = mock::StubCAS::builder()
       .directory(&TestDirectory::containing_roland())
       .build();
+    let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       store_dir,
+      Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       &[cas.address()],
       None,
       &None,
@@ -1826,15 +1838,19 @@ mod tests {
       Duration::from_secs(1),
       fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
+      timer_thread.handle(),
     )
     .expect("Failed to make store");
-    runtime
-      .block_on(store.store_file_bytes(roland.bytes(), false))
+    store
+      .store_file_bytes(roland.bytes(), false)
+      .wait()
       .expect("Saving file bytes to store");
-    runtime
-      .block_on(store.record_directory(&TestDirectory::containing_roland().directory(), false))
+    store
+      .record_directory(&TestDirectory::containing_roland().directory(), false)
+      .wait()
       .expect("Saving directory bytes to store");
-    let command_runner = CommandRunner::new(
+
+    let result = CommandRunner::new(
       &mock_server.address(),
       None,
       None,
@@ -1843,11 +1859,11 @@ mod tests {
       BTreeMap::new(),
       1,
       store,
-    );
-
-    let result = runtime
-      .block_on(command_runner.run(cat_roland_request()))
-      .unwrap();
+      timer_thread,
+    )
+    .run(cat_roland_request())
+    .wait()
+    .unwrap();
     assert_eq!(
       result.without_execution_attempts(),
       FallibleExecuteProcessResult {
@@ -1910,8 +1926,10 @@ mod tests {
     let cas = mock::StubCAS::builder()
       .directory(&TestDirectory::containing_roland())
       .build();
+    let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       store_dir,
+      Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       &[cas.address()],
       None,
       &None,
@@ -1921,6 +1939,7 @@ mod tests {
       Duration::from_secs(1),
       fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
+      timer_thread.handle(),
     )
     .expect("Failed to make store");
     store
@@ -1937,6 +1956,7 @@ mod tests {
       BTreeMap::new(),
       1,
       store,
+      timer_thread,
     )
     .run(cat_roland_request())
     .wait();
@@ -1979,8 +1999,10 @@ mod tests {
       .file(&TestData::roland())
       .directory(&TestDirectory::containing_roland())
       .build();
+    let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       store_dir,
+      Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       &[cas.address()],
       None,
       &None,
@@ -1990,11 +2012,11 @@ mod tests {
       Duration::from_secs(1),
       fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
+      timer_thread.handle(),
     )
     .expect("Failed to make store");
 
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
-    let runner = CommandRunner::new(
+    let error = CommandRunner::new(
       &mock_server.address(),
       None,
       None,
@@ -2003,11 +2025,11 @@ mod tests {
       BTreeMap::new(),
       1,
       store,
-    );
-
-    let error = runtime
-      .block_on(runner.run(cat_roland_request()))
-      .expect_err("Want error");
+      timer_thread,
+    )
+    .run(cat_roland_request())
+    .wait()
+    .expect_err("Want error");
     assert_contains(&error, &format!("{}", missing_digest.0));
   }
 
@@ -2580,14 +2602,15 @@ mod tests {
       .directory(&TestDirectory::containing_roland())
       .build();
     let command_runner = create_command_runner(address, &cas);
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
-    runtime.block_on(command_runner.run(request))
+    command_runner.run(request).wait()
   }
 
   fn create_command_runner(address: String, cas: &mock::StubCAS) -> CommandRunner {
     let store_dir = TempDir::new().unwrap();
+    let timer_thread = timer_thread();
     let store = fs::Store::with_remote(
       store_dir,
+      Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       &[cas.address()],
       None,
       &None,
@@ -2597,10 +2620,25 @@ mod tests {
       Duration::from_secs(1),
       fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
+      timer_thread.handle(),
     )
     .expect("Failed to make store");
 
-    CommandRunner::new(&address, None, None, None, None, BTreeMap::new(), 1, store)
+    CommandRunner::new(
+      &address,
+      None,
+      None,
+      None,
+      None,
+      BTreeMap::new(),
+      1,
+      store,
+      timer_thread,
+    )
+  }
+
+  fn timer_thread() -> Arc<futures_timer::HelperThread> {
+    Arc::new(futures_timer::HelperThread::new().unwrap())
   }
 
   fn extract_execute_response(
@@ -2611,13 +2649,12 @@ mod tests {
       .directory(&TestDirectory::containing_roland())
       .build();
     let command_runner = create_command_runner("".to_owned(), &cas);
-
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
-
-    runtime.block_on(command_runner.extract_execute_response(
-      super::OperationOrStatus::Operation(operation),
-      &mut ExecutionHistory::default(),
-    ))
+    command_runner
+      .extract_execute_response(
+        super::OperationOrStatus::Operation(operation),
+        &mut ExecutionHistory::default(),
+      )
+      .wait()
   }
 
   fn extract_output_files_from_response(
@@ -2628,9 +2665,9 @@ mod tests {
       .directory(&TestDirectory::containing_roland())
       .build();
     let command_runner = create_command_runner("".to_owned(), &cas);
-
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
-    runtime.block_on(command_runner.extract_output_files(&execute_response))
+    command_runner
+      .extract_output_files(&execute_response)
+      .wait()
   }
 
   fn make_any_proto(message: &dyn Message) -> protobuf::well_known_types::Any {
