@@ -14,6 +14,8 @@ from common import banner, die, green, travis_section
 
 
 def main() -> None:
+  banner("CI BEGINS")
+
   args = create_parser().parse_args()
   setup_environment(python_version=args.python_version)
 
@@ -45,6 +47,10 @@ def main() -> None:
     run_internal_backend_tests()
   if args.platform_specific_tests:
     run_platform_specific_tests()
+
+  banner("CI ENDS")
+  print()
+  green("SUCCESS")
 
 # -------------------------------------------------------------------------
 # Options
