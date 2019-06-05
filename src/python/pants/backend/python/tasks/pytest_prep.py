@@ -51,7 +51,7 @@ class PytestPrep(PythonExecutionTaskBase):
       pex_path = pex.path()
       pex_info = PexInfo.from_pex(pex_path)
       pex_info.merge_pex_path(pex_path)  # We're now on the sys.path twice.
-      PEXBuilder(pex_path, interpreter=interpreter, pex_info=pex_info).freeze()
+      PEXBuilder(pex_path, interpreter=interpreter, pex_info=pex_info).freeze(bytecode_compile=False)
       self._pex = PEX(pex=pex_path, interpreter=interpreter)
       self._interpreter = interpreter
 

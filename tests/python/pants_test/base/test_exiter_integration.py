@@ -13,8 +13,7 @@ class ExiterIntegrationTest(PantsRunIntegrationTest):
   @ensure_daemon
   def test_unicode_containing_exception(self):
     """Test whether we can run a single target without special flags."""
-    pants_run = self.run_pants(['test', 'testprojects/src/python/unicode/compilation_failure'])
+    pants_run = self.run_pants(['run', 'testprojects/src/python/unicode/compilation_failure'])
     self.assert_failure(pants_run)
 
-    self.assertIn('during bytecode compilation', pants_run.stderr_data)
     self.assertIn('import sys¡', pants_run.stderr_data)

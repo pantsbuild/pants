@@ -7,10 +7,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 
 import requests
-from py_zipkin import Encoding
+from py_zipkin import Encoding, get_default_tracer
 from py_zipkin.transport import BaseTransportHandler
 from py_zipkin.util import generate_random_64bit_string
-from py_zipkin.zipkin import ZipkinAttrs, create_attrs_for_span, zipkin_span
+from py_zipkin.zipkin import ZipkinAttrs, create_attrs_for_span
 
 from pants.base.workunit import WorkUnitLabel
 from pants.reporting.reporter import Reporter
@@ -56,14 +56,14 @@ class ZipkinReporter(Reporter):
     :param float sample_rate: Rate at which to sample Zipkin traces. Value 0.0 - 100.0.
     """
     super(ZipkinReporter, self).__init__(run_tracker, settings)
-    # We keep track of connection between workunits and spans
-    self._workunits_to_spans = {}
     # Create a transport handler
     self.handler = HTTPTransportHandler(endpoint)
     self.trace_id = trace_id
     self.parent_id = parent_id
     self.sample_rate = float(sample_rate)
     self.endpoint = endpoint
+    self.tracer = get_default_tracer()
+    self.run_tracker = run_tracker
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
@@ -74,8 +74,14 @@ class ZipkinReporter(Reporter):
     else:
       service_name = "pants workunit"
 
+    # Set local_tracer. Tracer stores spans and span's zipkin_attrs.
+    # If start_workunit is called from the root thread then local_tracer is the same as self.tracer.
+    # If start_workunit is called from a new thread then local_tracer will have an empty span
+    # storage and stack.
+    local_tracer = get_default_tracer()
+
     # Check if it is the first workunit
-    first_span = not self._workunits_to_spans
+    first_span = self.run_tracker.is_main_root_workunit(workunit)
     if first_span:
       # If trace_id and parent_id are given as flags create zipkin_attrs
       if self.trace_id is not None and self.parent_id is not None:
@@ -89,43 +95,88 @@ class ZipkinReporter(Reporter):
           is_sampled=True,
         )
       else:
-        zipkin_attrs =  create_attrs_for_span(
+        zipkin_attrs = create_attrs_for_span(
           # trace_id is the same as run_uuid that is created in run_tracker and is the part of
           # pants_run id
           trace_id=self.trace_id,
           sample_rate=self.sample_rate, # Value between 0.0 and 100.0
         )
-        self.trace_id = zipkin_attrs.trace_id
+        # TODO delete this line when parent_id will be passed in v2 engine:
+        #  - with ExecutionRequest when Nodes from v2 engine are called by a workunit;
+        #  - when a v2 engine Node is called by another v2 engine Node.
+        self.parent_id = zipkin_attrs.span_id
 
-
-      span = zipkin_span(
+      span = local_tracer.zipkin_span(
         service_name=service_name,
         span_name=workunit.name,
         transport_handler=self.handler,
         encoding=Encoding.V1_THRIFT,
-        zipkin_attrs=zipkin_attrs
+        zipkin_attrs=zipkin_attrs,
       )
     else:
-      span = zipkin_span(
+      # If start_workunit is called from a new thread local_tracer doesn't have zipkin attributes.
+      # Parent's attributes need to be added to the local_tracer zipkin_attrs storage.
+      if not local_tracer.get_zipkin_attrs():
+        parent_attrs = workunit.parent.zipkin_span.zipkin_attrs
+        local_tracer.push_zipkin_attrs(parent_attrs)
+        local_tracer.set_transport_configured(configured=True)
+      span = local_tracer.zipkin_span(
         service_name=service_name,
         span_name=workunit.name,
       )
-    self._workunits_to_spans[workunit] = span
+    # For all spans except the first span zipkin_attrs for span are created at this point
     span.start()
+    if workunit.name == 'background' and self.run_tracker.is_main_root_workunit(workunit.parent):
+      span.zipkin_attrs = span.zipkin_attrs._replace(
+        parent_span_id=workunit.parent.zipkin_span.zipkin_attrs.span_id
+      )
+      span.service_name = "pants background workunit"
+
     # Goals and tasks save their start time at the beginning of their run.
     # This start time is passed to workunit, because the workunit may be created much later.
     span.start_timestamp = workunit.start_time
     if first_span and span.zipkin_attrs.is_sampled:
       span.logging_context.start_timestamp = workunit.start_time
+    workunit.zipkin_span = span
 
   def end_workunit(self, workunit):
     """Implementation of Reporter callback."""
-    if workunit in self._workunits_to_spans:
-      span = self._workunits_to_spans.pop(workunit)
-      span.stop()
+    span = workunit.zipkin_span
+    span.stop()
+    span_tracer = span.get_tracer()
+    if span_tracer is not self.tracer:
+      for span in span_tracer.get_spans():
+        self.tracer.add_span(span)
+      span_tracer.clear()
 
   def close(self):
     """End the report."""
     endpoint = self.endpoint.replace("/api/v1/spans", "")
 
     logger.debug("Zipkin trace may be located at this URL {}/traces/{}".format(endpoint, self.trace_id))
+
+  def bulk_record_workunits(self, engine_workunits):
+    """A collection of workunits from v2 engine part"""
+    for workunit in engine_workunits:
+      duration = workunit['end_timestamp'] - workunit['start_timestamp']
+
+      local_tracer = get_default_tracer()
+
+      span = local_tracer.zipkin_span(
+        service_name="pants",
+        span_name=workunit['name'],
+        duration=duration,
+      )
+      span.start()
+      span.zipkin_attrs = ZipkinAttrs(
+        trace_id=self.trace_id,
+        span_id=workunit['span_id'],
+        # TODO change it when we properly pass parent_id to the v2 engine Nodes
+        # TODO Pass parent_id with ExecutionRequest when v2 engine is called by a workunit
+        # TODO pass parent_id when v2 engine Node is called by another v2 engine Node
+        parent_span_id=workunit.get("parent_id", self.parent_id),
+        flags='0', # flags: stores flags header. Currently unused
+        is_sampled=True,
+      )
+      span.start_timestamp = workunit['start_timestamp']
+      span.stop()

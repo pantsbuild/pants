@@ -342,7 +342,7 @@ class PexBuilderWrapper(object):
         dist = self._distributions.get('setuptools')
         if not dist:
           self.add_resolved_requirements([self._setuptools_requirement])
-      self._builder.freeze()
+      self._builder.freeze(bytecode_compile=False)
       self._frozen = True
 
   def set_entry_point(self, entry_point):

@@ -165,7 +165,9 @@ class HtmlReporter(Reporter):
     s = self._start_workunit_fmt_string.format(
       indent=len(workunit.ancestors()) * 10,
       id=workunit.id,
-      parent_id=workunit.parent.id if workunit.parent else '',
+      parent_id=workunit.parent.id if workunit.parent
+      and not self.run_tracker.is_background_root_workunit(workunit)
+      else '',
       workunit=workunit,
       icon_caret='down' if initially_open else 'right',
       display_class='' if initially_open else 'nodisplay',

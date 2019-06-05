@@ -89,7 +89,7 @@ class LocalPantsRunner(object):
     return options, build_config, options_bootstrapper
 
   @staticmethod
-  def _maybe_init_graph_session(graph_session, options_bootstrapper,build_config, global_options):
+  def _maybe_init_graph_session(graph_session, options_bootstrapper,build_config, options):
     if graph_session:
       return graph_session
 
@@ -101,7 +101,9 @@ class LocalPantsRunner(object):
       build_config
     )
 
-    return graph_scheduler_helper.new_session(global_options.v2_ui)
+    v2_ui = options.for_global_scope().v2_ui
+    zipkin_trace_v2 = options.for_scope('reporting').zipkin_trace_v2
+    return graph_scheduler_helper.new_session(zipkin_trace_v2, v2_ui)
 
   @staticmethod
   def _maybe_init_target_roots(target_roots, graph_session, options, build_root):
@@ -156,7 +158,7 @@ class LocalPantsRunner(object):
       daemon_graph_session,
       options_bootstrapper,
       build_config,
-      global_options
+      options
     )
 
     target_roots = cls._maybe_init_target_roots(
