@@ -13,12 +13,12 @@ use futures::future::{self, Future};
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
 use crate::nodes::{NodeKey, Select, Tracer, Visualizer};
-use crate::workunit_store::{WorkUnit, WorkUnitStore};
 use graph::{EntryId, Graph, InvalidationResult, NodeContext};
 use indexmap::IndexMap;
 use log::{debug, info, warn};
 use parking_lot::Mutex;
 use ui::EngineDisplay;
+use workunit_store::{WorkUnit, WorkUnitStore};
 
 ///
 /// A Session represents a related series of requests (generally: one run of the pants CLI) on an
