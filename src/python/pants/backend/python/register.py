@@ -91,9 +91,9 @@ def register_goals():
 
 def rules():
   return (
-    inject_init.rules()
-    + python_test_runner.rules()
-    + python_native_code_rules()
-    + resolve_requirements.rules()
-    + subprocess_environment_rules()
+    inject_init.rules() +
+    python_test_runner.rules() +
+    python_native_code_rules() +
+    resolve_requirements.rules() +
+    subprocess_environment_rules()
   )
