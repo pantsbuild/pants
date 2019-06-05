@@ -180,8 +180,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       classpath=[
         JarDependency(
           org='com.twitter',
-          name='rsc_2.11',
-          rev='0.0.0-734-e57e96eb',
+          name='rsc_2.12',
+          rev='0.0.0-768-7357aa0a',
         ),
       ],
       custom_rules=[
@@ -414,8 +414,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
           False,
           'rsc'
         )
-        # Write any additional resources for this target to the target workdir.
-        self.write_extra_resources(ctx)
 
       # Update the products with the latest classes.
       self.register_extra_products_from_contexts([ctx.target], compile_contexts)

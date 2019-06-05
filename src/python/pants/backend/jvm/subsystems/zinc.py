@@ -32,7 +32,9 @@ from pants.util.fileutil import safe_hardlink_or_copy
 from pants.util.memo import memoized_method, memoized_property
 
 
-_ZINC_COMPILER_VERSION = '0.0.9'
+# TODO: To use this with the nailgun strategy, will need a publish of `rsc_2.12`: this will
+# block landing this.
+_ZINC_COMPILER_VERSION = '0.0.11'
 
 
 class Zinc(object):
@@ -87,7 +89,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_BOOTSTRAPPER_TOOL_NAME,
                             classpath=[
-                              JarDependency('org.pantsbuild', 'zinc-bootstrapper_2.11', '0.0.4'),
+                              JarDependency('org.pantsbuild', 'zinc-bootstrapper_2.12', '0.0.11'),
                             ],
                             main=Zinc.ZINC_BOOTSTRAPER_MAIN,
                             custom_rules=shader_rules,
@@ -96,7 +98,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_COMPILER_TOOL_NAME,
                             classpath=[
-                              JarDependency('org.pantsbuild', 'zinc-compiler_2.11', _ZINC_COMPILER_VERSION),
+                              JarDependency('org.pantsbuild', 'zinc-compiler_2.12', _ZINC_COMPILER_VERSION),
                             ],
                             main=Zinc.ZINC_COMPILE_MAIN,
                             custom_rules=shader_rules)
@@ -127,7 +129,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_EXTRACTOR_TOOL_NAME,
                             classpath=[
-                              JarDependency('org.pantsbuild', 'zinc-extractor_2.11', '0.0.6')
+                              JarDependency('org.pantsbuild', 'zinc-extractor_2.12', '0.0.11')
                             ])
 
       # Register scalac for fixed versions of Scala, 2.10, 2.11 and 2.12.
