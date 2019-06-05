@@ -188,6 +188,12 @@ class RunTracker(Subsystem):
     """Is the workunit running under the main thread's root."""
     return workunit.root() == self._main_root_workunit
 
+  def is_main_root_workunit(self, workunit):
+    return workunit is self._main_root_workunit
+
+  def is_background_root_workunit(self, workunit):
+    return workunit is self._background_root_workunit
+
   def initialize(self, all_options):
     """Create run_info and relevant directories, and return the run id.
 
@@ -558,7 +564,8 @@ class RunTracker(Subsystem):
 
   def get_background_root_workunit(self):
     if self._background_root_workunit is None:
-      self._background_root_workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=None,
+      self._background_root_workunit = WorkUnit(run_info_dir=self.run_info_dir,
+                                                parent=self._main_root_workunit,
                                                 name='background', cmd=None)
       self._background_root_workunit.start()
       self.report.start_workunit(self._background_root_workunit)
