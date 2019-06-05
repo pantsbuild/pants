@@ -266,12 +266,13 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     """Classpath entries containing scalac plugins."""
     return []
 
-  def argsfiles_snapshot(self, compile_context):
+  def argsfiles_snapshot(self, compile_context, include_sources=True):
+    argsfiles = [compile_context.argsfile_opts]
+    if include_sources:
+      argsfiles.append(compile_context.argsfile_srcs)
     snapshot, = self.context._scheduler.capture_snapshots([
         PathGlobsAndRoot(
-          PathGlobs([
-            fast_relpath(argsfile, get_buildroot()) for argsfile in compile_context.argsfiles
-          ]),
+          PathGlobs([fast_relpath(argsfile, get_buildroot()) for argsfile in argsfiles]),
           get_buildroot(),
         ),
       ])

@@ -445,12 +445,10 @@ class BaseZincCompile(JvmCompile):
         Zinc.ZINC_COMPILE_MAIN
       ]
 
-    argsfiles_snapshot = self.argsfiles_snapshot(ctx)
-
-    argv = image_specific_argv + ['@{}'.format(argsfile) for argsfile in argsfiles_snapshot.files]
-    # TODO(#6071): Our ExecuteProcessRequest expects a specific string type for arguments,
-    # which py2 doesn't default to. This can be removed when we drop python 2.
-    argv = [text_type(arg) for arg in argv]
+    BATCH_SIZE = 1
+    # NB: We don't support using argfiles for the sources of batched compiles, so sufficiently large
+    # batch sizes would fail. But batches that large wouldn't be a great idea anyway.
+    argsfiles_snapshot = self.argsfiles_snapshot(ctx, include_sources=(BATCH_SIZE == 0))
 
     merged_input_digest = self.context._scheduler.merge_directories(
       tuple(s.directory_digest for s in snapshots) +
@@ -459,16 +457,47 @@ class BaseZincCompile(JvmCompile):
       (self.extra_resources_digest(ctx), argsfiles_snapshot.directory_digest)
     )
 
-    req = ExecuteProcessRequest(
-      argv=tuple(argv),
-      input_files=merged_input_digest,
-      output_files=(jar_file,) if self.get_options().use_classpath_jars else (),
-      output_directories=() if self.get_options().use_classpath_jars else (classes_dir,),
-      description="zinc compile for {}".format(ctx.target.address.spec),
-      jdk_home=self._zinc.underlying_dist.home,
-    )
-    res = self.context.execute_process_synchronously_or_raise(
-      req, self.name(), [WorkUnitLabel.COMPILER])
+    # Batches of args to run in parallel.
+    if BATCH_SIZE == 0:
+      # NB: One empty set of args: the sources are already supplied via the argsfiles.
+      batched_extra_args = [([], "")]
+    else:
+      def batch(list_to_batch, batch_size=0):
+        l = len(list_to_batch)
+        for chunk in range(0, l, batch_size):
+          yield list_to_batch[chunk:min(chunk + batch_size, l)]
+      batches = list(batch(ctx.sources, BATCH_SIZE))
+      batched_extra_args = [
+          (sources, " (batch {} of {})".format(idx + 1, len(batches)))
+          for idx, sources in enumerate(batches)
+        ]
+
+    process_requests = []
+    for extra_args, slug in batched_extra_args:
+      argv = image_specific_argv + [
+          '@{}'.format(argsfile) for argsfile in argsfiles_snapshot.files
+        ] + extra_args
+      # TODO(#6071): Our ExecuteProcessRequest expects a specific string type for arguments,
+      # which py2 doesn't default to. This can be removed when we drop python 2.
+      argv = [text_type(arg) for arg in argv]
+
+      process_requests.append(ExecuteProcessRequest(
+        argv=tuple(argv),
+        input_files=merged_input_digest,
+        output_files=(jar_file,) if self.get_options().use_classpath_jars else (),
+        output_directories=() if self.get_options().use_classpath_jars else (classes_dir,),
+        description="zinc compile for {}{}".format(ctx.target.address.spec, slug),
+        jdk_home=self._zinc.underlying_dist.home,
+      ))
+
+    # Execute (and merge outputs, if necessary).
+    print(process_requests)
+    results = self.context.execute_processes_synchronously_or_raise(
+      process_requests, self.name(), [WorkUnitLabel.COMPILER])
+    if len(results) == 1:
+      merged_result, = results
+    else:
+      raise Exception("TODO: Implement merging.")
 
     # TODO: Materialize as a batch in do_compile or somewhere
     self.context._scheduler.materialize_directories((
