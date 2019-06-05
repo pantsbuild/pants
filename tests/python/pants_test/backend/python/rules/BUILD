@@ -30,7 +30,9 @@ python_tests(
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:rules',
+    'src/python/pants/engine:selectors',
     'src/python/pants/util:collections',
+    'src/python/pants/util:contextutil',
     'tests/python/pants_test:test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
