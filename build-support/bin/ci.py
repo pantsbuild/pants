@@ -10,7 +10,7 @@ from enum import Enum
 from pathlib import Path
 from typing import List, Optional
 
-from common import banner, die, travis_section
+from common import banner, die, green, travis_section
 
 
 def main() -> None:
@@ -33,11 +33,11 @@ def main() -> None:
     run_clippy()
   if args.cargo_audit:
     run_cargo_audit()
-  if args.python:
+  if args.python_tests:
     run_python_tests()
-  if args.rust:
+  if args.rust_tests:
     run_rust_tests()
-  if args.jvm:
+  if args.jvm_tests:
     run_jvm_tests()
   if args.integration_tests:
     run_integration_tests(shard=args.integration_shard)
@@ -143,7 +143,7 @@ def set_cxx_compiler() -> None:
 
 def setup_python_interpreter(version: PythonVersion) -> None:
   if "PY" not in os.environ:
-    os.environ["PY"] = str(version)
+    os.environ["PY"] = f"python{version}"
   constraints_env_var = "PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS"
   if constraints_env_var not in os.environ:
     os.environ[constraints_env_var] = f"['CPython=={version}.*']"
@@ -181,7 +181,7 @@ def bootstrap(*, clean: bool, python_version: PythonVersion) -> None:
 
 # We only want to output failures and skips.
 # See https://docs.pytest.org/en/latest/usage.html#detailed-summary-report.
-PYTEST_PASSTHRU_ARGS = ["-q", "-rfa"]
+PYTEST_PASSTHRU_ARGS = ["--", "-q", "-rfa"]
 
 
 def _run_command(command: List[str], *, slug: str, start_message: str, die_message: str) -> None:
@@ -274,15 +274,58 @@ def run_cargo_audit() -> None:
       die("Cargo audit failure")
 
 
-# TODO
 def run_python_tests() -> None:
-  targets = ["src/java::", "src/scala::", "tests/java::", "tests/scala::", "zinc::"]
-  _run_command(
-    ["./pants.pex", "doc", "test"] + targets,
-    slug="CoreJVM",
-    start_message="Running core JVM tests",
-    die_message="Core JVM test failure."
-  )
+  # TODO(#7772): Simplify below to always use V2 and drop the blacklist.
+  known_v2_failures_file = "build-support/unit_test_v2_blacklist.txt"
+  with open(known_v2_failures_file, "r") as f:
+    blacklisted_targets = {line.strip() for line in f.readlines()}
+
+  with travis_section("CoreTests", "Running Python unit tests"):
+    try:
+      all_targets = subprocess.run([
+        "./pants.pex",
+        "--tag=-integration",
+        "--filter-type=python_tests",
+        "filter",
+        "src/python::",
+        "tests/python::",
+      ], stdout=subprocess.PIPE, encoding="utf-8", check=True).stdout.strip().split("\n")
+      v2_targets = set(all_targets) - blacklisted_targets
+      subprocess.run([
+        "./pants.pex",
+        "--no-v1",
+        "--v2",
+        "test.pytest"
+      ] + sorted(v2_targets) + PYTEST_PASSTHRU_ARGS, check=True)
+    except subprocess.CalledProcessError:
+      die("Core Python test failure (V2 test runner)")
+    else:
+      green("V2 unit tests passed.")
+
+    try:
+      subprocess.run([
+        "./pants.pex",
+        f"--target-spec-file={known_v2_failures_file}",
+        "test.pytest",
+        "--chroot",
+      ] + PYTEST_PASSTHRU_ARGS, check=True)
+    except subprocess.CalledProcessError:
+      die("Python unit test failure (V1 test runner")
+    else:
+      green("V1 unit tests passed.")
+
+    try:
+      subprocess.run([
+        "./pants.pex",
+        "--tag=-integration",
+        "--exclude-target-regexp=./*testprojects/.*",
+        "test.pytest",
+        "contrib::",
+      ] + PYTEST_PASSTHRU_ARGS, check=True)
+    except subprocess.CalledProcessError:
+      die("Contrib Python test failure")
+    else:
+      green("Contrib unit tests passed.")
 
 
 def run_rust_tests() -> None:
@@ -318,20 +361,45 @@ def run_jvm_tests() -> None:
   )
 
 
-# TODO
 def run_integration_tests(shard: Optional[str]) -> None:
-  targets = ["src/java::", "src/scala::", "tests/java::", "tests/scala::", "zinc::"]
-  _run_command(
-    ["./pants.pex", "doc", "test"] + targets,
-    slug="CoreJVM",
-    start_message="Running core JVM tests",
-    die_message="Core JVM test failure."
-  )
+  main_command = [
+    "./pants.pex",
+    "--tag=+integration",
+    "test.pytest",
+    "src/python::",
+    "tests/python::",
+  ]
+  contrib_command = [
+    "./pants.pex",
+    "--tag=+integration",
+    "--exclude-target-regexp=.*/testprojects/.*",
+    "test.pytest",
+    "contrib::",
+  ]
+  if shard is not None:
+    shard_arg = f"--test-pytest-test-shard={shard}"
+    main_command.append(shard_arg)
+    contrib_command.append(shard_arg)
+  main_command.extend(PYTEST_PASSTHRU_ARGS)
+  contrib_command.extend(PYTEST_PASSTHRU_ARGS)
+  with travis_section("IntegrationTests", f"Running Pants Integration tests{shard if shard is not None else ''}"):
+    try:
+      subprocess.run(main_command, check=True)
+    except subprocess.CalledProcessError:
+      die("Integration test failure.")
+    try:
+      subprocess.run(contrib_command, check=True)
+    except subprocess.CalledProcessError:
+      die("Contrib integration test failure.")
 
 
 def run_internal_backend_tests() -> None:
   _run_command(
-    ["./pants.pex", "test.pytest", "pants-plugins/src/python::", "pants-plugins/tests/python::"] + PYTEST_PASSTHRU_ARGS,
+    ["./pants.pex",
+     "test.pytest",
+     "pants-plugins/src/python::",
+     "pants-plugins/tests/python::",
+     ] + PYTEST_PASSTHRU_ARGS,
     slug="BackendTests",
     start_message="Running internal backend Python tests",
     die_message="Internal backend Python test failure."
@@ -341,7 +409,10 @@ def run_internal_backend_tests() -> None:
 def run_platform_specific_tests() -> None:
   targets = ["src/python/::", "tests/python::"]
   _run_command(
-    ["./pants.pex", "--tag='+platform_specific_behavior'", "test"] + targets + PYTEST_PASSTHRU_ARGS,
+    ["./pants.pex",
+     "--tag=+platform_specific_behavior",
+     "test"
+     ] + targets + PYTEST_PASSTHRU_ARGS,
     slug="PlatformSpecificTests",
     start_message=f"Running platform-specific tests on platform {platform.system()}",
     die_message="Pants platform-specific test failure."
