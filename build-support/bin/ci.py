@@ -69,48 +69,44 @@ class PythonVersion(Enum):
 def create_parser() -> argparse.ArgumentParser:
   parser = argparse.ArgumentParser(description="Runs commons tests for local or hosted CI.")
   parser.add_argument(
-    "-v", "--python-version",
+    "--python-version",
     type=PythonVersion,
     choices=list(PythonVersion),
     default=PythonVersion.py36,
     help="Run Pants with this version (defaults to 3.6)."
   )
   parser.add_argument(
-    "-b", "--bootstrap", action="store_true", help="Bootstrap a pants.pex from local sources."
+    "--bootstrap", action="store_true", help="Bootstrap a pants.pex from local sources."
   )
   parser.add_argument(
-    "-x", "--bootstrap-clean", action="store_true",
+    "--bootstrap-clean", action="store_true",
     help="Before bootstrapping, clean the environment so that it's like a fresh git clone."
   )
+  parser.add_argument("--githooks", action="store_true", help="Run pre-commit githook.")
   parser.add_argument(
-    "-g", "--githooks", action="store_true", help="Run pre-commit githook."
-  )
-  parser.add_argument(
-    "-s", "--sanity-checks", action="store_true",
+    "--sanity-checks", action="store_true",
     help="Run sanity checks of bootstrapped Pants and repo BUILD files."
   )
-  parser.add_argument("-l", "--lint", action="store_true", help="Run lint over whole codebase.")
-  parser.add_argument("-d", "--doc-gen", action="store_true", help="Run doc generation tests.")
-  parser.add_argument("-c", "--clippy", action="store_true", help="Run Clippy on Rust code.")
+  parser.add_argument("--lint", action="store_true", help="Run lint over whole codebase.")
+  parser.add_argument("--doc-gen", action="store_true", help="Run doc generation tests.")
+  parser.add_argument("--clippy", action="store_true", help="Run Clippy on Rust code.")
   parser.add_argument(
-    "-a", "--cargo-audit", action="store_true", help="Run Cargo audit of Rust dependencies."
+    "--cargo-audit", action="store_true", help="Run Cargo audit of Rust dependencies."
   )
-  parser.add_argument("-p", "--python-tests", action="store_true", help="Run Python unit tests.")
-  parser.add_argument("-r", "--rust-tests", action="store_true", help="Run Rust tests.")
-  parser.add_argument("-j", "--jvm-tests", action="store_true", help="Run JVM tests.")
+  parser.add_argument("--python-tests", action="store_true", help="Run Python unit tests.")
+  parser.add_argument("--rust-tests", action="store_true", help="Run Rust tests.")
+  parser.add_argument("--jvm-tests", action="store_true", help="Run JVM tests.")
   parser.add_argument(
-    "-i", "--integration-tests", action="store_true", help="Run Python integration tests."
+    "--integration-tests", action="store_true", help="Run Python integration tests."
   )
   parser.add_argument(
-    "-n", "--integration-shard", metavar="SHARD_NUMBER/TOTAL_SHARDS", default=None,
+    "--integration-shard", metavar="SHARD_NUMBER/TOTAL_SHARDS", default=None,
     help="Divide integration tests into TOTAL_SHARDS shards and just run those in SHARD_NUMBER. "
          "E.g. `-i 0/2` and `-i 1/2` will split the tests in half."
   )
+  parser.add_argument("--plugin-tests", action="store_true", help="Run tests for pants-plugins.")
   parser.add_argument(
-    "-y", "--plugin-tests", action="store_true", help="Run tests for pants-plugins."
-  )
-  parser.add_argument(
-    "-z", "--platform-specific-tests", action="store_true", help="Test platform-specific behavior."
+    "--platform-specific-tests", action="store_true", help="Test platform-specific behavior."
   )
   return parser
 
