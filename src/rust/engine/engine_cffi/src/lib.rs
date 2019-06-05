@@ -60,7 +60,7 @@ use std::os::raw;
 use std::panic;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use workunit_store::WorkUnitStore;
+use time::Timespec;
 
 // TODO: Consider renaming and making generic for collections of PyResults.
 #[repr(C)]
@@ -331,20 +331,25 @@ pub extern "C" fn scheduler_metrics(
         .collect::<Vec<_>>();
       if session.should_record_zipkin_spans() {
         let workunits = session
+          .workunit_store()
           .get_workunits()
           .lock()
           .iter()
           .map(|workunit| {
-            let workunit_zipkin_trace_info = vec![
+            let mut workunit_zipkin_trace_info = vec![
               externs::store_utf8("name"),
               externs::store_utf8(&workunit.name),
               externs::store_utf8("start_timestamp"),
-              externs::store_f64(workunit.start_timestamp),
+              externs::store_f64(timespec_as_float_secs(&workunit.start_timestamp)),
               externs::store_utf8("end_timestamp"),
-              externs::store_f64(workunit.end_timestamp),
+              externs::store_f64(timespec_as_float_secs(&workunit.end_timestamp)),
               externs::store_utf8("span_id"),
               externs::store_utf8(&workunit.span_id),
             ];
+            if let Some(parent_id) = &workunit.parent_id {
+              workunit_zipkin_trace_info.push(externs::store_utf8("parent_id"));
+              workunit_zipkin_trace_info.push(externs::store_utf8(parent_id));
+            }
             externs::store_dict(&workunit_zipkin_trace_info)
           })
           .collect::<Vec<_>>();
@@ -354,6 +359,13 @@ pub extern "C" fn scheduler_metrics(
       externs::store_dict(&values).into()
     })
   })
+}
+
+fn timespec_as_float_secs(timespec: &Timespec) -> f64 {
+  //  Reverting time from Timespec to f64 decreases precision.
+  let whole_secs = timespec.sec as f64;
+  let fract_part_in_nanos = f64::from(timespec.nsec);
+  whole_secs + fract_part_in_nanos / 1_000_000_000.0
 }
 
 ///

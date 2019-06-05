@@ -97,6 +97,7 @@ rule_graph = { path = "rule_graph" }
 smallvec = "0.6"
 store = { path = "fs/store" }
 tempfile = "3"
+time = "0.1.40"
 ui = { path = "ui" }
 url = "1.7.1"
 task_executor = { path = "task_executor" }
