@@ -32,9 +32,7 @@ from pants.util.fileutil import safe_hardlink_or_copy
 from pants.util.memo import memoized_method, memoized_property
 
 
-# TODO: To use this with the nailgun strategy, will need a publish of `rsc_2.12`: this will
-# block landing this.
-_ZINC_COMPILER_VERSION = '0.0.11'
+_ZINC_COMPILER_VERSION = '0.0.12'
 
 
 class Zinc(object):
@@ -129,7 +127,7 @@ class Zinc(object):
       cls.register_jvm_tool(register,
                             Zinc.ZINC_EXTRACTOR_TOOL_NAME,
                             classpath=[
-                              JarDependency('org.pantsbuild', 'zinc-extractor_2.12', '0.0.11')
+                              JarDependency('org.pantsbuild', 'zinc-extractor_2.12', '0.0.12')
                             ])
 
       # Register scalac for fixed versions of Scala, 2.10, 2.11 and 2.12.
