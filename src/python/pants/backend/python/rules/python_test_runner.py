@@ -116,8 +116,9 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
 
   # NB: we use the hardcoded and generic bin name `python`, rather than something dynamic like
   # `sys.executable`, to ensure that the interpreter may be discovered both locally and in remote
-  # execution. This is only used to run the downloaded PEX tool; it is not necessarily the
-  # interpreter that PEX will use to execute the generated .pex file.
+  # execution (so long as `env` is populated with a `PATH` env var and `python` is discoverable
+  # somewhere on that PATH). This is only used to run the downloaded PEX tool; it is not
+  # necessarily the interpreter that PEX will use to execute the generated .pex file.
   request = ExecuteProcessRequest(
     argv=("python", './{}'.format(output_pytest_requirements_pex_filename)),
     env=pex_exe_env,

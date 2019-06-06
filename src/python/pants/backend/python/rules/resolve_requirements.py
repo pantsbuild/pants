@@ -56,8 +56,9 @@ def resolve_requirements(request, python_setup, pex_build_environment):
 
   # NB: we use the hardcoded and generic bin name `python`, rather than something dynamic like
   # `sys.executable`, to ensure that the interpreter may be discovered both locally and in remote
-  # execution. This is only used to run the downloaded PEX tool; it is not necessarily the
-  # interpreter that PEX will use to execute the generated .pex file.
+  # execution (so long as `env` is populated with a `PATH` env var and `python` is discoverable
+  # somewhere on that PATH). This is only used to run the downloaded PEX tool; it is not
+  # necessarily the interpreter that PEX will use to execute the generated .pex file.
   argv = ["python", "./{}".format(pex_snapshot.files[0]), "-o", request.output_filename]
   if request.entry_point is not None:
     argv.extend(["-e", request.entry_point])
