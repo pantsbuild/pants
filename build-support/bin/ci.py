@@ -21,7 +21,6 @@ def main() -> None:
 
   if args.bootstrap:
     bootstrap(clean=args.bootstrap_clean, python_version=args.python_version)
-  check_pants_pex_exists()
   set_run_from_pex()
 
   if args.githooks:
@@ -180,8 +179,12 @@ def check_pants_pex_exists() -> None:
 PYTEST_PASSTHRU_ARGS = ["--", "-q", "-rfa"]
 
 
-def _run_command(command: List[str], *, slug: str, start_message: str, die_message: str) -> None:
+def _run_command(
+  command: List[str], *, slug: str, start_message: str, die_message: str, requires_pex: bool = True
+) -> None:
   with travis_section(slug, start_message):
+    if requires_pex:
+      check_pants_pex_exists()
     try:
       subprocess.run(command, check=True)
     except subprocess.CalledProcessError:
@@ -220,6 +223,7 @@ def run_sanity_checks() -> None:
     ["targets"]
   ]
   with travis_section("SanityCheck", "Sanity checking bootstrapped Pants and repo BUILD files"):
+    check_pants_pex_exists()
     for check in checks:
       run_check(check)
 
@@ -248,7 +252,8 @@ def run_clippy() -> None:
     ["build-support/bin/check_clippy.sh"],
     slug="RustClippy",
     start_message="Running Clippy on Rust code",
-    die_message="Clippy failure."
+    die_message="Clippy failure.",
+    requires_pex=False,
   )
 
 
@@ -285,6 +290,7 @@ def run_python_tests() -> None:
     blacklisted_targets = {line.strip() for line in f.readlines()}
 
   with travis_section("CoreTests", "Running Python unit tests"):
+    check_pants_pex_exists()
     try:
       all_targets = subprocess.run([
         "./pants.pex",
@@ -387,6 +393,7 @@ def run_integration_tests(*, shard: Optional[str]) -> None:
   main_command.extend(PYTEST_PASSTHRU_ARGS)
   contrib_command.extend(PYTEST_PASSTHRU_ARGS)
   with travis_section("IntegrationTests", f"Running Pants Integration tests{shard if shard is not None else ''}"):
+    check_pants_pex_exists()
     try:
       subprocess.run(main_command, check=True)
     except subprocess.CalledProcessError:
