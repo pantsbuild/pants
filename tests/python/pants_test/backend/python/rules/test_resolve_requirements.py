@@ -46,10 +46,10 @@ class TestResolveRequirements(TestBase):
       return tuple(sorted(iterable)) if iterable is not None else tuple()
 
     request = ResolveRequirementsRequest(
-      requirements=hashify_optional_collection(requirements),
       output_filename="test.pex",
-      entry_point=entry_point,
+      requirements=hashify_optional_collection(requirements),
       interpreter_constraints=hashify_optional_collection(interpreter_constraints),
+      entry_point=entry_point,
     )
     requirements_pex = assert_single_element(
       self.scheduler.product_request(ResolvedRequirementsPex, [Params(

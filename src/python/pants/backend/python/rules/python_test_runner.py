@@ -61,10 +61,10 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
   all_requirements = all_target_requirements + list(pytest.get_requirement_strings())
   resolved_requirements_pex = yield Get(
     ResolvedRequirementsPex, ResolveRequirementsRequest(
-      requirements=tuple(all_requirements),
       output_filename=output_pytest_requirements_pex_filename,
+      requirements=tuple(all_requirements),
+      interpreter_constraints=tuple(interpreter_constraints),
       entry_point="pytest:main",
-      interpreter_constraints=tuple(interpreter_constraints)
     )
   )
 

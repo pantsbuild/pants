@@ -17,10 +17,10 @@ from pants.util.strutil import create_path_env_var
 
 
 class ResolveRequirementsRequest(datatype([
-  ('requirements', hashable_string_list),
   ('output_filename', string_type),
-  ('entry_point', string_optional),
+  ('requirements', hashable_string_list),
   ('interpreter_constraints', hashable_string_list),
+  ('entry_point', string_optional),
 ])):
   pass
 
