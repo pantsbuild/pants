@@ -4,13 +4,18 @@
 
 package org.pantsbuild.zinc.compiler
 
-import com.martiansoftware.nailgun.NGContext
 import java.io.File
 import java.nio.file.Paths
+import scala.collection.JavaConverters._
+
 import sbt.internal.inc.IncrementalCompilerImpl
 import sbt.internal.util.{ ConsoleLogger, ConsoleOut }
 import sbt.util.Level
 import xsbti.CompileFailed
+
+import com.martiansoftware.nailgun.NGContext
+import com.google.common.base.Charsets
+import com.google.common.io.Files
 
 import org.pantsbuild.zinc.analysis.AnalysisMap
 import org.pantsbuild.zinc.util.Util
@@ -64,7 +69,11 @@ object Main {
     cl
   }
 
-  def preprocessArgs(args: Array[String]): Array[String] = {
+  def preprocessArgs(rawArgs: Array[String]): Array[String] = {
+    val (argFiles, partialArgs) = rawArgs.partition(_.startsWith("@"))
+    val args = partialArgs ++ argFiles.flatMap { f =>
+      Files.readLines(new File(f.drop(1)), Charsets.UTF_8).asScala
+    }
     val fixedArgs = args.flatMap { arg =>
       arg match {
         case x if x.startsWith("-C") || x.startsWith("-S") => {
