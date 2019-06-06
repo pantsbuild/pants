@@ -35,8 +35,10 @@ def main() -> None:
     run_clippy()
   if args.cargo_audit:
     run_cargo_audit()
-  if args.python_tests:
-    run_python_tests()
+  if args.python_tests_v1:
+    run_python_tests_v1()
+  if args.python_tests_v2:
+    run_python_tests_v2()
   if args.rust_tests:
     run_rust_tests()
   if args.jvm_tests:
@@ -92,7 +94,15 @@ def create_parser() -> argparse.ArgumentParser:
   parser.add_argument(
     "--cargo-audit", action="store_true", help="Run Cargo audit of Rust dependencies."
   )
-  parser.add_argument("--python-tests", action="store_true", help="Run Python unit tests.")
+  # TODO(#7772): Simplify below to always use V2 and drop the blacklist.
+  parser.add_argument(
+    "--python-tests-v1", action="store_true",
+    help="Run Python unit tests with V1 test runner over the blacklist and contrib tests."
+  )
+  parser.add_argument(
+    "--python-tests-v2", action="store_true",
+    help="Run Python unit tests with V2 test runner."
+  )
   parser.add_argument("--rust-tests", action="store_true", help="Run Rust tests.")
   parser.add_argument("--jvm-tests", action="store_true", help="Run JVM tests.")
   parser.add_argument(
@@ -283,35 +293,10 @@ def run_cargo_audit() -> None:
       die("Cargo audit failure")
 
 
-def run_python_tests() -> None:
-  # TODO(#7772): Simplify below to always use V2 and drop the blacklist.
+def run_python_tests_v1() -> None:
   known_v2_failures_file = "build-support/unit_test_v2_blacklist.txt"
-  with open(known_v2_failures_file, "r") as f:
-    blacklisted_targets = {line.strip() for line in f.readlines()}
-
-  with travis_section("CoreTests", "Running Python unit tests"):
+  with travis_section("PythonTestsV1", "Running Python unit tests with V1 test runner"):
     check_pants_pex_exists()
-    try:
-      all_targets = subprocess.run([
-        "./pants.pex",
-        "--tag=-integration",
-        "--filter-type=python_tests",
-        "filter",
-        "src/python::",
-        "tests/python::",
-      ], stdout=subprocess.PIPE, encoding="utf-8", check=True).stdout.strip().split("\n")
-      v2_targets = set(all_targets) - blacklisted_targets
-      subprocess.run([
-        "./pants.pex",
-        "--no-v1",
-        "--v2",
-        "test.pytest"
-      ] + sorted(v2_targets) + PYTEST_PASSTHRU_ARGS, check=True)
-    except subprocess.CalledProcessError:
-      die("Core Python test failure (V2 test runner)")
-    else:
-      green("V2 unit tests passed.")
-
     try:
       subprocess.run([
         "./pants.pex",
@@ -336,6 +321,34 @@ def run_python_tests() -> None:
       die("Contrib Python test failure")
     else:
       green("Contrib unit tests passed.")
+
+
+def run_python_tests_v2() -> None:
+  known_v2_failures_file = "build-support/unit_test_v2_blacklist.txt"
+  with open(known_v2_failures_file, "r") as f:
+    blacklisted_targets = {line.strip() for line in f.readlines()}
+  with travis_section("PythonTestsV1", "Running Python unit tests with V2 test runner"):
+    check_pants_pex_exists()
+    try:
+      all_targets = subprocess.run([
+        "./pants.pex",
+        "--tag=-integration",
+        "--filter-type=python_tests",
+        "filter",
+        "src/python::",
+        "tests/python::",
+      ], stdout=subprocess.PIPE, encoding="utf-8", check=True).stdout.strip().split("\n")
+      v2_targets = set(all_targets) - blacklisted_targets
+      subprocess.run([
+        "./pants.pex",
+        "--no-v1",
+        "--v2",
+        "test.pytest"
+      ] + sorted(v2_targets) + PYTEST_PASSTHRU_ARGS, check=True)
+    except subprocess.CalledProcessError:
+      die("Python unit tests failure (V2 test runner)")
+    else:
+      green("V2 unit tests passed.")
 
 
 def run_rust_tests() -> None:
