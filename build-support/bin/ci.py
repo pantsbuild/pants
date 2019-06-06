@@ -198,11 +198,11 @@ def run_githooks() -> None:
 
 
 def run_sanity_checks() -> None:
-  def run_check(command: str) -> None:
-    print(f"* Executing `./pants.pex {command}` as a sanity check")
+  def run_check(command: List[str]) -> None:
+    print(f"* Executing `./pants.pex {' '.join(command)}` as a sanity check")
     try:
       subprocess.run(
-        ["./pants.pex", command],
+        ["./pants.pex"] + command,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.STDOUT,
         check=True
@@ -210,7 +210,15 @@ def run_sanity_checks() -> None:
     except subprocess.CalledProcessError:
       die(f"Failed to execute `./pants {command}`.")
 
-  checks = ["bash-completion", "reference", "clean-all", "goals", "list ::", "roots", "targets"]
+  checks = [
+    ["bash-completion"],
+    ["reference"],
+    ["clean-all"],
+    ["goals"],
+    ["list", "::"],
+    ["roots"],
+    ["targets"]
+  ]
   with travis_section("SanityCheck", "Sanity checking bootstrapped Pants and repo BUILD files"):
     for check in checks:
       run_check(check)
