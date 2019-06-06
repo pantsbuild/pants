@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
-from builtins import zip
+from builtins import str, zip
 
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
 from pants.base.exceptions import TaskError
