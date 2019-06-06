@@ -328,7 +328,7 @@ py27_linux_build_engine: &py27_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py2.7 PEX)"
   env:
     - docker_image_name=travis_ci
-    - docker_run_command="./build-support/bin/ci.sh -2b"
+    - docker_run_command="./build-support/bin/ci.py --bootstrap --python-version 2.7"
     - CACHE_NAME=linuxpexbuild.py27
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
 
@@ -338,7 +338,7 @@ py36_linux_build_engine: &py36_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py3.6 PEX)"
   env:
     - docker_image_name=travis_ci
-    - docker_run_command="./build-support/bin/ci.sh -b && ./build-support/bin/release.sh -f"
+    - docker_run_command="./build-support/bin/ci.py --bootstrap && ./build-support/bin/release.sh -f"
     - PREPARE_DEPLOY=1
     - CACHE_NAME=linuxpexbuild.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
@@ -355,7 +355,7 @@ py37_linux_build_engine: &py37_linux_build_engine
     - CACHE_NAME=linuxpexbuild.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
   script:
-    - ./build-support/bin/ci.sh -7b
+    - ./build-support/bin/ci.py --bootstrap --python-version 3.7
     - *aws_deploy_pants_pex
 
 base_osx_build_engine: &base_osx_build_engine
@@ -377,7 +377,7 @@ py27_osx_build_engine: &py27_osx_build_engine
     - CACHE_NAME=osxpexbuild.py27
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.osx
   script:
-    - ./build-support/bin/ci.sh -2b
+    - ./build-support/bin/ci.py --bootstrap --python-version 2.7
     - *aws_deploy_pants_pex
 
 py36_osx_build_engine: &py36_osx_build_engine
@@ -390,7 +390,7 @@ py36_osx_build_engine: &py36_osx_build_engine
     - CACHE_NAME=osxpexbuild.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
   script:
-    - ./build-support/bin/ci.sh -b
+    - ./build-support/bin/ci.py --bootstrap
     - ./build-support/bin/release.sh -f
     - *aws_deploy_pants_pex
 
@@ -404,7 +404,7 @@ py37_osx_build_engine: &py37_osx_build_engine
     - CACHE_NAME=osxpexbuild.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
   script:
-    - ./build-support/bin/ci.sh -7b
+    - ./build-support/bin/ci.py --bootstrap --python-version 3.7
     - *aws_deploy_pants_pex
 
 # -------------------------------------------------------------------------
@@ -419,7 +419,7 @@ py27_lint: &py27_lint
     - *py27_linux_test_config_env
     - CACHE_NAME=linuxselfchecks.py27
   script:
-    - ./build-support/bin/ci.sh -fmrt2
+    - ./build-support/bin/ci.py --githooks --sanity-checks --doc-gen --lint --python-version 2.7
 
 py36_lint: &py36_lint
   <<: *py36_linux_test_config
@@ -428,7 +428,7 @@ py36_lint: &py36_lint
     - *py36_linux_test_config_env
     - CACHE_NAME=linuxselfchecks.py36
   script:
-    - ./build-support/bin/ci.sh -fmrt
+    - ./build-support/bin/ci.py --githooks --sanity-checks --doc-gen --lint
 
 py37_lint: &py37_lint
   <<: *py37_linux_test_config
@@ -437,7 +437,7 @@ py37_lint: &py37_lint
     - *py37_linux_test_config_env
     - CACHE_NAME=linuxselfchecks.py37
   script:
-    - ./build-support/bin/ci.sh -fmrt7
+    - ./build-support/bin/ci.py --githooks --sanity-checks --doc-gen --lint --python-version 3.7
 
 # -------------------------------------------------------------------------
 # Rust lints
@@ -457,7 +457,7 @@ linux_rust_clippy: &linux_rust_clippy
     - ulimit -c unlimited
     - ulimit -n 8192
   script:
-    - ./build-support/bin/ci.sh -s
+    - ./build-support/bin/ci.py --clippy
 
 cargo_audit: &cargo_audit
   <<: *base_rust_lints
@@ -466,7 +466,7 @@ cargo_audit: &cargo_audit
     - CACHE_NAME=linuxcargoaudit
   stage: *test_cron
   script:
-    - ./build-support/bin/ci.sh -a
+    - ./build-support/bin/ci.py --cargo-audit
 
 # -------------------------------------------------------------------------
 # Build wheels
@@ -507,7 +507,7 @@ py27_linux_build_wheels_ucs2: &py27_linux_build_wheels_ucs2
   env:
     - *base_build_wheels_env
     - docker_image_name=travis_ci_py27_ucs2
-    - docker_run_command="./build-support/bin/ci.sh -2b
+    - docker_run_command="./build-support/bin/ci.py --bootstrap --python-version 2.7
                           && ./build-support/bin/check_pants_pex_abi.py cp27m
                           && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -2n"
     - CACHE_NAME=linuxwheelsbuild.ucs2
@@ -574,7 +574,7 @@ py27_osx_build_wheels_ucs4: &py27_osx_build_wheels_ucs4
     - PY=${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin/python
     - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${PYENV_PY27_VERSION}']"
   script:
-    - ./build-support/bin/ci.sh -2b
+    - ./build-support/bin/ci.py --bootstrap --python-version 2.7
     - ./build-support/bin/check_pants_pex_abi.py cp27mu
     - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -2n
 
@@ -605,7 +605,7 @@ base_rust_tests: &base_rust_tests
     - ulimit -c unlimited
     - ulimit -n 8192
   script:
-    - ./build-support/bin/ci.sh -e
+    - ./build-support/bin/ci.py --rust-tests
 
 linux_rust_tests: &linux_rust_tests
   <<: *base_rust_tests
@@ -640,7 +640,7 @@ osx_rust_tests: &osx_rust_tests
 
 base_osx_sanity_check: &base_osx_sanity_check
   script:
-    - MODE=debug ./build-support/bin/ci.sh -m
+    - MODE=debug ./build-support/bin/ci.py --sanity-checks
 
 # TODO: Update this to use 10.14 once it is available
 base_osx_10_12_sanity_check: &base_osx_10_12_sanity_check
@@ -710,7 +710,7 @@ py27_osx_platform_tests: &py27_osx_platform_tests
     - *py27_osx_test_config_env
     - CACHE_NAME=macosplatformtests.py27
   script:
-    - ./build-support/bin/ci.sh -z2
+    - ./build-support/bin/ci.py --platform-specific-tests --python-version 2.7
 
 py36_osx_platform_tests: &py36_osx_platform_tests
   <<: *py36_osx_test_config
@@ -719,7 +719,7 @@ py36_osx_platform_tests: &py36_osx_platform_tests
     - *py36_osx_test_config_env
     - CACHE_NAME=macosplatformtests.py36
   script:
-    - ./build-support/bin/ci.sh -z
+    - ./build-support/bin/ci.py --platform-specific-tests
 
 py37_osx_platform_tests: &py37_osx_platform_tests
   <<: *py37_osx_test_config
@@ -728,7 +728,7 @@ py37_osx_platform_tests: &py37_osx_platform_tests
     - *py37_osx_test_config_env
     - CACHE_NAME=macosplatformtests.py37
   script:
-    - ./build-support/bin/ci.sh -z7
+    - ./build-support/bin/ci.py --platform-specific-tests --python-version 3.7
 
 # -------------------------------------------------------------------------
 # JVM tests
@@ -745,7 +745,7 @@ py27_jvm_tests: &py27_jvm_tests
     - *py27_linux_test_config_env
     - CACHE_NAME=linuxjvmtests.py27
   script:
-    - ./build-support/bin/ci.sh -j2
+    - ./build-support/bin/ci.py --jvm-tests --python-version 2.7
 
 py36_jvm_tests: &py36_jvm_tests
   <<: *py36_linux_test_config
@@ -755,7 +755,7 @@ py36_jvm_tests: &py36_jvm_tests
     - *py36_linux_test_config_env
     - CACHE_NAME=linuxjvmtests.py36
   script:
-    - ./build-support/bin/ci.sh -j
+    - ./build-support/bin/ci.py --jvm-tests --python-version 2.7
 
 py37_jvm_tests: &py37_jvm_tests
   <<: *py37_linux_test_config
@@ -765,7 +765,7 @@ py37_jvm_tests: &py37_jvm_tests
     - *py37_linux_test_config_env
     - CACHE_NAME=linuxjvmtests.py37
   script:
-    - ./build-support/bin/ci.sh -j7
+    - ./build-support/bin/ci.py --jvm-tests --python-version 3.7
 
 # -------------------------------------------------------------------------
 # Deploy
@@ -888,8 +888,8 @@ matrix:
         - *py27_linux_test_config_env
         - CACHE_NAME=linuxunittests.py27
       script:
-        - ./build-support/bin/ci.sh -2l
-        - travis_wait 60 ./build-support/bin/ci.sh -2p
+        - ./build-support/bin/ci.py --plugin-tests --python-version 2.7
+        - travis_wait 60 ./build-support/bin/ci.py --python-tests --python-version 2.7
 
     - <<: *py36_linux_test_config
       name: "Unit tests (Py3.6 PEX)"
@@ -897,8 +897,8 @@ matrix:
         - *py36_linux_test_config_env
         - CACHE_NAME=linuxunittests.py36
       script:
-        - ./build-support/bin/ci.sh -l
-        - travis_wait 60 ./build-support/bin/ci.sh -p
+        - ./build-support/bin/ci.py --plugin-tests
+        - travis_wait 60 ./build-support/bin/ci.py --python-tests
 
     - <<: *py37_linux_test_config
       name: "Unit tests (Py3.7 PEX)"
@@ -906,8 +906,8 @@ matrix:
         - *py37_linux_test_config_env
         - CACHE_NAME=linuxunittests.py37
       script:
-        - ./build-support/bin/ci.sh -7l
-        - travis_wait 60 ./build-support/bin/ci.sh -7p
+       - ./build-support/bin/ci.py --plugin-tests --python-version 3.7
+       - travis_wait 60 ./build-support/bin/ci.py --python-tests --python-version 3.7
 
     - <<: *py27_linux_build_wheels_ucs2
     - <<: *py27_linux_build_wheels_ucs4
@@ -924,7 +924,9 @@ matrix:
         - *py36_linux_test_config_env
         - CACHE_NAME=integrationshard{{.}}
       script:
-        - ./build-support/bin/ci.sh -c -i {{.}}/{{integration_shards_length}}
+        - >
+          ./build-support/bin/ci.py --integration-tests
+          --integration-shard {{.}}/{{integration_shards_length}}
 
 {{/integration_shards}}
 {{#integration_shards}}
@@ -936,7 +938,9 @@ matrix:
         - *run_tests_under_pantsd
         - CACHE_NAME=integrationshard{{.}}_pantsd
       script:
-        - ./build-support/bin/ci.sh -c -i {{.}}/{{integration_shards_length}}
+        - >
+          ./build-support/bin/ci.py --integration-tests
+          --integration-shard {{.}}/{{integration_shards_length}}
 
 {{/integration_shards}}
 {{#integration_shards}}
@@ -946,7 +950,10 @@ matrix:
         - *py37_linux_test_config_env
         - CACHE_NAME=integrationshard{{.}}
       script:
-        - ./build-support/bin/ci.sh -c7 -i {{.}}/{{integration_shards_length}}
+        - >
+          ./build-support/bin/ci.py --integration-tests
+          --integration-shard {{.}}/{{integration_shards_length}}
+          --python-version 3.7
 
 {{/integration_shards}}
 {{#integration_shards}}
@@ -956,7 +963,10 @@ matrix:
         - *py27_linux_test_config_env
         - CACHE_NAME=cronshard{{.}}
       script:
-        - ./build-support/bin/ci.sh -c2 -i {{.}}/{{integration_shards_length}}
+        - >
+          ./build-support/bin/ci.py --integration-tests
+          --integration-shard {{.}}/{{integration_shards_length}}
+          --python-version 2.7
 
 {{/integration_shards}}
 

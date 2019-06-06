@@ -14,9 +14,10 @@ from common import die, green
 
 def main() -> None:
   if not Path("pants.pex").is_file:
-    die("pants.pex not found! Ensure you are in the repository root, then run " \
-        "'./build-support/bin/ci.sh -b' to bootstrap pants.pex with Python 3 or " \
-        "'./build-support/bin/ci.sh -2b' to bootstrap pants.pex with Python 2.")
+    die("pants.pex not found! Ensure you are in the repository root, then run "
+        "`./build-support/bin/ci.py --bootstrap` to bootstrap pants.pex with Python 3.6 or "
+        "`./build-support/bin/ci.py --bootstrap --python-version 2.7` to bootstrap pants.pex with "
+        "Python 2.7.")
   expected_abis = frozenset(create_parser().parse_args().abis)
   with zipfile.ZipFile("pants.pex", "r") as pex:
     with pex.open("PEX-INFO", "r") as pex_info:

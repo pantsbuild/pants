@@ -156,11 +156,11 @@ all tests pass. Our tests are hard and slow to run all of locally, so we recomme
 a pull request, and allow travis to run them. You can reproduce failures by running
 
     :::bash
-    $ ./build-support/bin/ci.sh
+    $ ./build-support/bin/ci.py
 
-with whatever relevant flags reproduce the failure (`./build-support/bin/ci.sh -h` will list the
+with whatever relevant flags reproduce the failure (`./build-support/bin/ci.py --help` will list the
 available flags). The relevant flags are in the log for the shard on a line that looks something
-like `Executing ./build-support/bin/ci.sh "-c3 -i 0/6" ...`.
+like `./build-support/bin/ci.py --python-tests --python-version 3.7`.
 
 To run just Pants' *unit* tests (skipping the can-be-slow integration tests), filter out
 the python tests tagged with 'integration':
