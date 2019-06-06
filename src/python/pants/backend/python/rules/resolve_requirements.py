@@ -36,10 +36,6 @@ def resolve_requirements(request, python_setup, pex_build_environment):
   """Returns a PEX with the given requirements, optional entry point, and optional
   interpreter constraints."""
 
-  # Sort all user requirement strings to increase the chance of cache hits across invocations.
-  # TODO(#7061): This text_type() wrapping can be removed after we drop py2!
-  sorted_requirements = list(sorted(text_type(req) for req in request.requirements))
-
   # TODO: Inject versions and digests here through some option, rather than hard-coding it.
   url = 'https://github.com/pantsbuild/pex/releases/download/v1.6.6/pex'
   digest = Digest('61bb79384db0da8c844678440bd368bcbfac17bbdb865721ad3f9cb0ab29b629', 1826945)
@@ -51,7 +47,7 @@ def resolve_requirements(request, python_setup, pex_build_environment):
   env.update(pex_build_environment.invocation_environment_dict)
 
   interpreter_constraint_args = []
-  for constraint in sorted(request.interpreter_constraints):
+  for constraint in request.interpreter_constraints:
     interpreter_constraint_args.extend(["--interpreter-constraint", text_type(constraint)])
 
   # NB: we use the hardcoded and generic bin name `python`, rather than something dynamic like
@@ -63,13 +59,14 @@ def resolve_requirements(request, python_setup, pex_build_environment):
   if request.entry_point is not None:
     argv.extend(["-e", request.entry_point])
   argv.extend(interpreter_constraint_args)
-  argv.extend(sorted_requirements)
+  # TODO(#7061): This text_type() wrapping can be removed after we drop py2!
+  argv.extend([text_type(req) for req in request.requirements])
 
   request = ExecuteProcessRequest(
     argv=tuple(argv),
     env=env,
     input_files=pex_snapshot.directory_digest,
-    description='Resolve requirements: {}'.format(", ".join(sorted_requirements)),
+    description='Resolve requirements: {}'.format(", ".join(request.requirements)),
     output_files=(request.output_filename,),
   )
 
