@@ -414,7 +414,7 @@ class BaseZincCompile(JvmCompile):
         if dep.directory_digest is None:
           logger.warning(
             "ClasspathEntry {} didn't have a Digest, so won't be present for hermetic "
-            "execution".format(dep)
+            "execution of zinc".format(dep)
           )
     snapshots.extend(
       classpath_entry.directory_digest for classpath_entry in scalac_classpath_entries

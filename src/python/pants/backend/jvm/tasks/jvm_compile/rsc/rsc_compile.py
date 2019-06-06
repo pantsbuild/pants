@@ -10,7 +10,6 @@ import os
 import re
 
 from future.utils import PY3, text_type
-from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext  # noqa
 from pants.backend.jvm.subsystems.rsc import Rsc
@@ -76,10 +75,6 @@ def _create_desandboxify_fn(possible_path_patterns):
     logger.debug('path-cleanup: no match for {}'.format(path))
     return path
   return desandboxify
-
-
-def _paths_from_classpath(classpath_tuples, collection_type=list):
-  return collection_type(y[1] for y in classpath_tuples)
 
 
 class CompositeProductAdder(object):
@@ -258,6 +253,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
           'zinc-only': lambda: confify([zinc_cc.jar_file]),
           'zinc-java': lambda: confify([zinc_cc.jar_file]),
           'rsc-and-zinc': lambda: confify(
+            # TODO: Populate this from the ExecuteProcessResult not by re-snapshotting.
             to_classpath_entries([rsc_cc.rsc_jar_file], self.context._scheduler)),
         })()
         self.context.products.get_data('rsc_mixed_compile_classpath').add_for_target(
@@ -360,11 +356,19 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         dependencies_for_target = list(
           DependencyContext.global_instance().dependencies_respecting_strict_deps(target))
 
-        rsc_deps_classpath_unprocessed = _paths_from_classpath(
-          self.context.products.get_data('rsc_mixed_compile_classpath').get_for_targets(dependencies_for_target),
-          collection_type=OrderedSet)
-
-        compile_classpath_rel = fast_relpath_collection(list(rsc_deps_classpath_unprocessed))
+        classpath_paths = []
+        classpath_directory_digests = []
+        classpath_product = self.context.products.get_data('rsc_mixed_compile_classpath')
+        classpath_entries = classpath_product.get_classpath_entries_for_targets(dependencies_for_target)
+        for _conf, classpath_entry in classpath_entries:
+          classpath_paths.append(classpath_entry.path)
+          if classpath_entry.directory_digest:
+            classpath_directory_digests.append(classpath_entry.directory_digest)
+          else:
+            logger.warning(
+              "ClasspathEntry {} didn't have a Digest, so won't be present for hermetic "
+              "execution of rsc".format(classpath_entry)
+            )
 
         ctx.ensure_output_dirs_exist()
 
@@ -379,12 +383,13 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
           def hermetic_digest_classpath():
             jdk_libs_rel, jdk_libs_digest = self._jdk_libs_paths_and_digest(distribution)
+
             merged_sources_and_jdk_digest = self.context._scheduler.merge_directories(
-              (jdk_libs_digest, sources_snapshot.directory_digest))
-            classpath_rel_jdk = compile_classpath_rel + jdk_libs_rel
+              (jdk_libs_digest, sources_snapshot.directory_digest) + tuple(classpath_directory_digests))
+            classpath_rel_jdk = classpath_paths + jdk_libs_rel
             return (merged_sources_and_jdk_digest, classpath_rel_jdk)
           def nonhermetic_digest_classpath():
-            classpath_abs_jdk = compile_classpath_rel + self._jdk_libs_abs(distribution)
+            classpath_abs_jdk = classpath_paths + self._jdk_libs_abs(distribution)
             return ((EMPTY_DIRECTORY_DIGEST), classpath_abs_jdk)
 
           (input_digest, classpath_entry_paths) = self.execution_strategy_enum.resolve_for_enum_variant({
@@ -403,12 +408,11 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
             args,
             distribution,
             tgt=tgt,
-            input_files=tuple(compile_classpath_rel),
             input_digest=input_digest,
             output_dir=os.path.dirname(rsc_jar_file))
 
         self._record_target_stats(tgt,
-          len(compile_classpath_rel),
+          len(classpath_entry_paths),
           len(target_sources),
           timer.elapsed,
           False,
@@ -574,7 +578,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         sources=sources,
       ))
 
-  def _runtool_hermetic(self, main, tool_name, args, distribution, tgt=None, input_files=tuple(), input_digest=None, output_dir=None):
+  def _runtool_hermetic(self, main, tool_name, args, distribution, tgt=None, input_digest=None, output_dir=None):
     tool_classpath_abs = self._rsc_classpath
     tool_classpath = fast_relpath_collection(tool_classpath_abs)
 
@@ -605,7 +609,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     cmd = initial_args + args
 
     pathglobs = list(tool_classpath)
-    pathglobs.extend(f if os.path.isfile(f) else '{}/**'.format(f) for f in input_files)
 
     if pathglobs:
       root = PathGlobsAndRoot(
@@ -675,14 +678,14 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     return runjava_workunit
 
   def _runtool(self, args, distribution,
-               tgt=None, input_files=tuple(), input_digest=None, output_dir=None):
+               tgt=None, input_digest=None, output_dir=None):
     main = 'rsc.cli.Main'
     tool_name = 'rsc'
     with self.context.new_workunit(tool_name) as wu:
       return self.execution_strategy_enum.resolve_for_enum_variant({
         self.HERMETIC: lambda: self._runtool_hermetic(
           main, tool_name, args, distribution,
-          tgt=tgt, input_files=input_files, input_digest=input_digest, output_dir=output_dir),
+          tgt=tgt, input_digest=input_digest, output_dir=output_dir),
         self.SUBPROCESS: lambda: self._runtool_nonhermetic(
           wu, self._rsc_classpath, main, tool_name, args, distribution),
         self.NAILGUN: lambda: self._runtool_nonhermetic(
