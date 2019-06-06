@@ -240,7 +240,7 @@ def run_lint() -> None:
 
 def run_doc_gen_tests() -> None:
   _run_command(
-    ["build-support/bin/publish.docs.sh"],
+    ["build-support/bin/publish_docs.sh"],
     slug="DocGen",
     start_message="Running site doc generation test",
     die_message="Failed to generate site docs."
