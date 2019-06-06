@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import re
-from builtins import zip
+from builtins import str, zip
 
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
 from pants.base.exceptions import TaskError
@@ -101,7 +101,7 @@ and/or files which need to be edited will be dumped to: {}
       if self.get_options().strict:
         raise error
       else:
-        self.context.log.warn(error)
+        self.context.log.warn(str(error))
     return py_namespaces_by_target
 
   class ClashingNamespaceError(TaskError): pass
@@ -136,7 +136,7 @@ Errors:
       if self.get_options().strict:
         raise error
       else:
-        self.context.log.warn(error)
+        self.context.log.warn(str(error))
     return namespaces_by_files
 
   def execute(self):
