@@ -62,8 +62,9 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
   resolved_requirements_pex = yield Get(
     ResolvedRequirementsPex, ResolveRequirementsRequest(
       output_filename=output_pytest_requirements_pex_filename,
-      requirements=tuple(sorted(all_requirements)),
-      interpreter_constraints=tuple(sorted(interpreter_constraints)),
+      # TODO(#7061): This text_type() wrapping can be removed after we drop py2!
+      requirements=tuple(sorted(text_type(requirement) for requirement in all_requirements)),
+      interpreter_constraints=tuple(sorted(text_type(constraint) for constraint in interpreter_constraints)),
       entry_point="pytest:main",
     )
   )

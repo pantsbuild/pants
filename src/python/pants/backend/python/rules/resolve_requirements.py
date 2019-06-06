@@ -48,7 +48,7 @@ def resolve_requirements(request, python_setup, pex_build_environment):
 
   interpreter_constraint_args = []
   for constraint in request.interpreter_constraints:
-    interpreter_constraint_args.extend(["--interpreter-constraint", text_type(constraint)])
+    interpreter_constraint_args.extend(["--interpreter-constraint", constraint])
 
   # NB: we use the hardcoded and generic bin name `python`, rather than something dynamic like
   # `sys.executable`, to ensure that the interpreter may be discovered both locally and in remote
@@ -58,9 +58,7 @@ def resolve_requirements(request, python_setup, pex_build_environment):
   argv = ["python", "./{}".format(pex_snapshot.files[0]), "-o", request.output_filename]
   if request.entry_point is not None:
     argv.extend(["-e", request.entry_point])
-  argv.extend(interpreter_constraint_args)
-  # TODO(#7061): This text_type() wrapping can be removed after we drop py2!
-  argv.extend([text_type(req) for req in request.requirements])
+  argv.extend(interpreter_constraint_args + list(request.requirements))
 
   request = ExecuteProcessRequest(
     argv=tuple(argv),
