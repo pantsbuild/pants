@@ -103,6 +103,10 @@ class Report(object):
     Each element of msg_elements is either a message or a (message, detail) pair, i.e. of type
     Union[str, Tuple[str, str]].
     """
+    # TODO(6742): Once we have enough MyPy coverage, we can rely on MyPy to catch any issues for us,
+    # rather than this runtime check.
+    assert all(isinstance(element, (str, tuple)) for element in msg_elements), \
+      "At least one logged message element is not of type Union[str, Tuple[str, str]]:\n {}".format(msg_elements)
     with self._lock:
       for reporter in self._reporters.values():
         reporter.handle_log(workunit, level, *msg_elements)
