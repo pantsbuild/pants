@@ -25,10 +25,7 @@ class ResolveRequirementsRequest(datatype([
   pass
 
 
-class ResolvedRequirementsPex(datatype([
-  ('directory_digest', Digest),
-  ('requirements', hashable_string_list)
-])):
+class ResolvedRequirementsPex(datatype([('directory_digest', Digest)])):
   pass
 
 
@@ -78,7 +75,6 @@ def resolve_requirements(request, python_setup, pex_build_environment):
   result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, request)
   yield ResolvedRequirementsPex(
     directory_digest=result.output_directory_digest,
-    requirements=tuple(sorted_requirements),
   )
 
 
