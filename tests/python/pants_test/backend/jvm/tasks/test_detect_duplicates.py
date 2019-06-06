@@ -15,10 +15,10 @@ from pants.java.jar.jar_dependency import JarDependency
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_mkdir, safe_mkdir_for, touch
-from pants_test.jvm.jvm_task_test_base import JvmTaskTestBase
+from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
 
 
-class DuplicateDetectorTest(JvmTaskTestBase):
+class DuplicateDetectorTest(JvmBinaryTaskTestBase):
 
   @classmethod
   def task_type(cls):

@@ -10,6 +10,7 @@ import shutil
 from pants.backend.jvm.register import build_file_aliases
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
+from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_pants_cachedir
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
@@ -60,7 +61,9 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
     # TODO: We really need a straightforward way for pants's own tests to get to the enclosing
     # pants instance's options values.
     artifact_caches = [os.path.join(get_pants_cachedir(), 'artifact_cache')]
-    self.set_options_for_scope(bootstrap_scope, jvm_options=['-Xmx128m'])
+    self.set_options_for_scope(bootstrap_scope,
+                               execution_strategy=NailgunTask.ExecutionStrategy.subprocess,
+                               jvm_options=['-Xmx128m'])
     self.set_options_for_scope('cache.{}'.format(bootstrap_scope),
                                read_from=artifact_caches,
                                write_to=artifact_caches)

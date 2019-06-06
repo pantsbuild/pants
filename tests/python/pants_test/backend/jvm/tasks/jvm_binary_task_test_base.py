@@ -8,10 +8,10 @@ import os
 
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
-from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
+from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
-class JvmBinaryTaskTestBase(JvmToolTaskTestBase):
+class JvmBinaryTaskTestBase(NailgunTaskTestBase):
   """
   :API: public
   """

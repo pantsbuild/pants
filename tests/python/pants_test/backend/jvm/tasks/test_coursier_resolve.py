@@ -22,7 +22,6 @@ from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDepende
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coursier_resolve import (CoursierResolve,
                                                       CoursierResolveFingerprintStrategy)
-from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.java import util
 from pants.java.jar.exclude import Exclude
@@ -30,12 +29,12 @@ from pants.java.jar.jar_dependency import JarDependency
 from pants.task.task import Task
 from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants.util.dirutil import safe_rmtree
-from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
+from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.task_test_base import TaskTestBase
 
 
-class CoursierResolveTest(JvmToolTaskTestBase):
+class CoursierResolveTest(NailgunTaskTestBase):
   """Tests for the class CoursierResolve."""
 
   @classmethod
@@ -44,7 +43,6 @@ class CoursierResolveTest(JvmToolTaskTestBase):
 
   def setUp(self):
     super(CoursierResolveTest, self).setUp()
-    self.set_options(execution_strategy=NailgunTask.ExecutionStrategy.subprocess)
     self.set_options_for_scope('cache.{}'.format(self.options_scope),
                                read_from=None,
                                write_to=None)
@@ -69,22 +67,22 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     compile_classpath = self.resolve([jar_lib, scala_lib])
     self.assertEqual(1, len(compile_classpath.get_for_target(jar_lib)))
     self.assertEqual(0, len(compile_classpath.get_for_target(scala_lib)))
-    
+
   def test_resolve_with_remote_url(self):
     dep_with_url = JarDependency('a', 'b', 'c',
                                  url='http://central.maven.org/maven2/junit/junit/4.12/junit-4.12.jar')
     dep_with_url_lib = self.make_target('//:a', JarLibrary, jars=[dep_with_url])
-    
+
     compile_classpath = self.resolve([dep_with_url_lib])
     # Get paths on compile classpath and assert that it starts with '.../coursier/cache/relative'
     paths = [tup[1] for tup in compile_classpath.get_for_target(dep_with_url_lib)]
     self.assertTrue(any(self._cache_dir_regex('relative').search(path) for path in paths), str(paths))
-  
+
   def test_resolve_with_local_url(self):
     with temporary_file_path(suffix='.jar') as url:
       dep_with_url = JarDependency('commons-lang', 'commons-lang', '2.5', url='file://' + url)
       dep_with_url_lib = self.make_target('//:a', JarLibrary, jars=[dep_with_url])
-      
+
       compile_classpath = self.resolve([dep_with_url_lib])
       # Get paths on compile classpath and assert that it starts with '.../coursier/cache/absolute'
       paths = [tup[1] for tup in compile_classpath.get_for_target(dep_with_url_lib)]
