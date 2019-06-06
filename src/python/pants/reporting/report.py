@@ -100,7 +100,8 @@ class Report(object):
   def log(self, workunit, level, *msg_elements):
     """Log a message.
 
-    Each element of msg_elements is either a message string or a (message, detail) pair.
+    Each element of msg_elements is either a message or a (message, detail) pair, i.e. of type
+    Union[str, Tuple[str, str]].
     """
     with self._lock:
       for reporter in self._reporters.values():
