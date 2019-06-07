@@ -95,6 +95,7 @@ impl DirectoryMaterializeMetadataBuilder {
   }
 }
 
+#[allow(clippy::type_complexity)]
 #[derive(Debug)]
 enum RootOrParentMetadataBuilder {
   Root(Arc<Mutex<Option<DirectoryMaterializeMetadataBuilder>>>),
@@ -350,7 +351,7 @@ impl Store {
 
                         // Sadly not quite stable in std yet.
                         fn as_secs_f64(d: std::time::Duration) -> f64 {
-                          (d.as_nanos() as f64) / (1_000_000_000 as f64)
+                          (d.as_nanos() as f64) / (1_000_000_000_f64)
                         }
 
                         Ok(Some((
