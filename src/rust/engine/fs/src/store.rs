@@ -3981,6 +3981,8 @@ mod tests {
 
     let local = LoadMetadata {
       source: Source::Local,
+      duration: None,
+      start: None,
     };
 
     let want = DirectoryMaterializeMetadata {
@@ -4036,34 +4038,28 @@ mod tests {
       .wait()
       .unwrap();
 
-    let local = LoadMetadata {
-      source: Source::Local,
-    };
-
-    let remote = LoadMetadata {
-      source: Source::Remote,
-    };
-
-    let want = DirectoryMaterializeMetadata {
-      metadata: local.clone(),
-      child_directories: btreemap! {
-        "pets".to_owned() => DirectoryMaterializeMetadata {
-          metadata: remote.clone(),
-          child_directories: btreemap!{
-            "cats".to_owned() => DirectoryMaterializeMetadata {
-              metadata: local.clone(),
-              child_directories: btreemap!{},
-              child_files: btreemap!{
-                "roland".to_owned() => local.clone(),
-              }
-            }
-          },
-          child_files: btreemap!{},
-        }
-      },
-      child_files: btreemap! {},
-    };
-
-    assert_eq!(want, metadata);
+    assert_eq!(
+      Source::Remote,
+      metadata
+        .child_directories
+        .get("pets")
+        .unwrap()
+        .metadata
+        .source
+    );
+    assert_eq!(
+      Source::Local,
+      metadata
+        .child_directories
+        .get("pets")
+        .unwrap()
+        .child_directories
+        .get("cats")
+        .unwrap()
+        .child_files
+        .get("roland")
+        .unwrap()
+        .source
+    );
   }
 }
