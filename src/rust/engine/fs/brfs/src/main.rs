@@ -179,7 +179,7 @@ impl BuildResultFS {
         }))
       }
       Vacant(entry) => match self.store.load_file_bytes_with(digest, |_| ()).wait() {
-        Ok(Some(())) => {
+        Ok(Some(((), _metadata))) => {
           let executable_inode = self.next_inode;
           self.next_inode += 1;
           let non_executable_inode = self.next_inode;
@@ -308,7 +308,7 @@ impl BuildResultFS {
           let maybe_directory = self.store.load_directory(digest).wait();
 
           match maybe_directory {
-            Ok(Some(directory)) => {
+            Ok(Some((directory, _metadata))) => {
               let mut entries = vec![
                 ReaddirEntry {
                   inode: inode,
@@ -441,7 +441,7 @@ impl fuse::Filesystem for BuildResultFS {
                 error!("Error reading directory {:?}: {}", parent_digest, err);
                 libc::EINVAL
               })?
-              .and_then(|directory| self.node_for_digest(&directory, filename))
+              .and_then(|(directory, _metadata)| self.node_for_digest(&directory, filename))
               .ok_or(libc::ENOENT)
           })
           .and_then(|node| match node {

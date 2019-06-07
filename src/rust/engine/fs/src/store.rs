@@ -41,6 +41,17 @@ pub struct UploadSummary {
   pub upload_wall_time: Duration,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum Source {
+  Local,
+  Remote,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct LoadMetadata {
+  pub source: Source,
+}
+
 ///
 /// A content-addressed store of file contents, and Directories.
 ///
@@ -154,7 +165,7 @@ impl Store {
     &self,
     digest: Digest,
     f: F,
-  ) -> BoxFuture<Option<T>, String> {
+  ) -> BoxFuture<Option<(T, LoadMetadata)>, String> {
     // No transformation or verification is needed for files, so we pass in a pair of functions
     // which always succeed, whether the underlying bytes are coming from a local or remote store.
     // Unfortunately, we need to be a little verbose to do this.
@@ -200,7 +211,7 @@ impl Store {
   pub fn load_directory(
     &self,
     digest: Digest,
-  ) -> BoxFuture<Option<bazel_protos::remote_execution::Directory>, String> {
+  ) -> BoxFuture<Option<(bazel_protos::remote_execution::Directory, LoadMetadata)>, String> {
     self.load_bytes_with(
       EntryType::Directory,
       digest,
@@ -247,7 +258,7 @@ impl Store {
     digest: Digest,
     f_local: FLocal,
     f_remote: FRemote,
-  ) -> BoxFuture<Option<T>, String> {
+  ) -> BoxFuture<Option<(T, LoadMetadata)>, String> {
     let local = self.local.clone();
     let maybe_remote = self.remote.clone();
     self
@@ -255,7 +266,15 @@ impl Store {
       .load_bytes_with(entry_type, digest, f_local)
       .and_then(
         move |maybe_local_value| match (maybe_local_value, maybe_remote) {
-          (Some(value_result), _) => future::done(value_result.map(Some)).to_boxed(),
+          (Some(value_result), _) => future::done(value_result.map(|res| {
+            Some((
+              res,
+              LoadMetadata {
+                source: Source::Local,
+              },
+            ))
+          }))
+          .to_boxed(),
           (None, None) => future::ok(None).to_boxed(),
           (None, Some(remote)) => remote
             .load_bytes_with(entry_type, digest, move |bytes: Bytes| bytes)
@@ -266,7 +285,12 @@ impl Store {
                     .store_bytes(entry_type, bytes, true)
                     .and_then(move |stored_digest| {
                       if digest == stored_digest {
-                        Ok(Some(value))
+                        Ok(Some((
+                          value,
+                          LoadMetadata {
+                            source: Source::Remote,
+                          },
+                        )))
                       } else {
                         Err(format!(
                           "CAS gave wrong digest: expected {:?}, got {:?}",
@@ -389,7 +413,9 @@ impl Store {
     self
       .load_directory(dir_digest)
       .and_then(move |directory_opt| {
-        directory_opt.ok_or_else(|| format!("Could not read dir with digest {:?}", dir_digest))
+        directory_opt
+          .map(|(dir, _metadata)| dir)
+          .ok_or_else(|| format!("Could not read dir with digest {:?}", dir_digest))
       })
       .and_then(move |directory| {
         // Traverse the files within directory
@@ -492,7 +518,9 @@ impl Store {
     self
       .load_directory(digest)
       .and_then(move |directory_opt| {
-        directory_opt.ok_or_else(|| format!("Directory with digest {:?} not found", digest))
+        directory_opt
+          .map(|(dir, _metadata)| dir)
+          .ok_or_else(|| format!("Directory with digest {:?} not found", digest))
       })
       .and_then(move |directory| {
         let file_futures = directory
@@ -545,8 +573,8 @@ impl Store {
           .map_err(|e| format!("Error writing file {:?}: {:?}", destination, e))
       })
       .and_then(move |write_result| match write_result {
-        Some(Ok(())) => Ok(()),
-        Some(Err(e)) => Err(e),
+        Some((Ok(()), _metadata)) => Ok(()),
+        Some((Err(e), _metadata)) => Err(e),
         None => Err(format!("File with digest {:?} not found", digest)),
       })
       .to_boxed()
@@ -567,7 +595,7 @@ impl Store {
                 .and_then(move |maybe_bytes| {
                   maybe_bytes
                     .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))
-                    .map(|content| FileContent { path, content })
+                    .map(|(content, _metadata)| FileContent { path, content })
                 })
                 .to_boxed()
             })
@@ -642,7 +670,7 @@ impl Store {
     self
       .load_directory(digest)
       .and_then(move |maybe_directory| match maybe_directory {
-        Some(directory) => {
+        Some((directory, _metadata)) => {
           let result_for_directory = f(&store, &path_so_far, digest, &directory);
           result_for_directory
             .and_then(move |r| {
@@ -2499,7 +2527,10 @@ mod tests {
   }
 
   pub fn load_file_bytes(store: &Store, digest: Digest) -> Result<Option<Bytes>, String> {
-    store.load_file_bytes_with(digest, |bytes| bytes).wait()
+    store
+      .load_file_bytes_with(digest, |bytes| bytes)
+      .wait()
+      .map(|res| res.map(|(bytes, _metadata)| bytes))
   }
 
   ///
@@ -2576,8 +2607,11 @@ mod tests {
     assert_eq!(
       new_store(dir.path(), cas.address())
         .load_directory(testdir.digest())
-        .wait(),
-      Ok(Some(testdir.directory()))
+        .wait()
+        .unwrap()
+        .unwrap()
+        .0,
+      testdir.directory()
     );
     assert_eq!(0, cas.read_request_count());
   }
@@ -2613,8 +2647,11 @@ mod tests {
     assert_eq!(
       new_store(dir.path(), cas.address())
         .load_directory(testdir.digest())
-        .wait(),
-      Ok(Some(testdir.directory()))
+        .wait()
+        .unwrap()
+        .unwrap()
+        .0,
+      testdir.directory()
     );
     assert_eq!(1, cas.read_request_count());
     assert_eq!(
@@ -2662,14 +2699,20 @@ mod tests {
     assert_eq!(
       new_local_store(dir.path())
         .load_directory(testdir_digest)
-        .wait(),
-      Ok(Some(testdir_directory))
+        .wait()
+        .unwrap()
+        .unwrap()
+        .0,
+      testdir_directory
     );
     assert_eq!(
       new_local_store(dir.path())
         .load_directory(recursive_testdir_digest)
-        .wait(),
-      Ok(Some(recursive_testdir_directory))
+        .wait()
+        .unwrap()
+        .unwrap()
+        .0,
+      recursive_testdir_directory
     );
   }
 
@@ -3295,8 +3338,11 @@ mod tests {
     assert_eq!(
       store_with_remote
         .load_file_bytes_with(TestData::roland().digest(), |b| b)
-        .wait(),
-      Ok(Some(TestData::roland().bytes()))
+        .wait()
+        .unwrap()
+        .unwrap()
+        .0,
+      TestData::roland().bytes()
     )
   }
 
@@ -3372,8 +3418,11 @@ mod tests {
     assert_eq!(
       store_with_remote
         .load_file_bytes_with(TestData::roland().digest(), |b| b)
-        .wait(),
-      Ok(Some(TestData::roland().bytes()))
+        .wait()
+        .unwrap()
+        .unwrap()
+        .0,
+      TestData::roland().bytes()
     )
   }
 
