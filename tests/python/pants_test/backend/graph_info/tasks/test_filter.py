@@ -12,8 +12,10 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.base.exceptions import TaskError
+from pants.build_graph.aliased_target import AliasTarget
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
+from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.task_test_base import ConsoleTaskTestBase
 
 
@@ -24,7 +26,7 @@ class BaseFilterTest(ConsoleTaskTestBase):
   def alias_groups(cls):
     return BuildFileAliases(
       targets={
-        'target': Target,
+        'target': AliasTarget,
         'java_library': JavaLibrary,
         'page': Page,
         'python_library': PythonLibrary,
@@ -307,4 +309,55 @@ class FilterTest(BaseFilterTest):
     self.assert_console_raises(TaskError,
       targets=self.targets('::'),
       options={'tag_regex': ['abc)']}
+                               )
+
+
+class FilterTestForTargetAlias(BaseFilterTest):
+
+  def setUp(self):
+    super(FilterTestForTargetAlias, self).setUp()
+    init_subsystem(Target.Arguments)
+
+    def add_to_build_file(type_alias, path, name, *deps):
+      all_deps = ["'{0}'".format(dep) for dep in deps]
+      self.add_to_build_file(path, dedent("""
+          {type_alias}(name='{name}',
+            dependencies=[{all_deps}],
+          )
+          """.format(type_alias=type_alias, name=name, all_deps=','.join(all_deps))))
+
+    add_to_build_file('python_library', 'common/a', 'a')
+    add_to_build_file('python_library', 'common/b', 'b')
+    add_to_build_file('python_library', 'common/c', 'c')
+    add_to_build_file('target', 'common/d', 'd', 'common/a:a')
+
+  def test_filter_py(self):
+    self.assert_console_output(
+      'common/a:a',
+      'common/b:b',
+      'common/c:c',
+      targets=self.targets('::'),
+      options={'type': ['python_library']}
+    )
+
+  def test_filter_alias(self):
+    """
+    Make sure only target alias is selected.
+    """
+    self.assert_console_output(
+      'common/d:d',
+      targets=self.targets('::'),
+      options={'type': ['target']}
+    )
+
+  def test_filter_no_alias(self):
+    """
+    Make sure only target alias is deselected.
+    """
+    self.assert_console_output(
+      'common/a:a',
+      'common/b:b',
+      'common/c:c',
+      targets=self.targets('::'),
+      options={'type': ['-target']}
     )
