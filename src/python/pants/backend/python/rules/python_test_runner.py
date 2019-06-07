@@ -120,6 +120,8 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
   # execution (so long as `env` is populated with a `PATH` env var and `python` is discoverable
   # somewhere on that PATH). This is only used to run the downloaded PEX tool; it is not
   # necessarily the interpreter that PEX will use to execute the generated .pex file.
+  # TODO(#7735): Set --python-setup-interpreter-search-paths differently for the host and target
+  # platforms, when we introduce platforms in https://github.com/pantsbuild/pants/issues/7735.
   request = ExecuteProcessRequest(
     argv=("python", './{}'.format(output_pytest_requirements_pex_filename)),
     env=pex_exe_env,

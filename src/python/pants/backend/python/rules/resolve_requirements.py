@@ -55,6 +55,8 @@ def resolve_requirements(request, python_setup, pex_build_environment):
   # execution (so long as `env` is populated with a `PATH` env var and `python` is discoverable
   # somewhere on that PATH). This is only used to run the downloaded PEX tool; it is not
   # necessarily the interpreter that PEX will use to execute the generated .pex file.
+  # TODO(#7735): Set --python-setup-interpreter-search-paths differently for the host and target
+  # platforms, when we introduce platforms in https://github.com/pantsbuild/pants/issues/7735.
   argv = ["python", "./{}".format(pex_snapshot.files[0]), "-o", request.output_filename]
   if request.entry_point is not None:
     argv.extend(["-e", request.entry_point])
