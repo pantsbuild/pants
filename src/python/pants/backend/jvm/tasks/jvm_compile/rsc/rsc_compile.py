@@ -23,7 +23,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.mirrored_target_option_mixin import MirroredTargetOptionMixin
-from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, DirectoryToMaterialize, PathGlobs,
+from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryToMaterialize, PathGlobs,
                              PathGlobsAndRoot)
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.java.jar.jar_dependency import JarDependency
@@ -103,7 +103,7 @@ class RscCompileContext(CompileContext):
     self.rsc_jar_file = rsc_jar_file
 
   def ensure_output_dirs_exist(self):
-    safe_mkdir(os.path.dirname(self.rsc_jar_file))
+    safe_mkdir(os.path.dirname(self.rsc_jar_file.path))
 
 
 class RscCompile(ZincCompile, MirroredTargetOptionMixin):
@@ -217,28 +217,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   # NB: Override of ZincCompile/JvmCompile method!
   def register_extra_products_from_contexts(self, targets, compile_contexts):
     super(RscCompile, self).register_extra_products_from_contexts(targets, compile_contexts)
-    def pathglob_for(filename):
-      return PathGlobsAndRoot(
-        PathGlobs(
-          (fast_relpath_optional(filename, get_buildroot()),)),
-        text_type(get_buildroot()))
-
-    def to_classpath_entries(paths, scheduler):
-      # list of path ->
-      # list of (path, optional<digest>) ->
-      path_and_digests = [(p, Digest.load(os.path.dirname(p))) for p in paths]
-      # partition: list of path, list of tuples
-      paths_without_digests = [p for (p, d) in path_and_digests if not d]
-      if paths_without_digests:
-        self.context.log.debug('Expected to find digests for {}, capturing them.'
-          .format(paths_without_digests))
-      paths_with_digests = [(p, d) for (p, d) in path_and_digests if d]
-      # list of path -> list path, captured snapshot -> list of path with digest
-      snapshots = scheduler.capture_snapshots(tuple(pathglob_for(p) for p in paths_without_digests))
-      captured_paths_and_digests = [(p, s.directory_digest)
-        for (p, s) in zip(paths_without_digests, snapshots)]
-      # merge and classpath ify
-      return [ClasspathEntry(p, d) for (p, d) in paths_with_digests + captured_paths_and_digests]
 
     def confify(entries):
       return [(conf, e) for e in entries for conf in self._confs]
@@ -252,9 +230,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         cp_entries = rsc_cc.workflow.resolve_for_enum_variant({
           'zinc-only': lambda: confify([zinc_cc.jar_file]),
           'zinc-java': lambda: confify([zinc_cc.jar_file]),
-          'rsc-and-zinc': lambda: confify(
-            # TODO: Populate this from the ExecuteProcessResult not by re-snapshotting.
-            to_classpath_entries([rsc_cc.rsc_jar_file], self.context._scheduler)),
+          'rsc-and-zinc': lambda: confify([rsc_cc.rsc_jar_file]),
         })()
         self.context.products.get_data('rsc_mixed_compile_classpath').add_for_target(
           target,
@@ -361,7 +337,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         classpath_product = self.context.products.get_data('rsc_mixed_compile_classpath')
         classpath_entries = classpath_product.get_classpath_entries_for_targets(dependencies_for_target)
         for _conf, classpath_entry in classpath_entries:
-          classpath_paths.append(classpath_entry.path)
+          classpath_paths.append(fast_relpath(classpath_entry.path, get_buildroot()))
           if classpath_entry.directory_digest:
             classpath_directory_digests.append(classpath_entry.directory_digest)
           else:
@@ -375,7 +351,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         with Timer() as timer:
           # Outline Scala sources into SemanticDB / scalac compatible header jars.
           # ---------------------------------------------
-          rsc_jar_file = fast_relpath(ctx.rsc_jar_file, get_buildroot())
+          rsc_jar_file_relative_path = fast_relpath(ctx.rsc_jar_file.path, get_buildroot())
 
           sources_snapshot = ctx.target.sources_snapshot(scheduler=self.context._scheduler)
 
@@ -401,7 +377,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
           target_sources = ctx.sources
           args = [
                    '-cp', os.pathsep.join(classpath_entry_paths),
-                   '-d', rsc_jar_file,
+                   '-d', rsc_jar_file_relative_path,
                  ] + target_sources
 
           self._runtool(
@@ -409,7 +385,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
             distribution,
             tgt=tgt,
             input_digest=input_digest,
-            output_dir=os.path.dirname(rsc_jar_file))
+            ctx=ctx)
 
         self._record_target_stats(tgt,
           len(classpath_entry_paths),
@@ -563,7 +539,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         classes_dir=None,
         jar_file=None,
         zinc_args_file=None,
-        rsc_jar_file=os.path.join(rsc_dir, 'm.jar'),
+        rsc_jar_file=ClasspathEntry(os.path.join(rsc_dir, 'm.jar')),
         log_dir=os.path.join(rsc_dir, 'logs'),
         sources=sources,
         workflow=self._classify_target_compile_workflow(target),
@@ -578,7 +554,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         sources=sources,
       ))
 
-  def _runtool_hermetic(self, main, tool_name, args, distribution, tgt=None, input_digest=None, output_dir=None):
+  def _runtool_hermetic(self, main, tool_name, args, distribution, tgt, input_digest, ctx):
     tool_classpath_abs = self._rsc_classpath
     tool_classpath = fast_relpath_collection(tool_classpath_abs)
 
@@ -625,8 +601,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     epr = ExecuteProcessRequest(
       argv=tuple(cmd),
       input_files=epr_input_files,
-      output_files=tuple(),
-      output_directories=(output_dir,),
+      output_files=(fast_relpath(ctx.rsc_jar_file.path, get_buildroot()),),
+      output_directories=tuple(),
       timeout_seconds=15*60,
       description='run {} for {}'.format(tool_name, tgt),
       # TODO: These should always be unicodes
@@ -642,15 +618,17 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     if res.exit_code != 0:
       raise TaskError(res.stderr, exit_code=res.exit_code)
 
-    if output_dir:
-      res.output_directory_digest.dump(output_dir)
-      self.context._scheduler.materialize_directories((
-        DirectoryToMaterialize(
-          # NB the first element here is the root to materialize into, not the dir to snapshot
-          text_type(get_buildroot()),
-          res.output_directory_digest),
-      ))
-      # TODO drop a file containing the digest, named maybe output_dir.digest
+    res.output_directory_digest.dump(ctx.rsc_jar_file.path)
+
+    ctx.rsc_jar_file = ClasspathEntry(ctx.rsc_jar_file.path, res.output_directory_digest)
+
+    self.context._scheduler.materialize_directories((
+      DirectoryToMaterialize(
+        # NB the first element here is the root to materialize into, not the dir to snapshot
+        text_type(get_buildroot()),
+        res.output_directory_digest),
+    ))
+
     return res
 
   # The classpath is parameterized so that we can have a single nailgun instance serving all of our
@@ -678,14 +656,13 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     return runjava_workunit
 
   def _runtool(self, args, distribution,
-               tgt=None, input_digest=None, output_dir=None):
+               tgt=None, input_digest=None, ctx=None):
     main = 'rsc.cli.Main'
     tool_name = 'rsc'
     with self.context.new_workunit(tool_name) as wu:
       return self.execution_strategy_enum.resolve_for_enum_variant({
         self.HERMETIC: lambda: self._runtool_hermetic(
-          main, tool_name, args, distribution,
-          tgt=tgt, input_digest=input_digest, output_dir=output_dir),
+          main, tool_name, args, distribution, tgt, input_digest, ctx),
         self.SUBPROCESS: lambda: self._runtool_nonhermetic(
           wu, self._rsc_classpath, main, tool_name, args, distribution),
         self.NAILGUN: lambda: self._runtool_nonhermetic(
