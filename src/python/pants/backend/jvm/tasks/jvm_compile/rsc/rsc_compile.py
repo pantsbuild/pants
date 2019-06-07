@@ -23,7 +23,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.mirrored_target_option_mixin import MirroredTargetOptionMixin
-from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, DirectoryToMaterialize, PathGlobs,
+from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryToMaterialize, PathGlobs,
                              PathGlobsAndRoot)
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.java.jar.jar_dependency import JarDependency
