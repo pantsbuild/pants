@@ -47,12 +47,14 @@ pub enum Source {
   Remote,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct LoadMetadata {
   pub source: Source,
+  pub start: Option<f64>,
+  pub duration: Option<f64>,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize)]
+#[derive(Debug, PartialEq, Serialize)]
 pub struct DirectoryMaterializeMetadata {
   pub metadata: LoadMetadata,
   pub child_directories: BTreeMap<String, DirectoryMaterializeMetadata>,
@@ -314,6 +316,10 @@ impl Store {
   ) -> BoxFuture<Option<(T, LoadMetadata)>, String> {
     let local = self.local.clone();
     let maybe_remote = self.remote.clone();
+    let start = std::time::Instant::now();
+    let start_since_epoch = std::time::SystemTime::now()
+      .duration_since(std::time::UNIX_EPOCH)
+      .expect("Surely you're not before the unix epoch?");
     self
       .local
       .load_bytes_with(entry_type, digest, f_local)
@@ -324,6 +330,8 @@ impl Store {
               res,
               LoadMetadata {
                 source: Source::Local,
+                start: None,
+                duration: None,
               },
             ))
           }))
@@ -338,10 +346,19 @@ impl Store {
                     .store_bytes(entry_type, bytes, true)
                     .and_then(move |stored_digest| {
                       if digest == stored_digest {
+                        let duration = std::time::Instant::now() - start;
+
+                        // Sadly not quite stable in std yet.
+                        fn as_secs_f64(d: std::time::Duration) -> f64 {
+                          (d.as_nanos() as f64) / (1_000_000_000 as f64)
+                        }
+
                         Ok(Some((
                           value,
                           LoadMetadata {
                             source: Source::Remote,
+                            start: Some(as_secs_f64(start_since_epoch)),
+                            duration: Some(as_secs_f64(duration)),
                           },
                         )))
                       } else {
