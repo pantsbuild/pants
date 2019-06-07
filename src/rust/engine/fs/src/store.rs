@@ -8,7 +8,7 @@ use futures::{future, Future};
 use hashing::Digest;
 use protobuf::Message;
 use serde_derive::Serialize;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
@@ -41,15 +41,68 @@ pub struct UploadSummary {
   pub upload_wall_time: Duration,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub enum Source {
   Local,
   Remote,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct LoadMetadata {
   pub source: Source,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize)]
+pub struct DirectoryMaterializeMetadata {
+  pub metadata: LoadMetadata,
+  pub child_directories: BTreeMap<String, DirectoryMaterializeMetadata>,
+  pub child_files: BTreeMap<String, LoadMetadata>,
+}
+
+#[derive(Debug)]
+struct DirectoryMaterializeMetadataBuilder {
+  pub metadata: LoadMetadata,
+  pub child_directories: Arc<Mutex<BTreeMap<String, DirectoryMaterializeMetadataBuilder>>>,
+  pub child_files: Arc<Mutex<BTreeMap<String, LoadMetadata>>>,
+}
+
+impl DirectoryMaterializeMetadataBuilder {
+  pub fn new(metadata: LoadMetadata) -> Self {
+    DirectoryMaterializeMetadataBuilder {
+      metadata,
+      child_directories: Arc::new(Mutex::new(BTreeMap::new())),
+      child_files: Arc::new(Mutex::new(BTreeMap::new())),
+    }
+  }
+}
+
+impl DirectoryMaterializeMetadataBuilder {
+  pub fn build(self) -> DirectoryMaterializeMetadata {
+    let child_directories = Arc::try_unwrap(self.child_directories)
+      .unwrap()
+      .into_inner();
+    let child_files = Arc::try_unwrap(self.child_files).unwrap().into_inner();
+    DirectoryMaterializeMetadata {
+      metadata: self.metadata,
+      child_directories: child_directories
+        .into_iter()
+        .map(|(dir, builder)| (dir, builder.build()))
+        .collect(),
+      child_files,
+    }
+  }
+}
+
+#[derive(Debug)]
+enum RootOrParentMetadataBuilder {
+  Root(Arc<Mutex<Option<DirectoryMaterializeMetadataBuilder>>>),
+  Parent(
+    (
+      String,
+      Arc<Mutex<BTreeMap<String, DirectoryMaterializeMetadataBuilder>>>,
+      Arc<Mutex<BTreeMap<String, LoadMetadata>>>,
+    ),
+  ),
 }
 
 ///
@@ -512,17 +565,59 @@ impl Store {
     &self,
     destination: PathBuf,
     digest: Digest,
+  ) -> BoxFuture<DirectoryMaterializeMetadata, String> {
+    let root = Arc::new(Mutex::new(None));
+    self
+      .materialize_directory_helper(
+        destination,
+        RootOrParentMetadataBuilder::Root(root.clone()),
+        digest,
+      )
+      .map(|()| Arc::try_unwrap(root).unwrap().into_inner().unwrap().build())
+      .to_boxed()
+  }
+
+  fn materialize_directory_helper(
+    &self,
+    destination: PathBuf,
+    root_or_parent_metadata: RootOrParentMetadataBuilder,
+    digest: Digest,
   ) -> BoxFuture<(), String> {
-    try_future!(super::safe_create_dir_all(&destination));
+    if let RootOrParentMetadataBuilder::Root(..) = root_or_parent_metadata {
+      try_future!(super::safe_create_dir_all(&destination));
+    } else {
+      try_future!(super::safe_create_dir(&destination));
+    }
+
     let store = self.clone();
     self
       .load_directory(digest)
-      .and_then(move |directory_opt| {
-        directory_opt
-          .map(|(dir, _metadata)| dir)
-          .ok_or_else(|| format!("Directory with digest {:?} not found", digest))
+      .and_then(move |directory_and_metadata_opt| {
+        let (directory, metadata) = directory_and_metadata_opt
+          .ok_or_else(|| format!("Directory with digest {:?} not found", digest))?;
+        let (child_directories, child_files) = match root_or_parent_metadata {
+          RootOrParentMetadataBuilder::Root(root) => {
+            let builder = DirectoryMaterializeMetadataBuilder::new(metadata);
+            let child_directories = builder.child_directories.clone();
+            let child_files = builder.child_files.clone();
+            *root.lock() = Some(builder);
+            (child_directories, child_files)
+          }
+          RootOrParentMetadataBuilder::Parent((
+            dir_name,
+            parent_child_directories,
+            _parent_files,
+          )) => {
+            let builder = DirectoryMaterializeMetadataBuilder::new(metadata);
+            let child_directories = builder.child_directories.clone();
+            let child_files = builder.child_files.clone();
+            parent_child_directories.lock().insert(dir_name, builder);
+            (child_directories, child_files)
+          }
+        };
+        Ok((directory, child_directories, child_files))
       })
-      .and_then(move |directory| {
+      .and_then(move |(directory, child_directories, child_files)| {
         let file_futures = directory
           .get_files()
           .iter()
@@ -530,7 +625,12 @@ impl Store {
             let store = store.clone();
             let path = destination.join(file_node.get_name());
             let digest = try_future!(file_node.get_digest().into());
-            store.materialize_file(path, digest, file_node.is_executable)
+            let child_files = child_files.clone();
+            let name = file_node.get_name().to_owned();
+            store
+              .materialize_file(path, digest, file_node.is_executable)
+              .map(move |metadata| child_files.lock().insert(name, metadata))
+              .to_boxed()
           })
           .collect::<Vec<_>>();
         let directory_futures = directory
@@ -540,7 +640,14 @@ impl Store {
             let store = store.clone();
             let path = destination.join(directory_node.get_name());
             let digest = try_future!(directory_node.get_digest().into());
-            store.materialize_directory(path, digest)
+
+            let builder = RootOrParentMetadataBuilder::Parent((
+              directory_node.get_name().to_owned(),
+              child_directories.clone(),
+              child_files.clone(),
+            ));
+
+            store.materialize_directory_helper(path, builder, digest)
           })
           .collect::<Vec<_>>();
         future::join_all(file_futures)
@@ -555,7 +662,7 @@ impl Store {
     destination: PathBuf,
     digest: Digest,
     is_executable: bool,
-  ) -> BoxFuture<(), String> {
+  ) -> BoxFuture<LoadMetadata, String> {
     self
       .load_file_bytes_with(digest, move |bytes| {
         OpenOptions::new()
@@ -573,7 +680,7 @@ impl Store {
           .map_err(|e| format!("Error writing file {:?}: {:?}", destination, e))
       })
       .and_then(move |write_result| match write_result {
-        Some((Ok(()), _metadata)) => Ok(()),
+        Some((Ok(()), metadata)) => Ok(metadata),
         Some((Err(e), _metadata)) => Err(e),
         None => Err(format!("File with digest {:?} not found", digest)),
       })
@@ -2465,7 +2572,10 @@ mod remote {
 
 #[cfg(test)]
 mod tests {
-  use super::{local, EntryType, FileContent, Store, UploadSummary};
+  use super::{
+    local, DirectoryMaterializeMetadata, EntryType, FileContent, LoadMetadata, Source, Store,
+    UploadSummary,
+  };
 
   use crate::pool::ResettablePool;
   use bazel_protos;
@@ -2474,6 +2584,7 @@ mod tests {
   use futures::Future;
   use futures_timer::TimerHandle;
   use hashing::{Digest, Fingerprint};
+  use maplit::btreemap;
   use mock::StubCAS;
   use protobuf::Message;
   use serverset::BackoffConfig;
@@ -3816,5 +3927,125 @@ mod tests {
         upload_wall_time: Duration::default(),
       }
     );
+  }
+
+  #[test]
+  fn materialize_directory_metadata_all_local() {
+    let outer_dir = TestDirectory::double_nested();
+    let nested_dir = TestDirectory::nested();
+    let inner_dir = TestDirectory::containing_roland();
+    let file = TestData::roland();
+
+    let dir = tempfile::tempdir().unwrap();
+    let store = new_local_store(dir.path());
+    store
+      .record_directory(&outer_dir.directory(), false)
+      .wait()
+      .expect("Error storing directory locally");
+    store
+      .record_directory(&nested_dir.directory(), false)
+      .wait()
+      .expect("Error storing directory locally");
+    store
+      .record_directory(&inner_dir.directory(), false)
+      .wait()
+      .expect("Error storing directory locally");
+    store
+      .store_file_bytes(file.bytes(), false)
+      .wait()
+      .expect("Error storing file locally");
+
+    let mat_dir = tempfile::tempdir().unwrap();
+    let metadata = store
+      .materialize_directory(mat_dir.path().to_owned(), outer_dir.digest())
+      .wait()
+      .unwrap();
+
+    let local = LoadMetadata {
+      source: Source::Local,
+    };
+
+    let want = DirectoryMaterializeMetadata {
+      metadata: local.clone(),
+      child_directories: btreemap! {
+        "pets".to_owned() => DirectoryMaterializeMetadata {
+          metadata: local.clone(),
+          child_directories: btreemap!{
+            "cats".to_owned() => DirectoryMaterializeMetadata {
+              metadata: local.clone(),
+              child_directories: btreemap!{},
+              child_files: btreemap!{
+                "roland".to_owned() => local.clone(),
+              },
+            }
+          },
+          child_files: btreemap!{},
+        }
+      },
+      child_files: btreemap! {},
+    };
+
+    assert_eq!(want, metadata);
+  }
+
+  #[test]
+  fn materialize_directory_metadata_mixed() {
+    let outer_dir = TestDirectory::double_nested();
+    let nested_dir = TestDirectory::nested();
+    let inner_dir = TestDirectory::containing_roland();
+    let file = TestData::roland();
+
+    let cas = StubCAS::builder().directory(&nested_dir).build();
+
+    let dir = tempfile::tempdir().unwrap();
+    let store = new_store(dir.path(), cas.address());
+    store
+      .record_directory(&outer_dir.directory(), false)
+      .wait()
+      .expect("Error storing directory locally");
+    store
+      .record_directory(&inner_dir.directory(), false)
+      .wait()
+      .expect("Error storing directory locally");
+    store
+      .store_file_bytes(file.bytes(), false)
+      .wait()
+      .expect("Error storing file locally");
+
+    let mat_dir = tempfile::tempdir().unwrap();
+    let metadata = store
+      .materialize_directory(mat_dir.path().to_owned(), outer_dir.digest())
+      .wait()
+      .unwrap();
+
+    let local = LoadMetadata {
+      source: Source::Local,
+    };
+
+    let remote = LoadMetadata {
+      source: Source::Remote,
+    };
+
+    let want = DirectoryMaterializeMetadata {
+      metadata: local.clone(),
+      child_directories: btreemap! {
+        "pets".to_owned() => DirectoryMaterializeMetadata {
+          metadata: remote.clone(),
+          child_directories: btreemap!{
+            "cats".to_owned() => DirectoryMaterializeMetadata {
+              metadata: local.clone(),
+              child_directories: btreemap!{},
+              child_files: btreemap!{
+                "roland".to_owned() => local.clone(),
+              }
+            }
+          },
+          child_files: btreemap!{},
+        }
+      },
+      child_files: btreemap! {},
+    };
+
+    assert_eq!(want, metadata);
   }
 }

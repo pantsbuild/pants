@@ -408,6 +408,9 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         let digest = Digest(fingerprint, size_bytes);
         runtime
           .block_on(store.materialize_directory(destination, digest))
+          .map(|metadata| {
+            eprintln!("{}", serde_json::to_string_pretty(&metadata).unwrap());
+          })
           .map_err(|err| {
             if err.contains("not found") {
               ExitError(err, ExitCode::NotFound)
