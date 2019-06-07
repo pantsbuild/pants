@@ -9,14 +9,13 @@ from builtins import str
 from future.utils import text_type
 
 from pants.backend.python.rules.inject_init import InjectedInitDigest
+from pants.backend.python.rules.resolve_requirements import (ResolvedRequirementsPex,
+                                                             ResolveRequirementsRequest)
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.engine.fs import (Digest, DirectoriesToMerge, DirectoryWithPrefixToStrip, Snapshot,
-                             UrlToFetch)
-from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
-                                           FallibleExecuteProcessResult)
+from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryWithPrefixToStrip
+from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import BuildFileAddresses, TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonTestsAdaptor
 from pants.engine.rules import UnionRule, optionable_rule, rule
@@ -26,31 +25,12 @@ from pants.source.source_root import SourceRootConfig
 from pants.util.strutil import create_path_env_var
 
 
-def parse_interpreter_constraints(python_setup, python_target_adaptors):
-  constraints = {
-    constraint
-    for target_adaptor in python_target_adaptors
-    for constraint in python_setup.compatibility_or_constraints(
-      getattr(target_adaptor, 'compatibility', None)
-    )
-  }
-  constraints_args = []
-  for constraint in sorted(constraints):
-    constraints_args.extend(["--interpreter-constraint", text_type(constraint)])
-  return constraints_args
-
-
 # TODO: Support resources
 # TODO(7697): Use a dedicated rule for removing the source root prefix, so that this rule
 # does not have to depend on SourceRootConfig.
-@rule(TestResult, [PythonTestsAdaptor, PyTest, PythonSetup, SourceRootConfig, PexBuildEnvironment, SubprocessEncodingEnvironment])
-def run_python_test(test_target, pytest, python_setup, source_root_config, pex_build_environment, subprocess_encoding_environment):
+@rule(TestResult, [PythonTestsAdaptor, PyTest, PythonSetup, SourceRootConfig, SubprocessEncodingEnvironment])
+def run_python_test(test_target, pytest, python_setup, source_root_config, subprocess_encoding_environment):
   """Runs pytest for one target."""
-
-  # TODO: Inject versions and digests here through some option, rather than hard-coding it.
-  url = 'https://github.com/pantsbuild/pex/releases/download/v1.6.6/pex'
-  digest = Digest('61bb79384db0da8c844678440bd368bcbfac17bbdb865721ad3f9cb0ab29b629', 1826945)
-  pex_snapshot = yield Get(Snapshot, UrlToFetch(url, digest))
 
   # TODO(7726): replace this with a proper API to get the `closure` for a
   # TransitiveHydratedTarget.
@@ -59,7 +39,16 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, pex_b
   )
   all_targets = [t.adaptor for t in transitive_hydrated_targets.closure]
 
+  interpreter_constraints = {
+    constraint
+    for target_adaptor in all_targets
+    for constraint in python_setup.compatibility_or_constraints(
+      getattr(target_adaptor, 'compatibility', None)
+    )
+  }
+
   # Produce a pex containing pytest and all transitive 3rdparty requirements.
+  output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
   all_target_requirements = []
   for maybe_python_req_lib in all_targets:
     # This is a python_requirement()-like target.
@@ -69,46 +58,16 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, pex_b
     if hasattr(maybe_python_req_lib, 'requirements'):
       for py_req in maybe_python_req_lib.requirements:
         all_target_requirements.append(str(py_req.requirement))
-
-  # Sort all user requirement strings to increase the chance of cache hits across invocations.
-  all_requirements = sorted(all_target_requirements + list(pytest.get_requirement_strings()))
-
-  # NB: we use the hardcoded and generic bin name `python`, rather than something dynamic like
-  # `sys.executable`, to ensure that the python_binary may be discovered both locally and in remote
-  # execution. This is only used to run the downloaded PEX tool; it is not necessarily the
-  # interpreter that PEX will use to execute the generated .pex files.
-  # Because PEX works with Python 2.7 and 3.4+, we do not need to worry about `python` pointing to
-  # a specific interpreter version.
-  python_binary = "python"
-  interpreter_constraint_args = parse_interpreter_constraints(
-    python_setup, python_target_adaptors=all_targets
+  all_requirements = all_target_requirements + list(pytest.get_requirement_strings())
+  resolved_requirements_pex = yield Get(
+    ResolvedRequirementsPex, ResolveRequirementsRequest(
+      output_filename=output_pytest_requirements_pex_filename,
+      # TODO(#7061): This text_type() wrapping can be removed after we drop py2!
+      requirements=tuple(sorted(text_type(requirement) for requirement in all_requirements)),
+      interpreter_constraints=tuple(sorted(text_type(constraint) for constraint in interpreter_constraints)),
+      entry_point="pytest:main",
+    )
   )
-  interpreter_search_paths = text_type(create_path_env_var(python_setup.interpreter_search_paths))
-
-  # TODO: This is non-hermetic because the requirements will be resolved on the fly by
-  # pex27, where it should be hermetically provided in some way.
-  output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
-  requirements_pex_argv = [
-    python_binary,
-    './{}'.format(pex_snapshot.files[0]),
-    '-e', 'pytest:main',
-    '-o', output_pytest_requirements_pex_filename,
-  ] + interpreter_constraint_args + [
-    # TODO(#7061): This text_type() wrapping can be removed after we drop py2!
-    text_type(req) for req in all_requirements
-  ]
-  pex_resolve_env = {'PATH': interpreter_search_paths}
-  # TODO(#6071): merge the two dicts via ** unpacking once we drop Py2.
-  pex_resolve_env.update(pex_build_environment.invocation_environment_dict)
-  requirements_pex_request = ExecuteProcessRequest(
-    argv=tuple(requirements_pex_argv),
-    env=pex_resolve_env,
-    input_files=pex_snapshot.directory_digest,
-    description='Resolve requirements: {}'.format(", ".join(all_requirements)),
-    output_files=(output_pytest_requirements_pex_filename,),
-  )
-  requirements_pex_response = yield Get(
-    ExecuteProcessResult, ExecuteProcessRequest, requirements_pex_request)
 
   source_roots = source_root_config.get_source_roots()
 
@@ -143,7 +102,7 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, pex_b
   all_input_digests = [
     sources_digest,
     inits_digest.directory_digest,
-    requirements_pex_response.output_directory_digest,
+    resolved_requirements_pex.directory_digest,
   ]
   merged_input_files = yield Get(
     Digest,
@@ -151,12 +110,20 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, pex_b
     DirectoriesToMerge(directories=tuple(all_input_digests)),
   )
 
+  interpreter_search_paths = text_type(create_path_env_var(python_setup.interpreter_search_paths))
   pex_exe_env = {'PATH': interpreter_search_paths}
   # TODO(#6071): merge the two dicts via ** unpacking once we drop Py2.
   pex_exe_env.update(subprocess_encoding_environment.invocation_environment_dict)
 
+  # NB: we use the hardcoded and generic bin name `python`, rather than something dynamic like
+  # `sys.executable`, to ensure that the interpreter may be discovered both locally and in remote
+  # execution (so long as `env` is populated with a `PATH` env var and `python` is discoverable
+  # somewhere on that PATH). This is only used to run the downloaded PEX tool; it is not
+  # necessarily the interpreter that PEX will use to execute the generated .pex file.
+  # TODO(#7735): Set --python-setup-interpreter-search-paths differently for the host and target
+  # platforms, when we introduce platforms in https://github.com/pantsbuild/pants/issues/7735.
   request = ExecuteProcessRequest(
-    argv=(python_binary, './{}'.format(output_pytest_requirements_pex_filename)),
+    argv=("python", './{}'.format(output_pytest_requirements_pex_filename)),
     env=pex_exe_env,
     input_files=merged_input_files,
     description='Run pytest for {}'.format(test_target.address.reference()),
@@ -174,9 +141,9 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, pex_b
 
 def rules():
   return [
-      run_python_test,
-      UnionRule(TestTarget, PythonTestsAdaptor),
-      optionable_rule(PyTest),
-      optionable_rule(PythonSetup),
-      optionable_rule(SourceRootConfig),
-    ]
+    run_python_test,
+    UnionRule(TestTarget, PythonTestsAdaptor),
+    optionable_rule(PyTest),
+    optionable_rule(PythonSetup),
+    optionable_rule(SourceRootConfig),
+  ]
