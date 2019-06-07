@@ -81,6 +81,7 @@ use log::{error, Log};
 use logging::logger::LOGGER;
 use logging::{Destination, Logger};
 use rule_graph::{GraphMaker, RuleGraph};
+use workunit_store::WorkUnitStore;
 
 // TODO: Consider renaming and making generic for collections of PyResults.
 #[repr(C)]

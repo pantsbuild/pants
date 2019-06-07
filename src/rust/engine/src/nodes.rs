@@ -29,10 +29,10 @@ use hashing;
 use process_execution::{self, CommandRunner};
 use rule_graph;
 
-use crate::scheduler::WorkUnit;
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
 use rand::thread_rng;
 use rand::Rng;
+use workunit_store::{WorkUnit, WorkUnitStore};
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
