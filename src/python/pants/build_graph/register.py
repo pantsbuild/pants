@@ -8,7 +8,7 @@ import os
 from builtins import object
 
 from pants.base.build_environment import get_buildroot, pants_version
-from pants.build_graph.aliased_target import AliasTargetFactory, AliasTarget
+from pants.build_graph.aliased_target import AliasTarget, AliasTargetFactory
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.files import Files
 from pants.build_graph.intransitive_dependency import (IntransitiveDependencyFactory,
