@@ -9,7 +9,7 @@ import os
 from builtins import object, open, str
 from multiprocessing import cpu_count
 
-from future.utils import PY3, text_type
+from future.utils import PY2, PY3, text_type
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
@@ -43,6 +43,7 @@ from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_file_
                                 safe_rmtree)
 from pants.util.fileutil import create_size_estimators
 from pants.util.memo import memoized_method, memoized_property
+from pants.util.strutil import ensure_text
 
 
 # Well known metadata file to register javac plugins.
@@ -295,6 +296,18 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
           PathGlobsAndRoot(PathGlobs(extra_resources), tmpdir)
         ])
       return snapshot.directory_digest
+
+  def write_argsfile(self, ctx, args):
+    """Write the argsfile for this context."""
+    with open(ctx.args_file, 'w') as fp:
+      for arg in args:
+        # NB: in Python 2, options are stored sometimes as bytes and sometimes as unicode in the OptionValueContainer.
+        # This is due to how Python 2 natively stores attributes as a map of `str` (aka `bytes`) to their value. So,
+        # the setattr() and getattr() functions sometimes use bytes.
+        if PY2:
+          arg = ensure_text(arg)
+        fp.write(arg)
+        fp.write('\n')
 
   def create_empty_extra_products(self):
     """Create any products the subclass task supports in addition to the runtime_classpath.
