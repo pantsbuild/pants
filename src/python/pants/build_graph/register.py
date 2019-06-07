@@ -8,7 +8,7 @@ import os
 from builtins import object
 
 from pants.base.build_environment import get_buildroot, pants_version
-from pants.build_graph.aliased_target import AliasTargetFactory
+from pants.build_graph.aliased_target import AliasTargetFactory, AliasTarget
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.files import Files
 from pants.build_graph.intransitive_dependency import (IntransitiveDependencyFactory,
@@ -16,7 +16,6 @@ from pants.build_graph.intransitive_dependency import (IntransitiveDependencyFac
 from pants.build_graph.prep_command import PrepCommand
 from pants.build_graph.remote_sources import RemoteSources
 from pants.build_graph.resources import Resources
-from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import ScopedDependencyFactory
 from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.util.netrc import Netrc
@@ -44,7 +43,7 @@ def build_file_aliases():
       'prep_command': PrepCommand,
       'resources': Resources,
       'remote_sources': RemoteSources,
-      'target': Target,
+      'target': AliasTarget,
     },
     objects={
       'get_buildroot': get_buildroot,
