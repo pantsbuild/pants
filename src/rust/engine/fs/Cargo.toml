@@ -35,6 +35,7 @@ tempfile = "3"
 uuid = { version = "0.7.1", features = ["v4"] }
 
 [dev-dependencies]
+maplit = "*"
 mock = { path = "../testutil/mock" }
 testutil = { path = "../testutil" }
 tokio = "0.1"

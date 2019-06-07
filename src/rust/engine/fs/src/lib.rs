@@ -865,6 +865,14 @@ fn safe_create_dir_all(path: &Path) -> Result<(), String> {
     .map_err(|e| format!("Failed to create dir {:?} due to {:?}", path, e))
 }
 
+fn safe_create_dir(path: &Path) -> Result<(), String> {
+  match fs::create_dir(path) {
+    Ok(()) => Ok(()),
+    Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
+    Err(err) => Err(format!("{}", err)),
+  }
+}
+
 #[cfg(test)]
 mod posixfs_test {
   use tempfile;

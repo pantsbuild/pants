@@ -566,6 +566,7 @@ impl CommandRunner {
             ))
           })
         })
+        .map(|(bytes, _metadata)| bytes)
         .to_boxed()
     } else {
       let stdout_raw = Bytes::from(execute_response.get_result().get_stdout_raw());
@@ -607,6 +608,7 @@ impl CommandRunner {
             ))
           })
         })
+        .map(|(bytes, _metadata)| bytes)
         .to_boxed()
     } else {
       let stderr_raw = Bytes::from(execute_response.get_result().get_stderr_raw());
@@ -1506,15 +1508,19 @@ mod tests {
         local_store
           .load_file_bytes_with(test_stdout.digest(), |v| v)
           .wait()
-          .unwrap(),
-        Some(test_stdout.bytes())
+          .unwrap()
+          .unwrap()
+          .0,
+        test_stdout.bytes()
       );
       assert_eq!(
         local_store
           .load_file_bytes_with(test_stderr.digest(), |v| v)
           .wait()
-          .unwrap(),
-        Some(test_stderr.bytes())
+          .unwrap()
+          .unwrap()
+          .0,
+        test_stderr.bytes()
       );
     }
   }

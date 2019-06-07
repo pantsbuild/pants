@@ -666,7 +666,7 @@ impl DownloadedFile {
       .load_file_bytes_with(digest, |_| ())
       .and_then(move |maybe_bytes| {
         maybe_bytes
-          .map(|()| future::ok(()).to_boxed())
+          .map(|((), _metadata)| future::ok(()).to_boxed())
           .unwrap_or_else(|| DownloadedFile::download(core.clone(), url, file_name.clone(), digest))
           .and_then(move |()| {
             DownloadedFile::snapshot_of_one_file(core.store(), PathBuf::from(file_name), digest)

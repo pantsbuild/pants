@@ -345,12 +345,14 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           let write_result = runtime.block_on(
             store.load_file_bytes_with(digest, |bytes| io::stdout().write_all(&bytes).unwrap()),
           )?;
-          write_result.ok_or_else(|| {
-            ExitError(
-              format!("File with digest {:?} not found", digest),
-              ExitCode::NotFound,
-            )
-          })
+          write_result
+            .ok_or_else(|| {
+              ExitError(
+                format!("File with digest {:?} not found", digest),
+                ExitCode::NotFound,
+              )
+            })
+            .map(|((), _metadata)| ())
         }
         ("save", Some(args)) => {
           let path = PathBuf::from(args.value_of("path").unwrap());
@@ -406,6 +408,9 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         let digest = Digest(fingerprint, size_bytes);
         runtime
           .block_on(store.materialize_directory(destination, digest))
+          .map(|metadata| {
+            eprintln!("{}", serde_json::to_string_pretty(&metadata).unwrap());
+          })
           .map_err(|err| {
             if err.contains("not found") {
               ExitError(err, ExitCode::NotFound)
@@ -457,27 +462,27 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           .parse::<usize>()
           .expect("size_bytes must be a non-negative number");
         let digest = Digest(fingerprint, size_bytes);
-        let proto_bytes =
-          match args.value_of("output-format").unwrap() {
-            "binary" => runtime
-              .block_on(store.load_directory(digest))
-              .map(|maybe_d| maybe_d.map(|d| d.write_to_bytes().unwrap())),
-            "text" => runtime
-              .block_on(store.load_directory(digest))
-              .map(|maybe_p| maybe_p.map(|p| format!("{:?}\n", p).as_bytes().to_vec())),
-            "recursive-file-list" => runtime
-              .block_on(expand_files(store, digest))
-              .map(|maybe_v| {
-                maybe_v
-                  .map(|v| {
-                    v.into_iter()
-                      .map(|(name, _digest)| format!("{}\n", name))
-                      .collect::<Vec<String>>()
-                      .join("")
-                  })
-                  .map(String::into_bytes)
-              }),
-            "recursive-file-list-with-digests" => runtime
+        let proto_bytes = match args.value_of("output-format").unwrap() {
+          "binary" => runtime
+            .block_on(store.load_directory(digest))
+            .map(|maybe_d| maybe_d.map(|(d, _metadata)| d.write_to_bytes().unwrap())),
+          "text" => runtime
+            .block_on(store.load_directory(digest))
+            .map(|maybe_p| maybe_p.map(|(p, _metadata)| format!("{:?}\n", p).as_bytes().to_vec())),
+          "recursive-file-list" => runtime
+            .block_on(expand_files(store, digest))
+            .map(|maybe_v| {
+              maybe_v
+                .map(|v| {
+                  v.into_iter()
+                    .map(|(name, _digest)| format!("{}\n", name))
+                    .collect::<Vec<String>>()
+                    .join("")
+                })
+                .map(String::into_bytes)
+            }),
+          "recursive-file-list-with-digests" => {
+            runtime
               .block_on(expand_files(store, digest))
               .map(|maybe_v| {
                 maybe_v
@@ -488,12 +493,13 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
                       .join("")
                   })
                   .map(String::into_bytes)
-              }),
-            format => Err(format!(
-              "Unexpected value of --output-format arg: {}",
-              format
-            )),
-          }?;
+              })
+          }
+          format => Err(format!(
+            "Unexpected value of --output-format arg: {}",
+            format
+          )),
+        }?;
         match proto_bytes {
           Some(bytes) => {
             io::stdout().write_all(&bytes).unwrap();
@@ -517,7 +523,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
       let digest = Digest(fingerprint, size_bytes);
       let v = match runtime.block_on(store.load_file_bytes_with(digest, |bytes| bytes))? {
         None => runtime.block_on(store.load_directory(digest).map(|maybe_dir| {
-          maybe_dir.map(|dir| {
+          maybe_dir.map(|(dir, _metadata)| {
             Bytes::from(
               dir
                 .write_to_bytes()
@@ -525,7 +531,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             )
           })
         }))?,
-        some => some,
+        Some((bytes, _metadata)) => Some(bytes),
       };
       match v {
         Some(bytes) => {
@@ -572,7 +578,7 @@ fn expand_files_helper(
   store
     .load_directory(digest)
     .and_then(|maybe_dir| match maybe_dir {
-      Some(dir) => {
+      Some((dir, _metadata)) => {
         {
           let mut files_unlocked = files.lock();
           for file in dir.get_files() {
