@@ -14,7 +14,7 @@ from collections import defaultdict
 from contextlib import closing
 from xml.etree import ElementTree
 
-from future.utils import PY2, text_type
+from future.utils import text_type
 
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -28,13 +28,13 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
-from pants.engine.fs import DirectoryToMaterialize
+from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import classproperty
-from pants.util.strutil import ensure_text, safe_shlex_join
+from pants.util.strutil import safe_shlex_join
 
 
 # Well known metadata file required to register scalac plugins with nsc.
@@ -220,7 +220,7 @@ class BaseZincCompile(JvmCompile):
 
     if zinc_args is not None:
       for compile_context in compile_contexts:
-        with open(compile_context.zinc_args_file, 'r') as fp:
+        with open(compile_context.args_file, 'r') as fp:
           args = fp.read().split()
         zinc_args[compile_context.target] = args
 
@@ -349,32 +349,24 @@ class BaseZincCompile(JvmCompile):
     zinc_args.extend(ctx.sources)
 
     self.log_zinc_file(ctx.analysis_file)
-    with open(ctx.zinc_args_file, 'w') as fp:
-      for arg in zinc_args:
-        # NB: in Python 2, options are stored sometimes as bytes and sometimes as unicode in the OptionValueContainer.
-        # This is due to how Python 2 natively stores attributes as a map of `str` (aka `bytes`) to their value. So,
-        # the setattr() and getattr() functions sometimes use bytes.
-        if PY2:
-          arg = ensure_text(arg)
-        fp.write(arg)
-        fp.write('\n')
+    self.write_argsfile(ctx, zinc_args)
 
     return self.execution_strategy_enum.resolve_for_enum_variant({
       self.HERMETIC: lambda: self._compile_hermetic(
-        jvm_options, ctx, classes_dir, jar_file, zinc_args, compiler_bridge_classpath_entry,
+        jvm_options, ctx, classes_dir, jar_file, compiler_bridge_classpath_entry,
         dependency_classpath, scalac_classpath_entries),
-      self.SUBPROCESS: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir, zinc_args),
-      self.NAILGUN: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir, zinc_args),
+      self.SUBPROCESS: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir),
+      self.NAILGUN: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir),
     })()
 
   class ZincCompileError(TaskError):
     """An exception type specifically to signal a failed zinc execution."""
 
-  def _compile_nonhermetic(self, jvm_options, ctx, classes_directory, zinc_args):
+  def _compile_nonhermetic(self, jvm_options, ctx, classes_directory):
     exit_code = self.runjava(classpath=self.get_zinc_compiler_classpath(),
                              main=Zinc.ZINC_COMPILE_MAIN,
                              jvm_options=jvm_options,
-                             args=zinc_args,
+                             args=['@{}'.format(ctx.args_file)],
                              workunit_name=self.name(),
                              workunit_labels=[WorkUnitLabel.COMPILER],
                              dist=self._zinc.dist)
@@ -384,7 +376,7 @@ class BaseZincCompile(JvmCompile):
       DirectoryToMaterialize(text_type(classes_directory), self.extra_resources_digest(ctx)),
     ))
 
-  def _compile_hermetic(self, jvm_options, ctx, classes_dir, jar_file, zinc_args,
+  def _compile_hermetic(self, jvm_options, ctx, classes_dir, jar_file,
                         compiler_bridge_classpath_entry, dependency_classpath,
                         scalac_classpath_entries):
     zinc_relpath = fast_relpath(self._zinc.zinc, get_buildroot())
@@ -453,18 +445,24 @@ class BaseZincCompile(JvmCompile):
         Zinc.ZINC_COMPILE_MAIN
       ]
 
+    argfile_snapshot, = self.context._scheduler.capture_snapshots([
+        PathGlobsAndRoot(
+          PathGlobs([fast_relpath(ctx.args_file, get_buildroot())]),
+          get_buildroot(),
+        ),
+      ])
+
+    argv = image_specific_argv + ['@{}'.format(argfile_snapshot.files[0])]
+    # TODO(#6071): Our ExecuteProcessRequest expects a specific string type for arguments,
+    # which py2 doesn't default to. This can be removed when we drop python 2.
+    argv = [text_type(arg) for arg in argv]
+
     merged_input_digest = self.context._scheduler.merge_directories(
       tuple(s.directory_digest for s in snapshots) +
       directory_digests +
       native_image_snapshots +
-      (self.extra_resources_digest(ctx),)
+      (self.extra_resources_digest(ctx), argfile_snapshot.directory_digest)
     )
-
-
-    argv = image_specific_argv + zinc_args
-    # TODO(#6071): Our ExecuteProcessRequest expects a specific string type for arguments,
-    # which py2 doesn't default to. This can be removed when we drop python 2.
-    argv = [text_type(arg) for arg in argv]
 
     req = ExecuteProcessRequest(
       argv=tuple(argv),

@@ -94,11 +94,11 @@ class RscCompileContext(CompileContext):
                rsc_jar_file,
                jar_file,
                log_dir,
-               zinc_args_file,
+               args_file,
                sources,
                workflow):
     super(RscCompileContext, self).__init__(target, analysis_file, classes_dir, jar_file,
-                                               log_dir, zinc_args_file, sources)
+                                               log_dir, args_file, sources)
     self.workflow = workflow
     self.rsc_jar_file = rsc_jar_file
 
@@ -380,12 +380,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
                    '-d', rsc_jar_file_relative_path,
                  ] + target_sources
 
-          self._runtool(
-            args,
-            distribution,
-            tgt=tgt,
-            input_digest=input_digest,
-            ctx=ctx)
+          self.write_argsfile(ctx, args)
+
+          self._runtool(distribution, input_digest, ctx)
 
         self._record_target_stats(tgt,
           len(classpath_entry_paths),
@@ -538,7 +535,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         analysis_file=None,
         classes_dir=None,
         jar_file=None,
-        zinc_args_file=None,
+        args_file=os.path.join(rsc_dir, 'rsc_args'),
         rsc_jar_file=ClasspathEntry(os.path.join(rsc_dir, 'm.jar')),
         log_dir=os.path.join(rsc_dir, 'logs'),
         sources=sources,
@@ -550,11 +547,11 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         classes_dir=ClasspathEntry(os.path.join(zinc_dir, 'classes'), None),
         jar_file=ClasspathEntry(os.path.join(zinc_dir, 'z.jar'), None),
         log_dir=os.path.join(zinc_dir, 'logs'),
-        zinc_args_file=os.path.join(zinc_dir, 'zinc_args'),
+        args_file=os.path.join(zinc_dir, 'zinc_args'),
         sources=sources,
       ))
 
-  def _runtool_hermetic(self, main, tool_name, args, distribution, tgt, input_digest, ctx):
+  def _runtool_hermetic(self, main, tool_name, distribution, input_digest, ctx):
     tool_classpath_abs = self._rsc_classpath
     tool_classpath = fast_relpath_collection(tool_classpath_abs)
 
@@ -582,7 +579,14 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         main,
       ]
 
-    cmd = initial_args + args
+    argfile_snapshot, = self.context._scheduler.capture_snapshots([
+        PathGlobsAndRoot(
+          PathGlobs([fast_relpath(ctx.args_file, get_buildroot())]),
+          get_buildroot(),
+        ),
+      ])
+
+    cmd = initial_args + ['@{}'.format(argfile_snapshot.files[0])]
 
     pathglobs = list(tool_classpath)
 
@@ -596,7 +600,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     epr_input_files = self.context._scheduler.merge_directories(
       ((path_globs_input_digest,) if path_globs_input_digest else ())
       + ((input_digest,) if input_digest else ())
-      + tuple(s.directory_digest for s in additional_snapshots))
+      + tuple(s.directory_digest for s in additional_snapshots)
+      + (argfile_snapshot.directory_digest,))
 
     epr = ExecuteProcessRequest(
       argv=tuple(cmd),
@@ -604,7 +609,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       output_files=(fast_relpath(ctx.rsc_jar_file.path, get_buildroot()),),
       output_directories=tuple(),
       timeout_seconds=15*60,
-      description='run {} for {}'.format(tool_name, tgt),
+      description='run {} for {}'.format(tool_name, ctx.target),
       # TODO: These should always be unicodes
       # Since this is always hermetic, we need to use `underlying.home` because
       # ExecuteProcessRequest requires an existing, local jdk location.
@@ -633,12 +638,12 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
   # The classpath is parameterized so that we can have a single nailgun instance serving all of our
   # execution requests.
-  def _runtool_nonhermetic(self, parent_workunit, classpath, main, tool_name, args, distribution):
+  def _runtool_nonhermetic(self, parent_workunit, classpath, main, tool_name, distribution, ctx):
     result = self.runjava(
       classpath=classpath,
       main=main,
       jvm_options=self.get_options().jvm_options,
-      args=args,
+      args=['@{}'.format(ctx.args_file)],
       workunit_name=tool_name,
       workunit_labels=[WorkUnitLabel.TOOL],
       dist=distribution
@@ -655,18 +660,17 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       raise Exception('couldnt find work unit for underlying execution')
     return runjava_workunit
 
-  def _runtool(self, args, distribution,
-               tgt=None, input_digest=None, ctx=None):
+  def _runtool(self, distribution, input_digest, ctx):
     main = 'rsc.cli.Main'
     tool_name = 'rsc'
     with self.context.new_workunit(tool_name) as wu:
       return self.execution_strategy_enum.resolve_for_enum_variant({
         self.HERMETIC: lambda: self._runtool_hermetic(
-          main, tool_name, args, distribution, tgt, input_digest, ctx),
+          main, tool_name, distribution, input_digest, ctx),
         self.SUBPROCESS: lambda: self._runtool_nonhermetic(
-          wu, self._rsc_classpath, main, tool_name, args, distribution),
+          wu, self._rsc_classpath, main, tool_name, distribution, ctx),
         self.NAILGUN: lambda: self._runtool_nonhermetic(
-          wu, self._nailgunnable_combined_classpath, main, tool_name, args, distribution),
+          wu, self._nailgunnable_combined_classpath, main, tool_name, distribution, ctx),
       })()
 
   _JDK_LIB_NAMES = ['rt.jar', 'dt.jar', 'jce.jar', 'tools.jar']
