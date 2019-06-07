@@ -882,32 +882,57 @@ matrix:
     - <<: *cargo_audit
 
     - <<: *py27_linux_test_config
-      name: "Unit tests (Py2.7 PEX)"
+      name: "Unit tests - V2 test runner (Py2.7 PEX)"
       stage: *test
       env:
         - *py27_linux_test_config_env
-        - CACHE_NAME=linuxunittests.py27
+        - CACHE_NAME=unit_tests.v2.py27
       script:
-        - ./build-support/bin/ci.py --plugin-tests --python-version 2.7
-        - travis_wait 60 ./build-support/bin/ci.py --python-tests --python-version 2.7
+        - travis_wait 50 ./build-support/bin/ci.py --python-tests-v2 --python-version 2.7
 
     - <<: *py36_linux_test_config
-      name: "Unit tests (Py3.6 PEX)"
+      name: "Unit tests - V2 test runner (Py3.6 PEX)"
       env:
         - *py36_linux_test_config_env
-        - CACHE_NAME=linuxunittests.py36
+        - CACHE_NAME=unit_tests.v2.py36
       script:
-        - ./build-support/bin/ci.py --plugin-tests
-        - travis_wait 60 ./build-support/bin/ci.py --python-tests
+        - travis_wait 50 ./build-support/bin/ci.py --python-tests-v2
 
     - <<: *py37_linux_test_config
-      name: "Unit tests (Py3.7 PEX)"
+      name: "Unit tests - V2 test runner (Py3.7 PEX)"
       env:
         - *py37_linux_test_config_env
-        - CACHE_NAME=linuxunittests.py37
+        - CACHE_NAME=unit_tests.v2.py37
+      script:
+       - travis_wait 50 ./build-support/bin/ci.py --python-tests-v2 --python-version 3.7
+
+    - <<: *py27_linux_test_config
+      name: "Unit tests - V1 test runner (Py2.7 PEX)"
+      stage: *test
+      env:
+        - *py27_linux_test_config_env
+        - CACHE_NAME=unit_tests.v1.py27
+      script:
+        - ./build-support/bin/ci.py --plugin-tests --python-version 2.7
+        - ./build-support/bin/ci.py --python-tests-v1 --python-version 2.7
+
+    - <<: *py36_linux_test_config
+      name: "Unit tests - V1 test runner (Py3.6 PEX)"
+      env:
+        - *py36_linux_test_config_env
+        - CACHE_NAME=unit_tests.v1.py36
+      script:
+        - ./build-support/bin/ci.py --plugin-tests
+        - ./build-support/bin/ci.py --python-tests-v1
+
+    - <<: *py37_linux_test_config
+      name: "Unit tests - V1 test runner (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=unit_tests.v1.py37
       script:
        - ./build-support/bin/ci.py --plugin-tests --python-version 3.7
-       - travis_wait 60 ./build-support/bin/ci.py --python-tests --python-version 3.7
+       - ./build-support/bin/ci.py --python-tests-v1 --python-version 3.7
 
     - <<: *py27_linux_build_wheels_ucs2
     - <<: *py27_linux_build_wheels_ucs4
