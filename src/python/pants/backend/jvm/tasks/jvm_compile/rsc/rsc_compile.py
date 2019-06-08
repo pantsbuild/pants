@@ -626,6 +626,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     if res.exit_code != 0:
       raise TaskError(res.stderr, exit_code=res.exit_code)
 
+    # TODO: parse the output of -Xprint:timings for rsc and write it to self._record_target_stats()!
+
     res.output_directory_digest.dump(ctx.rsc_jar_file.path)
 
     ctx.rsc_jar_file = ClasspathEntry(ctx.rsc_jar_file.path, res.output_directory_digest)
