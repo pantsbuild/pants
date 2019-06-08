@@ -14,9 +14,7 @@ from contextlib import contextmanager
 from six import string_types
 from twitter.common.collections import maybe_list
 
-from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import environment_as
-from pants.util.dirutil import relativize_paths
 from pants.util.meta import AbstractClass
 from pants.util.process_handler import subprocess
 
@@ -31,13 +29,13 @@ class Executor(AbstractClass):
   """
 
   @staticmethod
-  def _scrub_args(classpath, main, jvm_options, args, cwd):
+  def _scrub_args(classpath, main, jvm_options, args):
     classpath = maybe_list(classpath)
     if not isinstance(main, string_types) or not main:
       raise ValueError('A non-empty main classname is required, given: {}'.format(main))
     jvm_options = maybe_list(jvm_options or ())
     args = maybe_list(args or ())
-    return classpath, main, jvm_options, args, cwd
+    return classpath, main, jvm_options, args
 
   class Error(Exception):
     """Indicates an error launching a java program.
@@ -109,9 +107,10 @@ class Executor(AbstractClass):
     """Returns the `Distribution` this executor runs via."""
     return self._distribution
 
-  def runner(self, classpath, main, jvm_options=None, args=None, cwd=None):
+  def runner(self, classpath, main, jvm_options=None, args=None):
     """Returns an `Executor.Runner` for the given java command."""
-    return self._runner(*self._scrub_args(classpath, main, jvm_options, args, cwd=cwd))
+    classpath, main, jvm_options, args = self._scrub_args(classpath, main, jvm_options, args)
+    return self._runner(classpath, main, jvm_options, args)
 
   def execute(self, classpath, main, jvm_options=None, args=None, stdout=None, stderr=None,
       cwd=None):
@@ -126,19 +125,16 @@ class Executor(AbstractClass):
     Returns the exit code of the java program.
     Raises Executor.Error if there was a problem launching java itself.
     """
-    runner = self.runner(classpath=classpath, main=main, jvm_options=jvm_options, args=args,
-                         cwd=cwd)
-    return runner.run(stdout=stdout, stderr=stderr)
+    runner = self.runner(classpath=classpath, main=main, jvm_options=jvm_options, args=args)
+    return runner.run(stdout=stdout, stderr=stderr, cwd=cwd)
 
   @abstractmethod
-  def _runner(self, classpath, main, jvm_options, args, cwd=None):
+  def _runner(self, classpath, main, jvm_options, args):
     """Subclasses should return a `Runner` that can execute the given java main."""
 
-  def _create_command(self, classpath, main, jvm_options, args, cwd=None):
+  def _create_command(self, classpath, main, jvm_options, args):
     cmd = [self._distribution.java]
     cmd.extend(jvm_options)
-    if cwd:
-      classpath = relativize_paths(classpath, cwd)
     cmd.extend(['-cp', os.pathsep.join(classpath), main])
     cmd.extend(args)
     return cmd
@@ -151,8 +147,8 @@ class CommandLineGrabber(Executor):
     super(CommandLineGrabber, self).__init__(distribution=distribution)
     self._command = None  # Initialized when we run something.
 
-  def _runner(self, classpath, main, jvm_options, args, cwd=None):
-    self._command = self._create_command(classpath, main, jvm_options, args, cwd=cwd)
+  def _runner(self, classpath, main, jvm_options, args):
+    self._command = self._create_command(classpath, main, jvm_options, args)
 
     class Runner(self.Runner):
       @property
@@ -163,10 +159,10 @@ class CommandLineGrabber(Executor):
       def command(_):
         return list(self._command)
 
-      def run(_, stdout=None, stderr=None, stdin=None):
+      def run(_, stdout=None, stderr=None, stdin=None, cwd=None):
         return 0
 
-      def spawn(_, stdout=None, stderr=None, stdin=None):
+      def spawn(_, stdout=None, stderr=None, stdin=None, cwd=None):
         return None
 
     return Runner()
@@ -205,14 +201,8 @@ class SubprocessExecutor(Executor):
     with environment_as(**cls._SCRUBBED_ENV):
       yield
 
-  def __init__(self, distribution):
-    super(SubprocessExecutor, self).__init__(distribution=distribution)
-    self._buildroot = get_buildroot()
-    self._process = None
-
-  def _runner(self, classpath, main, jvm_options, args, cwd=None):
-    cwd = cwd or os.getcwd()
-    command = self._create_command(classpath, main, jvm_options, args, cwd=cwd)
+  def _runner(self, classpath, main, jvm_options, args):
+    command = self._create_command(classpath, main, jvm_options, args)
 
     class Runner(self.Runner):
       @property
@@ -223,11 +213,11 @@ class SubprocessExecutor(Executor):
       def command(_):
         return list(command)
 
-      def spawn(_, stdout=None, stderr=None, stdin=None):
-        return self._spawn(command, cwd, stdout=stdout, stderr=stderr, stdin=stdin)
+      def spawn(_, stdout=None, stderr=None, stdin=None, cwd=None):
+        return self._spawn(command, cwd=cwd, stdout=stdout, stderr=stderr, stdin=stdin)
 
-      def run(_, stdout=None, stderr=None, stdin=None):
-        return self._spawn(command, cwd, stdout=stdout, stderr=stderr, stdin=stdin).wait()
+      def run(_, stdout=None, stderr=None, stdin=None, cwd=None):
+        return self._spawn(command, cwd=cwd, stdout=stdout, stderr=stderr, stdin=stdin).wait()
 
     return Runner()
 
@@ -240,11 +230,13 @@ class SubprocessExecutor(Executor):
 
     :raises: :class:`Executor.Error` if there is a problem spawning the subprocess.
     """
-    cwd = cwd or os.getcwd()
-    cmd = self._create_command(*self._scrub_args(classpath, main, jvm_options, args, cwd=cwd))
-    return self._spawn(cmd, cwd, **subprocess_args)
+    classpath, main, jvm_options, args = self._scrub_args(classpath, main, jvm_options, args)
+    cmd = self._create_command(classpath, main, jvm_options, args)
+    return self._spawn(cmd, cwd=cwd, **subprocess_args)
 
-  def _spawn(self, cmd, cwd, stdout=None, stderr=None, stdin=None, **subprocess_args):
+  def _spawn(self, cmd, cwd=None, stdout=None, stderr=None, stdin=None, **subprocess_args):
+    cwd = cwd or os.getcwd()
+
     # NB: Only stdout and stderr have non-None defaults: callers that want to capture
     # stdin should pass it explicitly.
     stdout = stdout or sys.stdout

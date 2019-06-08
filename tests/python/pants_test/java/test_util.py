@@ -45,14 +45,14 @@ class ExecuteJavaTest(unittest.TestCase):
       mock_safe_classpath.side_effect = fake_safe_classpath
       yield mock_safe_classpath
 
-    self.runner.run.assert_called_once_with(stdin=None)
+    self.runner.run.assert_called_once_with(stdin=None, cwd=None)
     if create_synthetic_jar:
       self.executor.runner.assert_called_once_with(self.SAFE_CLASSPATH, self.TEST_MAIN,
-                                                    args=None, jvm_options=None, cwd=None)
+                                                   args=None, jvm_options=None)
       mock_safe_classpath.assert_called_once_with(self.TEST_CLASSPATH, self.SYNTHETIC_JAR_DIR)
     else:
       self.executor.runner.assert_called_once_with(self.TEST_CLASSPATH, self.TEST_MAIN,
-                                                    args=None, jvm_options=None, cwd=None)
+                                                   args=None, jvm_options=None)
       mock_safe_classpath.assert_not_called()
 
   def test_execute_java_no_error(self):
@@ -61,8 +61,8 @@ class ExecuteJavaTest(unittest.TestCase):
     """
     with self.mock_safe_classpath_helper():
       self.assertEqual(0, execute_java(self.TEST_CLASSPATH, self.TEST_MAIN,
-                                        executor=self.executor,
-                                        synthetic_jar_dir=self.SYNTHETIC_JAR_DIR))
+                                       executor=self.executor,
+                                       synthetic_jar_dir=self.SYNTHETIC_JAR_DIR))
 
   def test_execute_java_executor_error(self):
     """
@@ -81,8 +81,8 @@ class ExecuteJavaTest(unittest.TestCase):
     """
     with self.mock_safe_classpath_helper(create_synthetic_jar=False):
       self.assertEqual(0, execute_java(self.TEST_CLASSPATH, self.TEST_MAIN,
-                                        executor=self.executor,
-                                        create_synthetic_jar=False))
+                                       executor=self.executor,
+                                       create_synthetic_jar=False))
 
 
 def fake_safe_classpath(classpath, synthetic_jar_dir):

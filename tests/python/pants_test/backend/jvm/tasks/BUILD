@@ -815,3 +815,18 @@ python_tests(
   ],
   tags = {'integration'},
 )
+
+python_tests(
+  name = 'nailgun_task',
+  sources = ['test_nailgun_task.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks:nailgun_task',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/java:nailgun_executor',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:process_handler',
+    'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+  ],
+)

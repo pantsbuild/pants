@@ -7,6 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.java import util
 from pants.java.executor import SubprocessExecutor
@@ -112,6 +113,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
                                main=main,
                                jvm_options=jvm_options,
                                args=args,
+                               cwd=get_buildroot(),
                                executor=executor,
                                workunit_factory=self.context.new_workunit,
                                workunit_name=workunit_name,

@@ -227,7 +227,7 @@ class NailgunClient(object):
   DEFAULT_NG_PORT = 2113
 
   def __init__(self, host=DEFAULT_NG_HOST, port=DEFAULT_NG_PORT, ins=sys.stdin, out=None, err=None,
-               workdir=None, exit_on_broken_pipe=False, metadata_base_dir=None):
+               exit_on_broken_pipe=False, metadata_base_dir=None):
     """Creates a nailgun client that can be used to issue zero or more nailgun commands.
 
     :param string host: the nailgun server to contact (defaults to '127.0.0.1')
@@ -237,7 +237,6 @@ class NailgunClient(object):
                      in which case no input is read
     :param file out: a stream to write command standard output to (defaults to stdout)
     :param file err: a stream to write command standard error to (defaults to stderr)
-    :param string workdir: the default working directory for all nailgun commands (defaults to CWD)
     :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are
                                      encountered
     :param string metadata_base_dir: If a PID and PGRP are received from the server (only for
@@ -252,7 +251,6 @@ class NailgunClient(object):
     self._stdin = ins
     self._stdout = out or (sys.stdout.buffer if PY3 else sys.stdout)
     self._stderr = err or (sys.stderr.buffer if PY3 else sys.stderr)
-    self._workdir = workdir or os.path.abspath(os.path.curdir)
     self._exit_on_broken_pipe = exit_on_broken_pipe
     self._metadata_base_dir = metadata_base_dir
     # Mutable session state.
@@ -339,7 +337,7 @@ class NailgunClient(object):
     """
     environment = dict(**environment)
     environment.update(self.ENV_DEFAULTS)
-    cwd = cwd or self._workdir
+    cwd = cwd or os.getcwd()
 
     sock = self.try_connect()
 
@@ -370,6 +368,4 @@ class NailgunClient(object):
       self._session = None
 
   def __repr__(self):
-    return 'NailgunClient(host={!r}, port={!r}, workdir={!r})'.format(self._host,
-                                                                      self._port,
-                                                                      self._workdir)
+    return 'NailgunClient(host={!r}, port={!r})'.format(self._host, self._port)
