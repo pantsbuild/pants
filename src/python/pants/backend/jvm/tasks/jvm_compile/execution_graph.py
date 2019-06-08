@@ -184,9 +184,9 @@ class ExecutionGraph(object):
     def entry(key):
       dependees = self._dependees[key]
       if dependees:
-        return "{} -> {{\n  {}\n}}".format(key, ',\n  '.join(dependees))
+        return "{} <- {{\n  {}\n}}".format(key, ',\n  '.join(dependees))
       else:
-        return "{} -> {{}}".format(key)
+        return "{} <- {{}}".format(key)
     return "\n".join([
       entry(key)
       for key in self._job_keys_as_scheduled
