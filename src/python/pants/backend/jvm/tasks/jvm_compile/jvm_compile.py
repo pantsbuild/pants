@@ -266,6 +266,17 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     """Classpath entries containing scalac plugins."""
     return []
 
+  def argsfiles_snapshot(self, compile_context):
+    snapshot, = self.context._scheduler.capture_snapshots([
+        PathGlobsAndRoot(
+          PathGlobs([
+            fast_relpath(argsfile, get_buildroot()) for argsfile in compile_context.argsfiles
+          ]),
+          get_buildroot(),
+        ),
+      ])
+    return snapshot
+
   def extra_resources(self, compile_context):
     """Produces a dictionary of any extra, out-of-band resources for a target.
 
@@ -297,17 +308,17 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         ])
       return snapshot.directory_digest
 
-  def write_argsfile(self, ctx, args):
-    """Write the argsfile for this context."""
-    with open(ctx.args_file, 'w') as fp:
-      for arg in args:
-        # NB: in Python 2, options are stored sometimes as bytes and sometimes as unicode in the OptionValueContainer.
-        # This is due to how Python 2 natively stores attributes as a map of `str` (aka `bytes`) to their value. So,
-        # the setattr() and getattr() functions sometimes use bytes.
-        if PY2:
-          arg = ensure_text(arg)
-        fp.write(arg)
-        fp.write('\n')
+  def write_argsfiles(self, ctx, opts_args, srcs_args):
+    """Write the argsfiles for this context."""
+    for (argsfile, args) in [(ctx.argsfile_opts, opts_args), (ctx.argsfile_srcs, srcs_args)]:
+      with open(argsfile, 'w') as fp:
+        for arg in args:
+          # NB: in Python 2, options are stored sometimes as bytes and sometimes as unicode in the
+          # OptionValueContainer.
+          if PY2:
+            arg = ensure_text(arg)
+          fp.write(arg)
+          fp.write('\n')
 
   def create_empty_extra_products(self):
     """Create any products the subclass task supports in addition to the runtime_classpath.
@@ -375,7 +386,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                           ClasspathEntry(os.path.join(target_workdir, 'classes')),
                           ClasspathEntry(os.path.join(target_workdir, 'z.jar')),
                           os.path.join(target_workdir, 'logs'),
-                          os.path.join(target_workdir, 'zinc_args'),
+                          os.path.join(target_workdir, 'zinc_opts_args'),
+                          os.path.join(target_workdir, 'zinc_src_args'),
                           self._compute_sources_for_target(target))
 
   def execute(self):

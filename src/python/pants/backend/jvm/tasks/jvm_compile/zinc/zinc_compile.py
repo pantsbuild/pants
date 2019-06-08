@@ -28,7 +28,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
-from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
+from pants.engine.fs import DirectoryToMaterialize
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath
@@ -220,8 +220,10 @@ class BaseZincCompile(JvmCompile):
 
     if zinc_args is not None:
       for compile_context in compile_contexts:
-        with open(compile_context.args_file, 'r') as fp:
-          args = fp.read().split()
+        args = []
+        for argsfile in compile_context.argsfiles:
+          with open(argsfile, 'r') as fp:
+            args.extend(fp.read().split())
         zinc_args[compile_context.target] = args
 
   def create_empty_extra_products(self):
@@ -346,10 +348,8 @@ class BaseZincCompile(JvmCompile):
 
     jvm_options.extend(self._jvm_options)
 
-    zinc_args.extend(ctx.sources)
-
     self.log_zinc_file(ctx.analysis_file)
-    self.write_argsfile(ctx, zinc_args)
+    self.write_argsfiles(ctx, zinc_args, ctx.sources)
 
     return self.execution_strategy_enum.resolve_for_enum_variant({
       self.HERMETIC: lambda: self._compile_hermetic(
@@ -366,7 +366,7 @@ class BaseZincCompile(JvmCompile):
     exit_code = self.runjava(classpath=self.get_zinc_compiler_classpath(),
                              main=Zinc.ZINC_COMPILE_MAIN,
                              jvm_options=jvm_options,
-                             args=['@{}'.format(ctx.args_file)],
+                             args=['@{}'.format(argsfile) for argsfile in ctx.argsfiles],
                              workunit_name=self.name(),
                              workunit_labels=[WorkUnitLabel.COMPILER],
                              dist=self._zinc.dist)
@@ -445,14 +445,9 @@ class BaseZincCompile(JvmCompile):
         Zinc.ZINC_COMPILE_MAIN
       ]
 
-    argfile_snapshot, = self.context._scheduler.capture_snapshots([
-        PathGlobsAndRoot(
-          PathGlobs([fast_relpath(ctx.args_file, get_buildroot())]),
-          get_buildroot(),
-        ),
-      ])
+    argsfiles_snapshot = self.argsfiles_snapshot(ctx)
 
-    argv = image_specific_argv + ['@{}'.format(argfile_snapshot.files[0])]
+    argv = image_specific_argv + ['@{}'.format(argsfile) for argsfile in argsfiles_snapshot.files]
     # TODO(#6071): Our ExecuteProcessRequest expects a specific string type for arguments,
     # which py2 doesn't default to. This can be removed when we drop python 2.
     argv = [text_type(arg) for arg in argv]
@@ -461,7 +456,7 @@ class BaseZincCompile(JvmCompile):
       tuple(s.directory_digest for s in snapshots) +
       directory_digests +
       native_image_snapshots +
-      (self.extra_resources_digest(ctx), argfile_snapshot.directory_digest)
+      (self.extra_resources_digest(ctx), argsfiles_snapshot.directory_digest)
     )
 
     req = ExecuteProcessRequest(

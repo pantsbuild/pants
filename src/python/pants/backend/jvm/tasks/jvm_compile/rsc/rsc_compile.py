@@ -94,11 +94,12 @@ class RscCompileContext(CompileContext):
                rsc_jar_file,
                jar_file,
                log_dir,
-               args_file,
+               argsfile_opts,
+               argsfile_srcs,
                sources,
                workflow):
     super(RscCompileContext, self).__init__(target, analysis_file, classes_dir, jar_file,
-                                               log_dir, args_file, sources)
+                                               log_dir, argsfile_opts, argsfile_srcs, sources)
     self.workflow = workflow
     self.rsc_jar_file = rsc_jar_file
 
@@ -378,12 +379,12 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
           })()
 
           target_sources = ctx.sources
-          args = [
+          opts_args = [
                    '-cp', os.pathsep.join(classpath_entry_paths),
                    '-d', rsc_jar_file_relative_path,
-                 ] + self.get_options().extra_rsc_args + target_sources
+                 ] + self.get_options().extra_rsc_args
 
-          self.write_argsfile(ctx, args)
+          self.write_argsfiles(ctx, opts_args, target_sources)
 
           self._runtool(distribution, input_digest, ctx)
 
@@ -538,7 +539,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         analysis_file=None,
         classes_dir=None,
         jar_file=None,
-        args_file=os.path.join(rsc_dir, 'rsc_args'),
+        argsfile_opts=os.path.join(rsc_dir, 'rsc_opts_args'),
+        argsfile_srcs=os.path.join(rsc_dir, 'rsc_srcs_args'),
         rsc_jar_file=ClasspathEntry(os.path.join(rsc_dir, 'm.jar')),
         log_dir=os.path.join(rsc_dir, 'logs'),
         sources=sources,
@@ -550,7 +552,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         classes_dir=ClasspathEntry(os.path.join(zinc_dir, 'classes'), None),
         jar_file=ClasspathEntry(os.path.join(zinc_dir, 'z.jar'), None),
         log_dir=os.path.join(zinc_dir, 'logs'),
-        args_file=os.path.join(zinc_dir, 'zinc_args'),
+        argsfile_opts=os.path.join(zinc_dir, 'zinc_opts_args'),
+        argsfile_srcs=os.path.join(zinc_dir, 'zinc_srcs_args'),
         sources=sources,
       ))
 
@@ -582,14 +585,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         main,
       ]
 
-    argfile_snapshot, = self.context._scheduler.capture_snapshots([
-        PathGlobsAndRoot(
-          PathGlobs([fast_relpath(ctx.args_file, get_buildroot())]),
-          get_buildroot(),
-        ),
-      ])
+    argsfiles_snapshot = self.argsfiles_snapshot(ctx)
 
-    cmd = initial_args + ['@{}'.format(argfile_snapshot.files[0])]
+    cmd = initial_args + ['@{}'.format(argsfile) for argsfile in argsfiles_snapshot.files]
 
     pathglobs = list(tool_classpath)
 
@@ -604,7 +602,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       ((path_globs_input_digest,) if path_globs_input_digest else ())
       + ((input_digest,) if input_digest else ())
       + tuple(s.directory_digest for s in additional_snapshots)
-      + (argfile_snapshot.directory_digest,))
+      + (argsfiles_snapshot.directory_digest,))
 
     epr = ExecuteProcessRequest(
       argv=tuple(cmd),
@@ -648,7 +646,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       classpath=classpath,
       main=main,
       jvm_options=self.get_options().jvm_options,
-      args=['@{}'.format(ctx.args_file)],
+      args=['@{}'.format(argsfile) for argsfile in ctx.argsfiles],
       workunit_name=tool_name,
       workunit_labels=[WorkUnitLabel.COMPILER],
       dist=distribution
