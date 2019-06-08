@@ -277,10 +277,12 @@ class ClasspathProducts(object):
         if entry.directory_digest and not entry.has_been_materialized
       ]
       if missing_entries:
-        context._scheduler.materialize_directories(tuple(
-          DirectoryToMaterialize(path=get_buildroot(), directory_digest=entry.directory_digest)
-          for entry in missing_entries
-        ))
+        directory_digest = context._scheduler.merge_directories(
+          tuple(entry.directory_digest for entry in missing_entries)
+        )
+        context._scheduler.materialize_directories((
+          DirectoryToMaterialize(path=get_buildroot(), directory_digest=directory_digest),
+          ))
         for entry in missing_entries:
           entry.mark_as_materialized()
     return classpath_entries
