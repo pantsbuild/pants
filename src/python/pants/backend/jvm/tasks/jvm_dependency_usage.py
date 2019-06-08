@@ -19,6 +19,7 @@ from pants.build_graph.aliased_target import AliasTarget
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
+from pants.java.distribution.distribution import DistributionLocator
 from pants.task.task import Task
 from pants.util.fileutil import create_size_estimators
 
@@ -65,6 +66,10 @@ class JvmDependencyUsage(Task):
                   'Useful for computing analysis for a lot of targets, but '
                   'result can differ from direct execution because cached information '
                   'doesn\'t depend on 3rdparty libraries versions.')
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(JvmDependencyUsage, cls).subsystem_dependencies() + (DistributionLocator,)
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -159,7 +164,9 @@ class JvmDependencyUsage(Task):
     `classes_by_source`, `runtime_classpath`, `product_deps_by_src` parameters and
     stores the result to the build cache.
     """
-    analyzer = JvmDependencyAnalyzer(get_buildroot(), runtime_classpath)
+    analyzer = JvmDependencyAnalyzer(get_buildroot(),
+                                     DistributionLocator.cached(),
+                                     runtime_classpath)
     targets = self.context.targets()
     targets_by_file = analyzer.targets_by_file(targets)
     transitive_deps_by_target = analyzer.compute_transitive_deps_by_target(targets)

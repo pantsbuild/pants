@@ -10,7 +10,6 @@ import os
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.java.distribution.distribution import DistributionLocator
 from pants.net.http.fetcher import Fetcher
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_concurrent_creation
@@ -61,10 +60,6 @@ class CoursierSubsystem(Subsystem):
              help='Version paired with --bootstrap-jar-url, in order to invalidate and fetch the new version.')
     register('--bootstrap-fetch-timeout-secs', type=int, advanced=True, default=10,
              help='Timeout the fetch if the connection is idle for longer than this value.')
-
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super(CoursierSubsystem, cls).subsystem_dependencies() + (DistributionLocator,)
 
   def bootstrap_coursier(self, workunit_factory):
 
