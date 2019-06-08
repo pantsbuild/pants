@@ -394,11 +394,11 @@ class Context(object):
       build_graph.inject_address_closure(address)
     return build_graph
 
-  def execute_process_synchronously_without_raising(self, execute_process_request, name, labels=None):
-    """Executes a process (possibly remotely), and returns information about its output.
+  def execute_processes_synchronously_without_raising(self, execute_process_requests, name, labels=None):
+    """Executes processes (possibly remotely), and return information about their output.
 
-    :param execute_process_request: The ExecuteProcessRequest to run.
-    :param name: A descriptive name representing the process being executed.
+    :param execute_process_requests: The ExecuteProcessRequests to run.
+    :param name: A name for the parent workunit surrounding the process.
     :param labels: A tuple of WorkUnitLabels.
     :return: An ExecuteProcessResult with information about the execution.
 
@@ -414,6 +414,10 @@ class Context(object):
       workunit.output("stderr").write(result.stderr)
       workunit.set_outcome(WorkUnit.FAILURE if result.exit_code else WorkUnit.SUCCESS)
       return result
+
+  def execute_process_synchronously_without_raising(self, execute_process_request, name, labels=None):
+    """See execute_processes_synchronously_without_raising."""
+    return execute_processes_synchronously_without_raising([execute_process_request], name, labels=labels)[0]
 
   def execute_process_synchronously_or_raise(self, execute_process_request, name, labels=None):
     """Execute process synchronously, and throw if the return code is not 0.
