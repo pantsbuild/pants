@@ -17,12 +17,16 @@ class ClasspathEntry(object):
     self._path = path
     self._directory_digest = directory_digest
 
+    # We avoid re-materializing a ClasspathEntry if e.g. more than one task in a single pants run
+    # needs it.
+    # Note that we do not avoid re-materializing across pants runs, but the engine will attempt to
+    # make this cheap by not re-writing files which already exist during materialization.
     self._has_been_materialized_lock = threading.Lock()
     self._has_been_materialized = False
 
   @property
   def path(self):
-    """Returns the pants internal path of this classpath entry.
+    """Returns the absolute path to this classpath entry within the pants workdir.
 
     Suitable for use in constructing classpaths for pants executions and pants generated artifacts.
 
