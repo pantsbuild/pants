@@ -792,6 +792,9 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     # that, though (as well as the source files?).
     def record(k, v):
       self.context.run_tracker.report_target_info(self.options_scope, target, [stats_key, k], v)
+    self.context.log.debug(
+      '[Timing({})] {}: {} sec; {} sources; {} classpath elements'
+      .format(stats_key, target.address.spec, compiletime, sources_len, classpath_len))
     record('time', compiletime)
     record('classpath_len', classpath_len)
     record('sources_len', sources_len)
