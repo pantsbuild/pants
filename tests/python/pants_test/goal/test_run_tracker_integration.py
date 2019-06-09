@@ -53,23 +53,27 @@ class RunTrackerIntegrationTest(PantsRunIntegrationTest):
         self.assertIn('pantsd_stats', stats_json)
         self.assertIn('workunits', stats_json)
 
-  def test_workunit_failure(self):
-    pants_run = self.run_pants([
+  def _dummy_task_args(self):
+    return [
       '--pythonpath={}'.format(os.path.join(os.getcwd(), 'tests', 'python')),
       '--backend-packages={}'.format('pants_test.goal.data'),
       'run-dummy-workunit',
-      '--no-success'
-    ])
+    ]
+
+  def test_workunit_failure(self):
+    pants_run = self.run_pants(self._dummy_task_args() + ['--no-success'])
     # Make sure the task actually happens and of no exception.
     self.assertIn('[run-dummy-workunit]', pants_run.stdout_data)
     self.assertNotIn('Exception', pants_run.stderr_data)
     self.assert_failure(pants_run)
 
   def test_workunit_success(self):
-    pants_run = self.run_pants([
-      '--pythonpath={}'.format(os.path.join(os.getcwd(), 'tests', 'python')),
-      '--backend-packages={}'.format('pants_test.goal.data'),
-      'run-dummy-workunit',
-      '--success'
-    ])
+    pants_run = self.run_pants(self._dummy_task_args() + ['--success'])
+    self.assert_success(pants_run)
+
+  def test_workunit_long_name(self):
+    pants_run = self.run_pants(self._dummy_task_args() + [
+        '--success',
+        '--name={}'.format('ohno!' * 500),
+      ])
     self.assert_success(pants_run)

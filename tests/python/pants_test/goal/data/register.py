@@ -15,11 +15,13 @@ class TestWorkUnitTask(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
+    register('--name', default='dummy')
     register('--success', default=False, type=bool)
 
   def execute(self):
     result = WorkUnit.SUCCESS if self.get_options().success else WorkUnit.FAILURE
 
     # This creates workunit and marks it as failure.
-    with self.context.new_workunit('dummy') as workunit:
+    with self.context.new_workunit(self.get_options().name) as workunit:
+      workunit.output("stdout").write("Hello! I'm {}.".format(self.get_options().name).encode("UTF-8"))
       workunit.set_outcome(result)
