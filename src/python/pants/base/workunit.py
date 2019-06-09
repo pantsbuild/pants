@@ -6,6 +6,7 @@ import re
 import time
 import uuid
 from collections import namedtuple
+from hashlib import sha1
 
 from pants.util.dirutil import safe_mkdir_for
 from pants.util.memo import memoized_method
@@ -189,11 +190,16 @@ class WorkUnit:
       raise Exception('Invalid output name: {}'.format(name))
     if name not in self._outputs:
       workunit_name = re.sub(r'\W', '_', self.name)
-      path = os.path.join(self.run_info_dir,
-                          'tool_outputs', '{workunit_name}-{id}.{output_name}'
-                          .format(workunit_name=workunit_name,
-                                  id=self.id,
-                                  output_name=name))
+      workunit_slug = '{workunit_name}-{id}.{output_name}'.format(
+          workunit_name=workunit_name,
+          id=self.id,
+          output_name=name
+        )
+      path = os.path.join(
+          self.run_info_dir,
+          'tool_outputs',
+          sha1(workunit_slug.encode('UTF-8')).hexdigest()
+        )
       safe_mkdir_for(path)
       self._outputs[name] = FileBackedRWBuf(path)
       self._output_paths[name] = path
