@@ -57,7 +57,11 @@ class CoursierMixin(JvmResolverBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(CoursierMixin, cls).subsystem_dependencies() + (JarDependencyManagement, CoursierSubsystem)
+    return super(CoursierMixin, cls).subsystem_dependencies() + (
+      CoursierSubsystem,
+      DistributionLocator,
+      JarDependencyManagement
+    )
 
   @classmethod
   def register_options(cls, register):
@@ -382,7 +386,7 @@ class CoursierMixin(JvmResolverBase):
       if j.get_url():
         jar_url = j.get_url()
         module += ',url={}'.format(parse.quote_plus(jar_url))
-        
+
       if j.intransitive:
         cmd_args.append('--intransitive')
 
@@ -646,7 +650,7 @@ class CoursierMixin(JvmResolverBase):
   def _get_path_to_jar(cls, coursier_cache_path, pants_jar_path_base, jar_path):
     """
     Create the path to the jar that will live in .pants.d
-    
+
     :param coursier_cache_path: coursier cache location
     :param pants_jar_path_base: location under pants workdir to store the hardlink to the coursier cache
     :param jar_path: path of the jar
@@ -686,7 +690,7 @@ class CoursierResolve(CoursierMixin, NailgunTask):
   @classmethod
   def implementation_version(cls):
     return super(CoursierResolve, cls).implementation_version() + [('CoursierResolve', 2)]
-  
+
   def execute(self):
     """Resolves the specified confs for the configured targets and returns an iterator over
     tuples of (conf, jar path).

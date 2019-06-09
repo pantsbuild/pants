@@ -16,7 +16,6 @@ from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.build_graph.aliased_target import AliasTarget
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.target import Target
-from pants.java.distribution.distribution import DistributionLocator
 from pants.util.memo import memoized_method, memoized_property
 
 
@@ -27,8 +26,9 @@ class JvmDependencyAnalyzer(object):
   determining which targets correspond to the actual source dependencies of any given target.
   """
 
-  def __init__(self, buildroot, runtime_classpath):
+  def __init__(self, buildroot, distribution, runtime_classpath):
     self.buildroot = buildroot
+    self.distribution = distribution
     self.runtime_classpath = runtime_classpath
 
   @memoized_method
@@ -122,7 +122,7 @@ class JvmDependencyAnalyzer(object):
 
   def _find_all_bootstrap_jars(self):
     def get_path(key):
-      return DistributionLocator.cached().system_properties.get(key, '').split(':')
+      return self.distribution.system_properties.get(key, '').split(':')
 
     def find_jars_in_dirs(dirs):
       ret = []

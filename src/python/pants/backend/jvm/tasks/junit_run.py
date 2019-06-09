@@ -28,7 +28,6 @@ from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
-from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.java.junit.junit_xml_parser import RegistryOfTests, Test, parse_failed_targets
 from pants.process.lock import OwnerPrintingInterProcessFileLock
@@ -107,7 +106,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JUnitRun, cls).subsystem_dependencies() + (CodeCoverage, DistributionLocator, JUnit)
+    return super(JUnitRun, cls).subsystem_dependencies() + (CodeCoverage, JUnit)
 
   @classmethod
   def prepare(cls, options, round_manager):

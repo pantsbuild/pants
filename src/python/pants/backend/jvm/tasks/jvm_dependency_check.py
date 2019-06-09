@@ -53,7 +53,10 @@ class JvmDependencyCheck(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JvmDependencyCheck, cls).subsystem_dependencies() + (DependencyContext,)
+    return super(JvmDependencyCheck, cls).subsystem_dependencies() + (
+      DependencyContext,
+      DistributionLocator
+    )
 
   @staticmethod
   def _skip(options):
@@ -86,8 +89,13 @@ class JvmDependencyCheck(Task):
     return True
 
   @memoized_property
+  def _distribution(self):
+    return DistributionLocator.cached()
+
+  @memoized_property
   def _analyzer(self):
     return JvmDependencyAnalyzer(get_buildroot(),
+                                 self._distribution,
                                  self.context.products.get_data('runtime_classpath'))
 
   def execute(self):
@@ -180,7 +188,7 @@ class JvmDependencyCheck(Task):
       # We don't require explicit deps on the java runtime, so we shouldn't consider that
       # a missing dep.
       return (dep not in analyzer.bootstrap_jar_classfiles
-              and not dep.startswith(DistributionLocator.cached().real_home))
+              and not dep.startswith(self._distribution.real_home))
 
     def target_or_java_dep_in_targets(target, targets):
       # We want to check if the target is in the targets collection
