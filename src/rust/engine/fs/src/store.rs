@@ -300,6 +300,21 @@ impl Store {
   }
 
   ///
+  /// Similar to load_directory, but returns an error if the Directory does not exist.
+  ///
+  pub fn load_existing_directory(
+    &self,
+    digest: Digest,
+  ) -> impl Future<Item = (bazel_protos::remote_execution::Directory, LoadMetadata), Error = String>
+  {
+    self
+      .load_directory(digest)
+      .and_then(move |maybe_directory| {
+        maybe_directory.ok_or_else(|| format!("Digest {:?} did not exist in the Store.", digest))
+      })
+  }
+
+  ///
   /// Loads bytes from remote cas if required and possible (i.e. if remote is configured). Takes
   /// two functions f_local and f_remote. These functions are any validation or transformations you
   /// want to perform on the bytes received from the local and remote cas (if remote is configured).

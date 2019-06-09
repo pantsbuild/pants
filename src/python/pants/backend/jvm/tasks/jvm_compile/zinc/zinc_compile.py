@@ -29,7 +29,7 @@ from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
 from pants.engine.fs import DirectoryToMaterialize
-from pants.engine.isolated_process import ExecuteProcessRequest
+from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_method, memoized_property
@@ -491,21 +491,57 @@ class BaseZincCompile(JvmCompile):
       ))
 
     # Execute (and merge outputs, if necessary).
-    print(process_requests)
     results = self.context.execute_processes_synchronously_or_raise(
       process_requests, self.name(), [WorkUnitLabel.COMPILER])
-    if len(results) == 1:
-      merged_result, = results
-    else:
-      raise Exception("TODO: Implement merging.")
+
+    output_digest = self.merge_output_digests(ctx, [r.output_directory_digest for r in results])
 
     # TODO: Materialize as a batch in do_compile or somewhere
     self.context._scheduler.materialize_directories((
-      DirectoryToMaterialize(get_buildroot(), res.output_directory_digest),
+      DirectoryToMaterialize(get_buildroot(), output_digest),
     ))
 
     # TODO: This should probably return a ClasspathEntry rather than a Digest
-    return res.output_directory_digest
+    return output_digest
+
+  def merge_output_digests(self, ctx, directory_digests):
+    if len(directory_digests) == 1:
+      return directory_digests[0]
+    if not self.get_options().use_classpath_jars:
+      return self.context._scheduler.merge_directories(directory_digests)
+    
+    # Rename all jars (so that they don't collide) and merge them into the same digest.
+    # TODO: Make this API parallel.
+    jar_file = fast_relpath(ctx.jar_file.path, get_buildroot())
+    suffixed_jar_files = []
+    directory_digests = list(directory_digests)
+    for idx in range(1, len(directory_digests)):
+      suffixed_jar_file = '{}.{}'.format(jar_file, idx)
+      suffixed_jar_files.append(suffixed_jar_file)
+      directory_digests[idx] = self.context._scheduler.rename_in_directory(
+          directory_digests[idx],
+          jar_file,
+          suffixed_jar_file,
+        )
+    all_jars_digest = self.context._scheduler.merge_directories(directory_digests)
+
+    # Merge the jars into a single jar.
+    result, = self.context._scheduler.product_request(ExecuteProcessResult, [
+        ExecuteProcessRequest(
+          argv=("/bin/bash", "-c", textwrap.dedent("""
+            /bin/mkdir .extracted
+            for appended_jar in {}; do
+              /usr/bin/unzip $appended_jar -d .extracted
+            done
+            cd .extracted
+            /usr/bin/zip -r -g ../{} .
+            """).format(' '.join(suffixed_jar_files), jar_file)),
+          description="merging output directories",
+          output_files=(jar_file,),
+          input_files=all_jars_digest,
+        )
+      ])
+    return result.output_directory_digest
 
   def get_zinc_compiler_classpath(self):
     """Get the classpath for the zinc compiler JVM tool.

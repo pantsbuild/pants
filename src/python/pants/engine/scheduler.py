@@ -320,6 +320,20 @@ class Scheduler(object):
     )
     return self._raise_or_return(result)
 
+  def rename_in_directory(self, directory_digest, src_path, dst_path):
+    """Renames a path inside of the given DirectoryDigest.
+
+    :param directory_digest: Tuple of DirectoryDigests.
+    :return: A Digest.
+    """
+    result = self._native.lib.rename_in_directory(
+      self._scheduler,
+      self._to_value(directory_digest),
+      src_path.encode("utf-8"),
+      dst_path.encode("utf-8"),
+    )
+    return self._raise_or_return(result)
+
   def materialize_directories(self, directories_paths_and_digests):
     """Creates the specified directories on the file system.
 
@@ -584,6 +598,9 @@ class SchedulerSession(object):
 
   def merge_directories(self, directory_digests):
     return self._scheduler.merge_directories(directory_digests)
+
+  def rename_in_directory(self, directory_digest, src_path, dst_path):
+    return self._scheduler.rename_in_directory(directory_digest, src_path, dst_path)
 
   def materialize_directories(self, directories_paths_and_digests):
     """Creates the specified directories on the file system.

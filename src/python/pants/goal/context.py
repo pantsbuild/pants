@@ -395,15 +395,32 @@ class Context(object):
     return build_graph
 
   def execute_processes_synchronously_without_raising(self, execute_process_requests, name, labels=None):
-    """Executes processes (possibly remotely), and return information about their output.
+    """Executes processes (possibly remotely), and returns information about their output.
 
     :param execute_process_requests: The ExecuteProcessRequests to run.
-    :param name: A name for the parent workunit surrounding the process.
+    :param name: A name for the parent workunit surrounding the processes.
     :param labels: A tuple of WorkUnitLabels.
     :return: An ExecuteProcessResult with information about the execution.
 
     Note that this is an unstable, experimental API, which is subject to change with no notice.
     """
+    with self.new_workunit(name=name):
+      results = self._scheduler.product_request(FallibleExecuteProcessResult, execute_process_requests)
+      # NB: There is no real concept of concurrent workunits with the same parent, so we create
+      # and close them rapidly here in order to render their stdout and stderr.
+      for request, result in zip(execute_process_requests, results):
+        with self.run_tracker.new_workunit(
+            name=request.description,
+            labels=labels,
+            cmd=' '.join(request.argv)
+        ) as workunit:
+          workunit.output("stdout").write(result.stdout)
+          workunit.output("stderr").write(result.stderr)
+          workunit.set_outcome(WorkUnit.FAILURE if result.exit_code else WorkUnit.SUCCESS)
+      return results
+
+  def execute_process_synchronously_without_raising(self, execute_process_request, name, labels=None):
+    """See execute_processes_synchronously_without_raising."""
     with self.new_workunit(
       name=name,
       labels=labels,
@@ -415,9 +432,16 @@ class Context(object):
       workunit.set_outcome(WorkUnit.FAILURE if result.exit_code else WorkUnit.SUCCESS)
       return result
 
-  def execute_process_synchronously_without_raising(self, execute_process_request, name, labels=None):
-    """See execute_processes_synchronously_without_raising."""
-    return execute_processes_synchronously_without_raising([execute_process_request], name, labels=labels)[0]
+  def execute_processes_synchronously_or_raise(self, execute_process_requests, name, labels=None):
+    """Execute processes synchronously, and throw if any return code is not 0.
+
+    See execute_process_synchronously for the api docs.
+    """
+    fallible_results = self.execute_processes_synchronously_without_raising(execute_process_requests, name, labels)
+    return [
+        fallible_to_exec_result_or_raise(fallible_result, execute_process_request)
+        for fallible_result, execute_process_request in zip(fallible_results, execute_process_requests)
+      ]
 
   def execute_process_synchronously_or_raise(self, execute_process_request, name, labels=None):
     """Execute process synchronously, and throw if the return code is not 0.

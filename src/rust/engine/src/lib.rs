@@ -789,6 +789,36 @@ pub extern "C" fn merge_directories(
 }
 
 #[no_mangle]
+pub extern "C" fn rename_in_directory(
+  scheduler_ptr: *mut Scheduler,
+  directory_digest_value: Handle,
+  src_ptr: *const raw::c_char,
+  dst_ptr: *const raw::c_char,
+) -> PyResult {
+  let digest = match nodes::lift_digest(&directory_digest_value.into()) {
+    Ok(d) => d,
+    Err(err) => {
+      let e: Result<Value, String> = Err(err);
+      return e.into();
+    }
+  };
+
+  let src = unsafe { CStr::from_ptr(src_ptr).to_string_lossy().into_owned() };
+  let dst = unsafe { CStr::from_ptr(dst_ptr).to_string_lossy().into_owned() };
+  with_scheduler(scheduler_ptr, |scheduler| {
+    fs::Snapshot::rename_in_directory(
+      scheduler.core.store(),
+      digest,
+      PathBuf::from(src),
+      PathBuf::from(dst),
+    )
+    .wait()
+    .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
+    .into()
+  })
+}
+
+#[no_mangle]
 pub extern "C" fn materialize_directories(
   scheduler_ptr: *mut Scheduler,
   directories_paths_and_digests_value: Handle,

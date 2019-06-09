@@ -6,6 +6,7 @@ use crate::pool::ResettablePool;
 use crate::{Dir, File, PathGlobs, PathStat, PosixFS, Store};
 use bazel_protos;
 use boxfuture::{try_future, BoxFuture, Boxable};
+use either::Either;
 use futures::future::{self, join_all};
 use futures::Future;
 use hashing::{Digest, Fingerprint};
@@ -15,7 +16,7 @@ use protobuf;
 use std::ffi::OsString;
 use std::fmt;
 use std::iter::Iterator;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
 pub const EMPTY_FINGERPRINT: Fingerprint = Fingerprint([
@@ -23,6 +24,9 @@ pub const EMPTY_FINGERPRINT: Fingerprint = Fingerprint([
   0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55,
 ]);
 pub const EMPTY_DIGEST: Digest = Digest(EMPTY_FINGERPRINT, 0);
+
+type DirectoryOrFile =
+  Either<bazel_protos::remote_execution::DirectoryNode, bazel_protos::remote_execution::FileNode>;
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct Snapshot {
@@ -256,12 +260,8 @@ impl Snapshot {
       .into_iter()
       .map(|digest| {
         store
-          .load_directory(digest)
-          .and_then(move |maybe_directory| {
-            maybe_directory
-              .map(|(dir, _metadata)| dir)
-              .ok_or_else(|| format!("Digest {:?} did not exist in the Store.", digest))
-          })
+          .load_existing_directory(digest)
+          .map(|(dir, _metadata)| dir)
       })
       .collect::<Vec<_>>();
     join_all(directories)
@@ -339,6 +339,204 @@ impl Snapshot {
           store.record_directory(&out_dir, true)
         })
         .to_boxed()
+      })
+      .to_boxed()
+  }
+
+  ///
+  /// Rename the given src path (which must exist in the given directory Digest) to the given
+  /// dst path (which must not exist).
+  ///
+  /// TODO: This is currently implemented as "remove and then insert", when in theory we could
+  /// avoid double hashing any shared parents of the src and dst. But it might be more valuable to
+  /// spend that complexity budget on implementing batch rename instead...
+  ///
+  pub fn rename_in_directory(
+    store: Store,
+    dir_digest: Digest,
+    src: PathBuf,
+    dst: PathBuf,
+  ) -> impl Future<Item = Digest, Error = String> {
+    Snapshot::remove_from_directory(store.clone(), dir_digest, PathBuf::new(), src).and_then(
+      move |(digest_after_remove, removed_content)| {
+        Snapshot::add_to_directory(
+          store,
+          digest_after_remove,
+          PathBuf::new(),
+          dst,
+          removed_content,
+        )
+      },
+    )
+  }
+
+  ///
+  /// Removes the given path (which must exist) from the input directory, and returns a digest
+  /// for an output directory without the path, and a DirectoryOrFile for the content that
+  /// was removed.
+  ///
+  fn remove_from_directory(
+    store: Store,
+    dir_digest: Digest,
+    path_so_far: PathBuf,
+    src: PathBuf,
+  ) -> BoxFuture<(Digest, DirectoryOrFile), String> {
+    let (name, remainder) = try_future!(leading_component_from_relative(src));
+
+    let store2 = store.clone();
+    store
+      .load_existing_directory(dir_digest)
+      .and_then(move |(mut directory, _metadata)| {
+        // TODO: Extract "lookup in both lists" into a helper.
+        let position = if let Ok(dir_pos) = directory
+          .get_directories()
+          .binary_search_by(|d| d.get_name().cmp(&name))
+        {
+          Either::Left(dir_pos)
+        } else if let Ok(file_pos) = directory
+          .get_files()
+          .binary_search_by(|f| f.get_name().cmp(&name))
+        {
+          Either::Right(file_pos)
+        } else {
+          return futures::future::err(format!(
+            "Path name {} did not exist in {:?}",
+            name, path_so_far
+          ))
+          .to_boxed();
+        };
+
+        // If there is no remainder, we're at the appropriate level to simply remove and return an
+        // entry: otherwise, we have to recurse deeper and then replace the entry at this level.
+        if remainder.as_os_str().is_empty() {
+          // We're removing this entry.
+          let removed_content = match position {
+            Either::Left(dir_pos) => Either::Left(directory.mut_directories().remove(dir_pos)),
+            Either::Right(file_pos) => Either::Right(directory.mut_files().remove(file_pos)),
+          };
+          future::ok((directory, removed_content)).to_boxed()
+        } else {
+          // We're recursing and then replacing this entry.
+          if let Either::Left(dir_pos) = position {
+            let sub_dir_digest =
+              try_future!(directory.get_directories()[dir_pos].get_digest().into());
+            Snapshot::remove_from_directory(
+              store,
+              sub_dir_digest,
+              path_so_far.join(name),
+              remainder,
+            )
+            .map(move |(replacement_digest, removed_content)| {
+              // Replace the entry.
+              directory.mut_directories()[dir_pos].set_digest((&replacement_digest).into());
+              (directory, removed_content)
+            })
+            .to_boxed()
+          } else {
+            futures::future::err(format!(
+              "Path name {:?} was a file rather than a directory in {:?}",
+              name, path_so_far
+            ))
+            .to_boxed()
+          }
+        }
+      })
+      .and_then(move |(directory, removed_content)| {
+        store2
+          .record_directory(&directory, true)
+          .map(move |digest| (digest, removed_content))
+      })
+      .to_boxed()
+  }
+
+  ///
+  /// Adds the given directory or file at the given path (which must not already exist) in the input
+  /// directory, and returns a Digest for the resulting output directory.
+  ///
+  /// NB: The `name` of the given directory or file is ignored in favor of the final component of
+  /// the given `path`
+  ///
+  fn add_to_directory(
+    store: Store,
+    dir_digest: Digest,
+    path_so_far: PathBuf,
+    dst: PathBuf,
+    to_add: DirectoryOrFile,
+  ) -> BoxFuture<Digest, String> {
+    let (name, remainder) = try_future!(leading_component_from_relative(dst));
+
+    let store2 = store.clone();
+    store
+      .load_existing_directory(dir_digest)
+      .and_then(move |(mut directory, _metadata)| {
+        let dir_pos = directory
+          .get_directories()
+          .binary_search_by(|d| d.get_name().cmp(&name));
+        let file_pos = directory
+          .get_files()
+          .binary_search_by(|f| f.get_name().cmp(&name));
+
+        // If there is no remainder, we're at the appropriate level to insert our entry: otherwise,
+        // recurse and then replace the entry at this level.
+        if remainder.as_os_str().is_empty() {
+          // We're adding at this level.
+          let (dir_insert_pos, file_insert_pos) =
+            if let (Err(dir_insert_pos), Err(file_insert_pos)) = (dir_pos, file_pos) {
+              (dir_insert_pos, file_insert_pos)
+            } else {
+              return futures::future::err(format!(
+                "Destination name {} already existed under {:?}",
+                name, path_so_far
+              ))
+              .to_boxed();
+            };
+
+          match to_add {
+            Either::Left(mut dir_node) => {
+              dir_node.set_name(name.to_owned());
+              directory.mut_directories().insert(dir_insert_pos, dir_node);
+            }
+            Either::Right(mut file_node) => {
+              file_node.set_name(name.to_owned());
+              directory.mut_files().insert(file_insert_pos, file_node);
+            }
+          };
+          store.record_directory(&directory, true).to_boxed()
+        } else {
+          // We're recursing and then replacing this entry.
+          match (dir_pos, file_pos) {
+            // NB: We assume that the directory is valid and thus only has one value for a name.
+            (Ok(dir_existing_pos), _) => {
+              let sub_dir_digest = try_future!(directory.get_directories()[dir_existing_pos]
+                .get_digest()
+                .into());
+              Snapshot::add_to_directory(
+                store2,
+                sub_dir_digest,
+                path_so_far.join(name),
+                remainder,
+                to_add,
+              )
+              .and_then(move |replacement_digest| {
+                // Replace the entry.
+                directory.mut_directories()[dir_existing_pos]
+                  .set_digest((&replacement_digest).into());
+                store.record_directory(&directory, true)
+              })
+              .to_boxed()
+            }
+            (Err(_), Ok(_)) => futures::future::err(format!(
+              "Path name {} was a file rather than a directory in {:?}",
+              name, path_so_far
+            ))
+            .to_boxed(),
+            (Err(_), Err(_)) => futures::future::err(format!(
+              "Path name {} did not exist under {:?}",
+              name, path_so_far
+            ))
+            .to_boxed(),
+          }
+        }
       })
       .to_boxed()
   }
@@ -539,6 +737,25 @@ fn osstring_as_utf8(path: OsString) -> Result<String, String> {
   path
     .into_string()
     .map_err(|p| format!("{:?}'s file_name is not representable in UTF8", p))
+}
+
+///
+/// Return the first component and the remainder of the given relative Path.
+///
+/// TODO: This pattern is pretty inefficient: holding onto a path::Components iterator during
+/// recursion would be preferable. But that will have to wait for async/await.
+///
+fn leading_component_from_relative(path: PathBuf) -> Result<(String, PathBuf), String> {
+  let mut components = path.components();
+  if let Some(Component::Normal(name)) = components.next() {
+    if let Some(name) = name.to_str() {
+      Ok((name.to_owned(), components.as_path().to_owned()))
+    } else {
+      Err(format!("Path {:?} had invalid component: {:?}", path, name))
+    }
+  } else {
+    Err(format!("Path was empty or not relative: {:?}", path))
+  }
 }
 
 // StoreFileByDigest allows a File to be saved to an underlying Store, in such a way that it can be
