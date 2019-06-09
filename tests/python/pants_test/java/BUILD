@@ -81,9 +81,9 @@ python_tests(
   name = 'test_runjava',
   sources = ['test_runjava_synthetic_classpath.py'],
   dependencies = [
+    'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/java:util',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/jvm:jvm_tool_task_test_base',
-    'src/python/pants/backend/jvm/tasks:nailgun_task',
+    'tests/python/pants_test/jvm:nailgun_task_test_base',
   ]
 )

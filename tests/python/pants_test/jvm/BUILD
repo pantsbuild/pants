@@ -25,14 +25,15 @@ python_library(
   sources=['jvm_tool_task_test_base.py'],
   dependencies=[
     ':jvm_task_test_base',
-    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/subsystems:jvm_tool_mixin',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:bootstrap_jvm_tools',
+    'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:build_environment',
     'src/python/pants/build_graph',
     'src/python/pants/ivy',
+    'src/python/pants/java/jar',
   ]
 )
 

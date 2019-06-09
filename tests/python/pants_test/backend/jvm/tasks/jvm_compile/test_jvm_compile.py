@@ -13,14 +13,14 @@ from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import BaseZincCompile
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
-from pants_test.task_test_base import TaskTestBase
+from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
 class DummyJvmCompile(JvmCompile):
   pass
 
 
-class JvmCompileTest(TaskTestBase):
+class JvmCompileTest(NailgunTaskTestBase):
   DEFAULT_CONF = 'default'
 
   @classmethod
@@ -50,7 +50,7 @@ class JvmCompileTest(TaskTestBase):
       resulting_classpath.get_for_target(target))
 
 
-class BaseZincCompileJDKTest(TaskTestBase):
+class BaseZincCompileJDKTest(NailgunTaskTestBase):
   DEFAULT_CONF = 'default'
   old_cwd = os.getcwd()
 

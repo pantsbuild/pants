@@ -17,9 +17,9 @@ python_tests(
   name = 'jvm_compile',
   sources = ['test_jvm_compile.py'],
   dependencies = [
-    'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/backend/jvm/tasks/jvm_compile',
-    'tests/python/pants_test:task_test_base',
+    'src/python/pants/backend/jvm/tasks:classpath_products',
+    'tests/python/pants_test/jvm:nailgun_task_test_base',
   ],
 )
 

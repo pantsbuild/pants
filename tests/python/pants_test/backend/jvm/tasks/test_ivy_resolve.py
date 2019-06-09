@@ -21,14 +21,13 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDependencies
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveFingerprintStrategy
-from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
 from pants.task.task import Task
 from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants.util.dirutil import safe_delete
-from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
+from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.task_test_base import TaskTestBase, ensure_cached
 
@@ -37,7 +36,7 @@ def strip_workdir(dir, classpath):
   return [(conf, path[len(dir):]) for conf, path in classpath]
 
 
-class IvyResolveTest(JvmToolTaskTestBase):
+class IvyResolveTest(NailgunTaskTestBase):
   """Tests for the class IvyResolve."""
 
   @classmethod
@@ -46,7 +45,6 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
   def setUp(self):
     super(IvyResolveTest, self).setUp()
-    self.set_options(execution_strategy=NailgunTask.ExecutionStrategy.subprocess)
     self.set_options_for_scope('cache.{}'.format(self.options_scope),
                                read_from=None,
                                write_to=None)

@@ -59,7 +59,6 @@ class JarTaskTest(BaseJarTaskTest):
   MAX_SUBPROC_ARGS = 50
 
   class TestJarTask(JarTask):
-
     def execute(self):
       pass
 
@@ -234,7 +233,6 @@ class JarTaskTest(BaseJarTaskTest):
 class JarBuilderTest(BaseJarTaskTest):
 
   class TestJarBuilderTask(JarBuilderTask):
-
     def execute(self):
       pass
 

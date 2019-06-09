@@ -77,8 +77,8 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/java/distribution',
+    'tests/python/pants_test/jvm:nailgun_task_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:task_test_base',
   ],
 )
 

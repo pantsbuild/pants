@@ -8,15 +8,15 @@ python_tests(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:parameterized',
     'src/python/pants/backend/codegen/wire/java',
-    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:revision',
     'src/python/pants/base:validation',
     'src/python/pants/build_graph',
+    'src/python/pants/java/jar',
     'src/python/pants/util:contextutil',
+    'tests/python/pants_test/jvm:nailgun_task_test_base',
     'tests/python/pants_test:test_base',
-    'tests/python/pants_test:task_test_base',
   ]
 )
 

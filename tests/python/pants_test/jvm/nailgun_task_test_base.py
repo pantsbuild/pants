@@ -4,12 +4,17 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from pants.backend.jvm.tasks.nailgun_task import NailgunProcessGroup, NailgunTask
+from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 
 class NailgunTaskTestBase(JvmToolTaskTestBase):
-  """Prepares an ephemeral test build root that supports nailgun tasks.
+  """Ensures `NailgunTask` tests use subprocess mode to stably test the task under test.
+
+  For subclasses of NailgunTask the nailgun behavior is irrelevant to the code under test and can
+  cause problems in CI environments. As such, disabling nailgunning ensures the test focus is where
+  it needs to be to test the unit.
+
   :API: public
   """
 
@@ -18,12 +23,4 @@ class NailgunTaskTestBase(JvmToolTaskTestBase):
     :API: public
     """
     super(NailgunTaskTestBase, self).setUp()
-    self.set_options(execution_strategy=NailgunTask.ExecutionStrategy.nailgun)
-
-  def tearDown(self):
-    """
-    :API: public
-    """
-    super(NailgunTaskTestBase, self).tearDown()
-    # Kill any nailguns launched in our ephemeral build root.
-    NailgunProcessGroup(metadata_base_dir=self.subprocess_dir).killall()
+    self.set_options(execution_strategy=NailgunTask.ExecutionStrategy.subprocess)

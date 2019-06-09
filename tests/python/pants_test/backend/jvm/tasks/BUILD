@@ -213,14 +213,14 @@ python_tests(
   name = 'detect_duplicates',
   sources = ['test_detect_duplicates.py'],
   dependencies = [
-    'src/python/pants/java/jar',
-    'src/python/pants/backend/jvm/targets:jvm',
+    ':jvm_binary_task_test_base',
     'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:detect_duplicates',
     'src/python/pants/base:exceptions',
+    'src/python/pants/java/jar',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/jvm:jvm_task_test_base',
   ],
 )
 
@@ -262,21 +262,21 @@ python_tests(
   name = 'ivy_resolve',
   sources = ['test_ivy_resolve.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/backend/jvm:ivy_utils',
-    'src/python/pants/java/jar',
+    '3rdparty/python:future',
     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:ivy_resolve',
     'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
+    'src/python/pants/backend/jvm:ivy_utils',
+    'src/python/pants/java/jar',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+    'tests/python/pants_test/jvm:nailgun_task_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:test_base',
-    'tests/python/pants_test:task_test_base',
   ]
 )
 
@@ -286,21 +286,21 @@ python_tests(
     'test_coursier_resolve.py',
   ],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:future',
     '3rdparty/python:mock',
-    'src/python/pants/backend/jvm:ivy_utils',
-    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:coursier_resolve',
+    'src/python/pants/backend/jvm:ivy_utils',
+    'src/python/pants/java/jar',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+    'tests/python/pants_test/jvm:nailgun_task_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:test_base',
-    'tests/python/pants_test:task_test_base',
   ]
 )
 
@@ -379,7 +379,7 @@ python_tests(
     'src/python/pants/scm:scm',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:task_test_base',
+    'tests/python/pants_test/jvm:nailgun_task_test_base',
     'tests/python/pants_test/testutils:mock_logger',
   ],
 )
@@ -481,7 +481,7 @@ python_library(
   dependencies = [
     'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/java/jar',
-    'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+    'tests/python/pants_test/jvm:nailgun_task_test_base',
   ]
 )
 

@@ -19,8 +19,8 @@ from pants.backend.jvm.tasks.jvm_compile.rsc.rsc_compile import RscCompile, _cre
 from pants.java.jar.jar_dependency import JarDependency
 from pants.option.ranked_value import RankedValue
 from pants.util.contextutil import temporary_dir
+from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.task_test_base import TaskTestBase
 
 
 class LightWeightVTS(object):
@@ -36,7 +36,7 @@ class LightWeightVTS(object):
     pass
 
 
-class RscCompileTest(TaskTestBase):
+class RscCompileTest(NailgunTaskTestBase):
   DEFAULT_CONF = 'default'
 
   @classmethod
