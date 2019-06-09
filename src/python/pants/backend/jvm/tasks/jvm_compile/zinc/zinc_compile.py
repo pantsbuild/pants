@@ -445,10 +445,9 @@ class BaseZincCompile(JvmCompile):
         Zinc.ZINC_COMPILE_MAIN
       ]
 
-    BATCH_SIZE = 1
     # NB: We don't support using argfiles for the sources of batched compiles, so sufficiently large
     # batch sizes would fail. But batches that large wouldn't be a great idea anyway.
-    argsfiles_snapshot = self.argsfiles_snapshot(ctx, include_sources=(BATCH_SIZE == 0))
+    argsfiles_snapshot = self.argsfiles_snapshot(ctx, include_sources=(not ctx.is_batched))
 
     merged_input_digest = self.context._scheduler.merge_directories(
       tuple(s.directory_digest for s in snapshots) +
@@ -458,19 +457,19 @@ class BaseZincCompile(JvmCompile):
     )
 
     # Batches of args to run in parallel.
-    if BATCH_SIZE == 0:
-      # NB: One empty set of args: the sources are already supplied via the argsfiles.
-      batched_extra_args = [([], "")]
-    else:
+    if ctx.is_batched:
       def batch(list_to_batch, batch_size=0):
         l = len(list_to_batch)
         for chunk in range(0, l, batch_size):
           yield list_to_batch[chunk:min(chunk + batch_size, l)]
-      batches = list(batch(ctx.sources, BATCH_SIZE))
+      batches = list(batch(ctx.sources, ctx.batch_size))
       batched_extra_args = [
           (sources, " (batch {} of {})".format(idx + 1, len(batches)))
           for idx, sources in enumerate(batches)
         ]
+    else:
+      # NB: One empty set of args: the sources are already supplied via the argsfiles.
+      batched_extra_args = [([], "")]
 
     process_requests = []
     for extra_args, slug in batched_extra_args:

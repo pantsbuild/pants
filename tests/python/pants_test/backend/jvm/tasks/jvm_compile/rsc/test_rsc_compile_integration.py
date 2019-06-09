@@ -92,3 +92,11 @@ class RscCompileIntegration(BaseCompileIT):
     self.do_command(
       'compile', 'testprojects/src/scala/org/pantsbuild/testproject/javasources',
       config=config)
+
+  @_for_all_supported_execution_environments
+  def test_scala_batched(self, config):
+    self.do_command(
+      'compile',
+      '--compile-rsc-batch-size=1',
+      'testprojects/src/scala/org/pantsbuild/testproject/scalabatched',
+      config=config)
