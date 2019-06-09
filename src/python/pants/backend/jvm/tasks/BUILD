@@ -562,6 +562,7 @@ python_library(
   dependencies = [
     ':jvm_tool_task_mixin',
     'src/python/pants/java/jar',
+    'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/java/distribution:distribution',
     'src/python/pants/java:executor',

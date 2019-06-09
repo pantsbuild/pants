@@ -142,13 +142,15 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
     classpath = self.tool_classpath_from_products(products,
                                                   self.versioned_tool_name(tool, self.version),
                                                   scope=self.options_scope)
-    classpath = tuple(fast_relpath(c, get_buildroot()) for c in classpath)
-
-    return self._memoized_scalac_classpath(classpath, scheduler)
+    return self._memoized_scalac_classpath(tuple(classpath), scheduler)
 
   @memoized_method
   def _memoized_scalac_classpath(self, scala_path, scheduler):
-    snapshots = scheduler.capture_snapshots(tuple(PathGlobsAndRoot(PathGlobs([path]), get_buildroot()) for path in scala_path))
+    buildroot = get_buildroot()
+    path_globs_and_roots = tuple(PathGlobsAndRoot(PathGlobs([fast_relpath(path, buildroot)]),
+                                                  buildroot)
+                                 for path in scala_path)
+    snapshots = scheduler.capture_snapshots(path_globs_and_roots)
     return [ClasspathEntry(path, snapshot) for path, snapshot in list(zip(scala_path, snapshots))]
 
   def compiler_classpath_entries(self, products, scheduler):

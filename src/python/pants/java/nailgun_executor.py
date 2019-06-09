@@ -21,6 +21,7 @@ from pants.java.executor import Executor, SubprocessExecutor
 from pants.java.nailgun_client import NailgunClient
 from pants.pantsd.process_manager import FingerprintedProcessManager, ProcessGroup
 from pants.util.dirutil import read_file, safe_file_dump, safe_open
+from pants.util.memo import memoized_classproperty
 
 
 logger = logging.getLogger(__name__)
@@ -72,7 +73,10 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
   FINGERPRINT_CMD_KEY = '-Dpants.nailgun.fingerprint'
   _PANTS_NG_ARG_PREFIX = '-Dpants.buildroot'
   _PANTS_OWNER_ARG_PREFIX = '-Dpants.nailgun.owner'
-  _PANTS_NG_BUILDROOT_ARG = '='.join((_PANTS_NG_ARG_PREFIX, get_buildroot()))
+
+  @memoized_classproperty
+  def _PANTS_NG_BUILDROOT_ARG(cls):
+    return '='.join((cls._PANTS_NG_ARG_PREFIX, get_buildroot()))
 
   _NAILGUN_SPAWN_LOCK = threading.Lock()
   _PROCESS_NAME = 'java'
@@ -127,7 +131,7 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
       digest.update(str(item).encode('utf-8'))
     return digest.hexdigest() if PY3 else digest.hexdigest().decode('utf-8')
 
-  def _runner(self, classpath, main, jvm_options, args, cwd=None):
+  def _runner(self, classpath, main, jvm_options, args):
     """Runner factory. Called via Executor.execute()."""
     command = self._create_command(classpath, main, jvm_options, args)
 
@@ -181,7 +185,8 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
         self.terminate()
 
       if (not running) or (running and updated):
-        return self._spawn_nailgun_server(new_fingerprint, jvm_options, classpath, stdout, stderr, stdin)
+        return self._spawn_nailgun_server(new_fingerprint, jvm_options, classpath, stdout, stderr,
+                                          stdin)
 
     return self._create_ngclient(self.socket, stdout, stderr, stdin)
 
@@ -223,7 +228,7 @@ Stderr:
           accumulated_stdout += line
 
   def _create_ngclient(self, port, stdout, stderr, stdin):
-    return NailgunClient(port=port, ins=stdin, out=stdout, err=stderr, workdir=get_buildroot())
+    return NailgunClient(port=port, ins=stdin, out=stdout, err=stderr)
 
   def ensure_connectable(self, nailgun):
     """Ensures that a nailgun client is connectable or raises NailgunError."""
