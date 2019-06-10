@@ -226,7 +226,7 @@ class NailgunClient(object):
   DEFAULT_NG_HOST = '127.0.0.1'
   DEFAULT_NG_PORT = 2113
 
-  def __init__(self, host=DEFAULT_NG_HOST, port=DEFAULT_NG_PORT, ins=sys.stdin, out=None, err=None,
+  def __init__(self, host=None, port=None, ins=sys.stdin, out=None, err=None,
                exit_on_broken_pipe=False, metadata_base_dir=None):
     """Creates a nailgun client that can be used to issue zero or more nailgun commands.
 
@@ -244,9 +244,9 @@ class NailgunClient(object):
                                      written under this directory. For non-pailgun connections this
                                      may be None.
     """
-    self._host = host
-    self._port = port
-    self._address = (host, port)
+    self._host = host or self.DEFAULT_NG_HOST
+    self._port = port or self.DEFAULT_NG_PORT
+    self._address = (self._host, self._port)
     self._address_string = ':'.join(str(i) for i in self._address)
     self._stdin = ins
     self._stdout = out or (sys.stdout.buffer if PY3 else sys.stdout)

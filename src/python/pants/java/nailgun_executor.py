@@ -228,10 +228,7 @@ Stderr:
           accumulated_stdout += line
 
   def _create_ngclient(self, port, stdout, stderr, stdin):
-    kwargs = {"ins": stdin, "out": stdout, "err": stderr}
-    if port is not None:
-      kwargs["port"] = port
-    return NailgunClient(**kwargs)
+    return NailgunClient(port=port, ins=stdin, out=stdout, err=stderr)
 
   def ensure_connectable(self, nailgun):
     """Ensures that a nailgun client is connectable or raises NailgunError."""
