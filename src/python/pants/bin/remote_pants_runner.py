@@ -143,7 +143,8 @@ class RemotePantsRunner(object):
     modified_env['PANTSD_RUNTRACKER_CLIENT_START_TIME'] = str(self._start_time)
     modified_env['PANTSD_REQUEST_TIMEOUT_LIMIT'] = str(self._bootstrap_options.for_global_scope().pantsd_timeout_when_multiple_invocations)
 
-    assert isinstance(port, int), 'port {} is not an integer!'.format(port)
+    assert isinstance(port, int), \
+      'port {} is not an integer! It has type {}.'.format(port, type(port))
 
     # Instantiate a NailgunClient.
     client = NailgunClient(port=port,

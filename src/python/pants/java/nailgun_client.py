@@ -290,7 +290,9 @@ class NailgunClient(object):
     :returns: a connected `socket.socket`.
     :raises: `NailgunClient.NailgunConnectionError` on failure to connect.
     """
-    sock = RecvBufferedSocket(socket.socket(socket.AF_INET, socket.SOCK_STREAM))
+    sock = RecvBufferedSocket(
+      sock=socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
+    )
     try:
       sock.connect(self._address)
     except (socket.error, socket.gaierror) as e:
