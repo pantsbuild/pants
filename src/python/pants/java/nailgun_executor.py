@@ -183,7 +183,7 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
       if (not running) or (running and updated):
         return self._spawn_nailgun_server(new_fingerprint, jvm_options, classpath, stdout, stderr, stdin)
 
-    return self._create_ngclient(self.socket, stdout, stderr, stdin)
+    return self._create_ngclient(port=self.socket, stdout=stdout, stderr=stderr, stdin=stdin)
 
   class InitialNailgunConnectTimedOut(Exception):
     _msg_fmt = """Failed to read nailgun output after {timeout} seconds!
@@ -269,7 +269,7 @@ Stderr:
     logger.debug('Spawned nailgun server {i} with fingerprint={f}, pid={pid} port={port}'
                  .format(i=self._identity, f=fingerprint, pid=self.pid, port=self.socket))
 
-    client = self._create_ngclient(self.socket, stdout, stderr, stdin)
+    client = self._create_ngclient(port=self.socket, stdout=stdout, stderr=stderr, stdin=stdin)
     self.ensure_connectable(client)
 
     return client
