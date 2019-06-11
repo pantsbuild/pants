@@ -4,6 +4,149 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.18.0.dev0 (6/10/2019)
+-----------------------
+
+API Changes
+~~~~~~~~~~~
+* add extra rsc args (#7863)
+  `PR #7863 <https://github.com/pantsbuild/pants/pull/7863>`_
+
+New Features
+~~~~~~~~~~~~
+* fs_util directory materialize prints timing information to stderr (#7871)
+  `PR #7871 <https://github.com/pantsbuild/pants/pull/7871>`_
+
+* Migrate zinc compiler to scopt and add argfile support (#6803)
+  `PR #6803 <https://github.com/pantsbuild/pants/pull/6803>`_
+
+* Use zinc to create the context jar for zinc and rsc (#7833)
+  `PR #7833 <https://github.com/pantsbuild/pants/pull/7833>`_
+
+* Add generic --passthrough-args support. (#7803)
+  `PR #7803 <https://github.com/pantsbuild/pants/pull/7803>`_
+
+* Fix zipkin multithreading issue #7415 (#7826)
+  `PR #7826 <https://github.com/pantsbuild/pants/pull/7826>`_
+
+* Always capture and cache Digests in coursier and ivy (#7835)
+  `PR #7835 <https://github.com/pantsbuild/pants/pull/7835>`_
+
+* Write output from JUnit ConsoleRunner when process is terminated (#7799)
+  `PR #7799 <https://github.com/pantsbuild/pants/pull/7799>`_
+
+Bugfixes
+~~~~~~~~
+* Fix Nailgun failure when the port is not specified (#7878)
+  `PR #7878 <https://github.com/pantsbuild/pants/pull/7878>`_
+
+* Fix Junit runner failing when `--extra-jvm-options` provided (#7877)
+  `PR #7877 <https://github.com/pantsbuild/pants/pull/7877>`_
+
+* Fix `py-thrift-namespace-clash-check` type issue when logging with `--no-strict` mode (#7864)
+  `PR #7864 <https://github.com/pantsbuild/pants/pull/7864>`_
+
+* Re-instate PosixFS Threadpool (#7848)
+  `PR #7848 <https://github.com/pantsbuild/pants/pull/7848>`_
+
+* Fix remoting of V2 Python test runnner not being able to discover the Python interpreter (#7844)
+  `PR #7844 <https://github.com/pantsbuild/pants/pull/7844>`_
+
+* Fix .pyc files being included to partially get reproducible PEX builds (#7841)
+  `Issue #7808 <https://github.com/pantsbuild/pants/issues/7808>`_
+  `PR #7841 <https://github.com/pantsbuild/pants/pull/7841>`_
+
+* Use `--no-enabled-shared` for Linux wheel-builder interpreter so that the released PEX works with statically built interpreters (#7794)
+  `PR #7794 <https://github.com/pantsbuild/pants/pull/7794>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Remove an old redundant .isort.cfg. (#7859)
+  `PR #7859 <https://github.com/pantsbuild/pants/pull/7859>`_
+
+* Fix `DistributionLocator` dependency declarations. (#7875)
+  `PR #7875 <https://github.com/pantsbuild/pants/pull/7875>`_
+
+* Stabilize all tests of NailgunTask subclasses. (#7866)
+  `PR #7866 <https://github.com/pantsbuild/pants/pull/7866>`_
+
+* NailgunTasks execute java with consistent cwd. (#7872)
+  `PR #7872 <https://github.com/pantsbuild/pants/pull/7872>`_
+
+* add debug log for jvm target compile time ; fix execution graph display (#7873)
+  `PR #7873 <https://github.com/pantsbuild/pants/pull/7873>`_
+
+* Use argfile support in zinc and rsc (#7868)
+  `PR #7868 <https://github.com/pantsbuild/pants/pull/7868>`_
+
+* Create a separate crate for workunit_store (#7855)
+  `PR #7855 <https://github.com/pantsbuild/pants/pull/7855>`_
+
+* rsc re-uses DirectoryDigest from process execution rather than re-snapshotting (#7861)
+  `PR #7861 <https://github.com/pantsbuild/pants/pull/7861>`_
+
+* Extract out `resolve_requirements` V2 rule for creating PEXes with requirements (#7846)
+  `Issue #7795 <https://github.com/pantsbuild/pants/issues/7795>`_
+  `PR #7846 <https://github.com/pantsbuild/pants/pull/7846>`_
+
+* Split up CI unit tests into two distinct shards (#7867)
+  `PR #7867 <https://github.com/pantsbuild/pants/pull/7867>`_
+
+* Bump to latest zinc in order to consume zinc analysis fix (#7854)
+  `PR #7854 <https://github.com/pantsbuild/pants/pull/7854>`_
+
+* Port `ci.sh` to Python 3 for more descriptive CLI flags and less duplication (#7849)
+  `PR #7849 <https://github.com/pantsbuild/pants/pull/7849>`_
+
+* rsc doesn't re-snapshot jars produced by zinc (#7858)
+  `PR #7858 <https://github.com/pantsbuild/pants/pull/7858>`_
+
+* add java_sources to scala_library() snapshot (#7840)
+  `PR #7840 <https://github.com/pantsbuild/pants/pull/7840>`_
+
+* Apply isort fixes (#7857)
+  `PR #7857 <https://github.com/pantsbuild/pants/pull/7857>`_
+
+* Locate the classes directory in order to relativize classnames (#7853)
+  `PR #7853 <https://github.com/pantsbuild/pants/pull/7853>`_
+
+* Move V2 test runner integration test into proper location of `backend/python` folder (#7847)
+  `PR #7847 <https://github.com/pantsbuild/pants/pull/7847>`_
+
+* Run contrib tests with unit tests and integration tests for fewer CI delays (#7709)
+  `PR #7709 <https://github.com/pantsbuild/pants/pull/7709>`_
+
+* No longer default to saving non-deterministic run information to PEX in `./pants binary` (#7843)
+  `PR #7843 <https://github.com/pantsbuild/pants/pull/7843>`_
+
+* Cleanup unnecessary code from #7776 for `./pants binary` interpreter constraints (#7842)
+  `PR #7776 <https://github.com/pantsbuild/pants/pull/7776>`_
+
+* Apply final set of Shellcheck fixes and turn on in CI (#7832)
+  `PR #7832 <https://github.com/pantsbuild/pants/pull/7832>`_
+
+* Bump CI unit test timeout for less flaky runs (#7831)
+  `Issue #6898 <https://github.com/pantsbuild/pants/issues/6898>`_
+  `PR #7831 <https://github.com/pantsbuild/pants/pull/7831>`_
+
+* Bump to latest junit-runner (#7830)
+  `PR #7830 <https://github.com/pantsbuild/pants/pull/7830>`_
+
+* Sort entries in output zinc jars (#7834)
+  `PR #7834 <https://github.com/pantsbuild/pants/pull/7834>`_
+
+* Fix rsc compile transitive dep bug introduced in #7742 (#7825)
+  `PR #7825 <https://github.com/pantsbuild/pants/pull/7825>`_
+
+* Avoid redundant work while hackily_snapshot()ing. (#7829)
+  `PR #7829 <https://github.com/pantsbuild/pants/pull/7829>`_
+
+Documentation
+~~~~~~~~~~~~~
+* Add notes for 1.16.0rc6 (#7852)
+  `PR #7852 <https://github.com/pantsbuild/pants/pull/7852>`_
+
+
 1.17.0.dev1 (5/22/2019)
 -----------------------
 

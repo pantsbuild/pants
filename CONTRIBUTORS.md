@@ -134,6 +134,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Michael Doherty
 + Mike Cripps
 + Mike Lindsey
++ Mike Solomon
 + Misho Krastev
 + Moses Nakamura
 + Nadav Samet
