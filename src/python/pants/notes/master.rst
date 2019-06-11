@@ -120,7 +120,7 @@ Refactoring, Improvements, and Tooling
   `PR #7843 <https://github.com/pantsbuild/pants/pull/7843>`_
 
 * Cleanup unnecessary code from #7776 for `./pants binary` interpreter constraints (#7842)
-  `PR #7776 <https://github.com/pantsbuild/pants/pull/7776>`_
+  `PR #7842 <https://github.com/pantsbuild/pants/pull/7842>`_
 
 * Apply final set of Shellcheck fixes and turn on in CI (#7832)
   `PR #7832 <https://github.com/pantsbuild/pants/pull/7832>`_
