@@ -225,6 +225,11 @@ class NailgunStreamWriter(_StoppableDaemonThread):
 
   def run(self):
     while self._in_fds and not self.is_stopped:
+      # NB: For now, we stick with select.select, rather than the better abstracted and more robust
+      # selectors.DefaultSelector. We do this because we currently check for errored_fds, and this
+      # cannot be easily recreated with selectors (https://stackoverflow.com/a/49563017). See
+      # https://github.com/pantsbuild/pants/issues/7880 for why we might want to revisit this code
+      # to instead use selectors.
       readable_fds, _, errored_fds = select.select(self._in_fds, [], self._in_fds, self._select_timeout)
       self.do_run(readable_fds, errored_fds)
 
