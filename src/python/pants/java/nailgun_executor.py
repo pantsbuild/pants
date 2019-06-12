@@ -226,7 +226,10 @@ Stderr:
         )
 
     if PY3:
-      with selectors.DefaultSelector() as selector, \
+      # NB: We use PollSelector, rather than the more efficient DefaultSelector, because
+      # DefaultSelector results in using the epoll() syscall on Linux, which does not work with
+      # regular text files like ng_stdout. See https://stackoverflow.com/a/8645770.
+      with selectors.PollSelector() as selector, \
         safe_open(self._ng_stdout, 'r') as ng_stdout:
         selector.register(ng_stdout, selectors.EVENT_READ)
         while 1:
