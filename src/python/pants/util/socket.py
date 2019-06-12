@@ -80,9 +80,9 @@ class RecvBufferedSocket(object):
 
     if len(self._buffer) < bufsize:
       if PY3:
-        selector = selectors.DefaultSelector()
-        selector.register(self._socket, selectors.EVENT_READ)
-        events = selector.select(timeout=self._select_timeout)
+        with selectors.DefaultSelector() as selector:
+          selector.register(self._socket, selectors.EVENT_READ)
+          events = selector.select(timeout=self._select_timeout)
         if events:
           read_and_add_to_buffer()
       else:

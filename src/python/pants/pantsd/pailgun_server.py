@@ -230,9 +230,9 @@ class PailgunServer(ThreadingMixIn, TCPServer):
     elif self.timeout is not None:
       timeout = min(timeout, self.timeout)
     if PY3:
-      selector = selectors.DefaultSelector()
-      selector.register(self, selectors.EVENT_READ)
-      events = selector.select(timeout=timeout)
+      with selectors.DefaultSelector() as selector:
+        selector.register(self, selectors.EVENT_READ)
+        events = selector.select(timeout=timeout)
       if not events:
         self.handle_timeout()
         return
