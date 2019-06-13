@@ -10,20 +10,13 @@ import threading
 import traceback
 from contextlib import contextmanager
 
-from future.utils import PY3
 from six.moves.socketserver import BaseRequestHandler, BaseServer, TCPServer, ThreadingMixIn
 
 from pants.engine.native import Native
 from pants.java.nailgun_protocol import NailgunProtocol
 from pants.util.contextutil import maybe_profiled
 from pants.util.memo import memoized
-from pants.util.socket import RecvBufferedSocket
-
-
-if PY3:
-  import selectors
-else:
-  from pants.util.socket import safe_select
+from pants.util.socket import RecvBufferedSocket, is_readable
 
 
 class PailgunHandlerBase(BaseRequestHandler):
@@ -229,18 +222,10 @@ class PailgunServer(ThreadingMixIn, TCPServer):
       timeout = self.timeout
     elif self.timeout is not None:
       timeout = min(timeout, self.timeout)
-    if PY3:
-      with selectors.DefaultSelector() as selector:
-        selector.register(self, selectors.EVENT_READ)
-        events = selector.select(timeout=timeout)
-      if not events:
-        self.handle_timeout()
-        return
-    else:
-      fd_sets = safe_select([self], [], [], timeout)
-      if not fd_sets[0]:
-        self.handle_timeout()
-        return
+
+    if not is_readable(self, timeout=timeout):
+      self.handle_timeout()
+      return
 
     # After select tells us we can safely accept, guard the accept and request
     # handling with the lifecycle lock to avoid abrupt teardown mid-request.

@@ -45,6 +45,23 @@ def safe_select(*args, **kwargs):
         raise
 
 
+# TODO(6071): require kwarg-only args after `fileobj`.
+def is_readable(fileobj, timeout=None):
+  """Check that the file-like resource is readable within the given timeout via polling.
+  :param Union[int, SupportsFileNo] fileobj:
+  :param Optional[int] timeout: (in seconds)
+  :return bool
+  """
+  if PY3:
+    with selectors.DefaultSelector() as selector:
+      selector.register(fileobj, selectors.EVENT_READ)
+      events = selector.select(timeout=timeout)
+    return bool(events)
+  else:
+    readable, _, _ = safe_select([fileobj], [], [], timeout)
+    return bool(readable)
+
+
 class RecvBufferedSocket(object):
   """A socket wrapper that simplifies recv() buffering."""
 
@@ -74,21 +91,9 @@ class RecvBufferedSocket(object):
     """Buffers up to _chunk_size bytes when the internal buffer has less than `bufsize` bytes."""
     assert bufsize > 0, 'a positive bufsize is required'
 
-    def read_and_add_to_buffer():
+    if len(self._buffer) < bufsize and is_readable(self._socket, timeout=self._select_timeout):
       recvd = self._socket.recv(max(self._chunk_size, bufsize))
       self._buffer = self._buffer + recvd
-
-    if len(self._buffer) < bufsize:
-      if PY3:
-        with selectors.DefaultSelector() as selector:
-          selector.register(self._socket, selectors.EVENT_READ)
-          events = selector.select(timeout=self._select_timeout)
-        if events:
-          read_and_add_to_buffer()
-      else:
-        readable, _, _ = safe_select([self._socket], [], [], self._select_timeout)
-        if readable:
-          read_and_add_to_buffer()
     return_buf, self._buffer = self._buffer[:bufsize], self._buffer[bufsize:]
     return return_buf
 
