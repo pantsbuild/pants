@@ -212,8 +212,6 @@ Stderr:
     accumulated_stdout = ''
 
     def calculate_remaining_time():
-      # TODO: share the decreasing timeout logic here with NailgunProtocol.iter_chunks() by adding
-      # a method to pants.util.contextutil!
       return time.time() - (start_time + timeout)
 
     def possibly_raise_timeout(remaining_time):
