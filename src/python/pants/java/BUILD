@@ -57,6 +57,7 @@ python_library(
   dependencies = [
     ':executor',
     ':nailgun_client',
+    '3rdparty/python:future',
     '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',

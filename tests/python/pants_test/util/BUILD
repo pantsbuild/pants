@@ -155,6 +155,7 @@ python_tests(
   sources = ['test_socket.py'],
   coverage = ['pants.util.socket'],
   dependencies = [
+    '3rdparty/python:future',
     '3rdparty/python:mock',
     'src/python/pants/util:socket',
   ]

@@ -9,11 +9,34 @@ import socket
 import unittest
 
 import mock
+from future.utils import PY3
 
-from pants.util.socket import RecvBufferedSocket
+from pants.util.socket import RecvBufferedSocket, is_readable
 
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)
+
+
+class TestSocketUtils(unittest.TestCase):
+
+  @mock.patch('selectors.DefaultSelector' if PY3 else 'select.select', **PATCH_OPTS)
+  def test_is_readable(self, mock_selector):
+    mock_fileobj = mock.Mock()
+    if PY3:
+      mock_selector = mock_selector.return_value.__enter__.return_value
+      mock_selector.register = mock.Mock()
+      # NB: the return value should actually be List[Tuple[SelectorKey, Events]], but our code only
+      # cares that _some_ event happened so we choose a simpler mock here. See
+      # https://docs.python.org/3/library/selectors.html#selectors.BaseSelector.select.
+      mock_selector.select = mock.Mock(return_value=[(1, "")])
+    else:
+      mock_selector.return_value = ([1], [], [])
+    self.assertTrue(is_readable(mock_fileobj, timeout=0.1))
+    if PY3:
+      mock_selector.select = mock.Mock(return_value=[])
+    else:
+      mock_selector.return_value = ([], [], [])
+    self.assertFalse(is_readable(mock_fileobj, timeout=0.1))
 
 
 class TestRecvBufferedSocket(unittest.TestCase):
@@ -44,9 +67,18 @@ class TestRecvBufferedSocket(unittest.TestCase):
     self.server_sock.sendall(b'A' * double_chunk)
     self.assertEqual(self.buf_sock.recv(double_chunk), b'A' * double_chunk)
 
-  @mock.patch('pants.util.socket.select.select', **PATCH_OPTS)
-  def test_recv_check_calls(self, mock_select):
-    mock_select.return_value = ([1], [], [])
+  @mock.patch('selectors.DefaultSelector' if PY3 else 'select.select', **PATCH_OPTS)
+  def test_recv_check_calls(self, mock_selector):
+    if PY3:
+      mock_selector = mock_selector.return_value.__enter__.return_value
+      mock_selector.register = mock.Mock()
+      # NB: the return value should actually be List[Tuple[SelectorKey, Events]], but our code only
+      # cares that _some_ event happened so we choose a simpler mock here. See
+      # https://docs.python.org/3/library/selectors.html#selectors.BaseSelector.select.
+      mock_selector.select = mock.Mock(return_value=[(1, "")])
+    else:
+      mock_selector.return_value = ([1], [], [])
+
     self.mock_socket.recv.side_effect = [b'A' * self.chunk_size, b'B' * self.chunk_size]
 
     self.assertEqual(self.mocked_buf_sock.recv(128), b'A' * 128)
