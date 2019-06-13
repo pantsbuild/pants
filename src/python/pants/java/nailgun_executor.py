@@ -8,7 +8,6 @@ import hashlib
 import logging
 import os
 import re
-import select
 import threading
 import time
 from contextlib import closing
@@ -22,6 +21,12 @@ from pants.java.nailgun_client import NailgunClient
 from pants.pantsd.process_manager import FingerprintedProcessManager, ProcessGroup
 from pants.util.dirutil import read_file, safe_file_dump, safe_open
 from pants.util.memo import memoized_classproperty
+
+
+if PY3:
+  import selectors
+else:
+  import select
 
 
 logger = logging.getLogger(__name__)
@@ -203,29 +208,52 @@ Stderr:
 
   def _await_socket(self, timeout):
     """Blocks for the nailgun subprocess to bind and emit a listening port in the nailgun stdout."""
-    with safe_open(self._ng_stdout, 'r') as ng_stdout:
-      start_time = time.time()
-      accumulated_stdout = ''
-      while 1:
-        # TODO: share the decreasing timeout logic here with NailgunProtocol.iter_chunks() by adding
-        # a method to pants.util.contextutil!
-        remaining_time = time.time() - (start_time + timeout)
-        if remaining_time > 0:
-          stderr = read_file(self._ng_stderr, binary_mode=True)
-          raise self.InitialNailgunConnectTimedOut(
-            timeout=timeout,
-            stdout=accumulated_stdout,
-            stderr=stderr,
-          )
+    start_time = time.time()
+    accumulated_stdout = ''
 
-        readable, _, _ = select.select([ng_stdout], [], [], (-1 * remaining_time))
-        if readable:
-          line = ng_stdout.readline()                          # TODO: address deadlock risk here.
-          try:
-            return self._NG_PORT_REGEX.match(line).group(1)
-          except AttributeError:
-            pass
-          accumulated_stdout += line
+    def calculate_remaining_time():
+      return time.time() - (start_time + timeout)
+
+    def possibly_raise_timeout(remaining_time):
+      if remaining_time > 0:
+        stderr = read_file(self._ng_stderr, binary_mode=True)
+        raise self.InitialNailgunConnectTimedOut(
+          timeout=timeout,
+          stdout=accumulated_stdout,
+          stderr=stderr,
+        )
+
+    if PY3:
+      # NB: We use PollSelector, rather than the more efficient DefaultSelector, because
+      # DefaultSelector results in using the epoll() syscall on Linux, which does not work with
+      # regular text files like ng_stdout. See https://stackoverflow.com/a/8645770.
+      with selectors.PollSelector() as selector, \
+        safe_open(self._ng_stdout, 'r') as ng_stdout:
+        selector.register(ng_stdout, selectors.EVENT_READ)
+        while 1:
+          remaining_time = calculate_remaining_time()
+          possibly_raise_timeout(remaining_time)
+          events = selector.select(timeout=-1 * remaining_time)
+          if events:
+            line = ng_stdout.readline()  # TODO: address deadlock risk here.
+            try:
+              return self._NG_PORT_REGEX.match(line).group(1)
+            except AttributeError:
+              pass
+            accumulated_stdout += line
+    else:
+      with safe_open(self._ng_stdout, 'r') as ng_stdout:
+        while 1:
+          remaining_time = calculate_remaining_time()
+          possibly_raise_timeout(remaining_time)
+          readable, _, _ = select.select([ng_stdout], [], [], (-1 * remaining_time))
+          if readable:
+            line = ng_stdout.readline()  # TODO: address deadlock risk here.
+            try:
+              return self._NG_PORT_REGEX.match(line).group(1)
+            except AttributeError:
+              pass
+            accumulated_stdout += line
 
   def _create_ngclient(self, port, stdout, stderr, stdin):
     return NailgunClient(port=port, ins=stdin, out=stdout, err=stderr)

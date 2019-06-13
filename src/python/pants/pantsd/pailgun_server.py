@@ -16,7 +16,7 @@ from pants.engine.native import Native
 from pants.java.nailgun_protocol import NailgunProtocol
 from pants.util.contextutil import maybe_profiled
 from pants.util.memo import memoized
-from pants.util.socket import RecvBufferedSocket, safe_select
+from pants.util.socket import RecvBufferedSocket, is_readable
 
 
 class PailgunHandlerBase(BaseRequestHandler):
@@ -222,8 +222,8 @@ class PailgunServer(ThreadingMixIn, TCPServer):
       timeout = self.timeout
     elif self.timeout is not None:
       timeout = min(timeout, self.timeout)
-    fd_sets = safe_select([self], [], [], timeout)
-    if not fd_sets[0]:
+
+    if not is_readable(self, timeout=timeout):
       self.handle_timeout()
       return
 
