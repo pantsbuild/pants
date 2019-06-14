@@ -6,15 +6,7 @@ import subprocess
 
 
 def main() -> None:
-  subprocess.run([
-    "./pants",
-    "--tag=+type_checked",
-    "mypy",
-    "src/python/pants::",
-    "tests/python/pants_test::",
-    "contrib::",
-    "build-support/bin::",
-  ], check=True)
+  subprocess.run(["./pants", "--tag=+type_checked", "mypy", "::"], check=True)
 
 
 if __name__ == '__main__':
