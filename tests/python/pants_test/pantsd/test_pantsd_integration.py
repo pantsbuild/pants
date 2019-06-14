@@ -772,13 +772,14 @@ Interrupted by user over pailgun client!
         result.stderr_data,
       )
 
-  # Regression test for issue https://github.com/pantsbuild/pants/issues/7881
-  # When a run under pantsd calls pants with pantsd inside it, the inner run will time out
-  # waiting for the outer run to end.
   def test_inner_runs_dont_deadlock(self):
     """
     Create a pantsd run that calls testprojects/src/python/nested_runs with the appropriate
     bootstrap options to avoid restarting pantsd.
+
+    Regression test for issue https://github.com/pantsbuild/pants/issues/7881
+    When a run under pantsd calls pants with pantsd inside it, the inner run will time out
+    waiting for the outer run to end.
 
     NB: testprojects/src/python/nested_runs assumes that the pants.ini file is in ${workdir}/pants.ini
     """
@@ -790,6 +791,5 @@ Interrupted by user over pailgun client!
     with self.pantsd_successful_run_context(extra_config=config) as (pantsd_run, checker, workdir, _):
       result = pantsd_run(['run', 'testprojects/src/python/nested_runs', '--', workdir], expected_runs=2)
       checker.assert_started()
-      self.assertNotIn("Another pants invocation is running", result.stderr_data)
       self.assert_success(result)
->>>>>>> Add failing test
+      self.assertNotIn("Another pants invocation is running", result.stderr_data)
