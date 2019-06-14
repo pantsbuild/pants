@@ -10,8 +10,8 @@ import unittest
 from pants_test.subsystem import subsystem_util
 
 from pants.contrib.python.checks.checker.common import CheckstylePlugin
-from pants.contrib.python.checks.tasks.checkstyle.plugin_subsystem_base import (PluginSubsystemBase,
-                                                                                default_subsystem_for_plugin)
+from pants.contrib.python.checks.tasks.checkstyle.plugin_subsystem_base import (
+  PluginSubsystemBase, default_subsystem_for_plugin)
 
 
 class Plugin(CheckstylePlugin):
