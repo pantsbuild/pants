@@ -94,3 +94,13 @@ jar_library(
     jar(org='org.apache.avro', name='avro-ipc', rev=avro_rev),
   ],
 )
+
+jar_library(
+  name = 'bloop-config-gen',
+  jars = [
+    scala_jar(
+      org='org.pantsbuild', name='bloop-config-gen', rev='???',
+      url='file:///Users/dmcclanahan/tools/pants/dist/bloop-config-gen.jar',
+      mutable=True)
+  ],
+)
