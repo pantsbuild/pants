@@ -76,7 +76,6 @@ native_engine_cache_config: &native_engine_cache_config
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
       - ${HOME}/.cache/pants/rust/cargo
-      - build-support/pants_dev_deps.py27.venv
       - build-support/pants_dev_deps.py36.venv
       - build-support/pants_dev_deps.py37.venv
       - src/rust/engine/target
@@ -166,9 +165,6 @@ base_linux_config: &base_linux_config
   after_failure:
     - ./build-support/bin/ci-failure.sh
 
-py27_linux_config: &py27_linux_config
-  <<: *base_linux_config
-
 py36_linux_config: &py36_linux_config
   <<: *base_linux_config
 
@@ -186,14 +182,6 @@ base_linux_test_config: &base_linux_test_config
     - pyenv global 2.7.15 3.6.7 3.7.1
   before_script:
     - *aws_get_pants_pex
-
-py27_linux_test_config: &py27_linux_test_config
-  <<: *py27_linux_config
-  <<: *base_linux_test_config
-  stage: *test_cron
-  env:
-    - &py27_linux_test_config_env >
-      BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
 
 py36_linux_test_config: &py36_linux_test_config
   <<: *py36_linux_config
@@ -218,23 +206,6 @@ base_osx_config: &base_osx_config
     brew:
       packages:
       - openssl
-
-py27_osx_config: &py27_osx_config
-  <<: *base_osx_config
-  # NB: We ensure sane python2 and python3 interpreters are available on the PATH for scripting
-  # against.
-  env:
-    - &py27_osx_config_env >
-      PATH="/usr/local/opt/openssl/bin:${PATH}"
-      LDFLAGS="-L/usr/local/opt/openssl/lib"
-      CPPFLAGS="-I/usr/local/opt/openssl/include"
-      PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-      PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
-  before_install:
-    - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq
-    - chmod 755 /usr/local/bin/jq
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY36_VERSION}"
 
 py36_osx_config: &py36_osx_config
   <<: *base_osx_config
@@ -276,19 +247,6 @@ base_osx_test_config: &base_osx_test_config
     - ulimit -c unlimited
     - ulimit -n 8192
     - *aws_get_pants_pex
-
-py27_osx_test_config: &py27_osx_test_config
-  <<: *py27_osx_config
-  <<: *base_osx_test_config
-  stage: *test_cron
-  env:
-    - &py27_osx_test_config_env >
-      PATH="/usr/local/opt/openssl/bin:${PATH}"
-      LDFLAGS="-L/usr/local/opt/openssl/lib"
-      CPPFLAGS="-I/usr/local/opt/openssl/include"
-      BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.osx
-      PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-      PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
 
 py36_osx_test_config: &py36_osx_test_config
   <<: *py36_osx_config
@@ -375,15 +333,6 @@ base_linux_build_engine: &base_linux_build_engine
       sh -c "${docker_run_command}"
     - *aws_deploy_pants_pex
 
-py27_linux_build_engine: &py27_linux_build_engine
-  <<: *py27_linux_config
-  <<: *base_linux_build_engine
-  name: "Build Linux native engine and pants.pex (Py2.7 PEX)"
-  env:
-    - docker_run_command="./build-support/bin/ci.py --bootstrap --python-version 2.7"
-    - CACHE_NAME=linuxpexbuild.py27
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
-
 py36_linux_build_engine: &py36_linux_build_engine
   <<: *py36_linux_config
   <<: *base_linux_build_engine
@@ -415,18 +364,6 @@ base_osx_build_engine: &base_osx_build_engine
   after_failure:
     - ./build-support/bin/ci-failure.sh
 
-py27_osx_build_engine: &py27_osx_build_engine
-  <<: *py27_osx_config
-  <<: *base_osx_build_engine
-  name: "Build OSX native engine and pants.pex (Py2.7 PEX)"
-  env:
-    - *py27_osx_config_env
-    - CACHE_NAME=osxpexbuild.py27
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.osx
-  script:
-    - ./build-support/bin/ci.py --bootstrap --python-version 2.7
-    - *aws_deploy_pants_pex
-
 py36_osx_build_engine: &py36_osx_build_engine
   <<: *py36_osx_config
   <<: *base_osx_build_engine
@@ -457,16 +394,6 @@ py37_osx_build_engine: &py37_osx_build_engine
 # -------------------------------------------------------------------------
 # Lint
 # -------------------------------------------------------------------------
-
-py27_lint: &py27_lint
-  <<: *py27_linux_test_config
-  name: "Self-checks and lint (Py2.7 PEX)"
-  stage: *test
-  env:
-    - *py27_linux_test_config_env
-    - CACHE_NAME=linuxselfchecks.py27
-  script:
-    - ./build-support/bin/ci.py --githooks --sanity-checks --doc-gen --lint --python-version 2.7
 
 py36_lint: &py36_lint
   <<: *py36_linux_test_config
@@ -628,14 +555,6 @@ base_osx_10_12_sanity_check: &base_osx_10_12_sanity_check
   <<: *base_osx_sanity_check
   osx_image: xcode9.2
 
-py27_osx_10_12_sanity_check: &py27_osx_10_12_sanity_check
-  <<: *py27_osx_test_config
-  <<: *base_osx_10_12_sanity_check
-  name: "OSX 10.12 sanity check (Py2.7 PEX)"
-  env:
-    - *py27_osx_test_config_env
-    - CACHE_NAME=macos10.12sanity.py27
-
 py36_osx_10_12_sanity_check: &py36_osx_10_12_sanity_check
   <<: *py36_osx_test_config
   <<: *base_osx_10_12_sanity_check
@@ -656,14 +575,6 @@ base_osx_10_13_sanity_check: &base_osx_10_13_sanity_check
   <<: *base_osx_sanity_check
   osx_image: xcode10.1
 
-py27_osx_10_13_sanity_check: &py27_osx_10_13_sanity_check
-  <<: *py27_osx_test_config
-  <<: *base_osx_10_13_sanity_check
-  name: "OSX 10.13 sanity check (Py2.7 PEX)"
-  env:
-    - *py27_osx_test_config_env
-    - CACHE_NAME=macos10.13sanity.py27
-
 py36_osx_10_13_sanity_check: &py36_osx_10_13_sanity_check
   <<: *py36_osx_test_config
   <<: *base_osx_10_13_sanity_check
@@ -683,15 +594,6 @@ py37_osx_10_13_sanity_check: &py37_osx_10_13_sanity_check
 # -------------------------------------------------------------------------
 # Platform specific tests
 # -------------------------------------------------------------------------
-
-py27_osx_platform_tests: &py27_osx_platform_tests
-  <<: *py27_osx_test_config
-  name: "OSX platform-specific tests (Py2.7 PEX)"
-  env:
-    - *py27_osx_test_config_env
-    - CACHE_NAME=macosplatformtests.py27
-  script:
-    - ./build-support/bin/ci.py --platform-specific-tests --python-version 2.7
 
 py36_osx_platform_tests: &py36_osx_platform_tests
   <<: *py36_osx_test_config
@@ -718,16 +620,6 @@ py37_osx_platform_tests: &py37_osx_platform_tests
 base_jvm_tests: &base_jvm_tests
   <<: *linux_with_fuse
 
-py27_jvm_tests: &py27_jvm_tests
-  <<: *py27_linux_test_config
-  <<: *base_jvm_tests
-  name: "JVM tests (Py2.7 PEX)"
-  env:
-    - *py27_linux_test_config_env
-    - CACHE_NAME=linuxjvmtests.py27
-  script:
-    - ./build-support/bin/ci.py --jvm-tests --python-version 2.7
-
 py36_jvm_tests: &py36_jvm_tests
   <<: *py36_linux_test_config
   <<: *base_jvm_tests
@@ -736,7 +628,7 @@ py36_jvm_tests: &py36_jvm_tests
     - *py36_linux_test_config_env
     - CACHE_NAME=linuxjvmtests.py36
   script:
-    - ./build-support/bin/ci.py --jvm-tests --python-version 2.7
+    - ./build-support/bin/ci.py --jvm-tests
 
 py37_jvm_tests: &py37_jvm_tests
   <<: *py37_linux_test_config
@@ -808,37 +700,21 @@ py36_deploy_unstable_pex: &py36_deploy_unstable_pex
 
 matrix:
   include:
-    - <<: *py27_linux_build_engine
-    - <<: *py27_linux_build_engine
-      stage: *bootstrap_cron
     - <<: *py36_linux_build_engine
     - <<: *py36_linux_build_engine
       stage: *bootstrap_cron
     - <<: *py37_linux_build_engine
 
-    - <<: *py27_osx_build_engine
-    - <<: *py27_osx_build_engine
-      stage: *bootstrap_cron
     - <<: *py36_osx_build_engine
     - <<: *py36_osx_build_engine
       stage: *bootstrap_cron
     - <<: *py37_osx_build_engine
 
-    - <<: *py27_lint
     - <<: *py36_lint
     - <<: *py37_lint
 
     - <<: *linux_rust_clippy
     - <<: *cargo_audit
-
-    - <<: *py27_linux_test_config
-      name: "Unit tests - V2 test runner (Py2.7 PEX)"
-      stage: *test
-      env:
-        - *py27_linux_test_config_env
-        - CACHE_NAME=unit_tests.v2.py27
-      script:
-        - travis_wait 50 ./build-support/bin/ci.py --python-tests-v2 --python-version 2.7
 
     - <<: *py36_linux_test_config
       name: "Unit tests - V2 test runner (Py3.6 PEX)"
@@ -855,16 +731,6 @@ matrix:
         - CACHE_NAME=unit_tests.v2.py37
       script:
        - travis_wait 50 ./build-support/bin/ci.py --python-tests-v2 --python-version 3.7
-
-    - <<: *py27_linux_test_config
-      name: "Unit tests - V1 test runner (Py2.7 PEX)"
-      stage: *test
-      env:
-        - *py27_linux_test_config_env
-        - CACHE_NAME=unit_tests.v1.py27
-      script:
-        - ./build-support/bin/ci.py --plugin-tests --python-version 2.7
-        - ./build-support/bin/ci.py --python-tests-v1 --python-version 2.7
 
     - <<: *py36_linux_test_config
       name: "Unit tests - V1 test runner (Py3.6 PEX)"
@@ -1547,243 +1413,19 @@ matrix:
           --integration-shard 19/20
           --python-version 3.7
 
-    - <<: *py27_linux_test_config
-      name: "Integration tests - shard 0 (Py2.7 PEX)"
-      env:
-        - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard0
-      script:
-        - >
-          ./build-support/bin/ci.py --integration-tests
-          --integration-shard 0/20
-          --python-version 2.7
-
-    - <<: *py27_linux_test_config
-      name: "Integration tests - shard 1 (Py2.7 PEX)"
-      env:
-        - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard1
-      script:
-        - >
-          ./build-support/bin/ci.py --integration-tests
-          --integration-shard 1/20
-          --python-version 2.7
-
-    - <<: *py27_linux_test_config
-      name: "Integration tests - shard 2 (Py2.7 PEX)"
-      env:
-        - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard2
-      script:
-        - >
-          ./build-support/bin/ci.py --integration-tests
-          --integration-shard 2/20
-          --python-version 2.7
-
-    - <<: *py27_linux_test_config
-      name: "Integration tests - shard 3 (Py2.7 PEX)"
-      env:
-        - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard3
-      script:
-        - >
-          ./build-support/bin/ci.py --integration-tests
-          --integration-shard 3/20
-          --python-version 2.7
-
-    - <<: *py27_linux_test_config
-      name: "Integration tests - shard 4 (Py2.7 PEX)"
-      env:
-        - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard4
-      script:
-        - >
-          ./build-support/bin/ci.py --integration-tests
-          --integration-shard 4/20
-          --python-version 2.7
-
-    - <<: *py27_linux_test_config
-      name: "Integration tests - shard 5 (Py2.7 PEX)"
-      env:
-        - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard5
-      script:
-        - >
-          ./build-support/bin/ci.py --integration-tests
-          --integration-shard 5/20
-          --python-version 2.7
-
-    - <<: *py27_linux_test_config
-      name: "Integration tests - shard 6 (Py2.7 PEX)"
-      env:
-        - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard6
-      script:
-        - >
-          ./build-support/bin/ci.py --integration-tests
-          --integration-shard 6/20
-          --python-version 2.7
-
-    - <<: *py27_linux_test_config
-      name: "Integration tests - shard 7 (Py2.7 PEX)"
-      env:
-        - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard7
-      script:
-        - >
-          ./build-support/bin/ci.py --integration-tests
-          --integration-shard 7/20
-          --python-version 2.7
-
-    - <<: *py27_linux_test_config
-      name: "Integration tests - shard 8 (Py2.7 PEX)"
-      env:
-        - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard8
-      script:
-        - >
-          ./build-support/bin/ci.py --integration-tests
-          --integration-shard 8/20
-          --python-version 2.7
-
-    - <<: *py27_linux_test_config
-      name: "Integration tests - shard 9 (Py2.7 PEX)"
-      env:
-        - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard9
-      script:
-        - >
-          ./build-support/bin/ci.py --integration-tests
-          --integration-shard 9/20
-          --python-version 2.7
-
-    - <<: *py27_linux_test_config
-      name: "Integration tests - shard 10 (Py2.7 PEX)"
-      env:
-        - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard10
-      script:
-        - >
-          ./build-support/bin/ci.py --integration-tests
-          --integration-shard 10/20
-          --python-version 2.7
-
-    - <<: *py27_linux_test_config
-      name: "Integration tests - shard 11 (Py2.7 PEX)"
-      env:
-        - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard11
-      script:
-        - >
-          ./build-support/bin/ci.py --integration-tests
-          --integration-shard 11/20
-          --python-version 2.7
-
-    - <<: *py27_linux_test_config
-      name: "Integration tests - shard 12 (Py2.7 PEX)"
-      env:
-        - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard12
-      script:
-        - >
-          ./build-support/bin/ci.py --integration-tests
-          --integration-shard 12/20
-          --python-version 2.7
-
-    - <<: *py27_linux_test_config
-      name: "Integration tests - shard 13 (Py2.7 PEX)"
-      env:
-        - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard13
-      script:
-        - >
-          ./build-support/bin/ci.py --integration-tests
-          --integration-shard 13/20
-          --python-version 2.7
-
-    - <<: *py27_linux_test_config
-      name: "Integration tests - shard 14 (Py2.7 PEX)"
-      env:
-        - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard14
-      script:
-        - >
-          ./build-support/bin/ci.py --integration-tests
-          --integration-shard 14/20
-          --python-version 2.7
-
-    - <<: *py27_linux_test_config
-      name: "Integration tests - shard 15 (Py2.7 PEX)"
-      env:
-        - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard15
-      script:
-        - >
-          ./build-support/bin/ci.py --integration-tests
-          --integration-shard 15/20
-          --python-version 2.7
-
-    - <<: *py27_linux_test_config
-      name: "Integration tests - shard 16 (Py2.7 PEX)"
-      env:
-        - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard16
-      script:
-        - >
-          ./build-support/bin/ci.py --integration-tests
-          --integration-shard 16/20
-          --python-version 2.7
-
-    - <<: *py27_linux_test_config
-      name: "Integration tests - shard 17 (Py2.7 PEX)"
-      env:
-        - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard17
-      script:
-        - >
-          ./build-support/bin/ci.py --integration-tests
-          --integration-shard 17/20
-          --python-version 2.7
-
-    - <<: *py27_linux_test_config
-      name: "Integration tests - shard 18 (Py2.7 PEX)"
-      env:
-        - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard18
-      script:
-        - >
-          ./build-support/bin/ci.py --integration-tests
-          --integration-shard 18/20
-          --python-version 2.7
-
-    - <<: *py27_linux_test_config
-      name: "Integration tests - shard 19 (Py2.7 PEX)"
-      env:
-        - *py27_linux_test_config_env
-        - CACHE_NAME=cronshard19
-      script:
-        - >
-          ./build-support/bin/ci.py --integration-tests
-          --integration-shard 19/20
-          --python-version 2.7
-
 
     - <<: *linux_rust_tests
     - <<: *osx_rust_tests
 
-    - <<: *py27_osx_10_12_sanity_check
     - <<: *py36_osx_10_12_sanity_check
     - <<: *py37_osx_10_12_sanity_check
 
-    - <<: *py27_osx_10_13_sanity_check
     - <<: *py36_osx_10_13_sanity_check
     - <<: *py37_osx_10_13_sanity_check
 
-    - <<: *py27_osx_platform_tests
     - <<: *py36_osx_platform_tests
     - <<: *py37_osx_platform_tests
 
-    - <<: *py27_jvm_tests
     - <<: *py36_jvm_tests
     - <<: *py37_jvm_tests
 
