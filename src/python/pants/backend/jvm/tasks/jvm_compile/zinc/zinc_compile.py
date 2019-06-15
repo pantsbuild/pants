@@ -203,6 +203,12 @@ class BaseZincCompile(JvmCompile):
 
   def register_extra_products_from_contexts(self, targets, compile_contexts):
     compile_contexts = [self.select_runtime_context(compile_contexts[t]) for t in targets]
+
+    bloop_classes_dir = self.context.products.get_data('bloop_classes_dir')
+    if bloop_classes_dir is not None:
+      for compile_context in compile_contexts:
+        bloop_classes_dir[compile_context.target] = compile_context.classes_dir
+
     zinc_analysis = self.context.products.get_data('zinc_analysis')
     zinc_args = self.context.products.get_data('zinc_args')
 
@@ -219,6 +225,9 @@ class BaseZincCompile(JvmCompile):
         zinc_args[compile_context.target] = args
 
   def create_empty_extra_products(self):
+    if self.context.products.is_required_data('bloop_classes_dir'):
+      self.context.products.safe_create_data('bloop_classes_dir', dict)
+
     if self.context.products.is_required_data('zinc_analysis'):
       self.context.products.safe_create_data('zinc_analysis', dict)
 
@@ -641,7 +650,7 @@ class ZincCompile(BaseZincCompile):
 
   @classmethod
   def product_types(cls):
-    return ['runtime_classpath', 'zinc_analysis', 'zinc_args']
+    return ['runtime_classpath', 'zinc_analysis', 'zinc_args', 'bloop_classes_dir']
 
   def select(self, target):
     # Require that targets are marked for JVM compilation, to differentiate from

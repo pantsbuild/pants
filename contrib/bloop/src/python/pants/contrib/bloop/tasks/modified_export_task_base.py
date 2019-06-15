@@ -7,7 +7,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from collections import defaultdict
 
 import six
-# FIXME: turn on lint, we're importing much more than we need to here.
+
+from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.junit_tests import JUnitTests
@@ -27,6 +28,17 @@ from twitter.common.collections import OrderedSet
 
 
 class ModifiedExportTaskBase(ExportTask):
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(ModifiedExportTaskBase, cls).prepare(options, round_manager)
+    round_manager.require_data('bloop_classes_dir')
+    round_manager.require_data('zinc_analysis')
+    round_manager.require_data('zinc_args')
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(ModifiedExportTaskBase, cls).subsystem_dependencies() + (DependencyContext,)
 
   # This is copied from the upstream task so we can edit it. This should *really* be broken out into
   # separate methods upstream.
@@ -86,8 +98,7 @@ class ModifiedExportTaskBase(ExportTask):
 
       if not current_target.is_synthetic:
         info['globs'] = current_target.globs_relative_to_buildroot()
-        if self.get_options().sources:
-          info['sources'] = list(current_target.sources_relative_to_buildroot())
+        info['sources'] = list(current_target.sources_relative_to_buildroot())
 
       info['transitive'] = current_target.transitive
       info['scope'] = str(current_target.scope)
@@ -130,7 +141,23 @@ class ModifiedExportTaskBase(ExportTask):
       target_libraries = OrderedSet()
       if isinstance(current_target, JarLibrary):
         target_libraries = OrderedSet(iter_transitive_jars(current_target))
-      for dep in current_target.dependencies:
+
+      classes_dir = self.context.products.get_data('bloop_classes_dir').get(current_target, None)
+      if classes_dir is not None:
+        info['classes_dir'] = classes_dir.path
+
+      zinc_analysis = self.context.products.get_data('zinc_analysis').get(current_target, None)
+      if zinc_analysis is not None:
+        # TODO: what is z.jar used for? classes dir?
+        _classes_dir, _z_jar_file, analysis_file = zinc_analysis
+        info['zinc_analysis'] = analysis_file
+
+      zinc_args = self.context.products.get_data('zinc_args').get(current_target, None)
+      if zinc_args is not None:
+        info['zinc_args'] = zinc_args
+
+      dep_ctx = DependencyContext.global_instance()
+      for dep in current_target.strict_dependencies(dep_ctx):
         info['targets'].append(dep.address.spec)
         if isinstance(dep, JarLibrary):
           for jar in dep.jar_dependencies:

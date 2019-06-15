@@ -10,8 +10,10 @@ import os
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.base.build_environment import get_buildroot, get_pants_cachedir
 from pants.base.exceptions import TaskError
+from pants.base.workunit import WorkUnitLabel
 from pants.java.distribution.distribution import DistributionLocator
-from pants.util.dirutil import safe_mkdir, safe_mkdir_for
+from pants.util.collections import assert_single_element
+from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 from pants.util.process_handler import subprocess
 
@@ -27,17 +29,12 @@ class EnsimeGen(ModifiedExportTaskBase):
 
     register('--reported-scala-version', type=str, default='2.12.8',
              help='Scala version to report to ensime. Defaults to the scala platform version.')
-    register('--scalac-options', type=list,
-             default=['-deprecation', '-unchecked', '-Xlint'],
-             help='Options to pass to scalac for ensime.')
-    register('--javac-options', type=list,
-             default=['-deprecation', '-Xlint:all', '-Xlint:-serial', '-Xlint:-path'],
-             help='Options to pass to javac for ensime.')
-    register('--output-file', type=str, default='.bloop', advanced=True,
+    register('--output-dir', type=str, default='.bloop', advanced=True,
              help='Relative path to the buildroot to write the ensime config to.')
 
   @classmethod
   def prepare(cls, options, round_manager):
+    super(EnsimeGen, cls).prepare(options, round_manager)
     # NB: this is so we run after compile -- we want our class dirs to be populated already.
     round_manager.require_data('runtime_classpath')
     # round_manager.require_data(EnsimeGenJar)
@@ -67,10 +64,8 @@ class EnsimeGen(ModifiedExportTaskBase):
     if not reported_scala_version:
       reported_scala_version = self._scala_platform.version
 
-    zinc_compile_dir = os.path.join(self.get_options().pants_workdir, 'compile/zinc')
-
-    output_file = os.path.join(get_buildroot(), self.get_options().output_file)
-    safe_mkdir_for(output_file)
+    output_dir = os.path.join(get_buildroot(), self.get_options().output_dir)
+    safe_mkdir(output_dir)
 
     scala_compiler_jars = [
       cpe.path for cpe in
@@ -81,24 +76,24 @@ class EnsimeGen(ModifiedExportTaskBase):
       get_buildroot(),
       reported_scala_version,
       self.get_options().pants_distdir,
-      zinc_compile_dir,
-      output_file,
+      output_dir,
     ]
 
+    def split_json_options(options_lines):
+      return json.dumps(assert_single_element(options_lines).split('\n'))
+
     env = {
-      'SCALAC_ARGS': json.dumps(self.get_options().scalac_options),
-      'JAVAC_ARGS': json.dumps(self.get_options().javac_options),
       'SCALA_COMPILER_JARS_CLASSPATH': ':'.join(scala_compiler_jars),
     }
 
     self.context.log.debug('export_result:\n{}'.format(export_result))
     self.context.log.debug('env:\n{}'.format(env))
 
-    with self.context.new_workunit('bloop-invoke') as workunit:
+    with self.context.new_workunit('bloop-invoke', labels=[WorkUnitLabel.COMPILER]) as workunit:
       proc = subprocess.Popen([
         'java',
         '-jar',
-        'dist/bloop-config-gen.jar'
+        '/Users/dmcclanahan/tools/pants/dist/bloop-config-gen.jar'
       ] + argv,
                               env=env,
                               stdin=subprocess.PIPE,

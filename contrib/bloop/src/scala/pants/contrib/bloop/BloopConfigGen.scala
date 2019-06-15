@@ -13,25 +13,20 @@ object BloopConfigGen extends App {
     buildRoot,
     scalaVersion,
     distDir,
-    zincCompileDir,
     bloopConfigDir) = args
 
   val buildRootPath = Path(buildRoot)
   val distDirPath = Path(distDir)
-  val zincBasePath = Path(zincCompileDir)
   val bloopConfigDirPath = Path(bloopConfigDir)
 
   val allStdin = scala.io.Source.stdin.mkString
   val pantsExportParsed = allStdin.parseJson.convertTo[PantsExport]
 
-  val scalacEnvArgs = sys.env("SCALAC_ARGS").parseJson.convertTo[Seq[String]]
-  val javacEnvArgs = sys.env("JAVAC_ARGS").parseJson.convertTo[Seq[String]]
-
   val scalaCompilerJars = sys.env("SCALA_COMPILER_JARS_CLASSPATH")
     .split(":")
     .map(jar => buildRootPath / RelPath(jar))
 
-  val sourceTargetTypes = Set("scala_library", "java_library", "junit_tests", "jvm_binary")
+  val sourceTargetTypes = Set("scala_library", "java_library", "junit_tests", "jvm_binary", "target")
 
   val sourceTargets = pantsExportParsed.targets.filter { case (_, target) =>
     sourceTargetTypes(target.targetType)
@@ -43,16 +38,17 @@ object BloopConfigGen extends App {
     // much? Should intellij/BSP have this info? Because pants resolves 3rdparty artifacts itself,
     // we may need to figure out the right way to pipe this into bloop.
     .map { case (depName, target) => (depName, target.id) }
-    .toSeq
-    .distinct
     .toMap
+  System.err.println(s"sourceTargetMap: $sourceTargetMap")
 
   val projects: Seq[BloopConfig.Project] = sourceTargets
-    .map { case (_, target) =>
+    .flatMap { case (_, target) =>
+      target.classesDir.map(Path(_)).map((target, _))
+    }
+    .map { case (target, classesDir) =>
       // TODO: ensure bloop doesn't attempt to recreate this directory if it doesn't exist
       // (e.g. after a clean-all), or pants will error out (because it expects this to be a
       // symlink!).
-      val classesDir = zincBasePath / "current" / RelPath(target.id) / "current" / "classes"
       val dependentJars = target.libraries.flatMap { coord =>
         pantsExportParsed.libraries.get(coord)
           .getOrElse(Seq())
@@ -63,8 +59,10 @@ object BloopConfigGen extends App {
       }.map(Path(_))
 
       val dependentTargets = target.dependencies
-        .map(_.flatMap(sourceTargetMap.get(_)))
-        .getOrElse(Seq())
+        // TODO: some targets like //:scala-library won't show up -- these should be converted into
+        // e.g. `addCompilerToClasspath` perhaps??
+        .flatMap(sourceTargetMap.get(_))
+      System.err.println(s"target: ${target.id}, deps: ${target.dependencies}, depT: $dependentTargets")
 
       val sources = target.sources.getOrElse(Seq())
         .map(srcRelPath => buildRootPath / RelPath(srcRelPath))
@@ -91,23 +89,31 @@ object BloopConfigGen extends App {
         organization = "org.scala-lang",
         name = "scala-compiler",
         version = scalaVersion,
-        options = scalacEnvArgs.toList,
+        options = target.zincArgs.getOrElse(Seq()).flatMap { opt =>
+          if (opt.startsWith("-S")) {
+            Some(opt.substring(2))
+          } else { None }
+        }.toList,
         jars = scalaCompilerJars.map(_.toNIO).toList,
         // TODO: when would this not be None?
-        analysis = None,
+        analysis = target.zincAnalysis.map(Path(_).toNIO),
         setup = Some(BloopConfig.CompileSetup(
           // TODO: Determine whether the CompileOrder refers to a global "scala first, then java"
           // (e.g. maven only allows one), or within a specific target (likely the first)!
           order = BloopConfig.Mixed,
-          addLibraryToBootClasspath = false,
-          addCompilerToClasspath = false,
-          addExtraJarsToClasspath = false,
-          manageBootClasspath = false,
+          addLibraryToBootClasspath = true,
+          addCompilerToClasspath = true,
+          addExtraJarsToClasspath = true,
+          manageBootClasspath = true,
           filterLibraryFromClasspath = false
         ))
       )
 
-      val javaConfig = BloopConfig.Java(options = javacEnvArgs.toList)
+      val javaConfig = BloopConfig.Java(options = target.zincArgs.getOrElse(Seq()).flatMap { opt =>
+        if (opt.startsWith("-C")) {
+          Some(opt.substring(2))
+        } else { None }
+      }.toList)
 
       BloopConfig.Project(
         name = target.id,
