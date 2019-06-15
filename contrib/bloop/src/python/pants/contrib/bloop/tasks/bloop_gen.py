@@ -8,7 +8,7 @@ import json
 import os
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
-from pants.base.build_environment import get_buildroot, get_pants_cachedir
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.java.distribution.distribution import DistributionLocator
@@ -17,15 +17,14 @@ from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 from pants.util.process_handler import subprocess
 
-# from upstreamable.tasks.bootstrap_ensime_gen import EnsimeGenJar
 from pants.contrib.bloop.tasks.modified_export_task_base import ModifiedExportTaskBase
 
 
-class EnsimeGen(ModifiedExportTaskBase):
+class BloopGen(ModifiedExportTaskBase):
 
   @classmethod
   def register_options(cls, register):
-    super(EnsimeGen, cls).register_options(register)
+    super(BloopGen, cls).register_options(register)
 
     register('--reported-scala-version', type=str, default='2.12.8',
              help='Scala version to report to ensime. Defaults to the scala platform version.')
@@ -34,21 +33,15 @@ class EnsimeGen(ModifiedExportTaskBase):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(EnsimeGen, cls).prepare(options, round_manager)
+    super(BloopGen, cls).prepare(options, round_manager)
     # NB: this is so we run after compile -- we want our class dirs to be populated already.
     round_manager.require_data('runtime_classpath')
-    # round_manager.require_data(EnsimeGenJar)
+    # round_manager.require_data(BloopGenJar)
     # cls.prepare_tools(round_manager)
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(EnsimeGen, cls).subsystem_dependencies() + (DistributionLocator, ScalaPlatform,)
-
-  def _make_ensime_cache_dir(self):
-    bootstrap_dir = get_pants_cachedir()
-    cache_dir = os.path.join(bootstrap_dir, 'ensime')
-    safe_mkdir(cache_dir)
-    return cache_dir
+    return super(BloopGen, cls).subsystem_dependencies() + (DistributionLocator, ScalaPlatform,)
 
   @memoized_property
   def _scala_platform(self):
@@ -58,6 +51,7 @@ class EnsimeGen(ModifiedExportTaskBase):
 
     exported_targets_map = self.generate_targets_map(self.context.targets())
     export_result = json.dumps(exported_targets_map, indent=4, separators=(',', ': '))
+    self.context.log.debug("export_result: {}".format(export_result))
 
     # TODO: use JvmPlatform for jvm options!
     reported_scala_version = self.get_options().reported_scala_version
@@ -84,9 +78,16 @@ class EnsimeGen(ModifiedExportTaskBase):
 
     env = {
       'SCALA_COMPILER_JARS_CLASSPATH': ':'.join(scala_compiler_jars),
+      'PANTS_TARGET_TYPES': ':'.join([
+        "scala_library",
+        "java_library",
+        "junit_tests",
+        "jvm_binary",
+        "target",
+        "annotation_processor"]),
     }
 
-    self.context.log.debug('export_result:\n{}'.format(export_result))
+    # self.context.log.debug('export_result:\n{}'.format(export_result))
     self.context.log.debug('env:\n{}'.format(env))
 
     with self.context.new_workunit('bloop-invoke', labels=[WorkUnitLabel.COMPILER]) as workunit:

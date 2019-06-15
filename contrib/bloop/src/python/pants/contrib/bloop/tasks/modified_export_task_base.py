@@ -7,7 +7,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from collections import defaultdict
 
 import six
-
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -32,6 +31,7 @@ class ModifiedExportTaskBase(ExportTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(ModifiedExportTaskBase, cls).prepare(options, round_manager)
+    round_manager.require_data('bloop_dep_classpath')
     round_manager.require_data('bloop_classes_dir')
     round_manager.require_data('zinc_analysis')
     round_manager.require_data('zinc_args')
@@ -145,6 +145,10 @@ class ModifiedExportTaskBase(ExportTask):
       classes_dir = self.context.products.get_data('bloop_classes_dir').get(current_target, None)
       if classes_dir is not None:
         info['classes_dir'] = classes_dir.path
+
+      dep_classpath = self.context.products.get_data('bloop_dep_classpath').get(current_target, None)
+      if dep_classpath is not None:
+        info['dependency_classpath'] = dep_classpath
 
       zinc_analysis = self.context.products.get_data('zinc_analysis').get(current_target, None)
       if zinc_analysis is not None:

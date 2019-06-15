@@ -6,10 +6,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from pants.goal.task_registrar import TaskRegistrar as task
 
-# from upstreamable.tasks.bootstrap_ensime_gen import BootstrapEnsimeGen
-from pants.contrib.bloop.tasks.ensime_gen import EnsimeGen
+from pants.contrib.bloop.tasks.bloop_gen import BloopGen
 
 
 def register_goals():
-  # task(name='bootstrap-ensime-gen', action=BootstrapEnsimeGen).install('bootstrap')
-  task(name='ensime-gen', action=EnsimeGen).install('ensime')
+  task(name='bloop-gen', action=BloopGen).install('bloop')

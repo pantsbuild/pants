@@ -8,7 +8,7 @@ case class Target(
   dependencies: Seq[String],
   targetType: String,
   scope: String,
-  roots: Seq[SourceRoot],
+  sourceRoots: Seq[SourceRoot],
   isTargetRoot: Boolean,
   specPath: String,
   main: Option[String],
@@ -22,7 +22,8 @@ case class Target(
   isSynthetic: Boolean,
   classesDir: Option[String],
   zincAnalysis: Option[String],
-  zincArgs: Option[Seq[String]])
+  zincArgs: Option[Seq[String]],
+  dependencyClasspath: Option[Seq[String]])
 
 case class JvmPlatform(sourceLevel: String, args: Seq[String], targetLevel: String)
 
@@ -43,7 +44,7 @@ object PantsExportProtocol extends DefaultJsonProtocol {
     Target,
     "targets", "pants_target_type", "scope", "roots", "is_target_root", "spec_path", "main",
     "excludes", "id", "sources", "libraries", "transitive", "is_code_gen", "platform",
-    "is_synthetic", "classes_dir", "zinc_analysis", "zinc_args")
+    "is_synthetic", "classes_dir", "zinc_analysis", "zinc_args", "dependency_classpath")
   implicit val jvmPlatformFormat = jsonFormat(JvmPlatform, "source_level", "args", "target_level")
   implicit val jvmPlatformDictFormat = jsonFormat(JvmPlatformDict, "platforms", "default_platform")
   implicit val preferredJvmDistFormat = jsonFormat(PreferredJvmDistribution, "strict", "non_strict")

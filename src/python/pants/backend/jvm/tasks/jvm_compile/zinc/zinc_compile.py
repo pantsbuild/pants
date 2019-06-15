@@ -209,6 +209,11 @@ class BaseZincCompile(JvmCompile):
       for compile_context in compile_contexts:
         bloop_classes_dir[compile_context.target] = compile_context.classes_dir
 
+    bloop_dep_classpath = self.context.products.get_data('bloop_dep_classpath')
+    if bloop_dep_classpath is not None:
+      for compile_context in compile_contexts:
+        bloop_dep_classpath[compile_context.target] = compile_context.dependency_classpath
+
     zinc_analysis = self.context.products.get_data('zinc_analysis')
     zinc_args = self.context.products.get_data('zinc_args')
 
@@ -227,6 +232,9 @@ class BaseZincCompile(JvmCompile):
   def create_empty_extra_products(self):
     if self.context.products.is_required_data('bloop_classes_dir'):
       self.context.products.safe_create_data('bloop_classes_dir', dict)
+
+    if self.context.products.is_required_data('bloop_dep_classpath'):
+      self.context.products.safe_create_data('bloop_dep_classpath', dict)
 
     if self.context.products.is_required_data('zinc_analysis'):
       self.context.products.safe_create_data('zinc_analysis', dict)
@@ -262,6 +270,9 @@ class BaseZincCompile(JvmCompile):
               settings, compiler_option_sets, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
     absolute_classpath = (ctx.classes_dir.path,) + tuple(ce.path for ce in dependency_classpath)
+
+    self.context.log.debug('target: {}, abs_cp: {}'.format(ctx.target.address.spec, absolute_classpath))
+    ctx.dependency_classpath = absolute_classpath
 
     if self.get_options().capture_classpath:
       self._record_compile_classpath(absolute_classpath, ctx.target, ctx.classes_dir.path)
@@ -650,7 +661,13 @@ class ZincCompile(BaseZincCompile):
 
   @classmethod
   def product_types(cls):
-    return ['runtime_classpath', 'zinc_analysis', 'zinc_args', 'bloop_classes_dir']
+    return [
+      'runtime_classpath',
+      'zinc_analysis',
+      'zinc_args',
+      'bloop_classes_dir',
+      'bloop_dep_classpath',
+    ]
 
   def select(self, target):
     # Require that targets are marked for JVM compilation, to differentiate from

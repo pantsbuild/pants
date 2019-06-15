@@ -26,46 +26,42 @@ object BloopConfigGen extends App {
     .split(":")
     .map(jar => buildRootPath / RelPath(jar))
 
-  val sourceTargetTypes = Set("scala_library", "java_library", "junit_tests", "jvm_binary", "target")
+  val sourceTargetTypes = sys.env("PANTS_TARGET_TYPES")
+    .split(":")
+    .toSet
 
   val sourceTargets = pantsExportParsed.targets.filter { case (_, target) =>
     sourceTargetTypes(target.targetType)
   }
   // Refer to dependencies by their `id`, not by `depName` (which is a pants target spec -- not
   // allowed).
-  val sourceTargetMap = sourceTargets
+  val sourceTargetMap = sourceTargets.toMap
+  val sourceTargetIdMap = sourceTargets
     // TODO: we drop target.scope here when calling .distinct -- is this flattening our graph too
     // much? Should intellij/BSP have this info? Because pants resolves 3rdparty artifacts itself,
     // we may need to figure out the right way to pipe this into bloop.
     .map { case (depName, target) => (depName, target.id) }
     .toMap
-  System.err.println(s"sourceTargetMap: $sourceTargetMap")
+  System.err.println(s"sourceTargetIdMap: $sourceTargetIdMap")
 
   val projects: Seq[BloopConfig.Project] = sourceTargets
     .flatMap { case (_, target) =>
       target.classesDir.map(Path(_)).map((target, _))
     }
     .map { case (target, classesDir) =>
-      // TODO: ensure bloop doesn't attempt to recreate this directory if it doesn't exist
-      // (e.g. after a clean-all), or pants will error out (because it expects this to be a
-      // symlink!).
-      val dependentJars = target.libraries.flatMap { coord =>
-        pantsExportParsed.libraries.get(coord)
-          .getOrElse(Seq())
-          // Get libraries in all "scopes". "Scopes" here refers to a maven classifier (a parameter
-          // used when resolving 3rdparty jars) -- NOT the same as `target.scope` (which is e.g. how
-          // intellij classifies modules)!
-          .flatMap(_._2.split(":").toSeq)
-      }.map(Path(_))
-
-      val dependentTargets = target.dependencies
+      val dependentTargetIds = target.dependencies
         // TODO: some targets like //:scala-library won't show up -- these should be converted into
         // e.g. `addCompilerToClasspath` perhaps??
-        .flatMap(sourceTargetMap.get(_))
-      System.err.println(s"target: ${target.id}, deps: ${target.dependencies}, depT: $dependentTargets")
+        .flatMap(sourceTargetIdMap.get(_))
+      System.err.println(s"target: ${target.id}, deps: ${target.dependencies}, depT: $dependentTargetIds")
 
-      val sources = target.sources.getOrElse(Seq())
-        .map(srcRelPath => buildRootPath / RelPath(srcRelPath))
+      val dependencyClasspath = target.dependencyClasspath.getOrElse(Seq()).map(Path(_))
+
+      val sourceTargetClassDirs = target.dependencies
+        .flatMap(sourceTargetMap.get(_))
+        .flatMap(_.classesDir.map(Path(_)))
+
+      val sourceRoots = target.sourceRoots.map(_.sourceRootPath).map(Path(_))
 
       val curPlatformString = target.platform
         .getOrElse(pantsExportParsed.jvmPlatforms.defaultPlatform)
@@ -118,9 +114,9 @@ object BloopConfigGen extends App {
       BloopConfig.Project(
         name = target.id,
         directory = (buildRootPath / RelPath(target.specPath)).toNIO,
-        sources = sources.map(_.toNIO).toList,
-        dependencies = dependentTargets.toList,
-        classpath = dependentJars.map(_.toNIO).toList,
+        sources = sourceRoots.map(_.toNIO).toList,
+        dependencies = dependentTargetIds.toList,
+        classpath = (sourceTargetClassDirs ++ dependencyClasspath).map(_.toNIO).toList,
         out = distDirPath.toNIO,
         classesDir = classesDir.toNIO,
         // TODO: parse resources targets from the export json!
@@ -142,6 +138,4 @@ object BloopConfigGen extends App {
     val outputFile = bloopConfigDirPath / RelPath(s"${proj.name}.json")
     BloopConfigWrite(bloopConfigFile, outputFile.toNIO)
   }
-
-  println(s"bbbbb!!!:\n${pantsExportParsed.toJson.prettyPrint}")
 }

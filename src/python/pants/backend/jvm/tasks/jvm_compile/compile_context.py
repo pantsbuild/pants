@@ -24,6 +24,7 @@ class CompileContext:
     self.args_file = args_file
     self.post_compile_merge_dir = post_compile_merge_dir
     self.sources = sources
+    self.dependency_classpath = None
 
   @contextmanager
   def open_jar(self, mode):
