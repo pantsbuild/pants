@@ -98,8 +98,8 @@ jar_library(
 jar_library(
   name = 'bloop-config-gen',
   jars = [
-    scala_jar(
-      org='org.pantsbuild', name='bloop-config-gen', rev='???',
+    jar(
+      org='org.pantsbuild', name='bloop-config-gen_2.12', rev='???',
       url='file:///Users/dmcclanahan/tools/pants/dist/bloop-config-gen.jar',
       mutable=True)
   ],

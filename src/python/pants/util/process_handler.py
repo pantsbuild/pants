@@ -55,6 +55,9 @@ class SubprocessProcessHandler(ProcessHandler):
   def poll(self):
     return self._process.poll()
 
+  def communicate(self, stdin=None):
+    return self._process.communicate(input=stdin)
+
   def communicate_teeing_stdout_and_stderr(self, stdin=None):
     """
     Just like subprocess.communicate, but tees stdout and stderr to both sys.std{out,err} and a

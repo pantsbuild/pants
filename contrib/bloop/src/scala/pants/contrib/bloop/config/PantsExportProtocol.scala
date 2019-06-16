@@ -1,4 +1,4 @@
-package pants.contrib.bloop
+package pants.contrib.bloop.config
 
 import spray.json._
 

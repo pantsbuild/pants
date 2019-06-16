@@ -1,6 +1,6 @@
-package pants.contrib.bloop
+package pants.contrib.bloop.config
 
-import pants.contrib.bloop.PantsExportProtocol._
+import pants.contrib.bloop.config.PantsExportProtocol._
 
 import ammonite.ops._
 import bloop.config.{Config => BloopConfig, write => BloopConfigWrite}

@@ -5,6 +5,7 @@ import zipfile
 from contextlib import contextmanager
 
 from pants.util.contextutil import open_zip
+from pants.util.dirutil import safe_mkdir, safe_mkdir_for
 
 
 class CompileContext:
@@ -25,6 +26,14 @@ class CompileContext:
     self.post_compile_merge_dir = post_compile_merge_dir
     self.sources = sources
     self.dependency_classpath = None
+
+  def ensure_output_dirs_exist(self):
+    # TODO: this may not be necessary at all!!
+    safe_mkdir_for(self.analysis_file)
+    safe_mkdir(self.classes_dir.path)
+    safe_mkdir_for(self.jar_file.path)
+    safe_mkdir(self.log_dir)
+    safe_mkdir_for(self.args_file)
 
   @contextmanager
   def open_jar(self, mode):

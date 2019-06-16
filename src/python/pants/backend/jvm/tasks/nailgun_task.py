@@ -90,7 +90,8 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
       return SubprocessExecutor(dist)
 
   def runjava(self, classpath, main, jvm_options=None, args=None, workunit_name=None,
-              workunit_labels=None, workunit_log_config=None, dist=None):
+              workunit_labels=None, workunit_log_config=None, dist=None,
+              do_async=False, stdin=None, stdout=None, stderr=None):
     """Runs the java main using the given classpath and args.
 
     If --execution-strategy=subprocess is specified then the java main is run in a freshly spawned
@@ -105,19 +106,29 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     # when `NailgunExecutor` is used because args are passed through socket, therefore turning off
     # creating synthetic jar if nailgun is used.
     create_synthetic_jar = self.execution_strategy != self.NAILGUN
+    execute_kwargs = dict(classpath=classpath,
+                          main=main,
+                          jvm_options=jvm_options,
+                          args=args,
+                          cwd=get_buildroot(),
+                          executor=executor,
+                          workunit_factory=self.context.new_workunit,
+                          workunit_name=workunit_name,
+                          workunit_labels=workunit_labels,
+                          workunit_log_config=workunit_log_config,
+                          create_synthetic_jar=create_synthetic_jar,
+                          synthetic_jar_dir=self._executor_workdir)
+
     try:
-      return util.execute_java(classpath=classpath,
-                               main=main,
-                               jvm_options=jvm_options,
-                               args=args,
-                               cwd=get_buildroot(),
-                               executor=executor,
-                               workunit_factory=self.context.new_workunit,
-                               workunit_name=workunit_name,
-                               workunit_labels=workunit_labels,
-                               workunit_log_config=workunit_log_config,
-                               create_synthetic_jar=create_synthetic_jar,
-                               synthetic_jar_dir=self._executor_workdir)
+      if do_async:
+        execute_kwargs.update(dict(
+          stdin=stdin,
+          stdout=stdout,
+          stderr=stderr))
+        return util.execute_java_async(**execute_kwargs)
+      else:
+        assert stdin is None
+        return util.execute_java(**execute_kwargs)
     except executor.Error as e:
       raise TaskError(e)
 

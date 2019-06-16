@@ -1,4 +1,10 @@
 scala_library(
+  provides=scala_artifact(
+    org='org.pantsbuild',
+    name='bloop-config-gen',
+    repo=public,
+    publication_metadata=pants_library('???'),
+  ),
   dependencies=[
     'contrib/bloop/3rdparty:ammonite-ops',
     'contrib/bloop/3rdparty:bloop-json-config',
@@ -8,8 +14,8 @@ scala_library(
 
 jvm_binary(
   name='bloop-config-gen',
-  main='pants.contrib.bloop.BloopConfigGen',
+  main='pants.contrib.bloop.config.BloopConfigGen',
   dependencies=[
-    ':bloop',
+    ':config',
   ],
 )
