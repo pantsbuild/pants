@@ -9,6 +9,8 @@ import sys
 from collections import defaultdict
 from configparser import ConfigParser
 from functools import total_ordering
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
 from bs4 import BeautifulSoup
 
@@ -179,7 +181,8 @@ def build_and_print_packages(version):
   for (flags, packages) in packages_by_flags.items():
     args = ("./pants", "setup-py", "--run=bdist_wheel {}".format(" ".join(flags))) + tuple(package.target for package in packages)
     try:
-      subprocess.run(args, check=True)
+      # We print stdout to stderr because release.sh is expecting stdout to only be package names.
+      subprocess.run(args, stdout=sys.stderr, check=True)
       for package in packages:
         print(package.name)
     except subprocess.CalledProcessError:
