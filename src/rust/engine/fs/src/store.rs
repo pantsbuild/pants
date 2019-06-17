@@ -591,6 +591,18 @@ impl Store {
         RootOrParentMetadataBuilder::Root(root.clone()),
         digest,
       )
+      .and_then(|files| {
+        // We fsync in a batch. For most filesystems, this means the first sync_all call will
+        // actually flush all of the writes to disk, and the subsequent calls will be no-ops.
+        // If we don't batch them like this, each one will have some actual work to do, and it
+        // will probably be slower.
+        for file in files {
+          file
+            .sync_all()
+            .map_err(|err| format!("Error fsyncing materialized file: {}", err))?;
+        }
+        Ok(())
+      })
       .map(|()| Arc::try_unwrap(root).unwrap().into_inner().unwrap().build())
       .to_boxed()
   }
@@ -600,7 +612,7 @@ impl Store {
     destination: PathBuf,
     root_or_parent_metadata: RootOrParentMetadataBuilder,
     digest: Digest,
-  ) -> BoxFuture<(), String> {
+  ) -> BoxFuture<Vec<std::fs::File>, String> {
     if let RootOrParentMetadataBuilder::Root(..) = root_or_parent_metadata {
       try_future!(super::safe_create_dir_all(&destination));
     } else {
@@ -647,7 +659,10 @@ impl Store {
             let name = file_node.get_name().to_owned();
             store
               .materialize_file(path, digest, file_node.is_executable)
-              .map(move |metadata| child_files.lock().insert(name, metadata))
+              .map(move |(file, metadata)| {
+                child_files.lock().insert(name, metadata);
+                file
+              })
               .to_boxed()
           })
           .collect::<Vec<_>>();
@@ -670,7 +685,12 @@ impl Store {
           .collect::<Vec<_>>();
         future::join_all(file_futures)
           .join(future::join_all(directory_futures))
-          .map(|_| ())
+          .map(|(mut files, directories)| {
+            for directory in directories {
+              files.extend(directory)
+            }
+            files
+          })
       })
       .to_boxed()
   }
@@ -680,7 +700,7 @@ impl Store {
     destination: PathBuf,
     digest: Digest,
     is_executable: bool,
-  ) -> BoxFuture<LoadMetadata, String> {
+  ) -> BoxFuture<(std::fs::File, LoadMetadata), String> {
     self
       .load_file_bytes_with(digest, move |bytes| {
         OpenOptions::new()
@@ -690,15 +710,12 @@ impl Store {
           .open(&destination)
           .and_then(|mut f| {
             f.write_all(&bytes)?;
-            // See `materialize_directory`, but we fundamentally materialize files for other
-            // processes to read; as such, we must ensure data is flushed to disk and visible
-            // to them as opposed to just our process.
-            f.sync_all()
+            Ok(f)
           })
           .map_err(|e| format!("Error writing file {:?}: {:?}", destination, e))
       })
       .and_then(move |write_result| match write_result {
-        Some((Ok(()), metadata)) => Ok(metadata),
+        Some((Ok(f), metadata)) => Ok((f, metadata)),
         Some((Err(e), _metadata)) => Err(e),
         None => Err(format!("File with digest {:?} not found", digest)),
       })
