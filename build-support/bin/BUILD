@@ -5,6 +5,7 @@ python_library(
   name = 'common',
   sources = 'common.py',
   compatibility = ['CPython>=3.6'],
+  tags = {'type_checked'},
 )
 
 python_binary(
@@ -14,6 +15,7 @@ python_binary(
     ':common',
   ],
   compatibility = ['CPython>=3.6'],
+  tags = {'type_checked'},
 )
 
 python_binary(
@@ -23,6 +25,7 @@ python_binary(
     ':common',
   ],
   compatibility = ['CPython>=3.6'],
+  tags = {'type_checked'},
 )
 
 python_binary(
@@ -32,6 +35,7 @@ python_binary(
     ':common',
   ],
   compatibility = ['CPython>=3.6'],
+  tags = {'type_checked'},
 )
 
 python_binary(
@@ -41,6 +45,14 @@ python_binary(
     ':common',
   ],
   compatibility = ['CPython>=3.6'],
+  tags = {'type_checked'},
+)
+
+python_binary(
+  name = 'mypy',
+  sources = 'mypy.py',
+  compatibility = ['CPython>=3.6'],
+  tags = {'type_checked'},
 )
 
 python_binary(
@@ -50,4 +62,5 @@ python_binary(
     ':common',
   ],
   compatibility = ['CPython>=3.6'],
+  tags = {'type_checked'},
 )
