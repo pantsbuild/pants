@@ -522,9 +522,9 @@ base_build_wheels: &base_build_wheels
     - &base_build_wheels_env PREPARE_DEPLOY=1
 
 py36_linux_build_wheels: &py36_linux_build_wheels
-  <<: *py36_linux_test_config
   <<: *travis_docker_image
   <<: *base_build_wheels
+  <<: *py36_linux_test_config
   name: "Build wheels - Linux and abi3 (Py3.6+)"
   env:
     - *py36_linux_test_config_env
