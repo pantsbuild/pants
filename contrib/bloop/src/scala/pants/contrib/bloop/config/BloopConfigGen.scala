@@ -61,7 +61,8 @@ object BloopConfigGen extends App {
         .flatMap(sourceTargetMap.get(_))
         .flatMap(_.classesDir.map(Path(_)))
 
-      val sourceRoots = target.sourceRoots.map(_.sourceRootPath).map(Path(_))
+      val sources = target.sources.getOrElse(Seq())
+        .map(srcRelPath => buildRootPath / RelPath(srcRelPath))
 
       val curPlatformString = target.platform
         .getOrElse(pantsExportParsed.jvmPlatforms.defaultPlatform)
@@ -114,7 +115,7 @@ object BloopConfigGen extends App {
       BloopConfig.Project(
         name = target.id,
         directory = (buildRootPath / RelPath(target.specPath)).toNIO,
-        sources = sourceRoots.map(_.toNIO).toList,
+        sources = sources.map(_.toNIO).toList,
         dependencies = dependentTargetIds.toList,
         classpath = (sourceTargetClassDirs ++ dependencyClasspath).map(_.toNIO).toList,
         out = distDirPath.toNIO,

@@ -29,6 +29,13 @@ from twitter.common.collections import OrderedSet
 class ModifiedExportTaskBase(ExportTask):
 
   @classmethod
+  def register_options(cls, register):
+    super(ModifiedExportTaskBase, cls).register_options(register)
+
+    register('--allow-synthetic-sources', type=bool, default=True, fingerprint=True,
+             help='???')
+
+  @classmethod
   def prepare(cls, options, round_manager):
     super(ModifiedExportTaskBase, cls).prepare(options, round_manager)
     round_manager.require_data('bloop_dep_classpath')
@@ -96,7 +103,7 @@ class ModifiedExportTaskBase(ExportTask):
         'pants_target_type': self._get_pants_target_alias(type(current_target)),
       }
 
-      if not current_target.is_synthetic:
+      if (not current_target.is_synthetic) or self.get_options().allow_synthetic_sources:
         info['globs'] = current_target.globs_relative_to_buildroot()
         info['sources'] = list(current_target.sources_relative_to_buildroot())
 

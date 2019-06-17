@@ -6,9 +6,9 @@ scala_library(
     publication_metadata=pants_library('???'),
   ),
   dependencies=[
-    'contrib/bloop/3rdparty:ammonite-ops',
-    'contrib/bloop/3rdparty:bloop-json-config',
-    'contrib/bloop/3rdparty:spray-json',
+    'contrib/bloop/3rdparty/jvm:ammonite-ops',
+    'contrib/bloop/3rdparty/jvm:bloop-json-config',
+    'contrib/bloop/3rdparty/jvm:spray-json',
   ],
 )
 

@@ -8,7 +8,7 @@ jar_library(
   ],
 )
 
-BLOOP_REV = '1.2.5'
+BLOOP_REV = '1.3.2'
 
 jar_library(
   name='bloop-json-config',

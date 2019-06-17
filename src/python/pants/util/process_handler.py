@@ -43,6 +43,18 @@ class SubprocessProcessHandler(ProcessHandler):
   def __init__(self, process):
     self._process = process
 
+  @property
+  def stdin(self):
+    return self._process.stdin
+
+  @property
+  def stdout(self):
+    return self._process.stdout
+
+  @property
+  def stderr(self):
+    return self._process.stderr
+
   def wait(self, timeout=None):
     return self._process.wait(timeout=timeout)
 
