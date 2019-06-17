@@ -11,6 +11,7 @@ source "${ROOT}/build-support/common.sh"
 
 # Note we allow the user to predefine this value so that they may point to a specific interpreter.
 export PY="${PY:-python3.6}"
+interpreter_constraint="CPython==3.6.*"
 if ! command -v "${PY}" >/dev/null; then
   die "Python interpreter ${PY} not discoverable on your PATH."
 fi
@@ -19,7 +20,7 @@ if [[ "${py_major_minor}" != "3.6" ]]; then
   die "Invalid interpreter. The release script requires Python 3.6 (you are using ${py_major_minor})."
 fi
 
-export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==3.6.*']"
+export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['${interpreter_constraint}']"
 
 function run_local_pants() {
   "${ROOT}/pants" "$@"
