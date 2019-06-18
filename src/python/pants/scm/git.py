@@ -72,8 +72,11 @@ class Git(Scm):
   def _invoke(cls, cmd, stderr=None):
     """Invoke the given command, and return a tuple of process and raw binary output.
 
-    stderr flows to wherever its currently mapped for the parent process - generally to
-    the terminal where the user can see the error.
+    If stderr is defined as None, it will flow to wherever it is currently mapped
+    for the parent process, generally to the terminal where the user can see the error
+    (cf. https://docs.python.org/3.7/library/subprocess.html#subprocess.Popen ). In
+    some cases we want to treat it specially, which is why it is exposed
+    in the signature of _invoke.
 
     :param list cmd: The command in the form of a list of strings
     :returns: The completed process object and its standard output.
