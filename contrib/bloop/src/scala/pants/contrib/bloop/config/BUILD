@@ -3,7 +3,7 @@ scala_library(
     org='org.pantsbuild',
     name='bloop-config-gen',
     repo=public,
-    publication_metadata=pants_library('???'),
+    publication_metadata=pants_library('???!'),
   ),
   dependencies=[
     'contrib/bloop/3rdparty/jvm:ammonite-ops',

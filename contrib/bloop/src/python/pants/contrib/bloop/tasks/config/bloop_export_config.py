@@ -64,7 +64,7 @@ class BloopExportConfig(ModifiedExportTaskBase):
 
   def execute(self):
     exported_targets_map = self.generate_targets_map(self.context.targets())
-    self.context.log.debug('exported_targets_map: {}'.format(exported_targets_map))
+    # self.context.log.debug('exported_targets_map: {}'.format(exported_targets_map))
 
     # TODO: use JvmPlatform for jvm options!
     reported_scala_version = self.get_options().reported_scala_version

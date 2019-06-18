@@ -39,7 +39,7 @@ class CoursierSubsystem(Subsystem):
                # but still prints results if --report is specified.
                '-q',
                # Do not use default public maven repo.
-               '--no-default',
+               # '--no-default',
                # Concurrent workers
                '-n', '8',
              ],
