@@ -4,8 +4,6 @@
 FROM centos:7
 
 # Install a (more) modern gcc, a JDK, and dependencies for installing Python through Pyenv.
-# Also install sqlite-devel because Python 3 errors on startup if not -- see
-# https://stackoverflow.com/a/39907500/2518889.
 RUN yum -y update
 RUN yum install -y centos-release-scl
 RUN yum install -y \
@@ -29,7 +27,6 @@ ENV PYENV_ROOT /pyenv-docker-build
 ENV PYENV_BIN "${PYENV_ROOT}/bin/pyenv"
 RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
 
-# Install Python 2.7, 3.6, and 3.7.
 # NB: We intentionally do not use `--enable-shared`, as it results in our shipped wheels for the PEX release using
 # `libpython.X.Y.so.1`, which means that the PEX will not work for any consumer interpreters that were statically
 # built, i.e. compiled without `--enable-shared`. See https://github.com/pantsbuild/pants/pull/7794.
