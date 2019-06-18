@@ -190,7 +190,7 @@ py27_linux_test_config: &py27_linux_test_config
 py36_linux_test_config: &py36_linux_test_config
   <<: *py36_linux_config
   <<: *base_linux_test_config
-  stage: *test
+  stage: *test_cron
   env:
     - &py36_linux_test_config_env >
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
@@ -198,7 +198,7 @@ py36_linux_test_config: &py36_linux_test_config
 py37_linux_test_config: &py37_linux_test_config
   <<: *py37_linux_config
   <<: *base_linux_test_config
-  stage: *test_cron
+  stage: *test
   env:
     # TODO(https://github.com/tensorflow/tensorflow/issues/27078): tensorflow==1.13.1 on python 3.7.2 for Linux uses the new C++ ABI, which may be an error.
     - &py37_linux_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
@@ -285,7 +285,7 @@ py27_osx_test_config: &py27_osx_test_config
 py36_osx_test_config: &py36_osx_test_config
   <<: *py36_osx_config
   <<: *base_osx_test_config
-  stage: *test
+  stage: *test_cron
   env:
     - &py36_osx_test_config_env >
       PATH="/usr/local/opt/openssl/bin:${PATH}"
@@ -298,7 +298,7 @@ py36_osx_test_config: &py36_osx_test_config
 py37_osx_test_config: &py37_osx_test_config
   <<: *py37_osx_config
   <<: *base_osx_test_config
-  stage: *test_cron
+  stage: *test
   env:
     - &py37_osx_test_config_env >
       PATH="/usr/local/opt/openssl/bin:${PATH}"
@@ -345,7 +345,7 @@ travis_docker_image: &travis_docker_image
 base_linux_build_engine: &base_linux_build_engine
   <<: *native_engine_cache_config
   <<: *travis_docker_image
-  stage: *bootstrap
+  stage: *bootstrap_cron
   # Callers of this anchor are expected to provide values in their `env` for
   # `docker_image_name` and `docker_run_command` (i.e. the bash command(s) to run).
   script:
@@ -393,7 +393,7 @@ py36_linux_build_engine: &py36_linux_build_engine
 py37_linux_build_engine: &py37_linux_build_engine
   <<: *py37_linux_config
   <<: *native_engine_cache_config
-  stage: *bootstrap_cron
+  stage: *bootstrap
   name: "Build Linux native engine and pants.pex (Py3.7 PEX)"
   env:
     - CACHE_NAME=linuxpexbuild.py37
@@ -404,7 +404,7 @@ py37_linux_build_engine: &py37_linux_build_engine
 
 base_osx_build_engine: &base_osx_build_engine
   <<: *native_engine_cache_config
-  stage: *bootstrap
+  stage: *bootstrap_cron
   # We request the oldest image we can (corresponding to OSX 10.11) for maximum compatibility.
   # We use 10.11 as a minimum to avoid https://github.com/rust-lang/regex/issues/489.
   # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
@@ -441,7 +441,7 @@ py36_osx_build_engine: &py36_osx_build_engine
 py37_osx_build_engine: &py37_osx_build_engine
   <<: *py37_osx_config
   <<: *base_osx_build_engine
-  stage: *bootstrap_cron
+  stage: *bootstrap
   name: "Build OSX native engine and pants.pex (Py3.7 PEX)"
   env:
     - *py37_osx_config_env
