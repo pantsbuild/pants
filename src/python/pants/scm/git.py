@@ -47,9 +47,9 @@ class Git(Scm):
     try:
       if subdir:
         with pushd(subdir):
-          process, out = cls._invoke(cmd)
+          process, out = cls._invoke(cmd, stderr=subproces.DEVNULL)
       else:
-        process, out = cls._invoke(cmd)
+        process, out = cls._invoke(cmd, stderr=subprocess.DEVNULL)
       cls._check_result(cmd, process.returncode, raise_type=Scm.ScmException)
     except Scm.ScmException:
       return None
@@ -69,7 +69,7 @@ class Git(Scm):
     return cls(binary=binary, worktree=dest)
 
   @classmethod
-  def _invoke(cls, cmd):
+  def _invoke(cls, cmd, stderr=None):
     """Invoke the given command, and return a tuple of process and raw binary output.
 
     stderr flows to wherever its currently mapped for the parent process - generally to
@@ -80,7 +80,7 @@ class Git(Scm):
     :raises: Scm.LocalException if there was a problem exec'ing the command at all.
     """
     try:
-      process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+      process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=stderr)
     except OSError as e:
       # Binary DNE or is not executable
       raise cls.LocalException('Failed to execute command {}: {}'.format(' '.join(cmd), e))
