@@ -680,6 +680,9 @@ osx_rust_tests: &osx_rust_tests
       casks:
       - openssl
       - osxfuse
+      # We must update or else Homebrew will complain it is too outdated
+      # (See https://travis-ci.org/pantsbuild/pants/jobs/546948768#L278).
+      update: true
   before_install:
     - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY36_VERSION}"
   env:
