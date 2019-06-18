@@ -5,7 +5,6 @@ use std;
 use std::convert::TryInto;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::thread;
 use std::time::Duration;
 
 use tokio::runtime::Runtime;
@@ -22,12 +21,10 @@ use boxfuture::{BoxFuture, Boxable};
 use core::clone::Clone;
 use fs::{safe_create_dir_all_ioerror, PosixFS};
 use graph::{EntryId, Graph, NodeContext};
-use log::debug;
 use parking_lot::RwLock;
 use process_execution::{self, BoundedCommandRunner, CommandRunner};
 use rand::seq::SliceRandom;
 use reqwest;
-use resettable::Resettable;
 use rule_graph::RuleGraph;
 use std::collections::btree_map::BTreeMap;
 use store::Store;
@@ -45,9 +42,10 @@ pub struct Core {
   pub tasks: Tasks,
   pub rule_graph: RuleGraph<Rule>,
   pub types: Types,
-  runtime: Resettable<Arc<RwLock<Runtime>>>,
-  store_and_command_runner_and_http_client:
-    Resettable<(Store, BoundedCommandRunner, reqwest::r#async::Client)>,
+  runtime: Arc<RwLock<Runtime>>,
+  store: Store,
+  pub command_runner: BoundedCommandRunner,
+  pub http_client: reqwest::r#async::Client,
   pub vfs: PosixFS,
   pub build_root: PathBuf,
 }
@@ -79,11 +77,9 @@ impl Core {
     let mut remote_store_servers = remote_store_servers;
     remote_store_servers.shuffle(&mut rand::thread_rng());
 
-    let runtime = Resettable::new(|| {
-      Arc::new(RwLock::new(Runtime::new().unwrap_or_else(|e| {
+    let runtime = Arc::new(RwLock::new(Runtime::new().unwrap_or_else(|e| {
         panic!("Could not initialize Runtime: {:?}", e)
-      })))
-    });
+      })));
     // We re-use these certs for both the execution and store service; they're generally tied together.
     let root_ca_certs = if let Some(path) = remote_root_ca_certs_path {
       Some(
@@ -104,34 +100,33 @@ impl Core {
       None
     };
 
-    let store_and_command_runner_and_http_client = Resettable::new(move || {
-      let local_store_dir = local_store_dir.clone();
-      let store = safe_create_dir_all_ioerror(&local_store_dir)
-        .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))
-        .and_then(|()| {
-          if remote_store_servers.is_empty() {
-            Store::local_only(local_store_dir)
-          } else {
-            Store::with_remote(
-              local_store_dir,
-              &remote_store_servers,
-              remote_instance_name.clone(),
-              &root_ca_certs,
-              oauth_bearer_token.clone(),
-              remote_store_thread_count,
-              remote_store_chunk_bytes,
-              remote_store_chunk_upload_timeout,
-              // TODO: Take a parameter
-              store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10))
-                .unwrap(),
-              remote_store_rpc_retries,
+    let local_store_dir = local_store_dir.clone();
+    let store = safe_create_dir_all_ioerror(&local_store_dir)
+      .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))
+      .and_then(|()| {
+        if remote_store_servers.is_empty() {
+          Store::local_only(local_store_dir)
+        } else {
+          Store::with_remote(
+            local_store_dir,
+            &remote_store_servers,
+            remote_instance_name.clone(),
+            &root_ca_certs,
+            oauth_bearer_token.clone(),
+            remote_store_thread_count,
+            remote_store_chunk_bytes,
+            remote_store_chunk_upload_timeout,
+            // TODO: Take a parameter
+            store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10))
+            .unwrap(),
+            remote_store_rpc_retries,
             )
-          }
-        })
-        .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
+        }
+      })
+    .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
 
-      let underlying_command_runner: Box<dyn CommandRunner> = match &remote_execution_server {
-        Some(ref address) => Box::new(process_execution::remote::CommandRunner::new(
+    let underlying_command_runner: Box<dyn CommandRunner> = match &remote_execution_server {
+      Some(ref address) => Box::new(process_execution::remote::CommandRunner::new(
           address,
           remote_execution_process_cache_namespace.clone(),
           remote_instance_name.clone(),
@@ -146,17 +141,13 @@ impl Core {
           store.clone(),
           work_dir.clone(),
           process_execution_cleanup_local_dirs,
-        )),
-      };
+          )),
+    };
 
-      let command_runner =
-        BoundedCommandRunner::new(underlying_command_runner, process_execution_parallelism);
+    let command_runner =
+      BoundedCommandRunner::new(underlying_command_runner, process_execution_parallelism);
 
-      let http_client = reqwest::r#async::Client::new();
-
-      (store, command_runner, http_client)
-    });
-
+    let http_client = reqwest::r#async::Client::new();
     let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);
 
     Core {
@@ -165,7 +156,9 @@ impl Core {
       rule_graph: rule_graph,
       types: types,
       runtime: runtime,
-      store_and_command_runner_and_http_client: store_and_command_runner_and_http_client,
+      store,
+      command_runner,
+      http_client,
       // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
       vfs: PosixFS::new(&build_root, &ignore_patterns).unwrap_or_else(|e| {
@@ -175,45 +168,8 @@ impl Core {
     }
   }
 
-  pub fn fork_context<F, T>(&self, f: F) -> T
-  where
-    F: Fn() -> T,
-  {
-    // Only one fork may occur at a time, but draining the Runtime and Graph requires that the
-    // Graph lock is not actually held during draining (as that would not allow the Runtime's
-    // threads to observe the draining value). So we attempt to mark the Graph draining (similar
-    // to a CAS loop), and treat a successful attempt as indication that our thread has permission
-    // to execute the fork.
-    //
-    // An alternative would be to have two locks in the Graph: one outer lock for the draining
-    // bool, and one inner lock for Graph mutations. But forks should be rare enough that busy
-    // waiting is not too contentious.
-    while let Err(()) = self.graph.mark_draining(true) {
-      debug!("Waiting to enter fork_context...");
-      thread::sleep(Duration::from_millis(10));
-    }
-    let t = self.runtime.with_reset(|| {
-      self
-        .graph
-        .with_exclusive(|| self.store_and_command_runner_and_http_client.with_reset(f))
-    });
-    self
-      .graph
-      .mark_draining(false)
-      .expect("Multiple callers should not be in the fork context at once.");
-    t
-  }
-
   pub fn store(&self) -> Store {
-    self.store_and_command_runner_and_http_client.get().0
-  }
-
-  pub fn command_runner(&self) -> BoundedCommandRunner {
-    self.store_and_command_runner_and_http_client.get().1
-  }
-
-  pub fn http_client(&self) -> reqwest::r#async::Client {
-    self.store_and_command_runner_and_http_client.get().2
+    self.store.clone()
   }
 
   ///
@@ -226,7 +182,6 @@ impl Core {
     let logging_destination = logging::get_destination();
     self
       .runtime
-      .get()
       .read()
       .executor()
       .spawn(futures::future::ok(()).and_then(move |()| {
@@ -255,7 +210,6 @@ impl Core {
     let logging_destination = logging::get_destination();
     self
       .runtime
-      .get()
       .write()
       .block_on(futures::future::ok(()).and_then(move |()| {
         logging::set_destination(logging_destination);
@@ -322,6 +276,6 @@ impl NodeContext for Context {
   where
     F: Future<Item = (), Error = ()> + Send + 'static,
   {
-    self.core.runtime.get().read().executor().spawn(future);
+    self.core.runtime.read().executor().spawn(future);
   }
 }

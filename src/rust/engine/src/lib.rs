@@ -377,13 +377,11 @@ pub extern "C" fn scheduler_metrics(
 pub extern "C" fn scheduler_fork_context(
   scheduler_ptr: *mut Scheduler,
   func: Function,
-) -> PyResult {
-  with_scheduler(scheduler_ptr, |scheduler| {
-    scheduler.core.fork_context(|| {
-      externs::exclusive_call(&func.0)
-        .map_err(|f| format!("{:?}", f))
-        .into()
-    })
+  ) -> PyResult {
+  with_scheduler(scheduler_ptr, |_| {
+    externs::exclusive_call(&func.0)
+      .map_err(|f| format!("{:?}", f))
+      .into()
   })
 }
 
