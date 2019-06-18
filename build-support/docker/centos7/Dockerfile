@@ -21,8 +21,7 @@ RUN yum install -y \
 ARG PYTHON_27_VERSION=2.7.13
 ARG PYTHON_36_VERSION=3.6.8
 ARG PYTHON_37_VERSION=3.7.3
-# NB: PYENV_ROOT must be set for `pyenv install` to be available. This failure mode is not mentioned
-# in https://github.com/pyenv/pyenv#basic-github-checkout.
+
 ENV PYENV_ROOT /pyenv-docker-build
 ENV PYENV_BIN "${PYENV_ROOT}/bin/pyenv"
 RUN git clone https://github.com/pyenv/pyenv ${PYENV_ROOT}
