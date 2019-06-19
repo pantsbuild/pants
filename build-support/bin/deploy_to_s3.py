@@ -2,11 +2,13 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import shutil
 import subprocess
 
 
 def main() -> None:
-  install_aws_cli()
+  if shutil.which("aws") is None:
+    install_aws_cli()
   configure_auth()
   deploy()
 
