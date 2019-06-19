@@ -8,7 +8,8 @@
 # with by resulting in two Python 2.7 installs: system vs. pyenv.
 
 # Use our custom Centos6 image for binary compatibility with old linux distros.
-FROM pantsbuild/centos6:latest
+ARG BASE_IMAGE=pantsbuild/centos6:latest
+FROM ${BASE_IMAGE}
 
 # Note we use 2.7.15, rather than 2.7.13, as the centos6 image already comes with 2.7.13
 # installed, which uses UCS4 instead of UCS2. This allows us to disambiguate which Python 2
