@@ -49,6 +49,13 @@ python_binary(
 )
 
 python_binary(
+  name = 'deploy_to_s3',
+  sources = 'deploy_to_s3.py',
+  compatibility = ['CPython>=3.6'],
+  tags = {'type_checked'},
+)
+
+python_binary(
   name = 'mypy',
   sources = 'mypy.py',
   compatibility = ['CPython>=3.6'],
