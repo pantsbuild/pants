@@ -30,7 +30,6 @@ use clap;
 use env_logger;
 use fs;
 use futures;
-use futures_timer;
 
 use rand;
 
@@ -39,7 +38,7 @@ use serde_json;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use clap::{value_t, App, Arg, SubCommand};
-use fs::{GlobMatching, ResettablePool, Snapshot, Store, StoreFileByDigest, UploadSummary};
+use fs::{GlobMatching, Snapshot, Store, StoreFileByDigest, UploadSummary};
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
@@ -257,7 +256,6 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
     .value_of("local-store-path")
     .map(PathBuf::from)
     .unwrap_or_else(Store::default_path);
-  let pool = Arc::new(ResettablePool::new("fsutil-pool-".to_string()));
   let mut runtime = tokio::runtime::Runtime::new().unwrap();
   let (store, store_has_remote) = {
     let (store_result, store_has_remote) = match top_match.values_of("server-address") {
@@ -290,7 +288,6 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         (
           Store::with_remote(
             &store_dir,
-            pool.clone(),
             &cas_addresses,
             top_match
               .value_of("remote-instance-name")
@@ -315,12 +312,11 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
               std::time::Duration::from_secs(20),
             )?,
             value_t!(top_match.value_of("rpc-attempts"), usize).expect("Bad rpc-attempts flag"),
-            futures_timer::TimerHandle::default(),
           ),
           true,
         )
       }
-      None => (Store::local_only(&store_dir, pool.clone()), false),
+      None => (Store::local_only(&store_dir), false),
     };
     let store = store_result.map_err(|e| {
       format!(
@@ -363,10 +359,9 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
               .map_err(|e| format!("Error canonicalizing path {:?}: {:?}", path, e))?
               .parent()
               .ok_or_else(|| format!("File being saved must have parent but {:?} did not", path))?,
-            pool,
           );
-          let file = posix_fs
-            .stat(PathBuf::from(path.file_name().unwrap()))
+          let file = runtime
+            .block_on(posix_fs.stat(PathBuf::from(path.file_name().unwrap())))
             .unwrap();
           match file {
             fs::Stat::File(f) => {
@@ -420,7 +415,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           })
       }
       ("save", Some(args)) => {
-        let posix_fs = Arc::new(make_posix_fs(args.value_of("root").unwrap(), pool));
+        let posix_fs = Arc::new(make_posix_fs(args.value_of("root").unwrap()));
         let store_copy = store.clone();
         let digest = runtime.block_on(
           posix_fs
@@ -609,8 +604,8 @@ fn expand_files_helper(
     .to_boxed()
 }
 
-fn make_posix_fs<P: AsRef<Path>>(root: P, pool: Arc<ResettablePool>) -> fs::PosixFS {
-  fs::PosixFS::new(&root, pool, &[]).unwrap()
+fn make_posix_fs<P: AsRef<Path>>(root: P) -> fs::PosixFS {
+  fs::PosixFS::new(&root, &[]).unwrap()
 }
 
 fn ensure_uploaded_to_remote(
