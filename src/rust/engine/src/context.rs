@@ -123,7 +123,7 @@ impl Core {
             )
         }
       })
-    .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
+      .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
 
     let underlying_command_runner: Box<dyn CommandRunner> = match &remote_execution_server {
       Some(ref address) => Box::new(process_execution::remote::CommandRunner::new(
