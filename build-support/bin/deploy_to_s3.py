@@ -29,7 +29,7 @@ def get_auth_values() -> Tuple[str, str]:
       return val
     die(f"Caller of the script must set the env var {key}.")
 
-  return get_value("AWS_ACCESS_KEY_ID"), get_value("AWS_SECRET_ACCESS_KEY")
+  return get_value("AWS_DEPLOY_ACCESS_KEY_ID"), get_value("AWS_DEPLOY_SECRET_ACCESS_KEY")
 
 
 def set_auth(*, access_key_id: str, secret_access_key: str) -> None:

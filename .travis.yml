@@ -31,10 +31,10 @@ env:
     - PYENV_ROOT="${PYENV_ROOT:-${HOME}/.pants_pyenv}"
     - PATH="${PYENV_ROOT}/shims:${PATH}"
     - AWS_CLI_ROOT="${HOME}/.aws_cli"
-    - AWS_ACCESS_KEY_ID=AKIAIWOKBXVU3JLY6EGQ
-    # This stores the encrypted AWS secret access key with the env var AWS_SECRET_ACCESS_KEY.
+    - AWS_DEPLOY_ACCESS_KEY_ID=AKIAIWOKBXVU3JLY6EGQ
+    # This stores the encrypted AWS secret access key with the env var AWS_DEPLOY_SECRET_ACCESS_KEY.
     # Travis converts it back into its original decrypted value when ran in CI, per
-    # https://docs.travis-ci.com/user/encryption-keys/.
+    # https://docs.travis-ci.com/user/environment-variables#defining-encrypted-variables-in-travisyml.
     - secure: UBVbpdYJ81OsDGKlPRBw6FlPJGlxosnFQ4A1xBbU5GwEBfv90GoKc6J0UwF+I4CDwytj/BlAks1XbW0zYX0oeIlXDnl1Vfikm1k4hfIr6VCLHKppiU69FlEs+ph0Dktz8+aUWhrvJzICZs6Gu08kTBQ5++3ulDWDeTHqjr713YM
 
 # Stages are documented here: https://docs.travis-ci.com/user/build-stages
