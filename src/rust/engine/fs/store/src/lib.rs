@@ -1,13 +1,44 @@
-use crate::{BackoffConfig, FileContent};
+// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+#![deny(warnings)]
+// Enable all clippy lints except for many of the pedantic ones. It's a shame this needs to be copied and pasted across crates, but there doesn't appear to be a way to include inner attributes from a common source.
+#![deny(
+  clippy::all,
+  clippy::default_trait_access,
+  clippy::expl_impl_clone_on_copy,
+  clippy::if_not_else,
+  clippy::needless_continue,
+  clippy::single_match_else,
+  clippy::unseparated_literal_suffix,
+  clippy::used_underscore_binding
+)]
+// It is often more clear to show that nothing is being moved.
+#![allow(clippy::match_ref_pats)]
+// Subjective style.
+#![allow(
+  clippy::len_without_is_empty,
+  clippy::redundant_field_names,
+  clippy::too_many_arguments
+)]
+// Default isn't as big a deal as people seem to think it is.
+#![allow(clippy::new_without_default, clippy::new_ret_no_self)]
+// Arc<Mutex> can be more clear than needing to grok Orderings:
+#![allow(clippy::mutex_atomic)]
+
+mod snapshot;
+pub use crate::snapshot::{OneOffStoreFileByDigest, Snapshot, StoreFileByDigest};
 
 use bazel_protos;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use dirs;
+use fs::FileContent;
 use futures::{future, Future};
 use hashing::Digest;
 use protobuf::Message;
 use serde_derive::Serialize;
+pub use serverset::BackoffConfig;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -598,9 +629,9 @@ impl Store {
     digest: Digest,
   ) -> BoxFuture<(), String> {
     if let RootOrParentMetadataBuilder::Root(..) = root_or_parent_metadata {
-      try_future!(super::safe_create_dir_all(&destination));
+      try_future!(fs::safe_create_dir_all(&destination));
     } else {
-      try_future!(super::safe_create_dir(&destination));
+      try_future!(fs::safe_create_dir(&destination));
     }
 
     let store = self.clone();
@@ -834,7 +865,7 @@ mod local {
   use bytes::Bytes;
   use digest::{Digest as DigestTrait, FixedOutput};
   use futures::future::{self, Future};
-  use hashing::{Digest, Fingerprint};
+  use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
   use lmdb::Error::{KeyExist, NotFound};
   use lmdb::{
     self, Cursor, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
@@ -850,7 +881,6 @@ mod local {
   use std::time;
   use tempfile::TempDir;
 
-  use super::super::EMPTY_DIGEST;
   use super::MAX_LOCAL_STORE_SIZE_BYTES;
 
   #[derive(Clone)]
@@ -1156,28 +1186,28 @@ mod local {
       };
 
       futures::future::poll_fn(move || tokio_threadpool::blocking( || {
-          let (env, db, _) = dbs.clone()?.get(&digest.0);
-          let ro_txn = env
-            .begin_ro_txn()
-            .map_err(|err| format!("Failed to begin read transaction: {}", err));
-          ro_txn.and_then(|txn| match txn.get(db, &digest.0) {
-            Ok(bytes) => {
-              if bytes.len() == digest.1 {
-                Ok(Some(f(Bytes::from(bytes))))
-              } else {
-                error!("Got hash collision reading from store - digest {:?} was requested, but retrieved bytes with that fingerprint had length {}. Congratulations, you may have broken sha256! Underlying bytes: {:?}", digest, bytes.len(), bytes);
-                Ok(None)
-              }
-            }
-            Err(NotFound) => Ok(None),
-            Err(err) => Err(format!("Error loading digest {:?}: {}", digest, err,)),
-          })
-        })).then(|blocking_result| {
-        match blocking_result {
-          Ok(v) => v,
-          Err(blocking_err) => Err(format!("Unable to run blocking task to load_bytes in local ByteStore on tokio runtime: {}", blocking_err)),
-        }
-      }).to_boxed()
+                let (env, db, _) = dbs.clone()?.get(&digest.0);
+                let ro_txn = env
+                    .begin_ro_txn()
+                    .map_err(|err| format!("Failed to begin read transaction: {}", err));
+                ro_txn.and_then(|txn| match txn.get(db, &digest.0) {
+                    Ok(bytes) => {
+                        if bytes.len() == digest.1 {
+                            Ok(Some(f(Bytes::from(bytes))))
+                        } else {
+                            error!("Got hash collision reading from store - digest {:?} was requested, but retrieved bytes with that fingerprint had length {}. Congratulations, you may have broken sha256! Underlying bytes: {:?}", digest, bytes.len(), bytes);
+                            Ok(None)
+                        }
+                    }
+                    Err(NotFound) => Ok(None),
+                    Err(err) => Err(format!("Error loading digest {:?}: {}", digest, err,)),
+                })
+            })).then(|blocking_result| {
+                match blocking_result {
+                    Ok(v) => v,
+                    Err(blocking_err) => Err(format!("Unable to run blocking task to load_bytes in local ByteStore on tokio runtime: {}", blocking_err)),
+                }
+            }).to_boxed()
     }
   }
 
@@ -1236,7 +1266,7 @@ mod local {
         fmt::Write::write_fmt(&mut dirname, format_args!("{:x}", fingerprint_prefix)).unwrap();
         let dirname = dirname[0..1].to_owned();
         let dir = root_path.join(dirname);
-        super::super::safe_create_dir_all(&dir)
+        fs::safe_create_dir_all(&dir)
           .map_err(|err| format!("Error making directory for store at {:?}: {:?}", dir, err))?;
         envs.push((ShardedLmdb::make_env(&dir)?, dir, fingerprint_prefix));
       }

@@ -11,7 +11,6 @@ clap = "2"
 dirs = "1"
 env_logger = "0.5.4"
 errno = "0.2.3"
-fs = { path = ".." }
 fuse = "0.3.1"
 futures = "^0.1.16"
 hashing = { path = "../../hashing" }
@@ -20,6 +19,7 @@ log = "0.4.1"
 parking_lot = "0.6"
 protobuf = { version = "2.0.6", features = ["with-bytes"] }
 serverset = { path = "../../serverset" }
+store = { path = "../store" }
 time = "0.1.39"
 tokio = "0.1"
 

@@ -28,7 +28,6 @@
 
 use clap;
 use env_logger;
-use fs;
 
 use process_execution;
 
@@ -39,6 +38,7 @@ use std::iter::Iterator;
 use std::path::PathBuf;
 use std::process::exit;
 use std::time::Duration;
+use store::{BackoffConfig, Store};
 use tokio::runtime::Runtime;
 
 /// A binary which takes args of format:
@@ -210,7 +210,7 @@ fn main() {
   let local_store_path = args
     .value_of("local-store-path")
     .map(PathBuf::from)
-    .unwrap_or_else(fs::Store::default_path);
+    .unwrap_or_else(Store::default_path);
   let server_arg = args.value_of("server");
   let remote_instance_arg = args.value_of("remote-instance-name").map(str::to_owned);
   let output_files = if let Some(values) = args.values_of("output-file-path") {
@@ -241,7 +241,7 @@ fn main() {
         None
       };
 
-      fs::Store::with_remote(
+      Store::with_remote(
         local_store_path,
         &[cas_server.to_owned()],
         remote_instance_arg.clone(),
@@ -251,11 +251,11 @@ fn main() {
         chunk_size,
         Duration::from_secs(30),
         // TODO: Take a command line arg.
-        fs::BackoffConfig::new(Duration::from_secs(1), 1.2, Duration::from_secs(20)).unwrap(),
+        BackoffConfig::new(Duration::from_secs(1), 1.2, Duration::from_secs(20)).unwrap(),
         3,
       )
     }
-    (None, None) => fs::Store::local_only(local_store_path),
+    (None, None) => Store::local_only(local_store_path),
     _ => panic!("Must specify either both --server and --cas-server or neither."),
   }
   .expect("Error making store");

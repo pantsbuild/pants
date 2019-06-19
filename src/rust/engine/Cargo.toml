@@ -34,6 +34,7 @@ members = [
   "fs",
   "fs/brfs",
   "fs/fs_util",
+  "fs/store",
   "graph",
   "hashing",
   "logging",
@@ -64,6 +65,7 @@ default-members = [
   "boxfuture",
   "fs",
   "fs/fs_util",
+  "fs/store",
   "graph",
   "hashing",
   "logging",
@@ -100,6 +102,7 @@ reqwest = { version = "0.9.10", default_features = false, features = ["rustls-tl
 resettable = { path = "resettable" }
 rule_graph = { path = "rule_graph" }
 smallvec = "0.6"
+store = { path = "fs/store" }
 tokio = "0.1"
 tempfile = "3"
 ui = { path = "ui" }

@@ -1,0 +1,36 @@
+[package]
+name = "store"
+version = "0.1.0"
+authors = ["Daniel Wagner-Hall <dwagnerhall@twitter.com>"]
+edition = "2018"
+
+[dependencies]
+bazel_protos = { path = "../../process_execution/bazel_protos" }
+boxfuture = { path = "../../boxfuture" }
+bytes = "0.4.5"
+digest = "0.8"
+dirs = "1"
+fs = { path = ".." }
+futures = "^0.1.16"
+grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "4dfafe9355dc996d7d0702e7386a6fedcd9734c0", default_features = false, features = ["protobuf-codec", "secure"] }
+hashing = { path = "../../hashing" }
+indexmap = "1.0.2"
+itertools = "0.7.2"
+lmdb = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "06bdfbfc6348f6804127176e561843f214fc17f8" }
+log = "0.4"
+parking_lot = "0.6"
+protobuf = { version = "2.0.6", features = ["with-bytes"] }
+serverset = { path = "../../serverset" }
+sha2 = "0.8"
+serde = "1.0"
+serde_derive = "1.0"
+tempfile = "3"
+tokio-threadpool = "0.1.12"
+uuid = { version = "0.7.1", features = ["v4"] }
+
+[dev-dependencies]
+maplit = "*"
+mock = { path = "../../testutil/mock" }
+testutil = { path = "../../testutil" }
+tokio = "0.1"
+walkdir = "2"

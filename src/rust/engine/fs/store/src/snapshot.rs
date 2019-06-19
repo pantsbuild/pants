@@ -1,13 +1,13 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::glob_matching::GlobMatching;
-use crate::{Dir, File, PathGlobs, PathStat, PosixFS, Store};
+use crate::Store;
 use bazel_protos;
 use boxfuture::{try_future, BoxFuture, Boxable};
+use fs::{Dir, File, GlobMatching, PathGlobs, PathStat, PosixFS};
 use futures::future::{self, join_all};
 use futures::Future;
-use hashing::{Digest, Fingerprint};
+use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::{self, IndexMap};
 use itertools::Itertools;
 use protobuf;
@@ -16,12 +16,6 @@ use std::fmt;
 use std::iter::Iterator;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-
-pub const EMPTY_FINGERPRINT: Fingerprint = Fingerprint([
-  0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
-  0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55,
-]);
-pub const EMPTY_DIGEST: Digest = Digest(EMPTY_FINGERPRINT, 0);
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct Snapshot {
@@ -582,14 +576,15 @@ mod tests {
   use testutil::data::TestDirectory;
   use testutil::make_file;
 
-  use super::super::{
-    Dir, File, GlobExpansionConjunction, GlobMatching, Path, PathGlobs, PathStat, PosixFS,
-    Snapshot, Store, StrictGlobMatching,
+  use super::{OneOffStoreFileByDigest, Snapshot};
+  use crate::Store;
+  use fs::{
+    Dir, File, GlobExpansionConjunction, GlobMatching, PathGlobs, PathStat, PosixFS,
+    StrictGlobMatching,
   };
-  use super::OneOffStoreFileByDigest;
 
   use std;
-  use std::path::PathBuf;
+  use std::path::{Path, PathBuf};
   use std::sync::Arc;
 
   const STR: &str = "European Burmese";
