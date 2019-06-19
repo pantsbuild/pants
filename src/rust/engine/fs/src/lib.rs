@@ -624,10 +624,7 @@ impl PosixFS {
       .and_then(|file| {
         tokio_io::io::read_to_end(file, Vec::new()).map(|(_file, bytes)| Bytes::from(bytes))
       })
-      .map(|content| FileContent {
-        path,
-        content,
-      })
+      .map(|content| FileContent { path, content })
   }
 
   pub fn read_link(&self, link: &Link) -> impl Future<Item = PathBuf, Error = io::Error> {
