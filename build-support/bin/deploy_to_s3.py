@@ -2,14 +2,19 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
 import shutil
 import subprocess
+from typing import Tuple
+
+from common import die
 
 
 def main() -> None:
   if shutil.which("aws") is None:
     install_aws_cli()
-  configure_auth()
+  access_key_id, secret_access_key = get_auth_values()
+  set_auth(access_key_id=access_key_id, secret_access_key=secret_access_key)
   deploy()
 
 
@@ -17,16 +22,22 @@ def install_aws_cli() -> None:
   subprocess.run(["./build-support/bin/install_aws_cli_for_ci.sh"], check=True)
 
 
-def configure_auth() -> None:
+def get_auth_values() -> Tuple[str, str]:
+  def get_value(key: str) -> str:
+    val = os.environ.get(key, None)
+    if val is not None:
+      return val
+    die(f"Caller of the script must set the env var {key}.")
+
+  return get_value("AWS_ACCESS_KEY_ID"), get_value("AWS_SECRET_ACCESS_KEY")
+
+
+def set_auth(*, access_key_id: str, secret_access_key: str) -> None:
   def set_value(key: str, value: str) -> None:
     subprocess.run(["aws", "configure", "set", key, value], check=True)
 
-  set_value("aws_access_key_id", "AKIAIWOKBXVU3JLY6EGQ")
-  set_value(
-    "aws_secret_access_key",
-    "UBVbpdYJ81OsDGKlPRBw6FlPJGlxosnFQ4A1xBbU5GwEBfv90GoKc6J0UwF+I4CDwytj/BlAks1XbW0zYX0oeIlXDnl1Vf"
-    "ikm1k4hfIr6VCLHKppiU69FlEs+ph0Dktz8+aUWhrvJzICZs6Gu08kTBQ5++3ulDWDeTHqjr713YM="
-  )
+  set_value("aws_access_key_id", access_key_id)
+  set_value("aws_secret_access_key", secret_access_key)
 
 
 def deploy() -> None:
