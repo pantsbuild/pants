@@ -313,13 +313,13 @@ base_linux_build_engine: &base_linux_build_engine
   <<: *native_engine_cache_config
   <<: *travis_docker_image
   stage: *bootstrap
-  # Callers of this anchor are expected to provide values in their `env` for
-  # `docker_image_name` and `docker_run_command` (i.e. the bash command(s) to run).
+  # Callers of this anchor are expected to provide a value in their `env` for `docker_run_command`
+  # (i.e. the bash command(s) to run).
   script:
     - >
-      {{>docker_build_image}}
+      {{>docker_build_travis_ci_image}}
     - >
-      {{>docker_run_image}}
+      {{>docker_run_travis_ci_image}}
     - *aws_deploy_pants_pex
 
 py27_linux_build_engine: &py27_linux_build_engine
@@ -327,7 +327,6 @@ py27_linux_build_engine: &py27_linux_build_engine
   <<: *base_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py2.7 PEX)"
   env:
-    - docker_image_name=travis_ci
     - docker_run_command="./build-support/bin/ci.py --bootstrap --python-version 2.7"
     - CACHE_NAME=linuxpexbuild.py27
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py27.linux
@@ -337,7 +336,6 @@ py36_linux_build_engine: &py36_linux_build_engine
   <<: *base_linux_build_engine
   name: "Build Linux native engine and pants.pex (Py3.6 PEX)"
   env:
-    - docker_image_name=travis_ci
     - docker_run_command="./build-support/bin/ci.py --bootstrap && ./build-support/bin/release.sh -f"
     - PREPARE_DEPLOY=1
     - CACHE_NAME=linuxpexbuild.py36
@@ -485,15 +483,14 @@ py36_linux_build_wheels: &py36_linux_build_wheels
   env:
     - *py36_linux_test_config_env
     - *base_build_wheels_env
-    - docker_image_name=travis_ci
     - docker_run_command="./build-support/bin/check_pants_pex_abi.py abi3 cp36m
                           && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
     - CACHE_NAME=linuxwheelsbuild.abi3
   script:
     - >
-      {{>docker_build_image}}
+      {{>docker_build_travis_ci_image}}
     - >
-      {{>docker_run_image}}
+      {{>docker_run_travis_ci_image}}
 
 py36_osx_build_wheels: &py36_osx_build_wheels
   <<: *py36_osx_test_config
