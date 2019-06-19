@@ -924,6 +924,7 @@ matrix:
     - <<: *py36_linux_build_engine
       stage: *bootstrap_cron
     - <<: *py37_linux_build_engine
+      stage: *bootstrap
 
     - <<: *py27_osx_build_engine
     - <<: *py27_osx_build_engine
