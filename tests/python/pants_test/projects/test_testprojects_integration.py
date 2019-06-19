@@ -34,6 +34,11 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/java/org/pantsbuild/testproject/thriftdeptest',
       # TODO(Eric Ayers): I don't understand why this fails
       'testprojects/src/java/org/pantsbuild/testproject/jvmprepcommand:compile-prep-command',
+      # TODO(#7903): failing to find -ltensorflow_framework
+      'examples/src/python/example/tensorflow_custom_op:tensorflow-zero-out-op',
+      'examples/src/python/example/tensorflow_custom_op:tensorflow-zero-out-op-wrapper',
+      'examples/src/python/example/tensorflow_custom_op:tensorflow_custom_op',
+      'examples/tests/python/example_test/tensorflow_custom_op:tensorflow_custom_op',
     ]
 
     # Targets that are intended to fail
