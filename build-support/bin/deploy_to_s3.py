@@ -34,7 +34,12 @@ def get_auth_values() -> Tuple[str, str]:
 
 def set_auth(*, access_key_id: str, secret_access_key: str) -> None:
   def set_value(key: str, value: str) -> None:
-    subprocess.run(["aws", "configure", "set", key, value], check=True)
+    # NB: We intentionally catch any errors to ensure that we don't leak the value upon failure,
+    # which would otherwise print the original command invoked.
+    try:
+      subprocess.run(["aws", "configure", "set", key, value], check=True)
+    except subprocess.CalledProcessError:
+      die(f"Failed to set {key}.")
 
   set_value("aws_access_key_id", access_key_id)
   set_value("aws_secret_access_key", secret_access_key)
