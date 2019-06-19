@@ -17,7 +17,7 @@ def install_aws_cli() -> None:
 
 def configure_auth() -> None:
   def set_value(key: str, value: str) -> None:
-    subprocess.run(["aws, configure", "set", key, value], check=True)
+    subprocess.run(["aws", "configure", "set", key, value], check=True)
 
   set_value("aws_access_key_id", "AKIAIWOKBXVU3JLY6EGQ")
   set_value(
