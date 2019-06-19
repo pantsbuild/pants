@@ -34,8 +34,8 @@ def get_auth_values() -> Tuple[str, str]:
 
 def set_auth(*, access_key_id: str, secret_access_key: str) -> None:
   def set_value(key: str, value: str) -> None:
-    # NB: We intentionally catch any errors to ensure that we don't leak the value upon failure,
-    # which would otherwise print the original command invoked.
+    # NB: We intentionally catch subprocess.CalledProcessError to ensure that we don't leak the
+    # auth value upon failure, as the normal stacktrace would print the entire command invoked.
     try:
       subprocess.run(["aws", "configure", "set", key, value], check=True)
     except subprocess.CalledProcessError:
