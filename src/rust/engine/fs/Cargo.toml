@@ -30,6 +30,7 @@ serde_derive = "1.0"
 tempfile = "3"
 tokio-codec = "0.1"
 tokio-fs = "0.1.6"
+tokio-io = "0.1.12"
 tokio-threadpool = "0.1.12"
 uuid = { version = "0.7.1", features = ["v4"] }
 

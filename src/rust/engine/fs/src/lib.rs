@@ -621,10 +621,12 @@ impl PosixFS {
     let path = file.path.clone();
     let path_abs = self.root.0.join(&file.path);
     tokio_fs::File::open(path_abs)
-      .and_then(|file| tokio_codec::FramedRead::new(file, tokio_codec::BytesCodec::new()).concat2())
+      .and_then(|file| {
+        tokio_io::io::read_to_end(file, Vec::new()).map(|(_file, bytes)| Bytes::from(bytes))
+      })
       .map(|content| FileContent {
         path,
-        content: content.freeze(),
+        content,
       })
   }
 
