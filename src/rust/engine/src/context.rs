@@ -20,7 +20,7 @@ use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 use boxfuture::{BoxFuture, Boxable};
 use core::clone::Clone;
-use fs::{self, safe_create_dir_all_ioerror, PosixFS, ResettablePool, Store};
+use fs::{self, safe_create_dir_all_ioerror, PosixFS, Store};
 use graph::{EntryId, Graph, NodeContext};
 use log::debug;
 use parking_lot::RwLock;
@@ -44,9 +44,7 @@ pub struct Core {
   pub tasks: Tasks,
   pub rule_graph: RuleGraph<Rule>,
   pub types: Types,
-  pub fs_pool: Arc<ResettablePool>,
-  runtime: Arc<RwLock<Runtime>>,
-  pub futures_timer_thread: Arc<futures_timer::HelperThread>,
+  runtime: Resettable<Arc<RwLock<Runtime>>>,
   store_and_command_runner_and_http_client:
     Resettable<(Store, BoundedCommandRunner, reqwest::r#async::Client)>,
   pub vfs: PosixFS,
@@ -80,11 +78,11 @@ impl Core {
     let mut remote_store_servers = remote_store_servers;
     remote_store_servers.shuffle(&mut rand::thread_rng());
 
-    let fs_pool = Arc::new(ResettablePool::new("io-".to_string()));
-    let runtime =
+    let runtime = Resettable::new(|| {
       Arc::new(RwLock::new(Runtime::new().unwrap_or_else(|e| {
         panic!("Could not initialize Runtime: {:?}", e)
-      })));
+      })))
+    });
     // We re-use these certs for both the execution and store service; they're generally tied together.
     let root_ca_certs = if let Some(path) = remote_root_ca_certs_path {
       Some(
@@ -105,20 +103,16 @@ impl Core {
       None
     };
 
-    let futures_timer_thread = Arc::new(futures_timer::HelperThread::new().unwrap());
-    let fs_pool2 = fs_pool.clone();
-    let futures_timer_thread2 = futures_timer_thread.clone();
     let store_and_command_runner_and_http_client = Resettable::new(move || {
       let local_store_dir = local_store_dir.clone();
       let store = safe_create_dir_all_ioerror(&local_store_dir)
         .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))
         .and_then(|()| {
           if remote_store_servers.is_empty() {
-            Store::local_only(local_store_dir, fs_pool2.clone())
+            Store::local_only(local_store_dir)
           } else {
             Store::with_remote(
               local_store_dir,
-              fs_pool2.clone(),
               &remote_store_servers,
               remote_instance_name.clone(),
               &root_ca_certs,
@@ -130,7 +124,6 @@ impl Core {
               fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10))
                 .unwrap(),
               remote_store_rpc_retries,
-              futures_timer_thread2.handle(),
             )
           }
         })
@@ -147,11 +140,9 @@ impl Core {
           // Allow for some overhead for bookkeeping threads (if any).
           process_execution_parallelism + 2,
           store.clone(),
-          futures_timer_thread2.clone(), // TODO remove clone once the store and http are not resettables
         )),
         None => Box::new(process_execution::local::CommandRunner::new(
           store.clone(),
-          fs_pool2.clone(),
           work_dir.clone(),
           process_execution_cleanup_local_dirs,
         )),
@@ -172,13 +163,11 @@ impl Core {
       tasks: tasks,
       rule_graph: rule_graph,
       types: types,
-      fs_pool: fs_pool.clone(),
       runtime: runtime,
-      futures_timer_thread: futures_timer_thread,
       store_and_command_runner_and_http_client: store_and_command_runner_and_http_client,
       // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
-      vfs: PosixFS::new(&build_root, fs_pool, &ignore_patterns).unwrap_or_else(|e| {
+      vfs: PosixFS::new(&build_root, &ignore_patterns).unwrap_or_else(|e| {
         panic!("Could not initialize VFS: {:?}", e);
       }),
       build_root: build_root,
@@ -202,10 +191,10 @@ impl Core {
       debug!("Waiting to enter fork_context...");
       thread::sleep(Duration::from_millis(10));
     }
-    let t = self.graph.with_exclusive(|| {
+    let t = self.runtime.with_reset(|| {
       self
-        .fs_pool
-        .with_shutdown(|| self.store_and_command_runner_and_http_client.with_reset(f))
+        .graph
+        .with_exclusive(|| self.store_and_command_runner_and_http_client.with_reset(f))
     });
     self
       .graph
@@ -236,6 +225,7 @@ impl Core {
     let logging_destination = logging::get_destination();
     self
       .runtime
+      .get()
       .read()
       .executor()
       .spawn(futures::future::ok(()).and_then(move |()| {
@@ -264,6 +254,7 @@ impl Core {
     let logging_destination = logging::get_destination();
     self
       .runtime
+      .get()
       .write()
       .block_on(futures::future::ok(()).and_then(move |()| {
         logging::set_destination(logging_destination);
@@ -330,6 +321,6 @@ impl NodeContext for Context {
   where
     F: Future<Item = (), Error = ()> + Send + 'static,
   {
-    self.core.runtime.write().executor().spawn(future);
+    self.core.runtime.get().read().executor().spawn(future);
   }
 }
