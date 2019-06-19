@@ -24,6 +24,7 @@ serverset = { path = "../../serverset" }
 sha2 = "0.8"
 serde = "1.0"
 serde_derive = "1.0"
+sharded_lmdb = { path = "../../sharded_lmdb" }
 tempfile = "3"
 tokio-threadpool = "0.1.12"
 uuid = { version = "0.7.1", features = ["v4"] }

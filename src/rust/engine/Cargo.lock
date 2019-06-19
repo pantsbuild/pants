@@ -2191,6 +2191,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sharded_lmdb"
+version = "0.0.1"
+dependencies = [
+ "fs 0.0.1",
+ "hashing 0.0.1",
+ "lmdb 0.8.0 (git+https://github.com/pantsbuild/lmdb-rs.git?rev=06bdfbfc6348f6804127176e561843f214fc17f8)",
+ "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tempfile 3.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "shell-escape"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2283,6 +2294,7 @@ dependencies = [
  "serde_derive 1.0.58 (registry+https://github.com/rust-lang/crates.io-index)",
  "serverset 0.0.1",
  "sha2 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sharded_lmdb 0.0.1",
  "tempfile 3.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "testutil 0.0.1",
  "tokio 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
