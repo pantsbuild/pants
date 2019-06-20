@@ -77,7 +77,8 @@ impl Core {
     let mut remote_store_servers = remote_store_servers;
     remote_store_servers.shuffle(&mut rand::thread_rng());
 
-    let runtime = Arc::new(RwLock::new(Runtime::new().unwrap_or_else(|e| {
+    let runtime =
+      Arc::new(RwLock::new(Runtime::new().unwrap_or_else(|e| {
         panic!("Could not initialize Runtime: {:?}", e)
       })));
     // We re-use these certs for both the execution and store service; they're generally tied together.
@@ -118,30 +119,30 @@ impl Core {
             remote_store_chunk_upload_timeout,
             // TODO: Take a parameter
             store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10))
-            .unwrap(),
+              .unwrap(),
             remote_store_rpc_retries,
-            )
+          )
         }
       })
       .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
 
     let underlying_command_runner: Box<dyn CommandRunner> = match &remote_execution_server {
       Some(ref address) => Box::new(process_execution::remote::CommandRunner::new(
-          address,
-          remote_execution_process_cache_namespace.clone(),
-          remote_instance_name.clone(),
-          root_ca_certs.clone(),
-          oauth_bearer_token.clone(),
-          remote_execution_extra_platform_properties.clone(),
-          // Allow for some overhead for bookkeeping threads (if any).
-          process_execution_parallelism + 2,
-          store.clone(),
-        )),
-        None => Box::new(process_execution::local::CommandRunner::new(
-          store.clone(),
-          work_dir.clone(),
-          process_execution_cleanup_local_dirs,
-          )),
+        address,
+        remote_execution_process_cache_namespace.clone(),
+        remote_instance_name.clone(),
+        root_ca_certs.clone(),
+        oauth_bearer_token.clone(),
+        remote_execution_extra_platform_properties.clone(),
+        // Allow for some overhead for bookkeeping threads (if any).
+        process_execution_parallelism + 2,
+        store.clone(),
+      )),
+      None => Box::new(process_execution::local::CommandRunner::new(
+        store.clone(),
+        work_dir.clone(),
+        process_execution_cleanup_local_dirs,
+      )),
     };
 
     let command_runner =
