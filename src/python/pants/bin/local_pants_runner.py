@@ -90,20 +90,19 @@ class LocalPantsRunner(object):
 
   @staticmethod
   def _maybe_init_graph_session(graph_session, options_bootstrapper,build_config, options):
-    if graph_session:
-      return graph_session
+    if not graph_session:
+      native = Native()
+      native.set_panic_handler()
+      graph_scheduler_helper = EngineInitializer.setup_legacy_graph(
+        native,
+        options_bootstrapper,
+        build_config
+      )
 
-    native = Native()
-    native.set_panic_handler()
-    graph_scheduler_helper = EngineInitializer.setup_legacy_graph(
-      native,
-      options_bootstrapper,
-      build_config
-    )
-
-    v2_ui = options.for_global_scope().v2_ui
-    zipkin_trace_v2 = options.for_scope('reporting').zipkin_trace_v2
-    return graph_scheduler_helper.new_session(zipkin_trace_v2, v2_ui)
+      v2_ui = options.for_global_scope().v2_ui
+      zipkin_trace_v2 = options.for_scope('reporting').zipkin_trace_v2
+      graph_session = graph_scheduler_helper.new_session(zipkin_trace_v2, v2_ui)
+    return graph_session, graph_session.scheduler_session
 
   @staticmethod
   def _maybe_init_target_roots(target_roots, graph_session, options, build_root):
@@ -154,7 +153,7 @@ class LocalPantsRunner(object):
 
     # If we're running with the daemon, we'll be handed a session from the
     # resident graph helper - otherwise initialize a new one here.
-    graph_session = cls._maybe_init_graph_session(
+    graph_session, scheduler_session = cls._maybe_init_graph_session(
       daemon_graph_session,
       options_bootstrapper,
       build_config,
@@ -178,12 +177,13 @@ class LocalPantsRunner(object):
       build_config,
       target_roots,
       graph_session,
+      scheduler_session,
       daemon_graph_session is not None,
       profile_path
     )
 
   def __init__(self, build_root, exiter, options, options_bootstrapper, build_config, target_roots,
-               graph_session, is_daemon, profile_path):
+               graph_session, scheduler, is_daemon, profile_path):
     """
     :param string build_root: The build root for this run.
     :param Exiter exiter: The Exiter instance to use for this run.
@@ -202,6 +202,7 @@ class LocalPantsRunner(object):
     self._build_config = build_config
     self._target_roots = target_roots
     self._graph_session = graph_session
+    self._scheduler = scheduler
     self._is_daemon = is_daemon
     self._profile_path = profile_path
 
@@ -286,6 +287,13 @@ class LocalPantsRunner(object):
         max_code = code
     return max_code
 
+  def _update_stats(self):
+    metrics = self._scheduler.metrics()
+    self._run_tracker.pantsd_stats.set_scheduler_metrics(metrics)
+    engine_workunits = self._scheduler.engine_workunits(metrics)
+    if engine_workunits:
+      self._run_tracker.report.bulk_record_workunits(engine_workunits)
+
   def _run(self):
     try:
       self._maybe_handle_help()
@@ -294,6 +302,7 @@ class LocalPantsRunner(object):
       goal_runner_result = self._maybe_run_v1()
     finally:
       try:
+        self._update_stats()
         run_tracker_result = self._run_tracker.end()
       except ValueError as e:
         # Calling .end() sometimes writes to a closed file, so we return a dummy result here.
