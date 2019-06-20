@@ -26,9 +26,11 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+#[macro_use]
+extern crate derivative;
+
 use boxfuture::BoxFuture;
 use bytes::Bytes;
-use derivative::Derivative;
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::AddAssign;
 use std::path::PathBuf;
@@ -44,7 +46,8 @@ pub mod remote;
 ///
 /// A process to be executed.
 ///
-#[derive(Derivative, Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Derivative, Clone, Debug, Eq)]
+#[derivative(PartialEq, Hash)]
 pub struct ExecuteProcessRequest {
   ///
   /// The arguments to execute.
@@ -71,6 +74,7 @@ pub struct ExecuteProcessRequest {
 
   pub timeout: std::time::Duration,
 
+  #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub description: String,
 
   ///
