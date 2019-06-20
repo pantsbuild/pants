@@ -341,20 +341,16 @@ py36_linux_build_engine: &py36_linux_build_engine
     - CACHE_NAME=linuxpexbuild.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
 
-# NB: we do not use Docker for Py37 because Centos6 has too outdated of OpenSSL.
-# See https://github.com/pantsbuild/pants/issues/7421. We will want to change this
-# shard back to Docker once we have a Centos7 base image.
 py37_linux_build_engine: &py37_linux_build_engine
   <<: *py37_linux_config
-  <<: *native_engine_cache_config
+  <<: *base_linux_build_engine
   stage: *bootstrap_cron
   name: "Build Linux native engine and pants.pex (Py3.7 PEX)"
   env:
+    - docker_centos_version=7
+    - docker_run_command="./build-support/bin/ci.py --bootstrap --python-version 3.7"
     - CACHE_NAME=linuxpexbuild.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-  script:
-    - ./build-support/bin/ci.py --bootstrap --python-version 3.7
-    - *aws_deploy_pants_pex
 
 base_osx_build_engine: &base_osx_build_engine
   <<: *native_engine_cache_config
