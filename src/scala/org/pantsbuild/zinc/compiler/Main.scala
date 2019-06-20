@@ -10,6 +10,7 @@ import scala.collection.JavaConverters._
 
 import sbt.internal.inc.IncrementalCompilerImpl
 import sbt.internal.util.{ ConsoleLogger, ConsoleOut }
+import sbt.io.IO
 import sbt.util.Level
 import xsbti.CompileFailed
 
@@ -159,6 +160,11 @@ object Main {
     try {
       // Run the compile.
       val result = new IncrementalCompilerImpl().compile(inputs, log)
+
+      // post compile merge dir
+      if (settings.postCompileMergeDir.isDefined) {
+        IO.copyDirectory(new File(settings.postCompileMergeDir.get.toURI), new File(settings.classesDirectory.toURI))
+      }
 
       // Store the output if the result changed.
       if (result.hasModified) {
