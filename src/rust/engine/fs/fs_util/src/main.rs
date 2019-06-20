@@ -38,7 +38,7 @@ use serde_json;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use clap::{value_t, App, Arg, SubCommand};
-use fs::{GlobMatching, Snapshot, Store, StoreFileByDigest, UploadSummary};
+use fs::GlobMatching;
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
@@ -50,6 +50,7 @@ use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
+use store::{Snapshot, Store, StoreFileByDigest, UploadSummary};
 
 #[derive(Debug)]
 enum ExitCode {
@@ -306,7 +307,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             // See https://github.com/pantsbuild/pants/pull/6433 for more context.
             Duration::from_secs(30 * 60),
             // TODO: Take a command line arg.
-            fs::BackoffConfig::new(
+            store::BackoffConfig::new(
               std::time::Duration::from_secs(1),
               1.2,
               std::time::Duration::from_secs(20),
@@ -367,7 +368,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             fs::Stat::File(f) => {
               let digest = runtime
                 .block_on(
-                  fs::OneOffStoreFileByDigest::new(store.clone(), Arc::new(posix_fs))
+                  store::OneOffStoreFileByDigest::new(store.clone(), Arc::new(posix_fs))
                     .store_by_digest(f),
                 )
                 .unwrap();
@@ -435,7 +436,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             .and_then(move |paths| {
               Snapshot::from_path_stats(
                 store_copy.clone(),
-                &fs::OneOffStoreFileByDigest::new(store_copy, posix_fs),
+                &store::OneOffStoreFileByDigest::new(store_copy, posix_fs),
                 paths,
               )
             })
@@ -542,7 +543,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
     ("gc", Some(args)) => {
       let target_size_bytes = value_t!(args.value_of("target-size-bytes"), usize)
         .expect("--target-size-bytes must be passed as a non-negative integer");
-      store.garbage_collect(target_size_bytes, fs::ShrinkBehavior::Compact)?;
+      store.garbage_collect(target_size_bytes, store::ShrinkBehavior::Compact)?;
       Ok(())
     }
 

@@ -28,15 +28,13 @@
 
 mod glob_matching;
 pub use crate::glob_matching::GlobMatching;
-mod snapshot;
-pub use crate::snapshot::{
-  OneOffStoreFileByDigest, Snapshot, StoreFileByDigest, EMPTY_DIGEST, EMPTY_FINGERPRINT,
-};
-mod store;
-pub use crate::store::{ShrinkBehavior, Store, UploadSummary, DEFAULT_LOCAL_STORE_GC_TARGET_BYTES};
 
-pub use serverset::BackoffConfig;
-
+use ::ignore::gitignore::{Gitignore, GitignoreBuilder};
+use boxfuture::{BoxFuture, Boxable};
+use bytes::Bytes;
+use futures::{future, Future, Stream};
+use glob::{MatchOptions, Pattern};
+use lazy_static::lazy_static;
 use std::cmp::min;
 use std::ffi::OsStr;
 use std::io;
@@ -44,14 +42,6 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::{fmt, fs};
-
-use ::ignore::gitignore::{Gitignore, GitignoreBuilder};
-use boxfuture::{BoxFuture, Boxable};
-use bytes::Bytes;
-use futures::future::{self, Future};
-use futures::Stream;
-use glob::{MatchOptions, Pattern};
-use lazy_static::lazy_static;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Stat {
@@ -817,12 +807,12 @@ pub fn safe_create_dir_all_ioerror(path: &Path) -> Result<(), io::Error> {
   }
 }
 
-fn safe_create_dir_all(path: &Path) -> Result<(), String> {
+pub fn safe_create_dir_all(path: &Path) -> Result<(), String> {
   safe_create_dir_all_ioerror(path)
     .map_err(|e| format!("Failed to create dir {:?} due to {:?}", path, e))
 }
 
-fn safe_create_dir(path: &Path) -> Result<(), String> {
+pub fn safe_create_dir(path: &Path) -> Result<(), String> {
   match fs::create_dir(path) {
     Ok(()) => Ok(()),
     Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),

@@ -23,7 +23,7 @@ use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::{self, BufMut};
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
-  PathGlobs, PathStat, StoreFileByDigest, StrictGlobMatching, VFS,
+  PathGlobs, PathStat, StrictGlobMatching, VFS,
 };
 use hashing;
 use process_execution::{self, CommandRunner};
@@ -32,6 +32,7 @@ use rule_graph;
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
 use rand::thread_rng;
 use rand::Rng;
+use store::{self, StoreFileByDigest};
 use workunit_store::{WorkUnit, WorkUnitStore};
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
@@ -204,7 +205,7 @@ impl WrappedNode for Select {
                   .into_iter()
                   .map(|val| lift_digest(&val).map_err(|str| throw(&str)))
                   .collect();
-              fs::Snapshot::merge_directories(core.store(), try_future!(digests))
+              store::Snapshot::merge_directories(core.store(), try_future!(digests))
                 .map_err(|err| throw(&err))
                 .map(move |digest| Snapshot::store_directory(&core, &digest))
                 .to_boxed()
@@ -222,7 +223,7 @@ impl WrappedNode for Select {
               lift_digest(&directory_digest_val).map_err(|str| throw(&str))
             })
             .and_then(move |digest| {
-              fs::Snapshot::from_digest(context.core.store(), digest).map_err(|str| throw(&str))
+              store::Snapshot::from_digest(context.core.store(), digest).map_err(|str| throw(&str))
             })
             .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
             .to_boxed()
@@ -249,7 +250,7 @@ impl WrappedNode for Select {
               Ok((digest, prefix))
             })
             .and_then(|(digest, prefix)| {
-              fs::Snapshot::strip_prefix(core.store(), digest, PathBuf::from(prefix))
+              store::Snapshot::strip_prefix(core.store(), digest, PathBuf::from(prefix))
                 .map_err(|err| throw(&err))
                 .map(move |digest| Snapshot::store_directory(&core, &digest))
             })
@@ -525,21 +526,21 @@ impl From<Scandir> for NodeKey {
 }
 
 ///
-/// A Node that captures an fs::Snapshot for a PathGlobs subject.
+/// A Node that captures an store::Snapshot for a PathGlobs subject.
 ///
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Snapshot(Key);
 
 impl Snapshot {
-  fn create(context: Context, path_globs: PathGlobs) -> NodeFuture<fs::Snapshot> {
+  fn create(context: Context, path_globs: PathGlobs) -> NodeFuture<store::Snapshot> {
     // Recursively expand PathGlobs into PathStats.
     // We rely on Context::expand tracking dependencies for scandirs,
-    // and fs::Snapshot::from_path_stats tracking dependencies for file digests.
+    // and store::Snapshot::from_path_stats tracking dependencies for file digests.
     context
       .expand(path_globs)
       .map_err(|e| format!("PathGlobs expansion failed: {}", e))
       .and_then(move |path_stats| {
-        fs::Snapshot::from_path_stats(context.core.store(), &context, path_stats)
+        store::Snapshot::from_path_stats(context.core.store(), &context, path_stats)
           .map_err(move |e| format!("Snapshot failed: {}", e))
       })
       .map_err(|e| throw(&e))
@@ -577,7 +578,7 @@ impl Snapshot {
     )
   }
 
-  pub fn store_snapshot(core: &Arc<Core>, item: &fs::Snapshot) -> Value {
+  pub fn store_snapshot(core: &Arc<Core>, item: &store::Snapshot) -> Value {
     let mut files = Vec::new();
     let mut dirs = Vec::new();
     for ps in &item.path_stats {
@@ -627,9 +628,9 @@ impl Snapshot {
 }
 
 impl WrappedNode for Snapshot {
-  type Item = Arc<fs::Snapshot>;
+  type Item = Arc<store::Snapshot>;
 
-  fn run(self, context: Context) -> NodeFuture<Arc<fs::Snapshot>> {
+  fn run(self, context: Context) -> NodeFuture<Arc<store::Snapshot>> {
     let lifted_path_globs = Self::lift_path_globs(&externs::val_for(&self.0));
     future::result(lifted_path_globs)
       .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))
@@ -654,7 +655,7 @@ impl DownloadedFile {
     core: Arc<Core>,
     url: Url,
     digest: hashing::Digest,
-  ) -> BoxFuture<fs::Snapshot, String> {
+  ) -> BoxFuture<store::Snapshot, String> {
     let file_name = try_future!(url
       .path_segments()
       .and_then(Iterator::last)
@@ -676,10 +677,10 @@ impl DownloadedFile {
   }
 
   fn snapshot_of_one_file(
-    store: fs::Store,
+    store: store::Store,
     name: PathBuf,
     digest: hashing::Digest,
-  ) -> BoxFuture<fs::Snapshot, String> {
+  ) -> BoxFuture<store::Snapshot, String> {
     #[derive(Clone)]
     struct Digester {
       digest: hashing::Digest,
@@ -691,7 +692,7 @@ impl DownloadedFile {
       }
     }
 
-    fs::Snapshot::from_path_stats(
+    store::Snapshot::from_path_stats(
       store,
       &Digester { digest },
       vec![fs::PathStat::File {
@@ -803,9 +804,9 @@ impl DownloadedFile {
 }
 
 impl WrappedNode for DownloadedFile {
-  type Item = Arc<fs::Snapshot>;
+  type Item = Arc<store::Snapshot>;
 
-  fn run(self, context: Context) -> NodeFuture<Arc<fs::Snapshot>> {
+  fn run(self, context: Context) -> NodeFuture<Arc<store::Snapshot>> {
     let value = externs::val_for(&self.0);
     let url_to_fetch = externs::project_str(&value, "url");
 
@@ -1198,7 +1199,7 @@ pub enum NodeResult {
   DirectoryListing(Arc<DirectoryListing>),
   LinkDest(LinkDest),
   ProcessResult(ProcessResult),
-  Snapshot(Arc<fs::Snapshot>),
+  Snapshot(Arc<store::Snapshot>),
   Value(Value),
 }
 
@@ -1208,8 +1209,8 @@ impl From<Value> for NodeResult {
   }
 }
 
-impl From<Arc<fs::Snapshot>> for NodeResult {
-  fn from(v: Arc<fs::Snapshot>) -> Self {
+impl From<Arc<store::Snapshot>> for NodeResult {
+  fn from(v: Arc<store::Snapshot>) -> Self {
     NodeResult::Snapshot(v)
   }
 }
@@ -1249,7 +1250,7 @@ impl TryFrom<NodeResult> for Value {
   }
 }
 
-impl TryFrom<NodeResult> for Arc<fs::Snapshot> {
+impl TryFrom<NodeResult> for Arc<store::Snapshot> {
   type Error = ();
 
   fn try_from(nr: NodeResult) -> Result<Self, ()> {

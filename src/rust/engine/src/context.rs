@@ -20,7 +20,7 @@ use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 use boxfuture::{BoxFuture, Boxable};
 use core::clone::Clone;
-use fs::{self, safe_create_dir_all_ioerror, PosixFS, Store};
+use fs::{safe_create_dir_all_ioerror, PosixFS};
 use graph::{EntryId, Graph, NodeContext};
 use log::debug;
 use parking_lot::RwLock;
@@ -30,6 +30,7 @@ use reqwest;
 use resettable::Resettable;
 use rule_graph::RuleGraph;
 use std::collections::btree_map::BTreeMap;
+use store::Store;
 
 ///
 /// The core context shared (via Arc) between the Scheduler and the Context objects of
@@ -121,7 +122,7 @@ impl Core {
               remote_store_chunk_bytes,
               remote_store_chunk_upload_timeout,
               // TODO: Take a parameter
-              fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10))
+              store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10))
                 .unwrap(),
               remote_store_rpc_retries,
             )
