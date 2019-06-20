@@ -31,7 +31,7 @@ def deploy() -> None:
   # NB: we use the sync command to avoid transferring files that have not changed. See
   # https://github.com/pantsbuild/pants/issues/7258.
   subprocess.run(
-    ["aws", "s3", "sync", "--acl", "public-read", "dist/deploy", "s3://binaries/pantsbuild.org"],
+    ["aws", "s3", "sync", "--acl", "public-read", "dist/deploy", "s3://binaries.pantsbuild.org"],
     check=True
   )
 
