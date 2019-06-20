@@ -235,6 +235,9 @@ class PailgunServer(ThreadingMixIn, TCPServer):
   def _should_keep_polling(self, timeout, time_polled):
     return self._should_poll_forever(timeout) or time_polled < timeout
 
+  def _send_stderr(self, request, message):
+    NailgunProtocol.send_stderr(request, message)
+
   @contextmanager
   def ensure_request_is_exclusive(self, environment, request):
     """
@@ -267,13 +270,16 @@ class PailgunServer(ThreadingMixIn, TCPServer):
         yield
     else:
       # We have to wait for another request to finish being handled.
-      NailgunProtocol.send_stderr(request, "Another pants invocation is running. Will wait {} for it to finish before giving up.\n".format(
+      self._send_stderr(request, "Another pants invocation is running. Will wait {} for it to finish before giving up.\n".format(
         "forever" if self._should_poll_forever(timeout) else "up to {} seconds".format(timeout)
       ))
+      self._send_stderr(request, "If you want to have multiple pants invocations at once, please "
+                                 "press Ctrl-C and run with PANTS_ENABLE_PANTSD=False in the "
+                                 "environment.")
       while not self.free_to_handle_request_lock.acquire(timeout=user_notification_interval):
         time_polled += user_notification_interval
         if self._should_keep_polling(timeout, time_polled):
-          NailgunProtocol.send_stderr(request, "Waiting for invocation to finish (waited for {}s so far)...\n".format(time_polled))
+          self._send_stderr(request, "Waiting for invocation to finish (waited for {}s so far)...\n".format(time_polled))
         else: # We have timed out.
           raise ExclusiveRequestTimeout("Timed out while waiting for another pants invocation to finish.")
       with yield_and_release(time_polled):
