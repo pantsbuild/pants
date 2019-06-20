@@ -900,7 +900,7 @@ mod local {
       Ok(ByteStore {
         inner: Arc::new(InnerStore {
           file_dbs: ShardedLmdb::new(files_root.clone(), MAX_LOCAL_STORE_SIZE_BYTES).map(Arc::new),
-          directory_dbs: ShardedLmdb::new(directories_root.clone(), MAX_LOCAL_STORE_SIZE_BYTES)
+          directory_dbs: ShardedLmdb::new(directories_root.clone(), 5 * 1024 * 1024 * 1024)
             .map(Arc::new),
         }),
       })
