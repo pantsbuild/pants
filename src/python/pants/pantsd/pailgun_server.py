@@ -260,7 +260,8 @@ class PailgunServer(ThreadingMixIn, TCPServer):
         self.logger.debug("released request lock.")
 
     time_polled = 0.0
-    user_notification_interval = 1.0 # Stop polling to notify the user every second.
+    # TODO: make this an option?
+    user_notification_interval = 5.0 # Stop polling to notify the user every second.
     self.logger.debug("request {} is trying to aquire the request lock.".format(request))
 
     # NB: Optimistically try to acquire the lock without blocking, in case we are the only request being handled.
@@ -270,12 +271,13 @@ class PailgunServer(ThreadingMixIn, TCPServer):
         yield
     else:
       # We have to wait for another request to finish being handled.
-      self._send_stderr(request, "Another pants invocation is running. Will wait {} for it to finish before giving up.\n".format(
-        "forever" if self._should_poll_forever(timeout) else "up to {} seconds".format(timeout)
-      ))
-      self._send_stderr(request, "If you want to have multiple pants invocations at once, please "
-                                 "press Ctrl-C and run with PANTS_ENABLE_PANTSD=False in the "
-                                 "environment.")
+      self._send_stderr(request, "Another pants invocation is running with pantsd enabled. "
+                                 "Will wait {} for it to finish before giving up.\n".format(
+                                   "forever" if self._should_poll_forever(timeout)
+                                   else "up to {} seconds".format(timeout)))
+      self._send_stderr(request, "If you don't want to wait for the first run to finish, please "
+                                 "press Ctrl-C and run this command with PANTS_ENABLE_PANTSD=False "
+                                 "in the environment.")
       while not self.free_to_handle_request_lock.acquire(timeout=user_notification_interval):
         time_polled += user_notification_interval
         if self._should_keep_polling(timeout, time_polled):
