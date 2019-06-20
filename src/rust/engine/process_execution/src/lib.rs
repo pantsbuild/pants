@@ -33,6 +33,7 @@ use std::ops::AddAssign;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+use store::UploadSummary;
 
 use async_semaphore::AsyncSemaphore;
 
@@ -118,8 +119,8 @@ pub struct ExecutionStats {
   was_cache_hit: bool,
 }
 
-impl AddAssign<fs::UploadSummary> for ExecutionStats {
-  fn add_assign(&mut self, summary: fs::UploadSummary) {
+impl AddAssign<UploadSummary> for ExecutionStats {
+  fn add_assign(&mut self, summary: UploadSummary) {
     self.uploaded_file_count += summary.uploaded_file_count;
     self.uploaded_bytes += summary.uploaded_file_bytes;
     self.upload += summary.upload_wall_time;

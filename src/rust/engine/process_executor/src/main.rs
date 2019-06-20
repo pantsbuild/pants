@@ -28,7 +28,6 @@
 
 use clap;
 use env_logger;
-use fs;
 
 use process_execution;
 
@@ -38,8 +37,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::iter::Iterator;
 use std::path::PathBuf;
 use std::process::exit;
-use std::sync::Arc;
 use std::time::Duration;
+use store::{BackoffConfig, Store};
 use tokio::runtime::Runtime;
 
 /// A binary which takes args of format:
@@ -211,9 +210,7 @@ fn main() {
   let local_store_path = args
     .value_of("local-store-path")
     .map(PathBuf::from)
-    .unwrap_or_else(fs::Store::default_path);
-  let pool = Arc::new(fs::ResettablePool::new("process-executor-".to_owned()));
-  let timer_thread = Arc::new(futures_timer::HelperThread::new().unwrap());
+    .unwrap_or_else(Store::default_path);
   let server_arg = args.value_of("server");
   let remote_instance_arg = args.value_of("remote-instance-name").map(str::to_owned);
   let output_files = if let Some(values) = args.values_of("output-file-path") {
@@ -244,9 +241,8 @@ fn main() {
         None
       };
 
-      fs::Store::with_remote(
+      Store::with_remote(
         local_store_path,
-        pool.clone(),
         &[cas_server.to_owned()],
         remote_instance_arg.clone(),
         &root_ca_certs,
@@ -255,12 +251,11 @@ fn main() {
         chunk_size,
         Duration::from_secs(30),
         // TODO: Take a command line arg.
-        fs::BackoffConfig::new(Duration::from_secs(1), 1.2, Duration::from_secs(20)).unwrap(),
+        BackoffConfig::new(Duration::from_secs(1), 1.2, Duration::from_secs(20)).unwrap(),
         3,
-        timer_thread.handle(),
       )
     }
-    (None, None) => fs::Store::local_only(local_store_path, pool.clone()),
+    (None, None) => Store::local_only(local_store_path),
     _ => panic!("Must specify either both --server and --cas-server or neither."),
   }
   .expect("Error making store");
@@ -311,12 +306,10 @@ fn main() {
         platform_properties,
         1,
         store.clone(),
-        timer_thread.clone(),
       )) as Box<dyn process_execution::CommandRunner>
     }
     None => Box::new(process_execution::local::CommandRunner::new(
       store.clone(),
-      pool,
       work_dir,
       true,
     )) as Box<dyn process_execution::CommandRunner>,

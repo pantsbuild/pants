@@ -1,14 +1,13 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::glob_matching::GlobMatching;
-use crate::pool::ResettablePool;
-use crate::{Dir, File, PathGlobs, PathStat, PosixFS, Store};
+use crate::Store;
 use bazel_protos;
 use boxfuture::{try_future, BoxFuture, Boxable};
+use fs::{Dir, File, GlobMatching, PathGlobs, PathStat, PosixFS};
 use futures::future::{self, join_all};
 use futures::Future;
-use hashing::{Digest, Fingerprint};
+use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::{self, IndexMap};
 use itertools::Itertools;
 use protobuf;
@@ -17,12 +16,6 @@ use std::fmt;
 use std::iter::Iterator;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-
-pub const EMPTY_FINGERPRINT: Fingerprint = Fingerprint([
-  0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
-  0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55,
-]);
-pub const EMPTY_DIGEST: Digest = Digest(EMPTY_FINGERPRINT, 0);
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct Snapshot {
@@ -474,7 +467,6 @@ impl Snapshot {
   ///
   pub fn capture_snapshot_from_arbitrary_root<P: AsRef<Path> + Send + 'static>(
     store: Store,
-    fs_pool: Arc<ResettablePool>,
     root_path: P,
     path_globs: PathGlobs,
     digest_hint: Option<Digest>,
@@ -485,7 +477,7 @@ impl Snapshot {
     future::result(digest_hint.ok_or_else(|| "No digest hint provided.".to_string()))
       .and_then(move |digest| Snapshot::from_digest(store, digest))
       .or_else(|_| {
-        let posix_fs = Arc::new(try_future!(PosixFS::new(root_path, fs_pool, &[])));
+        let posix_fs = Arc::new(try_future!(PosixFS::new(root_path, &[])));
 
         posix_fs
           .expand(path_globs)
@@ -584,14 +576,15 @@ mod tests {
   use testutil::data::TestDirectory;
   use testutil::make_file;
 
-  use super::super::{
-    Dir, File, GlobExpansionConjunction, GlobMatching, Path, PathGlobs, PathStat, PosixFS,
-    ResettablePool, Snapshot, Store, StrictGlobMatching,
+  use super::{OneOffStoreFileByDigest, Snapshot};
+  use crate::Store;
+  use fs::{
+    Dir, File, GlobExpansionConjunction, GlobMatching, PathGlobs, PathStat, PosixFS,
+    StrictGlobMatching,
   };
-  use super::OneOffStoreFileByDigest;
 
   use std;
-  use std::path::PathBuf;
+  use std::path::{Path, PathBuf};
   use std::sync::Arc;
 
   const STR: &str = "European Burmese";
@@ -603,18 +596,16 @@ mod tests {
     OneOffStoreFileByDigest,
     tokio::runtime::Runtime,
   ) {
-    let pool = Arc::new(ResettablePool::new("test-pool-".to_string()));
     // TODO: Pass a remote CAS address through.
     let store = Store::local_only(
       tempfile::Builder::new()
         .prefix("lmdb_store")
         .tempdir()
         .unwrap(),
-      pool.clone(),
     )
     .unwrap();
     let dir = tempfile::Builder::new().prefix("root").tempdir().unwrap();
-    let posix_fs = Arc::new(PosixFS::new(dir.path(), pool, &[]).unwrap());
+    let posix_fs = Arc::new(PosixFS::new(dir.path(), &[]).unwrap());
     let file_saver = OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone());
     let runtime = tokio::runtime::Runtime::new().unwrap();
     (store, dir, posix_fs, file_saver, runtime)
@@ -622,16 +613,21 @@ mod tests {
 
   #[test]
   fn snapshot_one_file() {
-    let (store, dir, posix_fs, digester, _runtime) = setup();
+    let (store, dir, posix_fs, digester, mut runtime) = setup();
 
     let file_name = PathBuf::from("roland");
     make_file(&dir.path().join(&file_name), STR.as_bytes(), 0o600);
 
-    let path_stats = expand_all_sorted(posix_fs);
+    let path_stats = expand_all_sorted(posix_fs, &mut runtime);
+    let snapshot = runtime
+      .block_on(Snapshot::from_path_stats(
+        store,
+        &digester,
+        path_stats.clone(),
+      ))
+      .unwrap();
     assert_eq!(
-      Snapshot::from_path_stats(store, &digester, path_stats.clone())
-        .wait()
-        .unwrap(),
+      snapshot,
       Snapshot {
         digest: Digest(
           Fingerprint::from_hex_string(
@@ -647,18 +643,23 @@ mod tests {
 
   #[test]
   fn snapshot_recursive_directories() {
-    let (store, dir, posix_fs, digester, _runtime) = setup();
+    let (store, dir, posix_fs, digester, mut runtime) = setup();
 
     let cats = PathBuf::from("cats");
     let roland = cats.join("roland");
     std::fs::create_dir_all(&dir.path().join(cats)).unwrap();
     make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
-    let path_stats = expand_all_sorted(posix_fs);
+    let path_stats = expand_all_sorted(posix_fs, &mut runtime);
+    let snapshot = runtime
+      .block_on(Snapshot::from_path_stats(
+        store,
+        &digester,
+        path_stats.clone(),
+      ))
+      .unwrap();
     assert_eq!(
-      Snapshot::from_path_stats(store, &digester, path_stats.clone())
-        .wait()
-        .unwrap(),
+      snapshot,
       Snapshot {
         digest: Digest(
           Fingerprint::from_hex_string(
@@ -674,28 +675,32 @@ mod tests {
 
   #[test]
   fn snapshot_from_digest() {
-    let (store, dir, posix_fs, digester, _runtime) = setup();
+    let (store, dir, posix_fs, digester, mut runtime) = setup();
 
     let cats = PathBuf::from("cats");
     let roland = cats.join("roland");
     std::fs::create_dir_all(&dir.path().join(cats)).unwrap();
     make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
-    let path_stats = expand_all_sorted(posix_fs);
-    let expected_snapshot = Snapshot::from_path_stats(store.clone(), &digester, path_stats.clone())
-      .wait()
+    let path_stats = expand_all_sorted(posix_fs, &mut runtime);
+    let expected_snapshot = runtime
+      .block_on(Snapshot::from_path_stats(
+        store.clone(),
+        &digester,
+        path_stats.clone(),
+      ))
       .unwrap();
     assert_eq!(
       expected_snapshot,
-      Snapshot::from_digest(store, expected_snapshot.digest)
-        .wait()
-        .unwrap(),
+      runtime
+        .block_on(Snapshot::from_digest(store, expected_snapshot.digest))
+        .unwrap()
     );
   }
 
   #[test]
   fn snapshot_recursive_directories_including_empty() {
-    let (store, dir, posix_fs, digester, _runtime) = setup();
+    let (store, dir, posix_fs, digester, mut runtime) = setup();
 
     let cats = PathBuf::from("cats");
     let roland = cats.join("roland");
@@ -706,12 +711,16 @@ mod tests {
     std::fs::create_dir_all(&dir.path().join(&llamas)).unwrap();
     make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
-    let sorted_path_stats = expand_all_sorted(posix_fs);
+    let sorted_path_stats = expand_all_sorted(posix_fs, &mut runtime);
     let mut unsorted_path_stats = sorted_path_stats.clone();
     unsorted_path_stats.reverse();
     assert_eq!(
-      Snapshot::from_path_stats(store, &digester, unsorted_path_stats.clone())
-        .wait()
+      runtime
+        .block_on(Snapshot::from_path_stats(
+          store,
+          &digester,
+          unsorted_path_stats.clone()
+        ))
         .unwrap(),
       Snapshot {
         digest: Digest(
@@ -728,25 +737,22 @@ mod tests {
 
   #[test]
   fn merge_directories_two_files() {
-    let (store, _, _, _, _) = setup();
+    let (store, _, _, _, mut runtime) = setup();
 
     let containing_roland = TestDirectory::containing_roland();
     let containing_treats = TestDirectory::containing_treats();
 
-    store
-      .record_directory(&containing_roland.directory(), false)
-      .wait()
+    runtime
+      .block_on(store.record_directory(&containing_roland.directory(), false))
       .expect("Storing roland directory");
-    store
-      .record_directory(&containing_treats.directory(), false)
-      .wait()
+    runtime
+      .block_on(store.record_directory(&containing_treats.directory(), false))
       .expect("Storing treats directory");
 
-    let result = Snapshot::merge_directories(
+    let result = runtime.block_on(Snapshot::merge_directories(
       store,
       vec![containing_treats.digest(), containing_roland.digest()],
-    )
-    .wait();
+    ));
 
     assert_eq!(
       result,
@@ -756,26 +762,24 @@ mod tests {
 
   #[test]
   fn merge_directories_clashing_files() {
-    let (store, _, _, _, _) = setup();
+    let (store, _, _, _, mut runtime) = setup();
 
     let containing_roland = TestDirectory::containing_roland();
     let containing_wrong_roland = TestDirectory::containing_wrong_roland();
 
-    store
-      .record_directory(&containing_roland.directory(), false)
-      .wait()
+    runtime
+      .block_on(store.record_directory(&containing_roland.directory(), false))
       .expect("Storing roland directory");
-    store
-      .record_directory(&containing_wrong_roland.directory(), false)
-      .wait()
+    runtime
+      .block_on(store.record_directory(&containing_wrong_roland.directory(), false))
       .expect("Storing wrong roland directory");
 
-    let err = Snapshot::merge_directories(
-      store,
-      vec![containing_roland.digest(), containing_wrong_roland.digest()],
-    )
-    .wait()
-    .expect_err("Want error merging");
+    let err = runtime
+      .block_on(Snapshot::merge_directories(
+        store,
+        vec![containing_roland.digest(), containing_wrong_roland.digest()],
+      ))
+      .expect_err("Want error merging");
 
     assert!(
       err.contains("roland"),
@@ -786,28 +790,25 @@ mod tests {
 
   #[test]
   fn merge_directories_same_files() {
-    let (store, _, _, _, _) = setup();
+    let (store, _, _, _, mut runtime) = setup();
 
     let containing_roland = TestDirectory::containing_roland();
     let containing_roland_and_treats = TestDirectory::containing_roland_and_treats();
 
-    store
-      .record_directory(&containing_roland.directory(), false)
-      .wait()
+    runtime
+      .block_on(store.record_directory(&containing_roland.directory(), false))
       .expect("Storing roland directory");
-    store
-      .record_directory(&containing_roland_and_treats.directory(), false)
-      .wait()
+    runtime
+      .block_on(store.record_directory(&containing_roland_and_treats.directory(), false))
       .expect("Storing treats directory");
 
-    let result = Snapshot::merge_directories(
+    let result = runtime.block_on(Snapshot::merge_directories(
       store,
       vec![
         containing_roland.digest(),
         containing_roland_and_treats.digest(),
       ],
-    )
-    .wait();
+    ));
 
     assert_eq!(
       result,
@@ -817,7 +818,7 @@ mod tests {
 
   #[test]
   fn snapshot_merge_two_files() {
-    let (store, tempdir, _, digester, _runtime) = setup();
+    let (store, tempdir, _, digester, mut runtime) = setup();
 
     let common_dir_name = "tower";
     let common_dir = PathBuf::from(common_dir_name);
@@ -836,22 +837,27 @@ mod tests {
       true,
     );
 
-    let merged = {
-      let snapshot1 =
-        Snapshot::from_path_stats(store.clone(), &digester, vec![dir.clone(), file1.clone()])
-          .wait()
-          .unwrap();
-      let snapshot2 =
-        Snapshot::from_path_stats(store.clone(), &digester, vec![dir.clone(), file2.clone()])
-          .wait()
-          .unwrap();
-      Snapshot::merge(store.clone(), &[snapshot1, snapshot2])
-        .wait()
-        .unwrap()
-    };
-    let merged_root_directory = store
-      .load_directory(merged.digest)
-      .wait()
+    let snapshot1 = runtime
+      .block_on(Snapshot::from_path_stats(
+        store.clone(),
+        &digester,
+        vec![dir.clone(), file1.clone()],
+      ))
+      .unwrap();
+
+    let snapshot2 = runtime
+      .block_on(Snapshot::from_path_stats(
+        store.clone(),
+        &digester,
+        vec![dir.clone(), file2.clone()],
+      ))
+      .unwrap();
+
+    let merged = runtime
+      .block_on(Snapshot::merge(store.clone(), &[snapshot1, snapshot2]))
+      .unwrap();
+    let merged_root_directory = runtime
+      .block_on(store.load_directory(merged.digest))
       .unwrap()
       .unwrap()
       .0;
@@ -863,9 +869,8 @@ mod tests {
     let merged_child_dirnode = merged_root_directory.directories[0].clone();
     let merged_child_dirnode_digest: Result<Digest, String> =
       merged_child_dirnode.get_digest().into();
-    let merged_child_directory = store
-      .load_directory(merged_child_dirnode_digest.unwrap())
-      .wait()
+    let merged_child_directory = runtime
+      .block_on(store.load_directory(merged_child_dirnode_digest.unwrap()))
       .unwrap()
       .unwrap()
       .0;
@@ -883,7 +888,7 @@ mod tests {
 
   #[test]
   fn snapshot_merge_colliding() {
-    let (store, tempdir, _, digester, _runtime) = setup();
+    let (store, tempdir, _, digester, mut runtime) = setup();
 
     let file = make_file_stat(
       tempdir.path(),
@@ -892,15 +897,23 @@ mod tests {
       false,
     );
 
-    let merged_res = {
-      let snapshot1 = Snapshot::from_path_stats(store.clone(), &digester, vec![file.clone()])
-        .wait()
-        .unwrap();
-      let snapshot2 = Snapshot::from_path_stats(store.clone(), &digester, vec![file])
-        .wait()
-        .unwrap();
-      Snapshot::merge(store.clone(), &[snapshot1, snapshot2]).wait()
-    };
+    let snapshot1 = runtime
+      .block_on(Snapshot::from_path_stats(
+        store.clone(),
+        &digester,
+        vec![file.clone()],
+      ))
+      .unwrap();
+
+    let snapshot2 = runtime
+      .block_on(Snapshot::from_path_stats(
+        store.clone(),
+        &digester,
+        vec![file],
+      ))
+      .unwrap();
+
+    let merged_res = Snapshot::merge(store.clone(), &[snapshot1, snapshot2]).wait();
 
     match merged_res {
       Err(ref msg) if msg.contains("contained duplicate path") && msg.contains("roland") => (),
@@ -1076,19 +1089,23 @@ mod tests {
     )
   }
 
-  fn expand_all_sorted(posix_fs: Arc<PosixFS>) -> Vec<PathStat> {
-    let mut v = posix_fs
-      .expand(
-        // Don't error or warn if there are no paths matched -- that is a valid state.
-        PathGlobs::create(
-          &["**".to_owned()],
-          &[],
-          StrictGlobMatching::Ignore,
-          GlobExpansionConjunction::AllMatch,
-        )
-        .unwrap(),
+  fn expand_all_sorted(
+    posix_fs: Arc<PosixFS>,
+    runtime: &mut tokio::runtime::Runtime,
+  ) -> Vec<PathStat> {
+    let mut v = runtime
+      .block_on(
+        posix_fs.expand(
+          // Don't error or warn if there are no paths matched -- that is a valid state.
+          PathGlobs::create(
+            &["**".to_owned()],
+            &[],
+            StrictGlobMatching::Ignore,
+            GlobExpansionConjunction::AllMatch,
+          )
+          .unwrap(),
+        ),
       )
-      .wait()
       .unwrap();
     v.sort_by(|a, b| a.path().cmp(b.path()));
     v

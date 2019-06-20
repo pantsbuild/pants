@@ -8,15 +8,16 @@ use bazel_protos;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use digest::{Digest as DigestTrait, FixedOutput};
-use fs::{self, File, PathStat, Store};
+use fs::{self, File, PathStat};
 use futures::{future, Future, Stream};
-use futures_timer::Delay;
 use grpcio;
 use hashing::{Digest, Fingerprint};
 use log::{debug, trace, warn};
 use protobuf::{self, Message, ProtobufEnum};
 use sha2::Sha256;
+use store::{Snapshot, Store, StoreFileByDigest};
 use time;
+use tokio_timer::Delay;
 
 use super::{ExecuteProcessRequest, ExecutionStats, FallibleExecuteProcessResult};
 use std;
@@ -45,7 +46,6 @@ pub struct CommandRunner {
   execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
   operations_client: Arc<bazel_protos::operations_grpc::OperationsClient>,
   store: Store,
-  futures_timer_thread: Arc<futures_timer::HelperThread>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -153,7 +153,6 @@ impl super::CommandRunner for CommandRunner {
         let command_runner3 = self.clone();
         let execute_request = Arc::new(execute_request);
         let execute_request2 = execute_request.clone();
-        let futures_timer_thread = self.futures_timer_thread.clone();
 
         let store2 = store.clone();
         let mut history = ExecutionHistory::default();
@@ -188,7 +187,6 @@ impl super::CommandRunner for CommandRunner {
                 let operations_client = operations_client.clone();
                 let command_runner2 = command_runner2.clone();
                 let command_runner3 = command_runner3.clone();
-                let futures_timer_thread = futures_timer_thread.clone();
                 let f = command_runner2.extract_execute_response(operation, &mut history);
                 f.map(future::Loop::Break).or_else(move |value| {
                   match value {
@@ -246,32 +244,32 @@ impl super::CommandRunner for CommandRunner {
                         .to_boxed()
                       } else {
                         // maybe the delay here should be the min of remaining time and the backoff period
-                        Delay::new_handle(
-                          Instant::now() + Duration::from_millis(backoff_period),
-                          futures_timer_thread.handle(),
-                        )
-                        .map_err(move |e| {
-                          format!(
-                            "Future-Delay errored at operation result polling for {}, {}: {}",
-                            operation_name, description, e
-                          )
-                        })
-                        .and_then(move |_| {
-                          future::done(
-                            operations_client
-                              .get_operation_opt(&operation_request, command_runner3.call_option())
-                              .or_else(move |err| {
-                                rpcerror_recover_cancelled(operation_request.take_name(), err)
-                              })
-                              .map(OperationOrStatus::Operation)
-                              .map_err(rpcerror_to_string),
-                          )
-                          .map(move |operation| {
-                            future::Loop::Continue((history, operation, iter_num + 1))
+                        Delay::new(Instant::now() + Duration::from_millis(backoff_period))
+                          .map_err(move |e| {
+                            format!(
+                              "Future-Delay errored at operation result polling for {}, {}: {}",
+                              operation_name, description, e
+                            )
+                          })
+                          .and_then(move |_| {
+                            future::done(
+                              operations_client
+                                .get_operation_opt(
+                                  &operation_request,
+                                  command_runner3.call_option(),
+                                )
+                                .or_else(move |err| {
+                                  rpcerror_recover_cancelled(operation_request.take_name(), err)
+                                })
+                                .map(OperationOrStatus::Operation)
+                                .map_err(rpcerror_to_string),
+                            )
+                            .map(move |operation| {
+                              future::Loop::Continue((history, operation, iter_num + 1))
+                            })
+                            .to_boxed()
                           })
                           .to_boxed()
-                        })
-                        .to_boxed()
                       }
                     }
                   }
@@ -312,7 +310,6 @@ impl CommandRunner {
     platform_properties: BTreeMap<String, String>,
     thread_count: usize,
     store: Store,
-    futures_timer_thread: Arc<futures_timer::HelperThread>,
   ) -> CommandRunner {
     let env = Arc::new(grpcio::Environment::new(thread_count));
     let channel = {
@@ -343,7 +340,6 @@ impl CommandRunner {
       execution_client,
       operations_client,
       store,
-      futures_timer_thread,
     }
   }
 
@@ -696,7 +692,7 @@ impl CommandRunner {
       }
     }
 
-    impl fs::StoreFileByDigest<String> for StoreOneOffRemoteDigest {
+    impl StoreFileByDigest<String> for StoreOneOffRemoteDigest {
       fn store_by_digest(&self, file: File) -> BoxFuture<Digest, String> {
         match self.map_of_paths_to_digests.get(&file.path) {
           Some(digest) => future::ok(*digest),
@@ -710,7 +706,7 @@ impl CommandRunner {
     }
 
     let store = self.store.clone();
-    fs::Snapshot::digest_from_path_stats(
+    Snapshot::digest_from_path_stats(
       self.store.clone(),
       &StoreOneOffRemoteDigest::new(path_map),
       &path_stats,
@@ -724,7 +720,7 @@ impl CommandRunner {
     .join(future::join_all(directory_digests))
     .and_then(|(files_digest, mut directory_digests)| {
       directory_digests.push(files_digest);
-      fs::Snapshot::merge_directories(store, directory_digests).map_err(|err| {
+      Snapshot::merge_directories(store, directory_digests).map_err(|err| {
         ExecutionError::Fatal(format!(
           "Error when merging output files and directories: {}",
           err
@@ -908,12 +904,12 @@ fn timespec_from(timestamp: &protobuf::well_known_types::Timestamp) -> time::Tim
 mod tests {
   use bazel_protos;
   use bytes::Bytes;
-  use fs;
   use futures::Future;
   use grpcio;
-  use hashing::{Digest, Fingerprint};
+  use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
   use mock;
   use protobuf::{self, Message, ProtobufEnum};
+  use store::Store;
   use tempfile::TempDir;
   use testutil::data::{TestData, TestDirectory};
   use testutil::{as_bytes, owned_string_vec};
@@ -928,7 +924,6 @@ mod tests {
   use std::iter::{self, FromIterator};
   use std::ops::Sub;
   use std::path::PathBuf;
-  use std::sync::Arc;
   use std::time::Duration;
 
   #[derive(Debug, PartialEq)]
@@ -1312,7 +1307,7 @@ mod tests {
           &ExecuteProcessRequest {
             argv: owned_string_vec(&["/bin/echo", "-n", "bar"]),
             env: BTreeMap::new(),
-            input_files: fs::EMPTY_DIGEST,
+            input_files: EMPTY_DIGEST,
             output_files: BTreeSet::new(),
             output_directories: BTreeSet::new(),
             timeout: Duration::from_millis(1000),
@@ -1368,7 +1363,7 @@ mod tests {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_directory: EMPTY_DIGEST,
         execution_attempts: vec![],
       }
     );
@@ -1397,7 +1392,7 @@ mod tests {
         stdout: testdata.bytes(),
         stderr: testdata_empty.bytes(),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_directory: EMPTY_DIGEST,
         execution_attempts: vec![],
       }
     );
@@ -1426,7 +1421,7 @@ mod tests {
         stdout: testdata_empty.bytes(),
         stderr: testdata.bytes(),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_directory: EMPTY_DIGEST,
         execution_attempts: vec![],
       }
     );
@@ -1434,6 +1429,8 @@ mod tests {
 
   #[test]
   fn ensure_inline_stdio_is_stored() {
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+
     let test_stdout = TestData::roland();
     let test_stderr = TestData::catnip();
 
@@ -1458,10 +1455,8 @@ mod tests {
     let store_dir_path = store_dir.path();
 
     let cas = mock::StubCAS::empty();
-    let timer_thread = timer_thread();
-    let store = fs::Store::with_remote(
+    let store = Store::with_remote(
       &store_dir_path,
-      Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       &[cas.address()],
       None,
       &None,
@@ -1469,9 +1464,8 @@ mod tests {
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
-      fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      timer_thread.handle(),
     )
     .expect("Failed to make store");
 
@@ -1484,39 +1478,34 @@ mod tests {
       BTreeMap::new(),
       1,
       store,
-      timer_thread,
     );
-    let result = cmd_runner.run(echo_roland_request()).wait().unwrap();
+    let result = runtime
+      .block_on(cmd_runner.run(echo_roland_request()))
+      .unwrap();
     assert_eq!(
       result.without_execution_attempts(),
       FallibleExecuteProcessResult {
         stdout: test_stdout.bytes(),
         stderr: test_stderr.bytes(),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_directory: EMPTY_DIGEST,
         execution_attempts: vec![],
       }
     );
 
-    let local_store = fs::Store::local_only(
-      &store_dir_path,
-      Arc::new(fs::ResettablePool::new("test-pool-".to_string())),
-    )
-    .expect("Error creating local store");
+    let local_store = Store::local_only(&store_dir_path).expect("Error creating local store");
     {
       assert_eq!(
-        local_store
-          .load_file_bytes_with(test_stdout.digest(), |v| v)
-          .wait()
+        runtime
+          .block_on(local_store.load_file_bytes_with(test_stdout.digest(), |v| v))
           .unwrap()
           .unwrap()
           .0,
         test_stdout.bytes()
       );
       assert_eq!(
-        local_store
-          .load_file_bytes_with(test_stderr.digest(), |v| v)
-          .wait()
+        runtime
+          .block_on(local_store.load_file_bytes_with(test_stderr.digest(), |v| v))
           .unwrap()
           .unwrap()
           .0,
@@ -1558,7 +1547,7 @@ mod tests {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_directory: EMPTY_DIGEST,
         execution_attempts: vec![],
       }
     );
@@ -1572,7 +1561,7 @@ mod tests {
     let execute_request = ExecuteProcessRequest {
       argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
       env: BTreeMap::new(),
-      input_files: fs::EMPTY_DIGEST,
+      input_files: EMPTY_DIGEST,
       output_files: BTreeSet::new(),
       output_directories: BTreeSet::new(),
       timeout: request_timeout,
@@ -1634,7 +1623,7 @@ mod tests {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_directory: EMPTY_DIGEST,
         execution_attempts: vec![],
       }
     );
@@ -1802,6 +1791,8 @@ mod tests {
 
   #[test]
   fn execute_missing_file_uploads_if_known() {
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+
     let roland = TestData::roland();
 
     let mock_server = {
@@ -1831,10 +1822,8 @@ mod tests {
     let cas = mock::StubCAS::builder()
       .directory(&TestDirectory::containing_roland())
       .build();
-    let timer_thread = timer_thread();
-    let store = fs::Store::with_remote(
+    let store = Store::with_remote(
       store_dir,
-      Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       &[cas.address()],
       None,
       &None,
@@ -1842,21 +1831,17 @@ mod tests {
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
-      fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      timer_thread.handle(),
     )
     .expect("Failed to make store");
-    store
-      .store_file_bytes(roland.bytes(), false)
-      .wait()
+    runtime
+      .block_on(store.store_file_bytes(roland.bytes(), false))
       .expect("Saving file bytes to store");
-    store
-      .record_directory(&TestDirectory::containing_roland().directory(), false)
-      .wait()
+    runtime
+      .block_on(store.record_directory(&TestDirectory::containing_roland().directory(), false))
       .expect("Saving directory bytes to store");
-
-    let result = CommandRunner::new(
+    let command_runner = CommandRunner::new(
       &mock_server.address(),
       None,
       None,
@@ -1865,18 +1850,18 @@ mod tests {
       BTreeMap::new(),
       1,
       store,
-      timer_thread,
-    )
-    .run(cat_roland_request())
-    .wait()
-    .unwrap();
+    );
+
+    let result = runtime
+      .block_on(command_runner.run(cat_roland_request()))
+      .unwrap();
     assert_eq!(
       result.without_execution_attempts(),
       FallibleExecuteProcessResult {
         stdout: roland.bytes(),
         stderr: Bytes::from(""),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_directory: EMPTY_DIGEST,
         execution_attempts: vec![],
       }
     );
@@ -1932,10 +1917,8 @@ mod tests {
     let cas = mock::StubCAS::builder()
       .directory(&TestDirectory::containing_roland())
       .build();
-    let timer_thread = timer_thread();
-    let store = fs::Store::with_remote(
+    let store = Store::with_remote(
       store_dir,
-      Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       &[cas.address()],
       None,
       &None,
@@ -1943,9 +1926,8 @@ mod tests {
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
-      fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      timer_thread.handle(),
     )
     .expect("Failed to make store");
     store
@@ -1962,7 +1944,6 @@ mod tests {
       BTreeMap::new(),
       1,
       store,
-      timer_thread,
     )
     .run(cat_roland_request())
     .wait();
@@ -1972,7 +1953,7 @@ mod tests {
         stdout: roland.bytes(),
         stderr: Bytes::from(""),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_directory: EMPTY_DIGEST,
         execution_attempts: vec![],
       })
     );
@@ -2005,10 +1986,8 @@ mod tests {
       .file(&TestData::roland())
       .directory(&TestDirectory::containing_roland())
       .build();
-    let timer_thread = timer_thread();
-    let store = fs::Store::with_remote(
+    let store = Store::with_remote(
       store_dir,
-      Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       &[cas.address()],
       None,
       &None,
@@ -2016,13 +1995,13 @@ mod tests {
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
-      fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      timer_thread.handle(),
     )
     .expect("Failed to make store");
 
-    let error = CommandRunner::new(
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    let runner = CommandRunner::new(
       &mock_server.address(),
       None,
       None,
@@ -2031,11 +2010,11 @@ mod tests {
       BTreeMap::new(),
       1,
       store,
-      timer_thread,
-    )
-    .run(cat_roland_request())
-    .wait()
-    .expect_err("Want error");
+    );
+
+    let error = runtime
+      .block_on(runner.run(cat_roland_request()))
+      .expect_err("Want error");
     assert_contains(&error, &format!("{}", missing_digest.0));
   }
 
@@ -2492,7 +2471,7 @@ mod tests {
     ExecuteProcessRequest {
       argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
       env: BTreeMap::new(),
-      input_files: fs::EMPTY_DIGEST,
+      input_files: EMPTY_DIGEST,
       output_files: BTreeSet::new(),
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(5000),
@@ -2608,15 +2587,14 @@ mod tests {
       .directory(&TestDirectory::containing_roland())
       .build();
     let command_runner = create_command_runner(address, &cas);
-    command_runner.run(request).wait()
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    runtime.block_on(command_runner.run(request))
   }
 
   fn create_command_runner(address: String, cas: &mock::StubCAS) -> CommandRunner {
     let store_dir = TempDir::new().unwrap();
-    let timer_thread = timer_thread();
-    let store = fs::Store::with_remote(
+    let store = Store::with_remote(
       store_dir,
-      Arc::new(fs::ResettablePool::new("test-pool-".to_owned())),
       &[cas.address()],
       None,
       &None,
@@ -2624,27 +2602,12 @@ mod tests {
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
-      fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
-      timer_thread.handle(),
     )
     .expect("Failed to make store");
 
-    CommandRunner::new(
-      &address,
-      None,
-      None,
-      None,
-      None,
-      BTreeMap::new(),
-      1,
-      store,
-      timer_thread,
-    )
-  }
-
-  fn timer_thread() -> Arc<futures_timer::HelperThread> {
-    Arc::new(futures_timer::HelperThread::new().unwrap())
+    CommandRunner::new(&address, None, None, None, None, BTreeMap::new(), 1, store)
   }
 
   fn extract_execute_response(
@@ -2655,12 +2618,13 @@ mod tests {
       .directory(&TestDirectory::containing_roland())
       .build();
     let command_runner = create_command_runner("".to_owned(), &cas);
-    command_runner
-      .extract_execute_response(
-        super::OperationOrStatus::Operation(operation),
-        &mut ExecutionHistory::default(),
-      )
-      .wait()
+
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+
+    runtime.block_on(command_runner.extract_execute_response(
+      super::OperationOrStatus::Operation(operation),
+      &mut ExecutionHistory::default(),
+    ))
   }
 
   fn extract_output_files_from_response(
@@ -2671,9 +2635,9 @@ mod tests {
       .directory(&TestDirectory::containing_roland())
       .build();
     let command_runner = create_command_runner("".to_owned(), &cas);
-    command_runner
-      .extract_output_files(&execute_response)
-      .wait()
+
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    runtime.block_on(command_runner.extract_output_files(&execute_response))
   }
 
   fn make_any_proto(message: &dyn Message) -> protobuf::well_known_types::Any {
@@ -2723,7 +2687,7 @@ mod tests {
     ExecuteProcessRequest {
       argv: owned_string_vec(&["/bin/echo", "meoooow"]),
       env: BTreeMap::new(),
-      input_files: fs::EMPTY_DIGEST,
+      input_files: EMPTY_DIGEST,
       output_files: BTreeSet::new(),
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),

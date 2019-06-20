@@ -34,14 +34,15 @@ members = [
   "fs",
   "fs/brfs",
   "fs/fs_util",
+  "fs/store",
   "graph",
   "hashing",
   "logging",
   "process_execution",
   "process_executor",
-  "resettable",
   "rule_graph",
   "serverset",
+  "sharded_lmdb",
   "tar_api",
   "testutil",
   "testutil/mock",
@@ -64,14 +65,15 @@ default-members = [
   "boxfuture",
   "fs",
   "fs/fs_util",
+  "fs/store",
   "graph",
   "hashing",
   "logging",
   "process_execution",
   "process_executor",
-  "resettable",
   "rule_graph",
   "serverset",
+  "sharded_lmdb",
   "tar_api",
   "testutil",
   "testutil/mock",
@@ -86,8 +88,6 @@ bytes = "0.4.5"
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures = "0.1.27"
-# TODO: Switch to a release once https://github.com/alexcrichton/futures-timer/pull/11 and https://github.com/alexcrichton/futures-timer/pull/12 merge
-futures-timer = { git = "https://github.com/pantsbuild/futures-timer", rev = "0b747e565309a58537807ab43c674d8951f9e5a0" }
 graph = { path = "graph" }
 hashing = { path = "hashing" }
 indexmap = "1.0.2"
@@ -99,9 +99,9 @@ parking_lot = "0.6"
 process_execution = { path = "process_execution" }
 rand = "0.6"
 reqwest = { version = "0.9.10", default_features = false, features = ["rustls-tls"] }
-resettable = { path = "resettable" }
 rule_graph = { path = "rule_graph" }
 smallvec = "0.6"
+store = { path = "fs/store" }
 tokio = "0.1"
 tempfile = "3"
 ui = { path = "ui" }
