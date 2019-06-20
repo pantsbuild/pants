@@ -30,10 +30,19 @@ def check_authentication_setup() -> None:
 def deploy() -> None:
   # NB: we use the sync command to avoid transferring files that have not changed. See
   # https://github.com/pantsbuild/pants/issues/7258.
-  subprocess.run(
-    ["aws", "s3", "sync", "--acl", "public-read", "dist/deploy", "s3://binaries.pantsbuild.org"],
-    check=True
-  )
+  subprocess.run([
+    "aws",
+    "s3",
+    "sync",
+    # This instructs the sync command to ignore timestamps, which we must do to allow distinct
+    # shards—which may finish building their wheels at different times—to not overwrite
+    # otherwise-identical wheels.
+    "--size-only",
+    "--acl",
+    "public-read",
+    "dist/deploy",
+    "s3://binaries.pantsbuild.org"
+  ], check=True)
 
 
 if __name__ == '__main__':
