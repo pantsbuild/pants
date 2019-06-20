@@ -40,7 +40,6 @@ members = [
   "logging",
   "process_execution",
   "process_executor",
-  "resettable",
   "rule_graph",
   "serverset",
   "sharded_lmdb",
@@ -72,7 +71,6 @@ default-members = [
   "logging",
   "process_execution",
   "process_executor",
-  "resettable",
   "rule_graph",
   "serverset",
   "sharded_lmdb",
@@ -101,7 +99,6 @@ parking_lot = "0.6"
 process_execution = { path = "process_execution" }
 rand = "0.6"
 reqwest = { version = "0.9.10", default_features = false, features = ["rustls-tls"] }
-resettable = { path = "resettable" }
 rule_graph = { path = "rule_graph" }
 smallvec = "0.6"
 store = { path = "fs/store" }
