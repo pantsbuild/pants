@@ -1182,29 +1182,29 @@ mod local {
         EntryType::File => self.inner.file_dbs.clone(),
       };
 
-      futures::future::poll_fn(move || tokio_threadpool::blocking( || {
-                let (env, db, _) = dbs.clone()?.get(&digest.0);
-                let ro_txn = env
-                    .begin_ro_txn()
-                    .map_err(|err| format!("Failed to begin read transaction: {}", err));
-                ro_txn.and_then(|txn| match txn.get(db, &digest.0) {
-                    Ok(bytes) => {
-                        if bytes.len() == digest.1 {
-                            Ok(Some(f(Bytes::from(bytes))))
-                        } else {
-                            error!("Got hash collision reading from store - digest {:?} was requested, but retrieved bytes with that fingerprint had length {}. Congratulations, you may have broken sha256! Underlying bytes: {:?}", digest, bytes.len(), bytes);
-                            Ok(None)
-                        }
-                    }
-                    Err(NotFound) => Ok(None),
-                    Err(err) => Err(format!("Error loading digest {:?}: {}", digest, err,)),
-                })
-            })).then(|blocking_result| {
-                match blocking_result {
-                    Ok(v) => v,
-                    Err(blocking_err) => Err(format!("Unable to run blocking task to load_bytes in local ByteStore on tokio runtime: {}", blocking_err)),
-                }
-            }).to_boxed()
+      futures::future::poll_fn(move || tokio_threadpool::blocking(|| {
+        let (env, db, _) = dbs.clone()?.get(&digest.0);
+        let ro_txn = env
+            .begin_ro_txn()
+            .map_err(|err| format!("Failed to begin read transaction: {}", err));
+        ro_txn.and_then(|txn| match txn.get(db, &digest.0) {
+          Ok(bytes) => {
+            if bytes.len() == digest.1 {
+              Ok(Some(f(Bytes::from(bytes))))
+            } else {
+              error!("Got hash collision reading from store - digest {:?} was requested, but retrieved bytes with that fingerprint had length {}. Congratulations, you may have broken sha256! Underlying bytes: {:?}", digest, bytes.len(), bytes);
+              Ok(None)
+            }
+          }
+          Err(NotFound) => Ok(None),
+          Err(err) => Err(format!("Error loading digest {:?}: {}", digest, err, )),
+        })
+      })).then(|blocking_result| {
+        match blocking_result {
+          Ok(v) => v,
+          Err(blocking_err) => Err(format!("Unable to run blocking task to load_bytes in local ByteStore on tokio runtime: {}", blocking_err)),
+        }
+      }).to_boxed()
     }
   }
 
