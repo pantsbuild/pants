@@ -28,6 +28,7 @@
 
 use boxfuture::BoxFuture;
 use bytes::Bytes;
+use derivative::Derivative;
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::AddAssign;
 use std::path::PathBuf;
@@ -43,7 +44,7 @@ pub mod remote;
 ///
 /// A process to be executed.
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Derivative, Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ExecuteProcessRequest {
   ///
   /// The arguments to execute.
