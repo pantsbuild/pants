@@ -49,11 +49,6 @@ use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
 
-// This is the maximum size any particular local LMDB store file is allowed to grow to.
-// It doesn't reflect space allocated on disk, or RAM allocated (it may be reflected in VIRT but
-// not RSS). There is no practical upper bound on this number, so we set it ridiculously high.
-const MAX_LOCAL_STORE_SIZE_BYTES: usize = 1024 * 1024 * 1024 * 1024 / 10;
-
 // This is the target number of bytes which should be present in all combined LMDB store files
 // after garbage collection. We almost certainly want to make this configurable.
 pub const DEFAULT_LOCAL_STORE_GC_TARGET_BYTES: usize = 4 * 1024 * 1024 * 1024;
@@ -877,8 +872,6 @@ mod local {
   use std::sync::Arc;
   use std::time;
 
-  use super::MAX_LOCAL_STORE_SIZE_BYTES;
-
   #[derive(Clone)]
   pub struct ByteStore {
     inner: Arc<InnerStore>,
@@ -899,7 +892,17 @@ mod local {
       let directories_root = root.join("directories");
       Ok(ByteStore {
         inner: Arc::new(InnerStore {
-          file_dbs: ShardedLmdb::new(files_root.clone(), MAX_LOCAL_STORE_SIZE_BYTES).map(Arc::new),
+          // We want these stores to be allowed to grow very large, in case we are on a system with
+          // large disks which doesn't want to GC a lot.
+          // It doesn't reflect space allocated on disk, or RAM allocated (it may be reflected in
+          // VIRT but not RSS). There is no practical upper bound on this number, so we set them
+          // ridiculously high.
+          // However! We set them lower than we'd otherwise choose because sometimes we see tests on
+          // travis fail because they can't allocate virtual memory, if there are multiple Stores
+          // in memory at the same time. We don't know why they're not efficiently garbage collected
+          // by python, but they're not, so...
+          file_dbs: ShardedLmdb::new(files_root.clone(), 1024 * 1024 * 1024 * 1024 / 10)
+            .map(Arc::new),
           directory_dbs: ShardedLmdb::new(directories_root.clone(), 5 * 1024 * 1024 * 1024)
             .map(Arc::new),
         }),

@@ -47,6 +47,11 @@ pub struct ShardedLmdb {
 }
 
 impl ShardedLmdb {
+  // max_size is the maximum size the databases together will be allowed to grow to.
+  // When calling this function, we will attempt to allocate that much virtual (not resident) memory
+  // for the mmap; in theory it should be possible not to bound this, but in practice we see travis
+  // occasionally fail tests because it's unable to allocate virtual memory if we set this too high,
+  // and we have too many tests running concurrently or close together.
   pub fn new(root_path: PathBuf, max_size: usize) -> Result<ShardedLmdb, String> {
     trace!("Initializing ShardedLmdb at root {:?}", root_path);
     let mut lmdbs = HashMap::new();
