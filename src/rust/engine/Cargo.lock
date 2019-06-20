@@ -2194,11 +2194,14 @@ dependencies = [
 name = "sharded_lmdb"
 version = "0.0.1"
 dependencies = [
+ "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "fs 0.0.1",
+ "futures 0.1.27 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashing 0.0.1",
  "lmdb 0.8.0 (git+https://github.com/pantsbuild/lmdb-rs.git?rev=06bdfbfc6348f6804127176e561843f214fc17f8)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 3.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio-threadpool 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
