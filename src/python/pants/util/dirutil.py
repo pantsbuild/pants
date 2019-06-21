@@ -320,10 +320,8 @@ def safe_rmtree_recursive(directory):
   :API: public
   """
   if os.path.islink(directory):
-    safe_delete(directory)
-  else:
     directory = os.path.join(directory, os.sep)
-    shutil.rmtree(directory, ignore_errors=True)
+  shutil.rmtree(directory, ignore_errors=True)
 
 
 def safe_open(filename, *args, **kwargs):
