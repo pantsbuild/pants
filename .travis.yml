@@ -31,7 +31,10 @@ env:
     - PYENV_ROOT="${PYENV_ROOT:-${HOME}/.pants_pyenv}"
     - PATH="${PYENV_ROOT}/shims:${PATH}"
     - AWS_CLI_ROOT="${HOME}/.aws_cli"
-    - AWS_ACCESS_KEY_ID=AKIAV6A6G7RQWPRUWIXR
+    # NB: We use this verbose name so that AWS does not pick up the env var $AWS_ACCESS_KEY_ID on
+    # pull request builds. We only want this value to be populated on branch builds. Users of this
+    # env var (e.g. `deploy_to_s3.py`) are expected to re-export the env var as $AWS_ACCESS_KEY_ID.
+    - AWS_ACCESS_KEY_ID__TO_BE_REEXPORTED_ON_DEPLOYS=AKIAV6A6G7RQWPRUWIXR
     # This stores the encrypted AWS secret access key with the env var AWS_SECRET_ACCESS_KEY.
     # Travis converts it back into its original decrypted value when ran in CI, per
     # https://docs.travis-ci.com/user/environment-variables#defining-encrypted-variables-in-travisyml.

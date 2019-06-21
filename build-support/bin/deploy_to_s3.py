@@ -12,7 +12,7 @@ from common import die
 def main() -> None:
   if shutil.which("aws") is None:
     install_aws_cli()
-  check_authentication_setup()
+  setup_authentication()
   deploy()
 
 
@@ -20,11 +20,13 @@ def install_aws_cli() -> None:
   subprocess.run(["./build-support/bin/install_aws_cli_for_ci.sh"], check=True)
 
 
-def check_authentication_setup() -> None:
-  access_key_id = "AWS_ACCESS_KEY_ID"
+def setup_authentication() -> None:
+  access_key_id = "AWS_ACCESS_KEY_ID__TO_BE_REEXPORTED_ON_DEPLOYS"
   secret_access_key = "AWS_SECRET_ACCESS_KEY"
   if access_key_id not in os.environ or secret_access_key not in os.environ:
     die(f"Caller of the script must set both {access_key_id} and {secret_access_key}.")
+  # Properly export the value so that AWS picks it up.
+  os.environ["AWS_ACESS_KEY_ID"] = os.environ[access_key_id]
 
 
 def deploy() -> None:
