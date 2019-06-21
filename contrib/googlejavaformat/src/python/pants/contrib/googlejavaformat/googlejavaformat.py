@@ -1,7 +1,7 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from abc import abstractproperty
+from abc import abstractmethod
 
 from pants.backend.jvm.tasks.rewrite_base import RewriteBase
 from pants.base.exceptions import TaskError
@@ -44,7 +44,8 @@ class GoogleJavaFormatBase(RewriteBase):
                         workunit_name='google-java-format',
                         jvm_options=self.get_options().jvm_options)
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def additional_args(self):
     """List of additional args to supply on the tool command-line."""
 

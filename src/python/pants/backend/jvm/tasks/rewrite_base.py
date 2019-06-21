@@ -3,7 +3,7 @@
 
 import os
 import shutil
-from abc import ABCMeta, abstractmethod, abstractproperty
+from abc import ABCMeta, abstractmethod
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
@@ -101,7 +101,8 @@ class RewriteBase(NailgunTask, metaclass=ABCMeta):
     Returns the UNIX return code of the tool.
     """
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def sideeffecting(self):
     """True if this command has sideeffects: ie, mutates the working copy."""
 

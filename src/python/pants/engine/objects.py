@@ -3,7 +3,7 @@
 
 import inspect
 import sys
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from builtins import object
 from collections import namedtuple
 
@@ -21,7 +21,8 @@ class SerializationError(Exception):
 class Resolvable(ABC):
   """Represents a resolvable object."""
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def address(self):
     """Return the opaque address descriptor that this resolvable resolves."""
 

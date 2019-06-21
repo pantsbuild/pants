@@ -1,7 +1,7 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from abc import ABC, abstractproperty
+from abc import ABC, abstractmethod
 
 from future.utils import text_type
 
@@ -74,7 +74,8 @@ class MirroredTargetOptionMixin(ABC):
   3. Otherwise, return the option value from the environment, config, or hardcoded default.
   """
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def mirrored_target_option_actions(self):
     """Subclasses should override and return a dict of (subsystem option name) -> selector function.
 

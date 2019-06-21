@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 
 from pants.engine.rules import rule
 from pants.util.memo import memoized_classproperty
@@ -20,13 +20,10 @@ class Platform(enum(all_normalized_os_names())):
 
 
 def _list_field(func):
-  """A decorator for methods corresponding to list-valued fields of an `ExtensibleAlgebraic`.
-
-  The result is also wrapped in `abstractproperty`.
-  """
-  wrapped = abstractproperty(func)
+  """A decorator for methods corresponding to list-valued fields of an `ExtensibleAlgebraic`."""
+  wrapped = abstractmethod(func)
   wrapped._field_type = 'list'
-  return wrapped
+  return property(wrapped)
 
 
 def _algebraic_data(metaclass):
@@ -129,7 +126,8 @@ class _Executable(_ExtensibleAlgebraic):
     :rtype: list of str
     """
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def exe_filename(self):
     """The "entry point" -- which file to invoke when PATH is set to `path_entries()`.
 

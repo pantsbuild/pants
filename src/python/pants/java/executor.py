@@ -4,7 +4,7 @@
 import logging
 import os
 import sys
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from builtins import object
 from contextlib import contextmanager
 
@@ -45,7 +45,8 @@ class Executor(ABC):
   class Runner(object):
     """A re-usable executor that can run a configured java command line."""
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def executor(self):
       """Returns the executor this runner uses to run itself."""
       raise NotImplementedError
@@ -55,7 +56,8 @@ class Executor(ABC):
       """Returns a string representation of the command that will be run."""
       return ' '.join(self.command)
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def command(self):
       """Returns a copy of the command line that will be run as a list of command line tokens."""
       raise NotImplementedError

@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from builtins import zip
 
 from future.utils import binary_type, text_type
@@ -247,7 +247,7 @@ class ChoicesMixin(ABC):
   """A mixin which declares that the type has a fixed set of possible instances."""
 
   @classproperty
-  @abstractproperty
+  @abstractmethod
   def all_variants(cls):
     """Return an iterable containing a de-duplicated list of all possible instances of this type."""
 

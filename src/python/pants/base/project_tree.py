@@ -3,7 +3,7 @@
 
 import logging
 import os
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 
 from pathspec.pathspec import PathSpec
 from pathspec.patterns.gitwildmatch import GitWildMatchPattern
@@ -200,7 +200,8 @@ class Stat(ABC):
   instantiate Stat instances.
   """
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def path(self):
     """:returns: The string path for this Stat."""
 

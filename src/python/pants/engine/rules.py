@@ -6,7 +6,7 @@ import inspect
 import itertools
 import logging
 import sys
-from abc import ABC, abstractproperty
+from abc import ABC, abstractmethod
 
 import asttokens
 from twitter.common.collections import OrderedSet
@@ -324,11 +324,13 @@ class Rule(ABC):
   as factories for constructing the nodes within the graph.
   """
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def output_type(self):
     """An output `type` for the rule."""
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def dependency_rules(self):
     """A tuple of @rules that are known to be necessary to run this rule.
 
@@ -336,7 +338,8 @@ class Rule(ABC):
     form a loosely coupled RuleGraph: this facility exists only to assist with boilerplate removal.
     """
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def dependency_optionables(self):
     """A tuple of Optionable classes that are known to be necessary to run this rule."""
     return ()

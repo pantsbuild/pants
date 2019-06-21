@@ -1,7 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from abc import abstractproperty
 from builtins import object
 
 
@@ -32,7 +31,7 @@ class ClassPropertyDescriptor(object):
       objtype = type(obj)
       # Get the callable field for this object, which may be a property.
     callable_field = self.fget.__get__(obj, objtype)
-    if isinstance(self.fget.__func__, abstractproperty):
+    if getattr(self.fget.__func__, '__isabstractmethod__', False):
       field_name = self.fget.__func__.fget.__name__
       raise TypeError("""\
 The classproperty '{func_name}' in type '{type_name}' was an abstractproperty, meaning that type \
@@ -104,7 +103,4 @@ def staticproperty(func):
 # TODO: look into merging this with `enum` and `ChoicesMixin`, which describe a fixed set of
 # singletons, to decouple the enum interface from the implementation as a `datatype`.
 # Extend Singleton and your class becomes a singleton, each construction returns the same instance.
-try:  # Python3
-  Singleton = SingletonMetaclass(u'Singleton', (object,), {})
-except TypeError:  # Python2
-  Singleton = SingletonMetaclass(b'Singleton', (object,), {})
+Singleton = SingletonMetaclass('Singleton', (object,), {})
