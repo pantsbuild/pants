@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from abc import ABCMeta, abstractproperty
+from abc import abstractproperty
 from builtins import object
 
 
@@ -111,10 +111,3 @@ try:  # Python3
   Singleton = SingletonMetaclass(u'Singleton', (object,), {})
 except TypeError:  # Python2
   Singleton = SingletonMetaclass(b'Singleton', (object,), {})
-
-
-# Abstract base classes w/o __metaclass__ or meta =, just extend AbstractClass.
-try:  # Python3
-  AbstractClass = ABCMeta(u'AbstractClass', (object,), {})
-except TypeError:  # Python2
-  AbstractClass = ABCMeta(b'AbstractClass', (object,), {})

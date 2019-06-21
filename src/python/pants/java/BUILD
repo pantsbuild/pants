@@ -11,7 +11,6 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:meta',
     'src/python/pants/util:process_handler',
   ]
 )
@@ -45,7 +44,6 @@ python_library(
   dependencies = [
     '3rdparty/python:future',
     '3rdparty/python:six',
-    'src/python/pants/util:meta',
     'src/python/pants/util:objects',
     'src/python/pants/util:osutil',
   ]

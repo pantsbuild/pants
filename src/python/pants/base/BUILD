@@ -24,7 +24,6 @@ python_library(
     ':build_environment',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
-    'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ]
 )
@@ -36,7 +35,6 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:pathspec',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:meta',
     ':project_tree',
   ]
 )
@@ -44,9 +42,6 @@ python_library(
 python_library(
   name = 'build_file_target_factory',
   sources = ['build_file_target_factory.py'],
-  dependencies = [
-    'src/python/pants/util:meta',
-  ]
 )
 
 python_library(
@@ -95,7 +90,6 @@ python_library(
   dependencies = [
     '3rdparty/python:future',
     ':deprecated',
-    'src/python/pants/util:meta',
   ]
 )
 
@@ -154,7 +148,6 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':deprecated',
     ':hash_utils',
-    'src/python/pants/util:meta',
   ]
 )
 
@@ -164,7 +157,6 @@ python_library(
   dependencies = [
     'src/python/pants/util:collections',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ],
 )

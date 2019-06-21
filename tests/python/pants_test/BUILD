@@ -73,6 +73,7 @@ python_library(
     'src/python/pants/task',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
+    'src/python/pants/util:meta',
     'tests/python/pants_test/base:context_utils',
     'tests/python/pants_test/engine:util',
     'tests/python/pants_test/option/util',

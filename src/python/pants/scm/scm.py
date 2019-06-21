@@ -4,12 +4,10 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from abc import abstractmethod, abstractproperty
-
-from pants.util.meta import AbstractClass
+from abc import ABC, abstractmethod, abstractproperty
 
 
-class Scm(AbstractClass):
+class Scm(ABC):
   """Abstracts high-level scm operations needed by pants core and pants tasks.
 
   :API: public

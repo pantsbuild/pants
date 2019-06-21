@@ -5,7 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
-from abc import abstractmethod, abstractproperty
+from abc import ABC, abstractmethod, abstractproperty
 from builtins import zip
 
 from future.utils import binary_type, text_type
@@ -13,7 +13,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.util.collections_abc_backport import Iterable, OrderedDict, namedtuple
 from pants.util.memo import memoized_classproperty
-from pants.util.meta import AbstractClass, classproperty
+from pants.util.meta import classproperty
 from pants.util.strutil import pluralize
 
 
@@ -32,7 +32,7 @@ class TypedDatatypeInstanceConstructionError(TypeCheckError):
   """Raised when a datatype()'s fields fail a type check upon construction."""
 
 
-class DatatypeMixin(AbstractClass):
+class DatatypeMixin(ABC):
   """Decouple datatype logic from the way it's created to ease migration to python 3 dataclasses."""
 
   @classproperty
@@ -246,7 +246,7 @@ class EnumVariantSelectionError(TypeCheckError):
 
 
 # TODO: look into merging this with pants.util.meta.Singleton!
-class ChoicesMixin(AbstractClass):
+class ChoicesMixin(ABC):
   """A mixin which declares that the type has a fixed set of possible instances."""
 
   @classproperty
@@ -401,7 +401,7 @@ class TypeConstraintError(TypeError):
   """Indicates a :class:`TypeConstraint` violation."""
 
 
-class TypeConstraint(AbstractClass):
+class TypeConstraint(ABC):
   """Represents a type constraint.
 
   Not intended for direct use; instead, use one of :class:`SuperclassesOf`, :class:`Exactly` or

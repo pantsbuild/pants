@@ -10,7 +10,7 @@ import itertools
 import os
 import shutil
 import textwrap
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from builtins import bytes, map, object, str, zip
 from collections import defaultdict
 
@@ -38,7 +38,6 @@ from pants.util.collections_abc_backport import Iterable, Mapping, MutableSequen
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_concurrent_creation, safe_rmtree, safe_walk
 from pants.util.memo import memoized_property
-from pants.util.meta import AbstractClass
 from pants.util.process_handler import subprocess
 from pants.util.strutil import ensure_binary, ensure_text, safe_shlex_split
 
@@ -163,7 +162,7 @@ class TargetAncestorIterator(object):
 # un-exported non-3rdparty interior nodes as needed.  It seems like the latter is preferable since
 # it can be used with a BUILD graph validator requiring completely exported subgraphs to enforce the
 # former as a matter of local repo policy.
-class ExportedTargetDependencyCalculator(AbstractClass):
+class ExportedTargetDependencyCalculator(ABC):
   """Calculates the dependencies of exported targets.
 
   When a target is exported many of its internal transitive library dependencies may be satisfied by

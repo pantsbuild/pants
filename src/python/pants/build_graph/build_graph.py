@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import itertools
 import logging
 import weakref
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from builtins import filter, object
 from collections import defaultdict, deque
 
@@ -18,13 +18,12 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.injectables_mixin import InjectablesMixin
 from pants.build_graph.target import Target
 from pants.util.collections_abc_backport import OrderedDict
-from pants.util.meta import AbstractClass
 
 
 logger = logging.getLogger(__name__)
 
 
-class BuildGraph(AbstractClass):
+class BuildGraph(ABC):
   """A directed acyclic graph of Targets and dependencies. Not necessarily connected.
 
   :API: public

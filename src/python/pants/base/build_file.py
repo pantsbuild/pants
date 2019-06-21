@@ -7,12 +7,12 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import os
 import re
+from abc import ABC
 
 from pathspec import PathSpec
 from twitter.common.collections import OrderedSet
 
 from pants.util.dirutil import fast_relpath
-from pants.util.meta import AbstractClass
 
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 # Note: Significant effort has been made to keep the types BuildFile, BuildGraph, Address, and
 # Target separated appropriately.  Don't add references to those other types to this module.
-class BuildFile(AbstractClass):
+class BuildFile(ABC):
 
   class BuildFileError(Exception):
     """Base class for all exceptions raised in BuildFile to make exception handling easier"""

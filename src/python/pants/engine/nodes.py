@@ -5,8 +5,8 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
+from abc import ABC
 
-from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
@@ -18,7 +18,7 @@ def _satisfied_by(t, o):
   return t.satisfied_by(o)
 
 
-class State(AbstractClass):
+class State(ABC):
   @classmethod
   def raise_unrecognized(cls, state):
     raise ValueError('Unrecognized Node State: {}'.format(state))

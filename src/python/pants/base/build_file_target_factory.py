@@ -4,12 +4,10 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from abc import abstractproperty
-
-from pants.util.meta import AbstractClass
+from abc import ABC, abstractproperty
 
 
-class BuildFileTargetFactory(AbstractClass):
+class BuildFileTargetFactory(ABC):
   """An object that can hydrate target types from BUILD files."""
 
   @abstractproperty

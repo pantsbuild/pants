@@ -4,7 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from abc import abstractmethod
+from abc import ABCMeta, abstractmethod
 from contextlib import contextmanager
 
 from pants.cache.cache_setup import CacheSetup
@@ -12,13 +12,13 @@ from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.memo import memoized_classproperty
-from pants.util.meta import AbstractClass, classproperty
+from pants.util.meta import classproperty
 from pants.util.objects import datatype
 
 
-class Goal(datatype([('exit_code', int)]), AbstractClass):
+class Goal(datatype([('exit_code', int)]), metaclass=ABCMeta):
   """The named product of a `@console_rule`.
-  
+
   This abstract class should be subclassed and given a `Goal.name` that it will be referred to by
   when invoked from the command line. The `Goal.name` also acts as the options_scope for the `Goal`.
 

@@ -5,11 +5,10 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
-from abc import abstractmethod, abstractproperty
+from abc import ABC, abstractmethod, abstractproperty
 
 from pants.engine.rules import rule
 from pants.util.memo import memoized_classproperty
-from pants.util.meta import AbstractClass
 from pants.util.objects import datatype, enum
 from pants.util.osutil import all_normalized_os_names, get_normalized_os_name
 from pants.util.strutil import create_path_env_var
@@ -45,7 +44,7 @@ def _algebraic_data(metaclass):
 # NB: prototypal inheritance seems *deeply* linked with the idea here!
 # TODO: since we are calling these methods from other files, we should remove the leading underscore
 # and add testing!
-class _ExtensibleAlgebraic(AbstractClass):
+class _ExtensibleAlgebraic(ABC):
   """A mixin to make it more concise to coalesce datatypes with related collection fields."""
 
   @memoized_classproperty
