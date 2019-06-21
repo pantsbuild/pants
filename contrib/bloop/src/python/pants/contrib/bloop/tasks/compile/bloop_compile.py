@@ -42,9 +42,9 @@ class BloopCompile(NailgunTask):
       classpath=self.tool_classpath('bloop-compile-wrapper'),
       main='pants.contrib.bloop.compile.PantsCompileMain',
       jvm_options=[],
-      # NB: jvm options need to be prefixed with -J (TODO: does this work for jvm properties?)!!!
+      # TODO: jvm options need to be prefixed with -J if we want to use them!
       args=[
-        '-J{}'.format(opt) for opt in self.get_options().jvm_options
+        t.id for t in self.context.target_roots
       ],
       workunit_name='bloop-compile',
       workunit_labels=[WorkUnitLabel.COMPILER],

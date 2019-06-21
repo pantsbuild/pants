@@ -91,7 +91,7 @@ object PantsCompileMain {
     ExecutionModel.AlwaysAsyncExecution
   )
 
-  def main(args: Array[String]): Unit = {
+  def main(compileTargets: Array[String]): Unit = {
     val launcherIn = new PipedInputStream()
     val clientOut = new PipedOutputStream(launcherIn)
 
@@ -99,8 +99,6 @@ object PantsCompileMain {
     val launcherOut = new PipedOutputStream(clientIn)
 
     val startedServer = Promise[Unit]()
-
-    throw new Exception("wow")
 
     val task = Task.fromFuture(startedServer.future).flatMap { Unit =>
       // TODO: set this level from somewhere!
@@ -111,8 +109,6 @@ object PantsCompileMain {
       val messages = BaseProtocolMessage.fromInputStream(clientIn, bspLogger)
 
       implicit val _ctx: DebugFilter = DebugFilter.All
-
-      throw new Exception("wow")
 
       val services = Services
         .empty(bspLogger)
@@ -127,30 +123,67 @@ object PantsCompileMain {
           case bsp.LogMessageParams(bsp.MessageType.Info, _, _, msg) => logger.info(msg)
           case bsp.LogMessageParams(bsp.MessageType.Warning, _, _, msg) => logger.warn(msg)
           case bsp.LogMessageParams(bsp.MessageType.Error, _, _, msg) => logger.error(msg)
+        }.notification(endpoints.Build.publishDiagnostics) {
+          case bsp.PublishDiagnosticsParams(uri, _, _, diagnostics, _) =>
+            // We prepend diagnostics so that tests can check they came from this notification
+            def printDiagnostic(d: bsp.Diagnostic): String = s"[diagnostic] ${d.message} ${d.range}"
+            diagnostics.foreach { d =>
+              d.severity match {
+                case Some(bsp.DiagnosticSeverity.Error) => logger.error(printDiagnostic(d))
+                case Some(bsp.DiagnosticSeverity.Warning) => logger.warn(printDiagnostic(d))
+                case Some(bsp.DiagnosticSeverity.Information) => logger.info(printDiagnostic(d))
+                case Some(bsp.DiagnosticSeverity.Hint) => logger.debug(printDiagnostic(d))
+                case None => logger.info(printDiagnostic(d))
+              }
+            }
         }
 
       val bspServer = new BloopLanguageServer(messages, bspClient, services, scheduler, bspLogger)
       val runningClientServer = bspServer.startTask.runAsync(scheduler)
 
-      val initializeBuildParams = bsp.InitializeBuildParams(
+      def ack(a: Ack): Unit = a match {
+        case Ack.Continue => ()
+        case Ack.Stop => throw new Exception("stopped???")
+      }
+
+      def err[S](r: Either[_, S]): S = r match {
+        case Left(s) => throw new Exception(s"error: $s")
+        case Right(result) => result
+      }
+
+      endpoints.Build.initialize.request(bsp.InitializeBuildParams(
         displayName = "pants-bloop-client",
         version = bloopVersion,
         bspVersion = bspVersion,
         rootUri = bsp.Uri(Environment.cwd.toUri),
         capabilities = bsp.BuildClientCapabilities(List("scala")),
         data = None
-      )
-
-      endpoints.Build.initialize.request(initializeBuildParams)
-        .flatMap { initializeResult =>
-          println(s"initializeResult: $initializeResult")
-          throw new Exception(s"initializeResult: $initializeResult")
+      )).map(err(_))
+        .flatMap { result =>
           // TODO: validate or something!
+          logger.info(s"initializeResult: $result")
           Task.fromFuture(endpoints.Build.initialized.notify(bsp.InitializedBuildParams()))
-        }.map {
-          case Ack.Continue => throw new Exception("wow!!")
-          case Ack.Stop => throw new Exception("stopped???")
-        }
+        }.map(ack(_))
+        .flatMap { Unit =>
+          endpoints.Workspace.buildTargets.request(bsp.WorkspaceBuildTargetsRequest())
+        }.map(err(_))
+        .map(_.targets)
+        .flatMap { targets =>
+          val targetIds = compileTargets.toSet
+          val matchingTargets = targets.filter(_.displayName.filter(targetIds).isDefined).toList
+          val mIds = matchingTargets.flatMap(_.displayName)
+          logger.info(s"matchingTargets: $mIds")
+
+          endpoints.BuildTarget.compile.request(bsp.CompileParams(
+            targets = matchingTargets.map(_.id).toList,
+            originId = None,
+            arguments = None
+          ))
+        }.map(err(_))
+         .map { compileResult =>
+           logger.info(s"compileResult: $compileResult")
+           ()
+         }
     }.runAsync(scheduler)
 
     val launcherTask = Task.eval(new LauncherMain(
@@ -162,9 +195,6 @@ object PantsCompileMain {
       nailgunPort = None,
       startedServer = startedServer,
       generateBloopInstallerURL = Installer.defaultWebsiteURL(_)
-    ).main(args :+ bloopVersion)).runAsync(scheduler)
-
-    Await.result(task, FiniteDuration(2, "s"))
-    Await.result(launcherTask, FiniteDuration(2, "s"))
+    ).main(Array(bloopVersion))).runAsync(scheduler)
   }
 }
