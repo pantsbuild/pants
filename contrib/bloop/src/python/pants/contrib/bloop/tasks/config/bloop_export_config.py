@@ -6,7 +6,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from future.utils import text_type
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
+from pants.base.build_environment import get_buildroot
 from pants.java.distribution.distribution import DistributionLocator
+from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_property
 from pants.util.meta import classproperty
 from pants.util.objects import datatype, string_list, string_type
@@ -72,7 +74,7 @@ class BloopExportConfig(ModifiedExportTaskBase):
       reported_scala_version = self._scala_platform.version
 
     scala_compiler_jars = [
-      cpe.path for cpe in
+      text_type(fast_relpath(cpe.path, get_buildroot())) for cpe in
       self._scala_platform.compiler_classpath_entries(self.context.products, self.context._scheduler)
     ]
 
