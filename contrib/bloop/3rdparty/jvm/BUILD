@@ -23,6 +23,8 @@ jar_library(
     scala_jar(org='ch.epfl.scala', name='bloop-frontend', rev=BLOOP_REV,
               # excludes=SCALAMETA_EXCLUDES,
               ),
+    # scala_jar(org='ch.epfl.scala', name='compiler-bridge', rev='1.3.0'),
+    # scala_jar(org='ch.epfl.scala', name='zinc-classpath', rev='1.3.0'),
   ],
 )
 
