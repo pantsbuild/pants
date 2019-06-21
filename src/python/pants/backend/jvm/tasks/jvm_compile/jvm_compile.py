@@ -51,6 +51,7 @@ _JAVAC_PLUGIN_INFO_FILE = 'META-INF/services/com.sun.source.util.Plugin'
 
 # Well known metadata file to register annotation processors with a java 1.6+ compiler.
 _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
+_POST_COMPILE_MERGE_DIR_PREFIX = 'post_compile_merge_dir'
 
 
 class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
@@ -277,9 +278,9 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     target = compile_context.target
 
     if isinstance(target, JavacPlugin):
-      result[_JAVAC_PLUGIN_INFO_FILE] = target.classname if PY3 else target.classname.decode('utf-8')
+      result[os.path.join(_POST_COMPILE_MERGE_DIR_PREFIX, _JAVAC_PLUGIN_INFO_FILE)] = target.classname if PY3 else target.classname.decode('utf-8')
     elif isinstance(target, AnnotationProcessor) and target.processors:
-      result[_PROCESSOR_INFO_FILE] = '{}\n'.format('\n'.join(p.strip() for p in target.processors))
+      result[os.path.join(_POST_COMPILE_MERGE_DIR_PREFIX, _PROCESSOR_INFO_FILE)] = '{}\n'.format('\n'.join(p.strip() for p in target.processors))
 
     return result
 
