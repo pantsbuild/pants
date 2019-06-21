@@ -295,7 +295,7 @@ class PailgunServer(ThreadingMixIn, TCPServer):
         self.request_complete_callback()
     except BrokenPipeError as e:
       # The client has closed the connection, most likely from a SIGINT
-      self.logger.error("Request {} abruptly closed, probably beacuse the client crashed, with {}({})".format(request, type(e), e))
+      self.logger.error("Request {} abruptly closed with {}, probably because the client crashed or was sent a SIGINT.".format(request, type(e)))
     except Exception as e:
       # If that fails, (synchronously) handle the error with the error handler sans-fork.
       try:
