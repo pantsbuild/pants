@@ -267,7 +267,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     """Classpath entries containing scalac plugins."""
     return []
 
-  def extra_resources(self, compile_context):
+  def post_compile_extra_resources(self, compile_context):
     """Produces a dictionary of any extra, out-of-band resources for a target.
 
     E.g., targets that produce scala compiler plugins or annotation processor files
@@ -284,10 +284,10 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
     return result
 
-  def extra_resources_digest(self, compile_context):
-    """Compute a Digest for the extra_resources for the given context."""
+  def extra_post_compile_resources_digest(self, compile_context):
+    """Compute a Digest for the post_compile_extra_resources for the given context."""
     # TODO: Switch to using #7739 once it is available.
-    extra_resources = self.extra_resources(compile_context)
+    extra_resources = self.post_compile_extra_resources(compile_context)
     if not extra_resources:
       return EMPTY_DIRECTORY_DIGEST
     with temporary_dir() as tmpdir:

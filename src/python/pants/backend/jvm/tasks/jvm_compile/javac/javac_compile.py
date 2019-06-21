@@ -176,7 +176,7 @@ class JavacCompile(JvmCompile):
           if return_code:
             raise TaskError('javac exited with return code {rc}'.format(rc=return_code))
         self.context._scheduler.materialize_directories((
-          DirectoryToMaterialize(text_type(ctx.classes_dir.path), self.extra_resources_digest(ctx)),
+          DirectoryToMaterialize(text_type(ctx.classes_dir.path), self.extra_post_compile_resources_digest(ctx)),
         ))
 
     self._create_context_jar(ctx)
@@ -236,7 +236,7 @@ class JavacCompile(JvmCompile):
     # Dump the output to the .pants.d directory where it's expected by downstream tasks.
     merged_directories = self.context._scheduler.merge_directories([
         exec_result.output_directory_digest,
-        self.extra_resources_digest(ctx),
+        self.extra_post_compile_resources_digest(ctx),
       ])
     classes_directory = ctx.classes_dir.path
     self.context._scheduler.materialize_directories((

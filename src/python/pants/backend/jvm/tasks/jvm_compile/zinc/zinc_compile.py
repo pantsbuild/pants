@@ -231,9 +231,9 @@ class BaseZincCompile(JvmCompile):
     if self.context.products.is_required_data('zinc_args'):
       self.context.products.safe_create_data('zinc_args', lambda: defaultdict(list))
 
-  def extra_resources(self, compile_context):
-    """Override `extra_resources` to additionally include scalac_plugin info."""
-    result = super(BaseZincCompile, self).extra_resources(compile_context)
+  def post_compile_extra_resources(self, compile_context):
+    """Override `post_compile_extra_resources` to additionally include scalac_plugin info."""
+    result = super(BaseZincCompile, self).post_compile_extra_resources(compile_context)
     target = compile_context.target
 
     if isinstance(target, ScalacPlugin):
@@ -373,7 +373,7 @@ class BaseZincCompile(JvmCompile):
     if exit_code != 0:
       raise self.ZincCompileError('Zinc compile failed.', exit_code=exit_code)
     self.context._scheduler.materialize_directories((
-      DirectoryToMaterialize(text_type(classes_directory), self.extra_resources_digest(ctx)),
+      DirectoryToMaterialize(text_type(classes_directory), self.extra_post_compile_resources_digest(ctx)),
     ))
 
   def _compile_hermetic(self, jvm_options, ctx, classes_dir, jar_file,
@@ -461,7 +461,7 @@ class BaseZincCompile(JvmCompile):
       tuple(s.directory_digest for s in snapshots) +
       directory_digests +
       native_image_snapshots +
-      (self.extra_resources_digest(ctx), argfile_snapshot.directory_digest)
+      (self.extra_post_compile_resources_digest(ctx), argfile_snapshot.directory_digest)
     )
 
     req = ExecuteProcessRequest(
