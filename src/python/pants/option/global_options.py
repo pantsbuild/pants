@@ -261,6 +261,10 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     # without resorting to heavier options parsing.
     register('--enable-pantsd', advanced=True, type=bool, default=False,
              help='Enables use of the pants daemon (and implicitly, the v2 engine). (Beta)')
+    register('--allow-pantsd-concurrent-runs', type=bool, default=False,
+             help='Enables multiple parallel runs using pantsd. Without this enabled, pants will '
+                  'start up all concurrent invocations (e.g. in other terminals) without pantsd. '
+                  'Enabling this option requires parallel pants invocations to block on the first.')
 
     # Whether or not to make necessary arrangements to have concurrent runs in pants.
     # In practice, this means that if this is set, a run will not even try to use pantsd.

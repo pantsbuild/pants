@@ -18,6 +18,12 @@ logger = logging.getLogger(__name__)
 PANTS_SUCCEEDED_EXIT_CODE = 0
 PANTS_FAILED_EXIT_CODE = 1
 
+# TODO: This is returned by the exit code of the pantsd nailgun connection if a client is already
+# connected and --allow-pantsd-concurrent-runs is *disabled*. This number is chosen to be a large
+# enough number that we hopefully don't have too many collisions with real errors. There could be a
+# better method of IPC used for this case.
+PANTSD_NO_CONCURRENT_RUN_EXIT_CODE = 42
+
 
 class Exiter:
   """A class that provides standard runtime exit behavior.

@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from future.utils import PY3, raise_with_traceback
 
 from pants.base.exception_sink import ExceptionSink, SignalHandler
+from pants.base.exiter import PANTSD_NO_CONCURRENT_RUN_EXIT_CODE
 from pants.console.stty_utils import STTYSettings
 from pants.java.nailgun_client import NailgunClient
 from pants.java.nailgun_protocol import NailgunProtocol
@@ -142,6 +143,7 @@ class RemotePantsRunner:
     modified_env = combined_dict(self._env, ng_env)
     modified_env['PANTSD_RUNTRACKER_CLIENT_START_TIME'] = str(self._start_time)
     modified_env['PANTSD_REQUEST_TIMEOUT_LIMIT'] = str(self._bootstrap_options.for_global_scope().pantsd_timeout_when_multiple_invocations)
+    modified_env['PANTSD_ALLOW_CONCURRENT_RUNS'] = str(self._bootstrap_options.for_global_scope().allow_pantsd_concurrent_runs)
 
     assert isinstance(port, int), \
       'port {} is not an integer! It has type {}.'.format(port, type(port))
@@ -157,6 +159,8 @@ class RemotePantsRunner:
     with self._trapped_signals(client), STTYSettings.preserved():
       # Execute the command on the pailgun.
       result = client.execute(self.PANTS_COMMAND, *self._args, **modified_env)
+      if result == PANTSD_NO_CONCURRENT_RUN_EXIT_CODE:
+        raise self.Fallback(Exception("Concurrent pantsd runs are disabled."))
 
     # Exit.
     self._exiter.exit(result)

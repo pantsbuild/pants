@@ -9,6 +9,7 @@ from contextlib import contextmanager
 
 from six.moves.socketserver import BaseRequestHandler, BaseServer, TCPServer, ThreadingMixIn
 
+from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTSD_NO_CONCURRENT_RUN_EXIT_CODE
 from pants.engine.native import Native
 from pants.java.nailgun_protocol import NailgunProtocol
 from pants.util.contextutil import maybe_profiled
@@ -91,9 +92,12 @@ class PailgunHandler(PailgunHandlerBase):
 
   def handle_error(self, exc=None):
     """Error handler for failed calls to handle()."""
+    failure_code = PANTS_FAILED_EXIT_CODE
     if exc:
       NailgunProtocol.send_stderr(self.request, traceback.format_exc())
-    failure_code = 1
+      if isinstance(exc, ImmediateTimeout):
+        failure_code = PANTSD_NO_CONCURRENT_RUN_EXIT_CODE
+
     NailgunProtocol.send_exit_with_code(self.request, failure_code)
 
 
@@ -101,7 +105,12 @@ class ExclusiveRequestTimeout(Exception):
   """Represents a timeout while waiting for another request to complete."""
 
 
-class PailgunHandleRequestLock:
+class ImmediateTimeout(Exception):
+  """Represents an early exit for the attempted pailgun connection when
+     --allow-pantsd-concurrent-runs is set."""
+
+
+class PailgunHandleRequestLock(object):
   """Convenience lock to implement Lock.acquire(timeout), which is not available in Python 2."""
   # TODO remove and replace for the py3 Lock() when we don't have to support py2 anymore.
 
@@ -249,6 +258,7 @@ class PailgunServer(ThreadingMixIn, TCPServer):
     # TODO add `did_poll` to pantsd metrics
 
     timeout = float(environment['PANTSD_REQUEST_TIMEOUT_LIMIT'])
+    no_concurrent = environment['PANTSD_ALLOW_CONCURRENT_RUNS'] == 'False'
 
     @contextmanager
     def yield_and_release(time_waited):
@@ -270,13 +280,16 @@ class PailgunServer(ThreadingMixIn, TCPServer):
       with yield_and_release(time_polled):
         yield
     else:
+      if no_concurrent:
+        self._send_stderr(request, "Another pants invocation is running with pantsd enabled.")
+        raise ImmediateTimeout("Exiting quickly with pantsd concurrent runs disabled.")
       # We have to wait for another request to finish being handled.
       self._send_stderr(request, "Another pants invocation is running with pantsd enabled. "
                                  "Will wait {} for it to finish before giving up.\n".format(
                                    "forever" if self._should_poll_forever(timeout)
                                    else "up to {} seconds".format(timeout)))
       self._send_stderr(request, "If you don't want to wait for the first run to finish, please "
-                                 "press Ctrl-C and run this command with PANTS_ENABLE_PANTSD=False "
+                                 "press Ctrl-C and run this command with PANTS_ALLOW_PANTSD_CONCURRENT_RUNS=True "
                                  "in the environment.")
       while not self.free_to_handle_request_lock.acquire(timeout=user_notification_interval):
         time_polled += user_notification_interval
