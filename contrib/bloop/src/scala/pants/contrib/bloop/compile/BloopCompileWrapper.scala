@@ -87,7 +87,7 @@ object PantsCompileMain {
 
   // implicit lazy val scheduler: Scheduler = Scheduler.Implicits.global
   implicit lazy val scheduler: Scheduler = Scheduler(
-    Executors.newFixedThreadPool(4),
+    Executors.newFixedThreadPool(8),
     ExecutionModel.AlwaysAsyncExecution
   )
 
@@ -100,7 +100,9 @@ object PantsCompileMain {
 
     val startedServer = Promise[Unit]()
 
-    val task = startedServer.future.flatMap { Unit =>
+    throw new Exception("wow")
+
+    val task = Task.fromFuture(startedServer.future).flatMap { Unit =>
       // TODO: set this level from somewhere!
       val logger = new BareBonesLogger(Level.Debug)
       val bspLogger = new BspClientLogger(logger)
@@ -148,10 +150,10 @@ object PantsCompileMain {
         }.map {
           case Ack.Continue => throw new Exception("wow!!")
           case Ack.Stop => throw new Exception("stopped???")
-        }.runAsync(scheduler)
-    }
+        }
+    }.runAsync(scheduler)
 
-    new LauncherMain(
+    val launcherTask = Task.eval(new LauncherMain(
       clientIn = launcherIn,
       clientOut = launcherOut,
       out = System.err,
@@ -160,8 +162,9 @@ object PantsCompileMain {
       nailgunPort = None,
       startedServer = startedServer,
       generateBloopInstallerURL = Installer.defaultWebsiteURL(_)
-    ).main(args :+ bloopVersion)
+    ).main(args :+ bloopVersion)).runAsync(scheduler)
 
     Await.result(task, FiniteDuration(2, "s"))
+    Await.result(launcherTask, FiniteDuration(2, "s"))
   }
 }
