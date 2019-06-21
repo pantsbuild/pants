@@ -26,7 +26,7 @@ def setup_authentication() -> None:
   if access_key_id not in os.environ or secret_access_key not in os.environ:
     die(f"Caller of the script must set both {access_key_id} and {secret_access_key}.")
   # Properly export the value so that AWS picks it up.
-  os.environ["AWS_ACESS_KEY_ID"] = os.environ[access_key_id]
+  os.environ["AWS_ACCESS_KEY_ID"] = os.environ[access_key_id]
 
 
 def deploy() -> None:
