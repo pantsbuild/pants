@@ -29,12 +29,16 @@ class PailgunClientSignalHandler(SignalHandler):
     super().__init__(*args, **kwargs)
 
   def _forward_signal_with_timeout(self, signum, signame):
+    exc = KeyboardInterrupt('Interrupted by user over pailgun client!')
+    pantsd_pid = self._pailgun_client._maybe_last_pid()
+    if pantsd_pid is None:
+      logger.info('No remote pantsd was found -- exiting!')
+      raise exc
+
     logger.info(
       'Sending {} to pantsd with pid {}, waiting up to {} seconds before sending SIGKILL...'
-      .format(signame, self._pailgun_client._maybe_last_pid(), self._timeout))
-    self._pailgun_client.set_exit_timeout(
-      timeout=self._timeout,
-      reason=KeyboardInterrupt('Interrupted by user over pailgun client!'))
+      .format(signame, pantsd_pid, self._timeout))
+    self._pailgun_client.set_exit_timeout(timeout=self._timeout, reason=exc)
     self._pailgun_client.maybe_send_signal(signum)
 
   def handle_sigint(self, signum, _frame):
