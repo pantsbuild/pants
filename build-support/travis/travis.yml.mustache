@@ -711,7 +711,7 @@ py27_osx_platform_tests: &py27_osx_platform_tests
     - *py27_osx_test_config_env
     - CACHE_NAME=macosplatformtests.py27
   script:
-    - ./build-support/bin/ci.py --platform-specific-tests --python-version 2.7
+    - travis_wait 50 ./build-support/bin/ci.py --platform-specific-tests --python-version 2.7
 
 py36_osx_platform_tests: &py36_osx_platform_tests
   <<: *py36_osx_test_config
@@ -720,7 +720,7 @@ py36_osx_platform_tests: &py36_osx_platform_tests
     - *py36_osx_test_config_env
     - CACHE_NAME=macosplatformtests.py36
   script:
-    - ./build-support/bin/ci.py --platform-specific-tests
+    - travis_wait 50 ./build-support/bin/ci.py --platform-specific-tests
 
 py37_osx_platform_tests: &py37_osx_platform_tests
   <<: *py37_osx_test_config
@@ -729,7 +729,7 @@ py37_osx_platform_tests: &py37_osx_platform_tests
     - *py37_osx_test_config_env
     - CACHE_NAME=macosplatformtests.py37
   script:
-    - ./build-support/bin/ci.py --platform-specific-tests --python-version 3.7
+    - travis_wait 50 ./build-support/bin/ci.py --platform-specific-tests --python-version 3.7
 
 # -------------------------------------------------------------------------
 # JVM tests
