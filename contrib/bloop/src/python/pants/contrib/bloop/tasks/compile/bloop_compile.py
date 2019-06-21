@@ -4,8 +4,7 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import time
-
+from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.workunit import WorkUnitLabel
 from pants.java.jar.jar_dependency import JarDependency
@@ -33,17 +32,23 @@ class BloopCompile(NailgunTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(BloopCompile, cls).prepare(options, round_manager)
-    round_manager.require_data('bloop_output_dir')
+    round_manager.require_data('bloop_classes_dir')
 
   _supported_languages = ['java', 'scala']
+
+  _confs = Zinc.DEFAULT_CONFS
 
   def execute(self):
     bsp_launcher_process = self.runjava(
       classpath=self.tool_classpath('bloop-compile-wrapper'),
       main='pants.contrib.bloop.compile.PantsCompileMain',
       jvm_options=[],
-      # TODO: jvm options need to be prefixed with -J if we want to use them!
+      # TODO: jvm options need to be prefixed with -J and passed to the LaumcherMain if we want to
+      # use them!
       args=[
+        self.get_options().level,
+        '--',
+      ] + [
         t.id for t in self.context.target_roots
       ],
       workunit_name='bloop-compile',
@@ -52,10 +57,21 @@ class BloopCompile(NailgunTask):
       stdin=subprocess.PIPE,
       stdout=subprocess.PIPE)
 
-    time.sleep(2)
     msg = ''
     while not msg:
       msg = bsp_launcher_process.stdout.readline()
+    # assert msg == 'compile complete!'
     self.context.log.info('msg: {}'.format(msg))
 
-    bsp_launcher_process.terminate()
+    bsp_launcher_process.stdin.close()
+    bsp_launcher_process.stdout.close()
+    bsp_launcher_process.kill()
+
+    for target in self.context.targets():
+      classes_dir = self.context.products.get_data('bloop_classes_dir').get(target, None)
+      if classes_dir is not None:
+        self.context.products.get_data('runtime_classpath').add_for_target(
+          target,
+          [(conf, classes_dir) for conf in self._confs])
+
+    self.context.log.info('finished compile!')

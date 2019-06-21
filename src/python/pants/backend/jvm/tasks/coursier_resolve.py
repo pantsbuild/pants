@@ -685,7 +685,6 @@ class CoursierResolve(CoursierMixin, NailgunTask):
     return super().implementation_version() + [('CoursierResolve', 2)]
 
   def execute(self):
-    return
     """Resolves the specified confs for the configured targets and returns an iterator over
     tuples of (conf, jar path).
     """

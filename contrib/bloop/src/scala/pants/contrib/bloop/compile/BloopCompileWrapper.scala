@@ -91,7 +91,20 @@ object PantsCompileMain {
     ExecutionModel.AlwaysAsyncExecution
   )
 
-  def main(compileTargets: Array[String]): Unit = {
+  def main(args: Array[String]): Unit = {
+    val (Array(logLevelArg), compileTargets) = {
+      val index = args.indexOf("--")
+      if (index == -1) (args, Array.empty[String])
+      else args.splitAt(index)
+    }
+    val logLevel = logLevelArg match {
+      case "debug" => Level.Debug
+      case "info" => Level.Info
+      case "warn" => Level.Warn
+      case "error" => Level.Error
+      case x => throw new Exception(s"unrecognized log level argument '$x'")
+    }
+
     val launcherIn = new PipedInputStream()
     val clientOut = new PipedOutputStream(launcherIn)
 
@@ -101,8 +114,7 @@ object PantsCompileMain {
     val startedServer = Promise[Unit]()
 
     val task = Task.fromFuture(startedServer.future).flatMap { Unit =>
-      // TODO: set this level from somewhere!
-      val logger = new BareBonesLogger(Level.Debug)
+      val logger = new BareBonesLogger(logLevel)
       val bspLogger = new BspClientLogger(logger)
 
       implicit val bspClient = new BloopLanguageClient(clientOut, bspLogger)
@@ -117,8 +129,7 @@ object PantsCompileMain {
           case bsp.ShowMessageParams(bsp.MessageType.Info, _, _, msg) => logger.info(msg)
           case bsp.ShowMessageParams(bsp.MessageType.Warning, _, _, msg) => logger.warn(msg)
           case bsp.ShowMessageParams(bsp.MessageType.Error, _, _, msg) => logger.error(msg)
-        }
-        .notification(endpoints.Build.logMessage) {
+        }.notification(endpoints.Build.logMessage) {
           case bsp.LogMessageParams(bsp.MessageType.Log, _, _, msg) => logger.debug(msg)
           case bsp.LogMessageParams(bsp.MessageType.Info, _, _, msg) => logger.info(msg)
           case bsp.LogMessageParams(bsp.MessageType.Warning, _, _, msg) => logger.warn(msg)
@@ -136,6 +147,20 @@ object PantsCompileMain {
                 case None => logger.info(printDiagnostic(d))
               }
             }
+        }.notification(endpoints.Build.taskStart) {
+          case bsp.TaskStartParams(_, _, Some(message), _, _) =>
+            logger.info(s"Task started: $message")
+          case _ => ()
+        }.notification(endpoints.Build.taskProgress) {
+          case bsp.TaskProgressParams(_, _, Some(message), Some(total), Some(progress), Some(unit), _, _) =>
+            logger.debug(s"Task progress ($progress/$total $unit): $message")
+          case bsp.TaskProgressParams(_, _, Some(message), _, _, _, _, _) =>
+            logger.debug(s"Task progress: $message")
+          case _ => ()
+        }.notification(endpoints.Build.taskFinish) {
+          case bsp.TaskFinishParams(_, _, Some(message), status, _, _) =>
+            logger.info(s"Task finished with status [$status]: $message")
+          case _ => ()
         }
 
       val bspServer = new BloopLanguageServer(messages, bspClient, services, scheduler, bspLogger)
@@ -180,10 +205,11 @@ object PantsCompileMain {
             arguments = None
           ))
         }.map(err(_))
-         .map { compileResult =>
-           logger.info(s"compileResult: $compileResult")
-           ()
-         }
+        .map { compileResult =>
+          logger.info(s"compileResult: $compileResult")
+          println("compile complete!")
+          sys.exit(0)
+        }
     }.runAsync(scheduler)
 
     val launcherTask = Task.eval(new LauncherMain(
