@@ -14,6 +14,7 @@ source build-support/common.sh
 if [[ -z "${AWS_CLI_ROOT:+''}" ]]; then
   die "Caller of the script must set the env var AWS_CLI_ROOT."
 fi
+
 AWS_CLI_BIN="${AWS_CLI_ROOT}/bin/aws"
 
 # We first check if AWS CLI is already installed thanks to Travis's cache.
@@ -31,9 +32,11 @@ if [[ ! -x "${AWS_CLI_BIN}" ]]; then
 
 fi
 
-# Travis does not cache symlinks (https://docs.travis-ci.com/user/caching/), so we create
-# the symlink ourselves everytime to ensure `aws` is discoverable globally.
-sudo ln -s "${AWS_CLI_BIN}" /usr/local/bin/aws
+# We symlink so that `aws` is discoverable on the $PATH.
+symlink="/usr/local/bin/aws"
+if [[ ! -L "${symlink}" ]]; then
+  sudo ln -s "${AWS_CLI_BIN}" "${symlink}"
+fi
 
 # Multipart operations aren't supported for anonymous users, so we set the
 # threshold high to avoid them being used automatically by the aws cli.
