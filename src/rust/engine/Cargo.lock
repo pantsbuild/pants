@@ -169,7 +169,6 @@ dependencies = [
  "dirs 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.5.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "errno 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "fs 0.0.1",
  "fuse 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.27 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashing 0.0.1",
@@ -178,6 +177,7 @@ dependencies = [
  "parking_lot 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 2.0.6 (git+https://github.com/pantsbuild/rust-protobuf?rev=171611c33ec92f07e1b7107327f6d0139a7afebf)",
  "serverset 0.0.1",
+ "store 0.1.0",
  "tempfile 3.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "testutil 0.0.1",
  "time 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -583,9 +583,9 @@ dependencies = [
  "process_execution 0.0.1",
  "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "reqwest 0.9.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "resettable 0.0.1",
  "rule_graph 0.0.1",
  "smallvec 0.6.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "store 0.1.0",
  "tar_api 0.0.1",
  "tempfile 3.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -712,38 +712,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "fs"
 version = "0.0.1"
 dependencies = [
- "bazel_protos 0.0.1",
  "boxfuture 0.0.1",
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "digest 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "dirs 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.27 (registry+https://github.com/rust-lang/crates.io-index)",
  "glob 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
- "grpcio 0.3.0 (git+https://github.com/pantsbuild/grpc-rs.git?rev=4dfafe9355dc996d7d0702e7386a6fedcd9734c0)",
- "hashing 0.0.1",
  "ignore 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "indexmap 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "itertools 0.7.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "lmdb 0.8.0 (git+https://github.com/pantsbuild/lmdb-rs.git?rev=06bdfbfc6348f6804127176e561843f214fc17f8)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "maplit 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "mock 0.0.1",
  "parking_lot 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "protobuf 2.0.6 (git+https://github.com/pantsbuild/rust-protobuf?rev=171611c33ec92f07e1b7107327f6d0139a7afebf)",
- "serde 1.0.89 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_derive 1.0.58 (registry+https://github.com/rust-lang/crates.io-index)",
- "serverset 0.0.1",
- "sha2 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 3.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "testutil 0.0.1",
  "tokio 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-codec 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-fs 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-io 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-threadpool 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "uuid 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "walkdir 2.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -772,6 +753,7 @@ dependencies = [
  "serde 1.0.89 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.58 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.39 (registry+https://github.com/rust-lang/crates.io-index)",
+ "store 0.1.0",
  "tokio 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -1651,8 +1633,8 @@ dependencies = [
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "mock 0.0.1",
  "protobuf 2.0.6 (git+https://github.com/pantsbuild/rust-protobuf?rev=171611c33ec92f07e1b7107327f6d0139a7afebf)",
- "resettable 0.0.1",
  "sha2 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "store 0.1.0",
  "tempfile 3.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "testutil 0.0.1",
  "time 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1668,10 +1650,9 @@ version = "0.0.1"
 dependencies = [
  "clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.5.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "fs 0.0.1",
  "hashing 0.0.1",
  "process_execution 0.0.1",
- "resettable 0.0.1",
+ "store 0.1.0",
  "tokio 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -2003,13 +1984,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "resettable"
-version = "0.0.1"
-dependencies = [
- "parking_lot 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "ring"
 version = "0.14.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2207,6 +2181,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sharded_lmdb"
+version = "0.0.1"
+dependencies = [
+ "fs 0.0.1",
+ "hashing 0.0.1",
+ "lmdb 0.8.0 (git+https://github.com/pantsbuild/lmdb-rs.git?rev=06bdfbfc6348f6804127176e561843f214fc17f8)",
+ "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tempfile 3.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "shell-escape"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2273,6 +2258,40 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "stable_deref_trait"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "store"
+version = "0.1.0"
+dependencies = [
+ "bazel_protos 0.0.1",
+ "boxfuture 0.0.1",
+ "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "digest 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "dirs 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fs 0.0.1",
+ "futures 0.1.27 (registry+https://github.com/rust-lang/crates.io-index)",
+ "grpcio 0.3.0 (git+https://github.com/pantsbuild/grpc-rs.git?rev=4dfafe9355dc996d7d0702e7386a6fedcd9734c0)",
+ "hashing 0.0.1",
+ "indexmap 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "itertools 0.7.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lmdb 0.8.0 (git+https://github.com/pantsbuild/lmdb-rs.git?rev=06bdfbfc6348f6804127176e561843f214fc17f8)",
+ "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "maplit 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mock 0.0.1",
+ "parking_lot 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "protobuf 2.0.6 (git+https://github.com/pantsbuild/rust-protobuf?rev=171611c33ec92f07e1b7107327f6d0139a7afebf)",
+ "serde 1.0.89 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.58 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serverset 0.0.1",
+ "sha2 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sharded_lmdb 0.0.1",
+ "tempfile 3.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "testutil 0.0.1",
+ "tokio 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio-threadpool 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "uuid 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "walkdir 2.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "string"

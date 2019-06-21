@@ -2,7 +2,7 @@ use log;
 use tempfile;
 
 use boxfuture::{try_future, BoxFuture, Boxable};
-use fs::{self, GlobExpansionConjunction, GlobMatching, PathGlobs, Snapshot, StrictGlobMatching};
+use fs::{self, GlobExpansionConjunction, GlobMatching, PathGlobs, StrictGlobMatching};
 use futures::{future, Future, Stream};
 use log::info;
 use std::collections::{BTreeSet, HashSet};
@@ -13,6 +13,7 @@ use std::os::unix::{fs::symlink, process::ExitStatusExt};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::Arc;
+use store::{OneOffStoreFileByDigest, Snapshot, Store};
 
 use tokio_codec::{BytesCodec, FramedRead};
 use tokio_process::CommandExt;
@@ -22,13 +23,13 @@ use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
 use bytes::{Bytes, BytesMut};
 
 pub struct CommandRunner {
-  store: fs::Store,
+  store: Store,
   work_dir: PathBuf,
   cleanup_local_dirs: bool,
 }
 
 impl CommandRunner {
-  pub fn new(store: fs::Store, work_dir: PathBuf, cleanup_local_dirs: bool) -> CommandRunner {
+  pub fn new(store: Store, work_dir: PathBuf, cleanup_local_dirs: bool) -> CommandRunner {
     CommandRunner {
       store,
       work_dir,
@@ -37,7 +38,7 @@ impl CommandRunner {
   }
 
   fn construct_output_snapshot(
-    store: fs::Store,
+    store: Store,
     posix_fs: Arc<fs::PosixFS>,
     output_file_paths: BTreeSet<PathBuf>,
     output_dir_paths: BTreeSet<PathBuf>,
@@ -68,9 +69,9 @@ impl CommandRunner {
       .expand(output_globs)
       .map_err(|err| format!("Error expanding output globs: {}", err))
       .and_then(|path_stats| {
-        fs::Snapshot::from_path_stats(
+        Snapshot::from_path_stats(
           store.clone(),
-          &fs::OneOffStoreFileByDigest::new(store, posix_fs),
+          &OneOffStoreFileByDigest::new(store, posix_fs),
           path_stats,
         )
       })
@@ -273,7 +274,7 @@ impl super::CommandRunner for CommandRunner {
       .and_then(ChildResults::collect_from)
       .and_then(move |child_results| {
         let output_snapshot = if output_file_paths.is_empty() && output_dir_paths.is_empty() {
-          future::ok(fs::Snapshot::empty()).to_boxed()
+          future::ok(store::Snapshot::empty()).to_boxed()
         } else {
           // Use no ignore patterns, because we are looking for explicitly listed paths.
           future::done(fs::PosixFS::new(workdir_path2, &[]))
@@ -329,13 +330,14 @@ mod tests {
 
   use super::super::CommandRunner as CommandRunnerTrait;
   use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
-  use fs;
+  use hashing::EMPTY_DIGEST;
   use std;
   use std::collections::{BTreeMap, BTreeSet};
   use std::env;
   use std::os::unix::fs::PermissionsExt;
   use std::path::{Path, PathBuf};
   use std::time::Duration;
+  use store::Store;
   use tempfile::TempDir;
   use testutil::data::{TestData, TestDirectory};
   use testutil::{as_bytes, owned_string_vec};
@@ -346,7 +348,7 @@ mod tests {
     let result = run_command_locally(ExecuteProcessRequest {
       argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
       env: BTreeMap::new(),
-      input_files: fs::EMPTY_DIGEST,
+      input_files: EMPTY_DIGEST,
       output_files: BTreeSet::new(),
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
@@ -360,7 +362,7 @@ mod tests {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_directory: EMPTY_DIGEST,
         execution_attempts: vec![],
       }
     )
@@ -372,7 +374,7 @@ mod tests {
     let result = run_command_locally(ExecuteProcessRequest {
       argv: owned_string_vec(&["/bin/bash", "-c", "echo -n foo ; echo >&2 -n bar ; exit 1"]),
       env: BTreeMap::new(),
-      input_files: fs::EMPTY_DIGEST,
+      input_files: EMPTY_DIGEST,
       output_files: BTreeSet::new(),
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
@@ -386,7 +388,7 @@ mod tests {
         stdout: as_bytes("foo"),
         stderr: as_bytes("bar"),
         exit_code: 1,
-        output_directory: fs::EMPTY_DIGEST,
+        output_directory: EMPTY_DIGEST,
         execution_attempts: vec![],
       }
     )
@@ -399,7 +401,7 @@ mod tests {
     let result = run_command_locally(ExecuteProcessRequest {
       argv: owned_string_vec(&["/bin/bash", "-c", "kill $$"]),
       env: BTreeMap::new(),
-      input_files: fs::EMPTY_DIGEST,
+      input_files: EMPTY_DIGEST,
       output_files: BTreeSet::new(),
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
@@ -413,7 +415,7 @@ mod tests {
         stdout: as_bytes(""),
         stderr: as_bytes(""),
         exit_code: -15,
-        output_directory: fs::EMPTY_DIGEST,
+        output_directory: EMPTY_DIGEST,
         execution_attempts: vec![],
       }
     )
@@ -429,7 +431,7 @@ mod tests {
     let result = run_command_locally(ExecuteProcessRequest {
       argv: owned_string_vec(&["/usr/bin/env"]),
       env: env.clone(),
-      input_files: fs::EMPTY_DIGEST,
+      input_files: EMPTY_DIGEST,
       output_files: BTreeSet::new(),
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
@@ -465,7 +467,7 @@ mod tests {
       ExecuteProcessRequest {
         argv: owned_string_vec(&["/usr/bin/env"]),
         env: env,
-        input_files: fs::EMPTY_DIGEST,
+        input_files: EMPTY_DIGEST,
         output_files: BTreeSet::new(),
         output_directories: BTreeSet::new(),
         timeout: Duration::from_millis(1000),
@@ -485,7 +487,7 @@ mod tests {
     run_command_locally(ExecuteProcessRequest {
       argv: owned_string_vec(&["echo", "-n", "foo"]),
       env: BTreeMap::new(),
-      input_files: fs::EMPTY_DIGEST,
+      input_files: EMPTY_DIGEST,
       output_files: BTreeSet::new(),
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
@@ -504,7 +506,7 @@ mod tests {
         "exit 0",
       ]),
       env: BTreeMap::new(),
-      input_files: fs::EMPTY_DIGEST,
+      input_files: EMPTY_DIGEST,
       output_files: BTreeSet::new(),
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
@@ -517,7 +519,7 @@ mod tests {
         stdout: as_bytes(""),
         stderr: as_bytes(""),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_directory: EMPTY_DIGEST,
         execution_attempts: vec![],
       }
     )
@@ -532,7 +534,7 @@ mod tests {
         format!("echo -n {} > {}", TestData::roland().string(), "roland"),
       ],
       env: BTreeMap::new(),
-      input_files: fs::EMPTY_DIGEST,
+      input_files: EMPTY_DIGEST,
       output_files: vec![PathBuf::from("roland")].into_iter().collect(),
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
@@ -566,7 +568,7 @@ mod tests {
         ),
       ],
       env: BTreeMap::new(),
-      input_files: fs::EMPTY_DIGEST,
+      input_files: EMPTY_DIGEST,
       output_files: vec![PathBuf::from("treats")].into_iter().collect(),
       output_directories: vec![PathBuf::from("cats")].into_iter().collect(),
       timeout: Duration::from_millis(1000),
@@ -599,7 +601,7 @@ mod tests {
         ),
       ],
       env: BTreeMap::new(),
-      input_files: fs::EMPTY_DIGEST,
+      input_files: EMPTY_DIGEST,
       output_files: vec![PathBuf::from("cats/roland"), PathBuf::from("treats")]
         .into_iter()
         .collect(),
@@ -634,7 +636,7 @@ mod tests {
         ),
       ],
       env: BTreeMap::new(),
-      input_files: fs::EMPTY_DIGEST,
+      input_files: EMPTY_DIGEST,
       output_files: vec![PathBuf::from("roland")].into_iter().collect(),
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
@@ -663,7 +665,7 @@ mod tests {
         format!("echo -n {} > {}", TestData::roland().string(), "roland"),
       ],
       env: BTreeMap::new(),
-      input_files: fs::EMPTY_DIGEST,
+      input_files: EMPTY_DIGEST,
       output_files: vec![PathBuf::from("roland"), PathBuf::from("susannah")]
         .into_iter()
         .collect(),
@@ -694,7 +696,7 @@ mod tests {
         format!("echo -n {} > cats/roland", TestData::roland().string()),
       ],
       env: BTreeMap::new(),
-      input_files: fs::EMPTY_DIGEST,
+      input_files: EMPTY_DIGEST,
       output_files: vec![PathBuf::from("cats/roland")].into_iter().collect(),
       output_directories: vec![PathBuf::from("cats")].into_iter().collect(),
       timeout: Duration::from_millis(1000),
@@ -724,7 +726,7 @@ mod tests {
     let result = run_command_locally(ExecuteProcessRequest {
       argv: vec!["/bin/cat".to_owned(), ".jdk/roland".to_owned()],
       env: BTreeMap::new(),
-      input_files: fs::EMPTY_DIGEST,
+      input_files: EMPTY_DIGEST,
       output_files: BTreeSet::new(),
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
@@ -737,7 +739,7 @@ mod tests {
         stdout: roland,
         stderr: as_bytes(""),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_directory: EMPTY_DIGEST,
         execution_attempts: vec![],
       })
     )
@@ -756,7 +758,7 @@ mod tests {
           format!("echo -n {} > {}", TestData::roland().string(), "roland"),
         ],
         env: BTreeMap::new(),
-        input_files: fs::EMPTY_DIGEST,
+        input_files: EMPTY_DIGEST,
         output_files: vec![PathBuf::from("roland")].into_iter().collect(),
         output_directories: BTreeSet::new(),
         timeout: Duration::from_millis(1000),
@@ -791,7 +793,7 @@ mod tests {
       ExecuteProcessRequest {
         argv: vec!["doesnotexist".to_owned()],
         env: BTreeMap::new(),
-        input_files: fs::EMPTY_DIGEST,
+        input_files: EMPTY_DIGEST,
         output_files: BTreeSet::new(),
         output_directories: BTreeSet::new(),
         timeout: Duration::from_millis(1000),
@@ -823,7 +825,7 @@ mod tests {
         ),
       ],
       env: BTreeMap::new(),
-      input_files: fs::EMPTY_DIGEST,
+      input_files: EMPTY_DIGEST,
       output_files: vec![PathBuf::from("cats/roland")].into_iter().collect(),
       output_directories: vec![PathBuf::from("birds/falcons")].into_iter().collect(),
       timeout: Duration::from_millis(1000),
@@ -852,7 +854,7 @@ mod tests {
         "/bin/mkdir falcons".to_string(),
       ],
       env: BTreeMap::new(),
-      input_files: fs::EMPTY_DIGEST,
+      input_files: EMPTY_DIGEST,
       output_files: BTreeSet::new(),
       output_directories: vec![PathBuf::from("falcons")].into_iter().collect(),
       timeout: Duration::from_millis(1000),
@@ -892,7 +894,7 @@ mod tests {
     cleanup: bool,
   ) -> Result<FallibleExecuteProcessResult, String> {
     let store_dir = TempDir::new().unwrap();
-    let store = fs::Store::local_only(store_dir.path()).unwrap();
+    let store = Store::local_only(store_dir.path()).unwrap();
     let runner = super::CommandRunner {
       store: store,
       work_dir: dir,

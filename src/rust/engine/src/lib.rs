@@ -42,7 +42,6 @@ mod selectors;
 mod tasks;
 mod types;
 
-use fs;
 use futures;
 
 use hashing;
@@ -379,12 +378,10 @@ pub extern "C" fn scheduler_fork_context(
   scheduler_ptr: *mut Scheduler,
   func: Function,
 ) -> PyResult {
-  with_scheduler(scheduler_ptr, |scheduler| {
-    scheduler.core.fork_context(|| {
-      externs::exclusive_call(&func.0)
-        .map_err(|f| format!("{:?}", f))
-        .into()
-    })
+  with_scheduler(scheduler_ptr, |_| {
+    externs::exclusive_call(&func.0)
+      .map_err(|f| format!("{:?}", f))
+      .into()
   })
 }
 
@@ -668,8 +665,8 @@ pub extern "C" fn set_panic_handler() {
 pub extern "C" fn garbage_collect_store(scheduler_ptr: *mut Scheduler) {
   with_scheduler(scheduler_ptr, |scheduler| {
     match scheduler.core.store().garbage_collect(
-      fs::DEFAULT_LOCAL_STORE_GC_TARGET_BYTES,
-      fs::ShrinkBehavior::Fast,
+      store::DEFAULT_LOCAL_STORE_GC_TARGET_BYTES,
+      store::ShrinkBehavior::Fast,
     ) {
       Ok(_) => {}
       Err(err) => error!("{}", err),
@@ -746,7 +743,7 @@ pub extern "C" fn capture_snapshots(
           .into_iter()
           .map(|(path_globs, root, digest_hint)| {
             let core = core.clone();
-            fs::Snapshot::capture_snapshot_from_arbitrary_root(
+            store::Snapshot::capture_snapshot_from_arbitrary_root(
               core.store(),
               root,
               path_globs,
@@ -783,7 +780,7 @@ pub extern "C" fn merge_directories(
   with_scheduler(scheduler_ptr, |scheduler| {
     scheduler
       .core
-      .block_on(fs::Snapshot::merge_directories(
+      .block_on(store::Snapshot::merge_directories(
         scheduler.core.store(),
         digests,
       ))

@@ -8,13 +8,14 @@ use bazel_protos;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use digest::{Digest as DigestTrait, FixedOutput};
-use fs::{self, File, PathStat, Store};
+use fs::{self, File, PathStat};
 use futures::{future, Future, Stream};
 use grpcio;
 use hashing::{Digest, Fingerprint};
 use log::{debug, trace, warn};
 use protobuf::{self, Message, ProtobufEnum};
 use sha2::Sha256;
+use store::{Snapshot, Store, StoreFileByDigest};
 use time;
 use tokio_timer::Delay;
 
@@ -691,7 +692,7 @@ impl CommandRunner {
       }
     }
 
-    impl fs::StoreFileByDigest<String> for StoreOneOffRemoteDigest {
+    impl StoreFileByDigest<String> for StoreOneOffRemoteDigest {
       fn store_by_digest(&self, file: File) -> BoxFuture<Digest, String> {
         match self.map_of_paths_to_digests.get(&file.path) {
           Some(digest) => future::ok(*digest),
@@ -705,7 +706,7 @@ impl CommandRunner {
     }
 
     let store = self.store.clone();
-    fs::Snapshot::digest_from_path_stats(
+    Snapshot::digest_from_path_stats(
       self.store.clone(),
       &StoreOneOffRemoteDigest::new(path_map),
       &path_stats,
@@ -719,7 +720,7 @@ impl CommandRunner {
     .join(future::join_all(directory_digests))
     .and_then(|(files_digest, mut directory_digests)| {
       directory_digests.push(files_digest);
-      fs::Snapshot::merge_directories(store, directory_digests).map_err(|err| {
+      Snapshot::merge_directories(store, directory_digests).map_err(|err| {
         ExecutionError::Fatal(format!(
           "Error when merging output files and directories: {}",
           err
@@ -903,12 +904,12 @@ fn timespec_from(timestamp: &protobuf::well_known_types::Timestamp) -> time::Tim
 mod tests {
   use bazel_protos;
   use bytes::Bytes;
-  use fs;
   use futures::Future;
   use grpcio;
-  use hashing::{Digest, Fingerprint};
+  use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
   use mock;
   use protobuf::{self, Message, ProtobufEnum};
+  use store::Store;
   use tempfile::TempDir;
   use testutil::data::{TestData, TestDirectory};
   use testutil::{as_bytes, owned_string_vec};
@@ -1306,7 +1307,7 @@ mod tests {
           &ExecuteProcessRequest {
             argv: owned_string_vec(&["/bin/echo", "-n", "bar"]),
             env: BTreeMap::new(),
-            input_files: fs::EMPTY_DIGEST,
+            input_files: EMPTY_DIGEST,
             output_files: BTreeSet::new(),
             output_directories: BTreeSet::new(),
             timeout: Duration::from_millis(1000),
@@ -1362,7 +1363,7 @@ mod tests {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_directory: EMPTY_DIGEST,
         execution_attempts: vec![],
       }
     );
@@ -1391,7 +1392,7 @@ mod tests {
         stdout: testdata.bytes(),
         stderr: testdata_empty.bytes(),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_directory: EMPTY_DIGEST,
         execution_attempts: vec![],
       }
     );
@@ -1420,7 +1421,7 @@ mod tests {
         stdout: testdata_empty.bytes(),
         stderr: testdata.bytes(),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_directory: EMPTY_DIGEST,
         execution_attempts: vec![],
       }
     );
@@ -1454,7 +1455,7 @@ mod tests {
     let store_dir_path = store_dir.path();
 
     let cas = mock::StubCAS::empty();
-    let store = fs::Store::with_remote(
+    let store = Store::with_remote(
       &store_dir_path,
       &[cas.address()],
       None,
@@ -1463,7 +1464,7 @@ mod tests {
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
-      fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
     )
     .expect("Failed to make store");
@@ -1487,12 +1488,12 @@ mod tests {
         stdout: test_stdout.bytes(),
         stderr: test_stderr.bytes(),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_directory: EMPTY_DIGEST,
         execution_attempts: vec![],
       }
     );
 
-    let local_store = fs::Store::local_only(&store_dir_path).expect("Error creating local store");
+    let local_store = Store::local_only(&store_dir_path).expect("Error creating local store");
     {
       assert_eq!(
         runtime
@@ -1546,7 +1547,7 @@ mod tests {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_directory: EMPTY_DIGEST,
         execution_attempts: vec![],
       }
     );
@@ -1560,7 +1561,7 @@ mod tests {
     let execute_request = ExecuteProcessRequest {
       argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
       env: BTreeMap::new(),
-      input_files: fs::EMPTY_DIGEST,
+      input_files: EMPTY_DIGEST,
       output_files: BTreeSet::new(),
       output_directories: BTreeSet::new(),
       timeout: request_timeout,
@@ -1622,7 +1623,7 @@ mod tests {
         stdout: as_bytes("foo"),
         stderr: as_bytes(""),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_directory: EMPTY_DIGEST,
         execution_attempts: vec![],
       }
     );
@@ -1821,7 +1822,7 @@ mod tests {
     let cas = mock::StubCAS::builder()
       .directory(&TestDirectory::containing_roland())
       .build();
-    let store = fs::Store::with_remote(
+    let store = Store::with_remote(
       store_dir,
       &[cas.address()],
       None,
@@ -1830,7 +1831,7 @@ mod tests {
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
-      fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
     )
     .expect("Failed to make store");
@@ -1860,7 +1861,7 @@ mod tests {
         stdout: roland.bytes(),
         stderr: Bytes::from(""),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_directory: EMPTY_DIGEST,
         execution_attempts: vec![],
       }
     );
@@ -1916,7 +1917,7 @@ mod tests {
     let cas = mock::StubCAS::builder()
       .directory(&TestDirectory::containing_roland())
       .build();
-    let store = fs::Store::with_remote(
+    let store = Store::with_remote(
       store_dir,
       &[cas.address()],
       None,
@@ -1925,7 +1926,7 @@ mod tests {
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
-      fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
     )
     .expect("Failed to make store");
@@ -1952,7 +1953,7 @@ mod tests {
         stdout: roland.bytes(),
         stderr: Bytes::from(""),
         exit_code: 0,
-        output_directory: fs::EMPTY_DIGEST,
+        output_directory: EMPTY_DIGEST,
         execution_attempts: vec![],
       })
     );
@@ -1985,7 +1986,7 @@ mod tests {
       .file(&TestData::roland())
       .directory(&TestDirectory::containing_roland())
       .build();
-    let store = fs::Store::with_remote(
+    let store = Store::with_remote(
       store_dir,
       &[cas.address()],
       None,
@@ -1994,7 +1995,7 @@ mod tests {
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
-      fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
     )
     .expect("Failed to make store");
@@ -2470,7 +2471,7 @@ mod tests {
     ExecuteProcessRequest {
       argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
       env: BTreeMap::new(),
-      input_files: fs::EMPTY_DIGEST,
+      input_files: EMPTY_DIGEST,
       output_files: BTreeSet::new(),
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(5000),
@@ -2592,7 +2593,7 @@ mod tests {
 
   fn create_command_runner(address: String, cas: &mock::StubCAS) -> CommandRunner {
     let store_dir = TempDir::new().unwrap();
-    let store = fs::Store::with_remote(
+    let store = Store::with_remote(
       store_dir,
       &[cas.address()],
       None,
@@ -2601,7 +2602,7 @@ mod tests {
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
-      fs::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
     )
     .expect("Failed to make store");
@@ -2686,7 +2687,7 @@ mod tests {
     ExecuteProcessRequest {
       argv: owned_string_vec(&["/bin/echo", "meoooow"]),
       env: BTreeMap::new(),
-      input_files: fs::EMPTY_DIGEST,
+      input_files: EMPTY_DIGEST,
       output_files: BTreeSet::new(),
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
