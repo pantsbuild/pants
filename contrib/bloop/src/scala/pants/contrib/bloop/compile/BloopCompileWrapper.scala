@@ -108,7 +108,24 @@ object PantsCompileMain {
       implicit val bspClient = new BloopLanguageClient(clientOut, bspLogger)
       val messages = BaseProtocolMessage.fromInputStream(clientIn, bspLogger)
 
-      val services = Services.empty(bspLogger)
+      implicit val _ctx: DebugFilter = DebugFilter.All
+
+      throw new Exception("wow")
+
+      val services = Services
+        .empty(bspLogger)
+        .notification(endpoints.Build.showMessage) {
+          case bsp.ShowMessageParams(bsp.MessageType.Log, _, _, msg) => logger.debug(msg)
+          case bsp.ShowMessageParams(bsp.MessageType.Info, _, _, msg) => logger.info(msg)
+          case bsp.ShowMessageParams(bsp.MessageType.Warning, _, _, msg) => logger.warn(msg)
+          case bsp.ShowMessageParams(bsp.MessageType.Error, _, _, msg) => logger.error(msg)
+        }
+        .notification(endpoints.Build.logMessage) {
+          case bsp.LogMessageParams(bsp.MessageType.Log, _, _, msg) => logger.debug(msg)
+          case bsp.LogMessageParams(bsp.MessageType.Info, _, _, msg) => logger.info(msg)
+          case bsp.LogMessageParams(bsp.MessageType.Warning, _, _, msg) => logger.warn(msg)
+          case bsp.LogMessageParams(bsp.MessageType.Error, _, _, msg) => logger.error(msg)
+        }
 
       val bspServer = new BloopLanguageServer(messages, bspClient, services, scheduler, bspLogger)
       val runningClientServer = bspServer.startTask.runAsync(scheduler)
@@ -121,8 +138,6 @@ object PantsCompileMain {
         capabilities = bsp.BuildClientCapabilities(List("scala")),
         data = None
       )
-
-      throw new Exception(s"initializeBuildParams: $initializeBuildParams")
 
       endpoints.Build.initialize.request(initializeBuildParams)
         .flatMap { initializeResult =>
