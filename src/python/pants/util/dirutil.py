@@ -310,6 +310,7 @@ def safe_rmtree(directory):
   else:
     shutil.rmtree(directory, ignore_errors=True)
 
+
 def safe_rmtree_recursive(directory):
   """Delete a directory if it's present. If it's not present, no-op.
 
