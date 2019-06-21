@@ -11,13 +11,8 @@ from pex.pex_info import PexInfo
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_execution_task_base import PythonExecutionTaskBase
-from pants.base.exception_sink import ExceptionSink, SignalHandler
+from pants.base.exception_sink import ExceptionSink
 from pants.task.repl_task_mixin import ReplTaskMixin
-
-
-class PythonReplSignalHandler(SignalHandler):
-  def handle_sigint(self, signum, _frame):
-    pass
 
 
 class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
@@ -61,18 +56,12 @@ class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
 
   # N.B. **pex_run_kwargs is used by tests only.
   def launch_repl(self, pex, **pex_run_kwargs):
-    running_under_pantsd = self.context.options.for_global_scope().enable_pantsd
-
-    if not running_under_pantsd:
-      # While the repl subprocess is synchronously spawned, we rely on process group
-      # signalling for a SIGINT to reach the repl subprocess directly - and want to
-      # do nothing in response on the parent side.
-      with ExceptionSink.trapped_signals(PythonReplSignalHandler()):
-        self._run_repl(pex, **pex_run_kwargs)
-    else:
-      # In pantsd, this task will be running in a non-main thread,
-      # so we can't override signal handling here.
-      # That said, this means that under pantsd,
-      # Ctrl-C will simply crash the repl (and the daemon).
-      # TODO(#7623) Potential more robust (but more invasive) fix.
+    # While the repl subprocess is synchronously spawned, we rely on process group
+    # signalling for a SIGINT to reach the repl subprocess directly - and want to
+    # do nothing in response on the parent side.
+    #
+    # NB: We use ExceptionSink.ignoring_sigint instead of ExceptionSink.trapped_signals here
+    # because this code may be running from a non-main thread when run under pantsd, and therefore
+    # will crash if we try to install new signal handlers.
+    with ExceptionSink.ignoring_sigint():
       self._run_repl(pex, **pex_run_kwargs)
