@@ -262,7 +262,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     with http_server(ZipkinHandler) as port:
       endpoint = "http://localhost:{}".format(port)
       command = [
-        '--v1',
+        '--no-v1',
         '--v2',
         '--reporting-zipkin-endpoint={}'.format(endpoint),
         '--reporting-zipkin-trace-v2',
@@ -280,7 +280,6 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
         "There is no span that contains '{}' in it's name. The trace:{}".format(
         v2_span_name_part, trace
         ))
-
 
   def test_zipkin_reporter_multi_threads(self):
     ZipkinHandler = zipkin_handler()

@@ -183,7 +183,7 @@ class LocalPantsRunner(object):
     )
 
   def __init__(self, build_root, exiter, options, options_bootstrapper, build_config, target_roots,
-               graph_session, scheduler, is_daemon, profile_path):
+               graph_session, scheduler_session, is_daemon, profile_path):
     """
     :param string build_root: The build root for this run.
     :param Exiter exiter: The Exiter instance to use for this run.
@@ -202,7 +202,7 @@ class LocalPantsRunner(object):
     self._build_config = build_config
     self._target_roots = target_roots
     self._graph_session = graph_session
-    self._scheduler = scheduler
+    self._scheduler_session = scheduler_session
     self._is_daemon = is_daemon
     self._profile_path = profile_path
 
@@ -288,9 +288,9 @@ class LocalPantsRunner(object):
     return max_code
 
   def _update_stats(self):
-    metrics = self._scheduler.metrics()
+    metrics = self._scheduler_session.metrics()
     self._run_tracker.pantsd_stats.set_scheduler_metrics(metrics)
-    engine_workunits = self._scheduler.engine_workunits(metrics)
+    engine_workunits = self._scheduler_session.engine_workunits(metrics)
     if engine_workunits:
       self._run_tracker.report.bulk_record_workunits(engine_workunits)
 
