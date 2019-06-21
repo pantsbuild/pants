@@ -6,7 +6,7 @@ import os
 
 from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_concurrent_rename, safe_rmtree
+from pants.util.dirutil import safe_concurrent_rename, safe_rmtree_recursive
 
 
 logger = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ class Clean(Task):
         pid = os.fork()
         if pid == 0:
           try:
-            safe_rmtree(pants_trash)
+            safe_rmtree_recursive(pants_trash)
           except (IOError, OSError):
             logger.warning("Async clean-all failed. Please try again.")
           finally:
@@ -53,4 +53,4 @@ class Clean(Task):
       else:
         # Recursively removes pants cache; user waits patiently.
         logger.info('For async removal, run `./pants clean-all --async`')
-        safe_rmtree(pants_trash)
+        safe_rmtree_recursive(pants_trash)

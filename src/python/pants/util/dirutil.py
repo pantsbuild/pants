@@ -310,6 +310,20 @@ def safe_rmtree(directory):
   else:
     shutil.rmtree(directory, ignore_errors=True)
 
+def safe_rmtree_recursive(directory):
+  """Delete a directory if it's present. If it's not present, no-op.
+
+  Note that if the directory argument is a symlink, it will follow the symlink and delete
+  everything inside.
+
+  :API: public
+  """
+  if os.path.islink(directory):
+    safe_delete(directory)
+  else:
+    directory = os.path.join(directory, os.sep)
+    shutil.rmtree(directory, ignore_errors=True)
+
 
 def safe_open(filename, *args, **kwargs):
   """Open a file safely, ensuring that its directory exists.

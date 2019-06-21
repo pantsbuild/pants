@@ -16,7 +16,8 @@ from pants.util.dirutil import (ExistingDirError, ExistingFileError, _mkdtemp_un
                                 get_basedir, longest_dir_prefix, mergetree, read_file,
                                 relative_symlink, relativize_paths, rm_rf, safe_concurrent_creation,
                                 safe_file_dump, safe_mkdir, safe_mkdtemp, safe_open,
-                                safe_rm_oldest_items_in_dir, safe_rmtree, touch)
+                                safe_rm_oldest_items_in_dir, safe_rmtree, safe_rmtree_recursive,
+                                touch)
 from pants.util.objects import datatype
 
 
@@ -494,6 +495,18 @@ class DirutilTest(unittest.TestCase):
       self.assertTrue(os.path.exists(link))
       safe_rmtree(link)
       self.assertTrue(os.path.exists(real))
+      self.assertFalse(os.path.exists(link))
+
+  def test_safe_rmtree_recursive_link(self):
+    with temporary_dir() as td:
+      real = os.path.join(td, 'real')
+      link = os.path.join(td, 'link')
+      os.mkdir(real)
+      os.symlink(real, link)
+      self.assertTrue(os.path.exists(real))
+      self.assertTrue(os.path.exists(link))
+      safe_rmtree_recursive(link)
+      self.assertFalse(os.path.exists(real))
       self.assertFalse(os.path.exists(link))
 
 
