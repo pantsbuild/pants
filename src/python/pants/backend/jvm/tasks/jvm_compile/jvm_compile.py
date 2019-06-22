@@ -51,7 +51,6 @@ _JAVAC_PLUGIN_INFO_FILE = 'META-INF/services/com.sun.source.util.Plugin'
 
 # Well known metadata file to register annotation processors with a java 1.6+ compiler.
 _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
-_POST_COMPILE_MERGE_DIR_PREFIX = 'post_compile_merge_dir'
 
 
 class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
