@@ -3,7 +3,6 @@
 
 import logging
 import sys
-from builtins import map, object
 from contextlib import contextmanager
 
 from twitter.common.collections import maybe_list

@@ -6,7 +6,6 @@ python_tests(
   sources=['test_build_dictionary_info_extracter.py'],
   coverage=['pants.help.build_dictionary_info_extracter'],
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/build_graph',
     'src/python/pants/help',
     'src/python/pants/util:objects',

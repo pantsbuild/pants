@@ -5,7 +5,6 @@ import sys
 import types
 import unittest
 import uuid
-from builtins import object
 from contextlib import contextmanager
 
 from future.utils import PY2

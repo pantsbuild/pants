@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import unittest
-from builtins import str
 
 from pants.build_graph.address import Address
 from pants.engine.objects import ValidationError

@@ -5,7 +5,6 @@ import os
 import shutil
 import tempfile
 import unittest
-from builtins import open
 
 from pants.reporting.linkify import linkify
 

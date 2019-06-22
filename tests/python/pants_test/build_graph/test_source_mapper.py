@@ -1,7 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from builtins import str
 from textwrap import dedent
 
 # TODO: Create a dummy target type in this test and remove this dep.

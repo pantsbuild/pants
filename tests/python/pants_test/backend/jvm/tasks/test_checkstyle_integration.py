@@ -4,7 +4,6 @@
 import json
 import os
 import shutil
-from builtins import open
 from contextlib import contextmanager
 from textwrap import dedent
 

@@ -3,7 +3,6 @@
 
 import glob
 import os
-from builtins import open
 from contextlib import contextmanager
 
 from future.utils import PY3

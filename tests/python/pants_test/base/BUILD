@@ -26,7 +26,6 @@ python_tests(
   name = 'exclude_target_regexp_integration',
   sources = [ 'test_exclude_target_regexp_integration.py' ],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:process_handler',
     'tests/python/pants_test:int-test',
   ],
@@ -49,7 +48,6 @@ python_library(
   name = 'context_utils',
   sources = ['context_utils.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:workunit',
     'src/python/pants/build_graph',
@@ -64,7 +62,6 @@ python_tests(
   sources = ['test_deprecated.py'],
   dependencies = [
     '3rdparty/python:mock',
-    '3rdparty/python:future',
     'src/python/pants/base:deprecated',
     'src/python/pants/util:collections',
     'src/python/pants:version',
@@ -173,7 +170,6 @@ python_tests(
   name = 'run_info',
   sources = ['test_run_info.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/base:run_info',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:test_base',
@@ -184,7 +180,6 @@ python_tests(
   name = 'worker_pool',
   sources = ['test_worker_pool.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/base:worker_pool',
     'src/python/pants/util:contextutil',
   ]
@@ -202,7 +197,6 @@ python_tests(
   name = 'exception_sink',
   sources = ['test_exception_sink.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:mock',
     'src/python/pants/base:exception_sink',
     'src/python/pants/util:contextutil',

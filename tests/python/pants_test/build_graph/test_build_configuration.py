@@ -3,7 +3,6 @@
 
 import os
 import unittest
-from builtins import object
 from contextlib import contextmanager
 
 from pants.base.build_file import BuildFile

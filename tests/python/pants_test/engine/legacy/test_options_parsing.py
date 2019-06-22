@@ -1,7 +1,6 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from builtins import str
 
 from pants.engine.selectors import Params
 from pants.init.options_initializer import BuildConfigInitializer

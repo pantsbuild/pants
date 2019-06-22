@@ -29,7 +29,6 @@ python_library(
     'pants_run_integration_test.py'
   ],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:ansicolors',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',

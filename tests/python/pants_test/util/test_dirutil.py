@@ -5,7 +5,6 @@ import errno
 import os
 import time
 import unittest
-from builtins import open, str
 from contextlib import contextmanager
 
 import mock

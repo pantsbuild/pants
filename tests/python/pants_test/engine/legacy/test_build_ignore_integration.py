@@ -3,7 +3,6 @@
 
 import os
 import tempfile
-from builtins import open
 
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 

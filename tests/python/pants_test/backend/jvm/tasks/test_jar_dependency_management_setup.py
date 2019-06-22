@@ -1,7 +1,6 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from builtins import next, object
 
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
                                                                     JarDependencyManagementSetup)

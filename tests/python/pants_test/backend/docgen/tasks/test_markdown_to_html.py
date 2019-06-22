@@ -3,7 +3,6 @@
 
 import os
 import unittest
-from builtins import open
 from textwrap import dedent
 
 import bs4

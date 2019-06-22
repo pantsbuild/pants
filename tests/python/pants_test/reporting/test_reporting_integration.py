@@ -5,7 +5,6 @@ import json
 import os.path
 import re
 import unittest
-from builtins import open
 from collections import defaultdict
 from http.server import BaseHTTPRequestHandler
 

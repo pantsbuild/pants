@@ -3,7 +3,6 @@
 
 import os
 import re
-from builtins import str
 
 from future.utils import PY3
 from pex.interpreter import PythonInterpreter

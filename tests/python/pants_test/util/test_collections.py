@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import unittest
-from builtins import str
 
 from pants.util.collections import (assert_single_element, combined_dict, factory_dict,
                                     recursively_update)

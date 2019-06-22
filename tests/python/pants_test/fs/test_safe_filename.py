@@ -3,7 +3,6 @@
 
 import os
 import unittest
-from builtins import object
 
 from pants.fs.fs import safe_filename
 

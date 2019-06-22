@@ -3,7 +3,6 @@
 
 import os
 import unittest
-from builtins import open
 from contextlib import contextmanager
 from textwrap import dedent
 from unittest import skipIf

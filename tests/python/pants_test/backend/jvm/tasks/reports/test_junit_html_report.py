@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from builtins import open
 from contextlib import contextmanager
 
 from pants.backend.jvm.tasks.reports.junit_html_report import (JUnitHtmlReport, ReportTestCase,

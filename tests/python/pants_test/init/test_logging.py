@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-from builtins import open
 from contextlib import contextmanager
 
 from pants.init.logging import get_numeric_level, setup_logging

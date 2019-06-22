@@ -6,7 +6,6 @@ python_tests(
   name = 'markdown_to_html',
   sources = ['test_markdown_to_html.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:beautifulsoup4',
     '3rdparty/python:mock',
     'src/python/pants/backend/docgen/targets',

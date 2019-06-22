@@ -27,7 +27,6 @@ python_tests(
   name = 'strict_deps_invalidation_integration',
   sources = ['test_strict_deps_invalidation_integration.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/base:build_environment',
     'tests/python/pants_test:int-test',
   ],

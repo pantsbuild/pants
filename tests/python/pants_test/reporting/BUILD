@@ -5,7 +5,6 @@ python_tests(
   name = 'linkify',
   sources = ['test_linkify.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/reporting',
   ],
   timeout = 10,

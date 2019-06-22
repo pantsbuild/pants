@@ -3,7 +3,6 @@
 
 import os
 import re
-from builtins import open, range
 from contextlib import contextmanager
 from textwrap import dedent
 

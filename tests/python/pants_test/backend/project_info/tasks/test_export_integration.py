@@ -4,7 +4,6 @@
 import json
 import os
 import re
-from builtins import open
 
 from twitter.common.collections import maybe_list
 

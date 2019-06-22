@@ -3,7 +3,6 @@
 
 import os
 import re
-from builtins import open
 
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest

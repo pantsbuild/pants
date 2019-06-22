@@ -3,7 +3,6 @@
 
 import collections
 import os
-from builtins import next, object, open
 from contextlib import contextmanager
 from unittest import TestCase
 from xml.etree.ElementTree import ParseError

@@ -3,7 +3,6 @@
 
 import os
 import unittest
-from builtins import object, str
 
 from mock import Mock
 

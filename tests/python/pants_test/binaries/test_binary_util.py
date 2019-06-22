@@ -4,7 +4,6 @@
 import glob
 import logging
 import os
-from builtins import object, open, str
 
 import mock
 from future.utils import PY2

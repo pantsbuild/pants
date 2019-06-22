@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import unittest
-from builtins import chr, range
 from collections import defaultdict
 
 from pants.backend.jvm.targets.jar_library import JarLibrary

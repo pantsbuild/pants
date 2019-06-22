@@ -3,7 +3,6 @@
 
 import os
 import re
-from builtins import open
 from contextlib import contextmanager
 
 from pants.backend.jvm.subsystems.jvm import JVM

@@ -3,7 +3,6 @@
 
 import os
 import re
-from builtins import object, open, str
 from subprocess import PIPE, Popen
 from textwrap import dedent
 

@@ -3,7 +3,6 @@
 
 import ast
 import unittest
-from builtins import object, str
 
 from pants.engine.selectors import Get
 

@@ -3,7 +3,6 @@
 
 import os
 import textwrap
-from builtins import open
 
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir

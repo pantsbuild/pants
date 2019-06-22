@@ -5,7 +5,6 @@ import io
 import json
 import os
 import shlex
-from builtins import open, str
 from contextlib import contextmanager
 from textwrap import dedent
 

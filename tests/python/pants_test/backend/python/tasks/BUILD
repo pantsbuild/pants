@@ -6,7 +6,6 @@ python_library(
   sources=['interpreter_cache_test_mixin.py'],
   dependencies = [
     'src/python/pants/util:collections_abc_backport',
-    '3rdparty/python:future',
   ]
 )
 
@@ -15,7 +14,6 @@ python_library(
   sources=['python_task_test_base.py'],
   dependencies=[
     ':interpreter_cache_test_mixin',
-    '3rdparty/python:future',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
@@ -54,7 +52,6 @@ python_tests(
   name = 'gather_sources',
   sources = ['test_gather_sources.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:pex',
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/backend/python/subsystems',
@@ -85,7 +82,6 @@ python_tests(
   name = 'isort_run',
   sources = ['test_isort_run.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/backend/python/tasks',
     'src/python/pants/base:exceptions',
     'src/python/pants/util:contextutil',
@@ -110,7 +106,6 @@ python_tests(
   sources = ['test_pytest_run.py'],
   dependencies = [
     '3rdparty/python:coverage',
-    '3rdparty/python:future',
     'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python/tasks',
     'src/python/pants/base:exceptions',
@@ -143,7 +138,6 @@ python_tests(
   name = 'python_binary_create',
   sources = ['test_python_binary_create.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/backend/python/tasks',
     'src/python/pants/base:run_info',
     'src/python/pants/build_graph',
@@ -168,7 +162,6 @@ python_tests(
   name = 'python_repl',
   sources = ['test_python_repl.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/backend/python/tasks',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
@@ -219,7 +212,6 @@ python_tests(
   name = 'resolve_requirements',
   sources = ['test_resolve_requirements.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:pex',
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/backend/python:python_requirement',
@@ -238,7 +230,6 @@ python_tests(
   name = 'select_interpreter',
   sources = ['test_select_interpreter.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:mock',
     '3rdparty/python:pex',
     'src/python/pants/backend/python:interpreter_cache',
@@ -255,7 +246,6 @@ python_tests(
   name = 'setup_py',
   sources = ['test_setup_py.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:mock',
     '3rdparty/python:pex',
     '3rdparty/python/twitter/commons:twitter.common.collections',

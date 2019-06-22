@@ -3,7 +3,6 @@
 
 import re
 import sys
-from builtins import object, str
 from contextlib import contextmanager
 from textwrap import dedent
 

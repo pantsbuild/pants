@@ -3,7 +3,6 @@
 
 import os
 import shutil
-from builtins import open
 
 import requests
 from pex.bin import pex as pex_main

@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import sys
-from builtins import object
 
 from pants.reporting.report import Report
 

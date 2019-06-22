@@ -3,7 +3,6 @@
 
 import os
 import re
-from builtins import str
 from io import StringIO
 from types import GeneratorType
 

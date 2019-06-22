@@ -6,7 +6,6 @@ import json
 import math
 import re
 import unittest
-from builtins import range, str
 from collections import OrderedDict
 
 from future.utils import PY3

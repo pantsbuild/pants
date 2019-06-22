@@ -3,7 +3,6 @@
 
 import re
 import unittest
-from builtins import str
 from contextlib import contextmanager
 
 from future.utils import PY3

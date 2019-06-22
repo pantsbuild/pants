@@ -4,7 +4,6 @@
 import copy
 import pickle
 from abc import abstractmethod
-from builtins import object, str
 from textwrap import dedent
 
 from future.utils import PY2, PY3, text_type

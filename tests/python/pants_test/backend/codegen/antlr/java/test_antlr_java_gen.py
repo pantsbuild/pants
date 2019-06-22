@@ -4,7 +4,6 @@
 import os
 import re
 import time
-from builtins import open
 from textwrap import dedent
 
 from twitter.common.dirutil.fileset import Fileset

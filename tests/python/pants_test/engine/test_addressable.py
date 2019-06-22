@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import unittest
-from builtins import object
 
 from pants.engine.addressable import (MutationError, NotSerializableError, addressable,
                                       addressable_dict, addressable_list)

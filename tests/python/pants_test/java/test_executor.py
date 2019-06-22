@@ -4,7 +4,6 @@
 import os
 import textwrap
 import unittest
-from builtins import object
 from contextlib import contextmanager
 
 from pants.java.distribution.distribution import Distribution
