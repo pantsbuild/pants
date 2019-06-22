@@ -258,10 +258,10 @@ class AddressableList(AddressableDescriptor):
     if not isinstance(value, MutableSequence):
       raise TypeError('The {} property of {} must be a list, given {} of type {}'
                       .format(self._name, instance, value, type(value).__name__))
-    return [super()._checked_value(instance, v) for v in value]
+    return [super(AddressableList, self)._checked_value(instance, v) for v in value]
 
   def _resolve_value(self, instance, value):
-    return [super()._resolve_value(instance, v)
+    return [super(AddressableList, self)._resolve_value(instance, v)
             for v in value] if value else []
 
 
@@ -287,10 +287,10 @@ class AddressableDict(AddressableDescriptor):
     if not isinstance(value, MutableMapping):
       raise TypeError('The {} property of {} must be a dict, given {} of type {}'
                       .format(self._name, instance, value, type(value).__name__))
-    return {k: super()._checked_value(instance, v) for k, v in value.items()}
+    return {k: super(AddressableDict, self)._checked_value(instance, v) for k, v in value.items()}
 
   def _resolve_value(self, instance, value):
-    return {k: super()._resolve_value(instance, v)
+    return {k: super(AddressableDict, self)._resolve_value(instance, v)
             for k, v in value.items()} if value else {}
 
 
