@@ -220,13 +220,13 @@ To run tests and bring up `pdb` for failing tests, you can instead pass `--pdb` 
 
         @classmethod
         def setUpClass(cls):
-    >     super(TargetsHelpTest, cls).setUpClass()
+    >     super().setUpClass()
     E     AttributeError: 'super' object has no attribute 'setUpClass'
 
     tests/python/pants_test/tasks/test_targets_help.py:24: AttributeError
     >>>>>>>>>>>>>>>>>>>>>>>>>>>>> entering PDB >>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     > /Users/lhosken/workspace/pants/tests/python/pants_test/tasks/test_targets_help.py(24)setUpClass()
-    -> super(TargetsHelpTest, cls).setUpClass()
+    -> super().setUpClass()
     (Pdb)
 
 Debug quickly; that test target will time out in a couple of minutes,

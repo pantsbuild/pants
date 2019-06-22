@@ -118,7 +118,7 @@ versions are set with the class method implementation_version.
     Class FooTask(Task):
       @classmethod
       def implementation_version(cls):
-        return super(FooTask, cls).implementation_version() + [('FooTask', 1)]
+        return super().implementation_version() + [('FooTask', 1)]
 
 We store both a version number and the name of the class in order to disambiguate changes in
 different classes that have the same implementation version set.
