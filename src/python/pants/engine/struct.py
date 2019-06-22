@@ -1,11 +1,13 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+
+from collections.abc import MutableMapping, MutableSequence
+
 from future.utils import binary_type, text_type
 
 from pants.engine.addressable import addressable, addressable_list
 from pants.engine.objects import Serializable, SerializableFactory, Validatable, ValidationError
-from pants.util.collections_abc_backport import MutableMapping, MutableSequence
 from pants.util.objects import SubclassesOf, SuperclassesOf
 
 

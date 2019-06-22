@@ -4,12 +4,12 @@
 import os
 import sys
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 from contextlib import contextmanager
 from zipfile import ZIP_DEFLATED
 
 from future.utils import PY2
 
-from pants.util.collections_abc_backport import OrderedDict
 from pants.util.contextutil import open_tar, open_zip, temporary_dir
 from pants.util.dirutil import is_executable, safe_concurrent_rename, safe_walk
 from pants.util.process_handler import subprocess

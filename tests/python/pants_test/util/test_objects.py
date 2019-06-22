@@ -4,11 +4,11 @@
 import copy
 import pickle
 from abc import abstractmethod
+from collections import OrderedDict
 from textwrap import dedent
 
 from future.utils import PY2, PY3, text_type
 
-from pants.util.collections_abc_backport import OrderedDict
 from pants.util.objects import (EnumVariantSelectionError, Exactly, HashableTypedCollection,
                                 SubclassesOf, SuperclassesOf, TypeCheckError, TypeConstraintError,
                                 TypedCollection, TypedDatatypeInstanceConstructionError,

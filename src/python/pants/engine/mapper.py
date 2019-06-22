@@ -2,10 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
+from collections import OrderedDict
 
 from pants.build_graph.address import BuildFileAddress
 from pants.engine.objects import Serializable
-from pants.util.collections_abc_backport import OrderedDict
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
 

@@ -3,12 +3,12 @@
 
 import os
 import re
+from collections import OrderedDict, defaultdict
 
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
 from pants.base.exceptions import TaskError
 from pants.engine.fs import FilesContent
 from pants.task.task import Task
-from pants.util.collections_abc_backport import OrderedDict, defaultdict
 from pants.util.dirutil import safe_file_dump
 
 

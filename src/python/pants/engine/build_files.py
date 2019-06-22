@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+from collections.abc import MutableMapping, MutableSequence
 from os.path import dirname, join
 
 import six
@@ -20,7 +21,6 @@ from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
 from pants.engine.struct import Struct
-from pants.util.collections_abc_backport import MutableMapping, MutableSequence
 from pants.util.objects import TypeConstraintError
 
 

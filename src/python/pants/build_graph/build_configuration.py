@@ -3,6 +3,7 @@
 
 import logging
 from collections import OrderedDict, namedtuple
+from collections.abc import Iterable
 
 from twitter.common.collections import OrderedSet
 
@@ -12,7 +13,6 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.engine.rules import RuleIndex
 from pants.option.optionable import Optionable
-from pants.util.collections_abc_backport import Iterable
 from pants.util.memo import memoized_method
 
 

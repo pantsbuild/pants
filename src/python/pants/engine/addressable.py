@@ -2,13 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import inspect
+from collections.abc import MutableMapping, MutableSequence
 from functools import update_wrapper
 
 from future.utils import string_types
 
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.objects import Collection, Resolvable, Serializable
-from pants.util.collections_abc_backport import MutableMapping, MutableSequence
 from pants.util.objects import TypeConstraintError
 
 

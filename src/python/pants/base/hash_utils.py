@@ -4,11 +4,12 @@
 import hashlib
 import json
 import logging
+from collections import OrderedDict
+from collections.abc import Iterable, Mapping, Set
 
 from future.utils import PY3, binary_type, text_type
 from twitter.common.collections import OrderedSet
 
-from pants.util.collections_abc_backport import Iterable, Mapping, OrderedDict, Set
 from pants.util.objects import DatatypeMixin
 from pants.util.strutil import ensure_binary
 

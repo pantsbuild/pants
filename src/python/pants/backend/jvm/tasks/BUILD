@@ -172,7 +172,6 @@ python_library(
   name = 'classpath_util',
   sources = ['classpath_util.py'],
   dependencies = [
-    'src/python/pants/util:collections_abc_backport',
     ':classpath_entry',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/util:contextutil',
@@ -315,7 +314,6 @@ python_library(
   name = 'jar_publish',
   sources = ['jar_publish.py'],
   dependencies = [
-    'src/python/pants/util:collections_abc_backport',
     '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':jar_publish_resources',
@@ -590,7 +588,6 @@ python_library(
   name = 'properties',
   sources = ['properties.py'],
   dependencies = [
-    'src/python/pants/util:collections_abc_backport',
     '3rdparty/python:six',
   ],
 )
@@ -620,8 +617,6 @@ python_library(
 python_library(
   name = 'resolve_shared',
   sources = ['resolve_shared.py'],
-  dependencies = [
-  ],
 )
 
 python_library(
