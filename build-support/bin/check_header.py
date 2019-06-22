@@ -112,7 +112,7 @@ def check_dir(directory: str, newly_created_files: Iterable[str]) -> List[Header
   header_parse_failures: List[HeaderCheckFailure] = []
   for root, dirs, files in os.walk(directory):
     for f in files:
-      if not f.endswith('.py') or os.path.basename(f) == '__init__.py':
+      if not f.endswith('.py') or os.path.basename(f) == '__init__.py' or root.endswith('contrib/python/checks/checker'):
         continue
       filename = os.path.join(root, f)
       try:
