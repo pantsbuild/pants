@@ -856,14 +856,13 @@ pub enum EntryType {
 mod local {
   use super::{EntryType, ShrinkBehavior};
 
-  use boxfuture::{BoxFuture, Boxable};
+  use boxfuture::{try_future, BoxFuture, Boxable};
   use bytes::Bytes;
   use digest::{Digest as DigestTrait, FixedOutput};
   use futures::future::{self, Future};
   use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
-  use lmdb::Error::{KeyExist, NotFound};
+  use lmdb::Error::NotFound;
   use lmdb::{self, Cursor, Database, RwTransaction, Transaction, WriteFlags};
-  use log::error;
   use sha2::Sha256;
   use sharded_lmdb::ShardedLmdb;
   use std;
@@ -1121,50 +1120,16 @@ mod local {
         EntryType::File => self.inner.file_dbs.clone(),
       };
 
-      let bytestore = self.clone();
-      futures::future::poll_fn(move || {
-        tokio_threadpool::blocking(|| {
-          let fingerprint = {
-            let mut hasher = Sha256::default();
-            hasher.input(&bytes);
-            Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
-          };
-          let digest = Digest(fingerprint, bytes.len());
-
-          let (env, content_database, lease_database) = dbs.clone()?.get(&fingerprint);
-          let put_res = env.begin_rw_txn().and_then(|mut txn| {
-            txn.put(
-              content_database,
-              &fingerprint,
-              &bytes,
-              WriteFlags::NO_OVERWRITE,
-            )?;
-            if initial_lease {
-              bytestore.lease(
-                lease_database,
-                &fingerprint,
-                Self::default_lease_until_secs_since_epoch(),
-                &mut txn,
-              )?;
-            }
-            txn.commit()
-          });
-
-          match put_res {
-            Ok(()) => Ok(digest),
-            Err(KeyExist) => Ok(digest),
-            Err(err) => Err(format!("Error storing digest {:?}: {}", digest, err)),
-          }
-        })
-      })
-      .then(|blocking_result| match blocking_result {
-        Ok(v) => v,
-        Err(blocking_err) => Err(format!(
-          "Unable to run blocking task to store_bytes in local ByteStore on tokio runtime: {}",
-          blocking_err
-        )),
-      })
-      .to_boxed()
+      let fingerprint = {
+        let mut hasher = Sha256::default();
+        hasher.input(&bytes);
+        Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
+      };
+      let digest = Digest(fingerprint, bytes.len());
+      try_future!(dbs)
+        .store_bytes(digest.0, bytes, initial_lease)
+        .map(move |()| digest)
+        .to_boxed()
     }
 
     pub fn load_bytes_with<T: Send + 'static, F: Fn(Bytes) -> T + Send + Sync + 'static>(
@@ -1185,27 +1150,11 @@ mod local {
         EntryType::File => self.inner.file_dbs.clone(),
       };
 
-      futures::future::poll_fn(move || tokio_threadpool::blocking(|| {
-        let (env, db, _) = dbs.clone()?.get(&digest.0);
-        let ro_txn = env
-            .begin_ro_txn()
-            .map_err(|err| format!("Failed to begin read transaction: {}", err));
-        ro_txn.and_then(|txn| match txn.get(db, &digest.0) {
-          Ok(bytes) => {
-            if bytes.len() == digest.1 {
-              Ok(Some(f(Bytes::from(bytes))))
-            } else {
-              error!("Got hash collision reading from store - digest {:?} was requested, but retrieved bytes with that fingerprint had length {}. Congratulations, you may have broken sha256! Underlying bytes: {:?}", digest, bytes.len(), bytes);
-              Ok(None)
-            }
-          }
-          Err(NotFound) => Ok(None),
-          Err(err) => Err(format!("Error loading digest {:?}: {}", digest, err, )),
-        })
-      })).then(|blocking_result| {
-        match blocking_result {
-          Ok(v) => v,
-          Err(blocking_err) => Err(format!("Unable to run blocking task to load_bytes in local ByteStore on tokio runtime: {}", blocking_err)),
+      try_future!(dbs).load_bytes_with(digest.0, move |bytes| {
+        if bytes.len() == digest.1 {
+          Ok(f(bytes))
+        } else {
+          Err(format!("Got hash collision reading from store - digest {:?} was requested, but retrieved bytes with that fingerprint had length {}. Congratulations, you may have broken sha256! Underlying bytes: {:?}", digest, bytes.len(), bytes))
         }
       }).to_boxed()
     }

@@ -5,7 +5,7 @@ There are a few ways to get a runnable version of Pants set up for your workspac
 beginning, make sure your machine fits the requirements. At a minimum, Pants requires the following to run properly:
 
 * Linux or macOS.
-* Python 2.7 or 3.6.
+* Python 3.6+.
 * A C compiler, system headers, Python headers (to compile native Python modules) and the libffi
   library and headers (to compile and link modules that use CFFI to access native code).
 * OpenJDK or Oracle JDK 7 or greater.

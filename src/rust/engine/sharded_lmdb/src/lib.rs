@@ -26,13 +26,19 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use bytes::Bytes;
+use futures::Future;
 use hashing::Fingerprint;
-use lmdb::{self, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags};
+use lmdb::{
+  self, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
+  RwTransaction, Transaction, WriteFlags,
+};
 use log::trace;
 use std::collections::HashMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time;
 use tempfile::TempDir;
 
 // Each LMDB directory can have at most one concurrent writer.
@@ -158,6 +164,102 @@ impl ShardedLmdb {
 
   pub fn all_lmdbs(&self) -> Vec<(Arc<Environment>, Database, Database)> {
     self.lmdbs.values().cloned().collect()
+  }
+
+  pub fn store_bytes(
+    &self,
+    key: Fingerprint,
+    bytes: Bytes,
+    initial_lease: bool,
+  ) -> impl Future<Item = (), Error = String> {
+    let store = self.clone();
+    futures::future::poll_fn(move || {
+      tokio_threadpool::blocking(|| {
+        let (env, db, lease_database) = store.get(&key);
+        let put_res = env.begin_rw_txn().and_then(|mut txn| {
+          txn.put(db, &key, &bytes, WriteFlags::NO_OVERWRITE)?;
+          if initial_lease {
+            store.lease(
+              lease_database,
+              &key,
+              Self::default_lease_until_secs_since_epoch(),
+              &mut txn,
+            )?;
+          }
+          txn.commit()
+        });
+
+        match put_res {
+          Ok(()) => Ok(()),
+          Err(lmdb::Error::KeyExist) => Ok(()),
+          Err(err) => Err(format!("Error storing key {:?}: {}", key.to_hex(), err)),
+        }
+      })
+    })
+    .then(|blocking_result| match blocking_result {
+      Ok(v) => v,
+      Err(blocking_err) => Err(format!(
+        "Unable to run blocking task to store_bytes in sharded_lmdb on tokio runtime: {}",
+        blocking_err
+      )),
+    })
+  }
+
+  fn lease(
+    &self,
+    database: Database,
+    fingerprint: &Fingerprint,
+    until_secs_since_epoch: u64,
+    txn: &mut RwTransaction<'_>,
+  ) -> Result<(), lmdb::Error> {
+    txn.put(
+      database,
+      &fingerprint.as_ref(),
+      &until_secs_since_epoch.to_le_bytes(),
+      WriteFlags::empty(),
+    )
+  }
+
+  fn default_lease_until_secs_since_epoch() -> u64 {
+    let now_since_epoch = time::SystemTime::now()
+      .duration_since(time::UNIX_EPOCH)
+      .expect("Surely you're not before the unix epoch?");
+    (now_since_epoch + time::Duration::from_secs(2 * 60 * 60)).as_secs()
+  }
+
+  pub fn load_bytes_with<
+    T: Send + 'static,
+    F: Fn(Bytes) -> Result<T, String> + Send + Sync + 'static,
+  >(
+    &self,
+    fingerprint: Fingerprint,
+    f: F,
+  ) -> impl Future<Item = Option<T>, Error = String> {
+    let store = self.clone();
+    futures::future::poll_fn(move || {
+      tokio_threadpool::blocking(|| {
+        let (env, db, _) = store.get(&fingerprint);
+        let ro_txn = env
+          .begin_ro_txn()
+          .map_err(|err| format!("Failed to begin read transaction: {}", err));
+        ro_txn.and_then(|txn| match txn.get(db, &fingerprint) {
+          Ok(bytes) => f(Bytes::from(bytes)).map(Some),
+          Err(lmdb::Error::NotFound) => Ok(None),
+          Err(err) => Err(format!(
+            "Error loading fingerprint {:?}: {}",
+            fingerprint.to_hex(),
+            err,
+          )),
+        })
+      })
+    })
+    .then(|blocking_result| match blocking_result {
+      Ok(v) => v,
+      Err(blocking_err) => Err(format!(
+        "Unable to run blocking task to load_bytes in local ByteStore on tokio runtime: {}",
+        blocking_err
+      )),
+    })
   }
 
   #[allow(clippy::identity_conversion)] // False positive: https://github.com/rust-lang/rust-clippy/issues/3913

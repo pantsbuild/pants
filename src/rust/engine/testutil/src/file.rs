@@ -29,9 +29,6 @@ pub fn contents(path: &Path) -> bytes::Bytes {
 
 pub fn is_executable(path: &Path) -> bool {
   std::fs::metadata(path)
-    .expect("Getting file metadata")
-    .permissions()
-    .mode()
-    & 0o100
-    == 0o100
+    .map(|meta| meta.permissions().mode() & 0o100 == 0o100)
+    .unwrap_or(false)
 }

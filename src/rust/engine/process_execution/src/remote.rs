@@ -636,21 +636,23 @@ impl CommandRunner {
     for dir in output_directories {
       let digest_result: Result<Digest, String> = dir.get_tree_digest().into();
       let mut digest = future::done(digest_result).to_boxed();
-      for component in dir.get_path().rsplit('/') {
-        let component = component.to_owned();
-        let store = self.store.clone();
-        digest = digest
-          .and_then(move |digest| {
-            let mut directory = bazel_protos::remote_execution::Directory::new();
-            directory.mut_directories().push({
-              let mut node = bazel_protos::remote_execution::DirectoryNode::new();
-              node.set_name(component);
-              node.set_digest((&digest).into());
-              node
-            });
-            store.record_directory(&directory, true)
-          })
-          .to_boxed();
+      if !dir.get_path().is_empty() {
+        for component in dir.get_path().rsplit('/') {
+          let component = component.to_owned();
+          let store = self.store.clone();
+          digest = digest
+            .and_then(move |digest| {
+              let mut directory = bazel_protos::remote_execution::Directory::new();
+              directory.mut_directories().push({
+                let mut node = bazel_protos::remote_execution::DirectoryNode::new();
+                node.set_name(component);
+                node.set_digest((&digest).into());
+                node
+              });
+              store.record_directory(&directory, true)
+            })
+            .to_boxed();
+        }
       }
       directory_digests.push(digest.map_err(|err| {
         ExecutionError::Fatal(format!("Error saving remote output directory: {}", err))
@@ -2464,6 +2466,26 @@ mod tests {
         .unwrap(),
         159
       ))
+    )
+  }
+
+  #[test]
+  fn extract_output_files_from_response_no_prefix() {
+    let mut output_directory = bazel_protos::remote_execution::OutputDirectory::new();
+    output_directory.set_path(String::new());
+    output_directory.set_tree_digest((&TestDirectory::containing_roland().digest()).into());
+
+    let mut execute_response = bazel_protos::remote_execution::ExecuteResponse::new();
+    execute_response.set_result({
+      let mut result = bazel_protos::remote_execution::ActionResult::new();
+      result.set_exit_code(0);
+      result.mut_output_directories().push(output_directory);
+      result
+    });
+
+    assert_eq!(
+      extract_output_files_from_response(&execute_response),
+      Ok(TestDirectory::containing_roland().digest())
     )
   }
 
