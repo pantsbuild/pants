@@ -513,8 +513,8 @@ function fetch_and_check_prebuilt_wheels() {
       fi
     done
 
-    # N.B. For platform-specific wheels, we expect 6 wheels: {linux,osx} * {cp27m,cp27mu,abi3}.
-    if [ "${cross_platform}" != "true" ] && [ ${#packages[@]} -ne 6 ]; then
+    # N.B. For platform-specific wheels, we expect 2 wheels: {linux,osx} * {abi3,}.
+    if [ "${cross_platform}" != "true" ] && [ ${#packages[@]} -ne 2 ]; then
       missing+=("${PACKAGE} (expected whls for each platform: had only ${packages[@]})")
       continue
     fi
