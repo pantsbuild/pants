@@ -6,7 +6,7 @@ from test_pants_plugin.subsystems.pants_test_infra import PantsTestInfra
 from pants.backend.python.targets.python_tests import PythonTests
 
 
-class PantsInfraTests(object):
+class PantsInfraTests:
 
   def __init__(self, parse_context):
     self._parse_context = parse_context
