@@ -36,7 +36,7 @@ class TargetFilterTaskMixinTest(TaskTestBase):
                             context_aware_object_factories={'blue': lambda ctx: None})
 
   def setUp(self):
-    super(TargetFilterTaskMixinTest, self).setUp()
+    super().setUp()
     self.task = self.create_task(self.context())
 
   def test_simple_alias(self):

@@ -21,7 +21,7 @@ class JvmToolTaskMixin(JvmToolMixin, TaskBase):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JvmToolTaskMixin, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     cls.prepare_tools(round_manager)
 
   def tool_jar(self, key, scope=None):

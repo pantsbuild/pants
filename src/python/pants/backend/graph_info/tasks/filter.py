@@ -26,7 +26,7 @@ class Filter(TargetFilterTaskMixin, ConsoleTask):
 
   @classmethod
   def register_options(cls, register):
-    super(Filter, cls).register_options(register)
+    super().register_options(register)
     register('--type', type=list, metavar='[+-]type1,type2,...',
              help='Filter on these target types.')
     register('--target', type=list, metavar='[+-]spec1,spec2,...',
@@ -39,7 +39,7 @@ class Filter(TargetFilterTaskMixin, ConsoleTask):
              help='Filter on targets with tags matching these regexes.')
 
   def __init__(self, *args, **kwargs):
-    super(Filter, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._filters = []
 
     def _get_targets(spec_str):

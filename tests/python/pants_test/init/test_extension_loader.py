@@ -92,7 +92,7 @@ def example_rule(root_type):
   yield WrapperType(root_type.value)
 
 
-class PluginProduct(object):
+class PluginProduct:
   pass
 
 

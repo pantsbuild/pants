@@ -9,7 +9,7 @@ from pants_test.test_base import TestBase
 class JavaWireLibraryTest(TestBase):
 
   def setUp(self):
-    super(JavaWireLibraryTest, self).setUp()
+    super().setUp()
 
   def test_fields(self):
     target = self.make_target('//:foo', JavaWireLibrary,

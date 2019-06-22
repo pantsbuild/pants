@@ -123,7 +123,7 @@ class TargetAdaptor(StructWithDeps):
 
 
 @union
-class HydrateableField(object):
+class HydrateableField:
   """A marker for Target(Adaptor) fields for which the engine might perform extra construction."""
 
 
@@ -202,7 +202,7 @@ class AppAdaptor(TargetAdaptor):
     """
     :param list bundles: A list of `BundleAdaptor` objects
     """
-    super(AppAdaptor, self).__init__(**kwargs)
+    super().__init__(**kwargs)
     self.bundles = bundles
 
   @addressable_list(Exactly(BundleAdaptor))
@@ -213,7 +213,7 @@ class AppAdaptor(TargetAdaptor):
   @property
   def field_adaptors(self):
     with exception_logging(logger, 'Exception in `field_adaptors` property'):
-      field_adaptors = super(AppAdaptor, self).field_adaptors
+      field_adaptors = super().field_adaptors
       if getattr(self, 'bundles', None) is None:
         return field_adaptors
 
@@ -255,14 +255,14 @@ class RemoteSourcesAdaptor(TargetAdaptor):
     """
     if not isinstance(dest, string_types):
       dest = dest._type_alias
-    super(RemoteSourcesAdaptor, self).__init__(dest=dest, **kwargs)
+    super().__init__(dest=dest, **kwargs)
 
 
 class PythonTargetAdaptor(TargetAdaptor):
   @property
   def field_adaptors(self):
     with exception_logging(logger, 'Exception in `field_adaptors` property'):
-      field_adaptors = super(PythonTargetAdaptor, self).field_adaptors
+      field_adaptors = super().field_adaptors
       if getattr(self, 'resources', None) is None:
         return field_adaptors
       base_globs = BaseGlobs.from_sources_field(self.resources, self.address.spec_path)

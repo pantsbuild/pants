@@ -27,7 +27,7 @@ class JunitTestsConcurrencyIntegrationTest(PantsRunIntegrationTest):
   def run_pants_with_workdir(self, command, workdir, **kwargs):
     if self.USE_EXPERIMENTAL_RUNNER:
       command.append("--test-junit-use-experimental-runner")
-    return super(JunitTestsConcurrencyIntegrationTest, self).run_pants_with_workdir(
+    return super().run_pants_with_workdir(
       command, workdir, **kwargs)
 
   @ensure_experimental

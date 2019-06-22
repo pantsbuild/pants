@@ -49,7 +49,7 @@ class NoopResolver(Resolver):
     return []
 
 
-class ResponseParser(object):
+class ResponseParser:
   """Resolver response parser utility class.
 
   :API: public

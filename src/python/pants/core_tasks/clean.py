@@ -19,7 +19,7 @@ class Clean(Task):
 
   @classmethod
   def register_options(cls, register):
-    super(Clean, cls).register_options(register)
+    super().register_options(register)
     register('--async', type=bool, default=False,
              help='Allows clean-all to run in the background. Can dramatically speed up clean-all '
                   'for large pants workdirs.')
@@ -51,6 +51,7 @@ class Clean(Task):
         else:
           logger.debug("Forked an asynchronous clean-all worker at pid: {}".format(pid))
       else:
-        # Recursively removes pants cache; user waits patiently. 
+        # Recursively removes pants cache; user waits patiently.
+
         logger.info('For async removal, run `./pants clean-all --async`')
         safe_rmtree(pants_trash)

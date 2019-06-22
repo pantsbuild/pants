@@ -16,7 +16,7 @@ class DummyLibrary(Target):
     payload = Payload()
     payload.add_fields({'sources': self.create_sources_field(sources=sources,
                                                              sources_rel_path=address.spec_path)})
-    super(DummyLibrary, self).__init__(address=address, payload=payload, *args, **kwargs)
+    super().__init__(address=address, payload=payload, *args, **kwargs)
 
 
 class DummyTask(Task):
@@ -45,7 +45,7 @@ class LocalCachingTest(TaskTestBase):
     return DummyTask
 
   def setUp(self):
-    super(LocalCachingTest, self).setUp()
+    super().setUp()
     self.artifact_cache = self.create_dir('artifact_cache')
     self.create_file(self._filename)
     self.set_options_for_scope(

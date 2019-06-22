@@ -17,7 +17,7 @@ from pants.util.osutil import IntegerForPid
 STDIO_DESCRIPTORS = (0, 1, 2)
 
 
-class ChunkType(object):
+class ChunkType:
   """Nailgun protocol chunk types.
 
   N.B. Because we force `__future__.unicode_literals` in sources, string literals are automatically
@@ -52,7 +52,7 @@ class ChunkType(object):
   VALID_TYPES = REQUEST_TYPES + EXECUTION_TYPES
 
 
-class NailgunProtocol(object):
+class NailgunProtocol:
   """A mixin that provides a base implementation of the Nailgun protocol as described on
      http://martiansoftware.com/nailgun/protocol.html.
 
@@ -395,7 +395,7 @@ class NailgunProtocol(object):
     return tuple(env.get(cls.TTY_PATH_ENV.format(fd_id)) for fd_id in STDIO_DESCRIPTORS)
 
 
-class MaybeShutdownSocket(object):
+class MaybeShutdownSocket:
   """A wrapper around a socket which knows whether it has been shut down.
 
   Because we may shut down a nailgun socket from one thread, and read from it on another, we use

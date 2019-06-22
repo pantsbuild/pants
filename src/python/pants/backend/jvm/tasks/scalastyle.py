@@ -15,7 +15,7 @@ from pants.util.dirutil import touch
 
 
 # TODO: Move somewhere more general?
-class FileExcluder(object):
+class FileExcluder:
   def __init__(self, excludes_path, log):
     self.excludes = set()
     if excludes_path:
@@ -61,11 +61,11 @@ class Scalastyle(LintTaskMixin, NailgunTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(Scalastyle, cls).subsystem_dependencies() + (ScalaPlatform, )
+    return super().subsystem_dependencies() + (ScalaPlatform, )
 
   @classmethod
   def register_options(cls, register):
-    super(Scalastyle, cls).register_options(register)
+    super().register_options(register)
     register('--config', type=file_option, advanced=True, fingerprint=True,
              help='Path to scalastyle config file.')
     register('--excludes', type=file_option, advanced=True, fingerprint=True,
@@ -99,7 +99,7 @@ class Scalastyle(LintTaskMixin, NailgunTask):
     return scala_sources
 
   def __init__(self, *args, **kwargs):
-    super(Scalastyle, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     self._results_dir = os.path.join(self.workdir, 'results')
 

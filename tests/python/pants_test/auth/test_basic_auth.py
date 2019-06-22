@@ -41,7 +41,7 @@ def _run_test_server():
 
 class TestBasicAuth(TestBase):
   def setUp(self):
-    super(TestBasicAuth, self).setUp()
+    super().setUp()
     self.port, shutdown_func = _run_test_server()
     self.addCleanup(shutdown_func)
 

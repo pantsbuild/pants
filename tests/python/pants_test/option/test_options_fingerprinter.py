@@ -15,7 +15,7 @@ from pants_test.test_base import TestBase
 class OptionsFingerprinterTest(TestBase):
 
   def setUp(self):
-    super(OptionsFingerprinterTest, self).setUp()
+    super().setUp()
     self.options_fingerprinter = OptionsFingerprinter(self.context().build_graph)
 
   def test_fingerprint_dict(self):

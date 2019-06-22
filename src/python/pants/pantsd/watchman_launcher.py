@@ -8,7 +8,7 @@ from pants.pantsd.watchman import Watchman
 from pants.util.memo import testable_memoized_property
 
 
-class WatchmanLauncher(object):
+class WatchmanLauncher:
   """An object that manages the configuration and lifecycle of Watchman."""
 
   @classmethod

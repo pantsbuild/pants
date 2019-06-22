@@ -10,7 +10,7 @@ class JavaAvroLibrary(JvmTarget):
 
   def __init__(self, payload=None, **kwargs):
     payload = payload or Payload()
-    super(JavaAvroLibrary, self).__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, **kwargs)
 
   @classmethod
   def alias(cls):

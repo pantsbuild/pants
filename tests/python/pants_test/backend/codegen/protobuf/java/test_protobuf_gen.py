@@ -15,7 +15,7 @@ from pants_test.task_test_base import TaskTestBase
 class ProtobufGenTest(TaskTestBase):
 
   def setUp(self):
-    super(ProtobufGenTest, self).setUp()
+    super().setUp()
     self.set_options(pants_bootstrapdir='~/.cache/pants',
                      max_subprocess_args=100,
                      binaries_fetch_timeout_secs=1,

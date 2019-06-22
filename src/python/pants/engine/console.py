@@ -6,7 +6,7 @@ import sys
 from colors import blue, green, red
 
 
-class Console(object):
+class Console:
   def __init__(self, stdout=None, stderr=None, use_colors=True):
     self._stdout = stdout or sys.stdout
     self._stderr = stderr or sys.stderr

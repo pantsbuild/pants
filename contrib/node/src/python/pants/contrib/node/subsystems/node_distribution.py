@@ -55,12 +55,12 @@ class NodeDistribution(NativeTool):
   def subsystem_dependencies(cls):
     # Note that we use a YarnpkgDistribution scoped to the NodeDistribution, which may itself
     # be scoped to a task.
-    return (super(NodeDistribution, cls).subsystem_dependencies() +
+    return (super().subsystem_dependencies() +
             (YarnpkgDistribution.scoped(cls), ))
 
   @classmethod
   def register_options(cls, register):
-    super(NodeDistribution, cls).register_options(register)
+    super().register_options(register)
     register('--package-manager', advanced=True, default='npm', fingerprint=True,
              choices=VALID_PACKAGE_MANAGERS,
              help='Default package manager config for repo. Should be one of {}'.format(

@@ -10,7 +10,7 @@ class ProducerInfo(namedtuple('ProducerInfo', ['product_type', 'task_type', 'goa
   """Describes the producer of a given product type."""
 
 
-class RoundManager(object):
+class RoundManager:
   """
   :API: public
   """

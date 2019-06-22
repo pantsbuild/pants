@@ -19,7 +19,7 @@ class JvmTaskTestBase(TaskTestBase):
     """
     :API: public
     """
-    super(JvmTaskTestBase, self).setUp()
+    super().setUp()
     init_subsystem(JvmResolveSubsystem)
     self.set_options_for_scope('resolver', resolver='ivy')
 

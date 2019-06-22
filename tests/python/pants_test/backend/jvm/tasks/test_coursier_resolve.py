@@ -38,7 +38,7 @@ class CoursierResolveTest(NailgunTaskTestBase):
     return CoursierResolve
 
   def setUp(self):
-    super(CoursierResolveTest, self).setUp()
+    super().setUp()
     self.set_options_for_scope('cache.{}'.format(self.options_scope),
                                read_from=None,
                                write_to=None)
@@ -307,11 +307,11 @@ class CoursierResolveFingerprintStrategyTest(TaskTestBase):
     return cls.EmptyTask
 
   def setUp(self):
-    super(CoursierResolveFingerprintStrategyTest, self).setUp()
+    super().setUp()
     init_subsystem(JarDependencyManagement)
 
   def tearDown(self):
-    super(CoursierResolveFingerprintStrategyTest, self).tearDown()
+    super().tearDown()
 
   def set_artifact_set_for(self, managed_jar_target, artifact_set):
     JarDependencyManagement.global_instance()._artifact_set_map[

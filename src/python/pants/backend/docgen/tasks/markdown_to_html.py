@@ -55,7 +55,7 @@ class MarkdownToHtml(Task):
     return [cls.MARKDOWN_HTML_PRODUCT, cls.WIKI_HTML_PRODUCT]
 
   def __init__(self, *args, **kwargs):
-    super(MarkdownToHtml, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._templates_dir = os.path.join('templates', 'markdown')
     self.open = self.get_options().open
     self.fragment = self.get_options().fragment

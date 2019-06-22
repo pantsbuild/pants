@@ -38,7 +38,7 @@ class LiteralCredentials(Credentials):
     :param username: A constant username value.
     :param password: A constant password value.
     """
-    super(LiteralCredentials, self).__init__(**kwargs)
+    super().__init__(**kwargs)
 
     if callable(username) or callable(password):
       raise TargetDefinitionException(self, 'The username and password arguments to credentials() '

@@ -23,7 +23,7 @@ class JVM(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(JVM, cls).register_options(register)
+    super().register_options(register)
     # TODO(benjy): Options to specify the JVM version?
     register('--options', type=list, metavar='<option>...',
              default=cls.options_default,

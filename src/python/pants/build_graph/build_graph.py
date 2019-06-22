@@ -47,7 +47,7 @@ class BuildGraph(ABC):
       super(BuildGraph.ManualSyntheticTargetError, self).__init__(
           'Found a manually-defined target at synthetic address {}'.format(addr.spec))
 
-  class NoDepPredicateWalk(object):
+  class NoDepPredicateWalk:
     """This is a utility class to aid in graph traversals that don't have predicates on dependency edges."""
 
     def __init__(self):
@@ -638,7 +638,7 @@ class CycleException(Exception):
   """
 
   def __init__(self, cycle):
-    super(CycleException, self).__init__('Cycle detected:\n\t{}'.format(
+    super().__init__('Cycle detected:\n\t{}'.format(
         ' ->\n\t'.join(target.address.spec for target in cycle)
     ))
 

@@ -10,7 +10,7 @@ class SortTargets(ConsoleTask):
 
   @classmethod
   def register_options(cls, register):
-    super(SortTargets, cls).register_options(register)
+    super().register_options(register)
     register('--reverse', type=bool,
              help='Sort least-dependent to most-dependent.')
 

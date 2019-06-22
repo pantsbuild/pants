@@ -8,7 +8,7 @@ from future.moves.itertools import zip_longest
 
 
 @total_ordering
-class Revision(object):
+class Revision:
   """Represents a software revision that is comparable to another revision describing the same
   software.
 

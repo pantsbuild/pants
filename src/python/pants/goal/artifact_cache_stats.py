@@ -12,7 +12,7 @@ from pants.util.dirutil import safe_mkdir
 CacheStat = namedtuple('CacheStat', ['hit_targets', 'miss_targets'])
 
 
-class ArtifactCacheStats(object):
+class ArtifactCacheStats:
   """Tracks the hits and misses in the artifact cache.
 
   If dir is specified, writes the hits and misses to files in that dir."""

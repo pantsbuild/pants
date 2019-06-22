@@ -33,7 +33,7 @@ class BuildSymbolInfo(namedtuple('_BuildSymbolInfo',
     return '\n'.join(self.details_lines)
 
 
-class BuildDictionaryInfoExtracter(object):
+class BuildDictionaryInfoExtracter:
   """Extracts help information about the symbols that may be used in BUILD files."""
 
   ADD_DESCR = '<Add description>'

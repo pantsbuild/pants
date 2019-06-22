@@ -13,7 +13,7 @@ class CppBinaryCreate(CppTask):
 
   @classmethod
   def register_options(cls, register):
-    super(CppBinaryCreate, cls).register_options(register)
+    super().register_options(register)
     register('--ld-options', help='Append these options to the link command line.')
 
   @classmethod
@@ -22,7 +22,7 @@ class CppBinaryCreate(CppTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(CppBinaryCreate, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require('lib')
     round_manager.require('objs')
 

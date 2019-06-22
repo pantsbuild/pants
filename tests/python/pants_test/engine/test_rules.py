@@ -19,25 +19,25 @@ from pants_test.engine.util import (TARGET_TABLE, assert_equal_with_printing, cr
 from pants_test.test_base import TestBase
 
 
-class A(object):
+class A:
 
   def __repr__(self):
     return 'A()'
 
 
-class B(object):
+class B:
 
   def __repr__(self):
     return 'B()'
 
 
-class C(object):
+class C:
 
   def __repr__(self):
     return 'C()'
 
 
-class D(object):
+class D:
 
   def __repr__(self):
     return 'D()'
@@ -748,7 +748,7 @@ class RuleGraphTest(TestBase):
   def test_invalid_get_arguments(self):
     with self.assertRaisesWithMessage(ValueError, """\
 Could not resolve type `XXX` in top level of module pants_test.engine.test_rules"""):
-      class XXX(object): pass
+      class XXX: pass
       @rule(A, [])
       def f():
         a = yield Get(A, XXX, 3)

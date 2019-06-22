@@ -10,7 +10,7 @@ from contextlib import contextmanager
 logger = logging.getLogger(__name__)
 
 
-class STTYSettings(object):
+class STTYSettings:
   """Saves/restores stty settings, e.g., during REPL execution."""
 
   @classmethod

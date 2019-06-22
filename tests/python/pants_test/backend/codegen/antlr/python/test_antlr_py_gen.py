@@ -18,7 +18,7 @@ class AntlrPyGenTest(NailgunTaskTestBase):
 
   @classmethod
   def alias_groups(cls):
-    return super(AntlrPyGenTest, cls).alias_groups().merge(BuildFileAliases(
+    return super().alias_groups().merge(BuildFileAliases(
       targets={
         'python_antlr_library': PythonAntlrLibrary,
       },

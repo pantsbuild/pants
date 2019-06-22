@@ -90,11 +90,11 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
   @classmethod
   def implementation_version(cls):
-    return super(PytestRun, cls).implementation_version() + [('PytestRun', 3)]
+    return super().implementation_version() + [('PytestRun', 3)]
 
   @classmethod
   def register_options(cls, register):
-    super(PytestRun, cls).register_options(register)
+    super().register_options(register)
 
     # NB: We always produce junit xml privately, and if this option is specified, we then copy
     # it to the user-specified directory, post any interaction with the cache to retrieve the
@@ -143,7 +143,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(PytestRun, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(PytestPrep.PytestBinary)
 
   def _test_target_filter(self):

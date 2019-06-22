@@ -35,7 +35,7 @@ class LambdexRun(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(LambdexRun, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(LambdexPrep.tool_instance_cls)
     round_manager.require('pex_archives')
 

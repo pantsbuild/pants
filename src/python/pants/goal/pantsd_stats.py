@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-class PantsDaemonStats(object):
+class PantsDaemonStats:
   """Tracks various stats about the daemon."""
 
   def __init__(self):

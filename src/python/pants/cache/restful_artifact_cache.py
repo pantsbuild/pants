@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 logging.getLogger('requests').setLevel(logging.WARNING)
 
 
-class RequestsSession(object):
+class RequestsSession:
   _session = None
 
   @classmethod
@@ -42,7 +42,7 @@ class RESTfulArtifactCache(ArtifactCache):
       under this base.
     :param BaseLocalArtifactCache local: local cache instance for storing and creating artifacts
     """
-    super(RESTfulArtifactCache, self).__init__(artifact_root)
+    super().__init__(artifact_root)
 
     self.best_url_selector = best_url_selector
     self._read_timeout_secs = read_timeout

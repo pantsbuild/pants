@@ -13,7 +13,7 @@ from pants.util.collections_abc_backport import OrderedDict
 from pants.util.dirutil import safe_mkdir_for
 
 
-class RunInfo(object):
+class RunInfo:
   """A little plaintext file containing very basic info about a pants run.
 
   Can only be appended to, never edited.

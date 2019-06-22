@@ -21,7 +21,7 @@ class JavadocGen(JvmdocGen):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JavadocGen, cls).subsystem_dependencies() + (DistributionLocator,)
+    return super().subsystem_dependencies() + (DistributionLocator,)
 
   def execute(self):
     def is_java(target):

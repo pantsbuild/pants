@@ -12,7 +12,7 @@ class BinaryCreate(JvmBinaryTask):
   """Creates a runnable monolithic binary deploy jar."""
 
   def __init__(self, *args, **kwargs):
-    super(BinaryCreate, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._outdir = self.get_options().pants_distdir
 
   @classmethod

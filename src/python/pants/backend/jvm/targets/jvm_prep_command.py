@@ -67,7 +67,7 @@ class JvmPrepCommand(JvmTarget):
       'args': PrimitiveField(args or []),
       'jvm_options': PrimitiveField(jvm_options or []),
     })
-    super(JvmPrepCommand, self).__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, **kwargs)
     if not mainclass:
       raise TargetDefinitionException(self, 'mainclass must be specified.')
     if goal not in self.goals():

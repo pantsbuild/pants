@@ -8,7 +8,7 @@ import six
 from pants.util.collections_abc_backport import OrderedDict
 
 
-class Properties(object):
+class Properties:
   """A Python reader for java.util.Properties formatted data.
 
   Based on:

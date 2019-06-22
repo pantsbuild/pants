@@ -88,7 +88,7 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
   """
   fingerprintable = fingerprintable_options or defaultdict(dict)
 
-  class FakeOptions(object):
+  class FakeOptions:
     def for_scope(self, scope):
       # TODO(John Sirois): Some users pass in A dict of scope -> _FakeOptionValues instead of a
       # dict of scope -> (dict of option name -> value).  Clean up these usages and kill this

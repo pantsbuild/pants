@@ -49,7 +49,7 @@ class ExecuteProcessRequest(datatype([
           "arg 'env' was invalid: value {} (with type {}) must be a dict".format(env, type(env)))
       env = tuple(item for pair in env.items() for item in pair)
 
-    return super(ExecuteProcessRequest, cls).__new__(
+    return super().__new__(
       cls,
       argv=argv,
       env=env,
@@ -107,7 +107,7 @@ stderr:
       stderr=stderr.decode('utf-8')
     )
 
-    super(ProcessExecutionFailure, self).__init__(msg)
+    super().__init__(msg)
 
 
 @rule(ExecuteProcessResult, [FallibleExecuteProcessResult, ExecuteProcessRequest])

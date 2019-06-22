@@ -18,7 +18,7 @@ class FileDeps(ConsoleTask):
 
   @classmethod
   def register_options(cls, register):
-    super(FileDeps, cls).register_options(register)
+    super().register_options(register)
     register('--globs', type=bool,
              help='Instead of outputting filenames, output globs (ignoring excludes)')
     register('--absolute', type=bool, default=True,

@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-class ClasspathEntry(object):
+class ClasspathEntry:
   """Represents a java classpath entry.
 
   :API: public
@@ -84,7 +84,7 @@ class ArtifactClasspathEntry(ClasspathEntry):
   """
 
   def __init__(self, path, coordinate, cache_path, directory_digest=None):
-    super(ArtifactClasspathEntry, self).__init__(path, directory_digest)
+    super().__init__(path, directory_digest)
     self._coordinate = coordinate
     self._cache_path = cache_path
 

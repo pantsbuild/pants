@@ -35,7 +35,7 @@ class SourcesTarget(Target):
                                                            sources_rel_path=address.spec_path,
                                                            key_arg='sources'))
     payload.add_field('exports', PrimitivesSetField(exports or []))
-    super(SourcesTarget, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   @property
   def export_specs(self):

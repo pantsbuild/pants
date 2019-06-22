@@ -20,7 +20,7 @@ def _validate_string(name, item):
   return _validate_maybe_string(name, item)
 
 
-class Scm(object):
+class Scm:
   """Corresponds to the maven POM <scm/> element.
 
   Refer to the schema here: http://maven.apache.org/maven-v4_0_0.xsd
@@ -59,7 +59,7 @@ class Scm(object):
     return Scm(self.connection, self.developer_connection, self.url, tag=tag)
 
 
-class License(object):
+class License:
   """Corresponds to the maven POM <license/> element.
 
   Refer to the schema here: http://maven.apache.org/maven-v4_0_0.xsd
@@ -76,7 +76,7 @@ class License(object):
     self.comments = _validate_maybe_string('comments', comments)
 
 
-class Developer(object):
+class Developer:
   """Corresponds to the maven POM <developer/> element.
 
   Refer to the schema here: http://maven.apache.org/maven-v4_0_0.xsd

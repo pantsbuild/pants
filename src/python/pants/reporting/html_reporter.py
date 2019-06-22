@@ -44,7 +44,7 @@ class HtmlReporter(Reporter):
   Settings = namedtuple('Settings', Reporter.Settings._fields + ('html_dir', 'template_dir'))
 
   def __init__(self, run_tracker, settings):
-    super(HtmlReporter, self).__init__(run_tracker, settings)
+    super().__init__(run_tracker, settings)
      # The main report, and associated tool outputs, go under this dir.
     self._html_dir = settings.html_dir
 

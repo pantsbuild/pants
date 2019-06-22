@@ -19,12 +19,12 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
   """
 
   def __init__(self, *args, **kwargs):
-    super(NodeTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._currently_executing_test_targets = []
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(NodeTest, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(NodePaths)
 
   @classmethod

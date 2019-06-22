@@ -37,7 +37,7 @@ def _import(typename):
 
 class JsonParser(Parser):
   def __init__(self, symbol_table):
-    super(JsonParser, self).__init__()
+    super().__init__()
     self.symbol_table = symbol_table
 
   def _as_type(self, type_or_name):
@@ -208,7 +208,7 @@ class PythonAssignmentsParser(Parser):
   """
 
   def __init__(self, symbol_table):
-    super(PythonAssignmentsParser, self).__init__()
+    super().__init__()
     self.symbol_table = symbol_table
 
   @memoized_property
@@ -258,7 +258,7 @@ class PythonCallbacksParser(Parser):
   """
 
   def __init__(self, symbol_table):
-    super(PythonCallbacksParser, self).__init__()
+    super().__init__()
     self.symbol_table = symbol_table
     self._lock = threading.Lock()
 

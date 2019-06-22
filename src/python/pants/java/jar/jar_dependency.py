@@ -14,7 +14,7 @@ from pants.util.memo import memoized_method, memoized_property
 from pants.util.objects import datatype
 
 
-class JarDependencyParseContextWrapper(object):
+class JarDependencyParseContextWrapper:
   """A pre-built Maven repository dependency.
 
   Examples:
@@ -101,7 +101,7 @@ class JarDependency(datatype([
     base_path = base_path or '.'
     if os.path.isabs(base_path):
       base_path = os.path.relpath(base_path, get_buildroot())
-    return super(JarDependency, cls).__new__(
+    return super().__new__(
         cls, org=org, base_name=name, rev=rev, force=force, ext=ext, url=url, apidocs=apidocs,
         classifier=classifier, mutable=mutable, intransitive=intransitive, excludes=excludes,
         base_path=base_path)

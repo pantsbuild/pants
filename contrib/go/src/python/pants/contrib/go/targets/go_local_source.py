@@ -53,7 +53,7 @@ class GoLocalSource(GoTarget):
                                            sources_rel_path=address.spec_path,
                                            key_arg='sources'),
     })
-    super(GoLocalSource, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   @property
   def import_path(self):

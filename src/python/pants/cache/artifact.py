@@ -12,7 +12,7 @@ class ArtifactError(Exception):
   pass
 
 
-class Artifact(object):
+class Artifact:
   """Represents a set of files in an artifact."""
 
   def __init__(self, artifact_root):
@@ -46,7 +46,7 @@ class DirectoryArtifact(Artifact):
   """An artifact stored as loose files under a directory."""
 
   def __init__(self, artifact_root, directory):
-    super(DirectoryArtifact, self).__init__(artifact_root)
+    super().__init__(artifact_root)
     self._directory = directory
 
   def exists(self):
@@ -82,7 +82,7 @@ class TarballArtifact(Artifact):
   # TODO: Expose `dereference` for tasks.
   # https://github.com/pantsbuild/pants/issues/3961
   def __init__(self, artifact_root, tarfile_, compression=9, dereference=True):
-    super(TarballArtifact, self).__init__(artifact_root)
+    super().__init__(artifact_root)
     self._tarfile = tarfile_
     self._compression = compression
     self._dereference = dereference

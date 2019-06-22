@@ -64,7 +64,7 @@ class XCodeCLITools(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(XCodeCLITools, cls).register_options(register)
+    super().register_options(register)
 
     register('--install-prefixes', type=list, default=cls.INSTALL_PREFIXES_DEFAULT,
              fingerprint=True, advanced=True,

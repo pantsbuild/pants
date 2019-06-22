@@ -36,7 +36,7 @@ class ScopeInfo(datatype([
   INTERMEDIATE = 'INTERMEDIATE'  # Scope added automatically to fill out the scope hierarchy.
 
   def __new__(cls, scope, category, optionable_cls=None, removal_version=None, removal_hint=None):
-    return super(ScopeInfo, cls).__new__(cls, scope, category, optionable_cls, removal_version, removal_hint)
+    return super().__new__(cls, scope, category, optionable_cls, removal_version, removal_hint)
 
   @property
   def description(self):

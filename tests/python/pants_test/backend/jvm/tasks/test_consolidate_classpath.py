@@ -22,7 +22,7 @@ class TestConsolidateClasspath(JvmBinaryTaskTestBase):
 
   def setUp(self):
     """Prepare targets, context, runtime classpath. """
-    super(TestConsolidateClasspath, self).setUp()
+    super().setUp()
     self.task = self.prepare_execute(self.context())
 
     self.jar_artifact = self.create_artifact(org='org.example', name='foo', rev='1.0.0')

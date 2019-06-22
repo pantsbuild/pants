@@ -19,7 +19,7 @@ class TypeCheckError(TypeError):
   # prefixing easy (maybe using a class field format string?).
   def __init__(self, type_name, msg, *args, **kwargs):
     formatted_msg = "type check error in class {}: {}".format(type_name, msg)
-    super(TypeCheckError, self).__init__(formatted_msg, *args, **kwargs)
+    super().__init__(formatted_msg, *args, **kwargs)
 
 
 # TODO: remove the `.type_check_error_type` property in `DatatypeMixin` and just have mixers
@@ -102,7 +102,7 @@ def datatype(field_decls, superclass_name=None, **kwargs):
         raise cls.make_type_error('Should not override __eq__.')
 
       try:
-        this_object = super(DataType, cls).__new__(cls, *args, **kwargs)
+        this_object = super().__new__(cls, *args, **kwargs)
       except TypeError as e:
         raise cls.make_type_error(
           "error in namedtuple() base constructor: {}".format(e))
@@ -139,7 +139,7 @@ def datatype(field_decls, superclass_name=None, **kwargs):
       if type(self) != type(other):
         return False
       # Explicitly return super.__eq__'s value in case super returns NotImplemented
-      return super(DataType, self).__eq__(other)
+      return super().__eq__(other)
     # We define an attribute on the `cls` level definition of `__eq__` that will allow us to detect
     # that it has been overridden.
     __eq__._eq_override_canary = None
@@ -152,7 +152,7 @@ def datatype(field_decls, superclass_name=None, **kwargs):
     # https://docs.python.org/3/reference/datamodel.html#object.__hash__.
     def __hash__(self):
       try:
-        return super(DataType, self).__hash__()
+        return super().__hash__()
       except TypeError:
         # If any fields are unhashable, we want to be able to specify which ones in the error
         # message, but we don't want to slow down the normal __hash__ code path, so we take the time
@@ -173,7 +173,7 @@ def datatype(field_decls, superclass_name=None, **kwargs):
       raise self.make_type_error("datatype object is not iterable")
 
     def _super_iter(self):
-      return super(DataType, self).__iter__()
+      return super().__iter__()
 
     def _asdict(self):
       """Return a new OrderedDict which maps field names to their values.
@@ -310,7 +310,7 @@ def enum(all_values):
       We convert uses of the constructor to call create(), so we then need to go around __new__ to
       bootstrap singleton creation from datatype()'s __new__.
       """
-      return super(ChoiceDatatype, cls).__new__(cls, value)
+      return super().__new__(cls, value)
 
     @classproperty
     def _allowed_values(cls):
@@ -346,14 +346,14 @@ def enum(all_values):
           "when comparing {!r} against {!r} with type '{}': "
           "enum equality is only defined for instances of the same enum class!"
           .format(self, other, type(other).__name__))
-      return super(ChoiceDatatype, self).__eq__(other)
+      return super().__eq__(other)
     # Redefine the canary so datatype __new__ doesn't raise.
     __eq__._eq_override_canary = None
 
     # NB: as noted in datatype(), __hash__ must be explicitly implemented whenever __eq__ is
     # overridden. See https://docs.python.org/3/reference/datamodel.html#object.__hash__.
     def __hash__(self):
-      return super(ChoiceDatatype, self).__hash__()
+      return super().__hash__()
 
     def resolve_for_enum_variant(self, mapping):
       """Return the object in `mapping` with the key corresponding to the enum value.
@@ -475,7 +475,7 @@ class TypeOnlyConstraint(TypeConstraint):
       type_list = ' or '.join(t.__name__ for t in types)
     description = '{}({})'.format(type(self).__name__, type_list)
 
-    super(TypeOnlyConstraint, self).__init__(description=description)
+    super().__init__(description=description)
 
     # NB: This is made into a tuple so that we can use self._types in issubclass() and others!
     self._types = tuple(types)
@@ -578,7 +578,7 @@ class TypedCollection(TypeConstraint):
 
     self._constraint = constraint
 
-    super(TypedCollection, self).__init__(description=description)
+    super().__init__(description=description)
 
   def _is_iterable(self, obj):
     return (self.iterable_constraint.satisfied_by(obj)

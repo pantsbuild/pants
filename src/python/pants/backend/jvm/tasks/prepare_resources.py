@@ -22,12 +22,12 @@ class PrepareResources(ResourcesTask):
   """
 
   def __init__(self, *args, **kwargs):
-    super(PrepareResources, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._buildroot = get_buildroot()
 
   @classmethod
   def implementation_version(cls):
-    return super(PrepareResources, cls).implementation_version() + [('PrepareResources', 2)]
+    return super().implementation_version() + [('PrepareResources', 2)]
 
   def find_all_relevant_resources_targets(self):
     # NB: Ordering isn't relevant here, because it is applied during the dep walk to

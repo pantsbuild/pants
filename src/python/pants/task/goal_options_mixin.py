@@ -30,7 +30,7 @@ class GoalOptionsRegistrar(Optionable):
     return type(type_name, (cls, ), {'options_scope': goal})
 
 
-class GoalOptionsMixin(object):
+class GoalOptionsMixin:
   """A mixin for tasks that inherit options registered at the goal level."""
   # Subclasses must set this to the appropriate subclass of GoalOptionsRegistrar.
   goal_options_registrar_cls = None

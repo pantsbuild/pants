@@ -42,7 +42,7 @@ class LegacyPythonCallbacksParser(Parser):
       import statements. Valid values: "allow", "warn", "error".
     :type build_file_imports_behavior: string
     """
-    super(LegacyPythonCallbacksParser, self).__init__()
+    super().__init__()
     self._symbols, self._parse_context = self._generate_symbols(symbol_table, aliases)
     self._build_file_imports_behavior = build_file_imports_behavior
 
@@ -107,7 +107,7 @@ class LegacyPythonCallbacksParser(Parser):
     # TODO: Replace builtins for paths with objects that will create wrapped PathGlobs objects.
     # The strategy for https://github.com/pantsbuild/pants/issues/3560 should account for
     # migrating these additional captured arguments to typed Sources.
-    class GlobWrapper(object):
+    class GlobWrapper:
       def __init__(self, parse_context, glob_type):
         self._parse_context = parse_context
         self._glob_type = glob_type

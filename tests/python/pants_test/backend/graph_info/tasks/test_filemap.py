@@ -24,7 +24,7 @@ class FilemapTest(ConsoleTaskTestBase):
     return Filemap
 
   def setUp(self):
-    super(FilemapTest, self).setUp()
+    super().setUp()
 
     def add_to_build_file(path, name, *files):
       for f in files:

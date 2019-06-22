@@ -29,7 +29,7 @@ class FindBugs(NailgunTask):
 
   @classmethod
   def register_options(cls, register):
-    super(FindBugs, cls).register_options(register)
+    super().register_options(register)
 
     register('--skip', type=bool, help='Skip findbugs.')
     register('--transitive', default=False, type=bool,
@@ -70,7 +70,7 @@ class FindBugs(NailgunTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(FindBugs, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data('runtime_classpath')
 
   @property

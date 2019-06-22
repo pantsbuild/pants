@@ -27,7 +27,7 @@ class PythonAWSLambda(Target):
       'binary': PrimitiveField(binary),
       'handler': PrimitiveField(handler),
     })
-    super(PythonAWSLambda, self).__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, **kwargs)
 
   @classmethod
   def alias(cls):
@@ -35,7 +35,7 @@ class PythonAWSLambda(Target):
 
   @classmethod
   def compute_dependency_specs(cls, kwargs=None, payload=None):
-    for spec in super(PythonAWSLambda, cls).compute_dependency_specs(kwargs, payload):
+    for spec in super().compute_dependency_specs(kwargs, payload):
       yield spec
     target_representation = kwargs or payload.as_dict()
     binary = target_representation.get('binary')

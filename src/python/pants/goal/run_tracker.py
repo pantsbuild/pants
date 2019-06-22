@@ -42,7 +42,7 @@ class RunTrackerOptionEncoder(CoercingOptionEncoder):
   def default(self, o):
     if isinstance(o, OrderedDict):
       return o
-    return super(RunTrackerOptionEncoder, self).default(o)
+    return super().default(o)
 
 
 class RunTracker(Subsystem):
@@ -75,7 +75,7 @@ class RunTracker(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(RunTracker, cls).subsystem_dependencies() + (Cookies,)
+    return super().subsystem_dependencies() + (Cookies,)
 
   @classmethod
   def register_options(cls, register):
@@ -106,7 +106,7 @@ class RunTracker(Subsystem):
     """
     :API: public
     """
-    super(RunTracker, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._run_timestamp = time.time()
     self._cmd_line = ' '.join(['pants'] + sys.argv[1:])
     self._sorted_goal_infos = tuple()
@@ -705,7 +705,7 @@ class RunTracker(Subsystem):
     self._merge_list_of_keys_into_dict(self._target_to_data, new_key_list, val, 0)
 
 
-class RunTrackerLogger(object):
+class RunTrackerLogger:
   """A logger facade that logs into a run tracker."""
 
   def __init__(self, run_tracker):

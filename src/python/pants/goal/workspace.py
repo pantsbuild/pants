@@ -32,7 +32,7 @@ class ScmWorkspace(Workspace):
     """
     :API: public
     """
-    super(ScmWorkspace, self).__init__()
+    super().__init__()
 
     if scm is None:
       raise self.WorkspaceError('Cannot figure out what changed without a configured '

@@ -23,7 +23,7 @@ class DummyCacheLibrary(Target):
     payload = Payload()
     payload.add_fields({'sources': self.create_sources_field(sources=sources,
                                                              sources_rel_path=address.spec_path)})
-    super(DummyCacheLibrary, self).__init__(address=address, payload=payload, *args, **kwargs)
+    super().__init__(address=address, payload=payload, *args, **kwargs)
 
 
 class DummyCacheTask(Task):

@@ -35,7 +35,7 @@ from pants_test.task_test_base import DeclarativeTaskTestMixin, ensure_cached
 # `PytestPrep` production requirements here.
 class PytestPrepCoverageVersionPinned(PytestPrep):
   def extra_requirements(self):
-    extra_reqs = list(super(PytestPrepCoverageVersionPinned, self).extra_requirements())
+    extra_reqs = list(super().extra_requirements())
     extra_reqs.append('coverage=={}'.format(coverage.__version__))
     return extra_reqs
 
@@ -104,7 +104,7 @@ class PytestTestEmpty(PytestTestBase):
 class PytestTestConftest(PytestTestBase):
 
   def setUp(self):
-    super(PytestTestConftest, self).setUp()
+    super().setUp()
 
     self.create_file('src/python/base/__init__.py')
     self.create_file('src/python/base/conftest.py', contents=dedent("""
@@ -162,7 +162,7 @@ class PytestTestFailedPexRun(PytestTestBase):
     return cls.AlwaysFailingPexRunPytestRun
 
   def setUp(self):
-    super(PytestTestFailedPexRun, self).setUp()
+    super().setUp()
     self.create_file(
       'tests/test_green.py',
       dedent("""
@@ -206,7 +206,7 @@ class PytestTestFailedPexRun(PytestTestBase):
 
 class PytestTest(PytestTestBase):
   def setUp(self):
-    super(PytestTest, self).setUp()
+    super().setUp()
 
     self.set_options_for_scope('cache.{}'.format(self.options_scope),
                                read_from=None,

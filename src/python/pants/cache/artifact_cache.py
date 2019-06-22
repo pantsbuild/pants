@@ -21,7 +21,7 @@ class NonfatalArtifactCacheError(Exception):
   pass
 
 
-class UnreadableArtifact(object):
+class UnreadableArtifact:
   """A False-y value to indicate a read-failure (vs a normal cache-miss)
 
   See docstring on `ArtifactCache.use_cached_files` for details.
@@ -47,7 +47,7 @@ class UnreadableArtifact(object):
     return "key={} err={}".format(self.key, self.err)
 
 
-class ArtifactCache(object):
+class ArtifactCache:
   """A map from cache key to a set of build artifacts.
 
   The cache key must uniquely identify the inputs (sources, compiler flags etc.) needed to

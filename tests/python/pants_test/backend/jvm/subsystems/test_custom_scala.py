@@ -18,7 +18,7 @@ class CustomScalaTest(NailgunTaskTestBase):
     return Scalastyle
 
   def setUp(self):
-    super(CustomScalaTest, self).setUp()
+    super().setUp()
     self.context()  # We don't need the context, but this ensures subsystem option registration.
 
     self.create_file(

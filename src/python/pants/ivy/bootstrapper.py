@@ -17,7 +17,7 @@ from pants.util.dirutil import safe_delete, touch
 logger = logging.getLogger(__name__)
 
 
-class Bootstrapper(object):
+class Bootstrapper:
   """Bootstraps a working ivy resolver.
 
   By default a working resolver will be bootstrapped from maven central and it will use standard

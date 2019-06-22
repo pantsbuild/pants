@@ -27,7 +27,7 @@ class PluginSubsystemBase(Subsystem):
       option_names.append(Parser.parse_dest(*args, **kwargs))
       register(*args, **kwargs)
 
-    super(PluginSubsystemBase, cls).register_options(recording_register)
+    super().register_options(recording_register)
 
     # All checks have this option.
     recording_register('--skip', type=bool, help='If enabled, skip this style checker.')

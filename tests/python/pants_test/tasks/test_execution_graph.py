@@ -13,14 +13,14 @@ from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailur
 from pants_test.testutils.py2_compat import assertRegex
 
 
-class ImmediatelyExecutingPool(object):
+class ImmediatelyExecutingPool:
   num_workers = 1
 
   def submit_async_work(self, work):
     work.func(*work.args_tuples[0])
 
 
-class PrintLogger(object):
+class PrintLogger:
 
   def error(self, msg):
     print(msg)
@@ -29,7 +29,7 @@ class PrintLogger(object):
     print(msg)
 
 
-class CapturingLogger(object):
+class CapturingLogger:
 
   log_entries = defaultdict(list)
 

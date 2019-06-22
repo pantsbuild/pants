@@ -40,7 +40,7 @@ class LoggerStreamTest(TestBase):
 
 class PantsDaemonTest(TestBase):
   def setUp(self):
-    super(PantsDaemonTest, self).setUp()
+    super().setUp()
     mock_options = mock.Mock()
     mock_options.pants_subprocessdir = 'non_existent_dir'
     self.pantsd = PantsDaemon(None,

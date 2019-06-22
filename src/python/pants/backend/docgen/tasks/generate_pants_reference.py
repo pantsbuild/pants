@@ -38,7 +38,7 @@ class GeneratePantsReference(Task):
                   'a standalone build dictionary page.')
 
   def __init__(self, *args, **kwargs):
-    super(GeneratePantsReference, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._outdir = os.path.join(self.get_options().pants_distdir, 'reference')
 
   def execute(self):

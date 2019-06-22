@@ -26,13 +26,13 @@ class ProtocGenGo(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(ProtocGenGo, cls).register_options(register)
+    super().register_options(register)
     register('--version', default='v1.1.0',
              help='Version of protoc-gen-go plugin to use when generating code')
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ProtocGenGo, cls).subsystem_dependencies() + (Protoc.scoped(cls), GoDistribution,)
+    return super().subsystem_dependencies() + (Protoc.scoped(cls), GoDistribution,)
 
   @memoized_method
   def select(self, context):

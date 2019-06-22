@@ -257,7 +257,7 @@ class CCompiler(datatype([
 
   @property
   def invocation_environment_dict(self):
-    ret = super(CCompiler, self).invocation_environment_dict.copy()
+    ret = super().invocation_environment_dict.copy()
 
     ret['CC'] = self.exe_filename
 
@@ -275,7 +275,7 @@ class CppCompiler(datatype([
 
   @property
   def invocation_environment_dict(self):
-    ret = super(CppCompiler, self).invocation_environment_dict.copy()
+    ret = super().invocation_environment_dict.copy()
 
     ret['CXX'] = self.exe_filename
 

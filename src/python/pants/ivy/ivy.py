@@ -14,7 +14,7 @@ from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.util.dirutil import safe_mkdir
 
 
-class Ivy(object):
+class Ivy:
   """Encapsulates the ivy cli taking care of the basic invocation letting you just worry about the
   args to pass to the cli itself.
 

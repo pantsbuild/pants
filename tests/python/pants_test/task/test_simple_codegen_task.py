@@ -22,7 +22,7 @@ class DummyTargetBase(Target):
     payload.add_fields({
       'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
     })
-    super(DummyTargetBase, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
 
 class SyntheticDummyLibrary(DummyTargetBase):
@@ -60,7 +60,7 @@ class DummyGen(SimpleCodegenTask):
   sources_globs = ('**/*.java',)
 
   def __init__(self, *args, **kwargs):
-    super(DummyGen, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._test_case = None
     self.setup_for_testing(None)
     self.execution_counts = 0
@@ -313,7 +313,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
 class ExportingDummyGen(DummyGen):
 
   def __init__(self, *args, **kwargs):
-    super(ExportingDummyGen, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.synthetic_type = ExportingSyntheticDummyLibrary
     self.synthetic_exports = ['marionette:no-strings']
     self.synthetic_dependencies = ['marionette:no-strings']
@@ -330,7 +330,7 @@ class ExportingDummyGen(DummyGen):
 
 class ExportingDummyLibrary(DummyLibrary):
   def __init__(self, exports=None, **kwargs):
-    super(ExportingDummyLibrary, self).__init__(**kwargs)
+    super().__init__(**kwargs)
     self._export_specs = exports or tuple() # NB: export_specs can't be None
 
   @property
@@ -340,7 +340,7 @@ class ExportingDummyLibrary(DummyLibrary):
 
 class ExportingSyntheticDummyLibrary(SyntheticDummyLibrary):
   def __init__(self, address, sources, exports=None, **kwargs):
-    super(ExportingSyntheticDummyLibrary, self).__init__(address, sources, **kwargs)
+    super().__init__(address, sources, **kwargs)
     self._export_specs = exports or tuple() # NB: export_specs can't be None
 
   @property

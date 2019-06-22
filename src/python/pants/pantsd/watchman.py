@@ -35,7 +35,7 @@ class Watchman(ProcessManager):
                           '1' for standard logging and '2' for verbose logging.
     :param str socket_path_override: The overridden target path of the watchman socket, if any.
     """
-    super(Watchman, self).__init__(name='watchman',
+    super().__init__(name='watchman',
                                    process_name='watchman',
                                    socket_type=str,
                                    metadata_base_dir=metadata_base_dir)

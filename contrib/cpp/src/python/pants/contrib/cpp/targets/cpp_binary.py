@@ -18,7 +18,7 @@ class CppBinary(CppTarget):
     """
     payload = payload or Payload()
     payload.add_field('libraries', PrimitiveField(libraries))
-    super(CppBinary, self).__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, **kwargs)
 
   @property
   def libraries(self):

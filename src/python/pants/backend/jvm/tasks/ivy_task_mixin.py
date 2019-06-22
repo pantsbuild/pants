@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 class IvyResolveFingerprintStrategy(FingerprintStrategy):
 
   def __init__(self, confs):
-    super(IvyResolveFingerprintStrategy, self).__init__()
+    super().__init__()
     self._confs = sorted(confs or [])
 
   def compute_fingerprint(self, target):
@@ -83,11 +83,11 @@ class IvyTaskMixin(JvmResolverBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(IvyTaskMixin, cls).subsystem_dependencies() + (IvySubsystem, JarDependencyManagement)
+    return super().subsystem_dependencies() + (IvySubsystem, JarDependencyManagement)
 
   @classmethod
   def register_options(cls, register):
-    super(IvyTaskMixin, cls).register_options(register)
+    super().register_options(register)
     # TODO: Register an --ivy-jvm-options here and use that, instead of the --jvm-options
     # registered by the task we mix into. That task may have intended those options for some
     # other JVM run than the Ivy one.
@@ -97,7 +97,7 @@ class IvyTaskMixin(JvmResolverBase):
 
   @classmethod
   def implementation_version(cls):
-    return super(IvyTaskMixin, cls).implementation_version() + [('IvyTaskMixin', 5)]
+    return super().implementation_version() + [('IvyTaskMixin', 5)]
 
   @memoized_property
   def ivy_repository_cache_dir(self):

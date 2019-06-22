@@ -46,7 +46,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     return register_core().merge(register_jvm()).merge(register_python())
 
   def setUp(self):
-    super(ExportTest, self).setUp()
+    super().setUp()
 
     # We need an initialized ScalaPlatform in order to make ScalaLibrary targets below.
     scala_options = {

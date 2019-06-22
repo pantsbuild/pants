@@ -41,7 +41,7 @@ class Executor(ABC):
   class InvalidDistribution(ValueError):
     """Indicates an invalid Distribution was used to construct this runner."""
 
-  class Runner(object):
+  class Runner:
     """A re-usable executor that can run a configured java command line."""
 
     @property
@@ -141,7 +141,7 @@ class CommandLineGrabber(Executor):
   """Doesn't actually execute anything, just captures the cmd line."""
 
   def __init__(self, distribution):
-    super(CommandLineGrabber, self).__init__(distribution=distribution)
+    super().__init__(distribution=distribution)
     self._command = None  # Initialized when we run something.
 
   def _runner(self, classpath, main, jvm_options, args):

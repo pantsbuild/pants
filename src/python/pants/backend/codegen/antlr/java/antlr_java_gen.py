@@ -42,12 +42,12 @@ class AntlrJavaGen(SimpleCodegenTask, NailgunTask):
 
   # TODO: Do we need this?
   def find_sources(self, target, target_dir):
-    sources = super(AntlrJavaGen, self).find_sources(target, target_dir)
+    sources = super().find_sources(target, target_dir)
     return [source for source in sources if source.endswith('.java')]
 
   @classmethod
   def register_options(cls, register):
-    super(AntlrJavaGen, cls).register_options(register)
+    super().register_options(register)
     for key, (classpath_spec, classpath) in _DEFAULT_ANTLR_DEPS.items():
       cls.register_jvm_tool(register, key, classpath=classpath, classpath_spec=classpath_spec)
 

@@ -27,7 +27,7 @@ class ThriftLinter(LintTaskMixin, NailgunTask):
 
   @classmethod
   def register_options(cls, register):
-    super(ThriftLinter, cls).register_options(register)
+    super().register_options(register)
     register('--strict', type=bool, fingerprint=True,
              help='Fail the goal if thrift linter errors are found. Overrides the '
                   '`strict-default` option.')

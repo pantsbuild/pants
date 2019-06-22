@@ -32,7 +32,7 @@ class SetupPyTestBase(PythonTaskTestBase):
     return SetupPy
 
   def setUp(self):
-    super(SetupPyTestBase, self).setUp()
+    super().setUp()
     self.distdir = os.path.join(self.build_root, 'dist')
     self.set_options(pants_distdir=self.distdir)
     init_subsystem(Target.Arguments)
@@ -54,7 +54,7 @@ class SetupPyTestBase(PythonTaskTestBase):
 class TestSetupPy(SetupPyTestBase):
 
   def setUp(self):
-    super(TestSetupPy, self).setUp()
+    super().setUp()
     self.dependency_calculator = SetupPy.DependencyCalculator(self.build_graph)
 
   @classmethod
@@ -62,7 +62,7 @@ class TestSetupPy(SetupPyTestBase):
     extra_aliases = BuildFileAliases(targets={'prep_command': PrepCommand,
                                               'resources': Resources,
                                               'target': Target})
-    return super(TestSetupPy, cls).alias_groups().merge(extra_aliases)
+    return super().alias_groups().merge(extra_aliases)
 
   def create_dependencies(self, depmap):
     target_map = {}

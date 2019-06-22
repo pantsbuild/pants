@@ -19,5 +19,5 @@ class NailgunTaskTestBase(JvmToolTaskTestBase):
     """
     :API: public
     """
-    super(NailgunTaskTestBase, self).setUp()
+    super().setUp()
     self.set_options(execution_strategy=NailgunTask.ExecutionStrategy.subprocess)

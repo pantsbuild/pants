@@ -21,5 +21,5 @@ class JvmResolveSubsystem(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(JvmResolveSubsystem, cls).register_options(register)
+    super().register_options(register)
     register('--resolver', choices=cls.CHOICES, default='ivy', help='Resolver to use for external jvm dependencies.')

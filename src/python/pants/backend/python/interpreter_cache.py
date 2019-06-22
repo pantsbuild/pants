@@ -28,7 +28,7 @@ class PythonInterpreterCache(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(PythonInterpreterCache, cls).subsystem_dependencies() + (PythonSetup,)
+    return super().subsystem_dependencies() + (PythonSetup,)
 
   class UnsatisfiableInterpreterConstraintsError(TaskError):
     """Indicates a Python interpreter matching given constraints could not be located."""

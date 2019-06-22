@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-class RankedValue(object):
+class RankedValue:
   """An option value, together with a rank inferred from its source.
 
   Allows us to control which source wins: e.g., a command-line flag overrides an environment

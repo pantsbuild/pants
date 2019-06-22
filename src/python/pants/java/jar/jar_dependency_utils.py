@@ -5,7 +5,7 @@
 from pants.util.memo import memoized_property
 
 
-class ResolvedJar(object):
+class ResolvedJar:
   """Represents an artifact resolved from the dependency resolution process."""
 
   def __init__(self, coordinate, cache_path, pants_path=None, directory_digest=None):

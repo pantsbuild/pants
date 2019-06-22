@@ -27,7 +27,7 @@ class WikiPageTest(TestBase):
     )
 
   def setUp(self):
-    super(WikiPageTest, self).setUp()
+    super().setUp()
 
     self.add_to_build_file('src/docs', dedent("""
 

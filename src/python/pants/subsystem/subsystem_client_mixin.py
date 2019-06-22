@@ -22,7 +22,7 @@ class SubsystemDependency(datatype([
   """Indicates intent to use an instance of `subsystem_cls` scoped to `scope`."""
 
   def __new__(cls, subsystem_cls, scope, removal_version=None, removal_hint=None):
-    return super(SubsystemDependency, cls).__new__(cls, subsystem_cls, scope, removal_version, removal_hint)
+    return super().__new__(cls, subsystem_cls, scope, removal_version, removal_hint)
 
   def is_global(self):
     return self.scope == GLOBAL_SCOPE
@@ -45,7 +45,7 @@ class SubsystemDependency(datatype([
       return self.subsystem_cls.subscope(self.scope)
 
 
-class SubsystemClientMixin(object):
+class SubsystemClientMixin:
   """A mixin for declaring dependencies on subsystems.
 
   Must be mixed in to an Optionable.

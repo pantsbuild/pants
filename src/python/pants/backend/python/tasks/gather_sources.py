@@ -28,11 +28,11 @@ class GatherSources(Task):
 
   @classmethod
   def implementation_version(cls):
-    return super(GatherSources, cls).implementation_version() + [('GatherSources', 5)]
+    return super().implementation_version() + [('GatherSources', 5)]
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(GatherSources, cls).subsystem_dependencies() + (PexBuilderWrapper.Factory,)
+    return super().subsystem_dependencies() + (PexBuilderWrapper.Factory,)
 
   @classmethod
   def product_types(cls):

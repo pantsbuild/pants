@@ -22,7 +22,7 @@ class GoWorkspaceTask(GoTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(GoWorkspaceTask, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data('go_remote_lib_src')
 
   def get_gopath(self, target):

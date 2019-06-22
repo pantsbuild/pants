@@ -15,7 +15,7 @@ SHAPELESS_CLSFILE = 'org/pantsbuild/testproject/unicode/shapeless/ShapelessExamp
 SHAPELESS_TARGET = 'testprojects/src/scala/org/pantsbuild/testproject/unicode/shapeless'
 
 
-class BaseZincCompileIntegrationTest(object):
+class BaseZincCompileIntegrationTest:
 
   def create_file(self, path, value):
     with safe_open(path, 'w') as f:

@@ -27,7 +27,7 @@ class WireGen(NailgunTaskBase, SimpleCodegenTask):
 
   @classmethod
   def register_options(cls, register):
-    super(WireGen, cls).register_options(register)
+    super().register_options(register)
 
 
     def wire_jar(name):
@@ -48,7 +48,7 @@ class WireGen(NailgunTaskBase, SimpleCodegenTask):
 
   def __init__(self, *args, **kwargs):
     """Generates Java files from .proto files using the Wire protobuf compiler."""
-    super(WireGen, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
   def synthetic_target_type(self, target):
     return JavaLibrary

@@ -100,7 +100,7 @@ class InvalidTargetName(ValueError):
   """Indicate an invalid target name for `Address`."""
 
 
-class Address(object):
+class Address:
   """A target address.
 
   An address is a unique name representing a
@@ -269,7 +269,7 @@ class BuildFileAddress(Address):
     """
     rel_path = rel_path or build_file.relpath
     spec_path = os.path.dirname(rel_path)
-    super(BuildFileAddress, self).__init__(spec_path=spec_path,
+    super().__init__(spec_path=spec_path,
                                            target_name=target_name or os.path.basename(spec_path))
     self.rel_path = rel_path
 

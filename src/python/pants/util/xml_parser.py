@@ -4,7 +4,7 @@
 from xml.dom.minidom import parse
 
 
-class XmlParser(object):
+class XmlParser:
   """Parse .xml files."""
 
   class XmlError(Exception):

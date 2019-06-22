@@ -49,7 +49,7 @@ class PythonIsortTest(PythonTaskTestBase):
     return IsortRun
 
   def setUp(self):
-    super(PythonIsortTest, self).setUp()
+    super().setUp()
     self._create_graph()
 
   def _create_graph(self):

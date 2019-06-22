@@ -34,7 +34,7 @@ class AddressableTypeValidationError(TypeConstraintError):
   """Indicates a value provided to an `AddressableDescriptor` failed to satisfy a type constraint."""
 
 
-class AddressableDescriptor(object):
+class AddressableDescriptor:
   """A data descriptor for fields containing one or more addressable items.
 
   An addressable descriptor has lifecycle expectations tightly coupled with the contract of
@@ -70,7 +70,7 @@ class AddressableDescriptor(object):
 
      >>> class Thing(Struct):
      ...   def __init__(self, thing):
-     ...     super(Thing, self).__init__()
+     ...     super().__init__()
      ...     self.thing = thing
      ...   @property
      ...   def parent(self):
@@ -205,7 +205,7 @@ def _addressable_wrapper(addressable_descriptor, type_constraint):
     #
     # class Thing(Struct):
     #   def __init__(self, thing):
-    #      super(Thing, self).__init__()
+    #      super().__init__()
     #      self.thing = thing
     #
     #   @property
@@ -258,10 +258,10 @@ class AddressableList(AddressableDescriptor):
     if not isinstance(value, MutableSequence):
       raise TypeError('The {} property of {} must be a list, given {} of type {}'
                       .format(self._name, instance, value, type(value).__name__))
-    return [super(AddressableList, self)._checked_value(instance, v) for v in value]
+    return [super()._checked_value(instance, v) for v in value]
 
   def _resolve_value(self, instance, value):
-    return [super(AddressableList, self)._resolve_value(instance, v)
+    return [super()._resolve_value(instance, v)
             for v in value] if value else []
 
 
@@ -287,10 +287,10 @@ class AddressableDict(AddressableDescriptor):
     if not isinstance(value, MutableMapping):
       raise TypeError('The {} property of {} must be a dict, given {} of type {}'
                       .format(self._name, instance, value, type(value).__name__))
-    return {k: super(AddressableDict, self)._checked_value(instance, v) for k, v in value.items()}
+    return {k: super()._checked_value(instance, v) for k, v in value.items()}
 
   def _resolve_value(self, instance, value):
-    return {k: super(AddressableDict, self)._resolve_value(instance, v)
+    return {k: super()._resolve_value(instance, v)
             for k, v in value.items()} if value else {}
 
 

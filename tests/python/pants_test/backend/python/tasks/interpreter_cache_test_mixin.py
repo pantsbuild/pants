@@ -4,7 +4,7 @@
 import os
 
 
-class InterpreterCacheTestMixin(object):
+class InterpreterCacheTestMixin:
   """A mixin to allow tests to use the "real" interpreter cache.
 
   This is so each test doesn't waste huge amounts of time recreating the cache on each run.
@@ -13,7 +13,7 @@ class InterpreterCacheTestMixin(object):
   """
 
   def setUp(self):
-    super(InterpreterCacheTestMixin, self).setUp()
+    super().setUp()
 
     # It would be nice to get the location of the real interpreter cache from PythonSetup,
     # but unfortunately real subsystems aren't available here (for example, we have no access

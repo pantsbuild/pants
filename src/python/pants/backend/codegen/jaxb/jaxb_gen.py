@@ -23,7 +23,7 @@ class JaxbGen(SimpleCodegenTask, NailgunTask):
 
   @classmethod
   def register_options(cls, register):
-    super(JaxbGen, cls).register_options(register)
+    super().register_options(register)
     cls.register_jvm_tool(register,
                           'xjc',
                           classpath=[
@@ -51,7 +51,7 @@ class JaxbGen(SimpleCodegenTask, NailgunTask):
     :param context: inherited parameter from Task
     :param workdir: inherited parameter from Task
     """
-    super(JaxbGen, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.set_distribution(jdk=True)
     self.gen_langs = set()
     lang = 'java'

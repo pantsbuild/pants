@@ -18,11 +18,11 @@ class CppCompile(NativeCompile):
 
   @classmethod
   def implementation_version(cls):
-    return super(CppCompile, cls).implementation_version() + [('CppCompile', 0)]
+    return super().implementation_version() + [('CppCompile', 0)]
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(CppCompile, cls).subsystem_dependencies() + (CppCompileSettings.scoped(cls),)
+    return super().subsystem_dependencies() + (CppCompileSettings.scoped(cls),)
 
   def get_compile_settings(self):
     return CppCompileSettings.scoped_instance(self)

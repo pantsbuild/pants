@@ -10,7 +10,7 @@ from pants.util.memo import memoized_method
 from pants.util.objects import enum
 
 
-class UnsetBool(object):
+class UnsetBool:
   """A type that can be used as the default value for a bool typed option to indicate un-set.
 
   In other words, `bool`-typed options with a `default=UnsetBool` that are not explicitly set will
@@ -126,7 +126,7 @@ def _convert(val, acceptable_types):
   return parse_expression(val, acceptable_types, raise_type=ParseError)
 
 
-class ListValueComponent(object):
+class ListValueComponent:
   """A component of the value of a list-typed option.
 
   One or more instances of this class can be merged to form a list value.
@@ -249,7 +249,7 @@ class ListValueComponent(object):
     return '{} +{} -{}'.format(self._action, self._appends, self._filters)
 
 
-class DictValueComponent(object):
+class DictValueComponent:
   """A component of the value of a dict-typed option.
 
   One or more instances of this class can be merged to form a dict value.

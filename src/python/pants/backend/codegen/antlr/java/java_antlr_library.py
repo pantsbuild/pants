@@ -38,7 +38,7 @@ class JavaAntlrLibrary(JvmTarget):
     elif not sources:
       raise TargetDefinitionException(self, "Missing required 'sources' parameter.")
 
-    super(JavaAntlrLibrary, self).__init__(name=name,
+    super().__init__(name=name,
                                            sources=sources,
                                            provides=provides,
                                            excludes=excludes,

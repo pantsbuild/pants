@@ -138,7 +138,7 @@ class BuildConfigurationTest(unittest.TestCase):
       self.assertEqual('george', context_aware_object(*args, **kwargs))
 
   def test_register_exposed_context_aware_class(self):
-    class George(object):
+    class George:
       def __init__(self, parse_context):
         self._parse_context = parse_context
 

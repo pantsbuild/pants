@@ -11,7 +11,7 @@ from heapq import heappop, heappush
 from pants.base.worker_pool import Work
 
 
-class Job(object):
+class Job:
   """A unit of scheduling for the ExecutionGraph.
 
   The ExecutionGraph represents a DAG of dependent work. A Job a node in the graph along with the
@@ -56,7 +56,7 @@ CANCELED = 'Canceled'
 RUNNING = 'Running'
 
 
-class StatusTable(object):
+class StatusTable:
   DONE_STATES = {SUCCESSFUL, FAILED, CANCELED}
 
   def __init__(self, keys, pending_dependencies_count):
@@ -98,7 +98,7 @@ class ExecutionFailure(Exception):
   def __init__(self, message, cause=None):
     if cause:
       message = "{}: {}".format(message, str(cause))
-    super(ExecutionFailure, self).__init__(message)
+    super().__init__(message)
     self.cause = cause
 
 
@@ -106,28 +106,28 @@ class UnexecutableGraphError(Exception):
   """Base exception class for errors that make an ExecutionGraph not executable"""
 
   def __init__(self, msg):
-    super(UnexecutableGraphError, self).__init__("Unexecutable graph: {}".format(msg))
+    super().__init__("Unexecutable graph: {}".format(msg))
 
 
 class NoRootJobError(UnexecutableGraphError):
   def __init__(self):
-    super(NoRootJobError, self).__init__(
+    super().__init__(
       "All scheduled jobs have dependencies. There must be a circular dependency.")
 
 
 class UnknownJobError(UnexecutableGraphError):
   def __init__(self, undefined_dependencies):
-    super(UnknownJobError, self).__init__("Undefined dependencies {}"
+    super().__init__("Undefined dependencies {}"
                                           .format(", ".join(map(repr, undefined_dependencies))))
 
 
 class JobExistsError(UnexecutableGraphError):
   def __init__(self, key):
-    super(JobExistsError, self).__init__("Job already scheduled {!r}"
+    super().__init__("Job already scheduled {!r}"
                                           .format(key))
 
 
-class ThreadSafeCounter(object):
+class ThreadSafeCounter:
   def __init__(self):
     self.lock = threading.Lock()
     self._counter = 0
@@ -145,7 +145,7 @@ class ThreadSafeCounter(object):
       self._counter -= 1
 
 
-class ExecutionGraph(object):
+class ExecutionGraph:
   """A directed acyclic graph of work to execute.
 
   This is currently only used within jvm compile, but the intent is to unify it with the future

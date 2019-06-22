@@ -115,7 +115,7 @@ class CoercingEncoder(json.JSONEncoder):
     return o
 
   def encode(self, o):
-    return super(CoercingEncoder, self).encode(self.default(o))
+    return super().encode(self.default(o))
 
 
 def json_hash(obj, digest=None, encoder=None):
@@ -148,7 +148,7 @@ def stable_json_sha1(obj, digest=None):
   return json_hash(obj, digest=digest, encoder=CoercingEncoder)
 
 
-class Sharder(object):
+class Sharder:
   """Assigns strings to shards pseudo-randomly, but stably."""
 
   class InvalidShardSpec(Exception):

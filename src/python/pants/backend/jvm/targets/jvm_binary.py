@@ -118,7 +118,7 @@ class Duplicate(JarRule):
     payload.add_fields({
       'action': PrimitiveField(self.validate_action(action)),
     })
-    super(Duplicate, self).__init__(apply_pattern, payload=payload)
+    super().__init__(apply_pattern, payload=payload)
 
   @property
   def action(self):
@@ -360,7 +360,7 @@ class JvmBinary(JvmTarget):
       'extra_jvm_options': PrimitiveField(list(extra_jvm_options or ())),
     })
 
-    super(JvmBinary, self).__init__(name=name,
+    super().__init__(name=name,
                                     address=address,
                                     payload=payload,
                                     sources=sources,

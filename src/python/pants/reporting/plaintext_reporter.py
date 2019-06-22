@@ -14,7 +14,7 @@ from pants.util.memo import memoized_method
 from pants.util.strutil import ensure_binary
 
 
-class ToolOutputFormat(object):
+class ToolOutputFormat:
   """Configuration item for displaying Tool Output to the console."""
 
   SUPPRESS =   'SUPPRESS'    # Do not display output from the workunit unless its outcome != SUCCESS
@@ -27,7 +27,7 @@ class ToolOutputFormat(object):
     return [key for key in dir(cls) if not key.startswith('_') and key.isupper()]
 
 
-class LabelFormat(object):
+class LabelFormat:
   """Configuration item for displaying a workunit label to the console."""
 
   SUPPRESS = 'SUPPRESS'              # Don't show the label at all
@@ -89,7 +89,7 @@ class PlainTextReporter(PlainTextReporterBase):
   }
 
   def __init__(self, run_tracker, settings):
-    super(PlainTextReporter, self).__init__(run_tracker, settings)
+    super().__init__(run_tracker, settings)
 
     # We eagerly validate that our output accepts raw bytes.
     settings.outfile.write(b'')

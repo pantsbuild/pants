@@ -8,7 +8,7 @@ from textwrap import dedent
 from pants.goal.goal import Goal
 
 
-class TaskRegistrar(object):
+class TaskRegistrar:
   """
   :API: public
   """

@@ -7,10 +7,10 @@ from pants.build_graph.target import Target
 from pants.util.dirutil import safe_open
 
 
-class InvalidationReport(object):
+class InvalidationReport:
   """Creates a report of all versioned target sets seen in the build."""
 
-  class TaskReport(object):
+  class TaskReport:
     class TaskEntry(namedtuple('TaskEntry', ['targets_hash', 'target_ids', 'cache_key_id',
                                              'cache_key_hash', 'phase', 'valid'])):
       """

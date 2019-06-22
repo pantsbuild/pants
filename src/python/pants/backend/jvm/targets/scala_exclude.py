@@ -17,5 +17,5 @@ class ScalaExclude(Exclude):
 
   @property
   def name(self):
-    base_name = super(ScalaExclude, self).name
+    base_name = super().name
     return ScalaPlatform.global_instance().suffix_version(base_name)

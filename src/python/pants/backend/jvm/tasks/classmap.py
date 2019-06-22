@@ -11,7 +11,7 @@ class ClassmapTask(ConsoleTask):
 
   @classmethod
   def register_options(cls, register):
-    super(ClassmapTask, cls).register_options(register)
+    super().register_options(register)
 
     register('--internal-only', default=False, type=bool, fingerprint=True,
              help='Specifies that only class names of internal dependencies should be included.')
@@ -39,5 +39,5 @@ class ClassmapTask(ConsoleTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(ClassmapTask, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data('runtime_classpath')

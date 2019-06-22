@@ -34,14 +34,14 @@ from pants.util.memo import memoized_property
 class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
   def __init__(self, main, custom_rules=None):
     # The bootstrapper uses no custom confs in its resolves.
-    super(ShadedToolFingerprintStrategy, self).__init__(confs=None)
+    super().__init__(confs=None)
 
     self._main = main
     self._custom_rules = custom_rules
 
   def compute_fingerprint(self, target):
     hasher = hashlib.sha1()
-    base_fingerprint = super(ShadedToolFingerprintStrategy, self).compute_fingerprint(target)
+    base_fingerprint = super().compute_fingerprint(target)
     if base_fingerprint is None:
       return None
 
@@ -79,7 +79,7 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):
 
   @classmethod
   def register_options(cls, register):
-    super(BootstrapJvmTools, cls).register_options(register)
+    super().register_options(register)
     register('--eager', type=bool, default=False,
              help='Eagerly bootstrap all known JVM tools, instead of fetching them on-demand. '
                   'Useful for creating a warm Pants workspace, e.g., for containerizing.')
@@ -90,11 +90,11 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(BootstrapJvmTools, cls).subsystem_dependencies() + (IvySubsystem, Shader.Factory)
+    return super().subsystem_dependencies() + (IvySubsystem, Shader.Factory)
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(BootstrapJvmTools, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     Shader.Factory.prepare_tools(round_manager)
 
   class ToolResolveError(TaskError):
@@ -175,7 +175,7 @@ class BootstrapJvmTools(IvyTaskMixin, CoursierMixin, JarTask):
     return None
 
   def __init__(self, *args, **kwargs):
-    super(BootstrapJvmTools, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._tool_cache_path = os.path.join(self.workdir, 'tool_cache')
 
   def execute(self):

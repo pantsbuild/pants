@@ -24,7 +24,7 @@ from pants.version import PANTS_SEMVER
 logger = logging.getLogger(__name__)
 
 
-class PluginResolver(object):
+class PluginResolver:
   @staticmethod
   def _is_wheel(path):
     return os.path.isfile(path) and path.endswith('.whl')

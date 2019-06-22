@@ -11,7 +11,7 @@ from pants_test.test_base import TestBase
 
 class TestWatchmanClient(TestBase):
   def setUp(self):
-    super(TestWatchmanClient, self).setUp()
+    super().setUp()
     self.swc = StreamableWatchmanClient(sockpath='/tmp/testing', transport='local')
 
   @contextmanager

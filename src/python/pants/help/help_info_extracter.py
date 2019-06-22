@@ -46,7 +46,7 @@ class OptionScopeHelpInfo(namedtuple('_OptionScopeHelpInfo',
   pass
 
 
-class HelpInfoExtracter(object):
+class HelpInfoExtracter:
   """Extracts information useful for displaying help from option registration args."""
 
   @classmethod

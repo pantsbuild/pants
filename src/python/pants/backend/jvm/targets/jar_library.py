@@ -28,7 +28,7 @@ class JarLibrary(Target):
       'excludes': ExcludesField([]),
       'managed_dependencies': PrimitiveField(managed_dependencies),
     })
-    super(JarLibrary, self).__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, **kwargs)
     # NB: Waiting to validate until superclasses are initialized.
     if not jars:
       raise TargetDefinitionException(self, 'Must have a non-empty list of jars.')

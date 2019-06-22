@@ -33,7 +33,7 @@ def swallow_psutil_exceptions():
     pass
 
 
-class ProcessGroup(object):
+class ProcessGroup:
   """Wraps a logical group of processes and provides convenient access to ProcessManager objects."""
 
   def __init__(self, name, metadata_base_dir=None):
@@ -65,7 +65,7 @@ class ProcessGroup(object):
       yield self._instance_from_process(item)
 
 
-class ProcessMetadataManager(object):
+class ProcessMetadataManager:
   """"Manages contextual, on-disk process metadata."""
 
   class MetadataError(Exception): pass
@@ -79,7 +79,7 @@ class ProcessMetadataManager(object):
     """
     :param str metadata_base_dir: The base directory for process metadata.
     """
-    super(ProcessMetadataManager, self).__init__()
+    super().__init__()
 
     self._metadata_base_dir = (
       metadata_base_dir or
@@ -243,7 +243,7 @@ class ProcessManager(ProcessMetadataManager):
     :param type socket_type: The type to be used for socket type casting (e.g. int).
     :param str metadata_base_dir: The overridden base directory for process metadata.
     """
-    super(ProcessManager, self).__init__(metadata_base_dir)
+    super().__init__(metadata_base_dir)
     self._name = name.lower().strip()
     self._pid = pid
     self._socket = socket
@@ -400,7 +400,7 @@ class ProcessManager(ProcessMetadataManager):
     if not force and self.is_alive():
       raise ProcessMetadataManager.MetadataError('cannot purge metadata for a running process!')
 
-    super(ProcessManager, self).purge_metadata_by_name(self._name)
+    super().purge_metadata_by_name(self._name)
 
   def _kill(self, kill_sig):
     """Send a signal to the current process."""

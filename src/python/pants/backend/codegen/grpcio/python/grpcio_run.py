@@ -23,7 +23,7 @@ class GrpcioRun(SimpleCodegenTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(GrpcioRun, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(GrpcioPrep.tool_instance_cls)
 
   def synthetic_target_type(self, target):

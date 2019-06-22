@@ -9,7 +9,7 @@ class PyTest(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(PyTest, cls).register_options(register)
+    super().register_options(register)
     # TODO: This is currently bounded below `3.7` due to #6282.
     register('--requirements', advanced=True, default='pytest>=3.0.7,<3.7',
              help='Requirements string for the pytest library.')

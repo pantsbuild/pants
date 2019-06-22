@@ -86,7 +86,7 @@ class EagerFilesetWithSpec(FilesetWithSpec):
       what globs or file list it came from. Must be relative to buildroot.
     :param snapshot: A Snapshot of the files, rooted at the buildroot.
     """
-    super(EagerFilesetWithSpec, self).__init__(rel_root, filespec)
+    super().__init__(rel_root, filespec)
     self._include_dirs = include_dirs
     self._snapshot = snapshot
 
@@ -129,7 +129,7 @@ class LazyFilesetWithSpec(FilesetWithSpec):
     :param files_calculator: A no-arg function that will lazily compute the file paths for
       this filespec.
     """
-    super(LazyFilesetWithSpec, self).__init__(rel_root, filespec)
+    super().__init__(rel_root, filespec)
     self._files_calculator = files_calculator
 
   @memoized_property
@@ -335,7 +335,7 @@ class RGlobs(FilesetRelPathWrapper):
 
       rglobs.append(os.path.join(*out))
 
-    return super(RGlobs, cls).to_filespec(rglobs, root=root, exclude=exclude)
+    return super().to_filespec(rglobs, root=root, exclude=exclude)
 
 
 class ZGlobs(FilesetRelPathWrapper):

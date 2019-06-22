@@ -48,7 +48,7 @@ class PathGlobs(datatype([
                                                  one file, or if any glob matching is ok.
     :rtype: :class:`PathGlobs`
     """
-    return super(PathGlobs, cls).__new__(
+    return super().__new__(
       cls,
       include=tuple(include),
       exclude=tuple(exclude),
@@ -125,7 +125,7 @@ class PathGlobsAndRoot(datatype([
   """
 
   def __new__(cls, path_globs, root, digest_hint=None):
-    return super(PathGlobsAndRoot, cls).__new__(cls, path_globs, root, digest_hint)
+    return super().__new__(cls, path_globs, root, digest_hint)
 
 
 class Snapshot(datatype([('directory_digest', Digest), ('files', tuple), ('dirs', tuple)])):

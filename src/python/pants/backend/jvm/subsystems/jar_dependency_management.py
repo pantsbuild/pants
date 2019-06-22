@@ -38,7 +38,7 @@ class JarDependencyManagement(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(JarDependencyManagement, cls).register_options(register)
+    super().register_options(register)
 
     conflict_strategies = [
       'FAIL',
@@ -58,7 +58,7 @@ class JarDependencyManagement(Subsystem):
              help='Turns warning messages into debug messages when resolving jar conflicts.')
 
   def __init__(self, *args, **kwargs):
-    super(JarDependencyManagement, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._default_target = None
     # Map of ManagedJarDependencies target ids to PinnedJarArtifactSets.
     # Populated early in the build by the JarDependencyManagementSetup task.
@@ -187,7 +187,7 @@ class JarDependencyManagement(Subsystem):
     return self._artifact_set_map[found_target.id]
 
 
-class PinnedJarArtifactSet(object):
+class PinnedJarArtifactSet:
   """A set of artifact coordinates and what versions they should be pinned to."""
 
   class MissingVersion(TaskError):
@@ -316,7 +316,7 @@ class JarDependencyManagementSetup(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JarDependencyManagementSetup, cls).subsystem_dependencies() + (JarDependencyManagement,)
+    return super().subsystem_dependencies() + (JarDependencyManagement,)
 
   def execute(self):
     self._resolve_default_target()

@@ -26,7 +26,7 @@ class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsys
 
   @classmethod
   def register_options(cls, register):
-    super(NativeBuildStep, cls).register_options(register)
+    super().register_options(register)
 
     register('--compiler-option-sets', advanced=True, default=(), type=list,
              fingerprint=True,
@@ -53,7 +53,7 @@ class CompileSettingsBase(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(CompileSettingsBase, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       NativeBuildStep.scoped(cls),
     )
 
@@ -64,7 +64,7 @@ class CompileSettingsBase(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(CompileSettingsBase, cls).register_options(register)
+    super().register_options(register)
     register('--header-file-extensions', advanced=True, default=cls.header_file_extensions_default,
              type=list, fingerprint=True,
              help="The file extensions which should not be provided to the compiler command line.")

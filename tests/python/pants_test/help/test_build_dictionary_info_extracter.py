@@ -13,7 +13,7 @@ from pants.util.objects import datatype
 class BuildDictionaryInfoExtracterTest(unittest.TestCase):
 
   def setUp(self):
-    super(BuildDictionaryInfoExtracterTest, self).setUp()
+    super().setUp()
     self.maxDiff = None
 
   def test_get_description_from_docstring(self):
@@ -95,7 +95,7 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
       BuildDictionaryInfoExtracter.get_function_args(func))
 
     # Test member function.
-    class TestCls(object):
+    class TestCls:
       def __init__(self, arg1, arg2=False):
         pass
 
@@ -183,7 +183,7 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
                       extracter.get_target_type_info())
 
   def test_get_object_info(self):
-    class Foo(object):
+    class Foo:
       """Foo docstring."""
 
       def __init__(self, bar, baz=42):
@@ -205,7 +205,7 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
                       extracter.get_object_info())
 
   def test_get_object_factory_info(self):
-    class Foo(object):
+    class Foo:
       """Foo docstring."""
 
       def __call__(self, bar, baz=42):
@@ -235,7 +235,7 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
         :param bar: Bar details.
         :param int baz: Baz details.
         """
-        return super(FooDatatype, cls).__new__(cls, bar, baz)
+        return super().__new__(cls, bar, baz)
 
     bfa = BuildFileAliases(targets={},
       objects={

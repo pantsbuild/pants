@@ -20,7 +20,7 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
 
   @classmethod
   def alias_groups(cls):
-    return super(PythonBinaryCreateTest, cls).alias_groups().merge(register_core())
+    return super().alias_groups().merge(register_core())
 
   def _assert_pex(self, binary, expected_output=None, expected_shebang=None):
     # The easiest way to create products required by the PythonBinaryCreate task is to

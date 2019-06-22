@@ -92,7 +92,7 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return (super(TaskBase, cls).subsystem_dependencies() +
+    return (super().subsystem_dependencies() +
             (CacheSetup.scoped(cls), BuildInvalidator.Factory, SourceRootConfig) +
             ((TargetFilter.scoped(cls),) if cls.target_filtering_enabled else tuple()))
 
@@ -118,7 +118,7 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
 
   @classmethod
   def register_options(cls, register):
-    super(TaskBase, cls).register_options(register)
+    super().register_options(register)
     if cls.supports_passthru_args():
       register('--passthrough-args',
                type=list,
@@ -171,7 +171,7 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
 
     class MyTask(Task):
       def __init__(self, *args, **kwargs):
-        super(MyTask, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         ...
 
     This allows us to change Task.__init__()'s arguments without
@@ -180,7 +180,7 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
 
     :API: public
     """
-    super(TaskBase, self).__init__()
+    super().__init__()
     self.context = context
     self._workdir = workdir
 
@@ -727,7 +727,7 @@ class Task(TaskBase):
 
     :API: public
     """
-    super(Task, self).__init__(context, workdir)
+    super().__init__(context, workdir)
 
   @abstractmethod
   def execute(self):
@@ -737,6 +737,6 @@ class Task(TaskBase):
     """
 
 
-class QuietTaskMixin(object):
+class QuietTaskMixin:
   """A mixin to signal that pants shouldn't print verbose progress information for this task."""
   pass

@@ -131,7 +131,7 @@ class TestParseFailedTargets(unittest.TestCase):
   def _raise_handler(e):
     raise e
 
-  class CollectHandler(object):
+  class CollectHandler:
     def __init__(self):
       self._errors = []
 

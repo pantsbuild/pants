@@ -12,7 +12,7 @@ class TestInjectInit(TestBase):
 
   @classmethod
   def rules(cls):
-    return super(TestInjectInit, cls).rules() + [inject_init, RootRule(Snapshot)]
+    return super().rules() + [inject_init, RootRule(Snapshot)]
 
   def assert_result(self, input_snapshot, expected_digest):
     injected_digest = assert_single_element(

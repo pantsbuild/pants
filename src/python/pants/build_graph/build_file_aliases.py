@@ -12,7 +12,7 @@ from pants.build_graph.target import Target
 from pants.util.memo import memoized_property
 
 
-class TargetMacro(object):
+class TargetMacro:
   """A specialized context aware object factory responsible for instantiating a set of target types.
 
   The macro acts to expand arguments to its alias in a BUILD file into one or more target
@@ -80,7 +80,7 @@ class TargetMacro(object):
     """Expands the given BUILD file arguments in to one or more target addressable instances."""
 
 
-class BuildFileAliases(object):
+class BuildFileAliases:
   """A structure containing sets of symbols to be exposed in BUILD files.
 
   There are three types of symbols that can be directly exposed:

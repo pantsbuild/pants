@@ -23,7 +23,7 @@ class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):
 
   @classmethod
   def register_options(cls, register):
-    super(ScalaRepl, cls).register_options(register)
+    super().register_options(register)
     register('--main', default='scala.tools.nsc.MainGenericRunner',
              help='The entry point for running the repl.')
     cls.register_jvm_tool(register, 'pants-runner', classpath=[
@@ -32,7 +32,7 @@ class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ScalaRepl, cls).subsystem_dependencies() + (DistributionLocator, ScalaPlatform)
+    return super().subsystem_dependencies() + (DistributionLocator, ScalaPlatform)
 
   @classmethod
   def select_targets(cls, target):

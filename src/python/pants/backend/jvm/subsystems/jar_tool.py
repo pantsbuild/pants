@@ -12,7 +12,7 @@ class JarTool(JvmToolMixin, Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(JarTool, cls).register_options(register)
+    super().register_options(register)
     cls.register_jvm_tool(register,
                           'jar-tool',
                           classpath=[

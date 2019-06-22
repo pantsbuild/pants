@@ -32,7 +32,7 @@ class IsortRun(FmtTaskMixin, Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(IsortRun, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(IsortPrep.tool_instance_cls)
 
   def execute(self):

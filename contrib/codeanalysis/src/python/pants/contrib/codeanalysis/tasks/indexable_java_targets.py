@@ -13,7 +13,7 @@ class IndexableJavaTargets(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(IndexableJavaTargets, cls).register_options(register)
+    super().register_options(register)
     register('--exclude-scopes', type=list, member_type=str, fingerprint=True,
              help='Dependency scopes to exclude from indexing.')
     register('--recursive', type=bool, fingerprint=True,

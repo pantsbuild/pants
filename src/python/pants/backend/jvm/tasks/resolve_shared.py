@@ -17,7 +17,7 @@ class JvmResolverBase(TaskBase):
     """Register an option to make capturing snapshots optional.
     This class is intended to be extended by Jvm resolvers (coursier and ivy), and the option name should reflect that.
     """
-    super(JvmResolverBase, cls).register_options(register)
+    super().register_options(register)
     register('--capture-snapshots', type=bool, default=False,
              removal_version='1.19.0.dev2',
              removal_hint='Enabled by default.',

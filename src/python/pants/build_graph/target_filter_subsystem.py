@@ -19,7 +19,7 @@ class TargetFilter(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(TargetFilter, cls).register_options(register)
+    super().register_options(register)
 
     register('--exclude-tags', type=list,
              default=[], fingerprint=True,
@@ -30,7 +30,7 @@ class TargetFilter(Subsystem):
     return TargetFiltering(exclude_tags).apply_tag_blacklist(targets)
 
 
-class TargetFiltering(object):
+class TargetFiltering:
   """Apply filtering logic against targets."""
 
   def __init__(self, exclude_tags):

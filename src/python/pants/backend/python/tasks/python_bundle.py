@@ -24,7 +24,7 @@ class PythonBundle(BundleMixin, Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(PythonBundle, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(cls._PEX_ARCHIVES)
 
   @staticmethod
@@ -38,7 +38,7 @@ class PythonBundle(BundleMixin, Task):
     return True
 
   def __init__(self, *args, **kwargs):
-    super(PythonBundle, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._outdir = self.get_options().pants_distdir
 
   def execute(self):

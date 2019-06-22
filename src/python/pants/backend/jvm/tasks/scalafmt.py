@@ -20,7 +20,7 @@ class ScalaFmt(RewriteBase):
 
   @classmethod
   def register_options(cls, register):
-    super(ScalaFmt, cls).register_options(register)
+    super().register_options(register)
     register('--configuration', advanced=True, type=file_option, fingerprint=True,
               help='Path to scalafmt config file, if not specified default scalafmt config used')
 
@@ -42,7 +42,7 @@ class ScalaFmt(RewriteBase):
 
   @classmethod
   def implementation_version(cls):
-    return super(ScalaFmt, cls).implementation_version() + [('ScalaFmt', 5)]
+    return super().implementation_version() + [('ScalaFmt', 5)]
 
   def invoke_tool(self, absolute_root, target_sources):
     # If no config file is specified use default scalafmt config.

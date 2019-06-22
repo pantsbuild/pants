@@ -12,7 +12,7 @@ from pants.util.dirutil import fast_relpath, safe_walk
 from pants.util.strutil import ensure_text
 
 
-class ClasspathUtil(object):
+class ClasspathUtil:
 
   @classmethod
   def compute_classpath_entries(cls, targets, classpath_products, extra_classpath_tuples, confs):

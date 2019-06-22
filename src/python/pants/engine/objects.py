@@ -135,7 +135,7 @@ class ValidationError(Exception):
                               that led to this validation error.
     :param string message: A message describing the invalid Struct field.
     """
-    super(ValidationError, self).__init__('Failed to validate {id}: {msg}'
+    super().__init__('Failed to validate {id}: {msg}'
                                           .format(id=identifier, msg=message))
 
 
@@ -150,7 +150,7 @@ class Validatable(ABC):
     """
 
 
-class Collection(object):
+class Collection:
   """Constructs classes representing collections of objects of a particular type.
 
   The produced class will expose its values under a field named dependencies - this is a stable API

@@ -6,7 +6,7 @@ import sys
 from pants.reporting.report import Report
 
 
-class MockLogger(object):
+class MockLogger:
   """A standalone logger that writes to stderr.
 
   :API: public

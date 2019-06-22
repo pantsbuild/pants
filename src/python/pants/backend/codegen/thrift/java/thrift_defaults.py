@@ -27,7 +27,7 @@ class ThriftDefaults(Subsystem):
              help='Extra arguments for the thrift compiler.')
 
   def __init__(self, *args, **kwargs):
-    super(ThriftDefaults, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._default_compiler = self.get_options().compiler
     self._default_language = self.get_options().language
     self._default_default_java_namespace = self.get_options().default_java_namespace

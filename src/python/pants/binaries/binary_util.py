@@ -44,7 +44,7 @@ class HostPlatform(datatype(['os_name', 'arch_or_version'])):
     return [self.os_name, self.arch_or_version]
 
 
-class BinaryToolUrlGenerator(object):
+class BinaryToolUrlGenerator:
   """Encapsulates the selection of urls to download for some binary tool.
 
   :API: public
@@ -86,7 +86,7 @@ class PantsHosted(BinaryToolUrlGenerator):
   class NoBaseUrlsError(ValueError): pass
 
   def __init__(self, binary_request, baseurls):
-    super(PantsHosted, self).__init__()
+    super().__init__()
     self._binary_request = binary_request
 
     if not baseurls:
@@ -145,7 +145,7 @@ class BinaryFetchRequest(datatype(['download_path', 'urls'])):
   class NoDownloadUrlsError(ValueError): pass
 
   def __new__(cls, download_path, urls):
-    this_object = super(BinaryFetchRequest, cls).__new__(
+    this_object = super().__new__(
       cls, download_path, tuple(urls))
 
     if not this_object.urls:
@@ -156,7 +156,7 @@ class BinaryFetchRequest(datatype(['download_path', 'urls'])):
     return this_object
 
 
-class BinaryToolFetcher(object):
+class BinaryToolFetcher:
 
   @classmethod
   def _default_http_fetcher(cls):
@@ -240,7 +240,7 @@ class BinaryToolFetcher(object):
     return bootstrapped_binary_path
 
 
-class BinaryUtil(object):
+class BinaryUtil:
   """Wraps utility methods for finding binary executables."""
 
   class Factory(Subsystem):

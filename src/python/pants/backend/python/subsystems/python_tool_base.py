@@ -15,7 +15,7 @@ class PythonToolBase(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(PythonToolBase, cls).register_options(register)
+    super().register_options(register)
     register('--interpreter-constraints', type=list, advanced=True, fingerprint=True,
              default=cls.default_interpreter_constraints,
              help='Python interpreter constraints for this tool. An empty list uses the default '

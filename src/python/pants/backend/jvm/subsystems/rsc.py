@@ -14,7 +14,7 @@ class Rsc(NativeTool):
 
   @classmethod
   def register_options(cls, register):
-    super(Rsc, cls).register_options(register)
+    super().register_options(register)
 
     register('--native-image', fingerprint=True, type=bool,
              help='Use a pre-compiled native-image for rsc. Requires running in hermetic mode')

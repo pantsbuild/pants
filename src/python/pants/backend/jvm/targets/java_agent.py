@@ -34,7 +34,7 @@ class JavaAgent(JavaLibrary):
       is needed by this agent; `False` by default.
     """
 
-    super(JavaAgent, self).__init__(
+    super().__init__(
         name=name,
         sources=sources,
         provides=None,

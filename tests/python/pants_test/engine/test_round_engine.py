@@ -12,7 +12,7 @@ from pants_test.test_base import TestBase
 
 class RoundEngineTest(EngineTestBase, TestBase):
   def setUp(self):
-    super(RoundEngineTest, self).setUp()
+    super().setUp()
 
     self.set_options_for_scope('', explain=False)
     for outer in ['goal1', 'goal2', 'goal3', 'goal4', 'goal5']:
@@ -27,7 +27,7 @@ class RoundEngineTest(EngineTestBase, TestBase):
   def tearDown(self):
     if self._context is not None:
       self.assertTrue(not self._context or self._context.is_unlocked())
-    super(RoundEngineTest, self).tearDown()
+    super().tearDown()
 
   def alternate_target_roots_action(self, tag):
     return 'alternate_target_roots', tag, self._context
@@ -65,7 +65,7 @@ class RoundEngineTest(EngineTestBase, TestBase):
         self.actions.append(self.prepare_action(tag))
 
       def __init__(me, *args, **kwargs):
-        super(RecordingTask, me).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.actions.append(self.construct_action(tag))
 
       def execute(me):
@@ -220,7 +220,7 @@ class RoundEngineTest(EngineTestBase, TestBase):
     class MyTask(Task):
       pass
     def install():
-      reg = super(RoundEngineTest, self).install_task(name='task1', action=MyTask, goal='goal1')
+      reg = super().install_task(name='task1', action=MyTask, goal='goal1')
       return reg.task_types()
     task1_pre, = install()
     Goal.clear()

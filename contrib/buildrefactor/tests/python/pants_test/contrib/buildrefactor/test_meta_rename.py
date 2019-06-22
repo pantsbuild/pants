@@ -23,7 +23,7 @@ class MetaRenameTest(TaskTestBase):
     return BuildFileAliases(targets={ 'java_library': JavaLibrary })
 
   def setUp(self):
-    super(MetaRenameTest, self).setUp()
+    super().setUp()
 
     self.new_name = 'goo'
     self.spec_path = 'a'

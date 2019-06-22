@@ -6,7 +6,7 @@ import os
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 
 
-class CmdLineSpecParser(object):
+class CmdLineSpecParser:
   """Parses address selectors as passed from the command line.
 
   See the `specs` package for more information on the types of objects returned.

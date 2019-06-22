@@ -23,7 +23,7 @@ class TestBuildLocalDistsWithCtypesNativeSources(BuildLocalPythonDistributionsTe
       CCompile,
       CppCompile,
       LinkSharedLibraries,
-    ] + super(TestBuildLocalDistsWithCtypesNativeSources, cls).run_before_task_types
+    ] + super().run_before_task_types
 
   dist_specs = OrderedDict([
 

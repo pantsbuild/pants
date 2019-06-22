@@ -61,7 +61,7 @@ class MutexTaskMixin(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(MutexTaskMixin, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     cls._implementations[cls.mutex_base()].add(cls)
 
   @classmethod

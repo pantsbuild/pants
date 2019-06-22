@@ -19,7 +19,7 @@ PANTS_SUCCEEDED_EXIT_CODE = 0
 PANTS_FAILED_EXIT_CODE = 1
 
 
-class Exiter(object):
+class Exiter:
   """A class that provides standard runtime exit behavior.
 
   `pants.base.exception_sink.ExceptionSink` handles exceptions and fatal signals, delegating to an

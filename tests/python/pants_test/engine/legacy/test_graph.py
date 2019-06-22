@@ -23,7 +23,7 @@ class GraphTest(TestBase):
 
   @classmethod
   def alias_groups(cls):
-    return super(GraphTest, cls).alias_groups().merge(
+    return super().alias_groups().merge(
       BuildFileAliases(targets={
           'files': Files,
           'tagged_files': TargetMacro.Factory.wrap(functools.partial(macro, Files, cls._TAG), Files),

@@ -77,7 +77,7 @@ from pants.java.jar.jar_dependency import JarDependencyParseContextWrapper
 
 class DeprecatedJavaTests(JUnitTests):
   def __init__(self, *args, **kwargs):
-    super(DeprecatedJavaTests, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     warn_or_error('1.4.0.dev0',
                   'java_tests(...) target type',
                   'Use junit_tests(...) instead for target {}.'.format(self.address.spec))

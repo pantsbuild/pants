@@ -23,7 +23,7 @@ class GoTask(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(GoTask, cls).subsystem_dependencies() + (GoDistribution.scoped(cls),)
+    return super().subsystem_dependencies() + (GoDistribution.scoped(cls),)
 
   @staticmethod
   def is_binary(target):
@@ -76,7 +76,7 @@ class GoTask(Task):
     return self.go_dist.create_go_cmd('env', args=[var]).check_output().decode('utf-8').strip()
 
 
-class ImportOracle(object):
+class ImportOracle:
   """Answers questions about Go imports."""
 
   class ListDepsError(Exception):

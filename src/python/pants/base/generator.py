@@ -14,7 +14,7 @@ class TemplateData(dict):
   """Encapsulates mustache template arguments as a property-addressable read-only object."""
 
   def __init__(self, **kwargs):
-    super(TemplateData, self).__init__(MustacheRenderer.expand(kwargs))
+    super().__init__(MustacheRenderer.expand(kwargs))
 
   def extend(self, **kwargs):
     """Returns a new instance with this instance's data overlayed by the key-value args."""
@@ -37,7 +37,7 @@ class TemplateData(dict):
 
 
 # TODO(benjy): Get rid of this class? It adds basically nothing over the MustacheRenderer.
-class Generator(object):
+class Generator:
   """Generates pants intermediary output files using a configured mustache template."""
 
   def __init__(self, template_text, **template_data):

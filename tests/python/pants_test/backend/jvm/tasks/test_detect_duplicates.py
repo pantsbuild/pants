@@ -22,7 +22,7 @@ class DuplicateDetectorTest(JvmBinaryTaskTestBase):
     return DuplicateDetector
 
   def setUp(self):
-    super(DuplicateDetectorTest, self).setUp()
+    super().setUp()
 
     self.classes_dir = os.path.join(self.test_workdir, 'classes')
     safe_mkdir(self.classes_dir)

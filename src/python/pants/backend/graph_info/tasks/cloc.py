@@ -18,11 +18,11 @@ class CountLinesOfCode(ConsoleTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(CountLinesOfCode, cls).subsystem_dependencies() + (ClocBinary,)
+    return super().subsystem_dependencies() + (ClocBinary,)
 
   @classmethod
   def register_options(cls, register):
-    super(CountLinesOfCode, cls).register_options(register)
+    super().register_options(register)
     register('--transitive', type=bool, fingerprint=True, default=True,
              help='Operate on the transitive dependencies of the specified targets.  '
                   'Unset to operate only on the specified targets.')

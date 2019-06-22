@@ -40,7 +40,7 @@ class IvyResolveTest(NailgunTaskTestBase):
     return IvyResolve
 
   def setUp(self):
-    super(IvyResolveTest, self).setUp()
+    super().setUp()
     self.set_options_for_scope('cache.{}'.format(self.options_scope),
                                read_from=None,
                                write_to=None)
@@ -485,11 +485,11 @@ class IvyResolveFingerprintStrategyTest(TaskTestBase):
     return EmptyTask
 
   def setUp(self):
-    super(IvyResolveFingerprintStrategyTest, self).setUp()
+    super().setUp()
     init_subsystem(JarDependencyManagement)
 
   def tearDown(self):
-    super(IvyResolveFingerprintStrategyTest, self).tearDown()
+    super().tearDown()
 
   def set_artifact_set_for(self, managed_jar_target, artifact_set):
     JarDependencyManagement.global_instance()._artifact_set_map[

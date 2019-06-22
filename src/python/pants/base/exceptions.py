@@ -17,7 +17,7 @@ class TaskError(Exception):
     """
     self._exit_code = kwargs.pop('exit_code', PANTS_FAILED_EXIT_CODE)
     self._failed_targets = kwargs.pop('failed_targets', [])
-    super(TaskError, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
   @property
   def exit_code(self):
@@ -48,7 +48,7 @@ class TargetDefinitionException(Exception):
     :param target: the target in question
     :param string msg: a description of the target misconfiguration
     """
-    super(Exception, self).__init__('Invalid target {}: {}'.format(target, msg))
+    super().__init__('Invalid target {}: {}'.format(target, msg))
 
 
 class BuildConfigurationError(Exception):

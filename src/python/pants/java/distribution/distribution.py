@@ -41,7 +41,7 @@ def _parse_java_version(name, version):
   return version
 
 
-class Distribution(object):
+class Distribution:
   """Represents a java distribution - either a JRE or a JDK installed on the local system.
 
   In particular provides access to the distribution's binaries; ie: java while ensuring basic
@@ -577,7 +577,7 @@ class DistributionLocator(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(DistributionLocator, cls).register_options(register)
+    super().register_options(register)
     human_readable_os_aliases = ', '.join('{}: [{}]'.format(str(key), ', '.join(sorted(val)))
                                           for key, val in OS_ALIASES.items())
     register('--paths', advanced=True, type=dict,

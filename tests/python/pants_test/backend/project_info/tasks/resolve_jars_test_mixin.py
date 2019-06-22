@@ -7,7 +7,7 @@ from textwrap import dedent
 from pants.util.contextutil import temporary_dir
 
 
-class ResolveJarsTestMixin(object):
+class ResolveJarsTestMixin:
   """Mixin for evaluating tasks which resolve their own source and javadoc jars (such as Export)."""
 
   def evaluate_subtask(self, targets, workdir, load_extra_confs, extra_args, expected_jars):

@@ -24,17 +24,17 @@ class MetaRename(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(MetaRename, cls).subsystem_dependencies() + (BuildozerBinary.scoped(cls),)
+    return super().subsystem_dependencies() + (BuildozerBinary.scoped(cls),)
 
   @classmethod
   def register_options(cls, register):
-    super(MetaRename, cls).register_options(register)
+    super().register_options(register)
 
     register('--from', type=str, default=None, help='The old dependency name to change')
     register('--to', type=str, default=None, help='The new name for the dependency')
 
   def __init__(self, *args, **kwargs):
-    super(MetaRename, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     self._from_address = Address.parse(self.get_options()['from'])
     self._to_address = Address.parse(self.get_options().to)

@@ -24,11 +24,11 @@ class GoCompile(GoWorkspaceTask):
 
   @classmethod
   def implementation_version(cls):
-    return super(GoCompile, cls).implementation_version() + [('GoCompile', 1)]
+    return super().implementation_version() + [('GoCompile', 1)]
 
   @classmethod
   def register_options(cls, register):
-    super(GoCompile, cls).register_options(register)
+    super().register_options(register)
     # Build flags fingerprint is handled by a custom strategy to enable
     # merging with task-specific flags.
     register('--build-flags', default='', help='Build flags to pass to Go compiler.')

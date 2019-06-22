@@ -13,7 +13,7 @@ from pants_test.test_base import TestBase
 
 class ProductsTest(TestBase):
   def setUp(self):
-    super(ProductsTest, self).setUp()
+    super().setUp()
     self.products = Products()
 
   def test_require(self):

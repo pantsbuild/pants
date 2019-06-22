@@ -25,7 +25,7 @@ class Files(Target):
                                            sources_rel_path=address.spec_path,
                                            key_arg='sources'),
     })
-    super(Files, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   def has_sources(self, extension=None):
     """`Files` targets never logically "own" sources of any particular type (extension).
@@ -45,4 +45,4 @@ class Files(Target):
     :return: `True` if this target owns at least one source file and `extension` is `None`.
     :rtype: bool
     """
-    return extension is None and super(Files, self).has_sources()
+    return extension is None and super().has_sources()

@@ -33,7 +33,7 @@ class OwnerPrintingInterProcessFileLock(InterProcessLock):
 
   def acquire(self, message_fn=print_to_stderr, **kwargs):
     logger.debug('acquiring lock: {!r}'.format(self))
-    super(OwnerPrintingInterProcessFileLock, self).acquire(blocking=False)
+    super().acquire(blocking=False)
     if not self.acquired:
       try:
         with open(self.message_path, 'rb') as f:
@@ -45,7 +45,7 @@ class OwnerPrintingInterProcessFileLock(InterProcessLock):
         else:
           raise
       message_fn(output)
-      super(OwnerPrintingInterProcessFileLock, self).acquire(**kwargs)
+      super().acquire(**kwargs)
 
     if self.acquired:
       current_process = psutil.Process()
@@ -59,4 +59,4 @@ class OwnerPrintingInterProcessFileLock(InterProcessLock):
     logger.debug('releasing lock: {!r}'.format(self))
     if self.acquired:
       safe_delete(self.message_path)
-    return super(OwnerPrintingInterProcessFileLock, self).release()
+    return super().release()

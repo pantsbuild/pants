@@ -46,7 +46,7 @@ class SimpleCodegenTask(Task):
 
     :API: public
     """
-    super(SimpleCodegenTask, self).__init__(context, workdir)
+    super().__init__(context, workdir)
 
   @classmethod
   def product_types(cls):
@@ -58,7 +58,7 @@ class SimpleCodegenTask(Task):
 
   @classmethod
   def register_options(cls, register):
-    super(SimpleCodegenTask, cls).register_options(register)
+    super().register_options(register)
     register('--allow-empty', type=bool, default=True, fingerprint=True,
              help='Skip targets with no sources defined.',
              advanced=True)
@@ -110,7 +110,7 @@ class SimpleCodegenTask(Task):
 
   @classmethod
   def implementation_version(cls):
-    return super(SimpleCodegenTask, cls).implementation_version() + [('SimpleCodegenTask', 2)]
+    return super().implementation_version() + [('SimpleCodegenTask', 2)]
 
   def synthetic_target_extra_exports(self, target, target_workdir):
     """Gets any extra exports generated synthetic targets should have.

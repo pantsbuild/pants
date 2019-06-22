@@ -24,7 +24,7 @@ class TestResolveRequirements(TestBase):
 
   @classmethod
   def rules(cls):
-    return super(TestResolveRequirements, cls).rules() + [
+    return super().rules() + [
       resolve_requirements,
       RootRule(ResolveRequirementsRequest),
       RootRule(PythonSetup),
@@ -33,7 +33,7 @@ class TestResolveRequirements(TestBase):
     ]
 
   def setUp(self):
-    super(TestResolveRequirements, self).setUp()
+    super().setUp()
     init_subsystems([PythonSetup, PythonNativeCode])
 
   def create_pex_and_get_pex_info(

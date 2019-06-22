@@ -20,11 +20,11 @@ class IvyOutdated(NailgunTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(IvyOutdated, cls).subsystem_dependencies() + (IvySubsystem.scoped(cls),)
+    return super().subsystem_dependencies() + (IvySubsystem.scoped(cls),)
 
   @classmethod
   def register_options(cls, register):
-    super(IvyOutdated, cls).register_options(register)
+    super().register_options(register)
     register('--confs', type=list, default=['default'],
              help='Pass a configuration to ivy in addition to the default ones.')
     register('--exclude-patterns', type=list, default=[],

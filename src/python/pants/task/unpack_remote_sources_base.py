@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class UnpackedArchives(datatype([('found_files', tuple), ('rel_unpack_dir', text_type)])):
 
   def __new__(cls, found_files, rel_unpack_dir):
-    return super(UnpackedArchives, cls).__new__(
+    return super().__new__(
       cls,
       tuple(found_files),
       text_type(rel_unpack_dir))

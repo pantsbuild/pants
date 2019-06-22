@@ -27,12 +27,12 @@ class NodeResolveTest(TaskTestBase):
     return NodeResolve
 
   def setUp(self):
-    super(NodeResolveTest, self).setUp()
+    super().setUp()
     NodeResolve.register_resolver_for_type(NodePreinstalledModule, NodePreinstalledModuleResolver)
     NodeResolve.register_resolver_for_type(NodeModule, NpmResolver)
 
   def tearDown(self):
-    super(NodeResolveTest, self).tearDown()
+    super().tearDown()
     NodeResolve._clear_resolvers()
 
   def wrap_context(self, context, product_types):

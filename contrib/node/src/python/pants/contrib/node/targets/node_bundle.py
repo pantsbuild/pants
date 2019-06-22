@@ -32,11 +32,11 @@ class NodeBundle(NodePackage):
       'archive': PrimitiveField(archive),
       'node_module': PrimitiveField(node_module),
     })
-    super(NodeBundle, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   @classmethod
   def compute_dependency_specs(cls, kwargs=None, payload=None):
-    for spec in super(NodeBundle, cls).compute_dependency_specs(kwargs, payload):
+    for spec in super().compute_dependency_specs(kwargs, payload):
       yield spec
 
     target_representation = kwargs or payload.as_dict()

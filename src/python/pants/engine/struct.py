@@ -294,7 +294,7 @@ class StructWithDeps(Struct):
     :param list dependencies: The direct dependencies of this struct.
     """
     # TODO: enforce the type of variants using the Addressable framework.
-    super(StructWithDeps, self).__init__(**kwargs)
+    super().__init__(**kwargs)
     self.dependencies = dependencies
 
   @addressable_list(SubclassesOf(Struct))

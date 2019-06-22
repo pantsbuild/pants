@@ -22,7 +22,7 @@ from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.source.source_root import SourceRootConfig
 
 
-class Context(object):
+class Context:
   """Contains the context for a single run of pants.
 
   Task implementations can access configuration data from pants.ini and any flags they have exposed

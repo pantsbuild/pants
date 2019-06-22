@@ -24,15 +24,15 @@ class AnalysisExtraction(NailgunTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(AnalysisExtraction, cls).subsystem_dependencies() + (DependencyContext, Zinc.Factory)
+    return super().subsystem_dependencies() + (DependencyContext, Zinc.Factory)
 
   @classmethod
   def register_options(cls, register):
-    super(AnalysisExtraction, cls).register_options(register)
+    super().register_options(register)
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(AnalysisExtraction, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data('zinc_analysis')
     round_manager.require_data('runtime_classpath')
 

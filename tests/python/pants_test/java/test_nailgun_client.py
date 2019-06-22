@@ -15,7 +15,7 @@ from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 PATCH_OPTS = dict(autospec=True, spec_set=True)
 
 
-class FakeFile(object):
+class FakeFile:
   def __init__(self):
     self.content = b''
 

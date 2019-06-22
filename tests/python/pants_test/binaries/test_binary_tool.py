@@ -75,7 +75,7 @@ class CustomUrls(BinaryToolBase):
 class BinaryToolBaseTest(TestBase):
 
   def setUp(self):
-    super(BinaryToolBaseTest, self).setUp()
+    super().setUp()
     self._context = self.context(
       for_subsystems=[DefaultVersion, AnotherTool, ReplacingLegacyOptionsTool, CustomUrls],
       options={

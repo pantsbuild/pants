@@ -20,7 +20,7 @@ from pants.task.task import QuietTaskMixin
 logger = logging.getLogger(__name__)
 
 
-class GoalRunnerFactory(object):
+class GoalRunnerFactory:
   def __init__(self, root_dir, options, build_config, run_tracker, reporting, graph_session,
                target_roots, exiter=sys.exit):
     """
@@ -126,7 +126,7 @@ class GoalRunnerFactory(object):
                       kill_nailguns=self._kill_nailguns)
 
 
-class GoalRunner(object):
+class GoalRunner:
   """Lists installed goals or else executes a named goal.
 
   NB: GoalRunner represents a v1-only codepath. v2 goals are registered via `@console_rule` and

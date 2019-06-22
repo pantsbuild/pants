@@ -12,7 +12,7 @@ from pants_test.testutils.py2_compat import assertRegex
 
 
 # A duck-typed Serializable with an `==` suitable for ease of testing.
-class Bob(object):
+class Bob:
   def __init__(self, **kwargs):
     self._kwargs = kwargs
 

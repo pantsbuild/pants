@@ -26,7 +26,7 @@ class PailgunClientSignalHandler(SignalHandler):
     assert(isinstance(pailgun_client, NailgunClient))
     self._pailgun_client = pailgun_client
     self._timeout = timeout
-    super(PailgunClientSignalHandler, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
   def _forward_signal_with_timeout(self, signum, signame):
     logger.info(
@@ -47,7 +47,7 @@ class PailgunClientSignalHandler(SignalHandler):
     self._forward_signal_with_timeout(signum, 'SIGTERM')
 
 
-class RemotePantsRunner(object):
+class RemotePantsRunner:
   """A thin client variant of PantsRunner."""
 
   class Fallback(Exception):

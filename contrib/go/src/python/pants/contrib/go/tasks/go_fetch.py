@@ -21,11 +21,11 @@ class GoFetch(GoTask):
 
   @classmethod
   def implementation_version(cls):
-    return super(GoFetch, cls).implementation_version() + [('GoFetch', 2)]
+    return super().implementation_version() + [('GoFetch', 2)]
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(GoFetch, cls).subsystem_dependencies() + (FetcherFactory,)
+    return super().subsystem_dependencies() + (FetcherFactory,)
 
   @classmethod
   def product_types(cls):

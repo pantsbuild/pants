@@ -78,7 +78,7 @@ class PrepCommand(Target):
       'prep_command_args': PrimitiveField(prep_args or []),
       'prep_environ': PrimitiveField(prep_environ),
     })
-    super(PrepCommand, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   @memoized_property
   def goals(self):

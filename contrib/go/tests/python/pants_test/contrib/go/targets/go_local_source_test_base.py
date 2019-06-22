@@ -19,10 +19,10 @@ class GoLocalSourceTestBase(ABC):
   def setUpClass(cls):
     if not issubclass(cls, TestBase):
       raise TypeError('Subclasses must mix in TestBase')
-    super(GoLocalSourceTestBase, cls).setUpClass()
+    super().setUpClass()
 
   def setUp(self):
-    super(GoLocalSourceTestBase, self).setUp()
+    super().setUp()
     # Force setup of SourceRootConfig subsystem, as go targets do computation on source roots.
     self.context()
 

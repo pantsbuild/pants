@@ -19,4 +19,4 @@ class GrpcioPrep(PythonToolPrepBase):
     if not targets:
       return 0
 
-    super(GrpcioPrep, self).execute()
+    super().execute()

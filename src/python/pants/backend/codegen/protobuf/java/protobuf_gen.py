@@ -25,11 +25,11 @@ class ProtobufGen(SimpleCodegenTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ProtobufGen, cls).subsystem_dependencies() + (Protoc.scoped(cls),)
+    return super().subsystem_dependencies() + (Protoc.scoped(cls),)
 
   @classmethod
   def register_options(cls, register):
-    super(ProtobufGen, cls).register_options(register)
+    super().register_options(register)
 
     # The protoc plugin names are used as proxies for the identity of the protoc
     # executable environment here.  Plugin authors must include a version in the name for
@@ -54,14 +54,14 @@ class ProtobufGen(SimpleCodegenTask):
   # TODO https://github.com/pantsbuild/pants/issues/604 prep start
   @classmethod
   def prepare(cls, options, round_manager):
-    super(ProtobufGen, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(JarImportProducts)
     round_manager.optional_data('deferred_sources')
   # TODO https://github.com/pantsbuild/pants/issues/604 prep finish
 
   def __init__(self, *args, **kwargs):
     """Generates Java files from .proto files using the Google protobuf compiler."""
-    super(ProtobufGen, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.plugins = self.get_options().protoc_plugins or []
     self._extra_paths = self.get_options().extra_path or []
 

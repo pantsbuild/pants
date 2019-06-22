@@ -23,7 +23,7 @@ class MavenLayoutTest(TestBase):
     )
 
   def setUp(self):
-    super(MavenLayoutTest, self).setUp()
+    super().setUp()
     init_subsystems([SourceRootConfig, JUnit])
     self.add_to_build_file('projectB/src/test/scala',
                            'junit_tests(name="test", sources=["a/source"])')

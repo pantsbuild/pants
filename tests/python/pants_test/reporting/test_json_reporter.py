@@ -7,13 +7,13 @@ from pants.reporting.report import Report
 from pants_test.test_base import TestBase
 
 
-class FakeRunTracker(object):
+class FakeRunTracker:
 
-  class FakeCacheStats(object):
+  class FakeCacheStats:
     def get_all(self):
       return []
 
-  class FakePantsdStats(object):
+  class FakePantsdStats:
     def get_all(self):
       return {}
 
@@ -24,7 +24,7 @@ class FakeRunTracker(object):
     return {}
 
 
-class FakeWorkUnit(object):
+class FakeWorkUnit:
   def __init__(self, parent, **kwargs):
     self.name = kwargs['name']
     self.id = '{}_id'.format(self.name)

@@ -14,7 +14,7 @@ class PayloadFieldAlreadyDefinedError(Exception): pass
 class PayloadFrozenError(Exception): pass
 
 
-class Payload(object):
+class Payload:
   """A mapping from field names to PayloadField instances.
 
   A Target will add PayloadFields to its Payload until instantiation is finished, at which point

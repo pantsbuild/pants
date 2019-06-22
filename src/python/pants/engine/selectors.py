@@ -88,7 +88,7 @@ Get({product!r}, {subject_type!r}, {subject!r})
     else:
       raise ValueError('Expected either two or three arguments to {}; got {}.'
                        .format(Get.__name__, args))
-    return super(Get, cls).__new__(cls, product, subject_declared_type, subject)
+    return super().__new__(cls, product, subject_declared_type, subject)
 
 
 class Params(datatype([('params', tuple)])):
@@ -98,4 +98,4 @@ class Params(datatype([('params', tuple)])):
   """
 
   def __new__(cls, *args):
-    return super(Params, cls).__new__(cls, tuple(args))
+    return super().__new__(cls, tuple(args))

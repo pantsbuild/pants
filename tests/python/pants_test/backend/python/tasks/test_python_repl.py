@@ -28,7 +28,7 @@ class PythonReplTest(PythonTaskTestBase):
 
   @classmethod
   def alias_groups(cls):
-    return super(PythonReplTest, cls).alias_groups().merge(
+    return super().alias_groups().merge(
         BuildFileAliases(targets={'jvm_target': cls.JvmTarget}))
 
   def create_non_python_target(self, relpath, name):
@@ -41,7 +41,7 @@ class PythonReplTest(PythonTaskTestBase):
     return self.target(Address(relpath, name).spec)
 
   def setUp(self):
-    super(PythonReplTest, self).setUp()
+    super().setUp()
     self.six = self.create_python_requirement_library('3rdparty/python/six', 'six',
                                                       requirements=['six==1.9.0'])
     self.requests = self.create_python_requirement_library('3rdparty/python/requests', 'requests',
@@ -61,7 +61,7 @@ class PythonReplTest(PythonTaskTestBase):
     self.non_python_target = self.create_non_python_target('src/python/java', 'java')
 
   def tearDown(self):
-    super(PythonReplTest, self).tearDown()
+    super().tearDown()
     ReplTaskMixin.reset_implementations()
 
   @contextmanager

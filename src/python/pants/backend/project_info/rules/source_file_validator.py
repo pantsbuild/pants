@@ -35,7 +35,7 @@ class Validate(Goal):
 
   @classmethod
   def register_options(cls, register):
-    super(Validate, cls).register_options(register)
+    super().register_options(register)
     register('--detail-level', type=DetailLevel, default=DetailLevel.nonmatching,
              help='How much detail to emit to the console.')
 
@@ -45,7 +45,7 @@ class SourceFileValidation(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(SourceFileValidation, cls).register_options(register)
+    super().register_options(register)
     # Config schema is as follows:
     #
     # {
@@ -91,7 +91,7 @@ class RegexMatchResult(datatype([
 RegexMatchResults = Collection.of(RegexMatchResult)
 
 
-class Matcher(object):
+class Matcher:
   """Class to match a single (possibly inverted) regex.
 
   Matches are allowed anywhere in the string (so really a "search" in the Python regex parlance).
@@ -113,7 +113,7 @@ class PathMatcher(Matcher):
   """A matcher for matching file paths."""
   
   def __init__(self, pattern, inverted=False, content_encoding='utf8'):
-    super(PathMatcher, self).__init__(pattern, inverted)
+    super().__init__(pattern, inverted)
     # The expected encoding of the content of files whose paths match this pattern.
     self.content_encoding = content_encoding
 
@@ -123,7 +123,7 @@ class ContentMatcher(Matcher):
   pass
 
 
-class MultiMatcher(object):
+class MultiMatcher:
   def __init__(self, config):
     """Class to check multiple regex matching on files.
 

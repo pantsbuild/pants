@@ -31,7 +31,7 @@ class fake_log(object):
     pass
 
 
-class MockSystemCalls(object):
+class MockSystemCalls:
   def __init__(self):
     self.copy2_calls = defaultdict(list)
     self.copytree_calls = defaultdict(list)
@@ -57,7 +57,7 @@ class TestCobertura(TestBase):
       safe_md=syscalls.safe_md)
 
   def setUp(self):
-    super(TestCobertura, self).setUp()
+    super().setUp()
 
     self.conf = 'default'
     self.factory = Cobertura.Factory("test_scope", [])

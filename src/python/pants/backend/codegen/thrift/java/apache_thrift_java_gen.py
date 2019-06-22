@@ -25,21 +25,21 @@ class ApacheThriftJavaGen(ApacheThriftGenBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ApacheThriftJavaGen, cls).subsystem_dependencies() + (ThriftDefaults,)
+    return super().subsystem_dependencies() + (ThriftDefaults,)
 
   @classmethod
   def implementation_version(cls):
-    return super(ApacheThriftJavaGen, cls).implementation_version() + [('ApacheThriftJavaGen', 2)]
+    return super().implementation_version() + [('ApacheThriftJavaGen', 2)]
 
   def __init__(self, *args, **kwargs):
-    super(ApacheThriftJavaGen, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._thrift_defaults = ThriftDefaults.global_instance()
 
   def synthetic_target_type(self, target):
     return JavaLibrary
 
   def is_gentarget(self, target):
-    return (super(ApacheThriftJavaGen, self).is_gentarget(target) and
+    return (super().is_gentarget(target) and
             self._thrift_defaults.compiler(target) == self._COMPILER)
 
   def _validate(self, target):
@@ -52,4 +52,4 @@ class ApacheThriftJavaGen(ApacheThriftGenBase):
 
   def execute_codegen(self, target, target_workdir):
     self._validate(target)
-    super(ApacheThriftJavaGen, self).execute_codegen(target, target_workdir)
+    super().execute_codegen(target, target_workdir)

@@ -24,7 +24,7 @@ def sib(directory):
 class CmdLineSpecParserTest(TestBase):
 
   def setUp(self):
-    super(CmdLineSpecParserTest, self).setUp()
+    super().setUp()
     self._spec_parser = CmdLineSpecParser(self.build_root)
 
   def test_normal(self):

@@ -28,7 +28,7 @@ class MypyTask(ResolveRequirementsTaskBase):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(MypyTask, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(PythonInterpreter)
 
   @classmethod
@@ -43,7 +43,7 @@ class MypyTask(ResolveRequirementsTaskBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(MypyTask, cls).subsystem_dependencies() + (PythonInterpreterCache,)
+    return super().subsystem_dependencies() + (PythonInterpreterCache,)
 
   def find_mypy_interpreter(self):
     interpreters = self._interpreter_cache.setup(

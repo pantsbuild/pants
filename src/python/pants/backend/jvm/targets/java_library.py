@@ -22,10 +22,10 @@ class JavaLibrary(ExportableJvmLibrary):
 
   @classmethod
   def subsystems(cls):
-    return super(JavaLibrary, cls).subsystems()
+    return super().subsystems()
 
   def __init__(self, address=None, **kwargs):
-    super(JavaLibrary, self).__init__(address=address, **kwargs)
+    super().__init__(address=address, **kwargs)
     if 'scalac_plugins' in kwargs:
       raise self.IllegalArgument(address.spec,
                                  'java_library does not support the scalac_plugins argument.')

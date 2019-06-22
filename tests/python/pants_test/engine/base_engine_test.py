@@ -48,7 +48,7 @@ class EngineTestBase(TestBase):
     """
     :API: public
     """
-    super(EngineTestBase, self).setUp()
+    super().setUp()
 
     # TODO(John Sirois): Now that the BuildFileParser controls goal registration by iterating
     # over plugin callbacks a GoalRegistry can be constructed by it and handed to all these
@@ -61,4 +61,4 @@ class EngineTestBase(TestBase):
     """
     Goal.clear()
 
-    super(EngineTestBase, self).tearDown()
+    super().tearDown()

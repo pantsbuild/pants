@@ -28,7 +28,7 @@ class ConfluenceError(Exception):
   """Indicates a problem performing an action with confluence."""
 
 
-class Confluence(object):
+class Confluence:
   """Interface for fetching and storing data in confluence."""
 
   def __init__(self, api_entrypoint, server_url, session_token, content_format='markdown'):

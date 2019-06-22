@@ -28,11 +28,11 @@ class ManagedJarDependencies(Target):
       'artifacts': JarsField(jar_objects),
       'library_specs': PrimitiveField(library_specs)
     })
-    super(ManagedJarDependencies, self).__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, **kwargs)
 
   @classmethod
   def compute_injectable_specs(cls, kwargs=None, payload=None):
-    for spec in super(ManagedJarDependencies, cls).compute_injectable_specs(kwargs, payload):
+    for spec in super().compute_injectable_specs(kwargs, payload):
       yield spec
 
     if kwargs:
@@ -62,7 +62,7 @@ class ManagedJarDependencies(Target):
     return jar_objects, library_specs
 
 
-class ManagedJarLibraries(object):
+class ManagedJarLibraries:
   """Creates a managed_jar_dependencies(), and also generates a jar_library for each artifact.
 
   Using this factory saves a lot of duplication. For example, this: ::

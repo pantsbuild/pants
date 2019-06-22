@@ -24,7 +24,7 @@ from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.engine.util import TARGET_TABLE, Target
 
 
-class Thing(object):
+class Thing:
   def __init__(self, **kwargs):
     self._kwargs = kwargs
 

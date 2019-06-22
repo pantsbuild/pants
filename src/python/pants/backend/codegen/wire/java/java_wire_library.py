@@ -63,4 +63,4 @@ class JavaWireLibrary(JvmTarget):
       'ordered_sources': PrimitiveField(ordered_sources or False),
     })
 
-    super(JavaWireLibrary, self).__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, **kwargs)

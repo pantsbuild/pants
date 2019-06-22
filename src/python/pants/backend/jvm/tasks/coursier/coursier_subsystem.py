@@ -27,7 +27,7 @@ class CoursierSubsystem(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(CoursierSubsystem, cls).register_options(register)
+    super().register_options(register)
     register('--cache-dir', type=str, fingerprint=True,
              default=os.path.join(get_pants_cachedir(), 'coursier'),
              help='Version paired with --bootstrap-jar-url, in order to invalidate and fetch the new version.')

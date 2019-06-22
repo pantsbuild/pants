@@ -9,7 +9,7 @@ from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 
 
-class ScopeInfoIterator(object):
+class ScopeInfoIterator:
   """Provides relevant ScopeInfo instances in a useful order."""
 
   def __init__(self, scope_to_info):

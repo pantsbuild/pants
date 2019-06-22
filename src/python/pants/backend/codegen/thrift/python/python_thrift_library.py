@@ -21,4 +21,4 @@ class PythonThriftLibrary(PythonTarget):
       resources in a .zip-module friendly way.)
     """
 
-    super(PythonThriftLibrary, self).__init__(**kwargs)
+    super().__init__(**kwargs)

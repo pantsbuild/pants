@@ -61,7 +61,7 @@ class NativeCompile(NativeTask, metaclass=ABCMeta):
 
   @classmethod
   def implementation_version(cls):
-    return super(NativeCompile, cls).implementation_version() + [('NativeCompile', 1)]
+    return super().implementation_version() + [('NativeCompile', 1)]
 
   class NativeCompileError(TaskError):
     """Raised for errors in this class's logic.

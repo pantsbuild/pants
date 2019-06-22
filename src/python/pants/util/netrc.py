@@ -7,7 +7,7 @@ from netrc import NetrcParseError
 from netrc import netrc as NetrcDb
 
 
-class Netrc(object):
+class Netrc:
   """Fetches username and password from ~/.netrc for logged in user."""
 
   class NetrcError(Exception):

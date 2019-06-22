@@ -18,14 +18,14 @@ class ConsoleTask(QuietTaskMixin, Task):
 
   @classmethod
   def register_options(cls, register):
-    super(ConsoleTask, cls).register_options(register)
+    super().register_options(register)
     register('--sep', default='\\n', metavar='<separator>',
              help='String to use to separate results.')
     register('--output-file', metavar='<path>',
              help='Write the console output to this file instead.')
 
   def __init__(self, *args, **kwargs):
-    super(ConsoleTask, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._console_separator = self.get_options().sep.encode('utf-8').decode('unicode_escape')
     if self.get_options().output_file:
       try:

@@ -4,7 +4,7 @@
 import os
 
 
-class Repository(object):
+class Repository:
   """An artifact repository, such as a maven repo.
 
   :API: public

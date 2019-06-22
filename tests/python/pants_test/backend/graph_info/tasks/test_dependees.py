@@ -41,7 +41,7 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
     )
 
   def setUp(self):
-    super(ConsoleTaskTestBase, self).setUp()
+    super().setUp()
 
     def add_to_build_file(path, name, alias=False, deps=()):
       self.add_to_build_file(path, dedent("""

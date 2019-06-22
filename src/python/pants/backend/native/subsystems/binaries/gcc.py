@@ -25,7 +25,7 @@ class GCC(NativeTool):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(GCC, cls).subsystem_dependencies() + (ArchiveFileMapper.scoped(cls),)
+    return super().subsystem_dependencies() + (ArchiveFileMapper.scoped(cls),)
 
   @memoized_property
   def _file_mapper(self):

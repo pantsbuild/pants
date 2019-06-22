@@ -108,7 +108,7 @@ class JarDependencyUtilsTest(unittest.TestCase):
   def test_m2_coordinate_create(self):
     attrs = ('org', 'name', 'rev', 'classifier', 'ext')
 
-    class CoordinateLike(object):
+    class CoordinateLike:
       def __init__(self):
         for i, a in enumerate(attrs):
           setattr(self, a, chr(i+ord('a'))) # Set attrs to the first few letters in the alphabet.

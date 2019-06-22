@@ -25,7 +25,7 @@ from pants_test.test_base import TestBase
 class TestNativeToolchain(TestBase, SchedulerTestBase):
 
   def setUp(self):
-    super(TestNativeToolchain, self).setUp()
+    super().setUp()
 
     init_subsystems([LibcDev, NativeToolchain], options={
       'libc': {

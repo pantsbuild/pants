@@ -36,7 +36,7 @@ class SingletonTest(TestBase):
     self.assertIs(One(), One())
 
 
-class WithProp(object):
+class WithProp:
   _value = 'val0'
 
   @classproperty
@@ -101,7 +101,7 @@ class OverridingMethodDefSuper(WithProp):
 
   @classproperty
   def class_property(cls):
-    return super(OverridingMethodDefSuper, cls).class_property + cls._other_value
+    return super().class_property + cls._other_value
 
 
 class ClassPropertyTest(TestBase):
@@ -148,7 +148,7 @@ class ClassPropertyTest(TestBase):
     self.assertEqual('val0o0', OverridingMethodDefSuper().class_property)
 
   def test_modify_class_value(self):
-    class WithFieldToModify(object):
+    class WithFieldToModify:
       _z = 'z0'
 
       @classproperty
@@ -163,7 +163,7 @@ class ClassPropertyTest(TestBase):
     self.assertEqual('z1', WithFieldToModify.class_property)
 
   def test_set_attr(self):
-    class SetValue(object):
+    class SetValue:
       _x = 'x0'
 
       @staticproperty
@@ -187,7 +187,7 @@ class ClassPropertyTest(TestBase):
     self.assertEqual('s1', SetValue.static_property)
 
   def test_delete_attr(self):
-    class DeleteValue(object):
+    class DeleteValue:
       _y = 'y0'
 
       @classproperty

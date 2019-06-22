@@ -5,7 +5,7 @@
 from pants.task.goal_options_mixin import GoalOptionsMixin, GoalOptionsRegistrar
 
 
-class HasTransitiveOptionMixin(object):
+class HasTransitiveOptionMixin:
   """A mixin for tasks that have a --transitive option.
 
   Some tasks must always act on the entire dependency closure. E.g., when compiling, one must
@@ -26,18 +26,18 @@ class HasTransitiveOptionMixin(object):
     return self.get_options().transitive
 
 
-class TransitiveOptionRegistrar(object):
+class TransitiveOptionRegistrar:
   """Registrar of --transitive."""
 
   @classmethod
   def register_options(cls, register):
-    super(TransitiveOptionRegistrar, cls).register_options(register)
+    super().register_options(register)
     register('--transitive', type=bool, default=True, fingerprint=True, recursive=True,
              help="If false, act only on the targets directly specified on the command line. "
                   "If true, act on the transitive dependency closure of those targets.")
 
 
-class HasSkipOptionMixin(object):
+class HasSkipOptionMixin:
   """A mixin for tasks that have a --skip option.
 
   Some tasks may be skipped during certain usages. E.g., you may not want to apply linters
@@ -52,12 +52,12 @@ class HasSkipOptionMixin(object):
     return self.get_options().skip
 
 
-class SkipOptionRegistrar(object):
+class SkipOptionRegistrar:
   """Registrar of --skip."""
 
   @classmethod
   def register_options(cls, register):
-    super(SkipOptionRegistrar, cls).register_options(register)
+    super().register_options(register)
     register('--skip', type=bool, default=False, fingerprint=True, recursive=True,
              help='Skip task.')
 

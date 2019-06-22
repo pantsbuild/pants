@@ -29,7 +29,7 @@ class SortTargetsTest(BaseSortTargetsTest):
     return BuildFileAliases(targets={'python_library': PythonLibrary})
 
   def setUp(self):
-    super(SortTargetsTest, self).setUp()
+    super().setUp()
 
     def add_to_build_file(path, name, *deps):
       all_deps = ["'{0}'".format(dep) for dep in list(deps)]

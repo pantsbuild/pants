@@ -25,16 +25,16 @@ class JaxWsGen(SimpleCodegenTask, NailgunTask):
 
   @classmethod
   def register_options(cls, register):
-    super(JaxWsGen, cls).register_options(register)
+    super().register_options(register)
     register('--ws-quiet', type=bool, help='Suppress WsImport output')
     register('--ws-verbose', type=bool, help='Make WsImport output verbose')
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JaxWsGen, cls).subsystem_dependencies() + (DistributionLocator,)
+    return super().subsystem_dependencies() + (DistributionLocator,)
 
   def __init__(self, *args, **kwargs):
-    super(JaxWsGen, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
   def synthetic_target_type(self, target):
     return JavaLibrary

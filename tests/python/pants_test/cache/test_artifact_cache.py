@@ -50,7 +50,7 @@ class TestArtifactCache(TestBase):
       yield path
 
   def setUp(self):
-    super(TestArtifactCache, self).setUp()
+    super().setUp()
     # Init engine because decompression now goes through native code.
     self._init_engine()
     TarballArtifact.NATIVE_BINARY = self._scheduler._scheduler._native

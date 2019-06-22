@@ -19,7 +19,7 @@ class List(LineOriented, Goal):
 
   @classmethod
   def register_options(cls, register):
-    super(List, cls).register_options(register)
+    super().register_options(register)
     register('--provides', type=bool,
              help='List only targets that provide an artifact, displaying the columns specified by '
                   '--provides-columns.')

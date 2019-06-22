@@ -54,7 +54,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(PythonExecutionTaskBase, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(PythonInterpreter)
     round_manager.require_data(ResolveRequirements.REQUIREMENTS_PEX)
     round_manager.require_data(GatherSources.PYTHON_SOURCES)
@@ -93,7 +93,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(PythonExecutionTaskBase, cls).subsystem_dependencies() + (PythonSetup,)
+    return super().subsystem_dependencies() + (PythonSetup,)
 
   def extra_files(self):
     """Override to provide extra files needed for execution.

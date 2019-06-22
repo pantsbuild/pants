@@ -17,9 +17,9 @@ class FileSystemPantsIgnoreTest(unittest.TestCase, PantsIgnoreTestBase):
     return FileSystemProjectTree(build_root, ignore_patterns)
 
   def setUp(self):
-    super(FileSystemPantsIgnoreTest, self).setUp()
+    super().setUp()
     self.prepare()
 
   def tearDown(self):
-    super(FileSystemPantsIgnoreTest, self).tearDown()
+    super().tearDown()
     self.cleanup()

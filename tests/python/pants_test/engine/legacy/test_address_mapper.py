@@ -157,7 +157,7 @@ class LegacyAddressMapperTest(TestBase):
 
   def test_other_throw_is_fail(self):
     # scan_addresses() should raise an error if the scheduler returns an error it can't ignore.
-    class ThrowReturningScheduler(object):
+    class ThrowReturningScheduler:
       def execution_request(self, *args):
         pass
 

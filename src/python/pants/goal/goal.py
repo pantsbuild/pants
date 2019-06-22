@@ -34,7 +34,7 @@ def _create_stable_task_type(superclass, options_scope):
   })
 
 
-class Goal(object):
+class Goal:
   """Factory for objects representing goals.
 
   Ensures that we have exactly one instance per goal name.

@@ -25,7 +25,7 @@ class PyThriftNamespaceClashCheck(Task):
 
   @classmethod
   def register_options(cls, register):
-    super(PyThriftNamespaceClashCheck, cls).register_options(register)
+    super().register_options(register)
     # TODO: deprecate the --strict option in a future release!
     register('--strict', type=bool, default=False, fingerprint=True,
              help='Whether to fail the build if thrift sources have invalid python namespaces.')

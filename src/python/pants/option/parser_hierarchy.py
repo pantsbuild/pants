@@ -44,7 +44,7 @@ def all_enclosing_scopes(scope, allow_global=True):
     scope = (None if scope == GLOBAL_SCOPE else enclosing_scope(scope))
 
 
-class ParserHierarchy(object):
+class ParserHierarchy:
   """A hierarchy of scoped Parser instances.
 
   A scope is a dotted string: E.g., compile.java. In this example the compile.java scope is

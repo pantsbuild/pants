@@ -23,7 +23,7 @@ class EngineTest(EngineTestBase):
         self._action()
 
   def setUp(self):
-    super(EngineTest, self).setUp()
+    super().setUp()
     self._context = self.context()
 
   def assert_attempt(self, engine, *goal_names):
