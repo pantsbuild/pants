@@ -52,6 +52,5 @@ class Clean(Task):
           logger.debug("Forked an asynchronous clean-all worker at pid: {}".format(pid))
       else:
         # Recursively removes pants cache; user waits patiently.
-
         logger.info('For async removal, run `./pants clean-all --async`')
         safe_rmtree(pants_trash)

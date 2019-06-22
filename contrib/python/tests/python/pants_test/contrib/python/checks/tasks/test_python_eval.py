@@ -38,7 +38,7 @@ class PythonEvalTest(PythonTaskTestBase):
 
 
     @compile_time_check_decorator
-    class BarB:
+    class BarB(object):
       pass
     """)})
 
@@ -57,7 +57,7 @@ class PythonEvalTest(PythonTaskTestBase):
 
 
     @compile_time_check_decorator
-    class BazD:
+    class BazD(object):
       pass
     """)}, dependencies=['//src/python/a'])
 

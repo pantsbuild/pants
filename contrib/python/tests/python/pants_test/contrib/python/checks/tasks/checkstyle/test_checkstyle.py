@@ -127,7 +127,7 @@ class CheckstyleTest(PythonTaskTestBase):
   @parameterized.expand(CHECKER_RESOLVE_METHOD)
   def test_pass(self, unused_test_name, resolve_local):
     self.create_file('a/python/pass.py', contents=dedent("""
-                       class UpperCase:
+                       class UpperCase(object):
                          pass
                      """))
     target = self.make_target('a/python:pass', PythonLibrary, sources=['pass.py'])

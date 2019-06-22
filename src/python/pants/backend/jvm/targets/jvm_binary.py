@@ -360,11 +360,7 @@ class JvmBinary(JvmTarget):
       'extra_jvm_options': PrimitiveField(list(extra_jvm_options or ())),
     })
 
-    super().__init__(name=name,
-                                    address=address,
-                                    payload=payload,
-                                    sources=sources,
-                                    **kwargs)
+    super().__init__(name=name, address=address, payload=payload, sources=sources, **kwargs)
 
   @property
   def basename(self):

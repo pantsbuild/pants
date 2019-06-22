@@ -145,8 +145,7 @@ class BinaryFetchRequest(datatype(['download_path', 'urls'])):
   class NoDownloadUrlsError(ValueError): pass
 
   def __new__(cls, download_path, urls):
-    this_object = super().__new__(
-      cls, download_path, tuple(urls))
+    this_object = super().__new__(cls, download_path, tuple(urls))
 
     if not this_object.urls:
       raise cls.NoDownloadUrlsError(
