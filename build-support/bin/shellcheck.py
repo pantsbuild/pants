@@ -24,7 +24,6 @@ def ensure_shellcheck_installed() -> None:
 def run_shellcheck() -> None:
   targets = set(glob("./**/*.sh", recursive=True)) | {
     "./pants",
-    "./pants2",
     "./build-support/pants_venv",
     "./build-support/virtualenv",
     "./build-support/githooks/pre-commit",
