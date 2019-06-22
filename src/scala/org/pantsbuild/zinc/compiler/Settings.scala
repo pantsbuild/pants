@@ -287,7 +287,7 @@ object Settings {
 
     opt[File]("post-compile-merge-dir")
       .action((x, c) => c.copy(_postCompileMergeDir = Some(x)))
-      .text("Dir to merge with compile outputs after compilation")
+      .text("Directory to merge with compile outputs after compilation")
 
     opt[File]("class-destination")
       .abbr("d")
