@@ -3,7 +3,7 @@
 
 import logging
 import os.path
-from abc import ABCMeta, abstractproperty
+from abc import ABCMeta, abstractmethod
 from builtins import object, str
 
 from six import string_types
@@ -331,11 +331,13 @@ class BaseGlobs(Locatable, metaclass=ABCMeta):
       excluded_patterns.extend(exclude_filespecs.get('globs', []))
     return {'globs': excluded_patterns}
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def path_globs_kwarg(self):
     """The name of the `PathGlobs` parameter corresponding to this BaseGlobs instance."""
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def legacy_globs_class(self):
     """The corresponding `wrapped_globs` class for this BaseGlobs."""
 

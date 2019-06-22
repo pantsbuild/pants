@@ -1,7 +1,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from abc import abstractproperty
+from abc import abstractmethod
 
 from pants.backend.jvm.tasks.rewrite_base import RewriteBase
 from pants.base.exceptions import TaskError
@@ -58,7 +58,8 @@ class ScalaFmt(RewriteBase):
                         workunit_name='scalafmt',
                         jvm_options=self.get_options().jvm_options)
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def additional_args(self):
     """Returns the arguments used to run Scalafmt command.
 

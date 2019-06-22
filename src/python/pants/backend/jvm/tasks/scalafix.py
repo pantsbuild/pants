@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from abc import abstractproperty
+from abc import abstractmethod
 
 from pants.backend.jvm.tasks.rewrite_base import RewriteBase
 from pants.base.exceptions import TaskError
@@ -83,7 +83,8 @@ class ScalaFix(RewriteBase):
                         args=args,
                         workunit_name='scalafix')
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def additional_args(self):
     """Additional arguments to the Scalafix command."""
 

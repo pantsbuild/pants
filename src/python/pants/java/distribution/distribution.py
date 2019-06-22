@@ -6,7 +6,7 @@ import logging
 import os
 import pkgutil
 import plistlib
-from abc import ABC, abstractproperty
+from abc import ABC, abstractmethod
 from builtins import object, open, str
 from collections import namedtuple
 from contextlib import contextmanager
@@ -301,7 +301,8 @@ class _DistributionEnvironment(ABC):
       """
       return cls(home_path=None, bin_path=bin_path)
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def jvm_locations(self):
     """Return the jvm locations discovered in this environment.
 

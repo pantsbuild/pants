@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from builtins import open
 from hashlib import sha1
 
@@ -56,11 +56,13 @@ class FilesetWithSpec(ABC):
       for exclude_filespec in exclude:
         self._validate_globs_in_filespec(exclude_filespec, rel_root)
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def files(self):
     """Return the concrete set of files matched by this FilesetWithSpec, relative to `self.rel_root`."""
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def files_hash(self):
     """Return a unique hash for this set of files."""
 
@@ -151,11 +153,13 @@ class LazyFilesetWithSpec(FilesetWithSpec):
 class FilesetRelPathWrapper(ABC):
   KNOWN_PARAMETERS = frozenset({'exclude', 'follow_links'})
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def wrapped_fn(cls):
     """The wrapped file calculation function."""
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def validate_files(cls):
     """True to validate the existence of files returned by wrapped_fn."""
 

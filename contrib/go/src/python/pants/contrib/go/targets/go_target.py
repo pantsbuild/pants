@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from abc import abstractproperty
+from abc import abstractmethod
 
 from pants.build_graph.target import Target
 
@@ -54,7 +54,8 @@ class GoTarget(Target):
       raise ValueError('Absolute package paths are not allowed. Given: {!r}'.format(package_path))
     return '' if not package_path or package_path == os.curdir else package_path.lstrip('/')
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def import_path(self):
     """Returns the import path string that should be used to import this target's package.
 

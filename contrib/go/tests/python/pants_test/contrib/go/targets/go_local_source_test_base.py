@@ -1,7 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from abc import ABC, abstractproperty
+from abc import ABC, abstractmethod
 from textwrap import dedent
 
 from pants.build_graph.address_lookup_error import AddressLookupError
@@ -26,7 +26,8 @@ class GoLocalSourceTestBase(ABC):
     # Force setup of SourceRootConfig subsystem, as go targets do computation on source roots.
     self.context()
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def target_type(self):
     """Subclasses should return a GoLocalSource target subclass."""
 

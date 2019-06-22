@@ -3,7 +3,7 @@
 
 import functools
 import re
-from abc import ABC, ABCMeta, abstractproperty
+from abc import ABC, ABCMeta, abstractmethod
 from builtins import str
 
 from pants.engine.selectors import Get
@@ -25,11 +25,13 @@ class OptionableFactory(ABC):
   loosely defined by `_construct_optionable` and `OptionableFactory.signature`.
   """
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def optionable_cls(self):
     """The Optionable class that is constructed by this OptionableFactory."""
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def options_scope(self):
     """The scope from which the ScopedOptions for the target Optionable will be parsed."""
 

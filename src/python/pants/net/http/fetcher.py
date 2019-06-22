@@ -7,7 +7,7 @@ import re
 import sys
 import tempfile
 import time
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from builtins import object, open, str
 from contextlib import closing, contextmanager
 
@@ -209,14 +209,16 @@ class Fetcher(object):
   class _Response(ABC):
     """Abstracts a fetch response."""
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def status_code(self):
       """The HTTP status code for the fetch.
 
       :rtype: int
       """
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def size(self):
       """The size of the fetched file in bytes if known; otherwise, `None`.
 
