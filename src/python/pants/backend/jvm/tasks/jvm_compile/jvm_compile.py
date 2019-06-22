@@ -278,9 +278,9 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     target = compile_context.target
 
     if isinstance(target, JavacPlugin):
-      result[os.path.join(_POST_COMPILE_MERGE_DIR_PREFIX, _JAVAC_PLUGIN_INFO_FILE)] = target.classname if PY3 else target.classname.decode('utf-8')
+      result[_JAVAC_PLUGIN_INFO_FILE] = target.classname if PY3 else target.classname.decode('utf-8')
     elif isinstance(target, AnnotationProcessor) and target.processors:
-      result[os.path.join(_POST_COMPILE_MERGE_DIR_PREFIX, _PROCESSOR_INFO_FILE)] = '{}\n'.format('\n'.join(p.strip() for p in target.processors))
+      result[_PROCESSOR_INFO_FILE] = '{}\n'.format('\n'.join(p.strip() for p in target.processors))
 
     return result
 
@@ -290,13 +290,13 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     extra_resources = self.post_compile_extra_resources(compile_context)
     if not extra_resources:
       return EMPTY_DIRECTORY_DIGEST
-    with temporary_dir() as tmpdir:
-      for filename, filecontent in extra_resources.items():
-        safe_file_dump(os.path.join(tmpdir, filename), filecontent)
-      snapshot, = self.context._scheduler.capture_snapshots([
-          PathGlobsAndRoot(PathGlobs(extra_resources), tmpdir)
-        ])
-      return snapshot.directory_digest
+
+    for filename, filecontent in extra_resources.items():
+      safe_file_dump(os.path.join(compile_context.post_compile_merge_dir, filename), filecontent)
+    snapshot, = self.context._scheduler.capture_snapshots([
+        PathGlobsAndRoot(PathGlobs(extra_resources), compile_context.post_compile_merge_dir)
+      ])
+    return snapshot.directory_digest
 
   def write_argsfile(self, ctx, args):
     """Write the argsfile for this context."""
@@ -372,13 +372,15 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       self.get_options().class_not_found_error_patterns))
 
   def create_compile_context(self, target, target_workdir):
-    return CompileContext(target,
-                          os.path.join(target_workdir, 'z.analysis'),
-                          ClasspathEntry(os.path.join(target_workdir, 'classes')),
-                          ClasspathEntry(os.path.join(target_workdir, 'z.jar')),
-                          os.path.join(target_workdir, 'logs'),
-                          os.path.join(target_workdir, 'zinc_args'),
-                          self._compute_sources_for_target(target))
+    return CompileContext(target=target,
+                          analysis_file=os.path.join(target_workdir, 'z.analysis'),
+                          classes_dir=ClasspathEntry(os.path.join(target_workdir, 'classes')),
+                          jar_file=ClasspathEntry(os.path.join(target_workdir, 'z.jar')),
+                          log_dir=os.path.join(target_workdir, 'logs'),
+                          args_file=os.path.join(target_workdir, 'zinc_args'),
+                          post_compile_merge_dir=os.path.join(target_workdir,
+                                                              'post_compile_merge_dir'),
+                          sources=self._compute_sources_for_target(target))
 
   def execute(self):
     if JvmPlatform.global_instance().get_options().compiler != self.compiler_name:

@@ -551,6 +551,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         jar_file=ClasspathEntry(os.path.join(zinc_dir, 'z.jar'), None),
         log_dir=os.path.join(zinc_dir, 'logs'),
         args_file=os.path.join(zinc_dir, 'zinc_args'),
+        post_compile_merge_dir=os.path.join(zinc_dir, 'post_compile_merge_dir'),
         sources=sources,
       ))
 

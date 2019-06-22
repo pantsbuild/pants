@@ -293,6 +293,11 @@ class BaseZincCompile(JvmCompile):
     if not self.get_options().colors:
       zinc_args.append('-no-color')
 
+    if self.post_compile_extra_resources(ctx):
+      self.extra_post_compile_resources_digest(ctx)
+      post_compile_merge_dir = relative_to_exec_root(ctx.post_compile_merge_dir)
+      zinc_args.extend(['--post-compile-merge-dir', post_compile_merge_dir])
+
     compiler_bridge_classpath_entry = self._zinc.compile_compiler_bridge(self.context)
     zinc_args.extend(['-compiled-bridge-jar', relative_to_exec_root(compiler_bridge_classpath_entry.path)])
     zinc_args.extend(['-scala-path', ':'.join(scala_path)])
@@ -363,7 +368,9 @@ class BaseZincCompile(JvmCompile):
     """An exception type specifically to signal a failed zinc execution."""
 
   def _compile_nonhermetic(self, jvm_options, ctx, classes_directory):
-    exit_code = self.runjava(classpath=self.get_zinc_compiler_classpath(),
+    exit_code = self.runjava(
+                             # classpath=self.get_zinc_compiler_classpath(),
+                             classpath=['/Users/yic/workspace/pants/dist/bin.jar'],
                              main=Zinc.ZINC_COMPILE_MAIN,
                              jvm_options=jvm_options,
                              args=['@{}'.format(ctx.args_file)],
@@ -372,9 +379,6 @@ class BaseZincCompile(JvmCompile):
                              dist=self._zinc.dist)
     if exit_code != 0:
       raise self.ZincCompileError('Zinc compile failed.', exit_code=exit_code)
-    self.context._scheduler.materialize_directories((
-      DirectoryToMaterialize(text_type(classes_directory), self.extra_post_compile_resources_digest(ctx)),
-    ))
 
   def _compile_hermetic(self, jvm_options, ctx, classes_dir, jar_file,
                         compiler_bridge_classpath_entry, dependency_classpath,
