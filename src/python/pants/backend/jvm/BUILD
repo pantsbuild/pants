@@ -74,7 +74,6 @@ python_library(
   name='repository',
   sources=['repository.py'],
   dependencies = [
-    '3rdparty/python:future',
   ]
 )
 

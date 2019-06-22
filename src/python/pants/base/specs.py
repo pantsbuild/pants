@@ -4,7 +4,6 @@
 import os
 import re
 from abc import ABC, abstractmethod
-from builtins import str
 
 from pants.util.collections import assert_single_element
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname

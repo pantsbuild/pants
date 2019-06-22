@@ -7,7 +7,6 @@ import logging
 import os
 import xml.etree.ElementTree as ET
 from abc import ABC, abstractmethod
-from builtins import map, next, object, open
 from collections import defaultdict
 from functools import total_ordering
 

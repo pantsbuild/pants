@@ -3,7 +3,6 @@
 
 import os
 import sys
-from builtins import filter, object
 from collections import defaultdict
 from contextlib import contextmanager
 

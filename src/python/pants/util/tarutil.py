@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import tarfile
-from builtins import str
 
 
 class TarFile(tarfile.TarFile):

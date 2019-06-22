@@ -4,7 +4,6 @@
 import re
 import traceback
 from abc import abstractmethod
-from builtins import object, range
 from functools import total_ordering
 
 from pants.base.exceptions import TaskError

@@ -4,7 +4,6 @@
 import copy
 import re
 import sys
-from builtins import object, open, str
 
 from future.utils import text_type
 

@@ -3,7 +3,6 @@
 
 import os
 import sys
-from builtins import open, range
 
 import markdown
 from docutils.core import publish_parts

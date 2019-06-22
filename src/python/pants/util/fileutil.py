@@ -5,7 +5,6 @@ import errno
 import os
 import random
 import shutil
-from builtins import open
 from contextlib import contextmanager
 from uuid import uuid4
 

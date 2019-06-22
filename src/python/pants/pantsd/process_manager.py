@@ -7,7 +7,6 @@ import os
 import signal
 import time
 import traceback
-from builtins import object, str
 from contextlib import contextmanager
 
 import psutil

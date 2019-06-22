@@ -3,7 +3,6 @@
 
 import os
 import re
-from builtins import object
 
 from twitter.common.collections import OrderedSet
 

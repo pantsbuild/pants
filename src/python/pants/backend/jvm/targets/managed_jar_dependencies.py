@@ -3,7 +3,6 @@
 
 import copy
 import os
-from builtins import object
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload

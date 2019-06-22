@@ -3,7 +3,6 @@
 
 import os
 import shutil
-from builtins import object
 from hashlib import sha1
 
 from future.utils import raise_from

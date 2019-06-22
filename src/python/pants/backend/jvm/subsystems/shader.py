@@ -4,7 +4,6 @@
 import logging
 import os
 import re
-from builtins import object
 from collections import namedtuple
 from contextlib import contextmanager
 

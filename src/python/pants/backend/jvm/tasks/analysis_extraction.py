@@ -3,7 +3,6 @@
 
 import json
 import os
-from builtins import open
 from collections import defaultdict
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext

@@ -4,7 +4,6 @@
 import logging
 import os.path
 from abc import ABCMeta, abstractmethod
-from builtins import object, str
 
 from six import string_types
 

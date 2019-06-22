@@ -4,7 +4,6 @@
 import logging
 import os
 from abc import abstractmethod
-from builtins import zip
 
 from future.utils import text_type
 from twitter.common.collections import OrderedSet

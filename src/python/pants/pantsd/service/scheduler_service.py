@@ -6,7 +6,6 @@ import os
 import queue
 import sys
 import threading
-from builtins import open
 
 from future.utils import PY3
 

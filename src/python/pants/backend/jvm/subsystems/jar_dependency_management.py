@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-from builtins import map, next, object
 from collections import defaultdict
 from textwrap import dedent
 

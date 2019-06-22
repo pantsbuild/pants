@@ -6,7 +6,6 @@ import os
 import re
 import time
 import uuid
-from builtins import open, range, str
 from collections import defaultdict, namedtuple
 from textwrap import dedent
 

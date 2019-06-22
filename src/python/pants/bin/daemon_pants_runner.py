@@ -6,7 +6,6 @@ import os
 import sys
 import termios
 import time
-from builtins import open, zip
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot

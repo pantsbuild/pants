@@ -4,7 +4,6 @@
 import functools
 import os
 import shutil
-from builtins import str
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet

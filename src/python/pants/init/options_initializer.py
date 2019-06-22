@@ -3,7 +3,6 @@
 
 import logging
 import sys
-from builtins import map, object
 
 import pkg_resources
 

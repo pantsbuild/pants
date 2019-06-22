@@ -4,7 +4,6 @@
 import json
 import logging
 from abc import ABC, abstractmethod
-from builtins import object, str
 
 import requests
 

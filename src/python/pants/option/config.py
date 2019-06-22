@@ -6,7 +6,6 @@ import io
 import itertools
 import os
 from abc import ABC
-from builtins import open
 from contextlib import contextmanager
 from hashlib import sha1
 

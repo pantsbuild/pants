@@ -3,7 +3,6 @@
 
 import functools
 import os
-from builtins import object, open, str
 from multiprocessing import cpu_count
 
 from future.utils import PY2, PY3, text_type

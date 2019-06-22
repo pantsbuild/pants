@@ -3,7 +3,6 @@
 
 import os
 import sys
-from builtins import open
 from io import BytesIO
 
 from future.utils import PY3

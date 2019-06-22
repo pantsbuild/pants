@@ -8,7 +8,6 @@ import os
 import pkgutil
 import shutil
 import sys
-from builtins import input, next, object, open, str
 from collections import defaultdict, namedtuple
 from copy import copy
 

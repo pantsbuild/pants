@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-from builtins import object
 
 from pants.binaries.binary_util import BinaryToolFetcher, BinaryUtil
 from pants.pantsd.watchman import Watchman

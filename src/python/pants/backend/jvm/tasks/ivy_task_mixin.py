@@ -4,7 +4,6 @@
 import hashlib
 import logging
 import os
-from builtins import str
 
 from future.utils import PY3
 

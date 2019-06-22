@@ -4,7 +4,6 @@
 import logging
 import sys
 import termios
-from builtins import object
 from contextlib import contextmanager
 
 

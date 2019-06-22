@@ -5,7 +5,6 @@ python_library(
   name='address_mapper',
   sources=['address_mapper.py'],
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/base:build_file',
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
@@ -48,7 +47,6 @@ python_library(
   name='structs',
   sources=['structs.py'],
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/base:deprecated',
     'src/python/pants/build_graph',
     'src/python/pants/engine:fs',

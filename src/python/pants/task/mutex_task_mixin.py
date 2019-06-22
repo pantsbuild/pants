@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import abstractmethod
-from builtins import filter
 from collections import defaultdict
 
 from pants.base.exceptions import TaskError

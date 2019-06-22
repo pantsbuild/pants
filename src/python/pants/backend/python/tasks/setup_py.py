@@ -8,7 +8,6 @@ import os
 import shutil
 import textwrap
 from abc import ABC, abstractmethod
-from builtins import bytes, map, object, str, zip
 from collections import defaultdict
 
 from pex.installer import Packager, WheelInstaller

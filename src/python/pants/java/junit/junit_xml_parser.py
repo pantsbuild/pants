@@ -3,7 +3,6 @@
 
 import fnmatch
 import os
-from builtins import object
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet

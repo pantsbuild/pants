@@ -4,7 +4,6 @@
 import logging
 import os
 import tokenize
-from builtins import object
 from io import BytesIO, StringIO
 
 import six

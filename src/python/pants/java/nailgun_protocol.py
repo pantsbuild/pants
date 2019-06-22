@@ -8,7 +8,6 @@ import struct
 import threading
 import time
 from abc import ABC, abstractmethod
-from builtins import bytes, object, str, zip
 from contextlib import contextmanager
 
 from pants.util.objects import datatype

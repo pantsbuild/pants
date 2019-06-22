@@ -5,7 +5,6 @@ import os
 import re
 import time
 import uuid
-from builtins import object, range
 from collections import namedtuple
 
 from pants.util.dirutil import safe_mkdir_for

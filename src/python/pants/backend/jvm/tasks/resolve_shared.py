@@ -1,7 +1,6 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from builtins import next
 
 from pants.base.build_environment import get_buildroot
 from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot

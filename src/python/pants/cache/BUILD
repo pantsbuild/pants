@@ -3,7 +3,6 @@
 
 python_library(
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:requests',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:validation',

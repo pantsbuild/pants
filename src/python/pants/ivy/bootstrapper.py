@@ -5,7 +5,6 @@ import hashlib
 import logging
 import os
 import shutil
-from builtins import map, object, open
 
 from pants.base.build_environment import get_buildroot
 from pants.ivy.ivy import Ivy

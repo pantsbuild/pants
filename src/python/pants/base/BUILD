@@ -17,7 +17,6 @@ python_library(
   name = 'project_tree',
   sources = ['file_system_project_tree.py', 'project_tree.py', 'project_tree_factory.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:pathspec',
     '3rdparty/python:scandir',
     '3rdparty/python:six',
@@ -88,7 +87,6 @@ python_library(
   name = 'fingerprint_strategy',
   sources = ['fingerprint_strategy.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':deprecated',
   ]
 )
@@ -98,7 +96,6 @@ python_library(
   sources = ['generator.py'],
   dependencies = [
     ':mustache',
-    '3rdparty/python:future',
     '3rdparty/python:pystache',
   ]
 )
@@ -118,7 +115,6 @@ python_library(
   name = 'mustache',
   sources = ['mustache.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:pystache',
     '3rdparty/python:six',
   ]
@@ -128,7 +124,6 @@ python_library(
   name = 'parse_context',
   sources = ['parse_context.py'],
   dependencies = [
-    '3rdparty/python:future',
   ]
 )
 
@@ -165,7 +160,6 @@ python_library(
   name = 'revision',
   sources = ['revision.py'],
   dependencies = [
-    '3rdparty/python:future',
   ]
 )
 
@@ -174,7 +168,6 @@ python_library(
   sources = ['run_info.py'],
   dependencies = [
     'src/python/pants/util:collections_abc_backport',
-    '3rdparty/python:future',
     ':build_environment',
     'src/python/pants/util:dirutil',
     'src/python/pants:version',
@@ -185,7 +178,6 @@ python_library(
   name = 'cmd_line_spec_parser',
   sources = ['cmd_line_spec_parser.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':build_file',
     ':specs',
@@ -215,7 +207,6 @@ python_library(
   name = 'workunit',
   sources = ['workunit.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:rwbuf',

@@ -3,7 +3,6 @@
 
 import logging
 import os
-from builtins import str
 
 from pants.base.build_file import BuildFile
 from pants.base.specs import DescendantAddresses, SiblingAddresses, Specs

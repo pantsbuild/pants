@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import sys
-from builtins import object
 
 from pants.base.build_environment import pants_release, pants_version
 from pants.goal.goal import Goal

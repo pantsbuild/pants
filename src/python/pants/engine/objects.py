@@ -4,7 +4,6 @@
 import inspect
 import sys
 from abc import ABC, abstractmethod
-from builtins import object
 from collections import namedtuple
 
 from future.utils import PY2

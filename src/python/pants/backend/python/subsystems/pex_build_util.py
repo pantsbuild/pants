@@ -3,7 +3,6 @@
 
 import logging
 import os
-from builtins import str
 from collections import defaultdict
 
 from future.utils import PY2

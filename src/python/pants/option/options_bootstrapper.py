@@ -5,7 +5,6 @@ import itertools
 import logging
 import os
 import sys
-from builtins import filter
 
 from future.utils import iteritems
 

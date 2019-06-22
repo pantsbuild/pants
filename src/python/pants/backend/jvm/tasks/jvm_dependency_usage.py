@@ -4,7 +4,6 @@
 import json
 import os
 import sys
-from builtins import next, object, open, str
 from collections import defaultdict, namedtuple
 
 from future.utils import PY3

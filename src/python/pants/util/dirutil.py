@@ -9,7 +9,6 @@ import stat
 import tempfile
 import threading
 import uuid
-from builtins import open
 from collections import defaultdict
 from contextlib import contextmanager
 

@@ -4,7 +4,6 @@
 import inspect
 import re
 import textwrap
-from builtins import object, range
 from collections import namedtuple
 
 from future.utils import PY3

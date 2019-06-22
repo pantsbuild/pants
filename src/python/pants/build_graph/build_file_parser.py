@@ -3,7 +3,6 @@
 
 import logging
 import warnings
-from builtins import object
 
 import six
 

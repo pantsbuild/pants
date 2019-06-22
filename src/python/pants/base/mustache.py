@@ -3,7 +3,6 @@
 
 import os
 import pkgutil
-from builtins import object
 
 import pystache
 import six

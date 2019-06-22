@@ -21,7 +21,6 @@ python_library(
   name = 'collections',
   sources = ['collections.py'],
   dependencies = [
-    '3rdparty/python:future',
   ]
 )
 
@@ -37,7 +36,6 @@ python_library(
   name = 'debug',
   sources = ['debug.py'],
   dependencies = [
-    '3rdparty/python:future',
   ],
 )
 
@@ -72,7 +70,6 @@ python_library(
   name = 'fileutil',
   sources = ['fileutil.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':contextutil',
   ],
 )
@@ -97,7 +94,6 @@ python_library(
   name = 'meta',
   sources = ['meta.py'],
   dependencies = [
-    '3rdparty/python:future',
   ]
 )
 
@@ -105,7 +101,6 @@ python_library(
   name = 'netrc',
   sources = ['netrc.py'],
   dependencies = [
-    '3rdparty/python:future',
   ]
 )
 
@@ -152,7 +147,6 @@ python_library(
   name = 'retry',
   sources = ['retry.py'],
   dependencies = [
-    '3rdparty/python:future',
   ]
 )
 
@@ -160,7 +154,6 @@ python_library(
   name = 'rwbuf',
   sources = ['rwbuf.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:six',
   ]
 )
@@ -169,7 +162,6 @@ python_library(
   name = 's3_log_aggregator',
   sources = ['s3_log_aggregator.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:s3logparse'
   ]
 )
@@ -202,7 +194,6 @@ python_library(
   name = 'tarutil',
   sources = ['tarutil.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:six',
   ],
 )

@@ -7,7 +7,6 @@ import os
 import pkgutil
 import plistlib
 from abc import ABC, abstractmethod
-from builtins import object, open, str
 from collections import namedtuple
 from contextlib import contextmanager
 

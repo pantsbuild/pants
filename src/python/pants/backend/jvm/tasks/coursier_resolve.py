@@ -5,7 +5,6 @@ import hashlib
 import itertools
 import json
 import os
-from builtins import open, str, zip
 from collections import defaultdict
 
 from future.moves.urllib import parse

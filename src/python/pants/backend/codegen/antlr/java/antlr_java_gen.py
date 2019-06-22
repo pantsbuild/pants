@@ -4,7 +4,6 @@
 import logging
 import os
 import re
-from builtins import open
 
 from pants.backend.codegen.antlr.java.java_antlr_library import JavaAntlrLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary

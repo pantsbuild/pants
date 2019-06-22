@@ -3,7 +3,6 @@
 
 import os
 from abc import ABC, abstractmethod
-from builtins import open
 from hashlib import sha1
 
 from six import string_types

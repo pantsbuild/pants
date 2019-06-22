@@ -3,7 +3,6 @@
 
 import logging
 import sys
-from builtins import object
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.workunit import WorkUnit, WorkUnitLabel

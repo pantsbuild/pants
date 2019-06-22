@@ -4,7 +4,6 @@
 import multiprocessing
 import os
 import sys
-from builtins import str
 from textwrap import dedent
 
 from pants.base.build_environment import (get_buildroot, get_default_pants_config_file,

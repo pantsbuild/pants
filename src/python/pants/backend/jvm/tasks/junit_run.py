@@ -5,7 +5,6 @@ import fnmatch
 import itertools
 import os
 import sys
-from builtins import object, range, str
 from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet

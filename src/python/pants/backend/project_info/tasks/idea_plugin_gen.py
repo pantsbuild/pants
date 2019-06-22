@@ -7,7 +7,6 @@ import os
 import pkgutil
 import re
 import shutil
-from builtins import open
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.python.targets.python_target import PythonTarget

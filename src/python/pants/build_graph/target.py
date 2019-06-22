@@ -4,7 +4,6 @@
 import logging
 import os
 import weakref
-from builtins import object, str
 from hashlib import sha1
 
 from six import string_types

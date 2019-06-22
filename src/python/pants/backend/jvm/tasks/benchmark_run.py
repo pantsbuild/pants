@@ -3,7 +3,6 @@
 
 import os
 import shutil
-from builtins import str
 
 from pants.backend.jvm.targets.benchmark import Benchmark
 from pants.backend.jvm.tasks.jvm_task import JvmTask

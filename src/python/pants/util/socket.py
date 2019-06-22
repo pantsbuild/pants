@@ -4,7 +4,6 @@
 import errno
 import io
 import socket
-from builtins import object
 
 from future.utils import PY3
 

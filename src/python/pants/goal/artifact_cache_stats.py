@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from builtins import object, open, str, zip
 from collections import defaultdict, namedtuple
 
 from pants.cache.artifact_cache import UnreadableArtifact

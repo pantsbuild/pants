@@ -5,7 +5,6 @@ import io
 import os
 import select
 import threading
-from builtins import zip
 from contextlib import contextmanager
 
 from contextlib2 import ExitStack

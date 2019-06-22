@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-from builtins import object, str, zip
 from collections import defaultdict, deque
 from contextlib import contextmanager
 from os.path import dirname

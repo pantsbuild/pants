@@ -5,7 +5,6 @@ import logging
 import os
 import sys
 import threading
-from builtins import object
 from contextlib import contextmanager
 
 from future.utils import text_type

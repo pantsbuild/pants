@@ -3,7 +3,6 @@
 
 import re
 import shlex
-from builtins import bytes, str
 
 from future.utils import PY3
 
