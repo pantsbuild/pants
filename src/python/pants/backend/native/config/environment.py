@@ -19,11 +19,10 @@ class Platform(enum(all_normalized_os_names())):
     return cls(get_normalized_os_name())
 
 
-def _list_field(func):
+class _list_field(property):
   """A decorator for methods corresponding to list-valued fields of an `ExtensibleAlgebraic`."""
-  wrapped = abstractmethod(func)
-  wrapped._field_type = 'list'
-  return property(wrapped)
+  __isabstractmethod__ = True
+  _field_type = 'list'
 
 
 def _algebraic_data(metaclass):
