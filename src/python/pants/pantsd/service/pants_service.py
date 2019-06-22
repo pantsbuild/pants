@@ -6,9 +6,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import threading
 import time
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
-from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
@@ -33,7 +32,7 @@ class PantsServices(datatype([
     return super(PantsServices, cls).__new__(cls, services, port_map, lifecycle_lock)
 
 
-class PantsService(AbstractClass):
+class PantsService(ABC):
   """Pants daemon service base class.
 
   The service lifecycle is made up of states described in the _ServiceState class, and controlled

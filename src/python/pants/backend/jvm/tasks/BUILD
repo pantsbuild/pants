@@ -368,7 +368,6 @@ python_library(
     'src/python/pants/binaries',
     'src/python/pants/java/jar',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:meta',
   ],
 )
 
@@ -417,7 +416,6 @@ python_library(
     'src/python/pants/util:desktop',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
-    'src/python/pants/util:meta',
     'src/python/pants/util:process_handler',
     'src/python/pants/util:strutil',
   ],
@@ -718,7 +716,6 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/option',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:meta',
     'src/python/pants/util:memo',
   ]
 )

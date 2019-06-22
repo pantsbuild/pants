@@ -10,11 +10,10 @@ import socket
 import struct
 import threading
 import time
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from builtins import bytes, object, str, zip
 from contextlib import contextmanager
 
-from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 from pants.util.osutil import IntegerForPid
 
@@ -239,7 +238,7 @@ class NailgunProtocol(object):
 
   class TimeoutOptions(datatype([('start_time', float), ('interval', float)])): pass
 
-  class TimeoutProvider(AbstractClass):
+  class TimeoutProvider(ABC):
 
     @abstractmethod
     def maybe_timeout_options(self):

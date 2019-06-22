@@ -157,7 +157,6 @@ python_library(
   sources = ['project_tree_test_base.py'],
   dependencies = [
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:meta',
   ]
 )
 

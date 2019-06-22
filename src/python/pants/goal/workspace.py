@@ -4,14 +4,13 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 from pants.base.build_environment import get_buildroot
 from pants.scm.scm import Scm
-from pants.util.meta import AbstractClass
 
 
-class Workspace(AbstractClass):
+class Workspace(ABC):
   """Tracks the state of the current workspace."""
 
   class WorkspaceError(Exception):

@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import logging
 import os
 import sys
-from abc import abstractmethod, abstractproperty
+from abc import ABC, abstractmethod, abstractproperty
 from builtins import object
 from contextlib import contextmanager
 
@@ -15,14 +15,13 @@ from six import string_types
 from twitter.common.collections import maybe_list
 
 from pants.util.contextutil import environment_as
-from pants.util.meta import AbstractClass
 from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)
 
 
-class Executor(AbstractClass):
+class Executor(ABC):
   """Executes java programs.
 
   :API: public

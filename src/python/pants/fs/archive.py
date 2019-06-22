@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import sys
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from zipfile import ZIP_DEFLATED
 
@@ -15,7 +15,6 @@ from future.utils import PY2
 from pants.util.collections_abc_backport import OrderedDict
 from pants.util.contextutil import open_tar, open_zip, temporary_dir
 from pants.util.dirutil import is_executable, safe_concurrent_rename, safe_walk
-from pants.util.meta import AbstractClass
 from pants.util.process_handler import subprocess
 from pants.util.strutil import ensure_text
 
@@ -23,7 +22,7 @@ from pants.util.strutil import ensure_text
 """Support for wholesale archive creation and extraction in a uniform API across archive types."""
 
 
-class Archiver(AbstractClass):
+class Archiver(ABC):
 
   def extract(self, path, outdir, concurrency_safe=False, **kwargs):
     """Extracts an archive's contents to the specified outdir with an optional filter.

@@ -9,7 +9,7 @@ import inspect
 import itertools
 import logging
 import sys
-from abc import abstractproperty
+from abc import ABC, abstractproperty
 
 import asttokens
 from twitter.common.collections import OrderedSet
@@ -19,7 +19,6 @@ from pants.engine.selectors import Get
 from pants.util.collections import assert_single_element
 from pants.util.collections_abc_backport import Iterable, OrderedDict
 from pants.util.memo import memoized
-from pants.util.meta import AbstractClass
 from pants.util.objects import SubclassesOf, TypedCollection, datatype
 
 
@@ -321,7 +320,7 @@ class UnionRule(datatype([
     return super(UnionRule, cls).__new__(cls, union_base, union_member)
 
 
-class Rule(AbstractClass):
+class Rule(ABC):
   """Rules declare how to produce products for the product graph.
 
   A rule describes what dependencies must be provided to produce a particular product. They also act

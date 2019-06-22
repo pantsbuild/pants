@@ -5,6 +5,7 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
+from abc import ABCMeta
 from hashlib import sha1
 
 from future.utils import PY3, string_types
@@ -16,10 +17,9 @@ from pants.base.payload_field import (ExcludesField, FingerprintedField, Fingerp
                                       PrimitiveField)
 from pants.base.validation import assert_list
 from pants.java.jar.exclude import Exclude
-from pants.util.meta import AbstractClass
 
 
-class JarRule(FingerprintedMixin, AbstractClass):
+class JarRule(FingerprintedMixin, metaclass=ABCMeta):
 
   def __init__(self, apply_pattern, payload=None):
     self.payload = payload or Payload()

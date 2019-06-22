@@ -5,16 +5,15 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
-from abc import abstractmethod
+from abc import ABCMeta, abstractmethod
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.target import Target
 from pants.util.memo import memoized_method
-from pants.util.meta import AbstractClass
 from pants.util.netrc import Netrc
 
 
-class Credentials(Target, AbstractClass):
+class Credentials(Target, metaclass=ABCMeta):
   """Credentials for a maven repository.
 
   The ``publish.jar`` section of your ``pants.ini`` file can refer to one

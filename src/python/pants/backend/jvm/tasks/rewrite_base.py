@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import shutil
-from abc import abstractmethod, abstractproperty
+from abc import ABCMeta, abstractmethod, abstractproperty
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
@@ -15,10 +15,9 @@ from pants.option.custom_types import dir_option
 from pants.process.xargs import Xargs
 from pants.util.dirutil import fast_relpath, safe_mkdir_for_all
 from pants.util.memo import memoized_property
-from pants.util.meta import AbstractClass
 
 
-class RewriteBase(NailgunTask, AbstractClass):
+class RewriteBase(NailgunTask, metaclass=ABCMeta):
   """Abstract base class for JVM-based tools that check/rewrite sources."""
 
   @classmethod

@@ -6,13 +6,13 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import sys
+from abc import ABC
 from builtins import object
 from collections import namedtuple
 
 from twitter.common.collections import OrderedSet
 
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
-from pants.util.meta import AbstractClass
 
 
 # TODO: Switch all clients to reference pants.option.scope directly.
@@ -38,7 +38,7 @@ class SplitArgs(namedtuple('SplitArgs',
   """
 
 
-class HelpRequest(AbstractClass):
+class HelpRequest(ABC):
   """Represents an implicit or explicit request for help by the user."""
 
 

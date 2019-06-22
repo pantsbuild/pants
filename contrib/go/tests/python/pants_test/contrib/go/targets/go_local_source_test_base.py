@@ -4,17 +4,16 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from abc import abstractproperty
+from abc import ABC, abstractproperty
 from textwrap import dedent
 
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants.util.meta import AbstractClass
 from pants_test.test_base import TestBase
 
 from pants.contrib.go.register import build_file_aliases
 
 
-class GoLocalSourceTestBase(AbstractClass):
+class GoLocalSourceTestBase(ABC):
   # NB: We assume we're mixed into a TestBase - we can't extend that directly or else unittest tries
   # to run our test methods in the subclass (OK), and against us (not OK).
   # NB: We use aliases and BUILD files to test proper registration of anonymous targets and macros.
