@@ -4,6 +4,79 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.18.0.dev1 (6/21/2019)
+-----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* No longer release a Python 2 wheel or PEX (#7888)
+  `PR #7888 <https://github.com/pantsbuild/pants/pull/7888>`_
+
+* Bump default Mypy version from 0.670 to 0.710 (#7912)
+  `PR #7912 <https://github.com/pantsbuild/pants/pull/7912>`_
+
+Bugfixes
+~~~~~~~~
+
+* Don't nest output directories in an empty path (#7908)
+  `PR #7908 <https://github.com/pantsbuild/pants/pull/7908>`_
+
+* Migrate python_repl to use ignoring-sigint (#7890)
+  `PR #7890 <https://github.com/pantsbuild/pants/pull/7890>`_
+
+* Use Selectors module for more robust and efficient syscalls (#7882)
+  `Issue #7880 <https://github.com/pantsbuild/pants/issues/7880>`_
+  `PR #7882 <https://github.com/pantsbuild/pants/pull/7882>`_
+
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Set internal compatibility to >= CPython 3.6 and remove ./pants2 (#7925)
+  `PR #7925 <https://github.com/pantsbuild/pants/pull/7925>`_
+
+* Move reading and writing bytes from Store to ShardedLmdb (#7909)
+  `PR #7909 <https://github.com/pantsbuild/pants/pull/7909>`_
+
+* Remove Python 2 testing from CI (#7922)
+  `PR #7922 <https://github.com/pantsbuild/pants/pull/7922>`_
+
+* Move PATH testutils to testutil crate (#7910)
+  `PR #7910 <https://github.com/pantsbuild/pants/pull/7910>`_
+
+* Fix #7895 breaking CI for pull requests (#7921)
+  `PR #7921 <https://github.com/pantsbuild/pants/pull/7921>`_
+
+* Use S3 Sync for CI deploys to avoid recopying files (#7895)
+  `Issue #7258 <https://github.com/pantsbuild/pants/issues/7258>`_
+  `PR #7895 <https://github.com/pantsbuild/pants/pull/7895>`_
+
+* Remove fork-related code from Rust (#7894)
+  `PR #7894 <https://github.com/pantsbuild/pants/pull/7894>`_
+
+* Prefactor: Extract store and sharded_lmdb into their own crates (#7904)
+  `PR #7904 <https://github.com/pantsbuild/pants/pull/7904>`_
+
+* Use Docker to build Python 3.7 PEX in CI (#7899)
+  `PR #7899 <https://github.com/pantsbuild/pants/pull/7899>`_
+
+* Switch back to using one threadpool (#7898)
+  `PR #7898 <https://github.com/pantsbuild/pants/pull/7898>`_
+
+* Skip failing TensorFlow tests (#7905)
+  `Issue #7903 <https://github.com/pantsbuild/pants/issues/7903>`_
+  `PR #7905 <https://github.com/pantsbuild/pants/pull/7905>`_
+
+* Add Centos7 docker image to allow building Python 3.7 wheels (#7892)
+  `PR #7892 <https://github.com/pantsbuild/pants/pull/7892>`_
+
+* Fix macOS Rust tests shard failing to Brew install (#7893)
+  `PR #7893 <https://github.com/pantsbuild/pants/pull/7893>`_
+
+* Set up `type_checked` tag for internal type hint migration (#7886)
+  `PR #7886 <https://github.com/pantsbuild/pants/pull/7886>`_
+
 1.18.0.dev0 (6/10/2019)
 -----------------------
 
