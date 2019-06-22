@@ -4,7 +4,7 @@
 import errno
 import hashlib
 import os
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from builtins import object, open
 from collections import namedtuple
 
@@ -13,7 +13,6 @@ from pants.build_graph.target import Target
 from pants.fs.fs import safe_filename
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir
-from pants.util.meta import AbstractClass
 
 
 # Bump this to invalidate all existing keys in artifact caches across all pants deployments in the
@@ -65,7 +64,7 @@ class CacheKey(namedtuple('CacheKey', ['id', 'hash'])):
     return self.hash != self._UNCACHEABLE_HASH
 
 
-class CacheKeyGeneratorInterface(AbstractClass):
+class CacheKeyGeneratorInterface(ABC):
   """Generates cache keys for versions of target sets."""
 
   @abstractmethod

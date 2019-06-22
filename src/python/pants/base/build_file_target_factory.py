@@ -1,12 +1,10 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from abc import abstractproperty
-
-from pants.util.meta import AbstractClass
+from abc import ABC, abstractproperty
 
 
-class BuildFileTargetFactory(AbstractClass):
+class BuildFileTargetFactory(ABC):
   """An object that can hydrate target types from BUILD files."""
 
   @abstractproperty

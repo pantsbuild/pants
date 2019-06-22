@@ -4,7 +4,7 @@
 import os
 import shutil
 import tempfile
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from builtins import bytes, object, open
 from contextlib import contextmanager
 
@@ -22,7 +22,6 @@ from pants.java.jar.manifest import Manifest
 from pants.java.util import relativize_classpath
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdtemp
-from pants.util.meta import AbstractClass
 
 
 class Jar(object):
@@ -38,7 +37,7 @@ class Jar(object):
   class Error(Exception):
     """Indicates an error creating or updating a jar on disk."""
 
-  class Entry(AbstractClass):
+  class Entry(ABC):
     """An entry to be written to a jar."""
 
     def __init__(self, dest):
@@ -360,7 +359,7 @@ class JarTask(NailgunTask):
 
 class JarBuilderTask(JarTask):
 
-  class JarBuilder(AbstractClass):
+  class JarBuilder(ABC):
     """A utility to aid in adding the classes and resources associated with targets to a jar.
 
     :API: public

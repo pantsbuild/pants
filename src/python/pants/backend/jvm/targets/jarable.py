@@ -1,13 +1,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from abc import abstractproperty
+from abc import ABC, abstractproperty
 
 from pants.java.jar.jar_dependency import JarDependency
-from pants.util.meta import AbstractClass
 
 
-class Jarable(AbstractClass):
+class Jarable(ABC):
   """A mixin that identifies a target as one that can provide a jar.
 
   :API: public

@@ -4,14 +4,13 @@
 import os
 import re
 import shutil
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 from pants.base.build_environment import get_buildroot
 from pants.util.dirutil import safe_mkdir
-from pants.util.meta import AbstractClass
 
 
-class NodeResolverBase(AbstractClass):
+class NodeResolverBase(ABC):
 
   file_regex = re.compile('^file:(.*)$')
 

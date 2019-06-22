@@ -1,7 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from abc import abstractmethod
+from abc import ABCMeta, abstractmethod
 from builtins import str
 
 from future.utils import string_types
@@ -9,11 +9,11 @@ from future.utils import string_types
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.target import Target
 from pants.util.memo import memoized_property
-from pants.util.meta import AbstractClass, classproperty
+from pants.util.meta import classproperty
 from pants.util.objects import TypeConstraintError
 
 
-class ImportRemoteSourcesMixin(Target, AbstractClass):
+class ImportRemoteSourcesMixin(Target, metaclass=ABCMeta):
   """A Target Mixin to be used when a target declares another target type to be imported."""
 
   class ExpectedAddressError(AddressLookupError):

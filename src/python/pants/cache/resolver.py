@@ -3,19 +3,18 @@
 
 import json
 import logging
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from builtins import object, str
 
 import requests
 
 from pants.base.validation import assert_list
-from pants.util.meta import AbstractClass
 
 
 logger = logging.getLogger(__name__)
 
 
-class Resolver(AbstractClass):
+class Resolver(ABC):
   """An abstract class base for resolving service urls.
 
   :API: public

@@ -1,16 +1,17 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from abc import ABCMeta
+
 from pants.backend.native.subsystems.native_build_step import ToolchainVariant
 from pants.backend.native.targets.native_artifact import NativeArtifact
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField, PrimitivesSetField
 from pants.build_graph.target import Target
-from pants.util.meta import AbstractClass
 
 
-class NativeLibrary(Target, AbstractClass):
+class NativeLibrary(Target, metaclass=ABCMeta):
   """A class wrapping targets containing sources for C-family languages and related code."""
 
   # TODO: replace this awkward classmethod with a mixin!

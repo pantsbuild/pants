@@ -116,6 +116,5 @@ python_library(
   dependencies = [
     'src/python/pants/base:build_environment',
     'src/python/pants/scm',
-    'src/python/pants/util:meta',
   ],
 )

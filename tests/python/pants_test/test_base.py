@@ -6,6 +6,7 @@ import logging
 import os
 import unittest
 import warnings
+from abc import ABC, ABCMeta, abstractmethod
 from builtins import object, open, str
 from collections import defaultdict
 from contextlib import contextmanager
@@ -37,17 +38,18 @@ from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import (recursive_dirname, relative_symlink, safe_file_dump, safe_mkdir,
                                 safe_mkdtemp, safe_open, safe_rmtree)
 from pants.util.memo import memoized_method
-from pants.util.meta import AbstractClass, classproperty
+from pants.util.meta import classproperty
 from pants_test.base.context_utils import create_context_from_options
 from pants_test.engine.util import init_native
 from pants_test.option.util.fakes import create_options_for_optionables
 from pants_test.subsystem import subsystem_util
 
 
-class TestGenerator(object):
+class AbstractTestGenerator(ABC):
   """A mixin that facilitates test generation at runtime."""
 
   @classmethod
+  @abstractmethod
   def generate_tests(cls):
     """Generate tests for a given class.
 
@@ -59,9 +61,6 @@ class TestGenerator(object):
       ThingTest.generate_tests()
 
     """
-    # This would be an @abstractmethod, but making TestGenerator extend AbstractClass causes an
-    # error as it gets instantiated directly somehow in testing.
-    raise NotImplementedError()
 
   @classmethod
   def add_test(cls, method_name, method):
@@ -78,7 +77,7 @@ class TestGenerator(object):
     setattr(cls, method_name, method)
 
 
-class TestBase(unittest.TestCase, AbstractClass):
+class TestBase(unittest.TestCase, metaclass=ABCMeta):
   """A baseclass useful for tests requiring a temporary buildroot.
 
   :API: public

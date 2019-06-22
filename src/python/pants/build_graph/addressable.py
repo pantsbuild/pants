@@ -2,11 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.build_graph.address import BuildFileAddress
-from pants.util.meta import AbstractClass
 
 
 class AddressableCallProxy(BuildFileTargetFactory):
@@ -48,7 +47,7 @@ class AddressableCallProxy(BuildFileTargetFactory):
             .format(self._addressable_factory, self._build_file))
 
 
-class Addressable(AbstractClass):
+class Addressable(ABC):
   """An ABC for classes which would like instances to be named and exported from BUILD files."""
 
   class Factory(BuildFileTargetFactory):

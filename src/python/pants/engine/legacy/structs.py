@@ -3,7 +3,7 @@
 
 import logging
 import os.path
-from abc import abstractproperty
+from abc import ABCMeta, abstractproperty
 from builtins import object, str
 
 from six import string_types
@@ -17,7 +17,7 @@ from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
 from pants.util.collections_abc_backport import MutableSequence, MutableSet
 from pants.util.contextutil import exception_logging
-from pants.util.meta import AbstractClass, classproperty
+from pants.util.meta import classproperty
 from pants.util.objects import Exactly, SubclassesOf, datatype
 
 
@@ -296,7 +296,7 @@ class PantsPluginAdaptor(PythonTargetAdaptor):
     return GlobsWithConjunction.for_literal_files(['register.py'], self.address.spec_path)
 
 
-class BaseGlobs(Locatable, AbstractClass):
+class BaseGlobs(Locatable, metaclass=ABCMeta):
   """An adaptor class to allow BUILD file parsing from ContextAwareObjectFactories."""
 
   @staticmethod

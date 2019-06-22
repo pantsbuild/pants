@@ -6,7 +6,7 @@ import itertools
 import logging
 import os
 import xml.etree.ElementTree as ET
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from builtins import map, next, object, open
 from collections import defaultdict
 from functools import total_ordering
@@ -14,7 +14,6 @@ from functools import total_ordering
 from pants.base.mustache import MustacheRenderer
 from pants.util.dirutil import safe_mkdir_for, safe_walk
 from pants.util.memo import memoized_property
-from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
@@ -170,7 +169,7 @@ class ReportTestCase(datatype(['name', 'time', 'failure', 'error', 'skipped'])):
     return d
 
 
-class JUnitHtmlReportInterface(AbstractClass):
+class JUnitHtmlReportInterface(ABC):
   """The interface JUnit html reporters must support."""
 
   @abstractmethod

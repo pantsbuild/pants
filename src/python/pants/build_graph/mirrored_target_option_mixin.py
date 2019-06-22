@@ -1,12 +1,11 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from abc import abstractproperty
+from abc import ABC, abstractproperty
 
 from future.utils import text_type
 
 from pants.util.memo import memoized_property
-from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
@@ -52,7 +51,7 @@ class MirroredTargetOptionDeclaration(datatype([
     return self.option_value
 
 
-class MirroredTargetOptionMixin(AbstractClass):
+class MirroredTargetOptionMixin(ABC):
   """Get option values which may be set in this subsystem or in a Target's keyword argument.
 
   A subsystem or task mixing in this class may set e.g.:

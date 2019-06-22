@@ -3,20 +3,19 @@
 
 import logging
 import os
-from abc import abstractmethod, abstractproperty
+from abc import ABC, abstractmethod, abstractproperty
 
 from pathspec.pathspec import PathSpec
 from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 
 from pants.util.dirutil import fast_relpath
-from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
 logger = logging.getLogger(__name__)
 
 
-class ProjectTree(AbstractClass):
+class ProjectTree(ABC):
   """Represents project tree which is used to locate and read build files.
   Has two implementations: one backed by file system and one backed by SCM.
   """
@@ -194,7 +193,7 @@ class ProjectTree(AbstractClass):
     return relpath
 
 
-class Stat(AbstractClass):
+class Stat(ABC):
   """An existing filesystem path with a known type, relative to the ProjectTree's buildroot.
 
   Note that in order to preserve these invariants, end-user functions should never directly

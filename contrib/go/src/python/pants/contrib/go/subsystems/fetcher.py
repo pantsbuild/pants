@@ -2,11 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections import namedtuple
 
 from pants.scm.git import Git
-from pants.util.meta import AbstractClass
 
 from pants.contrib.go.subsystems.fetch_error import FetchError
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
@@ -15,7 +14,7 @@ from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
 logger = logging.getLogger(__name__)
 
 
-class Fetcher(AbstractClass):
+class Fetcher(ABC):
   """Knows how to interpret remote import paths and fetch code to satisfy them."""
 
   def __init__(self, import_path):

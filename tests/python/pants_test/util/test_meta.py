@@ -1,16 +1,16 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from abc import abstractmethod, abstractproperty
+from abc import ABC, abstractmethod, abstractproperty
 from builtins import object
 
-from pants.util.meta import AbstractClass, Singleton, classproperty, staticproperty
+from pants.util.meta import Singleton, classproperty, staticproperty
 from pants_test.test_base import TestBase
 
 
 class AbstractClassTest(TestBase):
   def test_abstract_property(self):
-    class AbstractProperty(AbstractClass):
+    class AbstractProperty(ABC):
       @abstractproperty
       def property(self):
         pass
@@ -19,7 +19,7 @@ class AbstractClassTest(TestBase):
       AbstractProperty()
 
   def test_abstract_method(self):
-    class AbstractMethod(AbstractClass):
+    class AbstractMethod(ABC):
       @abstractmethod
       def method(self):
         pass
@@ -210,7 +210,7 @@ class ClassPropertyTest(TestBase):
     self.assertFalse(hasattr(DeleteValue, 'static_property'))
 
   def test_abstract_classproperty(self):
-    class Abstract(AbstractClass):
+    class Abstract(ABC):
       @classproperty
       @abstractproperty
       def f(cls):

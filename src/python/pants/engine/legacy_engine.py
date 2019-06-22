@@ -1,14 +1,13 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from builtins import str
 
 from pants.base.exceptions import TaskError
-from pants.util.meta import AbstractClass
 
 
-class Engine(AbstractClass):
+class Engine(ABC):
   """An engine for running a pants command line."""
 
   def execute(self, context, goals):

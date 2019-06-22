@@ -18,7 +18,6 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/goal',
-    'src/python/pants/util:meta',
   ],
 )
 
@@ -56,7 +55,6 @@ python_library(
     ':selectors',
     'src/python/pants/base:project_tree',
     'src/python/pants/option',
-    'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ]
 )
@@ -135,7 +133,6 @@ python_library(
   sources=['objects.py'],
   dependencies=[
     '3rdparty/python:future',
-    'src/python/pants/util:meta',
     'src/python/pants/util:memo',
     'src/python/pants/util:objects',
   ]
@@ -174,7 +171,6 @@ python_library(
   dependencies=[
     '3rdparty/python:future',
     '3rdparty/python:six',
-    'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ]
 )

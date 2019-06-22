@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from abc import abstractmethod, abstractproperty
+from abc import ABC, abstractmethod, abstractproperty
 from builtins import open
 from hashlib import sha1
 
@@ -13,10 +13,9 @@ from pants.base.build_environment import get_buildroot
 from pants.engine.fs import EMPTY_SNAPSHOT
 from pants.util.dirutil import fast_relpath, fast_relpath_optional
 from pants.util.memo import memoized_property
-from pants.util.meta import AbstractClass
 
 
-class FilesetWithSpec(AbstractClass):
+class FilesetWithSpec(ABC):
   """A set of files that keeps track of how we got it."""
 
   @staticmethod
@@ -149,7 +148,7 @@ class LazyFilesetWithSpec(FilesetWithSpec):
     return any(path_from_buildroot == path_in_spec for path_in_spec in self.paths_from_buildroot_iter())
 
 
-class FilesetRelPathWrapper(AbstractClass):
+class FilesetRelPathWrapper(ABC):
   KNOWN_PARAMETERS = frozenset({'exclude', 'follow_links'})
 
   @abstractproperty

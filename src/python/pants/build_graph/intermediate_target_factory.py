@@ -1,6 +1,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from abc import ABC
 from builtins import str
 from hashlib import sha1
 
@@ -8,7 +9,6 @@ from future.utils import PY3, string_types
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
-from pants.util.meta import AbstractClass
 
 
 def hash_target(address, suffix):
@@ -18,7 +18,7 @@ def hash_target(address, suffix):
   return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
 
-class IntermediateTargetFactoryBase(AbstractClass):
+class IntermediateTargetFactoryBase(ABC):
   """Convenience factory which constructs an intermediate target with the appropriate attributes."""
 
   class ExpectedAddressError(TargetDefinitionException):

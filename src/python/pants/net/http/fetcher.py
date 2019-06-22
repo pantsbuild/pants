@@ -7,7 +7,7 @@ import re
 import sys
 import tempfile
 import time
-from abc import abstractmethod, abstractproperty
+from abc import ABC, abstractmethod, abstractproperty
 from builtins import object, open, str
 from contextlib import closing, contextmanager
 
@@ -16,7 +16,6 @@ import six
 from future.utils import PY3
 
 from pants.util.dirutil import safe_open
-from pants.util.meta import AbstractClass
 from pants.util.strutil import strip_prefix
 
 
@@ -207,7 +206,7 @@ class Fetcher(object):
     self._root_dir = root_dir
     self._requests = requests_api or requests
 
-  class _Response(AbstractClass):
+  class _Response(ABC):
     """Abstracts a fetch response."""
 
     @abstractproperty

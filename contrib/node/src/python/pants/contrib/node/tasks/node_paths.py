@@ -1,13 +1,13 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.util.meta import AbstractClass
+from abc import ABC
 
 
 # TODO(John Sirois): UnionProducts? That seems broken though for ranged version constraints,
 # which npm has and are widely used in the community.  For now stay dumb simple (and slow) and
 # resolve each node_module individually.
-class NodePathsBase(AbstractClass):
+class NodePathsBase(ABC):
   """Maps NpmPackage targets to their resolved NODE_PATH."""
 
   def __init__(self):

@@ -3,13 +3,13 @@
 
 import functools
 import re
-from abc import abstractproperty
+from abc import ABC, ABCMeta, abstractproperty
 from builtins import str
 
 from pants.engine.selectors import Get
 from pants.option.errors import OptionsError
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo
-from pants.util.meta import AbstractClass, classproperty
+from pants.util.meta import classproperty
 
 
 def _construct_optionable(optionable_factory):
@@ -18,7 +18,7 @@ def _construct_optionable(optionable_factory):
   yield optionable_factory.optionable_cls(scope, scoped_options.options)
 
 
-class OptionableFactory(AbstractClass):
+class OptionableFactory(ABC):
   """A mixin that provides a method that returns an @rule to construct subclasses of Optionable.
 
   Optionable subclasses constructed in this manner must have a particular constructor shape, which is
@@ -51,7 +51,7 @@ class OptionableFactory(AbstractClass):
       )
 
 
-class Optionable(OptionableFactory, AbstractClass):
+class Optionable(OptionableFactory, metaclass=ABCMeta):
   """A mixin for classes that can register options on some scope."""
 
   # Subclasses must override.

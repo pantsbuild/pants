@@ -1,12 +1,10 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from abc import abstractmethod, abstractproperty
-
-from pants.util.meta import AbstractClass
+from abc import ABC, abstractmethod, abstractproperty
 
 
-class Scm(AbstractClass):
+class Scm(ABC):
   """Abstracts high-level scm operations needed by pants core and pants tasks.
 
   :API: public

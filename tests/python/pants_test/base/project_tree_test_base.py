@@ -4,13 +4,12 @@
 import os
 import shutil
 import tempfile
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 from pants.util.dirutil import safe_mkdir, touch
-from pants.util.meta import AbstractClass
 
 
-class ProjectTreeTestBase(AbstractClass):
+class ProjectTreeTestBase(ABC):
 
   @abstractmethod
   def mk_project_tree(self, build_root, ignore_patterns=[]):

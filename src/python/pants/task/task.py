@@ -3,7 +3,7 @@
 
 import os
 import sys
-from abc import abstractmethod
+from abc import ABCMeta, abstractmethod
 from builtins import filter, map, object, set, str, zip
 from contextlib import contextmanager
 from hashlib import sha1
@@ -27,10 +27,10 @@ from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.dirutil import safe_mkdir, safe_rm_oldest_items_in_dir
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.meta import AbstractClass, classproperty
+from pants.util.meta import classproperty
 
 
-class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
+class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
   """Defines a lifecycle that prepares a task for execution and provides the base machinery
   needed to execute it.
 

@@ -2,10 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from builtins import object
-
-from pants.util.meta import AbstractClass
 
 
 logger = logging.getLogger(__name__)
@@ -25,7 +23,7 @@ class DefaultFingerprintHashingMixin(object):
     return type(self) == type(other)
 
 
-class FingerprintStrategy(AbstractClass):
+class FingerprintStrategy(ABC):
   """A helper object for doing per-task, finer grained invalidation of Targets."""
 
   @abstractmethod

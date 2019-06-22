@@ -6,7 +6,7 @@ import logging
 import os
 import pkgutil
 import plistlib
-from abc import abstractproperty
+from abc import ABC, abstractproperty
 from builtins import object, open, str
 from collections import namedtuple
 from contextlib import contextmanager
@@ -19,7 +19,6 @@ from pants.java.util import execute_java, execute_java_async
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.meta import AbstractClass
 from pants.util.osutil import OS_ALIASES, normalize_os_name
 from pants.util.process_handler import subprocess
 
@@ -280,7 +279,7 @@ class Distribution(object):
             self._bin_path, self._minimum_version, self._maximum_version, self._jdk))
 
 
-class _DistributionEnvironment(AbstractClass):
+class _DistributionEnvironment(ABC):
   class Location(namedtuple('Location', ['home_path', 'bin_path'])):
     """Represents the location of a java distribution."""
 

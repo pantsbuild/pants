@@ -4,7 +4,7 @@
 import logging
 import os
 import re
-from abc import abstractmethod
+from abc import ABCMeta, abstractmethod
 
 from future.utils import text_type
 from twitter.common.dirutil.fileset import fnmatch_translate_extended
@@ -12,7 +12,7 @@ from twitter.common.dirutil.fileset import fnmatch_translate_extended
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.task.task import Task
-from pants.util.meta import AbstractClass, classproperty
+from pants.util.meta import classproperty
 from pants.util.objects import datatype
 
 
@@ -28,7 +28,7 @@ class UnpackedArchives(datatype([('found_files', tuple), ('rel_unpack_dir', text
       text_type(rel_unpack_dir))
 
 
-class UnpackRemoteSourcesBase(Task, AbstractClass):
+class UnpackRemoteSourcesBase(Task, metaclass=ABCMeta):
 
   @property
   def cache_target_dirs(cls):

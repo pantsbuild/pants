@@ -3,18 +3,17 @@
 
 import os
 import re
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from builtins import str
 
 from pants.util.collections import assert_single_element
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
 from pants.util.filtering import create_filters, wrap_filters
 from pants.util.memo import memoized_property
-from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
-class Spec(AbstractClass):
+class Spec(ABC):
   """Represents address selectors as passed from the command line.
 
   Supports `Single` target addresses as well as `Sibling` (:) and `Descendant` (::) selector forms.

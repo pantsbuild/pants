@@ -3,14 +3,13 @@
 
 import inspect
 import sys
-from abc import abstractmethod, abstractproperty
+from abc import ABC, abstractmethod, abstractproperty
 from builtins import object
 from collections import namedtuple
 
 from future.utils import PY2
 
 from pants.util.memo import memoized_classmethod
-from pants.util.meta import AbstractClass
 from pants.util.objects import Exactly, TypedCollection, datatype
 
 
@@ -19,7 +18,7 @@ class SerializationError(Exception):
 
 
 # TODO: Likely no longer necessary, due to the laziness of the product graph.
-class Resolvable(AbstractClass):
+class Resolvable(ABC):
   """Represents a resolvable object."""
 
   @abstractproperty
@@ -36,7 +35,7 @@ def _unpickle_serializable(serializable_class, kwargs):
   return serializable_class(**kwargs)
 
 
-class Locatable(AbstractClass):
+class Locatable(ABC):
   """Marks a class whose constructor should receive its spec_path relative to the build root.
 
   Locatable objects will be passed a `spec_path` constructor kwarg that indicates where they
@@ -61,7 +60,7 @@ class SerializablePickle(namedtuple('CustomPickle', ['unpickle_func', 'args'])):
                args=(type(serializable_instance), serializable_instance._asdict()))
 
 
-class Serializable(AbstractClass):
+class Serializable(ABC):
   """Marks a class that can be serialized into and reconstituted from python builtin values.
 
   Also provides support for the pickling protocol out of the box.
@@ -115,7 +114,7 @@ class Serializable(AbstractClass):
     return SerializablePickle.create(self)
 
 
-class SerializableFactory(AbstractClass):
+class SerializableFactory(ABC):
   """Creates :class:`Serializable` objects."""
 
   @abstractmethod
@@ -140,7 +139,7 @@ class ValidationError(Exception):
                                           .format(id=identifier, msg=message))
 
 
-class Validatable(AbstractClass):
+class Validatable(ABC):
   """Marks a class whose instances should validated post-construction."""
 
   @abstractmethod

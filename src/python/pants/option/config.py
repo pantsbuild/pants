@@ -5,6 +5,7 @@ import getpass
 import io
 import itertools
 import os
+from abc import ABC
 from builtins import open
 from contextlib import contextmanager
 from hashlib import sha1
@@ -14,12 +15,11 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
 from pants.util.eval import parse_expression
-from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 from pants.util.py2_compat import configparser
 
 
-class Config(AbstractClass):
+class Config(ABC):
   """Encapsulates ini-style config file loading and access.
 
   Supports recursive variable substitution using standard python format strings. E.g.,

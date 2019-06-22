@@ -46,6 +46,5 @@ python_library(
   dependencies=[
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:meta',
   ]
 )
