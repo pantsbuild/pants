@@ -28,7 +28,7 @@ case class Settings(
   _sources: Seq[File]               = Seq.empty,
   classpath: Seq[File]              = Seq.empty,
   _classesDirectory: Option[File]   = None,
-  _postCompileMergeDir: Option[File]   = None,
+  _postCompileMergeDir: Option[File] = None,
   outputJar: Option[File]           = None,
   scala: ScalaLocation              = ScalaLocation(),
   scalacOptions: Seq[String]        = Seq.empty,
