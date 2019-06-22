@@ -84,7 +84,6 @@ python_tests(
     ':pantsd_integration_test_base',
     'tests/python/pants_test:int-test',
     'tests/python/pants_test/testutils:process_test_util',
-    'tests/python/pants_test/testutils:py2_compat',
   ],
   tags = {'integration'},
   timeout = 900

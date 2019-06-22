@@ -54,13 +54,3 @@ python_library(
     ':git_util'
   ,]
 )
-
-python_library(
-  name = 'py2_compat',
-  sources = [
-    'py2_compat.py',
-  ],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
-)

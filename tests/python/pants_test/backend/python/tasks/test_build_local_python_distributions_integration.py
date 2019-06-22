@@ -10,7 +10,6 @@ from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.process_handler import subprocess
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.testutils.py2_compat import assertRegex
 
 
 class BuildLocalPythonDistributionsIntegrationTest(PantsRunIntegrationTest):
@@ -47,8 +46,8 @@ United States
       self._assert_nation_and_greeting(output)
       # Check that we have exactly one wheel output.
       single_wheel_output = assert_single_element(glob.glob(os.path.join(tmp_dir, '*.whl')))
-      assertRegex(self, os.path.basename(single_wheel_output),
-                  r'\A{}'.format(re.escape('hello_with_install_requires-1.0.0+')))
+      self.assertRegex(os.path.basename(single_wheel_output),
+                       r'\A{}'.format(re.escape('hello_with_install_requires-1.0.0+')))
 
   def test_pydist_run(self):
     with temporary_dir() as tmp_dir:

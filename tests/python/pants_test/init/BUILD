@@ -26,7 +26,6 @@ python_tests(
     'src/python/pants/util:objects',
     'tests/python/pants_test:test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test/testutils:py2_compat',
   ],
   coverage = ['pants.init'],
 )
