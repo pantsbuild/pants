@@ -291,6 +291,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     if not extra_resources:
       return EMPTY_DIRECTORY_DIGEST
 
+    safe_mkdir(compile_context.post_compile_merge_dir)
     for filename, filecontent in extra_resources.items():
       safe_file_dump(os.path.join(compile_context.post_compile_merge_dir, filename), filecontent)
     snapshot, = self.context._scheduler.capture_snapshots([
