@@ -5,7 +5,6 @@ python_tests(
   name = 'build_file_manipulator',
   sources = ['test_build_file_manipulator.py'],
   dependencies = [
-    '3rdparty/python:future',
     'contrib/buildgen/src/python/pants/contrib/buildgen:build_file_manipulator',
     'src/python/pants/base:build_file',
     'src/python/pants/base:project_tree',

@@ -3,7 +3,6 @@
 
 import json
 import re
-from builtins import object, str
 from collections import namedtuple
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel

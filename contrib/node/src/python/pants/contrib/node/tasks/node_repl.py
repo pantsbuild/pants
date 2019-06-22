@@ -3,7 +3,6 @@
 
 import json
 import os
-from builtins import open
 
 from future.utils import PY3
 from pants.base.exceptions import TaskError

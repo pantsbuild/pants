@@ -4,7 +4,6 @@
 import copy
 import os
 import unittest
-from builtins import open
 
 from pants.util.dirutil import safe_mkdtemp
 from pants_test.option.util.fakes import create_options

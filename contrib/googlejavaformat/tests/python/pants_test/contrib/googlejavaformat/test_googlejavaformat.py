@@ -1,7 +1,6 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from builtins import open
 from textwrap import dedent
 
 from pants.backend.jvm.register import build_file_aliases as register_jvm

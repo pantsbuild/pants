@@ -5,7 +5,6 @@ import ast
 import logging
 import re
 import sys
-from builtins import object, open, str
 from difflib import unified_diff
 
 from pants.build_graph.address import Address, BuildFileAddress

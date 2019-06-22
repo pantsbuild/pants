@@ -3,7 +3,6 @@
 
 import os
 import re
-from builtins import open
 
 from pants.backend.codegen.thrift.lib.thrift import Thrift
 from pants.base.build_environment import get_buildroot

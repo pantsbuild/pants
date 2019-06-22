@@ -4,7 +4,6 @@
 import json
 import os
 import string
-from builtins import open, zip
 from textwrap import dedent
 
 from future.utils import PY3

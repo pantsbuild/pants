@@ -1,7 +1,6 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from builtins import str
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.build_graph.target_scopes import Scope

@@ -3,7 +3,6 @@
 
 import os
 import re
-from builtins import open, str
 
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.java_library import JavaLibrary

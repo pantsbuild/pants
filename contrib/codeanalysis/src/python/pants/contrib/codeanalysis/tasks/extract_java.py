@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from builtins import next
 
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin

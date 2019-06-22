@@ -3,7 +3,6 @@
 
 import os
 import re
-from builtins import open
 
 
 INCLUDE_PARSER = re.compile(r'^\s*include\s+"([^"]+)"\s*([\/\/|\#].*)*$')
