@@ -1,6 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import configparser
 import itertools
 import json
 import os
@@ -32,7 +33,6 @@ from pants.util.dirutil import mergetree, safe_mkdir, safe_mkdir_for
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.objects import datatype
 from pants.util.process_handler import SubprocessProcessHandler
-from pants.util.py2_compat import configparser
 from pants.util.strutil import safe_shlex_join, safe_shlex_split
 from pants.util.xml_parser import XmlParser
 

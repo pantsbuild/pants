@@ -1,6 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import configparser
 import functools
 import os
 from contextlib import contextmanager
@@ -19,7 +20,6 @@ from pants.build_graph.target import Target
 from pants.source.source_root import SourceRootConfig
 from pants.util.contextutil import pushd, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
-from pants.util.py2_compat import configparser
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.task_test_base import DeclarativeTaskTestMixin, ensure_cached

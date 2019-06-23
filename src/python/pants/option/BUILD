@@ -16,7 +16,6 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
     'src/python/pants/util:objects',
-    'src/python/pants/util:py2_compat',
     'src/python/pants/util:strutil',
   ]
 )

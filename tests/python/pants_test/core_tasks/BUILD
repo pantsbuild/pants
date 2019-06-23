@@ -32,7 +32,6 @@ python_tests(
     'src/python/pants/base:exceptions',
     'src/python/pants/core_tasks',
     'tests/python/pants_test:task_test_base',
-    '3rdparty/python:configparser',
   ],
 )
 

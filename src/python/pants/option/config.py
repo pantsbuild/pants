@@ -1,6 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import configparser
 import getpass
 import io
 import itertools
@@ -15,7 +16,6 @@ from twitter.common.collections import OrderedSet
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
 from pants.util.eval import parse_expression
 from pants.util.objects import datatype
-from pants.util.py2_compat import configparser
 
 
 class Config(ABC):

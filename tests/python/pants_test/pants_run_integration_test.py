@@ -1,6 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import configparser
 import glob
 import os
 import re
@@ -22,7 +23,6 @@ from pants.util.dirutil import fast_relpath, safe_mkdir, safe_mkdir_for, safe_op
 from pants.util.objects import Exactly, datatype, string_type
 from pants.util.osutil import IntegerForPid
 from pants.util.process_handler import SubprocessProcessHandler, subprocess
-from pants.util.py2_compat import configparser
 from pants.util.strutil import ensure_binary
 from pants_test.testutils.file_test_util import check_symlinks, contains_exact_files
 
