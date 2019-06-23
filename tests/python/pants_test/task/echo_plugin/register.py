@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from builtins import open
 
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task

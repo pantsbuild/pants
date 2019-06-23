@@ -5,7 +5,6 @@ import logging
 import os
 import sys
 import warnings
-from builtins import object
 
 from pants.base.exception_sink import ExceptionSink
 from pants.bin.remote_pants_runner import RemotePantsRunner

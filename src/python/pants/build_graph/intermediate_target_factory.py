@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABC
-from builtins import str
 from hashlib import sha1
 
 from future.utils import PY3, string_types

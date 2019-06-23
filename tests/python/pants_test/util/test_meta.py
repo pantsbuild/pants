@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABC, abstractmethod
-from builtins import object
 
 from pants.util.meta import Singleton, classproperty, staticproperty
 from pants_test.test_base import TestBase

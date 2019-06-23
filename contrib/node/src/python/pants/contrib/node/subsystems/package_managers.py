@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-from builtins import object
 
 from pants.contrib.node.subsystems.command import command_gen
 

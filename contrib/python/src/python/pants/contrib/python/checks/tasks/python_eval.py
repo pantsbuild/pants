@@ -4,7 +4,6 @@
 import hashlib
 import os
 import pkgutil
-from builtins import open, str
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.pex_build_util import (PexBuilderWrapper,

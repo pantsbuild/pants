@@ -3,7 +3,6 @@
 
 import json
 import os
-from builtins import open
 from textwrap import dedent
 
 from pants.util.contextutil import temporary_dir

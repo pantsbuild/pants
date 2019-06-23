@@ -4,7 +4,6 @@
 import re
 import sys
 import unittest
-from builtins import object, str
 from textwrap import dedent
 
 from pants.engine.build_files import create_graph_rules

@@ -3,7 +3,6 @@
 
 python_library(
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/backend/codegen/thrift/lib',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:exceptions',

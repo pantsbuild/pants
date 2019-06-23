@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import unittest
-from builtins import chr, object, str
 
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 

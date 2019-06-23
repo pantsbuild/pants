@@ -3,7 +3,6 @@
 
 import os
 import re
-from builtins import open
 from subprocess import PIPE, Popen
 from textwrap import dedent
 from zipfile import ZipFile

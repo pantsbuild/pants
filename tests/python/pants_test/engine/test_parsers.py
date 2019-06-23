@@ -3,7 +3,6 @@
 
 import json
 import unittest
-from builtins import object, str
 from textwrap import dedent
 
 from pants.engine import parser

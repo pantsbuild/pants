@@ -3,7 +3,6 @@
 
 import os
 import re
-from builtins import open, str
 
 from pants.backend.jvm import argfile
 from pants.backend.jvm.subsystems.shader import Shader

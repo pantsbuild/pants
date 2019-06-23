@@ -3,7 +3,6 @@
 
 import re
 from abc import ABC, abstractmethod
-from builtins import zip
 
 from future.utils import binary_type, text_type
 from twitter.common.collections import OrderedSet

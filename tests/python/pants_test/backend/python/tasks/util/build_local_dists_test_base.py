@@ -3,7 +3,6 @@
 
 import re
 from abc import abstractmethod
-from builtins import next, str
 
 from pants.backend.native.register import rules as native_backend_rules
 from pants.backend.native.subsystems.libc_dev import LibcDev

@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from builtins import str
 
 from pants.binaries.binary_tool import BinaryToolBase
 from pants.binaries.binary_util import (BinaryToolFetcher, BinaryToolUrlGenerator, BinaryUtil,

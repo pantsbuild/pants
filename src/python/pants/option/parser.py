@@ -6,7 +6,6 @@ import json
 import os
 import re
 import traceback
-from builtins import next, object, open, str
 from collections import defaultdict
 
 import Levenshtein

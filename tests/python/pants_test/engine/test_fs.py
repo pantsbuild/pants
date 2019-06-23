@@ -7,7 +7,6 @@ import os
 import tarfile
 import unittest
 from abc import ABCMeta
-from builtins import open, str
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler
 

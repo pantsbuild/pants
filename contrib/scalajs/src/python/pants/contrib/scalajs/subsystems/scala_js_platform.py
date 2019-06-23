@@ -4,7 +4,6 @@
 import json
 import os
 import shutil
-from builtins import open
 
 from future.utils import PY3
 from pants.build_graph.injectables_mixin import InjectablesMixin

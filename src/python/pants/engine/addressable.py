@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import inspect
-from builtins import object
 from functools import update_wrapper
 
 from future.utils import string_types

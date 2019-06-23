@@ -4,7 +4,6 @@
 import functools
 import re
 from abc import ABC, ABCMeta, abstractmethod
-from builtins import str
 
 from pants.engine.selectors import Get
 from pants.option.errors import OptionsError

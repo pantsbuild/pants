@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
-from builtins import object
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.config import Config

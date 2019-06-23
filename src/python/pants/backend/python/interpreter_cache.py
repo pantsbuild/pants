@@ -4,7 +4,6 @@
 import logging
 import os
 import shutil
-from builtins import str
 from collections import defaultdict
 from textwrap import dedent
 

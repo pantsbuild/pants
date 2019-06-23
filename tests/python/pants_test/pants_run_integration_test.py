@@ -6,7 +6,6 @@ import os
 import re
 import shutil
 import unittest
-from builtins import open
 from contextlib import contextmanager
 from operator import eq, ne
 from threading import Lock

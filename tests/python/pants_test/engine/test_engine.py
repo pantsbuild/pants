@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import unittest
-from builtins import object, str
 from textwrap import dedent
 
 from pants.engine.rules import RootRule, rule

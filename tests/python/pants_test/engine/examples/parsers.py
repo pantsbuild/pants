@@ -5,7 +5,6 @@ import functools
 import importlib
 import inspect
 import threading
-from builtins import str
 from json.decoder import JSONDecoder
 from json.encoder import JSONEncoder
 

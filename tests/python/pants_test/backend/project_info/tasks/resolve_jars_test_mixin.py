@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from builtins import object, open
 from textwrap import dedent
 
 from pants.util.contextutil import temporary_dir

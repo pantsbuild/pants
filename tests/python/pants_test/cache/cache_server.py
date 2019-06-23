@@ -5,7 +5,6 @@ import http.server
 import os
 import re
 import socketserver
-from builtins import object, open
 from contextlib import contextmanager
 from multiprocessing import Process, Queue
 

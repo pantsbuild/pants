@@ -3,7 +3,6 @@
 
 import sys
 import traceback
-from builtins import object
 from textwrap import dedent
 
 from pants.goal.goal import Goal

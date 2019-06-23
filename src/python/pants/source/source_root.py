@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from builtins import object, range
 from collections import namedtuple
 
 from pants.base.project_tree_factory import get_project_tree

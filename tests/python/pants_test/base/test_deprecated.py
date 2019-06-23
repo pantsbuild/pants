@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import warnings
-from builtins import object, str
 from contextlib import contextmanager
 
 import mock

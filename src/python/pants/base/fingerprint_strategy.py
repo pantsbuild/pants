@@ -3,7 +3,6 @@
 
 import logging
 from abc import ABC, abstractmethod
-from builtins import object
 
 
 logger = logging.getLogger(__name__)

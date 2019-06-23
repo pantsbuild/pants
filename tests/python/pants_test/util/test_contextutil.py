@@ -9,7 +9,6 @@ import sys
 import unittest
 import uuid
 import zipfile
-from builtins import next, object, range, str
 from contextlib import contextmanager
 
 import mock

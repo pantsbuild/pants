@@ -10,7 +10,6 @@ import sys
 import threading
 import time
 import unittest
-from builtins import open, range, zip
 from textwrap import dedent
 
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file

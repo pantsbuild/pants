@@ -3,7 +3,6 @@
 
 import os
 import unittest
-from builtins import open
 
 from pants.backend.jvm import argfile
 

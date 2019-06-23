@@ -5,7 +5,6 @@ import logging
 import os
 import sys
 from abc import ABC, abstractmethod
-from builtins import object
 from contextlib import contextmanager
 
 from six import string_types

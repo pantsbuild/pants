@@ -5,7 +5,6 @@ python_tests(
   name="testprojects_integration",
   sources=['test_testprojects_integration.py'],
   dependencies=[
-    '3rdparty/python:future',
     ':base',
     'src/python/pants/util:contextutil',
   ],

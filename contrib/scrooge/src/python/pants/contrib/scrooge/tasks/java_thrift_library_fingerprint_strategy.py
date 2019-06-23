@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import hashlib
-from builtins import str
 
 from future.utils import PY3
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary

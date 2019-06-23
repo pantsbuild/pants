@@ -3,7 +3,6 @@
 
 import os
 import re
-from builtins import open, str
 
 from pkg_resources import resource_string
 from pygments.formatters.html import HtmlFormatter

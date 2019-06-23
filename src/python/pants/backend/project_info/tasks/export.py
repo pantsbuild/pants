@@ -3,7 +3,6 @@
 
 import json
 import os
-from builtins import object, str
 from collections import defaultdict
 
 import six

@@ -3,7 +3,6 @@
 
 import os
 import shutil
-from builtins import open
 from collections import defaultdict
 
 from pants.base.exceptions import TaskError

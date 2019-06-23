@@ -3,7 +3,6 @@
 
 import ast
 import textwrap
-from builtins import map
 
 from pants_test.contrib.python.checks.checker.plugin_test_base import CheckstylePluginTestBase
 

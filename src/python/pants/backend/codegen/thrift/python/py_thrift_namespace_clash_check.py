@@ -3,7 +3,6 @@
 
 import os
 import re
-from builtins import str, zip
 
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
 from pants.base.exceptions import TaskError

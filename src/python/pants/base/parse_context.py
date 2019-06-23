@@ -3,7 +3,6 @@
 
 import functools
 import threading
-from builtins import object
 
 
 class Storage(threading.local):

@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABC, abstractmethod
-from builtins import object
 from hashlib import sha1
 
 from future.utils import PY3

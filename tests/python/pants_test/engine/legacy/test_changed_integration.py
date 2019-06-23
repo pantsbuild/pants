@@ -3,7 +3,6 @@
 
 import os
 import shutil
-from builtins import open, str
 from contextlib import contextmanager
 from textwrap import dedent
 

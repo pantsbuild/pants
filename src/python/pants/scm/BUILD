@@ -12,7 +12,6 @@ python_library(
   name = 'git',
   sources = ['git.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':scm',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:memo',

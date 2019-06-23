@@ -4,7 +4,6 @@
 import os
 import re
 import tempfile
-from builtins import next, open
 from collections import defaultdict, namedtuple
 
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary

@@ -4,7 +4,6 @@
 import glob
 import os
 from abc import abstractmethod
-from builtins import object
 from contextlib import closing, contextmanager
 from io import BytesIO
 

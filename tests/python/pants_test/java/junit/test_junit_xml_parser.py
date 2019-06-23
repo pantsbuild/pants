@@ -3,7 +3,6 @@
 
 import os
 import unittest
-from builtins import object, open
 
 # NB: The Test -> JUnitTest import re-name above is needed to work around conflicts with pytest test
 # collection and a conflicting Test type in scope during that process.

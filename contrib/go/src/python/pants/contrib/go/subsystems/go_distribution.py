@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from builtins import str
 from collections import namedtuple
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel

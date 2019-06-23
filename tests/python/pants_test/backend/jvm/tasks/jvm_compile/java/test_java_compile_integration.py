@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from builtins import open
 
 from pants.fs.archive import archiver_for_path
 from pants.util.contextutil import temporary_dir

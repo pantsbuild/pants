@@ -6,7 +6,6 @@ import json
 import os
 import re
 import shutil
-from builtins import object, open, range
 from datetime import datetime
 
 from pystache import Renderer

@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABC, abstractmethod
-from builtins import str
 
 from pants.base.exceptions import TaskError
 

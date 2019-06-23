@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
-from builtins import filter, map, object, str
 from collections import defaultdict, namedtuple
 from hashlib import sha1
 

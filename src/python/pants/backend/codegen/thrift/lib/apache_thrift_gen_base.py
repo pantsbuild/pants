@@ -4,7 +4,6 @@
 import os
 import re
 import shutil
-from builtins import open
 
 from twitter.common.collections import OrderedSet
 

@@ -1,7 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from builtins import object
 from collections import defaultdict, namedtuple
 
 from pants.backend.jvm.targets.import_jars_mixin import ImportJarsMixin

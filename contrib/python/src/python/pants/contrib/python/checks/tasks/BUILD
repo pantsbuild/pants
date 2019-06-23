@@ -3,7 +3,6 @@
 
 python_library(
   dependencies=[
-    '3rdparty/python:future',
     '3rdparty/python:pex',
     ':resources',
     'src/python/pants/backend/python/subsystems',

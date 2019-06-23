@@ -4,7 +4,6 @@
 import logging
 import sys
 import traceback
-from builtins import object
 
 from future.utils import PY3
 

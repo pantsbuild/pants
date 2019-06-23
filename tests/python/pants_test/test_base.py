@@ -7,7 +7,6 @@ import os
 import unittest
 import warnings
 from abc import ABC, ABCMeta, abstractmethod
-from builtins import object, open, str
 from collections import defaultdict
 from contextlib import contextmanager
 from tempfile import mkdtemp

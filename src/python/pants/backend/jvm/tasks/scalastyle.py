@@ -3,7 +3,6 @@
 
 import os
 import re
-from builtins import object, open, str
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask

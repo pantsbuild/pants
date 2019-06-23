@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import copy
-from builtins import object
 
 from pants.option.ranked_value import RankedValue
 

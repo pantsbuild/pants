@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import json
-from builtins import filter, str
 
 from colors import black, blue, cyan, green, magenta, red, white
 from packaging.version import Version

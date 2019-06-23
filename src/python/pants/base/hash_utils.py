@@ -4,7 +4,6 @@
 import hashlib
 import json
 import logging
-from builtins import bytes, object, open, str
 
 from future.utils import PY3, binary_type, text_type
 from twitter.common.collections import OrderedSet

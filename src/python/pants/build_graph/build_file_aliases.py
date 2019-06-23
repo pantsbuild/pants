@@ -3,7 +3,6 @@
 
 import inspect
 from abc import abstractmethod
-from builtins import object
 from collections import defaultdict
 
 import six

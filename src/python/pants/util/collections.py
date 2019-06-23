@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import collections
-from builtins import next
 
 
 def combined_dict(*dicts):

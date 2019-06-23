@@ -3,7 +3,6 @@
 
 import hashlib
 import os
-from builtins import open
 
 from future.utils import PY3
 from pex.executor import Executor

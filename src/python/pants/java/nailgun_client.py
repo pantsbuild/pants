@@ -8,7 +8,6 @@ import signal
 import socket
 import sys
 import time
-from builtins import object, str
 
 import psutil
 from future.utils import PY3

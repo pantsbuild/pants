@@ -3,7 +3,6 @@
 
 import functools
 import os
-from builtins import open
 from contextlib import contextmanager
 from textwrap import dedent
 

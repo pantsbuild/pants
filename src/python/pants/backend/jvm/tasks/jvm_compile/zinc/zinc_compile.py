@@ -6,7 +6,6 @@ import logging
 import os
 import re
 import textwrap
-from builtins import open
 from collections import defaultdict
 from contextlib import closing
 from xml.etree import ElementTree

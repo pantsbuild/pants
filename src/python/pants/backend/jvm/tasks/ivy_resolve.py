@@ -4,7 +4,6 @@
 import os
 import shutil
 import time
-from builtins import open
 from textwrap import dedent
 
 from pants.backend.jvm.ivy_utils import IvyUtils

@@ -4,7 +4,6 @@
 python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:future',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/subsystems:jvm_tool_mixin',

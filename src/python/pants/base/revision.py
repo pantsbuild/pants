@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
-from builtins import map, object, str
 from functools import total_ordering
 
 from future.moves.itertools import zip_longest

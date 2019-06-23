@@ -3,7 +3,6 @@
 
 import os
 import unittest
-from builtins import open
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot

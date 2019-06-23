@@ -1,7 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from builtins import str
 
 from pants.backend.codegen.thrift.python.py_thrift_namespace_clash_check import \
   PyThriftNamespaceClashCheck

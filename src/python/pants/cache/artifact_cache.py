@@ -4,7 +4,6 @@
 import logging
 import os
 import sys
-from builtins import object
 
 
 # Note throughout the distinction between the artifact_root (which is where the artifacts are

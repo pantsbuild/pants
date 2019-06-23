@@ -3,7 +3,6 @@
 
 import os
 import re
-from builtins import bytes, object, str
 
 from pants.option.errors import ParseError
 from pants.util.eval import parse_expression

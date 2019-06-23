@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import zipfile
-from builtins import object
 from contextlib import contextmanager
 
 from pants.util.contextutil import open_zip

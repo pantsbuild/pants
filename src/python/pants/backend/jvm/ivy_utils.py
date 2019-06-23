@@ -8,7 +8,6 @@ import pkgutil
 import threading
 import xml.etree.ElementTree as ET
 from abc import abstractmethod
-from builtins import object, open, str
 from collections import defaultdict, namedtuple
 from functools import total_ordering
 

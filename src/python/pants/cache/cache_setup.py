@@ -3,7 +3,6 @@
 
 import os
 import threading
-from builtins import object, range, str
 from collections import namedtuple
 
 from future.moves.urllib.parse import urlparse

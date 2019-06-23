@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import abstractmethod
-from builtins import filter
 
 from pants.backend.native.config.environment import CppToolchain, CToolchain
 from pants.backend.native.subsystems.native_build_settings import NativeBuildSettings

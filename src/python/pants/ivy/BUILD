@@ -3,7 +3,6 @@
 
 python_library(
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
     'src/python/pants/base:build_environment',

@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import unittest
-from builtins import open
 
 from pants.base.run_info import RunInfo
 from pants.util.contextutil import temporary_file_path

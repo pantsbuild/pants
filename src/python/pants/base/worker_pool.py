@@ -3,7 +3,6 @@
 
 import multiprocessing
 import threading
-from builtins import next, object
 from multiprocessing.pool import ThreadPool
 
 from future.moves import _thread

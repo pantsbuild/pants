@@ -5,7 +5,6 @@ import itertools
 import logging
 import weakref
 from abc import ABC, abstractmethod
-from builtins import filter, object
 from collections import defaultdict, deque
 
 from twitter.common.collections import OrderedSet

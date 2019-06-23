@@ -3,7 +3,6 @@
 
 import functools
 import os
-from builtins import str
 
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro

@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-from builtins import object, str
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink

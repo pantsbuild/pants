@@ -8,7 +8,6 @@ import posixpath
 import shutil
 import sys
 from abc import abstractmethod
-from builtins import object
 from contextlib import contextmanager
 from functools import reduce
 

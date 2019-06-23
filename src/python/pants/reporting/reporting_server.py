@@ -9,7 +9,6 @@ import mimetypes
 import os
 import pkgutil
 import re
-from builtins import bytes, object, open, range, str, zip
 from collections import namedtuple
 from datetime import date, datetime
 from textwrap import dedent

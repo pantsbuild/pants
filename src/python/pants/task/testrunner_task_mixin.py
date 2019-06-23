@@ -7,7 +7,6 @@ import re
 import shutil
 import xml.etree.ElementTree as ET
 from abc import abstractmethod
-from builtins import filter, next, object, str
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot

@@ -3,7 +3,6 @@
 
 import os
 import re
-from builtins import range
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE

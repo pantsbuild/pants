@@ -16,7 +16,6 @@ python_tests(
   name = 'artifact_cache',
   sources = ['test_artifact_cache.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':cache_server',
     'src/python/pants/cache',
     'src/python/pants/invalidation',
@@ -30,7 +29,6 @@ python_tests(
   name = 'cache_setup',
   sources = ['test_cache_setup.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:mock',
     'src/python/pants/cache',
     'src/python/pants/option',
@@ -59,7 +57,6 @@ python_tests(
   name = 'caching_dereference_symlinks',
   sources = ['test_caching_tarball_deference.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/task:task',
     'src/python/pants/cache:cache',
     'src/python/pants/util:dirutil',
@@ -71,7 +68,6 @@ python_library(
   name = 'cache_server',
   sources = ['cache_server.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/testutils:file_test_util',
@@ -105,7 +101,6 @@ python_tests(
   name = 'cache_cleanup_integration',
   sources = ['test_cache_cleanup_integration.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:contextutil',

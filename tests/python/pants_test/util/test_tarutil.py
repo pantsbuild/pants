@@ -4,7 +4,6 @@
 import os
 import tarfile
 import unittest
-from builtins import open
 
 from pants.util.dirutil import safe_delete, safe_mkdtemp, safe_rmtree, touch
 from pants.util.tarutil import TarFile

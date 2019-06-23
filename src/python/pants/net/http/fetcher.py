@@ -8,7 +8,6 @@ import sys
 import tempfile
 import time
 from abc import ABC, abstractmethod
-from builtins import object, open, str
 from contextlib import closing, contextmanager
 
 import requests

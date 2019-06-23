@@ -3,7 +3,6 @@
 
 import re
 import unittest
-from builtins import object, str
 from collections import defaultdict
 
 from future.utils import PY3

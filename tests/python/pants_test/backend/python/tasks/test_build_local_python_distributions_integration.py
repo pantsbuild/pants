@@ -4,7 +4,6 @@
 import glob
 import os
 import re
-from builtins import open
 
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir

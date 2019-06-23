@@ -4,7 +4,6 @@
 import http.server
 import json
 import threading
-from builtins import open
 
 from future.moves.urllib.parse import parse_qs
 

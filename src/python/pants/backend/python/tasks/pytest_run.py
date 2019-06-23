@@ -8,7 +8,6 @@ import shutil
 import time
 import traceback
 import uuid
-from builtins import open, str
 from contextlib import contextmanager
 from io import StringIO
 from textwrap import dedent

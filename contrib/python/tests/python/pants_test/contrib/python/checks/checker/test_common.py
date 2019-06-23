@@ -4,7 +4,6 @@
 import ast
 import textwrap
 import unittest
-from builtins import range, str
 
 from pants_test.option.util.fakes import create_options
 

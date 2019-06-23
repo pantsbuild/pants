@@ -15,7 +15,6 @@ python_tests(
   name='go_distribution',
   sources=['test_go_distribution.py'],
   dependencies=[
-    '3rdparty/python:future',
     'contrib/go/src/python/pants/contrib/go/subsystems',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:process_handler',

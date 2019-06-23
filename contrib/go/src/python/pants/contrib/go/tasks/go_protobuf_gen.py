@@ -3,7 +3,6 @@
 
 import os
 import re
-from builtins import open
 
 from pants.backend.codegen.protobuf.subsystems.protoc import Protoc
 from pants.base.build_environment import get_buildroot

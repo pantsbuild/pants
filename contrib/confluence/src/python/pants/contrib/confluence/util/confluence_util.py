@@ -4,7 +4,6 @@
 import getpass
 import logging
 import mimetypes
-from builtins import object, open, str
 from os.path import basename
 from xmlrpc.client import Binary
 from xmlrpc.client import Error as XMLRPCError

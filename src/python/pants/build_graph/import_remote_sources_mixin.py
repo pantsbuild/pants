@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABCMeta, abstractmethod
-from builtins import str
 
 from future.utils import string_types
 

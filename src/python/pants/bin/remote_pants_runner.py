@@ -4,7 +4,6 @@
 import logging
 import sys
 import time
-from builtins import object, str
 from contextlib import contextmanager
 
 from future.utils import PY3, raise_with_traceback

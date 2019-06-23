@@ -5,7 +5,6 @@ import os
 import shutil
 import tempfile
 import unittest
-from builtins import open, str
 from multiprocessing import Manager, Process
 from threading import Thread
 

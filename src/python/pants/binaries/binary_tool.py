@@ -4,7 +4,6 @@
 import logging
 import os
 import threading
-from builtins import str
 
 from future.utils import text_type
 

@@ -4,7 +4,6 @@
 import signal
 import socket
 import unittest
-from builtins import object
 
 import mock
 

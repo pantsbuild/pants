@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from builtins import open
 from glob import glob1
 
 from pants.base.project_tree import Dir, File, Link, ProjectTree

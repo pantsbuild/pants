@@ -3,7 +3,6 @@
 
 import os
 import threading
-from builtins import open
 from collections import namedtuple
 
 

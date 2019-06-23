@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from builtins import map
 from textwrap import dedent
 
 from pex import pep425tags

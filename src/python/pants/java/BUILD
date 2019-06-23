@@ -5,7 +5,6 @@ python_library(
   name = 'executor',
   sources = ['executor.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
     'src/python/pants/base:build_environment',
@@ -32,7 +31,6 @@ python_library(
   name = 'nailgun_io',
   sources = ['nailgun_io.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:contextlib2',
     ':nailgun_protocol'
   ]
@@ -42,7 +40,6 @@ python_library(
   name = 'nailgun_protocol',
   sources = ['nailgun_protocol.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:six',
     'src/python/pants/util:objects',
     'src/python/pants/util:osutil',

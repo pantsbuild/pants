@@ -4,7 +4,6 @@
 import os
 import sys
 from abc import ABCMeta, abstractmethod
-from builtins import filter, map, object, set, str, zip
 from contextlib import contextmanager
 from hashlib import sha1
 from itertools import repeat

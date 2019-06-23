@@ -5,7 +5,6 @@ import importlib
 import locale
 import os
 import warnings
-from builtins import object
 from textwrap import dedent
 
 

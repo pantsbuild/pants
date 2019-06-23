@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import unittest
-from builtins import bytes
 
 from pants.util.strutil import camelcase, ensure_binary, ensure_text, pluralize, strip_prefix
 

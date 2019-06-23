@@ -6,7 +6,6 @@ import os
 import random
 import stat
 import unittest
-from builtins import open
 
 from mock import mock
 

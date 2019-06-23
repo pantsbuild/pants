@@ -9,7 +9,6 @@ import signal
 import sys
 import threading
 import traceback
-from builtins import object, str
 from contextlib import contextmanager
 
 import setproctitle

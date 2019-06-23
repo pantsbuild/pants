@@ -3,7 +3,6 @@
 
 import threading
 import time
-from builtins import bytes, object, str
 
 
 class ReportingError(Exception):

@@ -3,7 +3,6 @@
 
 import os
 import re
-from builtins import open
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.exceptions import TaskError

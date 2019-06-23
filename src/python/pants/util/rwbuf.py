@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import threading
-from builtins import bytes, object, open, str
 from io import BytesIO
 
 

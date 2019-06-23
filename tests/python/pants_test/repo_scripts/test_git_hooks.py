@@ -4,7 +4,6 @@
 import datetime
 import os
 import unittest
-from builtins import str
 from contextlib import contextmanager
 from textwrap import dedent
 

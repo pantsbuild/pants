@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import unittest
-from builtins import object
 
 from pants.util.memo import (memoized, memoized_classmethod, memoized_classproperty,
                              memoized_method, memoized_property, memoized_staticmethod,

@@ -4,7 +4,6 @@
 import os
 import sys
 from abc import ABC
-from builtins import object
 from collections import namedtuple
 
 from twitter.common.collections import OrderedSet

@@ -4,7 +4,6 @@
 import os
 import tempfile
 import unittest
-from builtins import open
 
 from pants.backend.jvm.subsystems.shader import RelocateRule, Shader, Shading
 from pants.java.distribution.distribution import DistributionLocator

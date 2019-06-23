@@ -8,7 +8,6 @@ import re
 import sys
 import sysconfig
 import traceback
-from builtins import bytes, object, open, str
 from contextlib import closing
 
 import cffi

@@ -9,7 +9,6 @@ import hashlib
 import os
 import re
 import zipfile
-from builtins import open, str
 
 from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import read_file, safe_file_dump

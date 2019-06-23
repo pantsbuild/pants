@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
-from builtins import str
 
 from pants.backend.graph_info.tasks.target_filter_task_mixin import TargetFilterTaskMixin
 from pants.base.build_environment import get_buildroot

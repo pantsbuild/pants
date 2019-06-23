@@ -5,7 +5,6 @@ import queue
 import sys
 import threading
 import traceback
-from builtins import map, object, str
 from collections import defaultdict, deque
 from heapq import heappop, heappush
 

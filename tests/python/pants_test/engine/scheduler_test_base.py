@@ -3,7 +3,6 @@
 
 import os
 import shutil
-from builtins import object
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.nodes import Throw
