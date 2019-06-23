@@ -13,7 +13,7 @@ from coverage.python import PythonFileReporter
 
 class SimpleFileTracer(FileTracer):
   def __init__(self, filename):
-    super().__init__()
+    super(SimpleFileTracer, self).__init__()
     self._filename = filename
 
   def source_filename(self):
@@ -22,7 +22,7 @@ class SimpleFileTracer(FileTracer):
 
 class SimpleFileReporter(PythonFileReporter):
   def __init__(self, morf, relpath):
-    super().__init__(morf, coverage=None)
+    super(SimpleFileReporter, self).__init__(morf, coverage=None)
     self._relpath = relpath
 
   def relative_filename(self):
@@ -48,7 +48,7 @@ class ChrootRemappingPlugin(CoveragePlugin):
   """A plugin that knows how to map Pants PEX chroots back to repo source code when reporting."""
 
   def __init__(self, buildroot, src_chroot_path, src_to_target_base):
-    super().__init__()
+    super(ChrootRemappingPlugin, self).__init__()
     self._buildroot = buildroot
     self._src_chroot_path = src_chroot_path
     self._src_to_target_base = src_to_target_base
