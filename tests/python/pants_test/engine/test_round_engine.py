@@ -65,7 +65,7 @@ class RoundEngineTest(EngineTestBase, TestBase):
         self.actions.append(self.prepare_action(tag))
 
       def __init__(me, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super(RecordingTask, me).__init__(*args, **kwargs)
         self.actions.append(self.construct_action(tag))
 
       def execute(me):
@@ -81,8 +81,7 @@ class RoundEngineTest(EngineTestBase, TestBase):
     """
     task_type = self.record(name, product_types, required_data, optional_data,
                             alternate_target_roots)
-    return super(RoundEngineTest,
-                 self).install_task(name=name, action=task_type, goal=goal).task_types()
+    return super().install_task(name=name, action=task_type, goal=goal).task_types()
 
   def create_context(self, for_task_types=None, target_roots=None):
     self._context = self.context(for_task_types=for_task_types, target_roots=target_roots)
@@ -220,7 +219,7 @@ class RoundEngineTest(EngineTestBase, TestBase):
     class MyTask(Task):
       pass
     def install():
-      reg = super().install_task(name='task1', action=MyTask, goal='goal1')
+      reg = super(RoundEngineTest, self).install_task(name='task1', action=MyTask, goal='goal1')
       return reg.task_types()
     task1_pre, = install()
     Goal.clear()
