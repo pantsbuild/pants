@@ -12,7 +12,7 @@ from contextlib2 import ExitStack
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 
 
-class Pipe(object):
+class Pipe:
   """
   Wrapper around OS pipes, that knows whether its write end is closed.
 
@@ -123,7 +123,7 @@ class NailgunStreamStdinReader(_StoppableDaemonThread):
     :param file write_handle: A file-like (usually the write end of a pipe/pty) onto which
       to write data decoded from the chunks.
     """
-    super(NailgunStreamStdinReader, self).__init__(name=self.__class__.__name__)
+    super().__init__(name=self.__class__.__name__)
     self._maybe_shutdown_socket = maybe_shutdown_socket
     self._write_handle = write_handle
 
@@ -191,7 +191,7 @@ class NailgunStreamWriter(_StoppableDaemonThread):
     :param int buf_size: the buffer size for reads from the file descriptor.
     :param int select_timeout: the timeout (in seconds) for select.select() calls against the fd.
     """
-    super(NailgunStreamWriter, self).__init__(name=self.__class__.__name__)
+    super().__init__(name=self.__class__.__name__)
     # Validates that we've received file descriptor numbers.
     self._in_fds = [int(f) for f in in_fds]
     self._socket = sock
@@ -256,7 +256,7 @@ class PipedNailgunStreamWriter(NailgunStreamWriter):
   def __init__(self, pipes, socket, chunk_type, *args, **kwargs):
     self._pipes = pipes
     in_fds = tuple(pipe.read_fd for pipe in pipes)
-    super(PipedNailgunStreamWriter, self).__init__(in_fds, socket, chunk_type, *args, **kwargs)
+    super().__init__(in_fds, socket, chunk_type, *args, **kwargs)
 
   def do_run(self, readable_fds, errored_fds):
     """
@@ -275,7 +275,7 @@ class PipedNailgunStreamWriter(NailgunStreamWriter):
           self._pipes.remove(pipe)
     if not self._pipes:
       self.stop()
-    super(PipedNailgunStreamWriter, self).do_run(readable_fds, errored_fds)
+    super().do_run(readable_fds, errored_fds)
 
   @classmethod
   @contextmanager

@@ -31,7 +31,7 @@ from pants.util.memo import memoized_method, memoized_property
 _ZINC_COMPILER_VERSION = '0.0.13'
 
 
-class Zinc(object):
+class Zinc:
   """Configuration for Pants' zinc wrapper tool."""
 
   ZINC_COMPILE_MAIN = 'org.pantsbuild.zinc.compiler.Main'

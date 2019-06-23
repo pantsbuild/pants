@@ -13,7 +13,7 @@ from pants_test.test_base import TestBase
 class TarballArtifactTest(TestBase):
 
   def setUp(self):
-    super(TarballArtifactTest, self).setUp()
+    super().setUp()
     # Init engine because decompression now goes through native code.
     self._init_engine()
     TarballArtifact.NATIVE_BINARY = self._scheduler._scheduler._native

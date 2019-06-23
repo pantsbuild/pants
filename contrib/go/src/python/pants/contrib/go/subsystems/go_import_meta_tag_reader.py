@@ -19,7 +19,7 @@ class GoImportMetaTagReader(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(GoImportMetaTagReader, cls).register_options(register)
+    super().register_options(register)
     register('--retries', type=int, default=1, advanced=True,
              help='How many times to retry when fetching meta tags.')
 

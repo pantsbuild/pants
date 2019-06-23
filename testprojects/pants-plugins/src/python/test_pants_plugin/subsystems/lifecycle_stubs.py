@@ -12,7 +12,7 @@ class LifecycleStubs(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(LifecycleStubs, cls).register_options(register)
+    super().register_options(register)
     register('--add-exiter-message', type=str, default=None,
              help='Add a message which displays to stderr on fatal exit.')
     register('--new-interactive-stream-output-file', type=file_option, default=None,

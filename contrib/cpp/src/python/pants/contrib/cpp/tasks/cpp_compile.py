@@ -15,7 +15,7 @@ class CppCompile(CppTask):
 
   @classmethod
   def register_options(cls, register):
-    super(CppCompile, cls).register_options(register)
+    super().register_options(register)
     register('--cc-options', advanced=True, type=list, default=[], fingerprint=True,
              help='Append these options to the compiler command line.')
     register('--cc-extensions', advanced=True, type=list, fingerprint=True,

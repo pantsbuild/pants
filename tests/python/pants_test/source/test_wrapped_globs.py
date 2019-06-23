@@ -20,7 +20,7 @@ class DummyTarget(Target):
     payload.add_fields({
       'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
     })
-    super(DummyTarget, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
 
 class FilesetRelPathWrapperTest(TestBase):
@@ -38,7 +38,7 @@ class FilesetRelPathWrapperTest(TestBase):
     )
 
   def setUp(self):
-    super(FilesetRelPathWrapperTest, self).setUp()
+    super().setUp()
     self.create_file('y/morx.java')
     self.create_file('y/fleem.java')
     self.create_file('z/w/foo.java')

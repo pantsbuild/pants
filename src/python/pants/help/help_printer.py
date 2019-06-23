@@ -12,7 +12,7 @@ from pants.option.arg_splitter import (GLOBAL_SCOPE, GoalsHelp, NoGoalHelp, Opti
 from pants.option.scope import ScopeInfo
 
 
-class HelpPrinter(object):
+class HelpPrinter:
   """Prints help to the console."""
 
   def __init__(self, options):

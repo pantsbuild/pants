@@ -18,7 +18,7 @@ class Login(ConsoleTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(Login, cls).subsystem_dependencies() + (BasicAuth,)
+    return super().subsystem_dependencies() + (BasicAuth,)
 
   @classmethod
   def supports_passthru_args(cls):
@@ -26,7 +26,7 @@ class Login(ConsoleTask):
 
   @classmethod
   def register_options(cls, register):
-    super(Login, cls).register_options(register)
+    super().register_options(register)
     register('--to', fingerprint=True,
              help='Log in to this provider.  Can also be specified as a passthru arg.')
 

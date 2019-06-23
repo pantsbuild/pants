@@ -29,7 +29,7 @@ class Storage(threading.local):
     return obj
 
 
-class ParseContext(object):
+class ParseContext:
   """The build file context that context aware objects - aka BUILD macros - operate against.
 
   All fields of the ParseContext must be assumed to be mutable by macros, and should

@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 logger = logging.getLogger(__name__)
 
 
-class DefaultFingerprintHashingMixin(object):
+class DefaultFingerprintHashingMixin:
   """Default definitions for __hash__ and __eq__.
 
   Warning: Don't use this when the mixed in class has instance attributes mixed into its

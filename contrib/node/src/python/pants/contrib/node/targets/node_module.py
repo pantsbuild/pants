@@ -78,7 +78,7 @@ class NodeModule(NodePackage):
       'bin_executables': PrimitiveField(bin_executables),
       'node_scope': PrimitiveField(node_scope),
     })
-    super(NodeModule, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   @property
   def style_ignore_path(self):

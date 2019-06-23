@@ -54,7 +54,7 @@ class PythonTarget(Target):
       'provides': provides,
       'compatibility': PrimitiveField(maybe_list(compatibility or ())),
     })
-    super(PythonTarget, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
     if provides and not isinstance(provides, PythonArtifact):
       raise TargetDefinitionException(self,
@@ -72,7 +72,7 @@ class PythonTarget(Target):
 
   @classmethod
   def compute_injectable_specs(cls, kwargs=None, payload=None):
-    for spec in super(PythonTarget, cls).compute_injectable_specs(kwargs, payload):
+    for spec in super().compute_injectable_specs(kwargs, payload):
       yield spec
 
     target_representation = kwargs or payload.as_dict()
@@ -103,6 +103,6 @@ class PythonTarget(Target):
     return [dep for dep in self.dependencies if isinstance(dep, Resources)]
 
   def walk(self, work, predicate=None):
-    super(PythonTarget, self).walk(work, predicate)
+    super().walk(work, predicate)
     for binary in self.provided_binaries.values():
       binary.walk(work, predicate)

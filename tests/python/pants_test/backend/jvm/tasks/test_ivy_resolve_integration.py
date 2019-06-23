@@ -17,7 +17,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
     config.update(
       {'resolver': {'resolver': 'ivy'}}
     )
-    return super(IvyResolveIntegrationTest, self).run_pants(
+    return super().run_pants(
       command,
       config,
       stdin_data,
@@ -34,7 +34,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
     config.update(
       {'resolver': {'resolver': 'ivy'}}
     )
-    return super(IvyResolveIntegrationTest, self).run_pants_with_workdir(
+    return super().run_pants_with_workdir(
       command,
       workdir,
       config,

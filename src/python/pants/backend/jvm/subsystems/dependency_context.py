@@ -36,7 +36,7 @@ class DependencyContext(Subsystem, DependencyContextBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(DependencyContext, cls).subsystem_dependencies() + (Java, ScalaPlatform)
+    return super().subsystem_dependencies() + (Java, ScalaPlatform)
 
   def all_dependencies(self, target):
     """All transitive dependencies of the context's target."""
@@ -77,7 +77,7 @@ class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
   """Task fingerprint strategy that also includes the resolved coordinates of dependent jars."""
 
   def __init__(self, classpath_products, dep_context):
-    super(ResolvedJarAwareFingerprintStrategy, self).__init__()
+    super().__init__()
     self._classpath_products = classpath_products
     self._dep_context = dep_context
 
@@ -106,7 +106,7 @@ class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
   def dependencies(self, target):
     if self.direct(target):
       return target.strict_dependencies(self._dep_context)
-    return super(ResolvedJarAwareFingerprintStrategy, self).dependencies(target)
+    return super().dependencies(target)
 
   def __hash__(self):
     # NB: FingerprintStrategy requires a useful override of eq/hash.

@@ -22,7 +22,7 @@ from pants.util.osutil import IntegerForPid
 logger = logging.getLogger(__name__)
 
 
-class SignalHandler(object):
+class SignalHandler:
   """A specification for how to handle a fixed set of nonfatal signals.
 
   This is subclassed and registered with ExceptionSink.reset_signal_handler() whenever the signal
@@ -98,7 +98,7 @@ class SignalHandler(object):
     raise self.SignalHandledNonLocalExit(signum, 'SIGTERM')
 
 
-class ExceptionSink(object):
+class ExceptionSink:
   """A mutable singleton object representing where exceptions should be logged to."""
 
   # NB: see the bottom of this file where we call reset_log_location() and other mutators in order

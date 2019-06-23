@@ -25,7 +25,7 @@ class PythonRequirementLibrary(Target):
     payload.add_fields({
       'requirements': PythonRequirementsField(requirements or []),
     })
-    super(PythonRequirementLibrary, self).__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, **kwargs)
 
   @property
   def requirements(self):

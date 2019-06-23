@@ -17,7 +17,7 @@ class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
 
   @classmethod
   def register_options(cls, register):
-    super(PythonRepl, cls).register_options(register)
+    super().register_options(register)
     # TODO: Create a python equivalent of register_jvm_tool, and use that instead of these
     # ad-hoc options.
     register('--ipython', type=bool,

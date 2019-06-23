@@ -23,7 +23,7 @@ class ExplainOptionsTask(ConsoleTask):
 
   @classmethod
   def register_options(cls, register):
-    super(ExplainOptionsTask, cls).register_options(register)
+    super().register_options(register)
     register('--scope', help='Only show options in this scope. Use GLOBAL for global scope.')
     register('--name', help='Only show options with this name.')
     register('--rank', choices=RankedValue.get_names(),

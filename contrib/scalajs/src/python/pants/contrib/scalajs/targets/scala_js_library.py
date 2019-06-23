@@ -26,4 +26,4 @@ class ScalaJSLibrary(ScalaJSTarget, Target):
                                            sources_rel_path=address.spec_path,
                                            key_arg='sources'),
     })
-    super(ScalaJSLibrary, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)

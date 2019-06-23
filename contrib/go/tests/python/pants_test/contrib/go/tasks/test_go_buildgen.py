@@ -23,7 +23,7 @@ class FakeFetcher(Fetcher):
     raise AssertionError('No fetches should be executed during go.buildgen')
 
 
-class FakeFetcherFactory(object):
+class FakeFetcherFactory:
   def get_fetcher(self, import_path):
     return FakeFetcher(import_path)
 
@@ -35,7 +35,7 @@ class GoBuildgenTest(TaskTestBase):
     return GoBuildgen
 
   def create_task(self, context, workdir=None):
-    task = super(GoBuildgenTest, self).create_task(context, workdir)
+    task = super().create_task(context, workdir)
     task.get_fetcher_factory = types.MethodType(lambda s: FakeFetcherFactory(), task)
     return task
 

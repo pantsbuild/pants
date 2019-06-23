@@ -23,7 +23,7 @@ def banner(message):
 
 
 @total_ordering
-class Package(object):
+class Package:
 
   def __init__(self, name, target, bdist_wheel_flags=None):
     self.name = name
@@ -37,7 +37,7 @@ class Package(object):
     return self.name == other.name
 
   def __hash__(self):
-    return super(Package, self).__hash__()
+    return super().__hash__()
 
   def __str__(self):
     return self.name

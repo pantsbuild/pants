@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class TestExcluder(TestBase):
 
   def setUp(self):
-    super(TestExcluder, self).setUp()
+    super().setUp()
     excludes_text = textwrap.dedent("""
       # ignore C++
       .*\.cpp::.*

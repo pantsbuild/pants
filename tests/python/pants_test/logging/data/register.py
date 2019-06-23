@@ -15,7 +15,7 @@ class TestWorkUnitLabelTask(NailgunTask):
 
   @classmethod
   def register_options(cls, register):
-    super(TestWorkUnitLabelTask, cls).register_options(register)
+    super().register_options(register)
     register('--ignore-label', default=False, type=bool)
 
   def execute(self):

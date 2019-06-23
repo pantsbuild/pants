@@ -26,7 +26,7 @@ class ArtifactCacheStatsTest(TestBase):
   TEST_SPEC_C = 'src/java/c'
 
   def setUp(self):
-    super(ArtifactCacheStatsTest, self).setUp()
+    super().setUp()
 
     self.target_a = self.make_target(spec=self.TEST_SPEC_A)
     self.target_b = self.make_target(spec=self.TEST_SPEC_B)

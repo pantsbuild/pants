@@ -136,7 +136,7 @@ class ApacheThriftConfiguration(StructWithDeps):
   # dictionary entry.
 
   def __init__(self, name=None, version=None, strict=None, lang=None, options=None, **kwargs):
-    super(ApacheThriftConfiguration, self).__init__(name=name,
+    super().__init__(name=name,
                                                     version=version,
                                                     strict=strict,
                                                     lang=lang,
@@ -155,7 +155,7 @@ class PublishConfiguration(Struct):
   # An example of addressable and addressable_mapping field wrappers.
 
   def __init__(self, default_repo, repos, name=None, **kwargs):
-    super(PublishConfiguration, self).__init__(name=name, **kwargs)
+    super().__init__(name=name, **kwargs)
     self.default_repo = default_repo
     self.repos = repos
 

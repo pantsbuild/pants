@@ -17,7 +17,7 @@ from pants.task.task import Task
 from pants.util.memo import memoized_property
 
 
-class JvmPlatformAnalysisMixin(object):
+class JvmPlatformAnalysisMixin:
   """Mixin which provides common helper methods to JvmPlatformValidate and JvmPlatformExplain."""
 
   @classmethod
@@ -154,7 +154,7 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
 
   @classmethod
   def register_options(cls, register):
-    super(JvmPlatformValidate, cls).register_options(register)
+    super().register_options(register)
     register('--check', default='fatal', choices=['off', 'warn', 'fatal'], fingerprint=True,
              help='Check to make sure no jvm targets target an earlier jdk than their dependencies')
     register('--children-before-parents', type=bool,
@@ -163,7 +163,7 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
                   'target -> dependees.')
 
   def __init__(self, *args, **kwargs):
-    super(JvmPlatformValidate, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.check = self.get_options().check
     self.parents_before_children = not self.get_options().children_before_parents
 
@@ -267,7 +267,7 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
 
   @classmethod
   def register_options(cls, register):
-    super(JvmPlatformExplain, cls).register_options(register)
+    super().register_options(register)
     register('--ranges', type=bool, default=True,
              help='For each target, list the minimum and maximum possible jvm target level, based '
                   'on its dependencies and dependees, respectively.')
@@ -291,7 +291,7 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
              help='List transitive dependencies in analysis output.')
 
   def __init__(self, *args, **kwargs):
-    super(JvmPlatformExplain, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._explain_regex = (re.compile(self.get_options().filter) if self.get_options().filter
                            else None)
 

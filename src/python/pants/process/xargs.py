@@ -6,7 +6,7 @@ import errno
 from pants.util.process_handler import subprocess
 
 
-class Xargs(object):
+class Xargs:
   """A subprocess execution wrapper in the spirit of the xargs command line tool.
 
   Specifically allows encapsulated commands to be passed very large argument lists by chunking up

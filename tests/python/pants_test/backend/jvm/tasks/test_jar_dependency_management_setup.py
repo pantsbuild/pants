@@ -284,7 +284,7 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
       'jar_library': JarLibrary,
     }
 
-    class FakeContext(object):
+    class FakeContext:
       def create_object(fake, target_type, name, **kwargs):
         return self.make_target(target_type=target_aliases[target_type],
                                 spec='//foo:{}'.format(name), **kwargs)

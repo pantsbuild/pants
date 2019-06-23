@@ -47,7 +47,7 @@ class Reproducer(Subsystem):
     return Repro(path, buildroot, ignore)
 
 
-class Repro(object):
+class Repro:
   def __init__(self, path, buildroot, ignore):
     """Create a Repro instance.
 

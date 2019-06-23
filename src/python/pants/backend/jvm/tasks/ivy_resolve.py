@@ -24,11 +24,11 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(IvyResolve, cls).subsystem_dependencies() + (JvmResolveSubsystem,)
+    return super().subsystem_dependencies() + (JvmResolveSubsystem,)
 
   @classmethod
   def register_options(cls, register):
-    super(IvyResolve, cls).register_options(register)
+    super().register_options(register)
     register('--override', type=list,
              fingerprint=True,
              help='Specifies a jar dependency override in the form: '
@@ -64,14 +64,14 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(IvyResolve, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     # Codegen may inject extra resolvable deps, so make sure we have a product dependency
     # on relevant codegen tasks, if any.
     round_manager.optional_data('java')
     round_manager.optional_data('scala')
 
   def __init__(self, *args, **kwargs):
-    super(IvyResolve, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     self._outdir = self.get_options().outdir or os.path.join(self.workdir, 'reports')
     self._open = self.get_options().open

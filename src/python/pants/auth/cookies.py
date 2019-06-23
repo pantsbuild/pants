@@ -16,7 +16,7 @@ class Cookies(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(Cookies, cls).register_options(register)
+    super().register_options(register)
     register('--path', advanced=True, fingerprint=True,
              default=os.path.join(register.bootstrap.pants_bootstrapdir, 'auth', 'cookies'),
              help='Path to file that stores persistent cookies. '

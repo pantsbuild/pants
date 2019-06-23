@@ -21,7 +21,7 @@ class JUnit(JvmToolMixin, InjectablesMixin, Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(JUnit, cls).register_options(register)
+    super().register_options(register)
     cls.register_jvm_tool(register,
                           'junit_library',
                           classpath=[

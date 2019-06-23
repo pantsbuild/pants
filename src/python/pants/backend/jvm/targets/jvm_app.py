@@ -27,7 +27,7 @@ class JvmApp(AppBase):
     """
     payload = payload or Payload()
     payload.add_field('deployjar', PrimitiveField(deployjar))
-    super(JvmApp, self).__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, **kwargs)
 
   @classmethod
   def binary_target_type(cls):

@@ -9,7 +9,7 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
 
 
-class SourceRootCategories(object):
+class SourceRootCategories:
   UNKNOWN = 'unknown'
   SOURCE = 'source'
   TEST = 'test'
@@ -20,7 +20,7 @@ class SourceRootCategories(object):
 SourceRoot = namedtuple('_SourceRoot', ['path', 'langs', 'category'])
 
 
-class SourceRootFactory(object):
+class SourceRootFactory:
   """Creates source roots that respect language canonicalizations."""
 
   def __init__(self, lang_canonicalizations):
@@ -45,7 +45,7 @@ class SourceRootFactory(object):
     return SourceRoot(relpath, tuple(self._canonicalize_langs(langs)), category)
 
 
-class SourceRoots(object):
+class SourceRoots:
   """An interface for querying source roots."""
 
   def __init__(self, source_root_config):
@@ -200,7 +200,7 @@ class SourceRootConfig(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(SourceRootConfig, cls).register_options(register)
+    super().register_options(register)
     register('--unmatched', choices=['create', 'fail'], default='create', advanced=True,
              fingerprint=True,
              help='Configures the behavior when sources are defined outside of any configured '
@@ -266,7 +266,7 @@ class SourceRootConfig(Subsystem):
     return SourceRootFactory(self.get_options().lang_canonicalizations)
 
 
-class SourceRootTrie(object):
+class SourceRootTrie:
   """A trie for efficiently finding the source root for a path.
 
   Finds the first outermost pattern that matches. E.g., the pattern src/* will match
@@ -281,7 +281,7 @@ class SourceRootTrie(object):
       super(SourceRootTrie.InvalidPath, self).__init__(
         'Invalid source root path or pattern: {}. Reason: {}.'.format(path, reason))
 
-  class Node(object):
+  class Node:
     def __init__(self):
       self.children = {}
       self.langs = tuple()

@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-class Exclude(object):
+class Exclude:
   """Represents a dependency exclude pattern to filter transitive dependencies against.
 
   :API: public

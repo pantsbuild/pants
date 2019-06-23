@@ -8,7 +8,7 @@ from pants.fs.fs import safe_filename
 
 
 class SafeFilenameTest(unittest.TestCase):
-  class FixedDigest(object):
+  class FixedDigest:
     def __init__(self, size):
       self._size = size
 

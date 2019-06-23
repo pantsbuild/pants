@@ -42,7 +42,7 @@ class UnpackedJars(ImportJarsMixin, Target):
       'exclude_patterns' : PrimitiveField(exclude_patterns or ()),
       'intransitive': PrimitiveField(intransitive)
     })
-    super(UnpackedJars, self).__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, **kwargs)
 
     if not libraries:
       raise self.ExpectedLibrariesError('Expected non-empty libraries attribute for {spec}'

@@ -12,19 +12,19 @@ from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.engine.util import assert_equal_with_printing, remove_locations_from_traceback
 
 
-class A(object):
+class A:
   pass
 
 
-class B(object):
+class B:
   pass
 
 
-class C(object):
+class C:
   pass
 
 
-class D(object):
+class D:
   pass
 
 

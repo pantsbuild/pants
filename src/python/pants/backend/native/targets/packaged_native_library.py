@@ -40,7 +40,7 @@ class PackagedNativeLibrary(Target):
       'lib_relpath': PrimitiveField(lib_relpath),
       'native_lib_names': PrimitivesSetField(native_lib_names),
     })
-    super(PackagedNativeLibrary, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   @property
   def include_relpath(self):

@@ -22,7 +22,7 @@ class InvalidSpecConstraint(Exception):
   """Raised when invalid constraints are given via target specs and arguments like --changed*."""
 
 
-class TargetRootsCalculator(object):
+class TargetRootsCalculator:
   """Determines the target roots for a given pants run."""
 
   @classmethod

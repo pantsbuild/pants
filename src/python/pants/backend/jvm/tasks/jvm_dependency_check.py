@@ -25,7 +25,7 @@ class JvmDependencyCheck(Task):
 
   @classmethod
   def register_options(cls, register):
-    super(JvmDependencyCheck, cls).register_options(register)
+    super().register_options(register)
     register('--missing-direct-deps', choices=['off', 'warn', 'fatal'],
              default='off',
              fingerprint=True,
@@ -49,7 +49,7 @@ class JvmDependencyCheck(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JvmDependencyCheck, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       DependencyContext,
       DistributionLocator
     )
@@ -62,14 +62,14 @@ class JvmDependencyCheck(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JvmDependencyCheck, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     if not cls._skip(options):
       round_manager.require_data('product_deps_by_src')
       round_manager.require_data('runtime_classpath')
       round_manager.require_data('zinc_analysis')
 
   def __init__(self, *args, **kwargs):
-    super(JvmDependencyCheck, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     # Set up dep checking if needed.
     def munge_flag(flag):

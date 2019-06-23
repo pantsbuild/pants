@@ -10,7 +10,7 @@ from pants.fs.archive import ZIP
 from pants.util.contextutil import temporary_dir
 
 
-class JvmPlatformIntegrationMixin(object):
+class JvmPlatformIntegrationMixin:
   """Mixin providing lots of JvmPlatform-related integration tests to java compilers (eg, zinc)."""
 
   def get_pants_compile_args(self):

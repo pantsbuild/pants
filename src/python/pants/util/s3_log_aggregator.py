@@ -8,7 +8,7 @@ from collections import defaultdict
 from s3logparse.s3logparse import parse_log_lines
 
 
-class Measure(object):
+class Measure:
   def __init__(self, init_count=0, init_bytes=0):
     self.count = init_count
     self.bytes = init_bytes

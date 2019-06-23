@@ -23,7 +23,7 @@ class JvmTarget(Target, Jarable):
 
   @classmethod
   def subsystems(cls):
-    return super(JvmTarget, cls).subsystems() + (Java, JvmPlatform)
+    return super().subsystems() + (Java, JvmPlatform)
 
   def __init__(self,
                address=None,
@@ -107,7 +107,7 @@ class JvmTarget(Target, Jarable):
       'scalac_plugin_args': PrimitiveField(scalac_plugin_args),
     })
 
-    super(JvmTarget, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
     # Service info is only used when generating resources, it should not affect, for example, a
     # compile fingerprint or javadoc fingerprint.  As such, its not a payload field.

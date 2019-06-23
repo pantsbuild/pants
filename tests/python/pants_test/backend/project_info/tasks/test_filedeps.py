@@ -27,10 +27,10 @@ class FileDepsTest(ConsoleTaskTestBase, AbstractTestGenerator):
     if kwargs['options']['absolute']:
       paths = [os.path.join(self.build_root, path) for path in paths]
 
-    super(FileDepsTest, self).assert_console_output(*paths, **kwargs)
+    super().assert_console_output(*paths, **kwargs)
 
   def setUp(self):
-    super(FileDepsTest, self).setUp()
+    super().setUp()
     self.context(options={
       'scala': {
         'runtime': ['tools:scala-library']

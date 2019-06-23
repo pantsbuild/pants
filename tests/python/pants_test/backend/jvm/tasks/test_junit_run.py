@@ -38,7 +38,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
   @classmethod
   def alias_groups(cls):
-    return super(JUnitRunnerTest, cls).alias_groups().merge(BuildFileAliases(
+    return super().alias_groups().merge(BuildFileAliases(
       targets={
         'files': Files,
         'junit_tests': JUnitTests,
@@ -47,7 +47,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     ))
 
   def setUp(self):
-    super(JUnitRunnerTest, self).setUp()
+    super().setUp()
     init_subsystem(JUnit)
 
   @ensure_cached(JUnitRun, expected_num_artifacts=1)

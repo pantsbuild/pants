@@ -22,7 +22,7 @@ class TestResult(datatype([
 
 
 @union
-class TestTarget(object):
+class TestTarget:
   """A union for registration of a testable target type."""
 
   # Prevent this class from being detected by pytest as a test class.

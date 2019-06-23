@@ -25,7 +25,7 @@ class BaseLocalArtifactCache(ArtifactCache):
     :param str permissions: File permissions to use when creating artifact files.
     :param bool dereference: Dereference symlinks when creating the cache tarball.
     """
-    super(BaseLocalArtifactCache, self).__init__(artifact_root)
+    super().__init__(artifact_root)
     self._compression = compression
     self._cache_root = None
     self._permissions = permissions
@@ -101,7 +101,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
     :param str permissions: File permissions to use when creating artifact files.
     :param bool dereference: Dereference symlinks when creating the cache tarball.
     """
-    super(LocalArtifactCache, self).__init__(
+    super().__init__(
       artifact_root,
       compression,
       permissions=int(permissions.strip(), base=8) if permissions else None,
@@ -180,7 +180,7 @@ class TempLocalArtifactCache(BaseLocalArtifactCache):
     """
     :param str artifact_root: The path under which cacheable products will be read/written.
     """
-    super(TempLocalArtifactCache, self).__init__(artifact_root, compression=compression,
+    super().__init__(artifact_root, compression=compression,
                                                  permissions=permissions)
 
   def _store_tarball(self, cache_key, src):

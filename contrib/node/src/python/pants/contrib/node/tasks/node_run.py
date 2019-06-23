@@ -14,7 +14,7 @@ class NodeRun(NodeTask):
 
   @classmethod
   def register_options(cls, register):
-    super(NodeRun, cls).register_options(register)
+    super().register_options(register)
     register('--script-name', default='start',
              help='The script name to run.')
 

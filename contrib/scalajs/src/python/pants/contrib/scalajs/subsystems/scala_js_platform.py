@@ -21,7 +21,7 @@ class ScalaJSPlatform(InjectablesMixin, Subsystem, NodeResolverBase):
 
   @classmethod
   def register_options(cls, register):
-    super(ScalaJSPlatform, cls).register_options(register)
+    super().register_options(register)
     # TODO: revisit after https://rbcommons.com/s/twitter/r/3225/
     register('--runtime', advanced=True, type=list, member_type=target_option,
              default=['//:scala-js-library'],
@@ -29,7 +29,7 @@ class ScalaJSPlatform(InjectablesMixin, Subsystem, NodeResolverBase):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(ScalaJSPlatform, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data('scala_js_binaries')
 
   def resolve_target(self, node_task, target, results_dir, node_paths):

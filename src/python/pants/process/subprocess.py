@@ -5,7 +5,7 @@
 from pants.subsystem.subsystem import Subsystem
 
 
-class Subprocess(object):
+class Subprocess:
   """A subsystem for managing subprocess state."""
 
   class Factory(Subsystem):

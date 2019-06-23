@@ -45,7 +45,7 @@ class OptionsHelp(HelpRequest):
     :param advanced: Did the user ask for advanced help (e.g., using --help-advanced).
     :param all_scopes: Did the user ask for help for all goals and tasks (e.g., using --help-all).
     """
-    super(OptionsHelp, self).__init__()
+    super().__init__()
     self.advanced = advanced
     self.all_scopes = all_scopes
 
@@ -62,7 +62,7 @@ class UnknownGoalHelp(HelpRequest):
   """The user specified an unknown goal (or task)."""
 
   def __init__(self, unknown_goals):
-    super(UnknownGoalHelp, self).__init__()
+    super().__init__()
     self.unknown_goals = unknown_goals
 
 
@@ -70,7 +70,7 @@ class NoGoalHelp(HelpRequest):
   """The user specified no goals."""
 
 
-class ArgSplitter(object):
+class ArgSplitter:
   """Splits a command-line into scoped sets of flags, and a set of targets.
 
   Recognizes, e.g.:

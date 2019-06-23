@@ -16,4 +16,4 @@ class ExportableJvmLibrary(JvmTarget):
       An optional object indicating the ivy artifact to export.
     """
     # TODO: Move provides argument out of the parent class and onto this one?
-    super(ExportableJvmLibrary, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)

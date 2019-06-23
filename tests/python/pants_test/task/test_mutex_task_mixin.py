@@ -16,7 +16,7 @@ class LogViewerTaskMixin(MutexTaskMixin):
     return LogViewerTaskMixin
 
   def __init__(self, *args, **kwargs):
-    super(LogViewerTaskMixin, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     self._executed = None
 
@@ -67,7 +67,7 @@ class GreenLogViewer(LogViewerTaskMixin):
 class MutexTaskMixinTest(TestBase):
 
   def tearDown(self):
-    super(MutexTaskMixinTest, self).tearDown()
+    super().tearDown()
 
     LogViewerTaskMixin.reset_implementations()
 

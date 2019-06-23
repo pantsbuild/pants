@@ -47,7 +47,7 @@ class PythonDistribution(PythonTarget):
     payload.add_fields({
       'setup_requires': PrimitiveField(maybe_list(setup_requires or ()))
     })
-    super(PythonDistribution, self).__init__(
+    super().__init__(
       address=address, payload=payload, sources=sources, **kwargs)
 
   @property

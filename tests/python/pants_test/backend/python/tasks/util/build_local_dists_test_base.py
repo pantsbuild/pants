@@ -37,7 +37,7 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskT
 
   @classmethod
   def rules(cls):
-    return super(BuildLocalPythonDistributionsTestBase, cls).rules() + native_backend_rules()
+    return super().rules() + native_backend_rules()
 
   @classproperty
   @abstractmethod
@@ -45,7 +45,7 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskT
     """Fed into `self.populate_target_dict()`."""
 
   def setUp(self):
-    super(BuildLocalPythonDistributionsTestBase, self).setUp()
+    super().setUp()
     # Share the target mapping across all test cases.
     self.target_dict = self.populate_target_dict(self.dist_specs)
 

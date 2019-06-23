@@ -19,5 +19,5 @@ class AnnotationProcessor(ExportableJvmLibrary):
     :param processors: A list of the fully qualified class names of the
       annotation processors this library exports.
     """
-    super(AnnotationProcessor, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.processors = processors

@@ -25,7 +25,7 @@ class BuildozerTest(TaskTestBase):
     return Buildozer
 
   def setUp(self):
-    super(BuildozerTest, self).setUp()
+    super().setUp()
 
     self.targets = prepare_dependencies(self)
 

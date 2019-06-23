@@ -19,7 +19,7 @@ class NodeTest(Target):
       'script_name': PrimitiveField(script_name or 'test'),
       'timeout':  PrimitiveField(timeout)
     })
-    super(NodeTest, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   @property
   def script_name(self):

@@ -12,7 +12,7 @@ class TestPythonBinary(TestBase):
     return build_file_aliases()
 
   def setUp(self):
-    super(TestPythonBinary, self).setUp()
+    super().setUp()
     # Force creation of SourceRootConfig global instance. PythonBinary uses source roots
     # when computing entry points.
     self.context()

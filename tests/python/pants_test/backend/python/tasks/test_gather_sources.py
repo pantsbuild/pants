@@ -22,7 +22,7 @@ class GatherSourcesTest(TaskTestBase):
     return GatherSources
 
   def setUp(self):
-    super(GatherSourcesTest, self).setUp()
+    super().setUp()
 
     self.filemap = {
       'src/python/one/foo.py': 'foo_py_content',

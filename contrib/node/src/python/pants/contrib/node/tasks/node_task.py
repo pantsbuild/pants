@@ -19,7 +19,7 @@ class NodeTask(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(NodeTask, cls).subsystem_dependencies() + (NodeDistribution.scoped(cls),)
+    return super().subsystem_dependencies() + (NodeDistribution.scoped(cls),)
 
   @memoized_property
   def node_distribution(self):

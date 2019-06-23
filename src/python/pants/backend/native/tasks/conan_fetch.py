@@ -37,18 +37,18 @@ class ConanFetch(SimpleCodegenTask):
 
   @classmethod
   def register_options(cls, register):
-    super(ConanFetch, cls).register_options(register)
+    super().register_options(register)
     register('--conan-remotes', type=dict, default=cls.default_remotes, advanced=True,
              fingerprint=True,
              help='The conan remotes to download conan packages from.')
 
   @classmethod
   def implementation_version(cls):
-    return super(ConanFetch, cls).implementation_version() + [('ConanFetch', 1)]
+    return super().implementation_version() + [('ConanFetch', 1)]
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(ConanFetch, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(ConanPrep.tool_instance_cls)
 
   class ConanConfigError(TaskError): pass
@@ -125,7 +125,7 @@ class ConanFetch(SimpleCodegenTask):
 
   @property
   def _copy_target_attributes(self):
-    basic_attributes = [a for a in super(ConanFetch, self)._copy_target_attributes
+    basic_attributes = [a for a in super()._copy_target_attributes
                         if a != 'provides']
     return basic_attributes + [
       'include_relpath',

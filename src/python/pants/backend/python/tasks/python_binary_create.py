@@ -29,7 +29,7 @@ class PythonBinaryCreate(Task):
 
   @classmethod
   def register_options(cls, register):
-    super(PythonBinaryCreate, cls).register_options(register)
+    super().register_options(register)
     register('--include-run-information', type=bool, default=False,
              help="Include run information in the PEX's PEX-INFO for information like the timestamp the PEX was "
                   "created and the command line used to create it. This information may be helpful to you, but means "
@@ -38,7 +38,7 @@ class PythonBinaryCreate(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(PythonBinaryCreate, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       PexBuilderWrapper.Factory,
       PythonNativeCode.scoped(cls),
     )
@@ -53,7 +53,7 @@ class PythonBinaryCreate(Task):
 
   @classmethod
   def implementation_version(cls):
-    return super(PythonBinaryCreate, cls).implementation_version() + [('PythonBinaryCreate', 2)]
+    return super().implementation_version() + [('PythonBinaryCreate', 2)]
 
   @property
   def cache_target_dirs(self):
@@ -71,7 +71,7 @@ class PythonBinaryCreate(Task):
     return isinstance(target, PythonBinary)
 
   def __init__(self, *args, **kwargs):
-    super(PythonBinaryCreate, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._distdir = self.get_options().pants_distdir
 
   def execute(self):

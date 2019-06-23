@@ -31,7 +31,7 @@ def make_flag_regex(long_name, short_name=None):
   return re.compile(rx_str)
 
 
-class Options(object):
+class Options:
   """The outward-facing API for interacting with options.
 
   Supports option registration and fetching option values.

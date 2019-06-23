@@ -34,7 +34,7 @@ class AddressableTypeValidationError(TypeConstraintError):
   """Indicates a value provided to an `AddressableDescriptor` failed to satisfy a type constraint."""
 
 
-class AddressableDescriptor(object):
+class AddressableDescriptor:
   """A data descriptor for fields containing one or more addressable items.
 
   An addressable descriptor has lifecycle expectations tightly coupled with the contract of
@@ -70,7 +70,7 @@ class AddressableDescriptor(object):
 
      >>> class Thing(Struct):
      ...   def __init__(self, thing):
-     ...     super(Thing, self).__init__()
+     ...     super().__init__()
      ...     self.thing = thing
      ...   @property
      ...   def parent(self):
@@ -205,7 +205,7 @@ def _addressable_wrapper(addressable_descriptor, type_constraint):
     #
     # class Thing(Struct):
     #   def __init__(self, thing):
-    #      super(Thing, self).__init__()
+    #      super().__init__()
     #      self.thing = thing
     #
     #   @property

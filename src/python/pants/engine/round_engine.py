@@ -12,7 +12,7 @@ from pants.engine.legacy_engine import Engine
 from pants.engine.round_manager import RoundManager
 
 
-class GoalExecutor(object):
+class GoalExecutor:
 
   def __init__(self, context, goal, tasktypes_by_name):
     self._context = context
@@ -107,7 +107,7 @@ class RoundEngine(Engine):
                                                       for goal, dependees
                                                       in dependees_by_goal.items())))
 
-  class TargetRootsReplacement(object):
+  class TargetRootsReplacement:
 
     class ConflictingProposalsError(Exception):
       """Indicates conflicting proposals for a target root replacement in a single pants run."""

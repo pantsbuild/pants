@@ -16,7 +16,7 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
   }
 
   def setUp(self):
-    super(FilemapIntegrationTest, self).setUp()
+    super().setUp()
 
     project_tree = FileSystemProjectTree(os.path.abspath(self.PATH_PREFIX), ['BUILD', '.*'])
     scan_set = set()

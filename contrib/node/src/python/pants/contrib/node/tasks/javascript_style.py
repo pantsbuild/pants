@@ -29,7 +29,7 @@ class JavascriptStyleBase(NodeTask):
 
   @classmethod
   def register_options(cls, register):
-    super(JavascriptStyleBase, cls).register_options(register)
+    super().register_options(register)
     register('--fail-slow', type=bool,
              help='Check all targets and present the full list of errors.')
     register('--color', type=bool, default=True, help='Enable or disable color.')

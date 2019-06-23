@@ -7,13 +7,13 @@ from pants.option.ranked_value import RankedValue
 
 
 # TODO: Get rid of this? The parser should be able to lazily track.
-class OptionTracker(object):
+class OptionTracker:
   """Records a history of what options are set and where they came from."""
 
   OptionHistoryRecord = namedtuple('OptionHistoryRecord',
                                    ['value', 'rank', 'deprecation_version', 'details'])
 
-  class OptionHistory(object):
+  class OptionHistory:
     """Tracks the history of an individual option."""
 
     def __init__(self):

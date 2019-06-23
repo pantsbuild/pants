@@ -172,7 +172,7 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
     return self._process_session()
 
 
-class NailgunClient(object):
+class NailgunClient:
   """A python nailgun client (see http://martiansoftware.com/nailgun for more info)."""
 
   class NailgunError(Exception):

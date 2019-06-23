@@ -15,7 +15,7 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 logger = logging.getLogger(__name__)
 
 
-class PantsRunner(object):
+class PantsRunner:
   """A higher-level runner that delegates runs to either a LocalPantsRunner or RemotePantsRunner."""
 
   def __init__(self, exiter, args=None, env=None, start_time=None):

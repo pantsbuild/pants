@@ -51,7 +51,7 @@ class DeprecatedTest(TestBase):
   def test_deprecated_method(self):
     expected_return = 'deprecated_method'
 
-    class Test(object):
+    class Test:
       @deprecated(self.FUTURE_VERSION)
       def deprecated_method(self):
         return expected_return
@@ -72,7 +72,7 @@ class DeprecatedTest(TestBase):
   def test_deprecated_property(self):
     expected_return = 'deprecated_property'
 
-    class Test(object):
+    class Test:
       @property
       @deprecated(self.FUTURE_VERSION)
       def deprecated_property(self):
@@ -176,7 +176,7 @@ class DeprecatedTest(TestBase):
 
   def test_bad_decorator_nesting(self):
     with self.assertRaises(BadDecoratorNestingError):
-      class Test(object):
+      class Test:
         @deprecated(self.FUTURE_VERSION)
         @property
         def test_prop(this):

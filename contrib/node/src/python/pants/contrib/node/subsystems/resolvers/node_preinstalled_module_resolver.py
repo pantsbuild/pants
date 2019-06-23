@@ -25,7 +25,7 @@ class NodePreinstalledModuleResolver(Subsystem, NodeResolverBase):
   def register_options(cls, register):
     register('--fetch-timeout-secs', type=int, advanced=True, default=10,
              help='Timeout the fetch if the connection is idle for longer than this value.')
-    super(NodePreinstalledModuleResolver, cls).register_options(register)
+    super().register_options(register)
     NodeResolve.register_resolver_for_type(NodePreinstalledModule, cls)
 
   def resolve_target(self, node_task, target, results_dir, node_paths, resolve_locally=False, **kwargs):

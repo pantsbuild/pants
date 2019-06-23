@@ -308,7 +308,7 @@ def open_tar(path_or_file, *args, **kwargs):
     yield tar
 
 
-class Timer(object):
+class Timer:
   """Very basic with-context to time operations
 
   Example usage:

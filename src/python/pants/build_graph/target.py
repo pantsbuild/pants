@@ -30,7 +30,7 @@ from pants.util.memo import memoized_method, memoized_property
 logger = logging.getLogger(__name__)
 
 
-class AbstractTarget(object):
+class AbstractTarget:
 
   @classmethod
   def subsystems(cls):
@@ -153,7 +153,7 @@ class Target(AbstractTarget):
 
   @classmethod
   def subsystems(cls):
-    return super(Target, cls).subsystems() + (cls.Arguments, cls.TagAssignments)
+    return super().subsystems() + (cls.Arguments, cls.TagAssignments)
 
   @classmethod
   def get_addressable_type(target_cls):

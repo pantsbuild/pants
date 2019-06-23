@@ -14,11 +14,11 @@ class LocalPythonDistributionArtifact(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(LocalPythonDistributionArtifact, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data('local_wheels')
 
   def __init__(self, *args, **kwargs):
-    super(LocalPythonDistributionArtifact, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.dist_dir = self.get_options().pants_distdir
 
   def execute(self):

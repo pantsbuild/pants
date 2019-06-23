@@ -106,7 +106,7 @@ class GoRemoteLibrary(GoTarget):
       'pkg': PrimitiveField(package_path),
     })
 
-    super(GoRemoteLibrary, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   @property
   def pkg(self):

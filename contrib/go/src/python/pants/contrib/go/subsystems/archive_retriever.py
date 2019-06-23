@@ -25,7 +25,7 @@ class ArchiveRetriever(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(ArchiveRetriever, cls).register_options(register)
+    super().register_options(register)
     register('--buffer-size', metavar='<bytes>', type=int, advanced=True,
              default=10 * 1024,  # 10KB in case jumbo frames are in play.
              help='The number of bytes of archive content to buffer in memory before flushing to '

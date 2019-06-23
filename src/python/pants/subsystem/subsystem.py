@@ -61,7 +61,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
   def get_scope_info(cls, subscope=None):
     cls.validate_scope_name_component(cls.options_scope)
     if subscope is None:
-      return super(Subsystem, cls).get_scope_info()
+      return super().get_scope_info()
     else:
       return ScopeInfo(cls.subscope(subscope), ScopeInfo.SUBSYSTEM, cls)
 
@@ -136,7 +136,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
 
     :API: public
     """
-    super(Subsystem, self).__init__()
+    super().__init__()
     self._scope = scope
     self._scoped_options = scoped_options
     self._fingerprint = None

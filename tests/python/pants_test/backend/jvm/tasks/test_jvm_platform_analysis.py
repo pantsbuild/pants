@@ -8,7 +8,7 @@ from pants.build_graph.target import Target
 from pants_test.task_test_base import TaskTestBase
 
 
-class JvmPlatformAnalysisTestMixin(object):
+class JvmPlatformAnalysisTestMixin:
   """Common helper methods for testing JvmPlatformValidate and JvmPlatformExplain.
 
   Mostly for building sets of targets that are interesting for testing.

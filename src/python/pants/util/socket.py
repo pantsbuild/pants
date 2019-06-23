@@ -58,7 +58,7 @@ def is_readable(fileobj, timeout=None):
     return bool(readable)
 
 
-class RecvBufferedSocket(object):
+class RecvBufferedSocket:
   """A socket wrapper that simplifies recv() buffering."""
 
   def __init__(self, sock, chunk_size=io.DEFAULT_BUFFER_SIZE, select_timeout=None):

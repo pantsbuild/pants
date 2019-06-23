@@ -17,7 +17,7 @@ class PythonEvalTest(PythonTaskTestBase):
     return PythonEval
 
   def setUp(self):
-    super(PythonEvalTest, self).setUp()
+    super().setUp()
     self._create_graph()
 
   def _create_graph(self, broken_c_library=True):

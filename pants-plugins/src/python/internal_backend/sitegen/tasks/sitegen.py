@@ -39,7 +39,7 @@ class SiteGen(Task):
 
   @classmethod
   def register_options(cls, register):
-    super(SiteGen, cls).register_options(register)
+    super().register_options(register)
     register('--config-path', type=list, help='Path to .json file describing site structure.')
 
   # TODO: requiring these products ensures that the markdown and reference tasks run before this
@@ -81,7 +81,7 @@ def load_soups(config):
   return soups
 
 
-class Precomputed(object):
+class Precomputed:
   """Info we compute (and preserve) before we mutate things."""
 
   def __init__(self, page, pantsref):
@@ -93,7 +93,7 @@ class Precomputed(object):
     self.pantsref = pantsref
 
 
-class PrecomputedPageInfo(object):
+class PrecomputedPageInfo:
   """Info we compute (and preserve) for each page before we mutate things."""
 
   def __init__(self, title, show_toc):

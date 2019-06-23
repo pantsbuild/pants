@@ -15,7 +15,7 @@ class ZincLanguageMixin(MirroredTargetOptionMixin):
 
   @classmethod
   def register_options(cls, register):
-    super(ZincLanguageMixin, cls).register_options(register)
+    super().register_options(register)
     # NB: This option is fingerprinted because the default value is not included in a target's
     # fingerprint. This also has the effect of invalidating only the relevant tasks: ZincCompile
     # in this case.

@@ -40,9 +40,9 @@ class CountingResolvable(Resolvable):
 
 class AddressableDescriptorTest(unittest.TestCase):
   def test_inappropriate_application(self):
-    class NotSerializable(object):
+    class NotSerializable:
       def __init__(self, count):
-        super(NotSerializable, self).__init__()
+        super().__init__()
         self.count = count
 
       @addressable(Exactly(int))

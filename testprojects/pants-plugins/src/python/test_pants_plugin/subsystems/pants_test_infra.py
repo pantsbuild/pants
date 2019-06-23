@@ -11,7 +11,7 @@ class PantsTestInfra(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(PantsTestInfra, cls).register_options(register)
+    super().register_options(register)
     register('--pants-requirement-target', advanced=True, fingerprint=True,
              help='Address for a python target providing the pants sdist.',
              type=str, default=None)

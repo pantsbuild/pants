@@ -13,7 +13,7 @@ class DummySubsystem(Subsystem):
   options_scope = 'dummy'
 
 
-class DummyOptions(object):
+class DummyOptions:
   def for_scope(self, scope):
     return object()
 
@@ -31,7 +31,7 @@ class ScopedDependentSubsystem(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ScopedDependentSubsystem, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       DummySubsystem.scoped(cls),
     )
 

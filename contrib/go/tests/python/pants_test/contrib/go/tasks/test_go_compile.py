@@ -18,7 +18,7 @@ class GoCompileTest(TaskTestBase):
     return GoCompile
 
   def setUp(self):
-    super(GoCompileTest, self).setUp()
+    super().setUp()
     self.go_compile = self.create_task(self.context())
 
   def _create_binary(self, target):

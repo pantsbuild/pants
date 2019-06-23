@@ -18,7 +18,7 @@ class InvalidRESTfulCacheProtoError(ArtifactCacheError):
   pass
 
 
-class Pinger(object):
+class Pinger:
   # Signifies that a netloc is unreachable.
   UNREACHABLE = 999999
 
@@ -67,7 +67,7 @@ class Pinger(object):
     return list(zip(urls, rt_secs))
 
 
-class BestUrlSelector(object):
+class BestUrlSelector:
   SUPPORTED_PROTOCOLS = ('http', 'https')
   MAX_FAILURES = 3
 

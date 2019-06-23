@@ -12,7 +12,7 @@ from pants.util.dirutil import safe_mkdir
 from pants.util.strutil import safe_shlex_split
 
 
-class CodeCoverageSettings(object):
+class CodeCoverageSettings:
   """A class containing settings for code coverage tasks."""
 
   def __init__(self, options, context, workdir, tool_classpath, confs, log,
@@ -57,7 +57,7 @@ class CodeCoverage(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(CodeCoverage, cls).subsystem_dependencies() + (Cobertura.Factory, Jacoco.Factory)
+    return super().subsystem_dependencies() + (Cobertura.Factory, Jacoco.Factory)
 
   # TODO(jtrobec): move these to subsystem scope after deprecating
   @staticmethod

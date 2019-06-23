@@ -101,7 +101,7 @@ class ExclusiveRequestTimeout(Exception):
   """Represents a timeout while waiting for another request to complete."""
 
 
-class PailgunHandleRequestLock(object):
+class PailgunHandleRequestLock:
   """Convenience lock to implement Lock.acquire(timeout), which is not available in Python 2."""
   # TODO remove and replace for the py3 Lock() when we don't have to support py2 anymore.
 

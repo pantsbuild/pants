@@ -14,9 +14,9 @@ class PyCodeStyleCheckerTest(CheckstylePluginTestBase):
     return True
 
   def get_plugin(self, file_content, **options):
-    return super(PyCodeStyleCheckerTest, self).get_plugin(file_content,
-                                                   max_length=options.get('max_length', 10),
-                                                   ignore=options.get('ignore', False))
+    return super().get_plugin(file_content,
+                              max_length=options.get('max_length', 10),
+                              ignore=options.get('ignore', False))
 
   def test_pycodestyle(self):
     self.assertNoNits('')

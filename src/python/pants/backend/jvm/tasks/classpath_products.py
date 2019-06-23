@@ -35,7 +35,7 @@ class MissingClasspathEntryError(Exception):
   """Indicates an unexpected problem finding a classpath entry."""
 
 
-class ClasspathProducts(object):
+class ClasspathProducts:
   """
   :API: public
   """

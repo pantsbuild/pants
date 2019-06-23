@@ -28,7 +28,7 @@ class ScalaLibraryTest(TestBase):
     )
 
   def setUp(self):
-    super(ScalaLibraryTest, self).setUp()
+    super().setUp()
     self.context(options={
       'scala': {
         'version': '2.11'

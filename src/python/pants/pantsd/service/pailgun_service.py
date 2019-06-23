@@ -22,7 +22,7 @@ class PailgunService(PantsService):
                                                resident scheduler.
     :param bool shutdown_after_run: PailgunService should shut down after running the first request.
     """
-    super(PailgunService, self).__init__()
+    super().__init__()
     self._bind_addr = bind_addr
     self._runner_class = runner_class
     self._scheduler_service = scheduler_service
@@ -88,4 +88,4 @@ class PailgunService(PantsService):
     if self.pailgun:
       self.pailgun.server_close()
 
-    super(PailgunService, self).terminate()
+    super().terminate()

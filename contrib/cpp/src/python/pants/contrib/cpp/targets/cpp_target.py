@@ -18,4 +18,4 @@ class CppTarget(Target):
     payload.add_field('sources', self.create_sources_field(sources=sources,
                                                            sources_rel_path=address.spec_path,
                                                            key_arg='sources'))
-    super(CppTarget, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)

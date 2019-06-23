@@ -155,7 +155,7 @@ class ContextutilTest(unittest.TestCase):
 
   def test_timer(self):
 
-    class FakeClock(object):
+    class FakeClock:
 
       def __init__(self):
         self._time = 0.0

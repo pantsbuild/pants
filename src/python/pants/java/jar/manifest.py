@@ -5,7 +5,7 @@ from contextlib import closing
 from io import BytesIO
 
 
-class Manifest(object):
+class Manifest:
   """
     Implements the basics of the jar manifest specification.
 

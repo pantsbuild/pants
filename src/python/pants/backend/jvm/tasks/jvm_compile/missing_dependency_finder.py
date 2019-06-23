@@ -21,7 +21,7 @@ class ClassNotFoundError(namedtuple('CompileError', ['source', 'lineno', 'classn
   pass
 
 
-class CompileErrorExtractor(object):
+class CompileErrorExtractor:
   """
   Extract `ClassNotFoundError`s from pants compile log.
   """
@@ -69,7 +69,7 @@ class CompileErrorExtractor(object):
     return errors
 
 
-class StringSimilarityRanker(object):
+class StringSimilarityRanker:
   """
   Sort strings according to their similarities to a given string.
   """
@@ -85,7 +85,7 @@ class StringSimilarityRanker(object):
       reverse=True)
 
 
-class MissingDependencyFinder(object):
+class MissingDependencyFinder:
   """
   Try to find missing dependencies from target's transitive dependencies.
   """

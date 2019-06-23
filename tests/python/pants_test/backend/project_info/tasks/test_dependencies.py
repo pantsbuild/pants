@@ -27,7 +27,7 @@ class NonPythonDependenciesTest(ConsoleTaskTestBase):
     return Dependencies
 
   def setUp(self):
-    super(NonPythonDependenciesTest, self).setUp()
+    super().setUp()
 
     third = self.make_target(
       'dependencies:third',
@@ -137,7 +137,7 @@ class PythonDependenciesTests(ConsoleTaskTestBase):
     return Dependencies
 
   def setUp(self):
-    super(PythonDependenciesTests, self).setUp()
+    super().setUp()
 
     python_leaf = self.make_target(
       'dependencies:python_leaf',

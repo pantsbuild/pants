@@ -26,7 +26,7 @@ class JvmRun(JvmTask):
 
   @classmethod
   def register_options(cls, register):
-    super(JvmRun, cls).register_options(register)
+    super().register_options(register)
     register('--only-write-cmd-line', metavar='<file>',
              help='Instead of running, just write the cmd line to this file.')
     # Note the use of implicit_value. This is so we can support three cases:
@@ -40,14 +40,14 @@ class JvmRun(JvmTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JvmRun, cls).subsystem_dependencies() + (DistributionLocator,)
+    return super().subsystem_dependencies() + (DistributionLocator,)
 
   @classmethod
   def supports_passthru_args(cls):
     return True
 
   def __init__(self, *args, **kwargs):
-    super(JvmRun, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.only_write_cmd_line = self.get_options().only_write_cmd_line
     self.args.extend(self.get_passthru_args())
 

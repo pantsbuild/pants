@@ -36,7 +36,7 @@ class TestBase(NailgunTaskTestBase):
 
   @classmethod
   def alias_groups(cls):
-    return super(TestBase, cls).alias_groups().merge(
+    return super().alias_groups().merge(
       register_core().merge(register_jvm())
     )
 

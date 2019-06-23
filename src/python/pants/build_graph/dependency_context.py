@@ -6,7 +6,7 @@ from pants.build_graph.aliased_target import AliasTarget
 from pants.build_graph.target import Target
 
 
-class DependencyContext(object):
+class DependencyContext:
 
   alias_types = (AliasTarget, Target)
   types_with_closure = ()

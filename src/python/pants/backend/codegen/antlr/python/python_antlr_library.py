@@ -16,7 +16,7 @@ class PythonAntlrLibrary(PythonTarget):
     """
     if antlr_version == '3.1.3':
       kwargs['compatibility'] = 'CPython>=2.7,<3'
-    super(PythonAntlrLibrary, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     self.module = module
     self.antlr_version = antlr_version

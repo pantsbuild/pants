@@ -57,11 +57,11 @@ class BaseZincCompileJDKTest(NailgunTaskTestBase):
 
   def setUp(self):
     os.chdir(get_buildroot())
-    super(BaseZincCompileJDKTest, self).setUp()
+    super().setUp()
 
   def tearDown(self):
     os.chdir(self.old_cwd)
-    super(BaseZincCompileJDKTest, self).tearDown()
+    super().tearDown()
 
   def test_subprocess_compile_jdk_being_symlink(self):
     context = self.context(target_roots=[])

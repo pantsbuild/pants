@@ -19,7 +19,7 @@ class BuildFileManipulatorTest(TestBase):
     return BuildFile(self.project_tree, 'BUILD')
 
   def setUp(self):
-    super(BuildFileManipulatorTest, self).setUp()
+    super().setUp()
     self.project_tree = FileSystemProjectTree(self.build_root)
     self.complicated_dep_comments = dedent(
       """\

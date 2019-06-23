@@ -38,7 +38,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
   @classmethod
   def register_options(cls, register):
-    super(ScroogeGen, cls).register_options(register)
+    super().register_options(register)
     register('--verbose', type=bool, help='Emit verbose output.')
     register('--strict', fingerprint=True, type=bool,
              help='Enable strict compilation.')
@@ -63,7 +63,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ScroogeGen, cls).subsystem_dependencies() + (ThriftDefaults,)
+    return super().subsystem_dependencies() + (ThriftDefaults,)
 
   @classmethod
   def product_types(cls):
@@ -71,14 +71,14 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
   @classmethod
   def implementation_version(cls):
-    return super(ScroogeGen, cls).implementation_version() + [('ScroogeGen', 3)]
+    return super().implementation_version() + [('ScroogeGen', 3)]
 
   @classmethod
   def get_fingerprint_strategy(cls):
     return JavaThriftLibraryFingerprintStrategy(ThriftDefaults.global_instance())
 
   def __init__(self, *args, **kwargs):
-    super(ScroogeGen, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._thrift_defaults = ThriftDefaults.global_instance()
     self._depinfo = None
 

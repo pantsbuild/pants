@@ -14,7 +14,7 @@ class GoRemoteLibraryTest(TestBase):
   # NB: We use  aliases and BUILD files to test proper registration of anonymous targets and macros.
 
   def setUp(self):
-    super(GoRemoteLibraryTest, self).setUp()
+    super().setUp()
     # Force setup of SourceRootConfig subsystem, as go targets do computation on source roots.
     self.context()
 

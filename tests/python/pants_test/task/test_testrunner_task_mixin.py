@@ -18,7 +18,7 @@ from pants.util.process_handler import ProcessHandler, subprocess
 from pants_test.task_test_base import TaskTestBase
 
 
-class DummyTestTarget(object):
+class DummyTestTarget:
   def __init__(self, name, timeout=None):
     self.name = name
     self.timeout = timeout
@@ -380,7 +380,7 @@ class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):
   def _raise_handler(e):
     raise e
 
-  class CollectHandler(object):
+  class CollectHandler:
     def __init__(self):
       self._errors = []
 

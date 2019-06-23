@@ -30,7 +30,7 @@ class TestInterpreterCache(TestBase):
     )
 
   def setUp(self):
-    super(TestInterpreterCache, self).setUp()
+    super().setUp()
     self._interpreter = PythonInterpreter.get()
 
   def _create_interpreter_cache(self, setup_options=None):

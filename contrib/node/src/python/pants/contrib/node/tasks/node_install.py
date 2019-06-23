@@ -23,7 +23,7 @@ class NodeInstall(NodeTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(NodeInstall, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(NodePathsLocal)
 
   def execute(self):

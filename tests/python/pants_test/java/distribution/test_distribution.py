@@ -18,7 +18,7 @@ from pants.util.process_handler import subprocess
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 
-class EXE(object):
+class EXE:
   def __init__(self, relpath, version=None):
     self._relpath = relpath
     self._version = version
@@ -150,7 +150,7 @@ class DistributionValidationTest(unittest.TestCase):
 
 class DistributionEnvLocationTest(unittest.TestCase):
   def setUp(self):
-    super(DistributionEnvLocationTest, self).setUp()
+    super().setUp()
     self.locator = _Locator(_EnvVarEnvironment())
 
   def test_locate_none(self):

@@ -17,7 +17,7 @@ class ImportOracleTest(TaskTestBase):
     return cls.ImportTask
 
   def setUp(self):
-    super(ImportOracleTest, self).setUp()
+    super().setUp()
     task = self.create_task(self.context())
     self.import_oracle = task.import_oracle
 

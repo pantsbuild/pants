@@ -51,7 +51,7 @@ class LLVM(NativeTool):
 
   @memoized_method
   def select(self):
-    unpacked_path = super(LLVM, self).select()
+    unpacked_path = super().select()
     # The archive from releases.llvm.org wraps the extracted content into a directory one level
     # deeper, but the one from our S3 does not. We account for both here.
     children = os.listdir(unpacked_path)
@@ -63,7 +63,7 @@ class LLVM(NativeTool):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(LLVM, cls).subsystem_dependencies() + (ArchiveFileMapper.scoped(cls),)
+    return super().subsystem_dependencies() + (ArchiveFileMapper.scoped(cls),)
 
   @memoized_property
   def _file_mapper(self):

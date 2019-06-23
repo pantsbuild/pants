@@ -8,7 +8,7 @@ import warnings
 from textwrap import dedent
 
 
-class PantsLoader(object):
+class PantsLoader:
   """Loads and executes entrypoints."""
 
   ENTRYPOINT_ENV_VAR = 'PANTS_ENTRYPOINT'

@@ -35,7 +35,7 @@ class Buildozer(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(Buildozer, cls).subsystem_dependencies() + (BuildozerBinary.scoped(cls),)
+    return super().subsystem_dependencies() + (BuildozerBinary.scoped(cls),)
 
   @classmethod
   def register_options(cls, register):

@@ -27,8 +27,7 @@ class NodePreinstalledModule(NodeModule):
     payload.add_fields({
       'dependencies_archive_url': PrimitiveField(dependencies_archive_url),
     })
-    super(NodePreinstalledModule, self).__init__(sources=sources, address=address,
-                                                 payload=payload, **kwargs)
+    super().__init__(sources=sources, address=address, payload=payload, **kwargs)
 
   @property
   def dependencies_archive_url(self):

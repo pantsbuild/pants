@@ -288,7 +288,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     """
     :API: public
     """
-    super(TestBase, self).setUp()
+    super().setUp()
     # Avoid resetting the Runtracker here, as that is specific to fork'd process cleanup.
     clean_global_runtime_state(reset_subsystem=True)
 
@@ -508,7 +508,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     """
     :API: public
     """
-    super(TestBase, self).tearDown()
+    super().tearDown()
     Subsystem.reset()
 
   @classproperty
@@ -673,7 +673,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         PathGlobsAndRoot(PathGlobs(('**',)), text_type(temp_dir)),
       ))[0]
 
-  class LoggingRecorder(object):
+  class LoggingRecorder:
     """Simple logging handler to record warnings."""
 
     def __init__(self):

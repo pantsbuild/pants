@@ -283,7 +283,7 @@ def union(cls):
   in as the subject of a `yield Get(...)`. See the following example:
 
   @union
-  class UnionBase(object): pass
+  class UnionBase: pass
 
   @rule(B, [X])
   def get_some_union_type(x):
@@ -315,7 +315,7 @@ class UnionRule(datatype([
     if not getattr(union_base, '_is_union', False):
       raise cls.make_type_error('union_base must be a type annotated with @union: was {} (type {})'
                                 .format(union_base, type(union_base).__name__))
-    return super(UnionRule, cls).__new__(cls, union_base, union_member)
+    return super().__new__(cls, union_base, union_member)
 
 
 class Rule(ABC):
@@ -372,7 +372,7 @@ class TaskRule(datatype([
               cacheable=True):
 
     # Create.
-    return super(TaskRule, cls).__new__(
+    return super().__new__(
         cls,
         output_type,
         input_selectors,

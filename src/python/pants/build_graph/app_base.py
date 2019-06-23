@@ -20,7 +20,7 @@ from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_property
 
 
-class RelativeToMapper(object):
+class RelativeToMapper:
   """A mapper that maps filesystem paths specified relative to a base directory."""
 
   def __init__(self, base):
@@ -37,7 +37,7 @@ class RelativeToMapper(object):
     return hash(self.base)
 
 
-class DirectoryReMapper(object):
+class DirectoryReMapper:
   """A mapper that maps files relative to a base directory into a destination directory."""
 
   class NonexistentBaseError(Exception):
@@ -94,7 +94,7 @@ class BundleProps(namedtuple('_BundleProps', ['rel_path', 'mapper', 'fileset']))
     return hash((self.rel_path, self.mapper))
 
 
-class Bundle(object):
+class Bundle:
   """A set of files to include in an application bundle.
 
   To learn about application bundles, see
@@ -245,7 +245,7 @@ class AppBase(Target):
       raise self.InvalidArchiveType(
         'Given archive type "{}" is invalid, choose from {}.'.format(
           payload.archive, list(Archive.TYPE_NAMES)))
-    super(AppBase, self).__init__(name=name, payload=payload, **kwargs)
+    super().__init__(name=name, payload=payload, **kwargs)
 
   def globs_relative_to_buildroot(self):
     buildroot = get_buildroot()
@@ -259,7 +259,7 @@ class AppBase(Target):
       else:
         # NB(nh): filemap is an OrderedDict, so this ordering is stable.
         globs += [fast_relpath(f, buildroot) for f in bundle.filemap.keys()]
-    super_globs = super(AppBase, self).globs_relative_to_buildroot()
+    super_globs = super().globs_relative_to_buildroot()
     if super_globs:
       globs += super_globs['globs']
     return {'globs': globs}
@@ -270,7 +270,7 @@ class AppBase(Target):
 
   @classmethod
   def compute_dependency_specs(cls, kwargs=None, payload=None):
-    for spec in super(AppBase, cls).compute_dependency_specs(kwargs, payload):
+    for spec in super().compute_dependency_specs(kwargs, payload):
       yield spec
 
     target_representation = kwargs or payload.as_dict()

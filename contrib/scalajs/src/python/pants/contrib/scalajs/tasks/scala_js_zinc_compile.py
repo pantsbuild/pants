@@ -18,7 +18,7 @@ class ScalaJSZincCompile(BaseZincCompile):
 
   @classmethod
   def register_options(cls, register):
-    super(ScalaJSZincCompile, cls).register_options(register)
+    super().register_options(register)
     # TODO: revisit after https://rbcommons.com/s/twitter/r/3225/
     cls.register_jvm_tool(register, 'scala-js-compiler')
 

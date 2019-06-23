@@ -9,13 +9,13 @@ from pants.util.process_handler import subprocess
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class Bundles(object):
+class Bundles:
   """Container class to hold test bundle specifications."""
 
   phrase_path = 'testprojects/src/java/org/pantsbuild/testproject/phrases'
   bundle_dir_prefix = 'testprojects.src.java.org.pantsbuild.testproject.phrases'
 
-  class Bundle(object):
+  class Bundle:
 
     def __init__(self, spec, text):
       self.spec = spec

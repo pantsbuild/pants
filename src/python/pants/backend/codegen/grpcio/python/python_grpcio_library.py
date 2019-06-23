@@ -8,4 +8,4 @@ class PythonGrpcioLibrary(PythonTarget):
   """A Python library generated from Protocol Buffer IDL files."""
 
   def __init__(self, sources=None, **kwargs):
-    super(PythonGrpcioLibrary, self).__init__(sources=sources, **kwargs)
+    super().__init__(sources=sources, **kwargs)

@@ -26,7 +26,7 @@ class PantsServices(datatype([
     services = services or tuple()
     port_map = port_map or dict()
     lifecycle_lock = lifecycle_lock or threading.RLock()
-    return super(PantsServices, cls).__new__(cls, services, port_map, lifecycle_lock)
+    return super().__new__(cls, services, port_map, lifecycle_lock)
 
 
 class PantsService(ABC):
@@ -47,7 +47,7 @@ class PantsService(ABC):
   class ServiceError(Exception): pass
 
   def __init__(self):
-    super(PantsService, self).__init__()
+    super().__init__()
     self.name = self.__class__.__name__
     self._state = _ServiceState()
 

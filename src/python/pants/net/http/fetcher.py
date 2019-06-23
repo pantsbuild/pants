@@ -18,7 +18,7 @@ from pants.util.dirutil import safe_open
 from pants.util.strutil import strip_prefix
 
 
-class Fetcher(object):
+class Fetcher:
   """A streaming URL fetcher that supports listeners."""
 
   class Error(Exception):
@@ -51,7 +51,7 @@ class Fetcher(object):
       """
       return self._response_code
 
-  class Listener(object):
+  class Listener:
     """A listener callback interface for HTTP GET requests made by a Fetcher."""
 
     def status(self, code, content_length=None):

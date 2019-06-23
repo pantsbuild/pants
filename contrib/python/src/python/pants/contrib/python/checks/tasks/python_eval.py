@@ -40,7 +40,7 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(PythonEval, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       PexBuilderWrapper.Factory,
       PythonInterpreterCache
     )
@@ -56,7 +56,7 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
 
   @classmethod
   def register_options(cls, register):
-    super(PythonEval, cls).register_options(register)
+    super().register_options(register)
     register('--fail-slow', type=bool,
              help='Compile all targets and present the full list of errors.')
 

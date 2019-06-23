@@ -23,7 +23,7 @@ from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdtemp
 
 
-class Jar(object):
+class Jar:
   """Encapsulates operations to build up or update a jar file.
 
   Upon construction the jar is conceptually opened for writes.  The write methods are called to
@@ -274,11 +274,11 @@ class JarTask(NailgunTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JarTask, cls).subsystem_dependencies() + (JarTool,)
+    return super().subsystem_dependencies() + (JarTool,)
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JarTask, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     JarTool.prepare_tools(round_manager)
 
   @staticmethod
@@ -301,7 +301,7 @@ class JarTask(NailgunTask):
     return name
 
   def __init__(self, *args, **kwargs):
-    super(JarTask, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.set_distribution(jdk=True)
     # TODO(John Sirois): Consider poking a hole for custom jar-tool jvm args - namely for Xmx
     # control.
@@ -478,7 +478,7 @@ class JarBuilderTask(JarTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JarBuilderTask, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     cls.JarBuilder.prepare(round_manager)
 
   @contextmanager

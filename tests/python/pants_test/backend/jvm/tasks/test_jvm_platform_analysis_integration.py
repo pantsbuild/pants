@@ -15,7 +15,7 @@ class JvmPlatformAnalysisIntegrationTest(PantsRunIntegrationTest):
   FAILURE_MESSAGE = "Dependencies cannot have a higher java target level than dependees!"
   CACHE_MESSAGE = "Invalidated 2 targets"
 
-  class JavaSandbox(object):
+  class JavaSandbox:
     """Testing sandbox for making temporary java_library targets."""
 
     def __init__(self, test, workdir, javadir):

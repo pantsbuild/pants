@@ -18,7 +18,7 @@ class StoreGCService(PantsService):
   _GARBAGE_COLLECTION_INTERVAL_SECONDS = 4 * 60 * 60
 
   def __init__(self, scheduler):
-    super(StoreGCService, self).__init__()
+    super().__init__()
     self._scheduler = scheduler
     self._logger = logging.getLogger(__name__)
 

@@ -24,4 +24,4 @@ class JaxWsLibrary(JvmTarget):
       'xjc_args': PrimitiveField(self.assert_list(xjc_args, key_arg='xjc_args')),
       'extra_args': PrimitiveField(self.assert_list(extra_args, key_arg='extra_args')),
     })
-    super(JaxWsLibrary, self).__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, **kwargs)

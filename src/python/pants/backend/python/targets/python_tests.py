@@ -28,7 +28,7 @@ class PythonTests(PythonTarget):
     """
     self._coverage = maybe_list(coverage) if coverage is not None else []
     self._timeout = timeout
-    super(PythonTests, self).__init__(**kwargs)
+    super().__init__(**kwargs)
 
   @property
   def coverage(self):

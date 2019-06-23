@@ -29,7 +29,7 @@ def resolved_example_jar_at(path, org='com.example', name='lib'):
 
 class ClasspathProductsTest(TestBase):
   def setUp(self):
-    super(ClasspathProductsTest, self).setUp()
+    super().setUp()
     init_subsystem(Target.Arguments)
 
   def test_single_classpath_element_no_excludes(self):

@@ -38,13 +38,13 @@ class ListTargetsTest(ConsoleRuleTestBase):
 
   @classmethod
   def rules(cls):
-    return super(ListTargetsTest, cls).rules() + list_targets.rules()
+    return super().rules() + list_targets.rules()
 
   def setUp(self):
-    super(ListTargetsTest, self).setUp()
+    super().setUp()
 
     # Setup a BUILD tree for various list tests
-    class Lib(object):
+    class Lib:
 
       def __init__(self, name, provides=False):
         self.name = name

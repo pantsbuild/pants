@@ -34,7 +34,7 @@ class ExternalUrlGenerator(BinaryToolUrlGenerator):
 class BinaryUtilTest(TestBase):
   """Tests binary_util's binaries_baseurls handling."""
 
-  class MapFetcher(object):
+  class MapFetcher:
     """Class which pretends to be a pants.net.http.Fetcher, but is actually a dictionary."""
 
     def __init__(self, read_map):

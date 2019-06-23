@@ -15,7 +15,7 @@ class NativeBuildSettings(Subsystem, MirroredTargetOptionMixin):
 
   @classmethod
   def register_options(cls, register):
-    super(NativeBuildSettings, cls).register_options(register)
+    super().register_options(register)
 
     # TODO: rename this so it's clear it is not the same option as JVM strict deps!
     register('--strict-deps', type=bool, default=True, fingerprint=True, advanced=True,

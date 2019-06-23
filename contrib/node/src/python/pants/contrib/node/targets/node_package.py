@@ -22,7 +22,7 @@ class NodePackage(Target):
     payload.add_fields({
       'package_name': PrimitiveField(package_name or address.target_name),
     })
-    super(NodePackage, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   @property
   def package_name(self):

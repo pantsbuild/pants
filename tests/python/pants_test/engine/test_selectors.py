@@ -7,11 +7,11 @@ import unittest
 from pants.engine.selectors import Get
 
 
-class AClass(object):
+class AClass:
   pass
 
 
-class BClass(object):
+class BClass:
 
   def __eq__(self, other):
     return type(self) == type(other)

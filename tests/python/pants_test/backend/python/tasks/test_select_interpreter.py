@@ -24,7 +24,7 @@ class SelectInterpreterTest(TaskTestBase):
     return SelectInterpreter
 
   def setUp(self):
-    super(SelectInterpreterTest, self).setUp()
+    super().setUp()
 
     # We're tied tightly to pex implementation details here faking out a python binary that outputs
     # only one value no matter what arguments, environment or input stream it has attached. That

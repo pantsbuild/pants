@@ -63,7 +63,7 @@ class FakeTask(Task):
 
   @classmethod
   def implementation_version(cls):
-    return super(FakeTask, cls).implementation_version() + cls._impls
+    return super().implementation_version() + cls._impls
 
   @classmethod
   def supports_passthru_args(cls):
@@ -75,7 +75,7 @@ class FakeTask(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(FakeTask, cls).subsystem_dependencies() + cls._deps
+    return super().subsystem_dependencies() + cls._deps
 
   def execute(self): pass
 
@@ -89,7 +89,7 @@ class OtherFakeTask(FakeTask):
 
   @classmethod
   def implementation_version(cls):
-    return super(OtherFakeTask, cls).implementation_version() + cls._other_impls
+    return super().implementation_version() + cls._other_impls
 
   options_scope = 'other-fake-task'
 
@@ -99,7 +99,7 @@ class FakeSubsystem(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(FakeSubsystem, cls).register_options(register)
+    super().register_options(register)
     register('--fake-option', type=bool)
 
 
@@ -108,7 +108,7 @@ class SubsystemWithDependencies(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(SubsystemWithDependencies, cls).subsystem_dependencies() + (FakeSubsystem,)
+    return super().subsystem_dependencies() + (FakeSubsystem,)
 
 
 class AnotherFakeTask(Task):
@@ -120,7 +120,7 @@ class AnotherFakeTask(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(AnotherFakeTask, cls).subsystem_dependencies() + (FakeSubsystem.scoped(cls),)
+    return super().subsystem_dependencies() + (FakeSubsystem.scoped(cls),)
 
   def execute(self): pass
 
@@ -138,7 +138,7 @@ class TaskWithTransitiveSubsystemDependencies(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(TaskWithTransitiveSubsystemDependencies, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       SubsystemWithDependencies,
     )
 
@@ -235,7 +235,7 @@ files(
 
   def _instantiate_synthesized_type(self, task_type, **kwargs):
     """Generate a new instance of the synthesized type `task_type`."""
-    ctx = super(TaskTestBase, self).context(for_task_types=[task_type], **kwargs)
+    ctx = super().context(for_task_types=[task_type], **kwargs)
     return task_type(ctx, self.test_workdir)
 
   def _task_type_to_fp(self, task_type, **kwargs):

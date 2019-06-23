@@ -31,7 +31,7 @@ class LibcDev(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(LibcDev, cls).subsystem_dependencies() + (ParseSearchDirs.scoped(cls),)
+    return super().subsystem_dependencies() + (ParseSearchDirs.scoped(cls),)
 
   @memoized_property
   def _parse_search_dirs(self):
@@ -39,7 +39,7 @@ class LibcDev(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(LibcDev, cls).register_options(register)
+    super().register_options(register)
 
     register('--enable-libc-search', type=bool, default=False, fingerprint=True, advanced=True,
              help="Whether to search for the host's libc installation. Set to False if the host "

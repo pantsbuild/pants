@@ -30,7 +30,7 @@ class ConsoleRuleTestBase(TestBase):
     raise NotImplementedError()
 
   def setUp(self):
-    super(ConsoleRuleTestBase, self).setUp()
+    super().setUp()
 
     if not issubclass(self.goal_cls, Goal):
       raise AssertionError('goal_cls() must return a Goal subclass, got {}'.format(self.goal_cls))

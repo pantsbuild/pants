@@ -14,7 +14,7 @@ class GoogleJavaFormatBase(RewriteBase):
 
   @classmethod
   def register_options(cls, register):
-    super(GoogleJavaFormatBase, cls).register_options(register)
+    super().register_options(register)
     cls.register_jvm_tool(register,
                           'google-java-format',
                           classpath=[
@@ -25,7 +25,7 @@ class GoogleJavaFormatBase(RewriteBase):
 
   @classmethod
   def implementation_version(cls):
-    return super(GoogleJavaFormatBase, cls).implementation_version() + [('GoogleJavaFormatBase', 1)]
+    return super().implementation_version() + [('GoogleJavaFormatBase', 1)]
 
   @classmethod
   def target_types(cls):

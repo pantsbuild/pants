@@ -55,7 +55,7 @@ class SubprocessExecutorTest(unittest.TestCase):
 
   def test_fails_with_bad_distribution(self):
 
-    class DefinitelyNotADistribution(object):
+    class DefinitelyNotADistribution:
       pass
 
     with self.assertRaises(Executor.InvalidDistribution):

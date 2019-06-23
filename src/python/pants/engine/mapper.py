@@ -178,7 +178,7 @@ class AddressMapper(datatype([
     build_ignore_patterns = tuple(build_ignore_patterns or [])
     exclude_target_regexps = tuple(exclude_target_regexps or [])
     subproject_roots = tuple(subproject_roots or [])
-    return super(AddressMapper, cls).__new__(
+    return super().__new__(
         cls,
         parser,
         build_patterns,

@@ -108,13 +108,13 @@ class SetupPyRunner(WheelInstaller):
 
   def __init__(self, source_dir, setup_command, **kw):
     self._setup_command = setup_command
-    super(SetupPyRunner, self).__init__(source_dir, **kw)
+    super().__init__(source_dir, **kw)
 
   def setup_command(self):
     return self._setup_command
 
 
-class TargetAncestorIterator(object):
+class TargetAncestorIterator:
   """Supports iteration of target ancestor lineages."""
 
   def __init__(self, build_graph):
@@ -407,7 +407,7 @@ class SetupPy(Task):
 
   @classmethod
   def register_options(cls, register):
-    super(SetupPy, cls).register_options(register)
+    super().register_options(register)
     register('--run',
              help="The command to run against setup.py.  Don't forget to quote any additional "
                   "parameters.  If no run command is specified, pants will by default generate "
@@ -558,7 +558,7 @@ class SetupPy(Task):
     return install_requires
 
   def __init__(self, *args, **kwargs):
-    super(SetupPy, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._root = get_buildroot()
     self._run = self.get_options().run
     self._recursive = self.get_options().recursive

@@ -71,7 +71,7 @@ class LegacyBuildGraph(BuildGraph):
     """
     self._scheduler = scheduler
     self._target_types = target_types
-    super(LegacyBuildGraph, self).__init__()
+    super().__init__()
 
   def clone_new(self):
     """Returns a new BuildGraph instance of the same type and with the same __init__ params."""

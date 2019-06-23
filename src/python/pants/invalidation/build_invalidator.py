@@ -116,7 +116,7 @@ class UncacheableCacheKeyGenerator(CacheKeyGeneratorInterface):
 # A persistent map from target set to cache key, which is a fingerprint of all
 # the inputs to the current version of that target set. That cache key can then be used
 # to look up build artifacts in an artifact cache.
-class BuildInvalidator(object):
+class BuildInvalidator:
   """Invalidates build targets based on the SHA1 hash of source files and other inputs."""
 
   class Factory(Subsystem):

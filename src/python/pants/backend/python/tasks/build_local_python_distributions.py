@@ -60,11 +60,11 @@ class BuildLocalPythonDistributions(Task):
 
   @classmethod
   def implementation_version(cls):
-    return super(BuildLocalPythonDistributions, cls).implementation_version() + [('BuildLocalPythonDistributions', 3)]
+    return super().implementation_version() + [('BuildLocalPythonDistributions', 3)]
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(BuildLocalPythonDistributions, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       BuildSetupRequiresPex.scoped(cls),
       PythonNativeCode.scoped(cls),
     )

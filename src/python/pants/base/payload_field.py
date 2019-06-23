@@ -61,7 +61,7 @@ class PayloadField(ABC):
     return self
 
 
-class FingerprintedMixin(object):
+class FingerprintedMixin:
   """Mixin this class to make your class suitable for passing to FingerprintedField.
 
   :API: public

@@ -50,7 +50,7 @@ class IvyUtilsTestBase(TestBase):
 class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
   def setUp(self):
-    super(IvyUtilsGenerateIvyTest, self).setUp()
+    super().setUp()
 
     self.add_to_build_file('src/java/targets',
         dedent("""

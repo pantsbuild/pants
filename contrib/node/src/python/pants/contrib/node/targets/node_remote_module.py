@@ -20,7 +20,7 @@ class NodeRemoteModule(NodePackage):
     payload.add_fields({
       'version': PrimitiveField(version or '*'),  # Guard against/allow `None`.
     })
-    super(NodeRemoteModule, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   @property
   def version(self):

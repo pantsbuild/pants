@@ -10,7 +10,7 @@ from pants.build_graph.address import Address
 from pants.util.meta import classproperty
 
 
-class PantsRequirement(object):
+class PantsRequirement:
   """Exports a `python_requirement_library` pointing at the active pants' corresponding sdist.
 
   This requirement is useful for custom plugin authors who want to build and test their plugin with

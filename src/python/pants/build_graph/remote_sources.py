@@ -48,7 +48,7 @@ class RemoteSources(Target):
       'sources_target_spec': PrimitiveField(self._sources_target_to_spec(address, sources_target)),
       'dest': PrimitiveField(dest.__name__),
     })
-    super(RemoteSources, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   @staticmethod
   def _sources_target_to_spec(address, sources_target):
@@ -56,7 +56,7 @@ class RemoteSources(Target):
 
   @classmethod
   def compute_dependency_specs(cls, kwargs=None, payload=None):
-    for spec in super(RemoteSources, cls).compute_dependency_specs(kwargs, payload):
+    for spec in super().compute_dependency_specs(kwargs, payload):
       yield spec
 
     if kwargs:

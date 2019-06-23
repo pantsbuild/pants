@@ -24,7 +24,7 @@ class JsonReporter(Reporter):
   Settings = namedtuple('Settings', Reporter.Settings._fields)
 
   def __init__(self, run_tracker, settings):
-    super(JsonReporter, self).__init__(run_tracker, settings)
+    super().__init__(run_tracker, settings)
 
     # We accumulate build state into this dict.
     self.results = {}

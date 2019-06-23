@@ -15,7 +15,7 @@ from pants.build_graph.target import Target
 from pants.util.memo import memoized_method, memoized_property
 
 
-class JvmDependencyAnalyzer(object):
+class JvmDependencyAnalyzer:
   """Helper class for tasks which need to analyze source dependencies.
 
   Primary purpose is to provide a classfile --> target mapping, which subclasses can use in

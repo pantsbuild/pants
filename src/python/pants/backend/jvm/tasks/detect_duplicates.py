@@ -27,7 +27,7 @@ class DuplicateDetector(JvmBinaryTask):
 
   @classmethod
   def register_options(cls, register):
-    super(DuplicateDetector, cls).register_options(register)
+    super().register_options(register)
     register('--exclude-files', default=EXCLUDED_FILES, type=list,
              help='Case insensitive filenames (without directory) to exclude from duplicate check.')
     register('--exclude-dirs', default=EXCLUDED_DIRS, type=list,
@@ -42,7 +42,7 @@ class DuplicateDetector(JvmBinaryTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(DuplicateDetector, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data('runtime_classpath')
 
   @memoized_property

@@ -48,7 +48,7 @@ class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
     return register_python()
 
   def setUp(self):
-    super(PythonTaskTestBase, self).setUp()
+    super().setUp()
     subsystem_util.init_subsystem(PythonBinary.Defaults)
 
   def create_python_library(self, relpath, name, source_contents_map=None,

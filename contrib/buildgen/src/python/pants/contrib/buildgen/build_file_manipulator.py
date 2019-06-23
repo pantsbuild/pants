@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class BuildTargetParseError(Exception): pass
 
 
-class DependencySpec(object):
+class DependencySpec:
   """A representation of a single dependency spec, including comments around it.
 
   This is a helper class to aid in deduplicating, sorting, forcing, and formatting
@@ -63,7 +63,7 @@ class DependencySpec(object):
     return '\n'.join(self.lines())
 
 
-class BuildFileManipulator(object):
+class BuildFileManipulator:
   """A class to load, represent, and change the dependencies of a given target.
 
   Use BuildFileManipulator.load(...) for construction, rather than constructing it directly.

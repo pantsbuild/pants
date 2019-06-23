@@ -13,7 +13,7 @@ class ReverseDepmap(ConsoleTask):
 
   @classmethod
   def register_options(cls, register):
-    super(ReverseDepmap, cls).register_options(register)
+    super().register_options(register)
     register('--transitive', type=bool,
              help='List transitive dependees.')
     register('--closed', type=bool,
@@ -23,7 +23,7 @@ class ReverseDepmap(ConsoleTask):
              help='Output format of results.')
 
   def __init__(self, *args, **kwargs):
-    super(ReverseDepmap, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     self._transitive = self.get_options().transitive
     self._closed = self.get_options().closed

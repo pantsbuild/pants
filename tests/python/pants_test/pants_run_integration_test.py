@@ -208,7 +208,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       ]
 
   def setUp(self):
-    super(PantsRunIntegrationTest, self).setUp()
+    super().setUp()
     # Some integration tests rely on clean subsystem state (e.g., to set up a DistributionLocator).
     Subsystem.reset()
 

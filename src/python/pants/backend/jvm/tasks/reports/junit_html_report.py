@@ -20,7 +20,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 @total_ordering
-class ReportTestSuite(object):
+class ReportTestSuite:
   """Data object for a JUnit test suite"""
 
   class MergeError(Exception):
@@ -144,7 +144,7 @@ class ReportTestCase(datatype(['name', 'time', 'failure', 'error', 'skipped'])):
   """Data object for a JUnit test case"""
 
   def __new__(cls, name, time, failure=None, error=None, skipped=False):
-    return super(ReportTestCase, cls).__new__(cls, name, float(time), failure, error, skipped)
+    return super().__new__(cls, name, float(time), failure, error, skipped)
 
   @memoized_property
   def icon_class(self):

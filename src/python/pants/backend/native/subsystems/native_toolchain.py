@@ -33,7 +33,7 @@ class NativeToolchain(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(NativeToolchain, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       Binutils.scoped(cls),
       GCC.scoped(cls),
       LibcDev.scoped(cls),
@@ -65,7 +65,7 @@ class NativeToolchain(Subsystem):
 class LibcObjects(datatype(['crti_object_paths'])): pass
 
 
-class LinkerWrapperMixin(object):
+class LinkerWrapperMixin:
 
   def for_compiler(self, compiler, platform):
     """Return a Linker object which is intended to be compatible with the given `compiler`."""

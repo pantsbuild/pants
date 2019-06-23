@@ -6,7 +6,7 @@ import os
 from pants.util.dirutil import safe_mkdir_for
 
 
-class ReproMixin(object):
+class ReproMixin:
   """ Additional helper methods for use in Repro tests"""
 
   def add_file(self, root, path, content):

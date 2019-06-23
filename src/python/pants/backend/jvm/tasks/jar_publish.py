@@ -39,7 +39,7 @@ from pants.util.strutil import ensure_text
 _TEMPLATES_RELPATH = os.path.join('templates', 'jar_publish')
 
 
-class PushDb(object):
+class PushDb:
 
   @staticmethod
   def load(path):
@@ -48,7 +48,7 @@ class PushDb(object):
       properties = Properties.load(props)
       return PushDb(properties)
 
-  class Entry(object):
+  class Entry:
 
     def __init__(self, sem_ver, named_ver, named_is_latest, sha, fingerprint):
       """Records the most recent push/release of an artifact.
@@ -142,7 +142,7 @@ class PushDb(object):
       Properties.dump(self._props, props)
 
 
-class PomWriter(object):
+class PomWriter:
   def __init__(self, get_db, tag):
     self._get_db = get_db
     self._tag = tag
@@ -297,7 +297,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
 
   @classmethod
   def register_options(cls, register):
-    super(JarPublish, cls).register_options(register)
+    super().register_options(register)
 
     # TODO(John Sirois): Support a preview mode that outputs a file with entries like:
     # artifact id:
@@ -353,7 +353,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JarPublish, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require('jars')
     round_manager.require('javadoc')
     round_manager.require('scaladoc')
@@ -363,7 +363,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
     return isinstance(target, ExportableJvmLibrary) and target.provides
 
   def __init__(self, *args, **kwargs):
-    super(JarPublish, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.cachedir = os.path.join(self.workdir, 'cache')
 
     self._jvm_options = self.get_options().jvm_options

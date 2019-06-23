@@ -13,7 +13,7 @@ class RunnableTestService(PantsService):
 
 class TestPantsService(TestBase):
   def setUp(self):
-    super(TestPantsService, self).setUp()
+    super().setUp()
     self.service = RunnableTestService()
 
   def test_init(self):

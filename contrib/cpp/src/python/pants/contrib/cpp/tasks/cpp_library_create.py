@@ -17,11 +17,11 @@ class CppLibraryCreate(CppTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(CppLibraryCreate, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require('objs')
 
   def __init__(self, *args, **kwargs):
-    super(CppLibraryCreate, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
   @property
   def cache_target_dirs(self):

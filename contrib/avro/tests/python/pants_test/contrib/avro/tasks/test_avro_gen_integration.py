@@ -24,7 +24,7 @@ class AvroJavaGenTest(PantsRunIntegrationTest):
         updated = full_config.get(scope, {})
         updated.update(scoped_cfgs)
         full_config[scope] = updated
-    return super(AvroJavaGenTest, self).run_pants_with_workdir(
+    return super().run_pants_with_workdir(
       command=command,
       workdir=workdir,
       config=full_config,

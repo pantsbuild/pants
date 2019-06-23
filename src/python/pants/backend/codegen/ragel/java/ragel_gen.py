@@ -21,10 +21,10 @@ class RagelGen(SimpleCodegenTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(RagelGen, cls).subsystem_dependencies() + (Ragel.scoped(cls),)
+    return super().subsystem_dependencies() + (Ragel.scoped(cls),)
 
   def __init__(self, *args, **kwargs):
-    super(RagelGen, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._java_out = os.path.join(self.workdir, 'gen-java')
 
   @memoized_property

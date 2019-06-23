@@ -10,8 +10,7 @@ class PyflakesCheckerTest(CheckstylePluginTestBase):
   plugin_type = PyflakesChecker
 
   def get_plugin(self, file_content, **options):
-    return super(PyflakesCheckerTest, self).get_plugin(file_content,
-                                                       ignore=options.get('ignore') or [])
+    return super().get_plugin(file_content, ignore=options.get('ignore') or [])
 
   def test_pyflakes(self):
     self.assertNoNits('')

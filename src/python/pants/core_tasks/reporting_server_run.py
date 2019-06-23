@@ -17,7 +17,7 @@ class ReportingServerRun(QuietTaskMixin, Task):
 
   @classmethod
   def register_options(cls, register):
-    super(ReportingServerRun, cls).register_options(register)
+    super().register_options(register)
     register('--port', type=int, default=0,
              help='Serve on this port. Leave unset to choose a free port '
                   'automatically (recommended if using pants concurrently in '

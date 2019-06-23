@@ -24,7 +24,7 @@ class JaxbLibrary(JvmTarget):
       'package': PrimitiveField(package),
       'jaxb_language': PrimitiveField(language),
     })
-    super(JaxbLibrary, self).__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, **kwargs)
 
     if language != 'java':
       raise ValueError('Language "{lang}" not supported for {class_type}'

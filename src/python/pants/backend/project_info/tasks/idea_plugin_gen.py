@@ -54,7 +54,7 @@ class IdeaPluginGen(ConsoleTask):
 
   @classmethod
   def register_options(cls, register):
-    super(IdeaPluginGen, cls).register_options(register)
+    super().register_options(register)
     # TODO: https://github.com/pantsbuild/pants/issues/3198
     # scala/java-language level should use what Pants already knows.
     register('--open', type=bool, default=True,
@@ -75,7 +75,7 @@ class IdeaPluginGen(ConsoleTask):
              help='Sets the java language and jdk used to compile the project\'s java sources.')
 
   def __init__(self, *args, **kwargs):
-    super(IdeaPluginGen, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     self.open = self.get_options().open
 

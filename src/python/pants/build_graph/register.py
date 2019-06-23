@@ -21,7 +21,7 @@ from pants.util.netrc import Netrc
 """Register the elementary BUILD file constructs."""
 
 
-class BuildFilePath(object):
+class BuildFilePath:
   def __init__(self, parse_context):
     self._parse_context = parse_context
 

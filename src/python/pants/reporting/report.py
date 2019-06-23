@@ -17,7 +17,7 @@ class EmitterThread(threading.Thread):
   """
 
   def __init__(self, report, name):
-    super(EmitterThread, self).__init__(name=name)
+    super().__init__(name=name)
     self._report = report
     # N.B. We must not use the name `self._stop`, as it is already used by Threading.thread
     # and overriding it results in `TypeError: 'Event' object is not callable` when ran with Py3.
@@ -36,7 +36,7 @@ class EmitterThread(threading.Thread):
     self._stopper.set()
 
 
-class Report(object):
+class Report:
   """A report of a pants run."""
 
   # Log levels.

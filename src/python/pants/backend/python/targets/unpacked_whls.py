@@ -68,7 +68,7 @@ class UnpackedWheels(ImportWheelsMixin, Target):
       # TODO: consider supporting transitive deps like UnpackedJars!
       # TODO: consider supporting `platforms` as in PythonBinary!
     })
-    super(UnpackedWheels, self).__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, **kwargs)
 
     if not libraries:
       raise self.ExpectedLibrariesError('Expected non-empty libraries attribute for {spec}'

@@ -227,7 +227,7 @@ class LegacyGraphSession(datatype(['scheduler_session', 'build_file_aliases', 'g
     return graph, address_mapper
 
 
-class EngineInitializer(object):
+class EngineInitializer:
   """Constructs the components necessary to run the v2 engine with v1 BuildGraph compatibility."""
 
   class GoalMappingError(Exception):

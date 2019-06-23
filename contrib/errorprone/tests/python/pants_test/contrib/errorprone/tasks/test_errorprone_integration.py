@@ -26,7 +26,7 @@ class ErrorProneTest(PantsRunIntegrationTest):
         updated = full_config.get(scope, {})
         updated.update(scoped_cfgs)
         full_config[scope] = updated
-    return super(ErrorProneTest, self).run_pants(command, full_config, stdin_data, extra_env, **kwargs)
+    return super().run_pants(command, full_config, stdin_data, extra_env, **kwargs)
 
   def test_no_warnings(self):
     cmd = ['compile', 'contrib/errorprone/tests/java/org/pantsbuild/contrib/errorprone:none']

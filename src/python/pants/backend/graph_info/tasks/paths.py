@@ -48,7 +48,7 @@ def find_paths_breadth_first(from_target, to_target, log):
 
 class PathFinder(ConsoleTask):
   def __init__(self, *args, **kwargs):
-    super(PathFinder, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.log = self.context.log
     self.target_roots = self.context.target_roots
 

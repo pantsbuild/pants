@@ -41,7 +41,7 @@ class JavaThriftLibrary(JvmTarget):
       options under ``--thrift-default-default-java-namespace``.
     :param compiler_args: Extra arguments to the compiler.
     """
-    super(JavaThriftLibrary, self).__init__(**kwargs)
+    super().__init__(**kwargs)
 
     def check_value_for_arg(arg, value, values):
       if value and value not in values:

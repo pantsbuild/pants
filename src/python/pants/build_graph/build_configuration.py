@@ -19,7 +19,7 @@ from pants.util.memo import memoized_method
 logger = logging.getLogger(__name__)
 
 
-class BuildConfiguration(object):
+class BuildConfiguration:
   """Stores the types and helper functions exposed to BUILD files."""
 
   class ParseState(namedtuple('ParseState', ['parse_context', 'parse_globals'])):

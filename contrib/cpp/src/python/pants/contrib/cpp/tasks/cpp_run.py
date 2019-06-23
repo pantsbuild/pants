@@ -12,7 +12,7 @@ class CppRun(CppTask):
 
   @classmethod
   def register_options(cls, register):
-    super(CppRun, cls).register_options(register)
+    super().register_options(register)
     register('--args',
              type=list,
              help='Append these options to the executable command line.')
@@ -23,7 +23,7 @@ class CppRun(CppTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(CppRun, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     # Require that an executable has been built.
     round_manager.require_data('exe')
 

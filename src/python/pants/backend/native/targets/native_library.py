@@ -42,7 +42,7 @@ class NativeLibrary(Target, metaclass=ABCMeta):
         "and value: {}."
         .format(NativeArtifact.alias(), type(ctypes_native_library).__name__, ctypes_native_library))
 
-    super(NativeLibrary, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   @property
   def toolchain_variant(self):

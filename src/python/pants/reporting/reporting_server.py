@@ -362,7 +362,7 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
     """Silence BaseHTTPRequestHandler's logging."""
 
 
-class ReportingServer(object):
+class ReportingServer:
   """Reporting Server HTTP server."""
 
   class Settings(namedtuple('Settings', ['info_dir', 'template_dir', 'assets_dir', 'root',

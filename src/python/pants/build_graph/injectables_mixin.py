@@ -5,7 +5,7 @@
 from pants.build_graph.address import Address
 
 
-class InjectablesMixin(object):
+class InjectablesMixin:
   """A mixin for classes (typically optionables) that require certain targets in order to function.
 
   :API: public

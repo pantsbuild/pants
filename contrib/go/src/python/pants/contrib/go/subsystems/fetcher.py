@@ -69,7 +69,7 @@ class CloningFetcher(Fetcher):
   # TODO: Support the explicit form if needed. It wouldn't be difficult.
 
   def __init__(self, import_path, meta_tag_reader):
-    super(CloningFetcher, self).__init__(import_path)
+    super().__init__(import_path)
     self._meta_tag_reader = meta_tag_reader
 
   def root(self):
@@ -108,7 +108,7 @@ class ArchiveFetcher(Fetcher):
     """
 
   def __init__(self, import_path, import_prefix, url_info, archive_retriever):
-    super(ArchiveFetcher, self).__init__(import_path)
+    super().__init__(import_path)
     self._import_prefix = import_prefix
     self._url_info = url_info
     self._archive_retriver = archive_retriever

@@ -29,7 +29,7 @@ class PyCodeStyleSubsystem(PluginSubsystemBase):
 
     # multiple statements
     # A common (acceptable) exception pattern at Twitter is:
-    #   class MyClass(object):
+    #   class MyClass:
     #     class Error(Exception): pass
     #     class DerpError(Error): pass
     #     class HerpError(Error): pass

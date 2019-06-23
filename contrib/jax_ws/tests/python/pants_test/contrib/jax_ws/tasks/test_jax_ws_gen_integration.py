@@ -17,7 +17,7 @@ class JaxWsGenTest(PantsRunIntegrationTest):
     return True
 
   def setUp(self):
-    super(JaxWsGenTest, self).setUp()
+    super().setUp()
     self.full_config = {
       'GLOBAL': {
         'pythonpath': ["%(buildroot)s/contrib/jax_ws/src/python"],

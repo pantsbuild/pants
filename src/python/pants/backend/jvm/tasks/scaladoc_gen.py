@@ -18,11 +18,11 @@ class ScaladocGen(JvmdocGen):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ScaladocGen, cls).subsystem_dependencies() + (DistributionLocator, ScalaPlatform.scoped(cls))
+    return super().subsystem_dependencies() + (DistributionLocator, ScalaPlatform.scoped(cls))
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(ScaladocGen, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     ScalaPlatform.prepare_tools(round_manager)
 
   def execute(self):

@@ -7,7 +7,7 @@ from collections import OrderedDict
 import six
 
 
-class Properties(object):
+class Properties:
   """A Python reader for java.util.Properties formatted data.
 
   Based on:

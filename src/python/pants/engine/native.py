@@ -476,7 +476,7 @@ class PyResult(datatype(['is_throw', 'handle'])):
   """Corresponds to the native object of the same name."""
 
 
-class ExternContext(object):
+class ExternContext:
   """A wrapper around python objects used in static extern functions in this module.
 
   See comments in `src/rust/engine/src/interning.rs` for more information on the relationship

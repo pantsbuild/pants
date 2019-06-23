@@ -11,12 +11,12 @@ from pants.util.dirutil import safe_mkdir
 class BundleEntries(NailgunTask):
   @classmethod
   def prepare(cls, options, round_manager):
-    super(BundleEntries, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data('kythe_entries_files')
 
   @classmethod
   def register_options(cls, register):
-    super(BundleEntries, cls).register_options(register)
+    super().register_options(register)
     register('--archive', type=str,
              choices=['none', 'uncompressed', 'tar', 'zip', 'gztar', 'bztar'],
              default='none', fingerprint=True,

@@ -19,7 +19,7 @@ class ScalaFix(RewriteBase):
 
   @classmethod
   def register_options(cls, register):
-    super(ScalaFix, cls).register_options(register)
+    super().register_options(register)
     register('--configuration', type=file_option, default=None, fingerprint=True,
              help='The config file to use (in HOCON format).')
     register('--rules', default='ProcedureSyntax', type=str, fingerprint=True,
@@ -46,7 +46,7 @@ class ScalaFix(RewriteBase):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(ScalaFix, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     # Only request a classpath if semantic checks are enabled.
     if options.semantic:
       round_manager.require_data('runtime_classpath')

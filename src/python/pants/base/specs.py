@@ -84,7 +84,7 @@ class SingleAddress(datatype(['directory', 'name']), Spec):
     if directory is None or name is None:
       raise ValueError('A SingleAddress must have both a directory and name. Got: '
                        '{}:{}'.format(directory, name))
-    return super(SingleAddress, cls).__new__(cls, directory, name)
+    return super().__new__(cls, directory, name)
 
   def to_spec_string(self):
     return '{}:{}'.format(self.directory, self.name)
@@ -191,7 +191,7 @@ class SpecsMatcher(datatype([('tags', tuple), ('exclude_patterns', tuple)])):
   """
 
   def __new__(cls, tags=None, exclude_patterns=tuple()):
-    return super(SpecsMatcher, cls).__new__(
+    return super().__new__(
       cls,
       tags=tuple(tags or []),
       exclude_patterns=tuple(exclude_patterns))
@@ -226,7 +226,7 @@ class Specs(datatype([('dependencies', tuple), ('matcher', SpecsMatcher)])):
   """A collection of Specs representing Spec subclasses, and a SpecsMatcher to filter results."""
 
   def __new__(cls, dependencies, tags=None, exclude_patterns=tuple()):
-    return super(Specs, cls).__new__(
+    return super().__new__(
       cls,
       dependencies=tuple(dependencies),
       matcher=SpecsMatcher(tags=tags, exclude_patterns=exclude_patterns),

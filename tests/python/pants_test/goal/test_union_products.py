@@ -9,7 +9,7 @@ from pants_test.test_base import TestBase
 
 class UnionProductsTest(TestBase):
   def setUp(self):
-    super(UnionProductsTest, self).setUp()
+    super().setUp()
     self.products = UnionProducts()
 
   def test_get_for_target(self):

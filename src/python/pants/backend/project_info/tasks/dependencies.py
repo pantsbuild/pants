@@ -21,7 +21,7 @@ class Dependencies(ConsoleTask):
 
   @classmethod
   def register_options(cls, register):
-    super(Dependencies, cls).register_options(register)
+    super().register_options(register)
     register('--internal-only', type=bool,
              help='Specifies that only internal dependencies should be included in the graph '
                   'output (no external jars).')
@@ -33,7 +33,7 @@ class Dependencies(ConsoleTask):
                   'in target BUILD file(s).')
 
   def __init__(self, *args, **kwargs):
-    super(Dependencies, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     self.is_internal_only = self.get_options().internal_only
     self.is_external_only = self.get_options().external_only

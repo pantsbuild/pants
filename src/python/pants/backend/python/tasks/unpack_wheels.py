@@ -46,7 +46,7 @@ class UnpackWheels(UnpackRemoteSourcesBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(UnpackWheels, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       PexBuilderWrapper.Factory,
       PythonInterpreterCache,
       PythonSetup,

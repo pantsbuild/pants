@@ -8,11 +8,11 @@ class SingletonMetaclass(type):
   def __call__(cls, *args, **kwargs):
     # TODO: convert this into an `@memoized_classproperty`!
     if not hasattr(cls, 'instance'):
-      cls.instance = super(SingletonMetaclass, cls).__call__(*args, **kwargs)
+      cls.instance = super().__call__(*args, **kwargs)
     return cls.instance
 
 
-class ClassPropertyDescriptor(object):
+class ClassPropertyDescriptor:
   """Define a readable attribute on a class, given a function."""
 
   # The current solution is preferred as it doesn't require any modifications to the class
@@ -48,7 +48,7 @@ def classproperty(func):
   bind the first argument to the class object.
 
   Usage:
-  >>> class Foo(object):
+  >>> class Foo:
   ...   @classproperty
   ...   def name(cls):
   ...     return cls.__name__
@@ -77,7 +77,7 @@ def staticproperty(func):
 
   Usage:
   >>> other_x = 'value'
-  >>> class Foo(object):
+  >>> class Foo:
   ...   @staticproperty
   ...   def x():
   ...     return other_x

@@ -13,7 +13,7 @@ from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants_test.engine.util import init_native
 
 
-class SchedulerTestBase(object):
+class SchedulerTestBase:
   """A mixin for classes (tests, presumably) which need to create temporary schedulers.
 
   TODO: In the medium term, this should be part of pants_test.test_base.TestBase.

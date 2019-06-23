@@ -17,7 +17,7 @@ from pants.util.memo import memoized_classproperty
 class PytestPrep(PythonExecutionTaskBase):
   """Prepares a PEX binary for the current test context with `pytest` as its entry-point."""
 
-  class PytestBinary(object):
+  class PytestBinary:
     """A `pytest` PEX binary with an embedded default (empty) `pytest.ini` config file."""
 
     @staticmethod
@@ -69,7 +69,7 @@ class PytestPrep(PythonExecutionTaskBase):
 
   @classmethod
   def implementation_version(cls):
-    return super(PytestPrep, cls).implementation_version() + [('PytestPrep', 2)]
+    return super().implementation_version() + [('PytestPrep', 2)]
 
   @classmethod
   def product_types(cls):
@@ -77,7 +77,7 @@ class PytestPrep(PythonExecutionTaskBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(PytestPrep, cls).subsystem_dependencies() + (PyTest,)
+    return super().subsystem_dependencies() + (PyTest,)
 
   @classmethod
   def _module_resource(cls, module_name, resource_relpath):

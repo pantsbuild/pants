@@ -25,7 +25,7 @@ class ExtraTestJarExample(JarTask):
 
   def __init__(self, context, workdir):
     # Constructor for custom task. Setup things that you need at pants initialization time.
-    super(ExtraTestJarExample, self).__init__(context, workdir)
+    super().__init__(context, workdir)
 
   # This method is called by pants, when the RoundEngine gets to the phase where your task is
   # attached.

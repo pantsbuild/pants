@@ -53,7 +53,7 @@ class InMemoryRWBuf(_RWBuf):
   situations that require a real file (e.g., redirecting stdout/stderr of subprocess.Popen())."""
 
   def __init__(self):
-    super(InMemoryRWBuf, self).__init__(BytesIO())
+    super().__init__(BytesIO())
     self._writepos = 0
 
   def do_write(self, s):
@@ -77,7 +77,7 @@ class FileBackedRWBuf(_RWBuf):
     self._io.write(s)
 
 
-class StringWriter(object):
+class StringWriter:
   """A write-only buffer which accepts strings and writes to another buffer which accepts bytes.
 
   Writes strings as utf-8.

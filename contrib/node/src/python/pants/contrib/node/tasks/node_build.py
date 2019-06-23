@@ -25,7 +25,7 @@ class NodeBuild(NodeTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(NodeBuild, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(NodePaths)
 
   @property

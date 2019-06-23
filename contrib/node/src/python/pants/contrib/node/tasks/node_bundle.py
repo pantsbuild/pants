@@ -19,11 +19,11 @@ class NodeBundle(NodeTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(NodeBundle, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data('bundleable_js')
 
   def __init__(self, *args, **kwargs):
-    super(NodeBundle, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._outdir = self.get_options().pants_distdir
 
   def execute(self):

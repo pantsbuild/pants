@@ -46,7 +46,7 @@ def rw_pipes(write_input=None):
 
 class NailgunExecutorTest(TestBase):
   def setUp(self):
-    super(NailgunExecutorTest, self).setUp()
+    super().setUp()
     self.executor = NailgunExecutor(identity='test',
                                     workdir='/__non_existent_dir',
                                     nailgun_classpath=[],

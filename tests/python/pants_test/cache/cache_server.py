@@ -92,7 +92,7 @@ class FailRESTHandler(http.server.SimpleHTTPRequestHandler):
     return self._return_failed()
 
 
-class TestCacheServer(object):
+class TestCacheServer:
   """A wrapper class that represents the underlying REST server.
 
   To create a TestCacheServer, use the `cache_server` factory function.

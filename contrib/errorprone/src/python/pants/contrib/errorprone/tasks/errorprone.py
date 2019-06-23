@@ -24,7 +24,7 @@ class ErrorProne(NailgunTask):
 
   @classmethod
   def register_options(cls, register):
-    super(ErrorProne, cls).register_options(register)
+    super().register_options(register)
 
     register('--skip', type=bool, help='Skip Error Prone.')
     register('--transitive', default=False, type=bool,
@@ -59,7 +59,7 @@ class ErrorProne(NailgunTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(ErrorProne, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data('runtime_classpath')
 
   @memoized_property

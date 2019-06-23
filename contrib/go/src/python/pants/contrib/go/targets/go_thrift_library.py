@@ -26,7 +26,7 @@ class GoThriftLibrary(Target):
     payload.add_field('sources',
                       self.create_sources_field(sources, address.spec_path, key_arg='sources'))
 
-    super(GoThriftLibrary, self).__init__(payload=payload, address=address, **kwargs)
+    super().__init__(payload=payload, address=address, **kwargs)
 
   @classmethod
   def alias(cls):
@@ -42,7 +42,7 @@ class GoThriftGenLibrary(GoTarget):
                                            sources_rel_path=address.spec_path,
                                            key_arg='sources'),
     })
-    super(GoThriftGenLibrary, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   @property
   def import_path(self):

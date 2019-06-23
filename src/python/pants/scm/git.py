@@ -105,7 +105,7 @@ class Git(Scm):
     remote:    The default remote to use.
     branch:    The default remote branch to use.
     """
-    super(Scm, self).__init__()
+    super().__init__()
 
     self._gitcmd = binary
     self._worktree = os.path.realpath(worktree or os.getcwd())
@@ -295,7 +295,7 @@ class Git(Scm):
     return GitRepositoryReader(self, rev)
 
 
-class GitRepositoryReader(object):
+class GitRepositoryReader:
   """
   Allows reading from files and directory information from an arbitrary git
   commit. This is useful for pants-aware git sparse checkouts.
@@ -413,19 +413,19 @@ class GitRepositoryReader(object):
       return None
     return path_so_far
 
-  class Symlink(object):
+  class Symlink:
 
     def __init__(self, name, sha):
       self.name = name
       self.sha = sha
 
-  class Dir(object):
+  class Dir:
 
     def __init__(self, name, sha):
       self.name = name
       self.sha = sha
 
-  class File(object):
+  class File:
 
     def __init__(self, name, sha):
       self.name = name

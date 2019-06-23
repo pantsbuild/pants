@@ -27,7 +27,7 @@ class JarCreateTestBase(JarTaskTestBase):
 
   @classmethod
   def alias_groups(cls):
-    return super(JarCreateTestBase, cls).alias_groups().merge(BuildFileAliases(
+    return super().alias_groups().merge(BuildFileAliases(
       targets={
         'java_library': JavaLibrary,
         'java_thrift_library': JavaThriftLibrary,
@@ -38,7 +38,7 @@ class JarCreateTestBase(JarTaskTestBase):
     ))
 
   def setUp(self):
-    super(JarCreateTestBase, self).setUp()
+    super().setUp()
     self.set_options(compressed=False, pants_bootstrapdir='~/.cache/pants', max_subprocess_args=100)
     init_subsystem(Target.Arguments)
 
@@ -78,7 +78,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
     return self.create_library(path, 'java_thrift_library', name, sources)
 
   def setUp(self):
-    super(JarCreateExecuteTest, self).setUp()
+    super().setUp()
 
     def test_path(path):
       return os.path.join(self.__class__.__name__, path)
@@ -89,7 +89,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
     # then call self.context() again to get hold of a context, which will superfluously (but
     # harmlessly) re-initialize Subsystem.
     # TODO: Fix this hack by separating option setup from context setup in the test sequence.
-    super(JarCreateExecuteTest, self).context()
+    super().context()
 
     self.res = self.create_resources(test_path('src/resources/com/twitter'), 'spam', 'r.txt')
     self.jl = self.java_library(test_path('src/java/com/twitter'), 'foo', ['a.java'],
@@ -109,7 +109,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
     self.empty_sl = self.scala_library(test_path('src/scala/com/foo'), 'foo', ['dupe.scala'])
 
   def context(self, **kwargs):
-    return super(JarCreateExecuteTest, self).context(
+    return super().context(
       target_roots=[self.jl, self.sl, self.binary, self.jtl, self.scala_lib, self.empty_sl],
       **kwargs)
 

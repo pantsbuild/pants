@@ -17,7 +17,7 @@ class ClassmapTaskTest(ConsoleTaskTestBase, JvmBinaryTaskTestBase):
     return ClassmapTask
 
   def setUp(self):
-    super(ClassmapTaskTest, self).setUp()
+    super().setUp()
     init_subsystem(Target.Arguments)
 
     self.add_to_build_file(

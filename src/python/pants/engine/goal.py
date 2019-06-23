@@ -107,12 +107,12 @@ class _GoalOptions(object):
   """A marker trait for the anonymous inner `Goal.Options` classes for `Goal`s."""
 
 
-class LineOriented(object):
+class LineOriented:
   """A mixin for Goal that adds Options to support the `line_oriented` context manager."""
 
   @classmethod
   def register_options(cls, register):
-    super(LineOriented, cls).register_options(register)
+    super().register_options(register)
     register('--sep', default='\\n', metavar='<separator>',
              help='String to use to separate result lines.')
     register('--output-file', metavar='<path>',

@@ -40,7 +40,7 @@ class LinkSharedLibraries(NativeTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(LinkSharedLibraries, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require(ObjectFiles)
 
   @property
@@ -49,7 +49,7 @@ class LinkSharedLibraries(NativeTask):
 
   @classmethod
   def implementation_version(cls):
-    return super(LinkSharedLibraries, cls).implementation_version() + [('LinkSharedLibraries', 1)]
+    return super().implementation_version() + [('LinkSharedLibraries', 1)]
 
   class LinkSharedLibrariesError(TaskError): pass
 

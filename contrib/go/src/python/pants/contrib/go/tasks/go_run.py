@@ -18,7 +18,7 @@ class GoRun(GoTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(GoRun, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data('exec_binary')
 
   def execute(self):

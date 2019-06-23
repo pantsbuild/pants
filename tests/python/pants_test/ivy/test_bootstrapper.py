@@ -11,7 +11,7 @@ from pants_test.subsystem.subsystem_util import init_subsystem
 
 class BootstrapperTest(unittest.TestCase):
   def setUp(self):
-    super(BootstrapperTest, self).setUp()
+    super().setUp()
     init_subsystem(IvySubsystem)
 
   def test_simple(self):

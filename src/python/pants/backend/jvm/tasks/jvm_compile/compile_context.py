@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from pants.util.contextutil import open_zip
 
 
-class CompileContext(object):
+class CompileContext:
   """A context for the compilation of a target.
 
   This can be used to differentiate between a partially completed compile in a temporary location

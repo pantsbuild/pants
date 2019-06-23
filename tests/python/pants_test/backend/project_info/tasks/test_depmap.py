@@ -24,7 +24,7 @@ class DepmapTest(BaseDepmapTest):
     return register_core().merge(register_jvm()).merge(register_python())
 
   def setUp(self):
-    super(DepmapTest, self).setUp()
+    super().setUp()
     subsystem_util.init_subsystem(PythonBinary.Defaults)
 
     def add_to_build_file(path, name, type, deps=(), **kwargs):

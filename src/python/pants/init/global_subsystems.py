@@ -11,7 +11,7 @@ from pants.scm.subsystems.changed import Changed
 from pants.source.source_root import SourceRootConfig
 
 
-class GlobalSubsystems(object):
+class GlobalSubsystems:
   @classmethod
   def get(cls):
     """Subsystems used outside of any task."""

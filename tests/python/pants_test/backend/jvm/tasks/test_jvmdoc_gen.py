@@ -33,7 +33,7 @@ class JvmdocGenTest(JvmTaskTestBase):
     return DummyJvmdocGen
 
   def setUp(self):
-    super(JvmdocGenTest, self).setUp()
+    super().setUp()
 
     self.t1 = self.make_target('t1')
     context = self.context(target_roots=[self.t1])

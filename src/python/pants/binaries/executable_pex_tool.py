@@ -18,7 +18,7 @@ class ExecutablePexTool(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ExecutablePexTool, cls).subsystem_dependencies() + (PexBuilderWrapper.Factory,)
+    return super().subsystem_dependencies() + (PexBuilderWrapper.Factory,)
 
   def bootstrap(self, interpreter, pex_file_path, extra_reqs=None):
     # Caching is done just by checking if the file at the specified path is already executable.

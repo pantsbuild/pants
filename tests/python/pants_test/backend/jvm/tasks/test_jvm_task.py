@@ -21,7 +21,7 @@ class JvmTaskTest(JvmTaskTestBase):
     return DummyJvmTask
 
   def setUp(self):
-    super(JvmTaskTest, self).setUp()
+    super().setUp()
 
     self.t1 = self.make_target('t1')
     self.t2 = self.make_target('t2')

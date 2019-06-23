@@ -31,7 +31,7 @@ class RunPrepCommandBase(Task):
     In this case, there are no special options, but we want to use this opportunity to setup
     goal validation in PrepCommand before the build graph is parsed.
     """
-    super(RunPrepCommandBase, cls).register_options(register)
+    super().register_options(register)
     PrepCommand.add_allowed_goal(cls.goal)
 
   @classmethod

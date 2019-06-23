@@ -4,7 +4,7 @@
 import os
 
 
-class CppToolchain(object):
+class CppToolchain:
   """Represents the cpp toolchain on the local system."""
 
   class Error(Exception):

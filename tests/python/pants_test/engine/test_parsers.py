@@ -11,7 +11,7 @@ from pants_test.engine.examples import parsers
 
 
 # A duck-typed Serializable with an `==` suitable for ease of testing.
-class Bob(object):
+class Bob:
   def __init__(self, **kwargs):
     self._kwargs = kwargs
 

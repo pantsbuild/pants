@@ -33,7 +33,7 @@ class JarCreate(JarBuilderTask):
 
   @classmethod
   def register_options(cls, register):
-    super(JarCreate, cls).register_options(register)
+    super().register_options(register)
     register('--compressed', default=True, type=bool,
              fingerprint=True,
              help='Create compressed jars.')
@@ -44,11 +44,11 @@ class JarCreate(JarBuilderTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JarCreate, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     cls.JarBuilder.prepare(round_manager)
 
   def __init__(self, *args, **kwargs):
-    super(JarCreate, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     self.compressed = self.get_options().compressed
     self._jars = {}

@@ -19,7 +19,7 @@ class RewriteBase(NailgunTask, metaclass=ABCMeta):
 
   @classmethod
   def register_options(cls, register):
-    super(RewriteBase, cls).register_options(register)
+    super().register_options(register)
     register('--target-types',
              default=cls.target_types(),
              advanced=True, type=list,

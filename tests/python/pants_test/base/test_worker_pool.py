@@ -9,7 +9,7 @@ from pants.base.workunit import WorkUnit
 from pants.util.contextutil import temporary_dir
 
 
-class FakeRunTracker(object):
+class FakeRunTracker:
   def register_thread(self, one):
     pass
 

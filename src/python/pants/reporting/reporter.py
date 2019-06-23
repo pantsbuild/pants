@@ -6,12 +6,12 @@ from collections import namedtuple
 from pants.reporting.report import Report
 
 
-class ReporterDestination(object):
+class ReporterDestination:
   OUT = 0
   ERR = 1
 
 
-class Reporter(object):
+class Reporter:
   """Formats and emits reports.
 
   Subclasses implement the callback methods, to provide specific reporting

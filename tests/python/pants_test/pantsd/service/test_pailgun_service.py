@@ -11,7 +11,7 @@ from pants.pantsd.service.pailgun_service import PailgunService
 PATCH_OPTS = dict(autospec=True, spec_set=True)
 
 
-class FakePailgun(object):
+class FakePailgun:
   server_port = 33333
 
 

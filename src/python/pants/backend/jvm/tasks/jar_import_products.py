@@ -6,7 +6,7 @@ from collections import defaultdict, namedtuple
 from pants.backend.jvm.targets.import_jars_mixin import ImportJarsMixin
 
 
-class JarImportProducts(object):
+class JarImportProducts:
   """Represents the products of jar import resolutions.
 
   Jar imports are jars containing source code to be unpacked and used locally.

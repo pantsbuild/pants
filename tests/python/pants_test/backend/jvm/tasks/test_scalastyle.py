@@ -61,7 +61,7 @@ class ScalastyleTest(NailgunTaskTestBase):
     return self.prepare_execute(self._create_context(scalastyle_config))
 
   def setUp(self):
-    super(ScalastyleTest, self).setUp()
+    super().setUp()
     # Default scalastyle config (import grouping rule) and no excludes.
     init_subsystem(ScalaPlatform, {
       ScalaPlatform.options_scope: {

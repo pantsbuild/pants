@@ -20,7 +20,7 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
 
   @classmethod
   def register_options(cls, register):
-    super(BenchmarkRun, cls).register_options(register)
+    super().register_options(register)
     register('--target', help='Name of the benchmark class. This is a mandatory argument.')
     register('--memory', type=bool, help='Enable memory profiling.')
     register('--debug', type=bool,
@@ -47,10 +47,10 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(BenchmarkRun, cls).subsystem_dependencies() + (DistributionLocator,)
+    return super().subsystem_dependencies() + (DistributionLocator,)
 
   def __init__(self, *args, **kwargs):
-    super(BenchmarkRun, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     # TODO(Steve Gury):
     # Find all the target classes from the Benchmark target itself
     # https://jira.twitter.biz/browse/AWESOME-1938

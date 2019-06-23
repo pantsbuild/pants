@@ -263,7 +263,7 @@ class JarPublishTest(NailgunTaskTestBase):
         task.check_targets(task.exported_targets())
 
 
-class FailNTimes(object):
+class FailNTimes:
 
   def __init__(self, tries, exc_type, success=None):
     self.tries = tries
@@ -301,7 +301,7 @@ class JarPublishAuthTest(NailgunTaskTestBase):
     return JarPublish
 
   def setUp(self):
-    super(JarPublishAuthTest, self).setUp()
+    super().setUp()
 
     self.set_options(
       jvm_options=['-Dfoo=bar'],
