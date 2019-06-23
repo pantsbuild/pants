@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
-from pants_test.testutils.py2_compat import assertRegex
 
 
 class PythonReplIntegrationTest(PantsRunIntegrationTest):
@@ -28,7 +27,7 @@ class PythonReplIntegrationTest(PantsRunIntegrationTest):
                '--quiet']
     program = 'from interpreter_selection.echo_interpreter_version import say_hello; say_hello()'
     pants_run = self.run_pants(command=command, stdin_data=program)
-    assertRegex(self, pants_run.stdout_data, r'2\.\d\.\d')
+    self.assertRegex(pants_run.stdout_data, r'2\.\d\.\d')
 
   @ensure_daemon
   def test_run_repl_with_3(self):
@@ -39,4 +38,4 @@ class PythonReplIntegrationTest(PantsRunIntegrationTest):
                '--quiet']
     program = 'from interpreter_selection.echo_interpreter_version import say_hello; say_hello()'
     pants_run = self.run_pants(command=command, stdin_data=program)
-    assertRegex(self, pants_run.stdout_data, r'3\.\d\.\d')
+    self.assertRegex(pants_run.stdout_data, r'3\.\d\.\d')

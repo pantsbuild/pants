@@ -10,7 +10,6 @@ from future.utils import PY3
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job, JobExistsError,
                                                                  NoRootJobError, UnknownJobError)
-from pants_test.testutils.py2_compat import assertRegex
 
 
 class ImmediatelyExecutingPool(object):
@@ -316,4 +315,4 @@ class ExecutionGraphTest(unittest.TestCase):
       "Traceback:.*in raising_wrapper.*raise Exception\\(\"I'm an error\"\\)",
       re.DOTALL,
     )
-    assertRegex(self, error_logs[1], regex)
+    self.assertRegex(error_logs[1], regex)

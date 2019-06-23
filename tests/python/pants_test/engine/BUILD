@@ -164,7 +164,6 @@ python_tests(
   sources=['test_parsers.py'],
   dependencies=[
     'tests/python/pants_test/engine/examples:parsers',
-    'tests/python/pants_test/testutils:py2_compat',
     'src/python/pants/engine:objects',
   ]
 )
@@ -184,7 +183,6 @@ python_tests(
     'src/python/pants/util:objects',
     'tests/python/pants_test/engine/examples:parsers',
     'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test/testutils:py2_compat',
     'tests/python/pants_test:test_base',
   ]
 )

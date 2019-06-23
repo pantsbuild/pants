@@ -46,7 +46,6 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:process_handler',
     'tests/python/pants_test/testutils:git_util',
-    'tests/python/pants_test/testutils:py2_compat',
     'tests/python/pants_test:test_base',
     'tests/python/pants_test:int-test',
   ],
@@ -98,7 +97,6 @@ python_tests(
   dependencies = [
     'src/python/pants/base:project_tree',
     'tests/python/pants_test:int-test',
-    'tests/python/pants_test/testutils:py2_compat',
   ],
   tags = {'integration'},
   timeout = 180,
@@ -148,7 +146,6 @@ python_tests(
   sources = ['test_list_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test',
-    'tests/python/pants_test/testutils:py2_compat',
   ],
   tags = {'integration'},
   timeout = 180,

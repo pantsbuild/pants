@@ -11,13 +11,12 @@ from pants.base.exception_sink import ExceptionSink
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file, safe_file_dump, safe_mkdir, touch
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.testutils.py2_compat import assertRegex
 
 
 class ExceptionSinkIntegrationTest(PantsRunIntegrationTest):
 
   def _assert_unhandled_exception_log_matches(self, pid, file_contents):
-    assertRegex(self, file_contents, """\
+    self.assertRegex(file_contents, """\
 timestamp: ([^\n]+)
 process title: ([^\n]+)
 sys\\.argv: ([^\n]+)
@@ -52,7 +51,7 @@ Exception message:.* 1 Exception encountered:
         # The backtrace should be omitted when --print-exception-stacktrace=False.
         print_exception_stacktrace=False)
       self.assert_failure(pants_run)
-      assertRegex(self, pants_run.stderr_data, """\
+      self.assertRegex(pants_run.stderr_data, """\
 timestamp: ([^\n]+)
 Exception caught: \\(pants\\.engine\\.scheduler\\.ExecutionError\\) \\(backtrace omitted\\)
 Exception message: 1 Exception encountered:
@@ -65,7 +64,7 @@ Exception message: 1 Exception encountered:
         pants_run.pid, read_file(shared_log_file))
 
   def _assert_graceful_signal_log_matches(self, pid, signum, signame, contents):
-    assertRegex(self, contents, """\
+    self.assertRegex(contents, """\
 timestamp: ([^\n]+)
 process title: ([^\n]+)
 sys\\.argv: ([^\n]+)
@@ -120,7 +119,7 @@ Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
     }
     for (signum, signame) in signal_names.items():
       with self._send_signal_to_waiter_handle(signum) as (workdir, waiter_run):
-        assertRegex(self, waiter_run.stderr_data, """\
+        self.assertRegex(waiter_run.stderr_data, """\
 timestamp: ([^\n]+)
 Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
 """.format(signum=signum, signame=signame))
@@ -137,7 +136,7 @@ Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
     with self._send_signal_to_waiter_handle(signal.SIGABRT) as (workdir, waiter_run):
       # Check that the logs show an abort signal and the beginning of a traceback.
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(workdir, waiter_run)
-      assertRegex(self, read_file(pid_specific_log_file), """\
+      self.assertRegex(read_file(pid_specific_log_file), """\
 Fatal Python error: Aborted
 
 Thread [^\n]+ \\(most recent call first\\):
@@ -153,7 +152,7 @@ Thread [^\n]+ \\(most recent call first\\):
 
       waiter_run = join()
       self.assert_success(waiter_run)
-      assertRegex(self, waiter_run.stderr_data, """\
+      self.assertRegex(waiter_run.stderr_data, """\
 Current thread [^\n]+ \\(most recent call first\\):
 """)
 

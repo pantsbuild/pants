@@ -17,7 +17,6 @@ from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, safe_open, tou
 from pants_test.pants_run_integration_test import read_pantsd_log
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 from pants_test.testutils.process_test_util import no_lingering_process_by_command
-from pants_test.testutils.py2_compat import assertNotRegex, assertRegex
 
 
 def launch_file_toucher(f):
@@ -83,7 +82,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
           continue
 
         # Check if the line begins with W or E to check if it is a warning or error line.
-        assertNotRegex(self, line, r'^[WE].*',
+        self.assertNotRegex(line, r'^[WE].*',
                        'error message detected in log:\n{}'.format(full_log))
 
   def test_pantsd_broken_pipe(self):
@@ -325,11 +324,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         return '\n'.join(read_pantsd_log(workdir))
 
       # Check the logs.
-      assertRegex(
-        self,
-        full_pantsd_log(),
-        r'watching invalidating files:.*{}'.format(test_dir)
-      )
+      self.assertRegex(full_pantsd_log(), r'watching invalidating files:.*{}'.format(test_dir))
 
       checker.assert_running()
 
@@ -445,17 +440,17 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         safe_file_dump(test_build_file, "python_library(sources=globs('some_non_existent_file.py'))")
         result = pantsd_run(export_cmd)
         checker.assert_running()
-        assertNotRegex(self, result.stdout_data, has_source_root_regex)
+        self.assertNotRegex(result.stdout_data, has_source_root_regex)
 
         safe_file_dump(test_build_file, "python_library(sources=globs('*.py'))")
         result = pantsd_run(export_cmd)
         checker.assert_running()
-        assertNotRegex(self, result.stdout_data, has_source_root_regex)
+        self.assertNotRegex(result.stdout_data, has_source_root_regex)
 
         safe_file_dump(test_src_file, 'import this\n')
         result = pantsd_run(export_cmd)
         checker.assert_running()
-        assertRegex(self, result.stdout_data, has_source_root_regex)
+        self.assertRegex(result.stdout_data, has_source_root_regex)
     finally:
       rm_rf(test_path)
 
@@ -537,7 +532,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       self.assert_failure(waiter_run)
 
       for regexp in regexps:
-        assertRegex(self, waiter_run.stderr_data, regexp)
+        self.assertRegex(waiter_run.stderr_data, regexp)
 
       time.sleep(1)
       for proc in pantsd_runner_processes:

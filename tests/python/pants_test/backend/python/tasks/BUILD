@@ -42,7 +42,6 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:process_handler',
     'tests/python/pants_test:int-test',
-    'tests/python/pants_test/testutils:py2_compat',
   ],
   tags = {'integration'},
   timeout=450
@@ -113,7 +112,6 @@ python_tests(
     'src/python/pants/source',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:py2_compat',
     'tests/python/pants_test:task_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
     ':python_task_test_base',
@@ -176,7 +174,6 @@ python_tests(
   sources = ['test_python_repl_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test',
-    'tests/python/pants_test/testutils:py2_compat',
   ],
   tags = {'integration'},
   timeout=120,

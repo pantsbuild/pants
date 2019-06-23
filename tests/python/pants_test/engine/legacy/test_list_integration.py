@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.testutils.py2_compat import assertRegex
 
 
 class ListIntegrationTest(PantsRunIntegrationTest):
@@ -38,7 +37,7 @@ class ListIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.do_command('list',
                                 'testprojects/tests/java/org/pantsbuild/build_parsing::',
                                 success=True)
-    assertRegex(self,
+    self.assertRegex(
       pants_run.stdout_data,
       r'testprojects/tests/java/org/pantsbuild/build_parsing:trailing_glob_doublestar'
     )

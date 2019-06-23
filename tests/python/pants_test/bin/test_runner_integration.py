@@ -6,7 +6,6 @@ import os
 from pants.base.build_environment import get_buildroot
 from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.testutils.py2_compat import assertRegex
 
 
 class RunnerIntegrationTest(PantsRunIntegrationTest):
@@ -31,8 +30,7 @@ class RunnerIntegrationTest(PantsRunIntegrationTest):
 
     warning_run = self.run_pants(cmdline)
     self.assert_success(warning_run)
-    assertRegex(
-      self,
+    self.assertRegex(
       warning_run.stderr_data,
       '\\[WARN\\].*DeprecationWarning: DEPRECATED: This is a test warning!')
 

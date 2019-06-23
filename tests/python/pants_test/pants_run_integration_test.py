@@ -513,7 +513,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     prefix = "[{}] {}:pid=".format(level, module)
     suffix = ": {}".format(msg)
     if pid is None:
-      self.assertRegexpMatches(log, re.escape(prefix) + "\\d+" + re.escape(suffix))
+      self.assertRegex(log, re.escape(prefix) + "\\d+" + re.escape(suffix))
     else:
       self.assertIn("{}{}{}".format(prefix, pid, suffix), log)
 
