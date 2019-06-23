@@ -94,8 +94,7 @@ class RscCompileContext(CompileContext):
                args_file,
                sources,
                workflow):
-    super().__init__(target, analysis_file, classes_dir, jar_file,
-                                               log_dir, args_file, sources)
+    super().__init__(target, analysis_file, classes_dir, jar_file, log_dir, args_file, sources)
     self.workflow = workflow
     self.rsc_jar_file = rsc_jar_file
 
@@ -209,8 +208,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   # Overrides the normal zinc compiler classpath, which only contains zinc.
   def get_zinc_compiler_classpath(self):
     return self.execution_strategy_enum.resolve_for_enum_variant({
-      self.HERMETIC: lambda: super().get_zinc_compiler_classpath(),
-      self.SUBPROCESS: lambda: super().get_zinc_compiler_classpath(),
+      # NB: We must use the verbose version of super() here, possibly because of the lambda.
+      self.HERMETIC: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
+      self.SUBPROCESS: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
       self.NAILGUN: lambda: self._nailgunnable_combined_classpath,
     })()
 
