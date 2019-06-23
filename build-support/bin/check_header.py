@@ -20,8 +20,8 @@ EXPECTED_HEADER = dedent("""\
 
 EXPECTED_NUM_LINES = 3
 
-_current_year = str(datetime.datetime.now().year)
-_current_century_regex = re.compile(r'20\d\d')
+CURRENT_YEAR = str(datetime.datetime.now().year)
+CURRENT_CENTURY_REGEX = re.compile(r'20\d\d')
 
 
 class HeaderCheckFailure(Exception):
@@ -92,12 +92,12 @@ def check_copyright_year(file_path: Path, *, copyright_line: str, is_newly_creat
   """Check that copyright is current year if for a new file, else that it's within
   the current century."""
   year = copyright_line[12:16]
-  if is_newly_created and year != _current_year:
-    raise HeaderCheckFailure(f'{file_path}: copyright year must be {_current_year} (was {year})')
-  elif not _current_century_regex.match(year):
+  if is_newly_created and year != CURRENT_YEAR:
+    raise HeaderCheckFailure(f'{file_path}: copyright year must be {CURRENT_YEAR} (was {year})')
+  elif not CURRENT_CENTURY_REGEX.match(year):
     raise HeaderCheckFailure(
-      f"{file_path}: copyright year must match '{_current_century_regex.pattern}' (was {year}): " +
-      f"current year is {_current_year}"
+      f"{file_path}: copyright year must match '{CURRENT_CENTURY_REGEX.pattern}' (was {year}): " +
+      f"current year is {CURRENT_YEAR}"
     )
 
 
