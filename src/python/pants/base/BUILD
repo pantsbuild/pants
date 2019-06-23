@@ -106,7 +106,6 @@ python_library(
   dependencies = [
     '3rdparty/python:future',
     ':deprecated',
-    'src/python/pants/util:collections_abc_backport',
     'src/python/pants/util:objects',
   ]
 )
@@ -167,7 +166,6 @@ python_library(
   name = 'run_info',
   sources = ['run_info.py'],
   dependencies = [
-    'src/python/pants/util:collections_abc_backport',
     ':build_environment',
     'src/python/pants/util:dirutil',
     'src/python/pants:version',

@@ -4,6 +4,7 @@
 import logging
 import os.path
 from abc import ABCMeta, abstractmethod
+from collections.abc import MutableSequence, MutableSet
 
 from six import string_types
 
@@ -14,7 +15,6 @@ from pants.engine.objects import Locatable
 from pants.engine.rules import UnionRule, union
 from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
-from pants.util.collections_abc_backport import MutableSequence, MutableSet
 from pants.util.contextutil import exception_logging
 from pants.util.meta import classproperty
 from pants.util.objects import Exactly, SubclassesOf, datatype

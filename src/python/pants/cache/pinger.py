@@ -1,7 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from collections import deque
+from collections import Counter, deque
 from contextlib import contextmanager
 from multiprocessing.pool import ThreadPool
 
@@ -9,7 +9,6 @@ import requests
 from future.moves.urllib.parse import urlparse
 
 from pants.cache.artifact_cache import ArtifactCacheError
-from pants.util.collections_abc_backport import Counter
 from pants.util.contextutil import Timer
 from pants.util.memo import memoized_method
 

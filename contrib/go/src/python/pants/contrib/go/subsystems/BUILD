@@ -3,7 +3,6 @@
 
 python_library(
   dependencies=[
-    'src/python/pants/util:collections_abc_backport',
     '3rdparty/python:requests',
     '3rdparty/python:pyopenssl',
     '3rdparty/python:six',

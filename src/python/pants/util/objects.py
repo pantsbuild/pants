@@ -3,11 +3,12 @@
 
 import re
 from abc import ABC, abstractmethod
+from collections import OrderedDict, namedtuple
+from collections.abc import Iterable
 
 from future.utils import binary_type, text_type
 from twitter.common.collections import OrderedSet
 
-from pants.util.collections_abc_backport import Iterable, OrderedDict, namedtuple
 from pants.util.memo import memoized_classproperty
 from pants.util.meta import classproperty
 from pants.util.strutil import pluralize

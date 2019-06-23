@@ -5,7 +5,7 @@ import itertools
 import logging
 import weakref
 from abc import ABC, abstractmethod
-from collections import defaultdict, deque
+from collections import OrderedDict, defaultdict, deque
 
 from twitter.common.collections import OrderedSet
 
@@ -13,7 +13,6 @@ from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.injectables_mixin import InjectablesMixin
 from pants.build_graph.target import Target
-from pants.util.collections_abc_backport import OrderedDict
 
 
 logger = logging.getLogger(__name__)

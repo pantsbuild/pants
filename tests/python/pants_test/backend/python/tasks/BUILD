@@ -4,9 +4,6 @@
 python_library(
   name='interpreter_cache_test_mixin',
   sources=['interpreter_cache_test_mixin.py'],
-  dependencies = [
-    'src/python/pants/util:collections_abc_backport',
-  ]
 )
 
 python_library(
@@ -253,7 +250,6 @@ python_tests(
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/fs',
-    'src/python/pants/util:collections_abc_backport',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/backend/python:interpreter_selection_utils',

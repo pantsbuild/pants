@@ -7,6 +7,8 @@ import itertools
 import logging
 import sys
 from abc import ABC, abstractmethod
+from collections import OrderedDict
+from collections.abc import Iterable
 
 import asttokens
 from twitter.common.collections import OrderedSet
@@ -14,7 +16,6 @@ from twitter.common.collections import OrderedSet
 from pants.engine.goal import Goal
 from pants.engine.selectors import Get
 from pants.util.collections import assert_single_element
-from pants.util.collections_abc_backport import Iterable, OrderedDict
 from pants.util.memo import memoized
 from pants.util.objects import SubclassesOf, TypedCollection, datatype
 

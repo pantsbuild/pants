@@ -4,13 +4,12 @@
 import inspect
 import re
 import textwrap
-from collections import namedtuple
+from collections import OrderedDict, namedtuple
 
 from future.utils import PY3
 
 from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
-from pants.util.collections_abc_backport import OrderedDict
 from pants.util.memo import memoized_method
 
 

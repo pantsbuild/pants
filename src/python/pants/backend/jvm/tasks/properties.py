@@ -2,10 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
+from collections import OrderedDict
 
 import six
-
-from pants.util.collections_abc_backport import OrderedDict
 
 
 class Properties(object):

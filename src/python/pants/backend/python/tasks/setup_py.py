@@ -8,7 +8,8 @@ import os
 import shutil
 import textwrap
 from abc import ABC, abstractmethod
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
+from collections.abc import Iterable, Mapping, MutableSequence, Set
 
 from pex.installer import Packager, WheelInstaller
 from pex.interpreter import PythonInterpreter
@@ -30,7 +31,6 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.resources import Resources
 from pants.task.task import Task
-from pants.util.collections_abc_backport import Iterable, Mapping, MutableSequence, OrderedDict, Set
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_concurrent_creation, safe_rmtree, safe_walk
 from pants.util.memo import memoized_property

@@ -23,11 +23,6 @@ def main() -> None:
     correct_import_message="`from pants.util.process_handler import subprocess`"
   )
   check_banned_import(
-    python_files,
-    bad_import_regex=r"^import future.moves.collections|^from future.moves.collections import|^from future.moves import .*collections",
-    correct_import_message="`import collections` or `from pants.util.collections_abc_backport`"
-  )
-  check_banned_import(
     rust_files,
     bad_import_regex=r"^use std::sync::.*(Mutex|RwLock)",
     correct_import_message="`parking_lot::(Mutex|RwLock)`"

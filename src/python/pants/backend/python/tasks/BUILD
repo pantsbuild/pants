@@ -3,7 +3,6 @@
 
 python_library(
   dependencies=[
-    'src/python/pants/util:collections_abc_backport',
     '3rdparty/python:pex',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
