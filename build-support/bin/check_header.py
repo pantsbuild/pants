@@ -59,6 +59,18 @@ def create_parser() -> argparse.ArgumentParser:
   return parser
 
 
+def check_dir(*, directory: Path, newly_created_files: Sequence[Path]) -> List[HeaderCheckFailure]:
+  header_parse_failures: List[HeaderCheckFailure] = []
+  for fp in directory.rglob("*.py"):
+    if fp.name == '__init__.py' or fp.parent.as_posix().endswith('contrib/python/checks/checker'):
+      continue
+    try:
+      check_header(fp, is_newly_created=fp in newly_created_files)
+    except HeaderCheckFailure as e:
+      header_parse_failures.append(e)
+  return header_parse_failures
+
+
 def check_header(file_path: Path, *, is_newly_created: bool = False) -> None:
   """Raises `HeaderCheckFailure` if the header doesn't match."""
   lines = get_header_lines(file_path)
@@ -107,18 +119,6 @@ def check_matches_header(file_path: Path, lines: List[str]) -> None:
   sanitized_lines[0] = "# Copyright YYYY" + copyright_line[16:]
   if "".join(sanitized_lines) != EXPECTED_HEADER:
     raise HeaderCheckFailure(f"{file_path}: header does not match the expected header")
-
-
-def check_dir(*, directory: Path, newly_created_files: Sequence[Path]) -> List[HeaderCheckFailure]:
-  header_parse_failures: List[HeaderCheckFailure] = []
-  for fp in directory.rglob("*.py"):
-    if fp.name == '__init__.py' or fp.parent.as_posix().endswith('contrib/python/checks/checker'):
-      continue
-    try:
-      check_header(fp, is_newly_created=fp in newly_created_files)
-    except HeaderCheckFailure as e:
-      header_parse_failures.append(e)
-  return header_parse_failures
 
 
 if __name__ == '__main__':
