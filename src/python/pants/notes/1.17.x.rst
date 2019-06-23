@@ -2,6 +2,44 @@
 ======================
 This document describes releases leading up to the ``1.17.x`` ``stable`` series.
 
+1.17.0rc1 (6/22/2019)
+---------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Use `--no-enabled-shared` for Linux wheel-builder interpreter so that the released PEX works with statically built interpreters (#7794)
+  `PR #7794 <https://github.com/pantsbuild/pants/pull/7794>`_
+
+Bugfixes
+~~~~~~~~
+
+* Use Selectors module for more robust and efficient syscalls (#7882)
+  `Issue #7880 <https://github.com/pantsbuild/pants/issues/7880>`_
+  `PR #7882 <https://github.com/pantsbuild/pants/pull/7882>`_
+
+* Fix Nailgun failure when the port is not specified (#7878)
+  `PR #7878 <https://github.com/pantsbuild/pants/pull/7878>`_
+
+* Fix Junit runner failing when `--extra-jvm-options` provided (#7877)
+  `PR #7877 <https://github.com/pantsbuild/pants/pull/7877>`_
+  `PR #7067 <https://github.com/pantsbuild/pants/pull/7067>`_
+
+* Fix `py-thrift-namespace-clash-check` type issue when logging with `--no-strict` mode (#7864)
+  `PR #7864 <https://github.com/pantsbuild/pants/pull/7864>`_
+
+* Fix rsc compile transitive dep bug introduced in #7742 (#7825)
+  `PR #7825 <https://github.com/pantsbuild/pants/pull/7825>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Re-instate PosixFS Threadpool (#7848)
+  `PR #7848 <https://github.com/pantsbuild/pants/pull/7848>`_
+
+* Avoid redundant work while hackily_snapshot()ing. (#7829)
+  `PR #7829 <https://github.com/pantsbuild/pants/pull/7829>`_
+
 1.17.0rc0 (5/30/2019)
 ---------------------
 
