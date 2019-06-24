@@ -106,8 +106,7 @@ class ExclusiveRequestTimeout(Exception):
 
 
 class ImmediateTimeout(Exception):
-  """Represents an early exit for the attempted pailgun connection when
-     --allow-pantsd-concurrent-runs is set."""
+  """Represents an early exit for the attempted pailgun connection when --concurrent is set."""
 
 
 class PailgunHandleRequestLock(object):
@@ -282,14 +281,14 @@ class PailgunServer(ThreadingMixIn, TCPServer):
     else:
       if no_concurrent:
         self._send_stderr(request, "Another pants invocation is running with pantsd enabled.")
-        raise ImmediateTimeout("Exiting quickly with pantsd concurrent runs disabled.")
+        raise ImmediateTimeout("Exiting quickly with concurrent runs disabled.")
       # We have to wait for another request to finish being handled.
       self._send_stderr(request, "Another pants invocation is running with pantsd enabled. "
                                  "Will wait {} for it to finish before giving up.\n".format(
                                    "forever" if self._should_poll_forever(timeout)
                                    else "up to {} seconds".format(timeout)))
       self._send_stderr(request, "If you don't want to wait for the first run to finish, please "
-                                 "press Ctrl-C and run this command with PANTS_ALLOW_PANTSD_CONCURRENT_RUNS=True "
+                                 "press Ctrl-C and run this command with PANTS_CONCURRENT=True "
                                  "in the environment.")
       while not self.free_to_handle_request_lock.acquire(timeout=user_notification_interval):
         time_polled += user_notification_interval

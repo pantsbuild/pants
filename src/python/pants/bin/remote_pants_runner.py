@@ -143,7 +143,7 @@ class RemotePantsRunner:
     modified_env = combined_dict(self._env, ng_env)
     modified_env['PANTSD_RUNTRACKER_CLIENT_START_TIME'] = str(self._start_time)
     modified_env['PANTSD_REQUEST_TIMEOUT_LIMIT'] = str(self._bootstrap_options.for_global_scope().pantsd_timeout_when_multiple_invocations)
-    modified_env['PANTSD_ALLOW_CONCURRENT_RUNS'] = str(self._bootstrap_options.for_global_scope().allow_pantsd_concurrent_runs)
+    modified_env['PANTSD_ALLOW_CONCURRENT_RUNS'] = str(self._bootstrap_options.for_global_scope().concurrent)
 
     assert isinstance(port, int), \
       'port {} is not an integer! It has type {}.'.format(port, type(port))
