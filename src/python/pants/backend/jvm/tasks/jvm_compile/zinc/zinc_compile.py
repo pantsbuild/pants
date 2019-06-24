@@ -91,7 +91,7 @@ class BaseZincCompile(JvmCompile):
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('BaseZincCompile', 7)]
+    return super().implementation_version() + [('BaseZincCompile', 8)]
 
   @classmethod
   def get_jvm_options_default(cls, bootstrap_option_values):
