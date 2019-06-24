@@ -365,9 +365,8 @@ class BaseZincCompile(JvmCompile):
   def _compile_nonhermetic(self, jvm_options, ctx, classes_directory):
     # Populate the resources to merge post compile onto disk for the nonhermetic case,
     # where `--post-compile-merge-dir` was added is the relevant part.
-    digest = self.extra_post_compile_resources_digest(ctx)
     self.context._scheduler.materialize_directories((
-      DirectoryToMaterialize(get_buildroot(), digest),
+      DirectoryToMaterialize(get_buildroot(), self.extra_post_compile_resources_digest(ctx)),
     ))
 
     exit_code = self.runjava(
