@@ -689,3 +689,16 @@ Interrupted by user over pailgun client!
         with open(os.path.join(directory, 'BUILD'), 'w') as f:
           f.write(template.format(a_deps='', b_deps='dependencies = [":A"],'))
         list_and_verify()
+
+  def test_concurrent_overrides_pantsd(self):
+    """
+    Tests that the --concurrent flag overrides the --enable-pantsd flag,
+    because we don't allow concurrent runs under pantsd.
+    """
+    config = {'GLOBAL': {'concurrent': True, 'enable_pantsd': True}}
+    with self.temporary_workdir() as workdir:
+      pants_run = self.run_pants_with_workdir(['goals'], workdir=workdir, config=config)
+      self.assert_success(pants_run)
+      # TODO migrate to pathlib when we cut 1.18.x
+      pantsd_log_location = os.path.join(workdir, 'pantsd', 'pantsd.log')
+      self.assertFalse(os.path.exists(pantsd_log_location))
