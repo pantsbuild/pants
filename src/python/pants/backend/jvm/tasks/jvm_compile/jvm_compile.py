@@ -286,13 +286,20 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     if not extra_resources:
       return EMPTY_DIRECTORY_DIGEST
 
-    safe_mkdir(compile_context.post_compile_merge_dir)
-    for filename, filecontent in extra_resources.items():
-      safe_file_dump(os.path.join(compile_context.post_compile_merge_dir, filename), filecontent)
-    snapshot, = self.context._scheduler.capture_snapshots([
-        PathGlobsAndRoot(PathGlobs(extra_resources), compile_context.post_compile_merge_dir)
+    with temporary_dir() as tmpdir:
+      rel_post_compile_merge_dir = fast_relpath(compile_context.post_compile_merge_dir, get_buildroot())
+      root_dir = os.path.join(tmpdir, rel_post_compile_merge_dir)
+      safe_mkdir(root_dir)
+
+      for filename, filecontent in extra_resources.items():
+        safe_file_dump(os.path.join(root_dir, filename), filecontent)
+
+      extra_resources_relative_to_rootdir = {os.path.join(rel_post_compile_merge_dir, k): v for k, v in
+                                             extra_resources.items()}
+      snapshot, = self.context._scheduler.capture_snapshots([
+        PathGlobsAndRoot(PathGlobs(extra_resources_relative_to_rootdir), tmpdir)
       ])
-    return snapshot.directory_digest
+      return snapshot.directory_digest
 
   def write_argsfile(self, ctx, args):
     """Write the argsfile for this context."""

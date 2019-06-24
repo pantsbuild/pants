@@ -290,7 +290,6 @@ class BaseZincCompile(JvmCompile):
       zinc_args.append('-no-color')
 
     if self.post_compile_extra_resources(ctx):
-      self.extra_post_compile_resources_digest(ctx)
       post_compile_merge_dir = relative_to_exec_root(ctx.post_compile_merge_dir)
       zinc_args.extend(['--post-compile-merge-dir', post_compile_merge_dir])
 
@@ -364,6 +363,13 @@ class BaseZincCompile(JvmCompile):
     """An exception type specifically to signal a failed zinc execution."""
 
   def _compile_nonhermetic(self, jvm_options, ctx, classes_directory):
+    # Populate the resources to merge post compile onto disk for the nonhermetic case,
+    # where `--post-compile-merge-dir` was added is the relevant part.
+    digest = self.extra_post_compile_resources_digest(ctx)
+    self.context._scheduler.materialize_directories((
+      DirectoryToMaterialize(get_buildroot(), digest),
+    ))
+
     exit_code = self.runjava(
                              # classpath=self.get_zinc_compiler_classpath(),
                              classpath=['/Users/yic/workspace/pants/dist/bin.jar'],
@@ -379,7 +385,8 @@ class BaseZincCompile(JvmCompile):
   def _compile_hermetic(self, jvm_options, ctx, classes_dir, jar_file,
                         compiler_bridge_classpath_entry, dependency_classpath,
                         scalac_classpath_entries):
-    zinc_relpath = fast_relpath(self._zinc.zinc, get_buildroot())
+    # zinc_relpath = fast_relpath(self._zinc.zinc, get_buildroot())
+    zinc_relpath = '/Users/yic/workspace/pants/dist/bin.jar'
 
     snapshots = [
       self._zinc.snapshot(self.context._scheduler),
