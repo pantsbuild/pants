@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import glob
 import os
 from abc import abstractmethod
-from builtins import object
 from contextlib import closing, contextmanager
 from io import BytesIO
 
@@ -77,7 +73,7 @@ class TaskTestBase(TestBase):
     """
     :API: public
     """
-    super(TaskTestBase, self).setUp()
+    super().setUp()
     self._testing_task_type = self.synthesize_task_subtype(self.task_type(), self.options_scope)
     # We locate the workdir below the pants_workdir, which BaseTest locates within the BuildRoot.
     # BaseTest cleans this up, so we don't need to.  We give it a stable name, so that we can
@@ -129,7 +125,7 @@ class TaskTestBase(TestBase):
     """
     # Add in our task type.
     for_task_types = [self._testing_task_type] + (for_task_types or [])
-    return super(TaskTestBase, self).context(for_task_types=for_task_types, **kwargs)
+    return super().context(for_task_types=for_task_types, **kwargs)
 
   def create_task(self, context, workdir=None):
     """
@@ -184,7 +180,7 @@ class ConsoleTaskTestBase(TaskTestBase):
     :API: public
     """
     Goal.clear()
-    super(ConsoleTaskTestBase, self).setUp()
+    super().setUp()
 
     task_type = self.task_type()
     assert issubclass(task_type, ConsoleTask), \
@@ -307,7 +303,7 @@ class ConsoleTaskTestBase(TaskTestBase):
       self.execute_console_task(**kwargs)
 
 
-class DeclarativeTaskTestMixin(object):
+class DeclarativeTaskTestMixin:
   """Experimental mixin for task tests allows specifying tasks to be run before or after the task.
 
   Calling `self.invoke_tasks()` will create instances of and execute task types in

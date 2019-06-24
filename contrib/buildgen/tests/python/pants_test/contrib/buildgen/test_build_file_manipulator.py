@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import open
 from textwrap import dedent
 
 from pants.base.build_file import BuildFile
@@ -23,7 +19,7 @@ class BuildFileManipulatorTest(TestBase):
     return BuildFile(self.project_tree, 'BUILD')
 
   def setUp(self):
-    super(BuildFileManipulatorTest, self).setUp()
+    super().setUp()
     self.project_tree = FileSystemProjectTree(self.build_root)
     self.complicated_dep_comments = dedent(
       """\

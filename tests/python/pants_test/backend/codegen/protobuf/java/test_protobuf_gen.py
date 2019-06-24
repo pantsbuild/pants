@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -18,7 +15,7 @@ from pants_test.task_test_base import TaskTestBase
 class ProtobufGenTest(TaskTestBase):
 
   def setUp(self):
-    super(ProtobufGenTest, self).setUp()
+    super().setUp()
     self.set_options(pants_bootstrapdir='~/.cache/pants',
                      max_subprocess_args=100,
                      binaries_fetch_timeout_secs=1,

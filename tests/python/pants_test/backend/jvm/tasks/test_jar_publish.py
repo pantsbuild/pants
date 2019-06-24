@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import unittest
-from builtins import object, str
 
 from mock import Mock
 
@@ -267,7 +263,7 @@ class JarPublishTest(NailgunTaskTestBase):
         task.check_targets(task.exported_targets())
 
 
-class FailNTimes(object):
+class FailNTimes:
 
   def __init__(self, tries, exc_type, success=None):
     self.tries = tries
@@ -305,7 +301,7 @@ class JarPublishAuthTest(NailgunTaskTestBase):
     return JarPublish
 
   def setUp(self):
-    super(JarPublishAuthTest, self).setUp()
+    super().setUp()
 
     self.set_options(
       jvm_options=['-Dfoo=bar'],

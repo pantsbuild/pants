@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import base64
 import os
@@ -44,7 +41,7 @@ def _run_test_server():
 
 class TestBasicAuth(TestBase):
   def setUp(self):
-    super(TestBasicAuth, self).setUp()
+    super().setUp()
     self.port, shutdown_func = _run_test_server()
     self.addCleanup(shutdown_func)
 

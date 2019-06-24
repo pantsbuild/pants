@@ -45,7 +45,6 @@ python_library(
   name='ivy_utils',
   sources=['ivy_utils.py'],
   dependencies=[
-    'src/python/pants/util:collections_abc_backport',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:future',
     '3rdparty/python:six',
@@ -74,7 +73,6 @@ python_library(
   name='repository',
   sources=['repository.py'],
   dependencies = [
-    '3rdparty/python:future',
   ]
 )
 

@@ -1,19 +1,14 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import inspect
 import sys
-from abc import abstractmethod, abstractproperty
-from builtins import object
+from abc import ABC, abstractmethod
 from collections import namedtuple
 
 from future.utils import PY2
 
 from pants.util.memo import memoized_classmethod
-from pants.util.meta import AbstractClass
 from pants.util.objects import Exactly, TypedCollection, datatype
 
 
@@ -22,10 +17,11 @@ class SerializationError(Exception):
 
 
 # TODO: Likely no longer necessary, due to the laziness of the product graph.
-class Resolvable(AbstractClass):
+class Resolvable(ABC):
   """Represents a resolvable object."""
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def address(self):
     """Return the opaque address descriptor that this resolvable resolves."""
 
@@ -39,7 +35,7 @@ def _unpickle_serializable(serializable_class, kwargs):
   return serializable_class(**kwargs)
 
 
-class Locatable(AbstractClass):
+class Locatable(ABC):
   """Marks a class whose constructor should receive its spec_path relative to the build root.
 
   Locatable objects will be passed a `spec_path` constructor kwarg that indicates where they
@@ -64,7 +60,7 @@ class SerializablePickle(namedtuple('CustomPickle', ['unpickle_func', 'args'])):
                args=(type(serializable_instance), serializable_instance._asdict()))
 
 
-class Serializable(AbstractClass):
+class Serializable(ABC):
   """Marks a class that can be serialized into and reconstituted from python builtin values.
 
   Also provides support for the pickling protocol out of the box.
@@ -118,7 +114,7 @@ class Serializable(AbstractClass):
     return SerializablePickle.create(self)
 
 
-class SerializableFactory(AbstractClass):
+class SerializableFactory(ABC):
   """Creates :class:`Serializable` objects."""
 
   @abstractmethod
@@ -139,11 +135,11 @@ class ValidationError(Exception):
                               that led to this validation error.
     :param string message: A message describing the invalid Struct field.
     """
-    super(ValidationError, self).__init__('Failed to validate {id}: {msg}'
+    super().__init__('Failed to validate {id}: {msg}'
                                           .format(id=identifier, msg=message))
 
 
-class Validatable(AbstractClass):
+class Validatable(ABC):
   """Marks a class whose instances should validated post-construction."""
 
   @abstractmethod
@@ -154,7 +150,7 @@ class Validatable(AbstractClass):
     """
 
 
-class Collection(object):
+class Collection:
   """Constructs classes representing collections of objects of a particular type.
 
   The produced class will expose its values under a field named dependencies - this is a stable API

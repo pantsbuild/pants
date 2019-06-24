@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import re
-from builtins import open
 
 from pants.backend.codegen.protobuf.subsystems.protoc import Protoc
 from pants.base.build_environment import get_buildroot
@@ -32,7 +28,7 @@ class GoProtobufGen(SimpleCodegenTask):
 
   @classmethod
   def register_options(cls, register):
-    super(GoProtobufGen, cls).register_options(register)
+    super().register_options(register)
 
     register('--import-target', type=target_option, fingerprint=True,
              help='Target that will be added as a dependency of protoc-generated Go code.')
@@ -41,7 +37,7 @@ class GoProtobufGen(SimpleCodegenTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(GoProtobufGen, cls).subsystem_dependencies() + (Protoc.scoped(cls), ProtocGenGo,)
+    return super().subsystem_dependencies() + (Protoc.scoped(cls), ProtocGenGo,)
 
   @memoized_property
   def _protoc(self):
@@ -100,7 +96,7 @@ class GoProtobufGen(SimpleCodegenTask):
 
   @property
   def _copy_target_attributes(self):
-    return [a for a in super(GoProtobufGen, self)._copy_target_attributes if a != 'provides']
+    return [a for a in super()._copy_target_attributes if a != 'provides']
 
   def synthetic_target_dir(self, target, target_workdir):
     all_sources = list(target.sources_relative_to_buildroot())

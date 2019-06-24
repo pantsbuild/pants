@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import json
-from builtins import filter, str
 
 from colors import black, blue, cyan, green, magenta, red, white
 from packaging.version import Version
@@ -27,7 +23,7 @@ class ExplainOptionsTask(ConsoleTask):
 
   @classmethod
   def register_options(cls, register):
-    super(ExplainOptionsTask, cls).register_options(register)
+    super().register_options(register)
     register('--scope', help='Only show options in this scope. Use GLOBAL for global scope.')
     register('--name', help='Only show options with this name.')
     register('--rank', choices=RankedValue.get_names(),

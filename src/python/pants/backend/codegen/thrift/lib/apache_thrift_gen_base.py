@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import re
 import shutil
-from builtins import open
 
 from twitter.common.collections import OrderedSet
 
@@ -31,7 +27,7 @@ class ApacheThriftGenBase(SimpleCodegenTask):
 
   @classmethod
   def register_options(cls, register):
-    super(ApacheThriftGenBase, cls).register_options(register)
+    super().register_options(register)
 
     # NB: As of thrift 0.9.2 there is 1 warning that -strict promotes to an error - missing a
     # struct field id.  If an artifact was cached with strict off, we must re-gen with strict on
@@ -52,7 +48,7 @@ class ApacheThriftGenBase(SimpleCodegenTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ApacheThriftGenBase, cls).subsystem_dependencies() + (Thrift.scoped(cls),)
+    return super().subsystem_dependencies() + (Thrift.scoped(cls),)
 
   def synthetic_target_extra_dependencies(self, target, target_workdir):
     for source in target.sources_relative_to_buildroot():

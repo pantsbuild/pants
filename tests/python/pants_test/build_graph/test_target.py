@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os.path
-from builtins import range, str
 from hashlib import sha1
 
 import mock
@@ -39,7 +35,7 @@ class SourcesTarget(Target):
                                                            sources_rel_path=address.spec_path,
                                                            key_arg='sources'))
     payload.add_field('exports', PrimitivesSetField(exports or []))
-    super(SourcesTarget, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   @property
   def export_specs(self):

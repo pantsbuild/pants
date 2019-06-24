@@ -4,7 +4,6 @@
 python_tests(
   name = 'test_git',
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/scm',
     'src/python/pants/scm:git',
     'src/python/pants/util:contextutil',

@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import sys
-from builtins import object
 
 
 # Note throughout the distinction between the artifact_root (which is where the artifacts are
@@ -25,7 +21,7 @@ class NonfatalArtifactCacheError(Exception):
   pass
 
 
-class UnreadableArtifact(object):
+class UnreadableArtifact:
   """A False-y value to indicate a read-failure (vs a normal cache-miss)
 
   See docstring on `ArtifactCache.use_cached_files` for details.
@@ -51,7 +47,7 @@ class UnreadableArtifact(object):
     return "key={} err={}".format(self.key, self.err)
 
 
-class ArtifactCache(object):
+class ArtifactCache:
   """A map from cache key to a set of build artifacts.
 
   The cache key must uniquely identify the inputs (sources, compiler flags etc.) needed to

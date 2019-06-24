@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -33,7 +29,7 @@ class JavascriptStyleBase(NodeTask):
 
   @classmethod
   def register_options(cls, register):
-    super(JavascriptStyleBase, cls).register_options(register)
+    super().register_options(register)
     register('--fail-slow', type=bool,
              help='Check all targets and present the full list of errors.')
     register('--color', type=bool, default=True, help='Enable or disable color.')

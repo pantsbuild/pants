@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import inspect
 import io
@@ -10,9 +7,9 @@ import itertools
 import os
 import shutil
 import textwrap
-from abc import abstractmethod
-from builtins import bytes, map, object, str, zip
-from collections import defaultdict
+from abc import ABC, abstractmethod
+from collections import OrderedDict, defaultdict
+from collections.abc import Iterable, Mapping, MutableSequence, Set
 
 from pex.installer import Packager, WheelInstaller
 from pex.interpreter import PythonInterpreter
@@ -34,11 +31,9 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.resources import Resources
 from pants.task.task import Task
-from pants.util.collections_abc_backport import Iterable, Mapping, MutableSequence, OrderedDict, Set
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_concurrent_creation, safe_rmtree, safe_walk
 from pants.util.memo import memoized_property
-from pants.util.meta import AbstractClass
 from pants.util.process_handler import subprocess
 from pants.util.strutil import ensure_binary, ensure_text, safe_shlex_split
 
@@ -113,13 +108,13 @@ class SetupPyRunner(WheelInstaller):
 
   def __init__(self, source_dir, setup_command, **kw):
     self._setup_command = setup_command
-    super(SetupPyRunner, self).__init__(source_dir, **kw)
+    super().__init__(source_dir, **kw)
 
   def setup_command(self):
     return self._setup_command
 
 
-class TargetAncestorIterator(object):
+class TargetAncestorIterator:
   """Supports iteration of target ancestor lineages."""
 
   def __init__(self, build_graph):
@@ -163,7 +158,7 @@ class TargetAncestorIterator(object):
 # un-exported non-3rdparty interior nodes as needed.  It seems like the latter is preferable since
 # it can be used with a BUILD graph validator requiring completely exported subgraphs to enforce the
 # former as a matter of local repo policy.
-class ExportedTargetDependencyCalculator(AbstractClass):
+class ExportedTargetDependencyCalculator(ABC):
   """Calculates the dependencies of exported targets.
 
   When a target is exported many of its internal transitive library dependencies may be satisfied by
@@ -412,7 +407,7 @@ class SetupPy(Task):
 
   @classmethod
   def register_options(cls, register):
-    super(SetupPy, cls).register_options(register)
+    super().register_options(register)
     register('--run',
              help="The command to run against setup.py.  Don't forget to quote any additional "
                   "parameters.  If no run command is specified, pants will by default generate "
@@ -563,7 +558,7 @@ class SetupPy(Task):
     return install_requires
 
   def __init__(self, *args, **kwargs):
-    super(SetupPy, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._root = get_buildroot()
     self._run = self.get_options().run
     self._recursive = self.get_options().recursive

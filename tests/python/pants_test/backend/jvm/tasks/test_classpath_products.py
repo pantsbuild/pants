@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import str
 
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
@@ -33,7 +29,7 @@ def resolved_example_jar_at(path, org='com.example', name='lib'):
 
 class ClasspathProductsTest(TestBase):
   def setUp(self):
-    super(ClasspathProductsTest, self).setUp()
+    super().setUp()
     init_subsystem(Target.Arguments)
 
   def test_single_classpath_element_no_excludes(self):

@@ -333,13 +333,12 @@ mod tests {
   use hashing::EMPTY_DIGEST;
   use std;
   use std::collections::{BTreeMap, BTreeSet};
-  use std::env;
-  use std::os::unix::fs::PermissionsExt;
-  use std::path::{Path, PathBuf};
+  use std::path::PathBuf;
   use std::time::Duration;
   use store::Store;
   use tempfile::TempDir;
   use testutil::data::{TestData, TestDirectory};
+  use testutil::path::find_bash;
   use testutil::{as_bytes, owned_string_vec};
 
   #[test]
@@ -500,11 +499,7 @@ mod tests {
   #[test]
   fn output_files_none() {
     let result = run_command_locally(ExecuteProcessRequest {
-      argv: owned_string_vec(&[
-        which("bash").expect("No bash on PATH").to_str().unwrap(),
-        "-c",
-        "exit 0",
-      ]),
+      argv: owned_string_vec(&[&find_bash(), "-c", "exit 0"]),
       env: BTreeMap::new(),
       input_files: EMPTY_DIGEST,
       output_files: BTreeSet::new(),
@@ -903,31 +898,5 @@ mod tests {
     tokio::runtime::Runtime::new()
       .unwrap()
       .block_on(runner.run(req))
-  }
-
-  fn find_bash() -> String {
-    which("bash")
-      .expect("No bash on PATH")
-      .to_str()
-      .expect("Path to bash not unicode")
-      .to_owned()
-  }
-
-  fn which(executable: &str) -> Option<PathBuf> {
-    if let Some(paths) = env::var_os("PATH") {
-      for path in env::split_paths(&paths) {
-        let executable_path = path.join(executable);
-        if is_executable(&executable_path) {
-          return Some(executable_path);
-        }
-      }
-    }
-    None
-  }
-
-  fn is_executable(path: &Path) -> bool {
-    std::fs::metadata(path)
-      .map(|meta| meta.permissions().mode() & 0o100 == 0o100)
-      .unwrap_or(false)
   }
 }

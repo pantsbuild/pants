@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.subsystem.subsystem import Subsystem
@@ -30,7 +27,7 @@ class ThriftDefaults(Subsystem):
              help='Extra arguments for the thrift compiler.')
 
   def __init__(self, *args, **kwargs):
-    super(ThriftDefaults, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._default_compiler = self.get_options().compiler
     self._default_language = self.get_options().language
     self._default_default_java_namespace = self.get_options().default_java_namespace

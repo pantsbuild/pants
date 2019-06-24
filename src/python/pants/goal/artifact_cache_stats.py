@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import object, open, str, zip
 from collections import defaultdict, namedtuple
 
 from pants.cache.artifact_cache import UnreadableArtifact
@@ -16,7 +12,7 @@ from pants.util.dirutil import safe_mkdir
 CacheStat = namedtuple('CacheStat', ['hit_targets', 'miss_targets'])
 
 
-class ArtifactCacheStats(object):
+class ArtifactCacheStats:
   """Tracks the hits and misses in the artifact cache.
 
   If dir is specified, writes the hits and misses to files in that dir."""

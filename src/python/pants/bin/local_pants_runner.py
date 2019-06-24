@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
-from builtins import object, str
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
@@ -33,7 +29,7 @@ class LocalExiter(Exiter):
   def __init__(self, run_tracker, repro, *args, **kwargs):
     self._run_tracker = run_tracker
     self._repro = repro
-    super(LocalExiter, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
   def exit(self, result=PANTS_SUCCEEDED_EXIT_CODE, msg=None, *args, **kwargs):
     # These strings are prepended to the existing exit message when calling the superclass .exit().
@@ -75,10 +71,10 @@ class LocalExiter(Exiter):
       msg = '{}\n\n{}'.format('\n'.join(additional_messages),
                               msg or '')
 
-    super(LocalExiter, self).exit(result=result, msg=msg, *args, **kwargs)
+    super().exit(result=result, msg=msg, *args, **kwargs)
 
 
-class LocalPantsRunner(object):
+class LocalPantsRunner:
   """Handles a single pants invocation running in the process-local context."""
 
   @staticmethod

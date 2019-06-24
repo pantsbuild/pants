@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
 import getpass
@@ -11,8 +8,7 @@ import os
 import pkgutil
 import shutil
 import sys
-from builtins import input, next, object, open, str
-from collections import defaultdict, namedtuple
+from collections import OrderedDict, defaultdict, namedtuple
 from copy import copy
 
 from future.utils import PY3
@@ -36,7 +32,6 @@ from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
 from pants.task.scm_publish_mixin import Namedver, ScmPublishMixin, Semver
 from pants.task.target_restriction_mixins import HasTransitiveOptionMixin, TransitiveOptionRegistrar
-from pants.util.collections_abc_backport import OrderedDict
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants.util.strutil import ensure_text
 
@@ -44,7 +39,7 @@ from pants.util.strutil import ensure_text
 _TEMPLATES_RELPATH = os.path.join('templates', 'jar_publish')
 
 
-class PushDb(object):
+class PushDb:
 
   @staticmethod
   def load(path):
@@ -53,7 +48,7 @@ class PushDb(object):
       properties = Properties.load(props)
       return PushDb(properties)
 
-  class Entry(object):
+  class Entry:
 
     def __init__(self, sem_ver, named_ver, named_is_latest, sha, fingerprint):
       """Records the most recent push/release of an artifact.
@@ -147,7 +142,7 @@ class PushDb(object):
       Properties.dump(self._props, props)
 
 
-class PomWriter(object):
+class PomWriter:
   def __init__(self, get_db, tag):
     self._get_db = get_db
     self._tag = tag
@@ -302,7 +297,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
 
   @classmethod
   def register_options(cls, register):
-    super(JarPublish, cls).register_options(register)
+    super().register_options(register)
 
     # TODO(John Sirois): Support a preview mode that outputs a file with entries like:
     # artifact id:
@@ -358,7 +353,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JarPublish, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require('jars')
     round_manager.require('javadoc')
     round_manager.require('scaladoc')
@@ -368,7 +363,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
     return isinstance(target, ExportableJvmLibrary) and target.provides
 
   def __init__(self, *args, **kwargs):
-    super(JarPublish, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.cachedir = os.path.join(self.workdir, 'cache')
 
     self._jvm_options = self.get_options().jvm_options

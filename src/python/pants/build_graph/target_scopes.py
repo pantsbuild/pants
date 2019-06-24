@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import object, str
 
 from future.utils import string_types
 
@@ -34,7 +30,7 @@ class Scope(frozenset):
     return scope or ('default',)
 
   def __new__(cls, scope):
-    return super(Scope, cls).__new__(cls, cls._parse(scope))
+    return super().__new__(cls, cls._parse(scope))
 
   def in_scope(self, exclude_scopes=None, include_scopes=None):
     """Whether this scope should be included by the given inclusion and exclusion rules.
@@ -62,16 +58,16 @@ class Scope(frozenset):
     return True
 
   def __add__(self, other):
-    return Scope(super(Scope, self).__or__(other))
+    return Scope(super().__or__(other))
 
   def __or__(self, other):
-    return Scope(super(Scope, self).__or__(other))
+    return Scope(super().__or__(other))
 
   def __str__(self):
     return ' '.join(sorted(self))
 
 
-class Scopes(object):
+class Scopes:
   """Default scope constants."""
 
   DEFAULT = Scope('DEFAULT')
@@ -132,7 +128,7 @@ class ScopedDependencyFactory(IntermediateTargetFactoryBase):
   """
 
   def __init__(self, parse_context):
-    super(ScopedDependencyFactory, self).__init__(parse_context)
+    super().__init__(parse_context)
     self._scope = None
 
   @property

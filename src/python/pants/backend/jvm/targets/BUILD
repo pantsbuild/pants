@@ -29,7 +29,6 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
-    '3rdparty/python:future',
     'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/subsystems:java',
     'src/python/pants/backend/jvm/subsystems:junit',
@@ -44,7 +43,6 @@ python_library(
     'src/python/pants/fs',
     'src/python/pants/source',
     'src/python/pants/util:memo',
-    'src/python/pants/util:meta',
     'src/python/pants/util:netrc',
     'src/python/pants/util:objects',
   ],

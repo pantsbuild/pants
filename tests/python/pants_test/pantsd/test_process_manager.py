@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import errno
 import logging
@@ -32,7 +29,7 @@ def fake_process(**kwargs):
 
 class TestProcessGroup(TestBase):
   def setUp(self):
-    super(TestProcessGroup, self).setUp()
+    super().setUp()
     self.pg = ProcessGroup('test', metadata_base_dir=self.subprocess_dir)
 
   def test_swallow_psutil_exceptions(self):
@@ -107,7 +104,7 @@ class TestProcessMetadataManager(TestBase):
   BUILDROOT = '/mock_buildroot/'
 
   def setUp(self):
-    super(TestProcessMetadataManager, self).setUp()
+    super().setUp()
     self.pmm = ProcessMetadataManager(metadata_base_dir=self.subprocess_dir)
 
   def test_maybe_cast(self):
@@ -182,7 +179,7 @@ class TestProcessMetadataManager(TestBase):
 
 class TestProcessManager(TestBase):
   def setUp(self):
-    super(TestProcessManager, self).setUp()
+    super().setUp()
     # N.B. We pass in `metadata_base_dir` here because ProcessManager (itself a non-task/non-
     # subsystem) depends on an initialized `GlobalOptions` subsystem for the value of
     # `--pants-subprocessdir` in the default case. This is normally provided by subsystem

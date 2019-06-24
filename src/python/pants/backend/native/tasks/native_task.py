@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 from abc import abstractmethod
-from builtins import filter
 
 from pants.backend.native.config.environment import CppToolchain, CToolchain
 from pants.backend.native.subsystems.native_build_settings import NativeBuildSettings
@@ -58,7 +54,7 @@ class NativeTask(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(NativeTask, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       # We use a globally-scoped dependency on NativeBuildSettings because the toolchain and
       # dependency calculation need to be the same for both compile and link tasks (and subscoping
       # would break that).
@@ -68,13 +64,13 @@ class NativeTask(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(NativeTask, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     # Allow the deferred_sources_mapping to take place first
     round_manager.optional_data('deferred_sources')
 
   @classmethod
   def implementation_version(cls):
-    return super(NativeTask, cls).implementation_version() + [('NativeTask', 0)]
+    return super().implementation_version() + [('NativeTask', 0)]
 
   @memoized_property
   def _native_build_settings(self):

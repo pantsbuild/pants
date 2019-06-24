@@ -3,8 +3,6 @@
 
 python_library(
   dependencies=[
-    'src/python/pants/util:collections_abc_backport',
-    '3rdparty/python:future',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',

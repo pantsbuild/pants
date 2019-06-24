@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import re
-from builtins import filter, str
 from collections import defaultdict
 
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
@@ -31,7 +27,7 @@ class DuplicateDetector(JvmBinaryTask):
 
   @classmethod
   def register_options(cls, register):
-    super(DuplicateDetector, cls).register_options(register)
+    super().register_options(register)
     register('--exclude-files', default=EXCLUDED_FILES, type=list,
              help='Case insensitive filenames (without directory) to exclude from duplicate check.')
     register('--exclude-dirs', default=EXCLUDED_DIRS, type=list,
@@ -46,7 +42,7 @@ class DuplicateDetector(JvmBinaryTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(DuplicateDetector, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data('runtime_classpath')
 
   @memoized_property

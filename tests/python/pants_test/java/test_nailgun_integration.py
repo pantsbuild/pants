@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.testutils.py2_compat import assertRegex
 
 
 class TestNailgunIntegration(PantsRunIntegrationTest):
@@ -37,7 +33,7 @@ class TestNailgunIntegration(PantsRunIntegrationTest):
               'compile.zinc': {'nailgun_timeout_seconds': '0.00002'}}
     )
     self.assert_failure(pants_run)
-    assertRegex(self, pants_run.stdout_data, """\
+    self.assertRegex(pants_run.stdout_data, """\
 compile\\(examples/src/java/org/pantsbuild/example/hello/greet:greet\\) failed: \
 Problem launching via <no nailgun connection> command org\\.pantsbuild\\.zinc\\.compiler\\.Main .*: \
 Failed to read nailgun output after 2e\-05 seconds!""")

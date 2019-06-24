@@ -1,14 +1,10 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
 import logging
 import os
 import site
-from builtins import object, open
 
 from pex import resolver
 from pex.base import requirement_is_exact
@@ -28,7 +24,7 @@ from pants.version import PANTS_SEMVER
 logger = logging.getLogger(__name__)
 
 
-class PluginResolver(object):
+class PluginResolver:
   @staticmethod
   def _is_wheel(path):
     return os.path.isfile(path) and path.endswith('.whl')

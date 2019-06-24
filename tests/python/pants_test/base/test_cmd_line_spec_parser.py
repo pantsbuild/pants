@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -27,7 +24,7 @@ def sib(directory):
 class CmdLineSpecParserTest(TestBase):
 
   def setUp(self):
-    super(CmdLineSpecParserTest, self).setUp()
+    super().setUp()
     self._spec_parser = CmdLineSpecParser(self.build_root)
 
   def test_normal(self):

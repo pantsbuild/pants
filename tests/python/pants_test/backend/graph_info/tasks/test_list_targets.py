@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import object
 from textwrap import dedent
 
 from pants.backend.jvm.artifact import Artifact
@@ -42,13 +38,13 @@ class ListTargetsTest(ConsoleRuleTestBase):
 
   @classmethod
   def rules(cls):
-    return super(ListTargetsTest, cls).rules() + list_targets.rules()
+    return super().rules() + list_targets.rules()
 
   def setUp(self):
-    super(ListTargetsTest, self).setUp()
+    super().setUp()
 
     # Setup a BUILD tree for various list tests
-    class Lib(object):
+    class Lib:
 
       def __init__(self, name, provides=False):
         self.name = name

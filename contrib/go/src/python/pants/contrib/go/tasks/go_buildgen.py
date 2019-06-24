@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import object, str
 from collections import defaultdict, namedtuple
 from textwrap import dedent
 
@@ -27,7 +23,7 @@ from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
 from pants.contrib.go.tasks.go_task import GoTask
 
 
-class GoTargetGenerator(object):
+class GoTargetGenerator:
   """Automatically generates a Go target graph given pre-existing target roots."""
 
   class GenerationError(Exception):
@@ -121,7 +117,7 @@ class GoBuildgen(GoTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(GoBuildgen, cls).subsystem_dependencies() + (FetcherFactory,)
+    return super().subsystem_dependencies() + (FetcherFactory,)
 
   @classmethod
   def _default_template(cls):

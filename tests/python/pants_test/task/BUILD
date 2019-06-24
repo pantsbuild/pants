@@ -15,7 +15,6 @@ python_tests(
   name = 'goal_options_mixin_integration',
   sources = ['test_goal_options_mixin_integration.py'],
   dependencies = [
-    '3rdparty/python:future',
     'tests/python/pants_test:int-test',
     'tests/python/pants_test/task/echo_plugin:plugin',
   ],
@@ -37,7 +36,6 @@ python_tests(
   name = 'simple_codegen_task',
   sources = ['test_simple_codegen_task.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/base:payload',
     'src/python/pants/build_graph',
     'src/python/pants/task',
@@ -75,7 +73,6 @@ python_tests(
   name='testrunner_task_mixin',
   sources=['test_testrunner_task_mixin.py'],
   dependencies=[
-    '3rdparty/python:future',
     '3rdparty/python:mock',
     'src/python/pants/task',
     'src/python/pants/util:process_handler',

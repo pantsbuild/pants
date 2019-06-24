@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -33,7 +30,7 @@ class FindBugsTest(PantsRunIntegrationTest):
         updated = full_config.get(scope, {})
         updated.update(scoped_cfgs)
         full_config[scope] = updated
-    return super(FindBugsTest, self).run_pants(command, full_config, stdin_data, extra_env, **kwargs)
+    return super().run_pants(command, full_config, stdin_data, extra_env, **kwargs)
 
   def test_no_warnings(self):
     cmd = ['compile', 'contrib/findbugs/tests/java/org/pantsbuild/contrib/findbugs:none']

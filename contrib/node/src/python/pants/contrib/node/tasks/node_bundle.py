@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -22,11 +19,11 @@ class NodeBundle(NodeTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(NodeBundle, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data('bundleable_js')
 
   def __init__(self, *args, **kwargs):
-    super(NodeBundle, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._outdir = self.get_options().pants_distdir
 
   def execute(self):

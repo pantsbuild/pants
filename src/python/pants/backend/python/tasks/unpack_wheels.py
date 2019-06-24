@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import str
 from hashlib import sha1
 
 from future.utils import PY3
@@ -50,7 +46,7 @@ class UnpackWheels(UnpackRemoteSourcesBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(UnpackWheels, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       PexBuilderWrapper.Factory,
       PythonInterpreterCache,
       PythonSetup,

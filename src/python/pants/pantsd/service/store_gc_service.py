@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import time
@@ -21,7 +18,7 @@ class StoreGCService(PantsService):
   _GARBAGE_COLLECTION_INTERVAL_SECONDS = 4 * 60 * 60
 
   def __init__(self, scheduler):
-    super(StoreGCService, self).__init__()
+    super().__init__()
     self._scheduler = scheduler
     self._logger = logging.getLogger(__name__)
 

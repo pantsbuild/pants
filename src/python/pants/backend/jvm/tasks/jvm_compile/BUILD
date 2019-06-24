@@ -16,7 +16,6 @@ python_library(
   name = 'compile_context',
   sources = ['compile_context.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:contextutil',
   ]
 )
@@ -68,7 +67,6 @@ python_library(
   name = 'execution_graph',
   sources = ['execution_graph.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/base:worker_pool',
   ],
 )
@@ -80,7 +78,6 @@ python_library(
     'missing_dependency_finder.py'
   ],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:ansicolors',
     '3rdparty/python/twitter/commons:twitter.common.collections',
   ],

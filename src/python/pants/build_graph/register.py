@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import object
 
 from pants.base.build_environment import get_buildroot, pants_version
 from pants.build_graph.aliased_target import AliasTargetFactory
@@ -25,7 +21,7 @@ from pants.util.netrc import Netrc
 """Register the elementary BUILD file constructs."""
 
 
-class BuildFilePath(object):
+class BuildFilePath:
   def __init__(self, parse_context):
     self._parse_context = parse_context
 

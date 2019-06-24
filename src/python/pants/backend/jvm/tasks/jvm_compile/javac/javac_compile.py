@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
 import os
-from builtins import str
 
 from future.utils import text_type
 
@@ -56,22 +52,22 @@ class JavacCompile(JvmCompile):
 
   @classmethod
   def register_options(cls, register):
-    super(JavacCompile, cls).register_options(register)
+    super().register_options(register)
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JavacCompile, cls).subsystem_dependencies() + (JvmPlatform,)
+    return super().subsystem_dependencies() + (JvmPlatform,)
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JavacCompile, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
 
   @classmethod
   def product_types(cls):
     return ['runtime_classpath']
 
   def __init__(self, *args, **kwargs):
-    super(JavacCompile, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.set_distribution(jdk=True)
 
     if self.get_options().use_classpath_jars:

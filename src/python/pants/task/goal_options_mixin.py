@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import object
 
 from future.utils import PY2
 
@@ -34,7 +30,7 @@ class GoalOptionsRegistrar(Optionable):
     return type(type_name, (cls, ), {'options_scope': goal})
 
 
-class GoalOptionsMixin(object):
+class GoalOptionsMixin:
   """A mixin for tasks that inherit options registered at the goal level."""
   # Subclasses must set this to the appropriate subclass of GoalOptionsRegistrar.
   goal_options_registrar_cls = None

@@ -1,11 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open
+from collections import OrderedDict
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -22,7 +19,6 @@ from pants.build_graph.prep_command import PrepCommand
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.fs.archive import TGZ
-from pants.util.collections_abc_backport import OrderedDict
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
 from pants_test.backend.python.interpreter_selection_utils import skip_unless_python36_present
@@ -36,7 +32,7 @@ class SetupPyTestBase(PythonTaskTestBase):
     return SetupPy
 
   def setUp(self):
-    super(SetupPyTestBase, self).setUp()
+    super().setUp()
     self.distdir = os.path.join(self.build_root, 'dist')
     self.set_options(pants_distdir=self.distdir)
     init_subsystem(Target.Arguments)
@@ -58,7 +54,7 @@ class SetupPyTestBase(PythonTaskTestBase):
 class TestSetupPy(SetupPyTestBase):
 
   def setUp(self):
-    super(TestSetupPy, self).setUp()
+    super().setUp()
     self.dependency_calculator = SetupPy.DependencyCalculator(self.build_graph)
 
   @classmethod
@@ -66,7 +62,7 @@ class TestSetupPy(SetupPyTestBase):
     extra_aliases = BuildFileAliases(targets={'prep_command': PrepCommand,
                                               'resources': Resources,
                                               'target': Target})
-    return super(TestSetupPy, cls).alias_groups().merge(extra_aliases)
+    return super().alias_groups().merge(extra_aliases)
 
   def create_dependencies(self, depmap):
     target_map = {}

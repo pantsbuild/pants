@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
@@ -30,7 +27,7 @@ class WireGen(NailgunTaskBase, SimpleCodegenTask):
 
   @classmethod
   def register_options(cls, register):
-    super(WireGen, cls).register_options(register)
+    super().register_options(register)
 
 
     def wire_jar(name):
@@ -51,7 +48,7 @@ class WireGen(NailgunTaskBase, SimpleCodegenTask):
 
   def __init__(self, *args, **kwargs):
     """Generates Java files from .proto files using the Wire protobuf compiler."""
-    super(WireGen, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
   def synthetic_target_type(self, target):
     return JavaLibrary

@@ -6,7 +6,6 @@ python_tests(
   sources=globs('*.py', exclude=[globs('*_integration.py')]),
   dependencies=[
     '3rdparty/python:mock',
-    '3rdparty/python:future',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
     'src/python/pants/option',
@@ -20,7 +19,6 @@ python_tests(
   name='options_integration',
   sources=globs('*_integration.py'),
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],

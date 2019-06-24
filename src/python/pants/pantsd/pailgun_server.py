@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import socket
@@ -104,7 +101,7 @@ class ExclusiveRequestTimeout(Exception):
   """Represents a timeout while waiting for another request to complete."""
 
 
-class PailgunHandleRequestLock(object):
+class PailgunHandleRequestLock:
   """Convenience lock to implement Lock.acquire(timeout), which is not available in Python 2."""
   # TODO remove and replace for the py3 Lock() when we don't have to support py2 anymore.
 

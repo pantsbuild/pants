@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import glob
 import os
-from builtins import open
 from contextlib import contextmanager
 
 from future.utils import PY3
@@ -44,7 +40,7 @@ class IvyResolveTest(NailgunTaskTestBase):
     return IvyResolve
 
   def setUp(self):
-    super(IvyResolveTest, self).setUp()
+    super().setUp()
     self.set_options_for_scope('cache.{}'.format(self.options_scope),
                                read_from=None,
                                write_to=None)
@@ -489,11 +485,11 @@ class IvyResolveFingerprintStrategyTest(TaskTestBase):
     return EmptyTask
 
   def setUp(self):
-    super(IvyResolveFingerprintStrategyTest, self).setUp()
+    super().setUp()
     init_subsystem(JarDependencyManagement)
 
   def tearDown(self):
-    super(IvyResolveFingerprintStrategyTest, self).tearDown()
+    super().tearDown()
 
   def set_artifact_set_for(self, managed_jar_target, artifact_set):
     JarDependencyManagement.global_instance()._artifact_set_map[

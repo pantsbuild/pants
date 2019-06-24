@@ -3,7 +3,6 @@
 
 python_tests(
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/tasks/coverage',
     'src/python/pants/java/jar',

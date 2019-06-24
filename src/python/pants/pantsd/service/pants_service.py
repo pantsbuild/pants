@@ -1,14 +1,10 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import threading
 import time
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
-from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
@@ -30,10 +26,10 @@ class PantsServices(datatype([
     services = services or tuple()
     port_map = port_map or dict()
     lifecycle_lock = lifecycle_lock or threading.RLock()
-    return super(PantsServices, cls).__new__(cls, services, port_map, lifecycle_lock)
+    return super().__new__(cls, services, port_map, lifecycle_lock)
 
 
-class PantsService(AbstractClass):
+class PantsService(ABC):
   """Pants daemon service base class.
 
   The service lifecycle is made up of states described in the _ServiceState class, and controlled
@@ -51,7 +47,7 @@ class PantsService(AbstractClass):
   class ServiceError(Exception): pass
 
   def __init__(self):
-    super(PantsService, self).__init__()
+    super().__init__()
     self.name = self.__class__.__name__
     self._state = _ServiceState()
 

@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest, read_pantsd_log
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
-from pants_test.testutils.py2_compat import assertNotRegex, assertRegex
 
 
 class NativeEngineLoggingTest(PantsRunIntegrationTest):
@@ -25,12 +21,12 @@ class NativeEngineLoggingTest(PantsRunIntegrationTest):
     pants_run = self.run_pants([
       "-linfo", "list", "src/scala::"
     ])
-    assertNotRegex(self, pants_run.stderr_data, expected_msg)
+    self.assertNotRegex(pants_run.stderr_data, expected_msg)
 
     pants_run = self.run_pants([
       "-ldebug", "list", "src/scala::"
     ])
-    assertRegex(self, pants_run.stderr_data, expected_msg)
+    self.assertRegex(pants_run.stderr_data, expected_msg)
 
 
 class PantsdNativeLoggingTest(PantsDaemonIntegrationTestBase):

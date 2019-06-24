@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import sys
-from builtins import open
 from io import BytesIO
 
 from future.utils import PY3
@@ -29,7 +25,7 @@ class Reporting(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(Reporting, cls).register_options(register)
+    super().register_options(register)
     register('--invalidation-report', type=bool,
              help='Write a formatted report on the invalid objects to the specified path.')
     register('--reports-dir', advanced=True, metavar='<dir>',

@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import object, str
 from collections import defaultdict
 
 import six
@@ -22,7 +18,7 @@ class ProductError(Exception):
   pass
 
 
-class UnionProducts(object):
+class UnionProducts:
   """Here, products for a target are an insertion ordered set.
 
   When products for multiple targets are requested, an ordered union is provided.
@@ -136,7 +132,7 @@ class UnionProducts(object):
     return not self == other
 
 
-class RootedProducts(object):
+class RootedProducts:
   """File products of a build that have a concept of a 'root' directory.
 
   E.g., classfiles, under a root package directory.
@@ -189,7 +185,7 @@ class RootedProducts(object):
   __nonzero__ = __bool__
 
 
-class MultipleRootedProducts(object):
+class MultipleRootedProducts:
   """A product consisting of multiple roots, with associated file products.
 
   :API: public
@@ -243,7 +239,7 @@ class MultipleRootedProducts(object):
     return "MultipleRootedProducts({})".format(self._rooted_products_by_root)
 
 
-class Products(object):
+class Products:
   """An out-of-band 'dropbox' where tasks can place build product information for later tasks to use.
 
   Historically, the only type of product was a ProductMapping. However this had some issues, as not
@@ -269,7 +265,7 @@ class Products(object):
 
   :API: public
   """
-  class ProductMapping(object):
+  class ProductMapping:
     """Maps products of a given type by target. Each product is a map from basedir to a list of
     files in that dir.
 

@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import re
-from builtins import open
 
 from pants.backend.codegen.thrift.lib.thrift import Thrift
 from pants.base.build_environment import get_buildroot
@@ -29,7 +25,7 @@ class GoThriftGen(SimpleCodegenTask):
 
   @classmethod
   def register_options(cls, register):
-    super(GoThriftGen, cls).register_options(register)
+    super().register_options(register)
 
     register('--strict', default=True, fingerprint=True, type=bool,
              help='Run thrift compiler with strict warnings.')
@@ -46,7 +42,7 @@ class GoThriftGen(SimpleCodegenTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(GoThriftGen, cls).subsystem_dependencies() + (Thrift.scoped(cls),)
+    return super().subsystem_dependencies() + (Thrift.scoped(cls),)
 
   @property
   def _thrift_binary(self):
@@ -171,7 +167,7 @@ class GoThriftGen(SimpleCodegenTask):
   @property
   def _copy_target_attributes(self):
     """Override `_copy_target_attributes` to exclude `provides`."""
-    return [a for a in super(GoThriftGen, self)._copy_target_attributes if a != 'provides']
+    return [a for a in super()._copy_target_attributes if a != 'provides']
 
   def synthetic_target_dir(self, target, target_workdir):
     all_sources = list(target.sources_relative_to_buildroot())

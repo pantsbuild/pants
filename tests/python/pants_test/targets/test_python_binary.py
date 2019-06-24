@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.python.register import build_file_aliases
 from pants.base.exceptions import TargetDefinitionException
@@ -15,7 +12,7 @@ class TestPythonBinary(TestBase):
     return build_file_aliases()
 
   def setUp(self):
-    super(TestPythonBinary, self).setUp()
+    super().setUp()
     # Force creation of SourceRootConfig global instance. PythonBinary uses source roots
     # when computing entry points.
     self.context()

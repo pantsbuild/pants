@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import warnings
-from builtins import object, str
 from contextlib import contextmanager
 
 import mock
@@ -55,7 +51,7 @@ class DeprecatedTest(TestBase):
   def test_deprecated_method(self):
     expected_return = 'deprecated_method'
 
-    class Test(object):
+    class Test:
       @deprecated(self.FUTURE_VERSION)
       def deprecated_method(self):
         return expected_return
@@ -76,7 +72,7 @@ class DeprecatedTest(TestBase):
   def test_deprecated_property(self):
     expected_return = 'deprecated_property'
 
-    class Test(object):
+    class Test:
       @property
       @deprecated(self.FUTURE_VERSION)
       def deprecated_property(self):
@@ -180,7 +176,7 @@ class DeprecatedTest(TestBase):
 
   def test_bad_decorator_nesting(self):
     with self.assertRaises(BadDecoratorNestingError):
-      class Test(object):
+      class Test:
         @deprecated(self.FUTURE_VERSION)
         @property
         def test_prop(this):

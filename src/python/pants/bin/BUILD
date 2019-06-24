@@ -4,7 +4,6 @@
 python_library(
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:future',
     '3rdparty/python:setproctitle',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:build_environment',

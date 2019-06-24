@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
-from builtins import object, str
 from functools import total_ordering
 
 from pants.base.exceptions import TaskError
@@ -55,7 +51,7 @@ class JvmPlatform(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(JvmPlatform, cls).register_options(register)
+    super().register_options(register)
     register('--platforms', advanced=True, type=dict, default={}, fingerprint=True,
              help='Compile settings that can be referred to by name in jvm_targets.')
     register('--default-platform', advanced=True, type=str, default=None, fingerprint=True,
@@ -65,7 +61,7 @@ class JvmPlatform(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JvmPlatform, cls).subsystem_dependencies() + (DistributionLocator,)
+    return super().subsystem_dependencies() + (DistributionLocator,)
 
   def _parse_platform(self, name, platform):
     return JvmPlatformSettings(platform.get('source', platform.get('target')),
@@ -176,7 +172,7 @@ class JvmPlatform(Subsystem):
 
 
 @total_ordering
-class JvmPlatformSettings(object):
+class JvmPlatformSettings:
   """Simple information holder to keep track of common arguments to java compilers."""
 
   class IllegalSourceTargetCombination(TaskError):

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -50,7 +47,7 @@ class PythonBinary(PythonTarget):
 
   @classmethod
   def subsystems(cls):
-    return super(PythonBinary, cls).subsystems() + (cls.Defaults,)
+    return super().subsystems() + (cls.Defaults,)
 
   # TODO(wickman) Consider splitting pex options out into a separate PexInfo builder that can be
   # attached to the binary target.  Ideally the PythonBinary target is agnostic about pex mechanics
@@ -108,7 +105,7 @@ class PythonBinary(PythonTarget):
       'emit_warnings': PrimitiveField(self.Defaults.should_emit_warnings(emit_warnings)),
     })
 
-    super(PythonBinary, self).__init__(sources=sources, payload=payload, **kwargs)
+    super().__init__(sources=sources, payload=payload, **kwargs)
 
     if (not sources or not sources.files) and entry_point is None:
       raise TargetDefinitionException(self,

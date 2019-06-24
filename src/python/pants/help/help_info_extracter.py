@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import object, str
 from collections import namedtuple
 
 from future.types import newstr
@@ -50,7 +46,7 @@ class OptionScopeHelpInfo(namedtuple('_OptionScopeHelpInfo',
   pass
 
 
-class HelpInfoExtracter(object):
+class HelpInfoExtracter:
   """Extracts information useful for displaying help from option registration args."""
 
   @classmethod

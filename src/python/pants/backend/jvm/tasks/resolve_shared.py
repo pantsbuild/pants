@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import next
 
 from pants.base.build_environment import get_buildroot
 from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot
@@ -21,7 +17,7 @@ class JvmResolverBase(TaskBase):
     """Register an option to make capturing snapshots optional.
     This class is intended to be extended by Jvm resolvers (coursier and ivy), and the option name should reflect that.
     """
-    super(JvmResolverBase, cls).register_options(register)
+    super().register_options(register)
     register('--capture-snapshots', type=bool, default=False,
              removal_version='1.19.0.dev2',
              removal_hint='Enabled by default.',

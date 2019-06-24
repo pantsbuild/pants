@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import object
 
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.base.build_environment import pants_version
@@ -14,7 +10,7 @@ from pants.build_graph.address import Address
 from pants.util.meta import classproperty
 
 
-class PantsRequirement(object):
+class PantsRequirement:
   """Exports a `python_requirement_library` pointing at the active pants' corresponding sdist.
 
   This requirement is useful for custom plugin authors who want to build and test their plugin with

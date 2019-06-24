@@ -4,7 +4,6 @@
 python_library(
   name = 'common',
   sources = 'common.py',
-  compatibility = ['CPython>=3.6'],
   tags = {'type_checked'},
 )
 
@@ -14,7 +13,6 @@ python_binary(
   dependencies = [
     ':common',
   ],
-  compatibility = ['CPython>=3.6'],
   tags = {'type_checked'},
 )
 
@@ -24,7 +22,6 @@ python_binary(
   dependencies = [
     ':common',
   ],
-  compatibility = ['CPython>=3.6'],
   tags = {'type_checked'},
 )
 
@@ -34,7 +31,6 @@ python_binary(
   dependencies = [
     ':common',
   ],
-  compatibility = ['CPython>=3.6'],
   tags = {'type_checked'},
 )
 
@@ -44,14 +40,21 @@ python_binary(
   dependencies = [
     ':common',
   ],
-  compatibility = ['CPython>=3.6'],
+  tags = {'type_checked'},
+)
+
+python_binary(
+  name = 'deploy_to_s3',
+  sources = 'deploy_to_s3.py',
+  dependencies = [
+    ':common',
+  ],
   tags = {'type_checked'},
 )
 
 python_binary(
   name = 'mypy',
   sources = 'mypy.py',
-  compatibility = ['CPython>=3.6'],
   tags = {'type_checked'},
 )
 
@@ -61,6 +64,5 @@ python_binary(
   dependencies = [
     ':common',
   ],
-  compatibility = ['CPython>=3.6'],
   tags = {'type_checked'},
 )

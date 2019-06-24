@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
 import sys
-from builtins import map, object
 
 import pkg_resources
 
@@ -23,7 +19,7 @@ from pants.subsystem.subsystem import Subsystem
 logger = logging.getLogger(__name__)
 
 
-class BuildConfigInitializer(object):
+class BuildConfigInitializer:
   """Initializes a BuildConfiguration object.
 
   This class uses a class-level cache for the internally generated `BuildConfiguration` object,
@@ -71,7 +67,7 @@ class BuildConfigInitializer(object):
     )
 
 
-class OptionsInitializer(object):
+class OptionsInitializer:
   """Initializes options."""
 
   @staticmethod

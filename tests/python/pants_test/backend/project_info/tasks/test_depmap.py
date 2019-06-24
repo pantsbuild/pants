@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -27,7 +24,7 @@ class DepmapTest(BaseDepmapTest):
     return register_core().merge(register_jvm()).merge(register_python())
 
   def setUp(self):
-    super(DepmapTest, self).setUp()
+    super().setUp()
     subsystem_util.init_subsystem(PythonBinary.Defaults)
 
     def add_to_build_file(path, name, type, deps=(), **kwargs):

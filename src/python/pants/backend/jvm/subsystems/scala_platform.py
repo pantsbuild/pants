@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from collections import namedtuple
 
@@ -91,7 +88,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
                             cls.versioned_tool_name('scalastyle', version),
                             classpath=[scala_style_jar])
 
-    super(ScalaPlatform, cls).register_options(register)
+    super().register_options(register)
 
     register('--scalac-plugins', advanced=True, type=list, fingerprint=True,
             help='Use these scalac plugins.')

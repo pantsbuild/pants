@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import multiprocessing
 import os
 import sys
-from builtins import str
 from textwrap import dedent
 
 from pants.base.build_environment import (get_buildroot, get_default_pants_config_file,

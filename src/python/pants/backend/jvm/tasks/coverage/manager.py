@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import shutil
-from builtins import object
 
 from pants.backend.jvm.tasks.coverage.cobertura import Cobertura
 from pants.backend.jvm.tasks.coverage.engine import NoCoverage
@@ -16,7 +12,7 @@ from pants.util.dirutil import safe_mkdir
 from pants.util.strutil import safe_shlex_split
 
 
-class CodeCoverageSettings(object):
+class CodeCoverageSettings:
   """A class containing settings for code coverage tasks."""
 
   def __init__(self, options, context, workdir, tool_classpath, confs, log,
@@ -61,7 +57,7 @@ class CodeCoverage(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(CodeCoverage, cls).subsystem_dependencies() + (Cobertura.Factory, Jacoco.Factory)
+    return super().subsystem_dependencies() + (Cobertura.Factory, Jacoco.Factory)
 
   # TODO(jtrobec): move these to subsystem scope after deprecating
   @staticmethod

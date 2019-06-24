@@ -1,10 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import re
+from abc import ABCMeta
 from hashlib import sha1
 
 from future.utils import PY3, string_types
@@ -16,10 +14,9 @@ from pants.base.payload_field import (ExcludesField, FingerprintedField, Fingerp
                                       PrimitiveField)
 from pants.base.validation import assert_list
 from pants.java.jar.exclude import Exclude
-from pants.util.meta import AbstractClass
 
 
-class JarRule(FingerprintedMixin, AbstractClass):
+class JarRule(FingerprintedMixin, metaclass=ABCMeta):
 
   def __init__(self, apply_pattern, payload=None):
     self.payload = payload or Payload()
@@ -121,7 +118,7 @@ class Duplicate(JarRule):
     payload.add_fields({
       'action': PrimitiveField(self.validate_action(action)),
     })
-    super(Duplicate, self).__init__(apply_pattern, payload=payload)
+    super().__init__(apply_pattern, payload=payload)
 
   @property
   def action(self):
@@ -363,11 +360,7 @@ class JvmBinary(JvmTarget):
       'extra_jvm_options': PrimitiveField(list(extra_jvm_options or ())),
     })
 
-    super(JvmBinary, self).__init__(name=name,
-                                    address=address,
-                                    payload=payload,
-                                    sources=sources,
-                                    **kwargs)
+    super().__init__(name=name, address=address, payload=payload, sources=sources, **kwargs)
 
   @property
   def basename(self):

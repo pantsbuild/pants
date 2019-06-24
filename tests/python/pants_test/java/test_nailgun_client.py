@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import signal
 import socket
 import unittest
-from builtins import object
 
 import mock
 
@@ -19,7 +15,7 @@ from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 PATCH_OPTS = dict(autospec=True, spec_set=True)
 
 
-class FakeFile(object):
+class FakeFile:
   def __init__(self):
     self.content = b''
 

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.base.workunit import WorkUnit
 from pants.reporting.json_reporter import JsonReporter
@@ -10,13 +7,13 @@ from pants.reporting.report import Report
 from pants_test.test_base import TestBase
 
 
-class FakeRunTracker(object):
+class FakeRunTracker:
 
-  class FakeCacheStats(object):
+  class FakeCacheStats:
     def get_all(self):
       return []
 
-  class FakePantsdStats(object):
+  class FakePantsdStats:
     def get_all(self):
       return {}
 
@@ -27,7 +24,7 @@ class FakeRunTracker(object):
     return {}
 
 
-class FakeWorkUnit(object):
+class FakeWorkUnit:
   def __init__(self, parent, **kwargs):
     self.name = kwargs['name']
     self.id = '{}_id'.format(self.name)

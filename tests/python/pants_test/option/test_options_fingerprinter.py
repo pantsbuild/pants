@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import range, zip
 
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
@@ -19,7 +15,7 @@ from pants_test.test_base import TestBase
 class OptionsFingerprinterTest(TestBase):
 
   def setUp(self):
-    super(OptionsFingerprinterTest, self).setUp()
+    super().setUp()
     self.options_fingerprinter = OptionsFingerprinter(self.context().build_graph)
 
   def test_fingerprint_dict(self):

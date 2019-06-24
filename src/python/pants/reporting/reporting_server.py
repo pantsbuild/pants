@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import http.server
 import itertools
@@ -12,7 +9,6 @@ import mimetypes
 import os
 import pkgutil
 import re
-from builtins import bytes, object, open, range, str, zip
 from collections import namedtuple
 from datetime import date, datetime
 from textwrap import dedent
@@ -366,7 +362,7 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
     """Silence BaseHTTPRequestHandler's logging."""
 
 
-class ReportingServer(object):
+class ReportingServer:
   """Reporting Server HTTP server."""
 
   class Settings(namedtuple('Settings', ['info_dir', 'template_dir', 'assets_dir', 'root',

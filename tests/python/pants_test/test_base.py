@@ -1,15 +1,12 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import itertools
 import logging
 import os
 import unittest
 import warnings
-from builtins import object, open, str
+from abc import ABC, ABCMeta, abstractmethod
 from collections import defaultdict
 from contextlib import contextmanager
 from tempfile import mkdtemp
@@ -40,17 +37,18 @@ from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import (recursive_dirname, relative_symlink, safe_file_dump, safe_mkdir,
                                 safe_mkdtemp, safe_open, safe_rmtree)
 from pants.util.memo import memoized_method
-from pants.util.meta import AbstractClass, classproperty
+from pants.util.meta import classproperty
 from pants_test.base.context_utils import create_context_from_options
 from pants_test.engine.util import init_native
 from pants_test.option.util.fakes import create_options_for_optionables
 from pants_test.subsystem import subsystem_util
 
 
-class TestGenerator(object):
+class AbstractTestGenerator(ABC):
   """A mixin that facilitates test generation at runtime."""
 
   @classmethod
+  @abstractmethod
   def generate_tests(cls):
     """Generate tests for a given class.
 
@@ -62,9 +60,6 @@ class TestGenerator(object):
       ThingTest.generate_tests()
 
     """
-    # This would be an @abstractmethod, but making TestGenerator extend AbstractClass causes an
-    # error as it gets instantiated directly somehow in testing.
-    raise NotImplementedError()
 
   @classmethod
   def add_test(cls, method_name, method):
@@ -81,7 +76,7 @@ class TestGenerator(object):
     setattr(cls, method_name, method)
 
 
-class TestBase(unittest.TestCase, AbstractClass):
+class TestBase(unittest.TestCase, metaclass=ABCMeta):
   """A baseclass useful for tests requiring a temporary buildroot.
 
   :API: public
@@ -293,7 +288,7 @@ class TestBase(unittest.TestCase, AbstractClass):
     """
     :API: public
     """
-    super(TestBase, self).setUp()
+    super().setUp()
     # Avoid resetting the Runtracker here, as that is specific to fork'd process cleanup.
     clean_global_runtime_state(reset_subsystem=True)
 
@@ -513,7 +508,7 @@ class TestBase(unittest.TestCase, AbstractClass):
     """
     :API: public
     """
-    super(TestBase, self).tearDown()
+    super().tearDown()
     Subsystem.reset()
 
   @classproperty
@@ -678,7 +673,7 @@ class TestBase(unittest.TestCase, AbstractClass):
         PathGlobsAndRoot(PathGlobs(('**',)), text_type(temp_dir)),
       ))[0]
 
-  class LoggingRecorder(object):
+  class LoggingRecorder:
     """Simple logging handler to record warnings."""
 
     def __init__(self):

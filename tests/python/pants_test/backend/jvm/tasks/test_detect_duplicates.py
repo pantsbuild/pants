@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -25,7 +22,7 @@ class DuplicateDetectorTest(JvmBinaryTaskTestBase):
     return DuplicateDetector
 
   def setUp(self):
-    super(DuplicateDetectorTest, self).setUp()
+    super().setUp()
 
     self.classes_dir = os.path.join(self.test_workdir, 'classes')
     safe_mkdir(self.classes_dir)

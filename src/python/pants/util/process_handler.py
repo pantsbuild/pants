@@ -1,18 +1,13 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import io
 import multiprocessing
 import os
 import sys
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 from future.utils import PY2, PY3
-
-from pants.util.meta import AbstractClass
 
 
 # Expose subprocess with python 3.2+ capabilities (namely timeouts) and bugfixes from this module.
@@ -26,7 +21,7 @@ else:
 subprocess = subprocess3
 
 
-class ProcessHandler(AbstractClass):
+class ProcessHandler(ABC):
   """An abstraction of process handling calls using the same interface as subprocess(32).Popen.
 
   See SubprocessProcessHandler below for an example.

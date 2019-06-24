@@ -1,11 +1,8 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from abc import abstractproperty
+from abc import abstractmethod
 
 from pants.backend.jvm.tasks.rewrite_base import RewriteBase
 from pants.base.exceptions import TaskError
@@ -22,7 +19,7 @@ class ScalaFix(RewriteBase):
 
   @classmethod
   def register_options(cls, register):
-    super(ScalaFix, cls).register_options(register)
+    super().register_options(register)
     register('--configuration', type=file_option, default=None, fingerprint=True,
              help='The config file to use (in HOCON format).')
     register('--rules', default='ProcedureSyntax', type=str, fingerprint=True,
@@ -49,7 +46,7 @@ class ScalaFix(RewriteBase):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(ScalaFix, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     # Only request a classpath if semantic checks are enabled.
     if options.semantic:
       round_manager.require_data('runtime_classpath')
@@ -86,7 +83,8 @@ class ScalaFix(RewriteBase):
                         args=args,
                         workunit_name='scalafix')
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def additional_args(self):
     """Additional arguments to the Scalafix command."""
 

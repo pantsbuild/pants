@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import datetime
 import os
@@ -10,11 +7,9 @@ import socket
 import struct
 import threading
 import time
-from abc import abstractmethod
-from builtins import bytes, object, str, zip
+from abc import ABC, abstractmethod
 from contextlib import contextmanager
 
-from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 from pants.util.osutil import IntegerForPid
 
@@ -22,7 +17,7 @@ from pants.util.osutil import IntegerForPid
 STDIO_DESCRIPTORS = (0, 1, 2)
 
 
-class ChunkType(object):
+class ChunkType:
   """Nailgun protocol chunk types.
 
   N.B. Because we force `__future__.unicode_literals` in sources, string literals are automatically
@@ -57,7 +52,7 @@ class ChunkType(object):
   VALID_TYPES = REQUEST_TYPES + EXECUTION_TYPES
 
 
-class NailgunProtocol(object):
+class NailgunProtocol:
   """A mixin that provides a base implementation of the Nailgun protocol as described on
      http://martiansoftware.com/nailgun/protocol.html.
 
@@ -239,7 +234,7 @@ class NailgunProtocol(object):
 
   class TimeoutOptions(datatype([('start_time', float), ('interval', float)])): pass
 
-  class TimeoutProvider(AbstractClass):
+  class TimeoutProvider(ABC):
 
     @abstractmethod
     def maybe_timeout_options(self):
@@ -400,7 +395,7 @@ class NailgunProtocol(object):
     return tuple(env.get(cls.TTY_PATH_ENV.format(fd_id)) for fd_id in STDIO_DESCRIPTORS)
 
 
-class MaybeShutdownSocket(object):
+class MaybeShutdownSocket:
   """A wrapper around a socket which knows whether it has been shut down.
 
   Because we may shut down a nailgun socket from one thread, and read from it on another, we use

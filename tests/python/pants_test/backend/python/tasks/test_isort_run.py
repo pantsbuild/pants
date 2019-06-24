@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open
 from textwrap import dedent
 
 from pytest import fail
@@ -53,7 +49,7 @@ class PythonIsortTest(PythonTaskTestBase):
     return IsortRun
 
   def setUp(self):
-    super(PythonIsortTest, self).setUp()
+    super().setUp()
     self._create_graph()
 
   def _create_graph(self):

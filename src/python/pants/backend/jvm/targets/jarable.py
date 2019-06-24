@@ -1,22 +1,19 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from abc import abstractproperty
+from abc import ABC, abstractmethod
 
 from pants.java.jar.jar_dependency import JarDependency
-from pants.util.meta import AbstractClass
 
 
-class Jarable(AbstractClass):
+class Jarable(ABC):
   """A mixin that identifies a target as one that can provide a jar.
 
   :API: public
   """
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def identifier(self):
     """Subclasses should return a stable unique identifier for the jarable target."""
 

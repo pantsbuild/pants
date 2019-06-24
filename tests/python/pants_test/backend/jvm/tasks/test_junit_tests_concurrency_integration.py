@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -30,7 +27,7 @@ class JunitTestsConcurrencyIntegrationTest(PantsRunIntegrationTest):
   def run_pants_with_workdir(self, command, workdir, **kwargs):
     if self.USE_EXPERIMENTAL_RUNNER:
       command.append("--test-junit-use-experimental-runner")
-    return super(JunitTestsConcurrencyIntegrationTest, self).run_pants_with_workdir(
+    return super().run_pants_with_workdir(
       command, workdir, **kwargs)
 
   @ensure_experimental

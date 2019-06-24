@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import shutil
-from builtins import object
 from hashlib import sha1
 
 from future.utils import raise_from
@@ -18,7 +14,7 @@ from pants.util.dirutil import relative_symlink, safe_delete, safe_mkdir, safe_r
 from pants.util.memo import memoized_method
 
 
-class VersionedTargetSet(object):
+class VersionedTargetSet:
   """Represents a list of targets, a corresponding CacheKey, and a flag determining whether the
   list of targets is currently valid.
 
@@ -183,7 +179,7 @@ class VersionedTarget(VersionedTargetSet):
     self.target = target
     self.cache_key = cache_key
     # Must come after the assignments above, as they are used in the parent's __init__.
-    super(VersionedTarget, self).__init__(cache_manager, [self])
+    super().__init__(cache_manager, [self])
     self.id = target.id
 
   @property
@@ -193,7 +189,7 @@ class VersionedTarget(VersionedTargetSet):
     :return: `True` if this target's associated artifacts can be cached.
     :rtype: bool
     """
-    return super(VersionedTarget, self).cacheable and not self.target.no_cache
+    return super().cacheable and not self.target.no_cache
 
   def create_results_dir(self):
     """Ensure that the empty results directory and a stable symlink exist for these versioned targets."""
@@ -231,7 +227,7 @@ class VersionedTarget(VersionedTargetSet):
     return 'VT({}, {})'.format(self.target.id, 'valid' if self.valid else 'invalid')
 
 
-class InvalidationCheck(object):
+class InvalidationCheck:
   """The result of calling check() on a CacheManager.
 
   Each member is a list of VersionedTargetSet objects.  Sorting of the targets depends
@@ -253,7 +249,7 @@ class InvalidationCheck(object):
     self.invalid_vts = invalid_vts
 
 
-class InvalidationCacheManager(object):
+class InvalidationCacheManager:
   """Manages cache checks, updates and invalidation keeping track of basic change
   and invalidation statistics.
   Note that this is distinct from the ArtifactCache concept, and should probably be renamed.

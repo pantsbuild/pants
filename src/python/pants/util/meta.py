@@ -1,11 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from abc import ABCMeta, abstractproperty
-from builtins import object
 
 
 class SingletonMetaclass(type):
@@ -14,11 +8,11 @@ class SingletonMetaclass(type):
   def __call__(cls, *args, **kwargs):
     # TODO: convert this into an `@memoized_classproperty`!
     if not hasattr(cls, 'instance'):
-      cls.instance = super(SingletonMetaclass, cls).__call__(*args, **kwargs)
+      cls.instance = super().__call__(*args, **kwargs)
     return cls.instance
 
 
-class ClassPropertyDescriptor(object):
+class ClassPropertyDescriptor:
   """Define a readable attribute on a class, given a function."""
 
   # The current solution is preferred as it doesn't require any modifications to the class
@@ -35,7 +29,7 @@ class ClassPropertyDescriptor(object):
       objtype = type(obj)
       # Get the callable field for this object, which may be a property.
     callable_field = self.fget.__get__(obj, objtype)
-    if isinstance(self.fget.__func__, abstractproperty):
+    if getattr(self.fget.__func__, '__isabstractmethod__', False):
       field_name = self.fget.__func__.fget.__name__
       raise TypeError("""\
 The classproperty '{func_name}' in type '{type_name}' was an abstractproperty, meaning that type \
@@ -54,7 +48,7 @@ def classproperty(func):
   bind the first argument to the class object.
 
   Usage:
-  >>> class Foo(object):
+  >>> class Foo:
   ...   @classproperty
   ...   def name(cls):
   ...     return cls.__name__
@@ -83,7 +77,7 @@ def staticproperty(func):
 
   Usage:
   >>> other_x = 'value'
-  >>> class Foo(object):
+  >>> class Foo:
   ...   @staticproperty
   ...   def x():
   ...     return other_x
@@ -107,14 +101,4 @@ def staticproperty(func):
 # TODO: look into merging this with `enum` and `ChoicesMixin`, which describe a fixed set of
 # singletons, to decouple the enum interface from the implementation as a `datatype`.
 # Extend Singleton and your class becomes a singleton, each construction returns the same instance.
-try:  # Python3
-  Singleton = SingletonMetaclass(u'Singleton', (object,), {})
-except TypeError:  # Python2
-  Singleton = SingletonMetaclass(b'Singleton', (object,), {})
-
-
-# Abstract base classes w/o __metaclass__ or meta =, just extend AbstractClass.
-try:  # Python3
-  AbstractClass = ABCMeta(u'AbstractClass', (object,), {})
-except TypeError:  # Python2
-  AbstractClass = ABCMeta(b'AbstractClass', (object,), {})
+Singleton = SingletonMetaclass('Singleton', (object,), {})

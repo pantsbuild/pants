@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import object
 from textwrap import wrap
 
 from colors import blue, cyan, green, red
@@ -12,7 +8,7 @@ from colors import blue, cyan, green, red
 from pants.help.help_info_extracter import HelpInfoExtracter
 
 
-class HelpFormatter(object):
+class HelpFormatter:
 
   def __init__(self, scope, show_recursive, show_advanced, color):
     self._scope = scope

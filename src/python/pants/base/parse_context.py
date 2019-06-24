@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import functools
 import threading
-from builtins import object
 
 
 class Storage(threading.local):
@@ -33,7 +29,7 @@ class Storage(threading.local):
     return obj
 
 
-class ParseContext(object):
+class ParseContext:
   """The build file context that context aware objects - aka BUILD macros - operate against.
 
   All fields of the ParseContext must be assumed to be mutable by macros, and should

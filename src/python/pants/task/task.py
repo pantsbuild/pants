@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import sys
-from abc import abstractmethod
-from builtins import filter, map, object, set, str, zip
+from abc import ABCMeta, abstractmethod
 from contextlib import contextmanager
 from hashlib import sha1
 from itertools import repeat
@@ -30,10 +26,10 @@ from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.dirutil import safe_mkdir, safe_rm_oldest_items_in_dir
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.meta import AbstractClass, classproperty
+from pants.util.meta import classproperty
 
 
-class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
+class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
   """Defines a lifecycle that prepares a task for execution and provides the base machinery
   needed to execute it.
 
@@ -96,7 +92,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return (super(TaskBase, cls).subsystem_dependencies() +
+    return (super().subsystem_dependencies() +
             (CacheSetup.scoped(cls), BuildInvalidator.Factory, SourceRootConfig) +
             ((TargetFilter.scoped(cls),) if cls.target_filtering_enabled else tuple()))
 
@@ -122,7 +118,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   @classmethod
   def register_options(cls, register):
-    super(TaskBase, cls).register_options(register)
+    super().register_options(register)
     if cls.supports_passthru_args():
       register('--passthrough-args',
                type=list,
@@ -175,7 +171,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     class MyTask(Task):
       def __init__(self, *args, **kwargs):
-        super(MyTask, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         ...
 
     This allows us to change Task.__init__()'s arguments without
@@ -184,7 +180,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     :API: public
     """
-    super(TaskBase, self).__init__()
+    super().__init__()
     self.context = context
     self._workdir = workdir
 
@@ -731,7 +727,7 @@ class Task(TaskBase):
 
     :API: public
     """
-    super(Task, self).__init__(context, workdir)
+    super().__init__(context, workdir)
 
   @abstractmethod
   def execute(self):
@@ -741,6 +737,6 @@ class Task(TaskBase):
     """
 
 
-class QuietTaskMixin(object):
+class QuietTaskMixin:
   """A mixin to signal that pants shouldn't print verbose progress information for this task."""
   pass

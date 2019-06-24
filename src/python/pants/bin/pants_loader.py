@@ -1,18 +1,14 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import importlib
 import locale
 import os
 import warnings
-from builtins import object
 from textwrap import dedent
 
 
-class PantsLoader(object):
+class PantsLoader:
   """Loads and executes entrypoints."""
 
   ENTRYPOINT_ENV_VAR = 'PANTS_ENTRYPOINT'

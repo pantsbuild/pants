@@ -4,7 +4,6 @@
 python_library(
   name='lib',
   dependencies = [
-    '3rdparty/python:future',
     'contrib/python/src/python/pants/contrib/python/checks/checker',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/option/util',
@@ -13,7 +12,6 @@ python_library(
 
 python_tests(
   dependencies=[
-    '3rdparty/python:future',
     ':lib',
     'contrib/python/src/python/pants/contrib/python/checks/checker',
     'src/python/pants/util:contextutil',

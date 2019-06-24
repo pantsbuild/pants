@@ -1,14 +1,10 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
 import itertools
 import json
 import os
-from builtins import open, str, zip
 from collections import defaultdict
 
 from future.moves.urllib import parse
@@ -53,11 +49,11 @@ class CoursierMixin(JvmResolverBase):
 
   @classmethod
   def implementation_version(cls):
-    return super(CoursierMixin, cls).implementation_version() + [('CoursierMixin', 2)]
+    return super().implementation_version() + [('CoursierMixin', 2)]
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(CoursierMixin, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       CoursierSubsystem,
       DistributionLocator,
       JarDependencyManagement
@@ -65,7 +61,7 @@ class CoursierMixin(JvmResolverBase):
 
   @classmethod
   def register_options(cls, register):
-    super(CoursierMixin, cls).register_options(register)
+    super().register_options(register)
     register('--allow-global-excludes', type=bool, advanced=False, fingerprint=True, default=True,
              help='Whether global excludes are allowed.')
     register('--report', type=bool, advanced=False, default=False,
@@ -669,7 +665,7 @@ class CoursierResolve(CoursierMixin, NailgunTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(CoursierResolve, cls).subsystem_dependencies() + (JvmResolveSubsystem,)
+    return super().subsystem_dependencies() + (JvmResolveSubsystem,)
 
   @classmethod
   def product_types(cls):
@@ -677,7 +673,7 @@ class CoursierResolve(CoursierMixin, NailgunTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(CoursierResolve, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     # Codegen may inject extra resolvable deps, so make sure we have a product dependency
     # on relevant codegen tasks, if any.
     round_manager.optional_data('java')
@@ -685,11 +681,11 @@ class CoursierResolve(CoursierMixin, NailgunTask):
 
   @classmethod
   def register_options(cls, register):
-    super(CoursierResolve, cls).register_options(register)
+    super().register_options(register)
 
   @classmethod
   def implementation_version(cls):
-    return super(CoursierResolve, cls).implementation_version() + [('CoursierResolve', 2)]
+    return super().implementation_version() + [('CoursierResolve', 2)]
 
   def execute(self):
     """Resolves the specified confs for the configured targets and returns an iterator over
@@ -717,7 +713,7 @@ class CoursierResolve(CoursierMixin, NailgunTask):
 class CoursierResolveFingerprintStrategy(FingerprintStrategy):
 
   def __init__(self, confs):
-    super(CoursierResolveFingerprintStrategy, self).__init__()
+    super().__init__()
     self._confs = sorted(confs or [])
 
   def compute_fingerprint(self, target):

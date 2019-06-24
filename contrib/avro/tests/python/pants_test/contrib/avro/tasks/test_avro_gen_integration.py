@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -27,7 +24,7 @@ class AvroJavaGenTest(PantsRunIntegrationTest):
         updated = full_config.get(scope, {})
         updated.update(scoped_cfgs)
         full_config[scope] = updated
-    return super(AvroJavaGenTest, self).run_pants_with_workdir(
+    return super().run_pants_with_workdir(
       command=command,
       workdir=workdir,
       config=full_config,

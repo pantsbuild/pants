@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open, str
 from textwrap import dedent
 
 import mock
@@ -28,7 +24,7 @@ class SelectInterpreterTest(TaskTestBase):
     return SelectInterpreter
 
   def setUp(self):
-    super(SelectInterpreterTest, self).setUp()
+    super().setUp()
 
     # We're tied tightly to pex implementation details here faking out a python binary that outputs
     # only one value no matter what arguments, environment or input stream it has attached. That

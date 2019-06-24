@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from io import StringIO
 
@@ -33,7 +30,7 @@ class ConsoleRuleTestBase(TestBase):
     raise NotImplementedError()
 
   def setUp(self):
-    super(ConsoleRuleTestBase, self).setUp()
+    super().setUp()
 
     if not issubclass(self.goal_cls, Goal):
       raise AssertionError('goal_cls() must return a Goal subclass, got {}'.format(self.goal_cls))

@@ -1,17 +1,13 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import zipfile
-from builtins import object
 from contextlib import contextmanager
 
 from pants.util.contextutil import open_zip
 
 
-class CompileContext(object):
+class CompileContext:
   """A context for the compilation of a target.
 
   This can be used to differentiate between a partially completed compile in a temporary location

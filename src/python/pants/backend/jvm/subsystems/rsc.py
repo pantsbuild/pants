@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.subsystems.zinc import _ZINC_COMPILER_VERSION
 from pants.binaries.binary_tool import NativeTool
@@ -17,7 +14,7 @@ class Rsc(NativeTool):
 
   @classmethod
   def register_options(cls, register):
-    super(Rsc, cls).register_options(register)
+    super().register_options(register)
 
     register('--native-image', fingerprint=True, type=bool,
              help='Use a pre-compiled native-image for rsc. Requires running in hermetic mode')

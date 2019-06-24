@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open
 from textwrap import dedent
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
@@ -25,13 +21,13 @@ from pants_test.subsystem.subsystem_util import init_subsystem
 class ScalaFmtTestBase(NailgunTaskTestBase):
   @classmethod
   def alias_groups(cls):
-    return super(ScalaFmtTestBase, cls).alias_groups().merge(
+    return super().alias_groups().merge(
       BuildFileAliases(targets={'java_tests': JUnitTests,
                                 'junit_tests': JUnitTests,
                                 'scala_library': ScalaLibrary}))
 
   def setUp(self):
-    super(ScalaFmtTestBase, self).setUp()
+    super().setUp()
 
     init_subsystem(ScalaPlatform)
     init_subsystem(SourceRootConfig)

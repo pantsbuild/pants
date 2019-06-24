@@ -1,15 +1,11 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import queue
 import sys
 import threading
-from builtins import open
 
 from future.utils import PY3
 
@@ -47,7 +43,7 @@ class SchedulerService(PantsService):
                                     subscriptions will tear down the daemon.
     :param string pantsd_pidfile: The path to the pantsd pidfile for fs event monitoring.
     """
-    super(SchedulerService, self).__init__()
+    super().__init__()
     self._fs_event_service = fs_event_service
     self._graph_helper = legacy_graph_scheduler
     self._invalidation_globs = invalidation_globs
@@ -71,7 +67,7 @@ class SchedulerService(PantsService):
 
   def setup(self, services):
     """Service setup."""
-    super(SchedulerService, self).setup(services)
+    super().setup(services)
     # Register filesystem event handlers on an FSEventService instance.
     self._fs_event_service.register_all_files_handler(self._enqueue_fs_event)
 
@@ -242,14 +238,14 @@ class SchedulerService(PantsService):
       self._state.maybe_pause()
 
 
-class LoopCondition(object):
+class LoopCondition:
   """A wrapped condition variable to handle deciding when loop consumers should re-run.
 
   Any number of threads may wait and/or notify the condition.
   """
 
   def __init__(self):
-    super(LoopCondition, self).__init__()
+    super().__init__()
     self._condition = threading.Condition(threading.Lock())
     self._iteration = 0
 

@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import re
-from builtins import open, str
 
 from pkg_resources import resource_string
 from pygments.formatters.html import HtmlFormatter
@@ -59,7 +55,7 @@ class MarkdownToHtml(Task):
     return [cls.MARKDOWN_HTML_PRODUCT, cls.WIKI_HTML_PRODUCT]
 
   def __init__(self, *args, **kwargs):
-    super(MarkdownToHtml, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._templates_dir = os.path.join('templates', 'markdown')
     self.open = self.get_options().open
     self.fragment = self.get_options().fragment

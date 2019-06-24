@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.targets.jvm_prep_command import JvmPrepCommand
@@ -18,7 +15,7 @@ class FakeRunJvmPrepCommand(RunJvmPrepCommandBase):
 class JvmPrepCommandTest(TaskTestBase):
 
   def setUp(self):
-    super(JvmPrepCommandTest, self).setUp()
+    super().setUp()
     # This is normally taken care of in RunJvmPrepCommandBase.register_options() when running pants,
     # but these don't get called in testing unless you call `self.create_task()`.
     # Some of these unit tests need to create targets before creating the task.

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
@@ -51,7 +48,7 @@ class EngineTestBase(TestBase):
     """
     :API: public
     """
-    super(EngineTestBase, self).setUp()
+    super().setUp()
 
     # TODO(John Sirois): Now that the BuildFileParser controls goal registration by iterating
     # over plugin callbacks a GoalRegistry can be constructed by it and handed to all these
@@ -64,4 +61,4 @@ class EngineTestBase(TestBase):
     """
     Goal.clear()
 
-    super(EngineTestBase, self).tearDown()
+    super().tearDown()

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
 import logging
@@ -26,7 +23,7 @@ class GrpcioRun(SimpleCodegenTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(GrpcioRun, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(GrpcioPrep.tool_instance_cls)
 
   def synthetic_target_type(self, target):

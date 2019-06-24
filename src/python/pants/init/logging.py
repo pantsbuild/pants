@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import copy
 import logging
@@ -74,7 +71,7 @@ def setup_logging_from_options(bootstrap_options):
 class NativeHandler(StreamHandler):
 
   def __init__(self, level, native=None, stream=None, native_filename=None):
-    super(NativeHandler, self).__init__(stream)
+    super().__init__(stream)
     self.native = native
     self.native_filename = native_filename
     self.setLevel(level)

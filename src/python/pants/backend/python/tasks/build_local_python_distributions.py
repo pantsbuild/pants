@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import glob
 import os
@@ -63,11 +60,11 @@ class BuildLocalPythonDistributions(Task):
 
   @classmethod
   def implementation_version(cls):
-    return super(BuildLocalPythonDistributions, cls).implementation_version() + [('BuildLocalPythonDistributions', 3)]
+    return super().implementation_version() + [('BuildLocalPythonDistributions', 3)]
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(BuildLocalPythonDistributions, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       BuildSetupRequiresPex.scoped(cls),
       PythonNativeCode.scoped(cls),
     )

@@ -15,7 +15,6 @@ python_tests(
   name='test_safeargs',
   sources=['test_safeargs.py'],
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/backend/jvm:argfile'
   ]
 )

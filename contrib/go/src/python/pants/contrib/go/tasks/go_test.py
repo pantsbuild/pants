@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import str
 from contextlib import contextmanager
 
 from future.utils import text_type
@@ -32,7 +28,7 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
 
   @classmethod
   def register_options(cls, register):
-    super(GoTest, cls).register_options(register)
+    super().register_options(register)
     register('--build-and-test-flags', type=str, default='', fingerprint=True,
              removal_version='1.17.0.dev0',
              removal_hint='Use --shlexed-build-and-test-flags instead! After this deprecation '

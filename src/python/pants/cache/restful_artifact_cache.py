@@ -1,14 +1,10 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import multiprocessing
 import queue
 import threading
-from builtins import object, open
 
 import requests
 from requests import RequestException
@@ -23,7 +19,7 @@ logger = logging.getLogger(__name__)
 logging.getLogger('requests').setLevel(logging.WARNING)
 
 
-class RequestsSession(object):
+class RequestsSession:
   _session = None
 
   @classmethod
@@ -46,7 +42,7 @@ class RESTfulArtifactCache(ArtifactCache):
       under this base.
     :param BaseLocalArtifactCache local: local cache instance for storing and creating artifacts
     """
-    super(RESTfulArtifactCache, self).__init__(artifact_root)
+    super().__init__(artifact_root)
 
     self.best_url_selector = best_url_selector
     self._read_timeout_secs = read_timeout

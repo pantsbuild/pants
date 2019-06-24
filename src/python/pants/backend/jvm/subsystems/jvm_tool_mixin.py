@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import object
 from collections import namedtuple
 from textwrap import dedent
 
@@ -13,7 +9,7 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import target_option
 
 
-class JvmToolMixin(object):
+class JvmToolMixin:
   """A mixin for registering and accessing JVM-based tools.
 
   Must be mixed in to something that can register and use options, e.g., a Task or a Subsystem.
@@ -54,7 +50,7 @@ class JvmToolMixin(object):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JvmToolMixin, cls).subsystem_dependencies() + (DistributionLocator,)
+    return super().subsystem_dependencies() + (DistributionLocator,)
 
   @classmethod
   def get_jvm_options_default(cls, bootstrap_option_values):
@@ -69,7 +65,7 @@ class JvmToolMixin(object):
 
   @classmethod
   def register_options(cls, register):
-    super(JvmToolMixin, cls).register_options(register)
+    super().register_options(register)
     register('--jvm-options', type=list,  advanced=True, metavar='<option>...',
              default=cls.get_jvm_options_default(register.bootstrap),
              help='Run with these JVM options.')

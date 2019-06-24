@@ -1,16 +1,12 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import object
 from collections import defaultdict, namedtuple
 
 from pants.backend.jvm.targets.import_jars_mixin import ImportJarsMixin
 
 
-class JarImportProducts(object):
+class JarImportProducts:
   """Represents the products of jar import resolutions.
 
   Jar imports are jars containing source code to be unpacked and used locally.

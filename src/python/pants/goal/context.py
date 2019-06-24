@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import sys
-from builtins import filter, object
 from collections import defaultdict
 from contextlib import contextmanager
 
@@ -26,7 +22,7 @@ from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.source.source_root import SourceRootConfig
 
 
-class Context(object):
+class Context:
   """Contains the context for a single run of pants.
 
   Task implementations can access configuration data from pants.ini and any flags they have exposed

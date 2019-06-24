@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import object
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
@@ -19,7 +15,7 @@ from pants.build_graph.target import Target
 from pants.util.memo import memoized_method, memoized_property
 
 
-class JvmDependencyAnalyzer(object):
+class JvmDependencyAnalyzer:
   """Helper class for tasks which need to analyze source dependencies.
 
   Primary purpose is to provide a classfile --> target mapping, which subclasses can use in

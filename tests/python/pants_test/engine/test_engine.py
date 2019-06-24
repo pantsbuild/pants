@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import unittest
-from builtins import object, str
 from textwrap import dedent
 
 from pants.engine.rules import RootRule, rule
@@ -16,19 +12,19 @@ from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.engine.util import assert_equal_with_printing, remove_locations_from_traceback
 
 
-class A(object):
+class A:
   pass
 
 
-class B(object):
+class B:
   pass
 
 
-class C(object):
+class C:
   pass
 
 
-class D(object):
+class D:
   pass
 
 

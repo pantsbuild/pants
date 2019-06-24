@@ -33,6 +33,7 @@ use std::path::Path;
 
 pub mod data;
 pub mod file;
+pub mod path;
 
 pub fn owned_string_vec(args: &[&str]) -> Vec<String> {
   args.iter().map(<&str>::to_string).collect()

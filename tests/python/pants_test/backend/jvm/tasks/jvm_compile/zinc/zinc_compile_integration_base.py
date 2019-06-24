@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import unittest
 import xml.etree.ElementTree as ET
-from builtins import object
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
@@ -19,7 +15,7 @@ SHAPELESS_CLSFILE = 'org/pantsbuild/testproject/unicode/shapeless/ShapelessExamp
 SHAPELESS_TARGET = 'testprojects/src/scala/org/pantsbuild/testproject/unicode/shapeless'
 
 
-class BaseZincCompileIntegrationTest(object):
+class BaseZincCompileIntegrationTest:
 
   def create_file(self, path, value):
     with safe_open(path, 'w') as f:

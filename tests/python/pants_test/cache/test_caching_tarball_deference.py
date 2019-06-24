@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open
 
 from pants.base.payload import Payload
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -27,7 +23,7 @@ class DummyCacheLibrary(Target):
     payload = Payload()
     payload.add_fields({'sources': self.create_sources_field(sources=sources,
                                                              sources_rel_path=address.spec_path)})
-    super(DummyCacheLibrary, self).__init__(address=address, payload=payload, *args, **kwargs)
+    super().__init__(address=address, payload=payload, *args, **kwargs)
 
 
 class DummyCacheTask(Task):

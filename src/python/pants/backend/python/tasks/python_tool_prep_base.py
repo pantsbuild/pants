@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import str
 from contextlib import contextmanager
 
 from pex.pex import PEX
@@ -24,7 +20,7 @@ from pants.util.process_handler import subprocess
 from pants.util.strutil import ensure_binary, safe_shlex_join
 
 
-class PythonToolInstance(object):
+class PythonToolInstance:
   def __init__(self, pex_path, interpreter):
     self._pex = PEX(pex_path, interpreter=interpreter)
     self._interpreter = interpreter
@@ -94,7 +90,7 @@ class PythonToolPrepBase(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(PythonToolPrepBase, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       cls.tool_subsystem_cls.scoped(cls),
       PexBuilderWrapper.Factory,
       PythonInterpreterCache,

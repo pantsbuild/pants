@@ -1,12 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
+import configparser
 import functools
 import os
-from builtins import open
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -23,7 +20,6 @@ from pants.build_graph.target import Target
 from pants.source.source_root import SourceRootConfig
 from pants.util.contextutil import pushd, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
-from pants.util.py2_compat import configparser
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.task_test_base import DeclarativeTaskTestMixin, ensure_cached
@@ -39,7 +35,7 @@ from pants_test.task_test_base import DeclarativeTaskTestMixin, ensure_cached
 # `PytestPrep` production requirements here.
 class PytestPrepCoverageVersionPinned(PytestPrep):
   def extra_requirements(self):
-    extra_reqs = list(super(PytestPrepCoverageVersionPinned, self).extra_requirements())
+    extra_reqs = list(super().extra_requirements())
     extra_reqs.append('coverage=={}'.format(coverage.__version__))
     return extra_reqs
 
@@ -108,7 +104,7 @@ class PytestTestEmpty(PytestTestBase):
 class PytestTestConftest(PytestTestBase):
 
   def setUp(self):
-    super(PytestTestConftest, self).setUp()
+    super().setUp()
 
     self.create_file('src/python/base/__init__.py')
     self.create_file('src/python/base/conftest.py', contents=dedent("""
@@ -166,7 +162,7 @@ class PytestTestFailedPexRun(PytestTestBase):
     return cls.AlwaysFailingPexRunPytestRun
 
   def setUp(self):
-    super(PytestTestFailedPexRun, self).setUp()
+    super().setUp()
     self.create_file(
       'tests/test_green.py',
       dedent("""
@@ -210,7 +206,7 @@ class PytestTestFailedPexRun(PytestTestBase):
 
 class PytestTest(PytestTestBase):
   def setUp(self):
-    super(PytestTest, self).setUp()
+    super().setUp()
 
     self.set_options_for_scope('cache.{}'.format(self.options_scope),
                                read_from=None,

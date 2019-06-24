@@ -1,28 +1,18 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import argparse
 import json
 import os
+import subprocess
 import sys
-from builtins import object
 from collections import defaultdict
 from configparser import ConfigParser
-from distutils.util import get_platform
 from functools import total_ordering
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
 from bs4 import BeautifulSoup
-from future.moves.urllib.error import HTTPError
-from future.moves.urllib.request import Request, urlopen
-from future.utils import PY2
-
-if PY2:
-  import subprocess32 as subprocess
-else:
-  import subprocess
 
 COLOR_BLUE = "\x1b[34m"
 COLOR_RESET = "\x1b[0m"
@@ -33,12 +23,12 @@ def banner(message):
 
 
 @total_ordering
-class Package(object):
+class Package:
 
   def __init__(self, name, target, bdist_wheel_flags=None):
     self.name = name
     self.target = target
-    self.bdist_wheel_flags = bdist_wheel_flags or ("--python-tag", "py27.py36.py37")
+    self.bdist_wheel_flags = bdist_wheel_flags or ("--python-tag", "py36.py37")
 
   def __lt__(self, other):
     return self.name < other.name
@@ -47,7 +37,7 @@ class Package(object):
     return self.name == other.name
 
   def __hash__(self):
-    return super(Package, self).__hash__()
+    return super().__hash__()
 
   def __str__(self):
     return self.name
@@ -86,20 +76,15 @@ class Package(object):
     return {owner.lower() for owner in owners}
 
 
-def find_platform_name():
-  # See: https://www.python.org/dev/peps/pep-0425/#id13
-  return get_platform().replace("-", "_").replace(".", "_")
-
-
-def core_packages(py2):
-  # N.B. When releasing with Python 3, we constrain the ABI (Application Binary Interface) to cp36 to allow
-  # pantsbuild.pants to work with any Python 3 version>= 3.6. We are able to get this future compatibility by
-  # specifing `abi3`, which signifies any version >= 3.6 must work. This is possible to set because in
+def core_packages():
+  # N.B. We constrain the ABI (Application Binary Interface) to cp36 to allow pantsbuild.pants to
+  # work with any Python 3 version>= 3.6. We are able to get this future compatibility by specifing
+  # `abi3`, which signifies any version >= 3.6 must work. This is possible to set because in
   # `src/rust/engine/src/cffi/native_engine.c` we set up `Py_LIMITED_API` and in `src/python/pants/BUILD` we
   # set ext_modules, which together allows us to mark the abi tag. See https://docs.python.org/3/c-api/stable.html
   # for documentation and https://bitbucket.org/pypa/wheel/commits/1f63b534d74b00e8c2e8809f07914f6da4502490?at=default#Ldocs/index.rstT121
   # for how to mark the ABI through bdist_wheel.
-  bdist_wheel_flags = ("--py-limited-api", "cp36") if not py2 else ("--python-tag", "cp27", "--plat-name", find_platform_name())
+  bdist_wheel_flags = ("--py-limited-api", "cp36")
   return {
     Package("pantsbuild.pants", "//src/python/pants:pants-packaged", bdist_wheel_flags=bdist_wheel_flags),
     Package("pantsbuild.pants.testinfra", "//tests/python/pants_test:test_infra"),
@@ -184,19 +169,20 @@ def contrib_packages():
   }
 
 
-def all_packages(py2):
-  return core_packages(py2).union(contrib_packages())
+def all_packages():
+  return core_packages().union(contrib_packages())
 
 
-def build_and_print_packages(version, py2=False):
+def build_and_print_packages(version):
   packages_by_flags = defaultdict(list)
-  for package in sorted(all_packages(py2)):
+  for package in sorted(all_packages()):
     packages_by_flags[package.bdist_wheel_flags].append(package)
 
   for (flags, packages) in packages_by_flags.items():
     args = ("./pants", "setup-py", "--run=bdist_wheel {}".format(" ".join(flags))) + tuple(package.target for package in packages)
     try:
-      subprocess.check_call(args, stdout=sys.stderr)
+      # We print stdout to stderr because release.sh is expecting stdout to only be package names.
+      subprocess.run(args, stdout=sys.stderr, check=True)
       for package in packages:
         print(package.name)
     except subprocess.CalledProcessError:
@@ -217,9 +203,9 @@ def get_pypi_config(section, option):
   return config.get(section, option)
 
 
-def check_ownership(users, minimum_owner_count=3, py2=False):
+def check_ownership(users, minimum_owner_count=3):
   minimum_owner_count = max(len(users), minimum_owner_count)
-  packages = sorted(all_packages(py2))
+  packages = sorted(all_packages())
   banner("Checking package ownership for {} packages".format(len(packages)))
   users = {user.lower() for user in users}
   insufficient = set()
@@ -255,9 +241,6 @@ def check_ownership(users, minimum_owner_count=3, py2=False):
 
 def _create_parser():
   parser = argparse.ArgumentParser()
-  # Note because of how argparse handles subparsers, the --py2 flag must be passed before any of the subparser
-  # flags to resolve properly.
-  parser.add_argument("-2", "--py2", action="store_true", default=False, help="Release any non-universal packages as Python 2.")
   subparsers = parser.add_subparsers(dest="command")
   # list
   parser_list = subparsers.add_parser('list')
@@ -278,11 +261,11 @@ if args.command == "list":
   if args.with_packages:
     print('\n'.join(
       '{} {} {}'.format(package.name, package.target, " ".join(package.bdist_wheel_flags))
-      for package in sorted(all_packages(args.py2))))
+      for package in sorted(all_packages())))
   else:
-    print('\n'.join(package.name for package in sorted(all_packages(args.py2))))
+    print('\n'.join(package.name for package in sorted(all_packages())))
 elif args.command == "list-owners":
-  for package in sorted(all_packages(args.py2)):
+  for package in sorted(all_packages()):
     if not package.exists():
       print("The {} package is new!  There are no owners yet.".format(package.name), file=sys.stderr)
       continue
@@ -291,8 +274,8 @@ elif args.command == "list-owners":
       print("{}".format(owner))
 elif args.command == "check-my-ownership":
   me = get_pypi_config('server-login', 'username')
-  check_ownership({me}, py2=args.py2)
+  check_ownership({me})
 elif args.command == "build_and_print":
-  build_and_print_packages(args.version, py2=args.py2)
+  build_and_print_packages(args.version)
 else:
   raise argparse.ArgumentError("Didn't recognise arguments {}".format(args))

@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os.path
-from builtins import object
 from contextlib import contextmanager
 
 from six import string_types
@@ -18,7 +14,7 @@ from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.util.dirutil import safe_mkdir
 
 
-class Ivy(object):
+class Ivy:
   """Encapsulates the ivy cli taking care of the basic invocation letting you just worry about the
   args to pass to the cli itself.
 

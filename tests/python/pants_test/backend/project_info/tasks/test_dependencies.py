@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -30,7 +27,7 @@ class NonPythonDependenciesTest(ConsoleTaskTestBase):
     return Dependencies
 
   def setUp(self):
-    super(NonPythonDependenciesTest, self).setUp()
+    super().setUp()
 
     third = self.make_target(
       'dependencies:third',
@@ -140,7 +137,7 @@ class PythonDependenciesTests(ConsoleTaskTestBase):
     return Dependencies
 
   def setUp(self):
-    super(PythonDependenciesTests, self).setUp()
+    super().setUp()
 
     python_leaf = self.make_target(
       'dependencies:python_leaf',

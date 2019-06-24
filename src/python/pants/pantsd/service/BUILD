@@ -5,7 +5,7 @@ python_library(
   name = 'pants_service',
   sources = ['pants_service.py'],
   dependencies = [
-    'src/python/pants/util:meta'
+    'src/python/pants/util:objects'
   ]
 )
 

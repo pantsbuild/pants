@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import object
-from collections import namedtuple
+from collections import OrderedDict, namedtuple
 
 from twitter.common.collections.orderedset import OrderedSet
 
@@ -14,10 +10,9 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.engine.legacy_engine import Engine
 from pants.engine.round_manager import RoundManager
-from pants.util.collections_abc_backport import OrderedDict
 
 
-class GoalExecutor(object):
+class GoalExecutor:
 
   def __init__(self, context, goal, tasktypes_by_name):
     self._context = context
@@ -112,7 +107,7 @@ class RoundEngine(Engine):
                                                       for goal, dependees
                                                       in dependees_by_goal.items())))
 
-  class TargetRootsReplacement(object):
+  class TargetRootsReplacement:
 
     class ConflictingProposalsError(Exception):
       """Indicates conflicting proposals for a target root replacement in a single pants run."""

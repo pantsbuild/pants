@@ -12,23 +12,13 @@ from typing import Iterable, List
 from common import die
 
 
-EXPECTED_HEADER_PY2 = dedent("""\
-  # coding=utf-8
-  # Copyright YYYY Pants project contributors (see CONTRIBUTORS.md).
-  # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-  from __future__ import absolute_import, division, print_function, unicode_literals
-
-  """)
-
-EXPECTED_HEADER_PY3 = dedent("""\
+EXPECTED_HEADER = dedent("""\
   # Copyright YYYY Pants project contributors (see CONTRIBUTORS.md).
   # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
   """)
 
-EXPECTED_NUM_PY2_LINES = 6
-EXPECTED_NUM_PY3_LINES = 3
+EXPECTED_NUM_LINES = 3
 
 _current_year = str(datetime.datetime.now().year)
 _current_century_regex = re.compile(r'20\d\d')
@@ -47,10 +37,7 @@ def main() -> None:
     failures = '\n  '.join(str(failure) for failure in header_parse_failures)
     die(f"""\
 ERROR: All .py files other than __init__.py should start with the header:
-{EXPECTED_HEADER_PY3}
-
-If they must support Python 2 still, they should start with the header:
-{EXPECTED_HEADER_PY2}
+{EXPECTED_HEADER}
 
 ---
 
@@ -75,27 +62,17 @@ def check_header(filename: str, *, is_newly_created: bool = False) -> None:
   """Raises `HeaderCheckFailure` if the header doesn't match."""
   lines = get_header_lines(filename)
   check_header_present(filename, lines)
-  is_py3_file = all("from __future__" not in line for line in lines)
-  if is_py3_file:
-    lines = lines[:EXPECTED_NUM_PY3_LINES]
-    copyright_line_index = 0
-    expected_header = EXPECTED_HEADER_PY3
-  else:
-    copyright_line_index = 1
-    expected_header = EXPECTED_HEADER_PY2
   check_copyright_year(
-    filename, copyright_line=lines[copyright_line_index], is_newly_created=is_newly_created
+    filename, copyright_line=lines[0], is_newly_created=is_newly_created
   )
-  check_matches_header(
-    filename, lines, expected_header=expected_header, copyright_line_index=copyright_line_index
-  )
+  check_matches_header(filename, lines)
 
 
 def get_header_lines(filename: str) -> List[str]:
   try:
     with open(filename, 'r') as f:
       # We grab an extra line in case there is a shebang.
-      lines = [f.readline() for _ in range(0, EXPECTED_NUM_PY2_LINES + 1)]
+      lines = [f.readline() for _ in range(0, EXPECTED_NUM_LINES + 1)]
   except IOError as e:
     raise HeaderCheckFailure(f"{filename}: error while reading input ({e})")
   # If a shebang line is included, remove it. Otherwise, we will have conservatively grabbed
@@ -106,7 +83,7 @@ def get_header_lines(filename: str) -> List[str]:
 
 def check_header_present(filename: str, lines: List[str]) -> None:
   num_nonempty_lines = len([line for line in lines if line])
-  if num_nonempty_lines < EXPECTED_NUM_PY3_LINES:
+  if num_nonempty_lines < EXPECTED_NUM_LINES:
     raise HeaderCheckFailure(f"{filename}: missing the expected header")
 
 
@@ -123,13 +100,11 @@ def check_copyright_year(filename: str, *, copyright_line: str, is_newly_created
     )
 
 
-def check_matches_header(
-  filename: str, lines: List[str], *, expected_header: str, copyright_line_index: int
-) -> None:
-  copyright_line = lines[copyright_line_index]
+def check_matches_header(filename: str, lines: List[str]) -> None:
+  copyright_line = lines[0]
   sanitized_lines = lines.copy()
-  sanitized_lines[copyright_line_index] = "# Copyright YYYY" + copyright_line[16:]
-  if "".join(sanitized_lines) != expected_header:
+  sanitized_lines[0] = "# Copyright YYYY" + copyright_line[16:]
+  if "".join(sanitized_lines) != EXPECTED_HEADER:
     raise HeaderCheckFailure(f"{filename}: header does not match the expected header")
 
 
@@ -137,7 +112,7 @@ def check_dir(directory: str, newly_created_files: Iterable[str]) -> List[Header
   header_parse_failures: List[HeaderCheckFailure] = []
   for root, dirs, files in os.walk(directory):
     for f in files:
-      if not f.endswith('.py') or os.path.basename(f) == '__init__.py':
+      if not f.endswith('.py') or os.path.basename(f) == '__init__.py' or root.endswith('contrib/python/checks/checker'):
         continue
       filename = os.path.join(root, f)
       try:

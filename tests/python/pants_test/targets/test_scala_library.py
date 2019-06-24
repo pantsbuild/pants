@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -31,7 +28,7 @@ class ScalaLibraryTest(TestBase):
     )
 
   def setUp(self):
-    super(ScalaLibraryTest, self).setUp()
+    super().setUp()
     self.context(options={
       'scala': {
         'version': '2.11'

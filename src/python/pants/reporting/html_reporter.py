@@ -1,15 +1,11 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import html
 import os
 import re
 import time
 import uuid
-from builtins import open, range, str
 from collections import defaultdict, namedtuple
 from textwrap import dedent
 
@@ -48,7 +44,7 @@ class HtmlReporter(Reporter):
   Settings = namedtuple('Settings', Reporter.Settings._fields + ('html_dir', 'template_dir'))
 
   def __init__(self, run_tracker, settings):
-    super(HtmlReporter, self).__init__(run_tracker, settings)
+    super().__init__(run_tracker, settings)
      # The main report, and associated tool outputs, go under this dir.
     self._html_dir = settings.html_dir
 

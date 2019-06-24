@@ -1,17 +1,13 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 from pants.base.build_environment import get_buildroot
 from pants.scm.scm import Scm
-from pants.util.meta import AbstractClass
 
 
-class Workspace(AbstractClass):
+class Workspace(ABC):
   """Tracks the state of the current workspace."""
 
   class WorkspaceError(Exception):
@@ -36,7 +32,7 @@ class ScmWorkspace(Workspace):
     """
     :API: public
     """
-    super(ScmWorkspace, self).__init__()
+    super().__init__()
 
     if scm is None:
       raise self.WorkspaceError('Cannot figure out what changed without a configured '

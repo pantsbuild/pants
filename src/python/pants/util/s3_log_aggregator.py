@@ -1,18 +1,14 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import sys
-from builtins import object, open
 from collections import defaultdict
 
 from s3logparse.s3logparse import parse_log_lines
 
 
-class Measure(object):
+class Measure:
   def __init__(self, init_count=0, init_bytes=0):
     self.count = init_count
     self.bytes = init_bytes

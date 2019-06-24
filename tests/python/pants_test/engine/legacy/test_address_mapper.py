@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import object, str
 
 import mock
 
@@ -161,7 +157,7 @@ class LegacyAddressMapperTest(TestBase):
 
   def test_other_throw_is_fail(self):
     # scan_addresses() should raise an error if the scheduler returns an error it can't ignore.
-    class ThrowReturningScheduler(object):
+    class ThrowReturningScheduler:
       def execution_request(self, *args):
         pass
 

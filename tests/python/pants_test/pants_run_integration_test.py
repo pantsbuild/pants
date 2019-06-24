@@ -1,15 +1,12 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
+import configparser
 import glob
 import os
 import re
 import shutil
 import unittest
-from builtins import open
 from contextlib import contextmanager
 from operator import eq, ne
 from threading import Lock
@@ -26,7 +23,6 @@ from pants.util.dirutil import fast_relpath, safe_mkdir, safe_mkdir_for, safe_op
 from pants.util.objects import Exactly, datatype, string_type
 from pants.util.osutil import IntegerForPid
 from pants.util.process_handler import SubprocessProcessHandler, subprocess
-from pants.util.py2_compat import configparser
 from pants.util.strutil import ensure_binary
 from pants_test.testutils.file_test_util import check_symlinks, contains_exact_files
 
@@ -212,7 +208,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       ]
 
   def setUp(self):
-    super(PantsRunIntegrationTest, self).setUp()
+    super().setUp()
     # Some integration tests rely on clean subsystem state (e.g., to set up a DistributionLocator).
     Subsystem.reset()
 
@@ -517,7 +513,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     prefix = "[{}] {}:pid=".format(level, module)
     suffix = ": {}".format(msg)
     if pid is None:
-      self.assertRegexpMatches(log, re.escape(prefix) + "\\d+" + re.escape(suffix))
+      self.assertRegex(log, re.escape(prefix) + "\\d+" + re.escape(suffix))
     else:
       self.assertIn("{}{}{}".format(prefix, pid, suffix), log)
 

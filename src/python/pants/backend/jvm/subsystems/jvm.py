@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 
@@ -26,7 +23,7 @@ class JVM(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(JVM, cls).register_options(register)
+    super().register_options(register)
     # TODO(benjy): Options to specify the JVM version?
     register('--options', type=list, metavar='<option>...',
              default=cls.options_default,

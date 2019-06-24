@@ -22,7 +22,7 @@ may be called via `./pants run` instead of direct invocation if desired."""
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, Tuple
+from typing import Iterator, NoReturn, Tuple
 
 
 _SCRIPT_START_TIME = time.time()
@@ -34,7 +34,7 @@ _COLOR_GREEN = "\x1b[32m"
 _COLOR_RESET = "\x1b[0m"
 
 
-def die(message: str) -> None:
+def die(message: str) -> NoReturn:
   raise SystemExit(f"{_COLOR_RED}{message}{_COLOR_RESET}")
 
 

@@ -1,16 +1,12 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import errno
-from builtins import object
 
 from pants.util.process_handler import subprocess
 
 
-class Xargs(object):
+class Xargs:
   """A subprocess execution wrapper in the spirit of the xargs command line tool.
 
   Specifically allows encapsulated commands to be passed very large argument lists by chunking up

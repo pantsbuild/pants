@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import unittest
-from builtins import object
 
 from pants.util.memo import (memoized, memoized_classmethod, memoized_classproperty,
                              memoized_method, memoized_property, memoized_staticmethod,
@@ -94,7 +90,7 @@ class MemoizeTest(unittest.TestCase):
     class SingleEntryMap(dict):
       def __setitem__(self, key, value):
         self.clear()
-        return super(SingleEntryMap, self).__setitem__(key, value)
+        return super().__setitem__(key, value)
 
     calculations = []
 
@@ -217,14 +213,14 @@ class MemoizeTest(unittest.TestCase):
   def test_descriptor_application_invalid(self):
     with self.assertRaises(ValueError):
       # Can't decorate a descriptor
-      class Foo(object):
+      class Foo:
         @memoized
         @property
         def name(self):
           pass
 
   def test_memoized_method(self):
-    class Foo(object):
+    class Foo:
       _x = 'x0'
 
       @memoized_method
@@ -242,7 +238,7 @@ class MemoizeTest(unittest.TestCase):
   def test_memoized_class_methods(self):
     externally_scoped_value = 'e0'
 
-    class Foo(object):
+    class Foo:
       _x = 'x0'
 
       @memoized_classmethod

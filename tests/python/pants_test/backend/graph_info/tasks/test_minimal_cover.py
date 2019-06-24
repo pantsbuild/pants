@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -29,7 +26,7 @@ class MinimalCoverTest(BaseMinimalCovertTest):
     return BuildFileAliases(targets={'python_library': PythonLibrary})
 
   def setUp(self):
-    super(MinimalCoverTest, self).setUp()
+    super().setUp()
 
     def add_to_build_file(path, name, *deps):
       all_deps = ["'{0}'".format(dep) for dep in list(deps)]

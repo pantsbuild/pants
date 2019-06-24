@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import functools
 import os
-from builtins import object, open, str
 from multiprocessing import cpu_count
 
 from future.utils import PY2, PY3, text_type
@@ -68,7 +64,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   @classmethod
   def register_options(cls, register):
-    super(JvmCompile, cls).register_options(register)
+    super().register_options(register)
 
     register('--args', advanced=True, type=list,
              default=list(cls.get_args_default(register.bootstrap)), fingerprint=True,
@@ -143,11 +139,11 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   @classmethod
   def implementation_version(cls):
-    return super(JvmCompile, cls).implementation_version() + [('JvmCompile', 3)]
+    return super().implementation_version() + [('JvmCompile', 3)]
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JvmCompile, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
 
     round_manager.require_data('compile_classpath')
 
@@ -170,7 +166,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JvmCompile, cls).subsystem_dependencies() + (DependencyContext,
+    return super().subsystem_dependencies() + (DependencyContext,
                                                               Java,
                                                               JvmPlatform,
                                                               ScalaPlatform,
@@ -330,7 +326,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     return ccs
 
   def __init__(self, *args, **kwargs):
-    super(JvmCompile, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._targets_to_compile_settings = None
 
     # JVM options for running the compiler.
@@ -699,7 +695,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     return "compile({})".format(compile_target.address.spec)
 
   def _create_compile_jobs(self, compile_contexts, invalid_targets, invalid_vts, classpath_product):
-    class Counter(object):
+    class Counter:
       def __init__(self, size, initial=0):
         self.size = size
         self.count = initial

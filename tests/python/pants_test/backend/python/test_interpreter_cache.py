@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import sys
-from builtins import str
 from contextlib import contextmanager
 
 from future.utils import PY3
@@ -34,7 +30,7 @@ class TestInterpreterCache(TestBase):
     )
 
   def setUp(self):
-    super(TestInterpreterCache, self).setUp()
+    super().setUp()
     self._interpreter = PythonInterpreter.get()
 
   def _create_interpreter_cache(self, setup_options=None):

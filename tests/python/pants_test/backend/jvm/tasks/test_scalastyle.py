@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 from textwrap import dedent
@@ -64,7 +61,7 @@ class ScalastyleTest(NailgunTaskTestBase):
     return self.prepare_execute(self._create_context(scalastyle_config))
 
   def setUp(self):
-    super(ScalastyleTest, self).setUp()
+    super().setUp()
     # Default scalastyle config (import grouping rule) and no excludes.
     init_subsystem(ScalaPlatform, {
       ScalaPlatform.options_scope: {

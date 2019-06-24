@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
 import logging
@@ -77,7 +74,7 @@ def _create_desandboxify_fn(possible_path_patterns):
   return desandboxify
 
 
-class CompositeProductAdder(object):
+class CompositeProductAdder:
   def __init__(self, *products):
     self.products = products
 
@@ -97,8 +94,7 @@ class RscCompileContext(CompileContext):
                args_file,
                sources,
                workflow):
-    super(RscCompileContext, self).__init__(target, analysis_file, classes_dir, jar_file,
-                                               log_dir, args_file, sources)
+    super().__init__(target, analysis_file, classes_dir, jar_file, log_dir, args_file, sources)
     self.workflow = workflow
     self.rsc_jar_file = rsc_jar_file
 
@@ -114,7 +110,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(RscCompile, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       Rsc,
     )
 
@@ -126,7 +122,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
   @classmethod
   def implementation_version(cls):
-    return super(RscCompile, cls).implementation_version() + [('RscCompile', 172)]
+    return super().implementation_version() + [('RscCompile', 172)]
 
   class JvmCompileWorkflowType(enum(['zinc-only', 'zinc-java', 'rsc-and-zinc'])):
     """Target classifications used to correctly schedule Zinc and Rsc jobs.
@@ -161,7 +157,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
   @classmethod
   def register_options(cls, register):
-    super(RscCompile, cls).register_options(register)
+    super().register_options(register)
     register('--force-compiler-tag-prefix', default='use-compiler', metavar='<tag>',
       help='Always compile targets marked with this tag with rsc, unless the workflow is '
            'specified on the cli.')
@@ -206,12 +202,13 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     cp = []
     cp.extend(self._rsc_classpath)
     # Add zinc's classpath so that it can be invoked from the same nailgun instance.
-    cp.extend(super(RscCompile, self).get_zinc_compiler_classpath())
+    cp.extend(super().get_zinc_compiler_classpath())
     return cp
 
   # Overrides the normal zinc compiler classpath, which only contains zinc.
   def get_zinc_compiler_classpath(self):
     return self.execution_strategy_enum.resolve_for_enum_variant({
+      # NB: We must use the verbose version of super() here, possibly because of the lambda.
       self.HERMETIC: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
       self.SUBPROCESS: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
       self.NAILGUN: lambda: self._nailgunnable_combined_classpath,
@@ -219,7 +216,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
   # NB: Override of ZincCompile/JvmCompile method!
   def register_extra_products_from_contexts(self, targets, compile_contexts):
-    super(RscCompile, self).register_extra_products_from_contexts(targets, compile_contexts)
+    super().register_extra_products_from_contexts(targets, compile_contexts)
 
     def confify(entries):
       return [(conf, e) for e in entries for conf in self._confs]
@@ -240,7 +237,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
           cp_entries)
 
   def create_empty_extra_products(self):
-    super(RscCompile, self).create_empty_extra_products()
+    super().create_empty_extra_products()
 
     compile_classpath = self.context.products.get_data('compile_classpath')
     runtime_classpath = self.context.products.get_data('runtime_classpath')

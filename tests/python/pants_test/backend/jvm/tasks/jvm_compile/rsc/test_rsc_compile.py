@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from textwrap import dedent
@@ -23,7 +20,7 @@ from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
 
 
-class LightWeightVTS(object):
+class LightWeightVTS:
   # Simple test double that covers the properties referred to by the _compile_jobs method.
 
   def __init__(self, target):

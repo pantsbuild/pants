@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
 from contextlib import contextmanager
@@ -19,7 +16,7 @@ class LogViewerTaskMixin(MutexTaskMixin):
     return LogViewerTaskMixin
 
   def __init__(self, *args, **kwargs):
-    super(LogViewerTaskMixin, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     self._executed = None
 
@@ -70,7 +67,7 @@ class GreenLogViewer(LogViewerTaskMixin):
 class MutexTaskMixinTest(TestBase):
 
   def tearDown(self):
-    super(MutexTaskMixinTest, self).tearDown()
+    super().tearDown()
 
     LogViewerTaskMixin.reset_implementations()
 

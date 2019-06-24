@@ -1,20 +1,16 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import functools
-from abc import abstractmethod
+from abc import ABCMeta, abstractmethod
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.target import Target
 from pants.util.memo import memoized_method
-from pants.util.meta import AbstractClass
 from pants.util.netrc import Netrc
 
 
-class Credentials(Target, AbstractClass):
+class Credentials(Target, metaclass=ABCMeta):
   """Credentials for a maven repository.
 
   The ``publish.jar`` section of your ``pants.ini`` file can refer to one
@@ -42,7 +38,7 @@ class LiteralCredentials(Credentials):
     :param username: A constant username value.
     :param password: A constant password value.
     """
-    super(LiteralCredentials, self).__init__(**kwargs)
+    super().__init__(**kwargs)
 
     if callable(username) or callable(password):
       raise TargetDefinitionException(self, 'The username and password arguments to credentials() '

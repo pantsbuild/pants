@@ -4,7 +4,6 @@
 python_tests(
   sources = ['test_reversion.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:pex',
     '3rdparty/python:requests',
     'tests/python/pants_test:int-test'

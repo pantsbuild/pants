@@ -1,21 +1,17 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import sys
-from abc import abstractmethod
+from abc import ABC, abstractmethod
+from collections import OrderedDict
 from contextlib import contextmanager
 from zipfile import ZIP_DEFLATED
 
 from future.utils import PY2
 
-from pants.util.collections_abc_backport import OrderedDict
 from pants.util.contextutil import open_tar, open_zip, temporary_dir
 from pants.util.dirutil import is_executable, safe_concurrent_rename, safe_walk
-from pants.util.meta import AbstractClass
 from pants.util.process_handler import subprocess
 from pants.util.strutil import ensure_text
 
@@ -23,7 +19,7 @@ from pants.util.strutil import ensure_text
 """Support for wholesale archive creation and extraction in a uniform API across archive types."""
 
 
-class Archiver(AbstractClass):
+class Archiver(ABC):
 
   def extract(self, path, outdir, concurrency_safe=False, **kwargs):
     """Extracts an archive's contents to the specified outdir with an optional filter.
@@ -77,7 +73,7 @@ class TarArchiver(Archiver):
     """
     :API: public
     """
-    super(TarArchiver, self).__init__(extension)
+    super().__init__(extension)
     self.mode = mode
     self.extension = extension
 
@@ -113,7 +109,7 @@ class XZCompressedTarArchiver(TarArchiver):
 
     self._xz_binary_path = xz_binary_path
 
-    super(XZCompressedTarArchiver, self).__init__('r|', 'tar.xz')
+    super().__init__('r|', 'tar.xz')
 
   @contextmanager
   def _invoke_xz(self, xz_input_file):
@@ -150,7 +146,7 @@ class XZCompressedTarArchiver(TarArchiver):
 
   def _extract(self, path, outdir):
     with self._invoke_xz(path) as xz_decompressed_tar_stream:
-      return super(XZCompressedTarArchiver, self)._extract(
+      return super()._extract(
         xz_decompressed_tar_stream, outdir, mode=self.mode)
 
   # TODO: implement this method, if we ever need it.
@@ -184,7 +180,7 @@ class ZipArchiver(Archiver):
     """
     :API: public
     """
-    super(ZipArchiver, self).__init__(extension)
+    super().__init__(extension)
     self.compression = compression
     self.extension = extension
 

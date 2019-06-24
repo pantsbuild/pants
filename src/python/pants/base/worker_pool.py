@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import multiprocessing
 import threading
-from builtins import next, object
 from multiprocessing.pool import ThreadPool
 
 from future.moves import _thread
@@ -14,7 +10,7 @@ from future.moves import _thread
 from pants.reporting.report import Report
 
 
-class Work(object):
+class Work:
   """Represents multiple concurrent calls to the same callable."""
 
   def __init__(self, func, args_tuples, workunit_name=None):
@@ -29,7 +25,7 @@ class Work(object):
     self.workunit_name = workunit_name
 
 
-class WorkerPool(object):
+class WorkerPool:
   """A pool of workers.
 
   Workers are threads, and so are subject to GIL constraints. Submitting CPU-bound work
@@ -178,7 +174,7 @@ class WorkerPool(object):
     self._pool.terminate()
 
 
-class SubprocPool(object):
+class SubprocPool:
   """Singleton for managing multiprocessing.Pool instances
 
   Subprocesses (including multiprocessing.Pool workers) can inherit locks in poorly written

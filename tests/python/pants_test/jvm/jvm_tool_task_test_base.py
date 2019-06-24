@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import shutil
@@ -37,7 +34,7 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
     """
     :API: public
     """
-    super(JvmToolTaskTestBase, self).setUp()
+    super().setUp()
 
     # Use a synthetic subclass for proper isolation when bootstrapping within the test.
     bootstrap_scope = 'bootstrap_scope'
@@ -83,7 +80,7 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
     """
     # Add in the bootstrapper task type, so its options get registered and set.
     for_task_types = [self.bootstrap_task_type] + (for_task_types or [])
-    return super(JvmToolTaskTestBase, self).context(for_task_types=for_task_types, **kwargs)
+    return super().context(for_task_types=for_task_types, **kwargs)
 
   def prepare_execute(self, context):
     """Prepares a jvm tool-using task for execution, first bootstrapping any required jvm tools.

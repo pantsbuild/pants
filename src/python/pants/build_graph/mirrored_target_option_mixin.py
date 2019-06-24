@@ -1,15 +1,11 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from abc import abstractproperty
+from abc import ABC, abstractmethod
 
 from future.utils import text_type
 
 from pants.util.memo import memoized_property
-from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
@@ -55,7 +51,7 @@ class MirroredTargetOptionDeclaration(datatype([
     return self.option_value
 
 
-class MirroredTargetOptionMixin(AbstractClass):
+class MirroredTargetOptionMixin(ABC):
   """Get option values which may be set in this subsystem or in a Target's keyword argument.
 
   A subsystem or task mixing in this class may set e.g.:
@@ -78,7 +74,8 @@ class MirroredTargetOptionMixin(AbstractClass):
   3. Otherwise, return the option value from the environment, config, or hardcoded default.
   """
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def mirrored_target_option_actions(self):
     """Subclasses should override and return a dict of (subsystem option name) -> selector function.
 

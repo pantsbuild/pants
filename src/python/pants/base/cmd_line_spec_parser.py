@@ -1,16 +1,12 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import object
 
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 
 
-class CmdLineSpecParser(object):
+class CmdLineSpecParser:
   """Parses address selectors as passed from the command line.
 
   See the `specs` package for more information on the types of objects returned.

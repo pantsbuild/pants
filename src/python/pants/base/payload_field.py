@@ -1,18 +1,13 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from abc import abstractmethod
-from builtins import object
+from abc import ABC, abstractmethod
 from hashlib import sha1
 
 from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
 from pants.base.hash_utils import stable_json_sha1
-from pants.util.meta import AbstractClass
 from pants.util.strutil import ensure_binary
 
 
@@ -25,7 +20,7 @@ def combine_hashes(hashes):
   return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
 
 
-class PayloadField(AbstractClass):
+class PayloadField(ABC):
   """An immutable, hashable structure to be mixed into Payload instances.
 
   :API: public
@@ -66,7 +61,7 @@ class PayloadField(AbstractClass):
     return self
 
 
-class FingerprintedMixin(object):
+class FingerprintedMixin:
   """Mixin this class to make your class suitable for passing to FingerprintedField.
 
   :API: public

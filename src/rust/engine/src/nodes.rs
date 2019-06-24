@@ -418,7 +418,7 @@ impl WrappedNode for ExecuteProcess {
 
     context
       .core
-      .command_runner()
+      .command_runner
       .run(request)
       .map(ProcessResult)
       .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
@@ -713,7 +713,7 @@ impl DownloadedFile {
   ) -> BoxFuture<(), String> {
     // TODO: Retry failures
     core
-      .http_client()
+      .http_client
       .get(url.clone())
       .send()
       .map_err(|err| format!("Error downloading file: {}", err))

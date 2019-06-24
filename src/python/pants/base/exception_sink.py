@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import datetime
 import faulthandler
@@ -12,7 +9,6 @@ import signal
 import sys
 import threading
 import traceback
-from builtins import object, str
 from contextlib import contextmanager
 
 import setproctitle
@@ -26,7 +22,7 @@ from pants.util.osutil import IntegerForPid
 logger = logging.getLogger(__name__)
 
 
-class SignalHandler(object):
+class SignalHandler:
   """A specification for how to handle a fixed set of nonfatal signals.
 
   This is subclassed and registered with ExceptionSink.reset_signal_handler() whenever the signal
@@ -102,7 +98,7 @@ class SignalHandler(object):
     raise self.SignalHandledNonLocalExit(signum, 'SIGTERM')
 
 
-class ExceptionSink(object):
+class ExceptionSink:
   """A mutable singleton object representing where exceptions should be logged to."""
 
   # NB: see the bottom of this file where we call reset_log_location() and other mutators in order

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import pstats
@@ -12,7 +9,6 @@ import sys
 import unittest
 import uuid
 import zipfile
-from builtins import next, object, range, str
 from contextlib import contextmanager
 
 import mock
@@ -159,7 +155,7 @@ class ContextutilTest(unittest.TestCase):
 
   def test_timer(self):
 
-    class FakeClock(object):
+    class FakeClock:
 
       def __init__(self):
         self._time = 0.0

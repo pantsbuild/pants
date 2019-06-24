@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.task.task import TaskBase
@@ -24,7 +21,7 @@ class JvmToolTaskMixin(JvmToolMixin, TaskBase):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JvmToolTaskMixin, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     cls.prepare_tools(round_manager)
 
   def tool_jar(self, key, scope=None):

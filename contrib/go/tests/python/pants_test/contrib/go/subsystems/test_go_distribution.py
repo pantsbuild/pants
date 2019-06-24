@@ -1,17 +1,12 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import unittest
-from builtins import str
 
 from pants.util.contextutil import environment_as
 from pants.util.process_handler import subprocess
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
-from pants_test.testutils.py2_compat import assertRegex
 
 from pants.contrib.go.subsystems.go_distribution import GoDistribution
 
@@ -58,7 +53,7 @@ class GoDistributionTest(unittest.TestCase):
     self.assertEqual(default_gopath, go_cmd.check_output().decode('utf-8').strip())
 
     regex = GoDistributionTest._generate_go_command_regex(gopath=default_gopath, final_value='GOPATH')
-    assertRegex(self, str(go_cmd), regex)
+    self.assertRegex(str(go_cmd), regex)
 
   def test_go_command_no_gopath(self):
     self.assert_no_gopath()
@@ -80,4 +75,4 @@ class GoDistributionTest(unittest.TestCase):
     self.assertEqual(['env', 'GOROOT'], go_cmd.cmdline[1:])
 
     regex = GoDistributionTest._generate_go_command_regex(gopath='/tmp/fred', final_value='GOROOT')
-    assertRegex(self, str(go_cmd), regex)
+    self.assertRegex(str(go_cmd), regex)

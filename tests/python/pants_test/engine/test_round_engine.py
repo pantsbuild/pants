@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import itertools
 
@@ -15,7 +12,7 @@ from pants_test.test_base import TestBase
 
 class RoundEngineTest(EngineTestBase, TestBase):
   def setUp(self):
-    super(RoundEngineTest, self).setUp()
+    super().setUp()
 
     self.set_options_for_scope('', explain=False)
     for outer in ['goal1', 'goal2', 'goal3', 'goal4', 'goal5']:
@@ -30,7 +27,7 @@ class RoundEngineTest(EngineTestBase, TestBase):
   def tearDown(self):
     if self._context is not None:
       self.assertTrue(not self._context or self._context.is_unlocked())
-    super(RoundEngineTest, self).tearDown()
+    super().tearDown()
 
   def alternate_target_roots_action(self, tag):
     return 'alternate_target_roots', tag, self._context
@@ -84,8 +81,7 @@ class RoundEngineTest(EngineTestBase, TestBase):
     """
     task_type = self.record(name, product_types, required_data, optional_data,
                             alternate_target_roots)
-    return super(RoundEngineTest,
-                 self).install_task(name=name, action=task_type, goal=goal).task_types()
+    return super().install_task(name=name, action=task_type, goal=goal).task_types()
 
   def create_context(self, for_task_types=None, target_roots=None):
     self._context = self.context(for_task_types=for_task_types, target_roots=target_roots)

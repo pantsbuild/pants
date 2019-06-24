@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.subsystem.subsystem import Subsystem
 
@@ -12,7 +9,7 @@ class PyTest(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(PyTest, cls).register_options(register)
+    super().register_options(register)
     # TODO: This is currently bounded below `3.7` due to #6282.
     register('--requirements', advanced=True, default='pytest>=3.0.7,<3.7',
              help='Requirements string for the pytest library.')

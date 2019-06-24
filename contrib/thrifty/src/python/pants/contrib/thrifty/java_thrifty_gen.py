@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -26,7 +23,7 @@ class JavaThriftyGen(NailgunTaskBase, SimpleCodegenTask):
 
   @classmethod
   def register_options(cls, register):
-    super(JavaThriftyGen, cls).register_options(register)
+    super().register_options(register)
 
     def thrifty_jar(name):
       return JarDependency(org='com.microsoft.thrifty', name=name, rev='0.4.3')

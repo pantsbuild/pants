@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
 import os
@@ -30,7 +27,7 @@ class PantsDaemonMonitor(ProcessManager):
     :param runner_process_context: A TrackedProcessContext that can be used to inspect live
       pantsd instances created in this context.
     """
-    super(PantsDaemonMonitor, self).__init__(name='pantsd', metadata_base_dir=metadata_base_dir)
+    super().__init__(name='pantsd', metadata_base_dir=metadata_base_dir)
     self.runner_process_context = runner_process_context
 
   def _log(self):

@@ -1,14 +1,10 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import sys
 import threading
-from builtins import object
 from contextlib import contextmanager
 
 from future.utils import text_type
@@ -85,7 +81,7 @@ class _LoggerStream(object):
 class PantsDaemonSignalHandler(SignalHandler):
 
   def __init__(self, daemon):
-    super(PantsDaemonSignalHandler, self).__init__()
+    super().__init__()
     self._daemon = daemon
 
   def handle_sigint(self, signum, _frame):
@@ -111,7 +107,7 @@ class PantsDaemon(FingerprintedProcessManager):
     after it has been created it is entirely process that the pantsd instance perishes.
     """
 
-  class Factory(object):
+  class Factory:
     @classmethod
     def maybe_launch(cls, options_bootstrapper):
       """Creates and launches a daemon instance if one does not already exist.
@@ -270,7 +266,7 @@ class PantsDaemon(FingerprintedProcessManager):
     :param string metadata_base_dir: The ProcessManager metadata base dir.
     :param Options bootstrap_options: The bootstrap options, if available.
     """
-    super(PantsDaemon, self).__init__(name='pantsd', metadata_base_dir=metadata_base_dir)
+    super().__init__(name='pantsd', metadata_base_dir=metadata_base_dir)
     self._native = native
     self._build_root = build_root
     self._work_dir = work_dir
@@ -495,7 +491,7 @@ class PantsDaemon(FingerprintedProcessManager):
 
     N.B. This should always be called under care of the `lifecycle_lock`.
     """
-    super(PantsDaemon, self).terminate()
+    super().terminate()
     if include_watchman:
       self.watchman_launcher.terminate()
 
@@ -507,7 +503,7 @@ class PantsDaemon(FingerprintedProcessManager):
     :return: True if the daemon needs to restart.
     """
     should_shutdown_after_run = self._bootstrap_options.for_global_scope().shutdown_pantsd_after_run
-    return super(PantsDaemon, self).needs_restart(option_fingerprint) or \
+    return super().needs_restart(option_fingerprint) or \
            (self.is_alive() and should_shutdown_after_run)
 
 

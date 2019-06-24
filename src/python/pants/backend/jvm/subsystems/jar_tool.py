@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.base.workunit import WorkUnitLabel
@@ -15,7 +12,7 @@ class JarTool(JvmToolMixin, Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(JarTool, cls).register_options(register)
+    super().register_options(register)
     cls.register_jvm_tool(register,
                           'jar-tool',
                           classpath=[

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -32,7 +29,7 @@ class Checkstyle(LintTaskMixin, NailgunTask):
 
   @classmethod
   def register_options(cls, register):
-    super(Checkstyle, cls).register_options(register)
+    super().register_options(register)
     register('--configuration', advanced=True, type=file_option, fingerprint=True,
              help='Path to the checkstyle configuration file.')
     register('--properties', advanced=True, type=dict_with_files_option, default={},
@@ -65,7 +62,7 @@ class Checkstyle(LintTaskMixin, NailgunTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(Checkstyle, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     if options.include_user_classpath:
       round_manager.require_data('runtime_classpath')
 

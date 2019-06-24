@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import errno
 import io
 import socket
-from builtins import object
 
 from future.utils import PY3
 
@@ -62,7 +58,7 @@ def is_readable(fileobj, timeout=None):
     return bool(readable)
 
 
-class RecvBufferedSocket(object):
+class RecvBufferedSocket:
   """A socket wrapper that simplifies recv() buffering."""
 
   def __init__(self, sock, chunk_size=io.DEFAULT_BUFFER_SIZE, select_timeout=None):

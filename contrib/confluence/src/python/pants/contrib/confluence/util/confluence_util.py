@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import getpass
 import logging
 import mimetypes
-from builtins import object, open, str
 from os.path import basename
 from xmlrpc.client import Binary
 from xmlrpc.client import Error as XMLRPCError
@@ -32,7 +28,7 @@ class ConfluenceError(Exception):
   """Indicates a problem performing an action with confluence."""
 
 
-class Confluence(object):
+class Confluence:
   """Interface for fetching and storing data in confluence."""
 
   def __init__(self, api_entrypoint, server_url, session_token, content_format='markdown'):

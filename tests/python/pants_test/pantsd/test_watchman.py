@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import os
@@ -25,7 +22,7 @@ class TestWatchman(TestBase):
   HANDLERS = [Watchman.EventHandler('test', {}, mock.Mock())]
 
   def setUp(self):
-    super(TestWatchman, self).setUp()
+    super().setUp()
     with mock.patch.object(Watchman, '_is_valid_executable', **self.PATCH_OPTS) as mock_is_valid:
       mock_is_valid.return_value = True
       self.watchman = Watchman('/fake/path/to/watchman', self.subprocess_dir)

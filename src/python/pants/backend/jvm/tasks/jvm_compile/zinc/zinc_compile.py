@@ -1,15 +1,11 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import errno
 import logging
 import os
 import re
 import textwrap
-from builtins import open
 from collections import defaultdict
 from contextlib import closing
 from xml.etree import ElementTree
@@ -95,7 +91,7 @@ class BaseZincCompile(JvmCompile):
 
   @classmethod
   def implementation_version(cls):
-    return super(BaseZincCompile, cls).implementation_version() + [('BaseZincCompile', 7)]
+    return super().implementation_version() + [('BaseZincCompile', 7)]
 
   @classmethod
   def get_jvm_options_default(cls, bootstrap_option_values):
@@ -125,7 +121,7 @@ class BaseZincCompile(JvmCompile):
 
   @classmethod
   def register_options(cls, register):
-    super(BaseZincCompile, cls).register_options(register)
+    super().register_options(register)
     register('--whitelisted-args', advanced=True, type=dict,
              default={
                '-S.*': False,
@@ -150,11 +146,11 @@ class BaseZincCompile(JvmCompile):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(BaseZincCompile, cls).subsystem_dependencies() + (Zinc.Factory, JvmPlatform,)
+    return super().subsystem_dependencies() + (Zinc.Factory, JvmPlatform,)
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(BaseZincCompile, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     ScalaPlatform.prepare_tools(round_manager)
 
   @property
@@ -176,7 +172,7 @@ class BaseZincCompile(JvmCompile):
     return Zinc.Factory.global_instance().create(self.context.products, self.execution_strategy)
 
   def __init__(self, *args, **kwargs):
-    super(BaseZincCompile, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     # A directory to contain per-target subdirectories with apt processor info files.
     self._processor_info_dir = os.path.join(self.workdir, 'apt-processor-info')
 
@@ -233,7 +229,7 @@ class BaseZincCompile(JvmCompile):
 
   def post_compile_extra_resources(self, compile_context):
     """Override `post_compile_extra_resources` to additionally include scalac_plugin info."""
-    result = super(BaseZincCompile, self).post_compile_extra_resources(compile_context)
+    result = super().extra_resources(compile_context)
     target = compile_context.target
 
     if isinstance(target, ScalacPlugin):

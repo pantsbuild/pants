@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TargetDefinitionException
@@ -70,7 +67,7 @@ class JvmPrepCommand(JvmTarget):
       'args': PrimitiveField(args or []),
       'jvm_options': PrimitiveField(jvm_options or []),
     })
-    super(JvmPrepCommand, self).__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, **kwargs)
     if not mainclass:
       raise TargetDefinitionException(self, 'mainclass must be specified.')
     if goal not in self.goals():

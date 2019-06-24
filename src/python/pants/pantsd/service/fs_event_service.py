@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
@@ -28,7 +25,7 @@ class FSEventService(PantsService):
     :param Watchman watchman: The Watchman instance as provided by the WatchmanLauncher subsystem.
     :param str build_root: The current build root.
     """
-    super(FSEventService, self).__init__()
+    super().__init__()
     self._logger = logging.getLogger(__name__)
     self._watchman = watchman
     self._build_root = os.path.realpath(build_root)

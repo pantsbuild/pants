@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import os
 import sys
-from builtins import next, object, open, str
 from collections import defaultdict, namedtuple
 
 from future.utils import PY3
@@ -47,7 +43,7 @@ class JvmDependencyUsage(Task):
 
   @classmethod
   def register_options(cls, register):
-    super(JvmDependencyUsage, cls).register_options(register)
+    super().register_options(register)
     register('--internal-only', default=False, type=bool, fingerprint=True,
              help='Specifies that only internal dependencies should be included in the graph '
                   'output (no external jars).')
@@ -70,11 +66,11 @@ class JvmDependencyUsage(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JvmDependencyUsage, cls).subsystem_dependencies() + (DistributionLocator,)
+    return super().subsystem_dependencies() + (DistributionLocator,)
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JvmDependencyUsage, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     if not options.use_cached:
       round_manager.require_data('classes_by_source')
       round_manager.require_data('runtime_classpath')
@@ -104,7 +100,7 @@ class JvmDependencyUsage(Task):
 
   @classmethod
   def implementation_version(cls):
-    return super(JvmDependencyUsage, cls).implementation_version() + [('JvmDependencyUsage', 7)]
+    return super().implementation_version() + [('JvmDependencyUsage', 7)]
 
   def _render(self, graph, fh):
     chunks = graph.to_summary() if self.get_options().summary else graph.to_json()
@@ -272,7 +268,7 @@ class JvmDependencyUsage(Task):
     return node
 
 
-class Node(object):
+class Node:
   def __init__(self, concrete_target):
     self.concrete_target = concrete_target
     self.products_total = 0
@@ -335,7 +331,7 @@ class Node(object):
     return res
 
 
-class Edge(object):
+class Edge:
   """Record a set of used products, and a boolean indicating that a depedency edge was declared."""
 
   def __init__(self, is_declared=False, is_used=False, products_used=None):
@@ -350,7 +346,7 @@ class Edge(object):
     return self
 
 
-class DependencyUsageGraph(object):
+class DependencyUsageGraph:
   def __init__(self, nodes, size_estimator):
     self._nodes = nodes
     self._size_estimator = size_estimator

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import importlib
 import logging
@@ -11,7 +8,6 @@ import re
 import sys
 import sysconfig
 import traceback
-from builtins import bytes, object, open, str
 from contextlib import closing
 
 import cffi
@@ -480,7 +476,7 @@ class PyResult(datatype(['is_throw', 'handle'])):
   """Corresponds to the native object of the same name."""
 
 
-class ExternContext(object):
+class ExternContext:
   """A wrapper around python objects used in static extern functions in this module.
 
   See comments in `src/rust/engine/src/interning.rs` for more information on the relationship

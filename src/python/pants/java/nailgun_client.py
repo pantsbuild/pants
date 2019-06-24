@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import errno
 import logging
@@ -11,7 +8,6 @@ import signal
 import socket
 import sys
 import time
-from builtins import object, str
 
 import psutil
 from future.utils import PY3
@@ -176,7 +172,7 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
     return self._process_session()
 
 
-class NailgunClient(object):
+class NailgunClient:
   """A python nailgun client (see http://martiansoftware.com/nailgun for more info)."""
 
   class NailgunError(Exception):

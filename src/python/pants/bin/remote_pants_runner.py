@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import sys
 import time
-from builtins import object, str
 from contextlib import contextmanager
 
 from future.utils import PY3, raise_with_traceback
@@ -30,7 +26,7 @@ class PailgunClientSignalHandler(SignalHandler):
     assert(isinstance(pailgun_client, NailgunClient))
     self._pailgun_client = pailgun_client
     self._timeout = timeout
-    super(PailgunClientSignalHandler, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
   def _forward_signal_with_timeout(self, signum, signame):
     logger.info(
@@ -51,7 +47,7 @@ class PailgunClientSignalHandler(SignalHandler):
     self._forward_signal_with_timeout(signum, 'SIGTERM')
 
 
-class RemotePantsRunner(object):
+class RemotePantsRunner:
   """A thin client variant of PantsRunner."""
 
   class Fallback(Exception):

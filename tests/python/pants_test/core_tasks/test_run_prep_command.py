@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import range
 
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -25,7 +21,7 @@ class FakeRunPrepCommand(RunPrepCommandBase):
 class RunPrepCommandTest(TaskTestBase):
 
   def setUp(self):
-    super(RunPrepCommandTest, self).setUp()
+    super().setUp()
     # This is normally taken care of in RunPrepCommandBase.register_options() when running pants,
     # but these don't get called in testing unless you call `self.create_task()`.
     # Some of these unit tests need to create targets before creating the task.

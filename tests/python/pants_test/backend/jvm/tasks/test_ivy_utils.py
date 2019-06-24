@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import os
 import xml.etree.ElementTree as ET
-from builtins import open, str
 from collections import namedtuple
 from textwrap import dedent
 
@@ -54,7 +50,7 @@ class IvyUtilsTestBase(TestBase):
 class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
   def setUp(self):
-    super(IvyUtilsGenerateIvyTest, self).setUp()
+    super().setUp()
 
     self.add_to_build_file('src/java/targets',
         dedent("""

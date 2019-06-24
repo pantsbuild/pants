@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import re
-from builtins import open
 
 from pants.backend.codegen.antlr.java.java_antlr_library import JavaAntlrLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -46,12 +42,12 @@ class AntlrJavaGen(SimpleCodegenTask, NailgunTask):
 
   # TODO: Do we need this?
   def find_sources(self, target, target_dir):
-    sources = super(AntlrJavaGen, self).find_sources(target, target_dir)
+    sources = super().find_sources(target, target_dir)
     return [source for source in sources if source.endswith('.java')]
 
   @classmethod
   def register_options(cls, register):
-    super(AntlrJavaGen, cls).register_options(register)
+    super().register_options(register)
     for key, (classpath_spec, classpath) in _DEFAULT_ANTLR_DEPS.items():
       cls.register_jvm_tool(register, key, classpath=classpath, classpath_spec=classpath_spec)
 

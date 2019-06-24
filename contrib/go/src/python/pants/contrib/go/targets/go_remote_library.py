@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import str
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
@@ -110,7 +106,7 @@ class GoRemoteLibrary(GoTarget):
       'pkg': PrimitiveField(package_path),
     })
 
-    super(GoRemoteLibrary, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   @property
   def pkg(self):

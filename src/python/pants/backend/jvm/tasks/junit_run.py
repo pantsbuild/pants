@@ -1,14 +1,10 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import fnmatch
 import itertools
 import os
 import sys
-from builtins import object, range, str
 from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
@@ -47,13 +43,13 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
   @classmethod
   def implementation_version(cls):
-    return super(JUnitRun, cls).implementation_version() + [('JUnitRun', 3)]
+    return super().implementation_version() + [('JUnitRun', 3)]
 
   _BATCH_ALL = sys.maxsize
 
   @classmethod
   def register_options(cls, register):
-    super(JUnitRun, cls).register_options(register)
+    super().register_options(register)
 
     register('--batch-size', advanced=True, type=int, default=cls._BATCH_ALL, fingerprint=True,
              help='Run at most this many tests in a single test process.')
@@ -106,11 +102,11 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JUnitRun, cls).subsystem_dependencies() + (CodeCoverage, JUnit)
+    return super().subsystem_dependencies() + (CodeCoverage, JUnit)
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JUnitRun, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
 
     # Compilation and resource preparation must have completed.
     round_manager.require_data('runtime_classpath')
@@ -119,7 +115,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     """Indicates an invalid combination of options for this task."""
 
   def __init__(self, *args, **kwargs):
-    super(JUnitRun, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     options = self.get_options()
     self._tests_to_run = options.test
@@ -196,7 +192,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     return args
 
   def classpath(self, targets, classpath_product=None, **kwargs):
-    return super(JUnitRun, self).classpath(targets,
+    return super().classpath(targets,
                                            classpath_product=classpath_product,
                                            include_scopes=Scopes.JVM_TEST_SCOPES,
                                            **kwargs)
@@ -487,7 +483,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
         _, error, _ = sys.exc_info()
         reports.generate(output_dir, exc=error)
 
-  class Reports(object):
+  class Reports:
     def __init__(self, junit_html_report, coverage):
       self._junit_html_report = junit_html_report
       self._coverage = coverage

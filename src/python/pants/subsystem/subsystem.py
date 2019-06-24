@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import inspect
 
@@ -64,7 +61,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
   def get_scope_info(cls, subscope=None):
     cls.validate_scope_name_component(cls.options_scope)
     if subscope is None:
-      return super(Subsystem, cls).get_scope_info()
+      return super().get_scope_info()
     else:
       return ScopeInfo(cls.subscope(subscope), ScopeInfo.SUBSYSTEM, cls)
 
@@ -139,7 +136,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
 
     :API: public
     """
-    super(Subsystem, self).__init__()
+    super().__init__()
     self._scope = scope
     self._scoped_options = scoped_options
     self._fingerprint = None

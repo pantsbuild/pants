@@ -1,20 +1,15 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import inspect
 import re
 import textwrap
-from builtins import object, range
-from collections import namedtuple
+from collections import OrderedDict, namedtuple
 
 from future.utils import PY3
 
 from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
-from pants.util.collections_abc_backport import OrderedDict
 from pants.util.memo import memoized_method
 
 
@@ -37,7 +32,7 @@ class BuildSymbolInfo(namedtuple('_BuildSymbolInfo',
     return '\n'.join(self.details_lines)
 
 
-class BuildDictionaryInfoExtracter(object):
+class BuildDictionaryInfoExtracter:
   """Extracts help information about the symbols that may be used in BUILD files."""
 
   ADD_DESCR = '<Add description>'

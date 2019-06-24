@@ -1,15 +1,14 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import ast
 import inspect
 import itertools
 import logging
 import sys
-from abc import abstractproperty
+from abc import ABC, abstractmethod
+from collections import OrderedDict
+from collections.abc import Iterable
 
 import asttokens
 from twitter.common.collections import OrderedSet
@@ -17,9 +16,7 @@ from twitter.common.collections import OrderedSet
 from pants.engine.goal import Goal
 from pants.engine.selectors import Get
 from pants.util.collections import assert_single_element
-from pants.util.collections_abc_backport import Iterable, OrderedDict
 from pants.util.memo import memoized
-from pants.util.meta import AbstractClass
 from pants.util.objects import SubclassesOf, TypedCollection, datatype
 
 
@@ -286,7 +283,7 @@ def union(cls):
   in as the subject of a `yield Get(...)`. See the following example:
 
   @union
-  class UnionBase(object): pass
+  class UnionBase: pass
 
   @rule(B, [X])
   def get_some_union_type(x):
@@ -318,21 +315,23 @@ class UnionRule(datatype([
     if not getattr(union_base, '_is_union', False):
       raise cls.make_type_error('union_base must be a type annotated with @union: was {} (type {})'
                                 .format(union_base, type(union_base).__name__))
-    return super(UnionRule, cls).__new__(cls, union_base, union_member)
+    return super().__new__(cls, union_base, union_member)
 
 
-class Rule(AbstractClass):
+class Rule(ABC):
   """Rules declare how to produce products for the product graph.
 
   A rule describes what dependencies must be provided to produce a particular product. They also act
   as factories for constructing the nodes within the graph.
   """
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def output_type(self):
     """An output `type` for the rule."""
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def dependency_rules(self):
     """A tuple of @rules that are known to be necessary to run this rule.
 
@@ -340,7 +339,8 @@ class Rule(AbstractClass):
     form a loosely coupled RuleGraph: this facility exists only to assist with boilerplate removal.
     """
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def dependency_optionables(self):
     """A tuple of Optionable classes that are known to be necessary to run this rule."""
     return ()
@@ -372,7 +372,7 @@ class TaskRule(datatype([
               cacheable=True):
 
     # Create.
-    return super(TaskRule, cls).__new__(
+    return super().__new__(
         cls,
         output_type,
         input_selectors,

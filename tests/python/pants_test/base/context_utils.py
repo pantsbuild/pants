@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
 import sys
-from builtins import map, object
 from contextlib import contextmanager
 
 from twitter.common.collections import maybe_list
@@ -29,7 +25,7 @@ class TestContext(Context):
   isolate the parts of the interface that a Task is allowed to use vs. the parts that the
   task-running machinery is allowed to use.
   """
-  class DummyWorkUnit(object):
+  class DummyWorkUnit:
     """A workunit stand-in that sends all output to stderr.
 
    These outputs are typically only used by subprocesses spawned by code under test, not
@@ -46,13 +42,13 @@ class TestContext(Context):
     def set_outcome(self, outcome):
       return sys.stderr.write('\nWorkUnit outcome: {}\n'.format(WorkUnit.outcome_string(outcome)))
 
-  class DummyRunTracker(object):
+  class DummyRunTracker:
     """A runtracker stand-in that does no actual tracking."""
 
     def __init__(self):
       self.logger = RunTrackerLogger(self)
 
-    class DummyArtifactCacheStats(object):
+    class DummyArtifactCacheStats:
       def add_hits(self, cache_name, targets): pass
 
       def add_misses(self, cache_name, targets, causes): pass
@@ -78,7 +74,7 @@ class TestContext(Context):
         name, lvl, fn, lno, msg, args, exc_info, *pos_args, **kwargs)
 
   def __init__(self, *args, **kwargs):
-    super(TestContext, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     logger_cls = logging.getLoggerClass()
     try:
       logging.setLoggerClass(self.TestLogger)

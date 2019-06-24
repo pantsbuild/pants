@@ -1,14 +1,10 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import sys
 import warnings
-from builtins import object
 
 from pants.base.exception_sink import ExceptionSink
 from pants.bin.remote_pants_runner import RemotePantsRunner
@@ -19,7 +15,7 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 logger = logging.getLogger(__name__)
 
 
-class PantsRunner(object):
+class PantsRunner:
   """A higher-level runner that delegates runs to either a LocalPantsRunner or RemotePantsRunner."""
 
   def __init__(self, exiter, args=None, env=None, start_time=None):

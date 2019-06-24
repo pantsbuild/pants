@@ -1,18 +1,14 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import copy
 import pickle
 from abc import abstractmethod
-from builtins import object, str
+from collections import OrderedDict
 from textwrap import dedent
 
 from future.utils import PY2, PY3, text_type
 
-from pants.util.collections_abc_backport import OrderedDict
 from pants.util.objects import (EnumVariantSelectionError, Exactly, HashableTypedCollection,
                                 SubclassesOf, SuperclassesOf, TypeCheckError, TypeConstraintError,
                                 TypedCollection, TypedDatatypeInstanceConstructionError,
@@ -21,7 +17,7 @@ from pants_test.test_base import TestBase
 
 
 class TypeConstraintTestBase(TestBase):
-  class A(object):
+  class A:
 
     def __repr__(self):
       return '{}()'.format(type(self).__name__)
@@ -247,14 +243,14 @@ class ExportedDatatype(datatype(['val'])):
   pass
 
 
-class AbsClass(object):
+class AbsClass:
   pass
 
 
 class SomeTypedDatatype(datatype([('val', int)])): pass
 
 
-class SomeMixin(object):
+class SomeMixin:
 
   @abstractmethod
   def as_str(self): pass
@@ -279,7 +275,7 @@ class WithExplicitTypeConstraint(datatype([('a_string', text_type), ('an_int', E
 class MixedTyping(datatype(['value', ('name', text_type)])): pass
 
 
-class SomeBaseClass(object):
+class SomeBaseClass:
   @abstractmethod
   def something(self): pass
 
@@ -309,7 +305,7 @@ class NonNegativeInt(datatype([('an_int', int)])):
   # __new__() method.
   def __new__(cls, *args, **kwargs):
     # Call the superclass ctor first to ensure the type is correct.
-    this_object = super(NonNegativeInt, cls).__new__(cls, *args, **kwargs)
+    this_object = super().__new__(cls, *args, **kwargs)
 
     value = this_object.an_int
 
@@ -322,7 +318,7 @@ class NonNegativeInt(datatype([('an_int', int)])):
 class CamelCaseWrapper(datatype([('nonneg_int', NonNegativeInt)])): pass
 
 
-class ReturnsNotImplemented(object):
+class ReturnsNotImplemented:
   def __eq__(self, other):
     return NotImplemented
 

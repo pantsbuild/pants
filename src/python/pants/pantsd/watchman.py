@@ -1,14 +1,10 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
 import json
 import logging
 import os
-from builtins import str
 from collections import namedtuple
 
 from pants.pantsd.process_manager import ProcessManager
@@ -39,7 +35,7 @@ class Watchman(ProcessManager):
                           '1' for standard logging and '2' for verbose logging.
     :param str socket_path_override: The overridden target path of the watchman socket, if any.
     """
-    super(Watchman, self).__init__(name='watchman',
+    super().__init__(name='watchman',
                                    process_name='watchman',
                                    socket_type=str,
                                    metadata_base_dir=metadata_base_dir)

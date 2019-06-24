@@ -84,8 +84,8 @@ You'll need to setup some files one-time in your own repo:
         'linux-x86_64',
         'macosx-10.4-x86_64',
       ],
-      # You may want to adjust the Python interpreter constraints. Note that Pants requires Python 2.7
-      # or 3.6+. Pex currently does not support flexible interpreter constraints (tracked by
+      # You may want to adjust the Python interpreter constraints. Note that Pants requires Python 3.6+.
+      # Pex currently does not support flexible interpreter constraints (tracked by
       # https://github.com/pantsbuild/pex/issues/690), so you must choose which version to target.
       compatibility=['CPython==3.6.*'],
       dependencies=[
@@ -220,13 +220,13 @@ To run tests and bring up `pdb` for failing tests, you can instead pass `--pdb` 
 
         @classmethod
         def setUpClass(cls):
-    >     super(TargetsHelpTest, cls).setUpClass()
+    >     super().setUpClass()
     E     AttributeError: 'super' object has no attribute 'setUpClass'
 
     tests/python/pants_test/tasks/test_targets_help.py:24: AttributeError
     >>>>>>>>>>>>>>>>>>>>>>>>>>>>> entering PDB >>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     > /Users/lhosken/workspace/pants/tests/python/pants_test/tasks/test_targets_help.py(24)setUpClass()
-    -> super(TargetsHelpTest, cls).setUpClass()
+    -> super().setUpClass()
     (Pdb)
 
 Debug quickly; that test target will time out in a couple of minutes,

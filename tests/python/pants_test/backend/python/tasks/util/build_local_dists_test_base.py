@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import re
 from abc import abstractmethod
-from builtins import next, str
 
 from pants.backend.native.register import rules as native_backend_rules
 from pants.backend.native.subsystems.libc_dev import LibcDev
@@ -41,7 +37,7 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskT
 
   @classmethod
   def rules(cls):
-    return super(BuildLocalPythonDistributionsTestBase, cls).rules() + native_backend_rules()
+    return super().rules() + native_backend_rules()
 
   @classproperty
   @abstractmethod
@@ -49,7 +45,7 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskT
     """Fed into `self.populate_target_dict()`."""
 
   def setUp(self):
-    super(BuildLocalPythonDistributionsTestBase, self).setUp()
+    super().setUp()
     # Share the target mapping across all test cases.
     self.target_dict = self.populate_target_dict(self.dist_specs)
 

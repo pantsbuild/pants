@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import object
 
 from future.utils import PY2
 
@@ -38,7 +34,7 @@ def _create_stable_task_type(superclass, options_scope):
   })
 
 
-class Goal(object):
+class Goal:
   """Factory for objects representing goals.
 
   Ensures that we have exactly one instance per goal name.

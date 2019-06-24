@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import glob
 import logging
 import os
-from builtins import object, open, str
 
 import mock
 from future.utils import PY2
@@ -38,7 +34,7 @@ class ExternalUrlGenerator(BinaryToolUrlGenerator):
 class BinaryUtilTest(TestBase):
   """Tests binary_util's binaries_baseurls handling."""
 
-  class MapFetcher(object):
+  class MapFetcher:
     """Class which pretends to be a pants.net.http.Fetcher, but is actually a dictionary."""
 
     def __init__(self, read_map):

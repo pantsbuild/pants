@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
 import sys
 import unittest
-from builtins import object, str
 from textwrap import dedent
 
 from pants.engine.build_files import create_graph_rules
@@ -23,25 +19,25 @@ from pants_test.engine.util import (TARGET_TABLE, assert_equal_with_printing, cr
 from pants_test.test_base import TestBase
 
 
-class A(object):
+class A:
 
   def __repr__(self):
     return 'A()'
 
 
-class B(object):
+class B:
 
   def __repr__(self):
     return 'B()'
 
 
-class C(object):
+class C:
 
   def __repr__(self):
     return 'C()'
 
 
-class D(object):
+class D:
 
   def __repr__(self):
     return 'D()'
@@ -752,7 +748,7 @@ class RuleGraphTest(TestBase):
   def test_invalid_get_arguments(self):
     with self.assertRaisesWithMessage(ValueError, """\
 Could not resolve type `XXX` in top level of module pants_test.engine.test_rules"""):
-      class XXX(object): pass
+      class XXX: pass
       @rule(A, [])
       def f():
         a = yield Get(A, XXX, 3)

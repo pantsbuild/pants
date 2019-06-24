@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import unittest
-from builtins import object
 
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
@@ -17,7 +13,7 @@ class DummySubsystem(Subsystem):
   options_scope = 'dummy'
 
 
-class DummyOptions(object):
+class DummyOptions:
   def for_scope(self, scope):
     return object()
 
@@ -35,7 +31,7 @@ class ScopedDependentSubsystem(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ScopedDependentSubsystem, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       DummySubsystem.scoped(cls),
     )
 

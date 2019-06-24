@@ -1,18 +1,14 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
-from builtins import object
 
 from pants.binaries.binary_util import BinaryToolFetcher, BinaryUtil
 from pants.pantsd.watchman import Watchman
 from pants.util.memo import testable_memoized_property
 
 
-class WatchmanLauncher(object):
+class WatchmanLauncher:
   """An object that manages the configuration and lifecycle of Watchman."""
 
   @classmethod

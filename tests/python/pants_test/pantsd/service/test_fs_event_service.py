@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from contextlib import contextmanager
 
@@ -21,7 +18,7 @@ class TestFSEventService(TestBase):
   WORKER_COUNT = 1
 
   def setUp(self):
-    super(TestFSEventService, self).setUp()
+    super().setUp()
     self.mock_watchman = mock.create_autospec(Watchman, spec_set=True)
     self.service = FSEventService(self.mock_watchman, self.BUILD_ROOT)
     self.service.setup(None)

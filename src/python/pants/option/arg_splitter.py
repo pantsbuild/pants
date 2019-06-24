@@ -1,18 +1,14 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import sys
-from builtins import object
+from abc import ABC
 from collections import namedtuple
 
 from twitter.common.collections import OrderedSet
 
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
-from pants.util.meta import AbstractClass
 
 
 # TODO: Switch all clients to reference pants.option.scope directly.
@@ -38,7 +34,7 @@ class SplitArgs(namedtuple('SplitArgs',
   """
 
 
-class HelpRequest(AbstractClass):
+class HelpRequest(ABC):
   """Represents an implicit or explicit request for help by the user."""
 
 
@@ -49,7 +45,7 @@ class OptionsHelp(HelpRequest):
     :param advanced: Did the user ask for advanced help (e.g., using --help-advanced).
     :param all_scopes: Did the user ask for help for all goals and tasks (e.g., using --help-all).
     """
-    super(OptionsHelp, self).__init__()
+    super().__init__()
     self.advanced = advanced
     self.all_scopes = all_scopes
 
@@ -66,7 +62,7 @@ class UnknownGoalHelp(HelpRequest):
   """The user specified an unknown goal (or task)."""
 
   def __init__(self, unknown_goals):
-    super(UnknownGoalHelp, self).__init__()
+    super().__init__()
     self.unknown_goals = unknown_goals
 
 
@@ -74,7 +70,7 @@ class NoGoalHelp(HelpRequest):
   """The user specified no goals."""
 
 
-class ArgSplitter(object):
+class ArgSplitter:
   """Splits a command-line into scoped sets of flags, and a set of targets.
 
   Recognizes, e.g.:

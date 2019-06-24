@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -60,11 +57,11 @@ class BaseZincCompileJDKTest(NailgunTaskTestBase):
 
   def setUp(self):
     os.chdir(get_buildroot())
-    super(BaseZincCompileJDKTest, self).setUp()
+    super().setUp()
 
   def tearDown(self):
     os.chdir(self.old_cwd)
-    super(BaseZincCompileJDKTest, self).tearDown()
+    super().tearDown()
 
   def test_subprocess_compile_jdk_being_symlink(self):
     context = self.context(target_roots=[])

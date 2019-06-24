@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from collections import defaultdict
@@ -22,7 +19,7 @@ class ScalaJSLink(NailgunTask):
 
   @classmethod
   def register_options(cls, register):
-    super(ScalaJSLink, cls).register_options(register)
+    super().register_options(register)
     register('--full-opt', type=bool, fingerprint=True,
              help='Perform all optimizations; this is generally only useful for deployments.')
     register('--check-ir', type=bool, fingerprint=True,
@@ -32,7 +29,7 @@ class ScalaJSLink(NailgunTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(ScalaJSLink, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     # Require that scala_js compilation has completed.
     round_manager.require_data('scala_js_ir')
 
@@ -43,7 +40,7 @@ class ScalaJSLink(NailgunTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ScalaJSLink, cls).subsystem_dependencies() + (ScalaJSPlatform,)
+    return super().subsystem_dependencies() + (ScalaJSPlatform,)
 
   @property
   def cache_target_dirs(self):

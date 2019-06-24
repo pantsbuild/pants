@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import str
 from contextlib import contextmanager
 
 from pex.interpreter import PythonInterpreter
@@ -34,7 +30,7 @@ class ResolveRequirementsTaskBase(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ResolveRequirementsTaskBase, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       PexBuilderWrapper.Factory,
       PythonSetup,
       PythonNativeCode.scoped(cls),
@@ -50,7 +46,7 @@ class ResolveRequirementsTaskBase(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(ResolveRequirementsTaskBase, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(PythonInterpreter)
     round_manager.optional_product(PythonRequirementLibrary)  # For local dists.
     # Codegen may inject extra resolvable deps, so make sure we have a product dependency

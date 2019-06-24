@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
 
@@ -55,7 +52,7 @@ class ConanRequirement(datatype([
                            line. Collected into the `native_lib_names` field of a
                            `packaged_native_library()` target.
     """
-    return super(ConanRequirement, cls).__new__(
+    return super().__new__(
       cls,
       text_type(pkg_spec),
       include_relpath=text_type(include_relpath or 'include'),
@@ -105,7 +102,7 @@ class ExternalNativeLibrary(Target):
     payload.add_fields({
       'packages': ConanRequirementSetField(packages),
     })
-    super(ExternalNativeLibrary, self).__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, **kwargs)
 
   @property
   def packages(self):

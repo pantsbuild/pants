@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -24,7 +21,7 @@ class JvmTaskTest(JvmTaskTestBase):
     return DummyJvmTask
 
   def setUp(self):
-    super(JvmTaskTest, self).setUp()
+    super().setUp()
 
     self.t1 = self.make_target('t1')
     self.t2 = self.make_target('t2')

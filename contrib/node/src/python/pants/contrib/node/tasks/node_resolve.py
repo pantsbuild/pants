@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from hashlib import sha1
@@ -77,7 +74,7 @@ class NodeResolve(NodeTask):
   @classmethod
   def prepare(cls, options, round_manager):
     """Allow each resolver to declare additional product requirements."""
-    super(NodeResolve, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     for resolver in cls._resolver_by_type.values():
       resolver.prepare(options, round_manager)
 

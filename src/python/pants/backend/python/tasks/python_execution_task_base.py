@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import str
 
 from future.utils import binary_type, text_type
 from pex.interpreter import PythonInterpreter
@@ -58,7 +54,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(PythonExecutionTaskBase, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(PythonInterpreter)
     round_manager.require_data(ResolveRequirements.REQUIREMENTS_PEX)
     round_manager.require_data(GatherSources.PYTHON_SOURCES)
@@ -97,7 +93,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(PythonExecutionTaskBase, cls).subsystem_dependencies() + (PythonSetup,)
+    return super().subsystem_dependencies() + (PythonSetup,)
 
   def extra_files(self):
     """Override to provide extra files needed for execution.

@@ -1,20 +1,17 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
+from abc import ABC, abstractmethod
 
-from abc import abstractmethod, abstractproperty
-from builtins import object
-
-from pants.util.meta import AbstractClass, Singleton, classproperty, staticproperty
+from pants.util.meta import Singleton, classproperty, staticproperty
 from pants_test.test_base import TestBase
 
 
 class AbstractClassTest(TestBase):
   def test_abstract_property(self):
-    class AbstractProperty(AbstractClass):
-      @abstractproperty
+    class AbstractProperty(ABC):
+      @property
+      @abstractmethod
       def property(self):
         pass
 
@@ -22,7 +19,7 @@ class AbstractClassTest(TestBase):
       AbstractProperty()
 
   def test_abstract_method(self):
-    class AbstractMethod(AbstractClass):
+    class AbstractMethod(ABC):
       @abstractmethod
       def method(self):
         pass
@@ -39,7 +36,7 @@ class SingletonTest(TestBase):
     self.assertIs(One(), One())
 
 
-class WithProp(object):
+class WithProp:
   _value = 'val0'
 
   @classproperty
@@ -104,7 +101,7 @@ class OverridingMethodDefSuper(WithProp):
 
   @classproperty
   def class_property(cls):
-    return super(OverridingMethodDefSuper, cls).class_property + cls._other_value
+    return super().class_property + cls._other_value
 
 
 class ClassPropertyTest(TestBase):
@@ -151,7 +148,7 @@ class ClassPropertyTest(TestBase):
     self.assertEqual('val0o0', OverridingMethodDefSuper().class_property)
 
   def test_modify_class_value(self):
-    class WithFieldToModify(object):
+    class WithFieldToModify:
       _z = 'z0'
 
       @classproperty
@@ -166,7 +163,7 @@ class ClassPropertyTest(TestBase):
     self.assertEqual('z1', WithFieldToModify.class_property)
 
   def test_set_attr(self):
-    class SetValue(object):
+    class SetValue:
       _x = 'x0'
 
       @staticproperty
@@ -190,7 +187,7 @@ class ClassPropertyTest(TestBase):
     self.assertEqual('s1', SetValue.static_property)
 
   def test_delete_attr(self):
-    class DeleteValue(object):
+    class DeleteValue:
       _y = 'y0'
 
       @classproperty
@@ -213,9 +210,10 @@ class ClassPropertyTest(TestBase):
     self.assertFalse(hasattr(DeleteValue, 'static_property'))
 
   def test_abstract_classproperty(self):
-    class Abstract(AbstractClass):
+    class Abstract(ABC):
       @classproperty
-      @abstractproperty
+      @property
+      @abstractmethod
       def f(cls):
         pass
 

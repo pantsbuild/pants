@@ -5,7 +5,6 @@
 python_tests(
   sources=rglobs('*.py'),
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:mock',
     '3rdparty/python:parameterized',
     '3rdparty/python:pex',
@@ -26,7 +25,6 @@ python_tests(
     'src/python/pants/util:objects',
     'tests/python/pants_test:test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test/testutils:py2_compat',
   ],
   coverage = ['pants.init'],
 )

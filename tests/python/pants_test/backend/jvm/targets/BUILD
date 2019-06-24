@@ -44,7 +44,6 @@ python_tests(
   name = 'junit_tests',
   sources = ['test_junit_tests.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/backend/jvm/subsystems:junit',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/build_graph',
@@ -57,7 +56,6 @@ python_tests(
   name = 'jvm_app',
   sources = ['test_jvm_app.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:parse_context',

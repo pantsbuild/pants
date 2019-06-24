@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from collections import namedtuple
@@ -34,7 +31,7 @@ class RunPrepCommandBase(Task):
     In this case, there are no special options, but we want to use this opportunity to setup
     goal validation in PrepCommand before the build graph is parsed.
     """
-    super(RunPrepCommandBase, cls).register_options(register)
+    super().register_options(register)
     PrepCommand.add_allowed_goal(cls.goal)
 
   @classmethod

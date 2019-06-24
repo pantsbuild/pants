@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import filter, object
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jvm_platform_analysis import JvmPlatformExplain, JvmPlatformValidate
@@ -12,7 +8,7 @@ from pants.build_graph.target import Target
 from pants_test.task_test_base import TaskTestBase
 
 
-class JvmPlatformAnalysisTestMixin(object):
+class JvmPlatformAnalysisTestMixin:
   """Common helper methods for testing JvmPlatformValidate and JvmPlatformExplain.
 
   Mostly for building sets of targets that are interesting for testing.

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
@@ -21,7 +18,7 @@ class ExecutablePexTool(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ExecutablePexTool, cls).subsystem_dependencies() + (PexBuilderWrapper.Factory,)
+    return super().subsystem_dependencies() + (PexBuilderWrapper.Factory,)
 
   def bootstrap(self, interpreter, pex_file_path, extra_reqs=None):
     # Caching is done just by checking if the file at the specified path is already executable.

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -17,7 +14,7 @@ class RuntimeClasspathPublisher(Task):
 
   @classmethod
   def register_options(cls, register):
-    super(Task, cls).register_options(register)
+    super().register_options(register)
     register('--manifest-jar-only', type=bool, default=False,
              help='Only export classpath in a manifest jar.')
 

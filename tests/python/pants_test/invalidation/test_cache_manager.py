@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import shutil
@@ -32,7 +29,7 @@ class InvalidationCacheManagerTest(TestBase):
     safe_mkdir(vt.results_dir)
 
   def setUp(self):
-    super(InvalidationCacheManagerTest, self).setUp()
+    super().setUp()
     self._dir = tempfile.mkdtemp()
     self.cache_manager = InvalidationCacheManager(
       results_dir_root=os.path.join(self._dir, 'results'),
@@ -44,7 +41,7 @@ class InvalidationCacheManagerTest(TestBase):
 
   def tearDown(self):
     shutil.rmtree(self._dir, ignore_errors=True)
-    super(InvalidationCacheManagerTest, self).tearDown()
+    super().tearDown()
 
   def make_vt(self):
     # Create an arbitrary VT. It will mimic the state of the VT handed back by a task.

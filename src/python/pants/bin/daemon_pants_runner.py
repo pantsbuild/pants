@@ -1,15 +1,11 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import datetime
 import os
 import sys
 import termios
 import time
-from builtins import open, zip
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
@@ -43,7 +39,7 @@ class DaemonExiter(Exiter):
     # N.B. Assuming a fork()'d child, cause os._exit to be called here to avoid the routine
     # sys.exit behavior.
     # TODO: The behavior we're avoiding with the use of os._exit should be described and tested.
-    super(DaemonExiter, self).__init__(exiter=os._exit)
+    super().__init__(exiter=os._exit)
     self._maybe_shutdown_socket = maybe_shutdown_socket
     self._finalizer = None
 
@@ -106,7 +102,7 @@ class _PantsRunFinishedWithFailureException(Exception):
     return self._exit_code
 
 
-class DaemonPantsRunner(object):
+class DaemonPantsRunner:
   """A daemonizing PantsRunner that speaks the nailgun protocol to a remote client.
 
   N.B. this class is primarily used by the PailgunService in pantsd.

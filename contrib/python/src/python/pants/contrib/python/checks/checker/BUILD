@@ -1,6 +1,11 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+# NB: This contrib module must keep Python 2 and Python 3 compatibility, as the binary is ran
+# with the interpreter corresponding to the version of the code being checked. Consequently,
+# we mark this contrib package as universal in packages.py, and must keep Python 2 support despite
+# Pants overall requiring Python 3.
+
 python_library(
   provides=contrib_setup_py(
     name='pantsbuild.pants.contrib.python.checks.checker',

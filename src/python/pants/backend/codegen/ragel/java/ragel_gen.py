@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import re
-from builtins import open
 
 from pants.backend.codegen.ragel.java.java_ragel_library import JavaRagelLibrary
 from pants.backend.codegen.ragel.subsystems.ragel import Ragel
@@ -25,10 +21,10 @@ class RagelGen(SimpleCodegenTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(RagelGen, cls).subsystem_dependencies() + (Ragel.scoped(cls),)
+    return super().subsystem_dependencies() + (Ragel.scoped(cls),)
 
   def __init__(self, *args, **kwargs):
-    super(RagelGen, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._java_out = os.path.join(self.workdir, 'gen-java')
 
   @memoized_property

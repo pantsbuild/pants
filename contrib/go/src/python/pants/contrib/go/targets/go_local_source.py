@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import re
@@ -56,7 +53,7 @@ class GoLocalSource(GoTarget):
                                            sources_rel_path=address.spec_path,
                                            key_arg='sources'),
     })
-    super(GoLocalSource, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   @property
   def import_path(self):

@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import threading
-from builtins import object, range, str
 from collections import namedtuple
 
 from future.moves.urllib.parse import urlparse
@@ -48,7 +44,7 @@ class CacheSetup(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(CacheSetup, cls).register_options(register)
+    super().register_options(register)
     default_cache = [os.path.join(get_buildroot(), '.cache')]
     register('--ignore', type=bool,
              help='Ignore all other cache configuration and skip using the cache.')
@@ -97,7 +93,7 @@ class CacheSetup(Subsystem):
     return CacheFactory(scoped_options, task.context.log, task, **kwargs)
 
 
-class CacheFactory(object):
+class CacheFactory:
 
   def __init__(self, options, log, task, pinger=None, resolver=None):
     """Create a cache factory from settings.

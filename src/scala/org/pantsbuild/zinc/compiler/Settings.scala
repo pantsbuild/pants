@@ -28,6 +28,7 @@ case class Settings(
   _sources: Seq[File]               = Seq.empty,
   classpath: Seq[File]              = Seq.empty,
   _classesDirectory: Option[File]   = None,
+  _postCompileMergeDir: Option[File] = None,
   outputJar: Option[File]           = None,
   scala: ScalaLocation              = ScalaLocation(),
   scalacOptions: Seq[String]        = Seq.empty,
@@ -46,6 +47,8 @@ case class Settings(
 
   lazy val classesDirectory: File =
     normalise(_classesDirectory.getOrElse(defaultClassesDirectory()))
+
+  lazy val postCompileMergeDir: Option[File] = _postCompileMergeDir.map(normalise)
 
   lazy val incOptions: IncOptions = {
     _incOptions.copy(
@@ -281,6 +284,10 @@ object Settings {
       .abbr("cp")
       .action((x, c) => c.copy(classpath = x))
       .text("Specify the classpath")
+
+    opt[File]("post-compile-merge-dir")
+      .action((x, c) => c.copy(_postCompileMergeDir = Some(x)))
+      .text("Directory to merge with compile outputs after compilation")
 
     opt[File]("class-destination")
       .abbr("d")

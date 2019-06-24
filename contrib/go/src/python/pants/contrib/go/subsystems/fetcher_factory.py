@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import re
@@ -26,7 +23,7 @@ class FetcherFactory(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return (super(FetcherFactory, cls).subsystem_dependencies() +
+    return (super().subsystem_dependencies() +
             (ArchiveRetriever, GoImportMetaTagReader))
 
   _DEFAULT_MATCHERS = {
@@ -45,7 +42,7 @@ class FetcherFactory(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(FetcherFactory, cls).register_options(register)
+    super().register_options(register)
     register('--disallow-cloning-fetcher', type=bool, default=False, advanced=True,
              fingerprint=True,
              help="If True, we only fetch archives explicitly matched by --matchers."

@@ -1,14 +1,10 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import re
 import time
 import uuid
-from builtins import object, range
 from collections import namedtuple
 
 from pants.util.dirutil import safe_mkdir_for
@@ -16,7 +12,7 @@ from pants.util.memo import memoized_method
 from pants.util.rwbuf import FileBackedRWBuf
 
 
-class WorkUnitLabel(object):
+class WorkUnitLabel:
   """
   :API: public
   """
@@ -57,7 +53,7 @@ class WorkUnitLabel(object):
     return [key for key in dir(cls) if not key.startswith('_') and key.isupper()]
 
 
-class WorkUnit(object):
+class WorkUnit:
   """A hierarchical unit of work, for the purpose of timing and reporting.
 
   A WorkUnit can be subdivided into further WorkUnits. The WorkUnit concept is deliberately

@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import json
 import re
-from builtins import object, str
 from collections import namedtuple
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -27,7 +23,7 @@ class GoTask(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(GoTask, cls).subsystem_dependencies() + (GoDistribution.scoped(cls),)
+    return super().subsystem_dependencies() + (GoDistribution.scoped(cls),)
 
   @staticmethod
   def is_binary(target):
@@ -80,7 +76,7 @@ class GoTask(Task):
     return self.go_dist.create_go_cmd('env', args=[var]).check_output().decode('utf-8').strip()
 
 
-class ImportOracle(object):
+class ImportOracle:
   """Answers questions about Go imports."""
 
   class ListDepsError(Exception):

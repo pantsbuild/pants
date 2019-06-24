@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open, str
 
 from pex.interpreter import PythonInterpreter
 
@@ -26,7 +22,7 @@ class GatherSourcesTest(TaskTestBase):
     return GatherSources
 
   def setUp(self):
-    super(GatherSourcesTest, self).setUp()
+    super().setUp()
 
     self.filemap = {
       'src/python/one/foo.py': 'foo_py_content',

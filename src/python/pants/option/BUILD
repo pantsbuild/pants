@@ -3,9 +3,7 @@
 
 python_library(
   dependencies=[
-    'src/python/pants/util:collections_abc_backport',
     '3rdparty/python:ansicolors',
-    '3rdparty/python:future',
     '3rdparty/python:python-Levenshtein',
     '3rdparty/python:PyYAML',
     '3rdparty/python:setuptools',
@@ -18,7 +16,6 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
     'src/python/pants/util:objects',
-    'src/python/pants/util:py2_compat',
     'src/python/pants/util:strutil',
   ]
 )

@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import re
 import sys
-from builtins import object, str
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -21,11 +17,11 @@ from pants_test.engine.util import assert_equal_with_printing, remove_locations_
 from pants_test.test_base import TestBase
 
 
-class A(object):
+class A:
   pass
 
 
-class B(object):
+class B:
   pass
 
 
@@ -43,7 +39,7 @@ def consumes_a_and_b(a, b):
   return str('{} and {}'.format(a, b))
 
 
-class C(object):
+class C:
   pass
 
 
@@ -63,15 +59,15 @@ def transitive_coroutine_rule(c):
 
 
 @union
-class UnionBase(object): pass
+class UnionBase: pass
 
 
-class UnionWrapper(object):
+class UnionWrapper:
   def __init__(self, inner):
     self.inner = inner
 
 
-class UnionA(object):
+class UnionA:
 
   def a(self):
     return A()
@@ -82,7 +78,7 @@ def select_union_a(union_a):
   return union_a.a()
 
 
-class UnionB(object):
+class UnionB:
 
   def a(self):
     return A()
@@ -100,7 +96,7 @@ def a_union_test(union_wrapper):
   yield union_a
 
 
-class TypeCheckFailWrapper(object):
+class TypeCheckFailWrapper:
   """
   This object wraps another object which will be used to demonstrate a type check failure when the
   engine processes a `yield Get(...)` statement.
@@ -149,7 +145,7 @@ class SchedulerTest(TestBase):
 
   @classmethod
   def rules(cls):
-    return super(SchedulerTest, cls).rules() + [
+    return super().rules() + [
       RootRule(A),
       # B is both a RootRule and an intermediate product here.
       RootRule(B),
@@ -221,7 +217,7 @@ class SchedulerWithNestedRaiseTest(TestBase):
 
   @classmethod
   def rules(cls):
-    return super(SchedulerWithNestedRaiseTest, cls).rules() + [
+    return super().rules() + [
       RootRule(B),
       RootRule(TypeCheckFailWrapper),
       RootRule(CollectionType),

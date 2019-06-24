@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
@@ -14,7 +11,6 @@ import threading
 import time
 import uuid
 import zipfile
-from builtins import object, open
 from contextlib import closing, contextmanager
 
 from colors import green
@@ -312,7 +308,7 @@ def open_tar(path_or_file, *args, **kwargs):
     yield tar
 
 
-class Timer(object):
+class Timer:
   """Very basic with-context to time operations
 
   Example usage:

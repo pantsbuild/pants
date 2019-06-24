@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import contextlib
 import multiprocessing
@@ -40,7 +37,7 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
 
   @classmethod
   def register_options(cls, register):
-    super(JvmdocGen, cls).register_options(register)
+    super().register_options(register)
     tool_name = cls.jvmdoc().tool_name
 
     register('--include-codegen', type=bool,
@@ -67,7 +64,7 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
     return [cls.jvmdoc().product_type]
 
   def __init__(self, *args, **kwargs):
-    super(JvmdocGen, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     options = self.get_options()
     self._include_codegen = options.include_codegen

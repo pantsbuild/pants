@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from contextlib import contextmanager
 
@@ -20,7 +17,7 @@ class ClassmapTaskTest(ConsoleTaskTestBase, JvmBinaryTaskTestBase):
     return ClassmapTask
 
   def setUp(self):
-    super(ClassmapTaskTest, self).setUp()
+    super().setUp()
     init_subsystem(Target.Arguments)
 
     self.add_to_build_file(

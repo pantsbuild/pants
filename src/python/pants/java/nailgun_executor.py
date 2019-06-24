@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
 import logging
@@ -36,7 +33,7 @@ class NailgunProcessGroup(ProcessGroup):
   _NAILGUN_KILL_LOCK = threading.Lock()
 
   def __init__(self, metadata_base_dir=None):
-    super(NailgunProcessGroup, self).__init__(name='nailgun', metadata_base_dir=metadata_base_dir)
+    super().__init__(name='nailgun', metadata_base_dir=metadata_base_dir)
     # TODO: this should enumerate the .pids dir first, then fallback to ps enumeration (& warn).
 
   def _iter_nailgun_instances(self, everywhere=False):
@@ -314,7 +311,7 @@ Stderr:
   def is_alive(self):
     """A ProcessManager.is_alive() override that ensures buildroot flags are present in the process
     command line arguments."""
-    return super(NailgunExecutor, self).is_alive(self._check_process_buildroot)
+    return super().is_alive(self._check_process_buildroot)
 
   def post_fork_child(self, fingerprint, jvm_options, classpath, stdout, stderr):
     """Post-fork() child callback for ProcessManager.daemon_spawn()."""

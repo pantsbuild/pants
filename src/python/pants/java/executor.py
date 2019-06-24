@@ -1,28 +1,23 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import sys
-from abc import abstractmethod, abstractproperty
-from builtins import object
+from abc import ABC, abstractmethod
 from contextlib import contextmanager
 
 from six import string_types
 from twitter.common.collections import maybe_list
 
 from pants.util.contextutil import environment_as
-from pants.util.meta import AbstractClass
 from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)
 
 
-class Executor(AbstractClass):
+class Executor(ABC):
   """Executes java programs.
 
   :API: public
@@ -46,10 +41,11 @@ class Executor(AbstractClass):
   class InvalidDistribution(ValueError):
     """Indicates an invalid Distribution was used to construct this runner."""
 
-  class Runner(object):
+  class Runner:
     """A re-usable executor that can run a configured java command line."""
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def executor(self):
       """Returns the executor this runner uses to run itself."""
       raise NotImplementedError
@@ -59,7 +55,8 @@ class Executor(AbstractClass):
       """Returns a string representation of the command that will be run."""
       return ' '.join(self.command)
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def command(self):
       """Returns a copy of the command line that will be run as a list of command line tokens."""
       raise NotImplementedError
@@ -144,7 +141,7 @@ class CommandLineGrabber(Executor):
   """Doesn't actually execute anything, just captures the cmd line."""
 
   def __init__(self, distribution):
-    super(CommandLineGrabber, self).__init__(distribution=distribution)
+    super().__init__(distribution=distribution)
     self._command = None  # Initialized when we run something.
 
   def _runner(self, classpath, main, jvm_options, args):

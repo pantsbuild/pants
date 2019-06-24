@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import textwrap
 import unittest
-from builtins import object
 from contextlib import contextmanager
 
 from twitter.common.collections import maybe_list
@@ -22,7 +18,7 @@ from pants.util.process_handler import subprocess
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 
-class EXE(object):
+class EXE:
   def __init__(self, relpath, version=None):
     self._relpath = relpath
     self._version = version
@@ -154,7 +150,7 @@ class DistributionValidationTest(unittest.TestCase):
 
 class DistributionEnvLocationTest(unittest.TestCase):
   def setUp(self):
-    super(DistributionEnvLocationTest, self).setUp()
+    super().setUp()
     self.locator = _Locator(_EnvVarEnvironment())
 
   def test_locate_none(self):

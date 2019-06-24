@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from textwrap import dedent
@@ -17,10 +14,10 @@ from pants_test.task_test_base import TaskTestBase
 class NativeTaskTestBase(TaskTestBase):
   @classmethod
   def rules(cls):
-    return super(NativeTaskTestBase, cls).rules() + register.rules()
+    return super().rules() + register.rules()
 
 
-class NativeCompileTestMixin(object):
+class NativeCompileTestMixin:
 
   def _retrieve_single_product_at_target_base(self, product_mapping, target):
     product = product_mapping.get(target)

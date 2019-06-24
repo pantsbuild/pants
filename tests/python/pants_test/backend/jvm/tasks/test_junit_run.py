@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open, range
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -42,7 +38,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
   @classmethod
   def alias_groups(cls):
-    return super(JUnitRunnerTest, cls).alias_groups().merge(BuildFileAliases(
+    return super().alias_groups().merge(BuildFileAliases(
       targets={
         'files': Files,
         'junit_tests': JUnitTests,
@@ -51,7 +47,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     ))
 
   def setUp(self):
-    super(JUnitRunnerTest, self).setUp()
+    super().setUp()
     init_subsystem(JUnit)
 
   @ensure_cached(JUnitRun, expected_num_artifacts=1)

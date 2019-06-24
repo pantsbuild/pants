@@ -1,15 +1,11 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import collections
 import json
 import os
 import re
 import shutil
-from builtins import object, open, range
 from datetime import datetime
 
 from pystache import Renderer
@@ -43,7 +39,7 @@ class SiteGen(Task):
 
   @classmethod
   def register_options(cls, register):
-    super(SiteGen, cls).register_options(register)
+    super().register_options(register)
     register('--config-path', type=list, help='Path to .json file describing site structure.')
 
   # TODO: requiring these products ensures that the markdown and reference tasks run before this
@@ -85,7 +81,7 @@ def load_soups(config):
   return soups
 
 
-class Precomputed(object):
+class Precomputed:
   """Info we compute (and preserve) before we mutate things."""
 
   def __init__(self, page, pantsref):
@@ -97,7 +93,7 @@ class Precomputed(object):
     self.pantsref = pantsref
 
 
-class PrecomputedPageInfo(object):
+class PrecomputedPageInfo:
   """Info we compute (and preserve) for each page before we mutate things."""
 
   def __init__(self, title, show_toc):
