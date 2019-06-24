@@ -229,7 +229,7 @@ class BaseZincCompile(JvmCompile):
 
   def post_compile_extra_resources(self, compile_context):
     """Override `post_compile_extra_resources` to additionally include scalac_plugin info."""
-    result = super().extra_resources(compile_context)
+    result = super().post_compile_extra_resources(compile_context)
     target = compile_context.target
 
     if isinstance(target, ScalacPlugin):
