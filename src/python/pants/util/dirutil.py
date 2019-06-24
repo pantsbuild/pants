@@ -297,31 +297,26 @@ def register_rmtree(directory, cleaner=_mkdtemp_atexit_cleaner):
   return directory
 
 
-def safe_rmtree(directory):
-  """Delete a directory if it's present. If it's not present, no-op.
+def append_os_sep(directory):
+  return os.path.join(directory, directory + os.sep)
 
-  Note that if the directory argument is a symlink, only the symlink will
-  be deleted.
+def safe_rmtree(directory, recursive=False):
+  """Delete a directory if it's present. If it's not present, no-op.
+  :param directory: path to a directory or a symlink
+  :param recursive: when set to False (default) and directory passed is a symlink, only the symlink
+                    will be deleted. When set to True, follow a symlink and delete everything
+                    inside.
 
   :API: public
   """
   if os.path.islink(directory):
-    safe_delete(directory)
+    if recursive:
+      directory = append_os_sep(directory)
+      shutil.rmtree(directory, ignore_errors=True)
+    else:
+      safe_delete(directory)
   else:
     shutil.rmtree(directory, ignore_errors=True)
-
-
-def safe_rmtree_recursive(directory):
-  """Delete a directory if it's present. If it's not present, no-op.
-
-  Note that if the directory argument is a symlink, it will follow the symlink and delete
-  everything inside.
-
-  :API: public
-  """
-  if os.path.islink(directory):
-    directory = os.path.join(directory, os.sep)
-  shutil.rmtree(directory, ignore_errors=True)
 
 
 def safe_open(filename, *args, **kwargs):
@@ -342,7 +337,7 @@ def safe_delete(filename):
       raise
 
 
-def safe_concurrent_rename(src, dst):
+def safe_concurrent_rename(src, dst, recursive=False):
   """Rename src to dst, ignoring errors due to dst already existing.
 
   Useful when concurrent processes may attempt to create dst, and it doesn't matter who wins.
@@ -352,8 +347,9 @@ def safe_concurrent_rename(src, dst):
   if os.path.isdir(src):  # Note that dst may not exist, so we test for the type of src.
     safe_rmtree(dst)
   else:
-    safe_delete(dst)
+    safe_rmtree(dst, recursive=True) if os.path.islink(src) and recursive else safe_delete(dst)
   try:
+    src = append_os_sep(src) if recursive else src
     shutil.move(src, dst)
   except IOError as e:
     if e.errno != errno.EEXIST:

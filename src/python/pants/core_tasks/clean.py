@@ -6,7 +6,7 @@ import os
 
 from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_concurrent_rename, safe_rmtree_recursive
+from pants.util.dirutil import safe_concurrent_rename, safe_rmtree
 
 
 logger = logging.getLogger(__name__)
@@ -23,6 +23,9 @@ class Clean(Task):
     register('--async', type=bool, default=False,
              help='Allows clean-all to run in the background. Can dramatically speed up clean-all '
                   'for large pants workdirs.')
+    register('--recursive', type=bool, default=True,
+            help='Allows clean-all to walk symlinks, if any.')
+
 
   def execute(self):
     pants_wd = self.get_options().pants_workdir
@@ -35,15 +38,16 @@ class Clean(Task):
       tmp_trash = os.path.join(tmpdir, "trash")
 
       # Moves contents of .pants.d to cleanup dir.
-      safe_concurrent_rename(pants_wd, tmp_trash)
-      safe_concurrent_rename(tmpdir, pants_wd)
+      recursive = self.get_options()['recursive']
+      safe_concurrent_rename(pants_wd, tmp_trash, recursive=recursive)
+      safe_concurrent_rename(tmpdir, pants_wd, recursive=recursive)
 
       if self.get_options()['async']:
         # The trash directory is deleted in a child process.
         pid = os.fork()
         if pid == 0:
           try:
-            safe_rmtree_recursive(pants_trash)
+            safe_rmtree(pants_trash, recursive=recursive)
           except (IOError, OSError):
             logger.warning("Async clean-all failed. Please try again.")
           finally:
@@ -53,4 +57,4 @@ class Clean(Task):
       else:
         # Recursively removes pants cache; user waits patiently.
         logger.info('For async removal, run `./pants clean-all --async`')
-        safe_rmtree_recursive(pants_trash)
+        safe_rmtree(pants_trash, recursive=recursive)
