@@ -12,8 +12,8 @@ class PythonTests(PythonTarget):
   :API: public
   """
 
-  # These are the patterns matched by pytest's test discovery.
-  default_sources_globs = ('test_*.py', '*_test.py')
+  # These are the patterns matched by pytest's test discovery, plus pytest's config hook file.
+  default_sources_globs = ('test_*.py', '*_test.py', 'conftest.py')
 
   @classmethod
   def alias(cls):
