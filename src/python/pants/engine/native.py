@@ -285,6 +285,14 @@ class _FFISpecification(object):
     obj = self._ffi.from_handle(val[0])
     type_id = c.to_id(type(obj))
     return TypeId(type_id)
+ 
+  @_extern_decl('TypeId', ['ExternContext*', 'Handle*'])
+  def extern_get_union_for(self, context_handle, val):
+      """Return the union a type belongs to if it exists"""
+      c = self._ffi.from_handle(context_handle)
+      obj = self._ffi.from_handle(val[0])
+      type_id = c.to_id(type(obj))
+      return TypeId(type_id)
 
   @_extern_decl('Ident', ['ExternContext*', 'Handle*'])
   def extern_identify(self, context_handle, val):
@@ -425,10 +433,14 @@ class _FFISpecification(object):
       if isinstance(res, Get):
         # Get.
         response.tag = self._lib.Get
+
+        is_union = getattr(res.subject_declared_type, '_is_union', False)
         response.get = (
             TypeId(c.to_id(res.product)),
             c.to_value(res.subject),
             c.identify(res.subject),
+            TypeId(c.to_id(res.subject_declared_type)),
+            c.to_value(res.subject_declared_type),
           )
       elif type(res) in (tuple, list):
         # GetMulti.
@@ -659,6 +671,7 @@ class Native(Singleton):
                            self.ffi_lib.extern_call,
                            self.ffi_lib.extern_generator_send,
                            self.ffi_lib.extern_get_type_for,
+                           self.ffi_lib.extern_get_union_for,
                            self.ffi_lib.extern_identify,
                            self.ffi_lib.extern_equals,
                            self.ffi_lib.extern_clone_val,
