@@ -186,8 +186,13 @@ class BaseZincCompileIntegrationTest:
           self.get_only(found, 'OtherSimpleScalacPlugin.class').endswith(
               'org/pantsbuild/example/scalac/plugin/OtherSimpleScalacPlugin.class'))
 
+      # Grab only the files under classes/ dir
+      scalac_xml_under_classes_dir = list(filter(lambda x: 'classes' in x,
+                                                 found['scalac-plugin.xml']))
+      self.assertEqual(1, len(scalac_xml_under_classes_dir))
+
       # Ensure that the plugin registration file is written to the root of the classpath.
-      path = self.get_only(found, 'scalac-plugin.xml')
+      path = scalac_xml_under_classes_dir[0]
       self.assertTrue(path.endswith('/classes/scalac-plugin.xml'),
                       'plugin registration file `{}` not located at the '
                       'root of the classpath'.format(path))
