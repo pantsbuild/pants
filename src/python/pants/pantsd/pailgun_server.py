@@ -266,6 +266,7 @@ class PailgunServer(ThreadingMixIn, TCPServer):
       with yield_and_release(time_polled):
         yield
     else:
+      self.logger.debug("request {} didn't aquire the lock on the first try, polling...".format(request))
       # We have to wait for another request to finish being handled.
       NailgunProtocol.send_stderr(request, "Another pants invocation is running. Will wait {} for it to finish before giving up.\n".format(
         "forever" if self._should_poll_forever(timeout) else "up to {} seconds".format(timeout)
