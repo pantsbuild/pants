@@ -30,6 +30,14 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/java/org/pantsbuild/testproject/thriftdeptest',
       # TODO(Eric Ayers): I don't understand why this fails
       'testprojects/src/java/org/pantsbuild/testproject/jvmprepcommand:compile-prep-command',
+      # TODO(#7952): Fails to execute Coursier
+      'testprojects/src/java/org/pantsbuild/testproject/aliases:main',
+      'testprojects/src/java/org/pantsbuild/testproject/aliases:intransitive-dependency',
+      # NB: These fail to bootstrap in their integration test shard, not compiling per se.
+      'testprojects/tests/scala/org/pantsbuild/testproject/exports:TC',
+      'testprojects/tests/scala/org/pantsbuild/testproject/exports:TD',
+      'testprojects/tests/scala/org/pantsbuild/testproject/non_exports:A',
+      'testprojects/tests/scala/org/pantsbuild/testproject/non_exports:B',
       # TODO(#7903): failing to find -ltensorflow_framework
       'examples/src/python/example/tensorflow_custom_op:tensorflow-zero-out-op',
       'examples/src/python/example/tensorflow_custom_op:tensorflow-zero-out-op-wrapper',
