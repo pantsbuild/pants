@@ -141,6 +141,7 @@ class RemotePantsRunner:
     # Merge the nailgun TTY capability environment variables with the passed environment dict.
     ng_env = NailgunProtocol.isatty_to_env(self._stdin, self._stdout, self._stderr)
     modified_env = combined_dict(self._env, ng_env)
+    # TODO: remove these repeated literal strings across the codebase (see #7948)!
     modified_env['PANTSD_RUNTRACKER_CLIENT_START_TIME'] = str(self._start_time)
     modified_env['PANTSD_REQUEST_TIMEOUT_LIMIT'] = str(self._bootstrap_options.for_global_scope().pantsd_timeout_when_multiple_invocations)
     modified_env['PANTSD_ALLOW_CONCURRENT_RUNS'] = str(self._bootstrap_options.for_global_scope().concurrent)

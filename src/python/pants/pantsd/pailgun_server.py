@@ -256,6 +256,7 @@ class PailgunServer(ThreadingMixIn, TCPServer):
     """
     # TODO add `did_poll` to pantsd metrics
 
+    # TODO: remove these repeated literal strings across the codebase (see #7948)!
     timeout = float(environment['PANTSD_REQUEST_TIMEOUT_LIMIT'])
     no_concurrent = environment['PANTSD_ALLOW_CONCURRENT_RUNS'] == 'False'
 
