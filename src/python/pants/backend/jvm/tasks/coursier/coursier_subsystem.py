@@ -89,4 +89,7 @@ class CoursierSubsystem(Subsystem):
           else:
             workunit.set_outcome(WorkUnit.SUCCESS)
 
+    import subprocess
+    sha = subprocess.check_output(['sha1sum', bootstrap_jar_path]).decode('utf-8')
+    logger.info("coursier sha1sum: {}".format(sha))
     return bootstrap_jar_path
