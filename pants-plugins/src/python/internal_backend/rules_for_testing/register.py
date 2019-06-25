@@ -1,6 +1,7 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from pants.base.exiter import PANTS_NONSTANDARD_TESTING_EXIT_CODE
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal
@@ -17,7 +18,7 @@ class ListAndDieForTesting(Goal):
 def fast_list_and_die_for_testing(console, addresses):
   for address in addresses.dependencies:
     console.print_stdout(address.spec)
-  yield ListAndDieForTesting(exit_code=42)
+  yield ListAndDieForTesting(exit_code=PANTS_NONSTANDARD_TESTING_EXIT_CODE)
 
 
 def rules():

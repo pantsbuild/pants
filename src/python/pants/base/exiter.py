@@ -18,6 +18,11 @@ logger = logging.getLogger(__name__)
 PANTS_SUCCEEDED_EXIT_CODE = 0
 PANTS_FAILED_EXIT_CODE = 1
 
+# A return code for when pants is invoked via an integration test and it needs to be checked that
+# pants returns the correct exit code.
+# TODO: Randomize this -- the result just needs to be an int!
+PANTS_NONSTANDARD_TESTING_EXIT_CODE = 10
+
 # TODO: This is returned by the exit code of the pantsd nailgun connection if a client is already
 # connected and --concurrent is *disabled*. This number is chosen to be a large enough number that
 # we hopefully don't have too many collisions with real errors. There could be a better method of

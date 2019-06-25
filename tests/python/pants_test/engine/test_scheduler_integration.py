@@ -3,6 +3,7 @@
 
 import os
 
+from pants.base.exiter import PANTS_NONSTANDARD_TESTING_EXIT_CODE
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 
@@ -33,4 +34,4 @@ class SchedulerIntegrationTest(PantsRunIntegrationTest):
     pants_result = self.run_pants(args)
     self.assert_failure(pants_result)
     self.assertEqual(pants_result.stdout_data, 'examples/src/scala/org/pantsbuild/example/hello/welcome:welcome\n')
-    self.assertEqual(pants_result.returncode, 42)
+    self.assertEqual(pants_result.returncode, PANTS_NONSTANDARD_TESTING_EXIT_CODE)
