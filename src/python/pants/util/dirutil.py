@@ -300,6 +300,7 @@ def register_rmtree(directory, cleaner=_mkdtemp_atexit_cleaner):
 def append_os_sep(directory):
   return os.path.join(directory, directory + os.sep)
 
+
 def safe_rmtree(directory, recursive=False):
   """Delete a directory if it's present. If it's not present, no-op.
   :param directory: path to a directory or a symlink

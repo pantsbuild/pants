@@ -15,8 +15,8 @@ from pants.util.dirutil import (ExistingDirError, ExistingFileError, _mkdtemp_un
                                 absolute_symlink, check_no_overlapping_paths, fast_relpath,
                                 get_basedir, longest_dir_prefix, mergetree, read_file,
                                 relative_symlink, relativize_paths, rm_rf, safe_concurrent_creation,
-                                safe_file_dump, safe_mkdir, safe_mkdtemp, safe_open,
-                                safe_rm_oldest_items_in_dir, safe_rmtree, touch)
+                                safe_concurrent_rename, safe_file_dump, safe_mkdir, safe_mkdtemp,
+                                safe_open, safe_rm_oldest_items_in_dir, safe_rmtree, touch)
 from pants.util.objects import datatype
 
 
@@ -439,6 +439,41 @@ class DirutilTest(unittest.TestCase):
 
       self.assertFalse(os.path.exists(safe_path))
       self.assertFalse(os.path.exists(expected_file))
+
+  def test_safe_concurrent_rename(self):
+    with temporary_dir() as td:
+      with temporary_dir() as td_renamed:
+        self.assertTrue(os.path.exists(td))
+        self.assertTrue(os.path.exists(td_renamed))
+        safe_concurrent_rename(td, td_renamed)
+        self.assertTrue(os.path.exists(td_renamed))
+        self.assertFalse(os.path.exists(td))
+
+  def test_safe_concurrent_rename_with_link(self):
+    with temporary_dir() as td:
+      with temporary_dir() as td_renamed:
+        td_link = os.path.join(td, 'link')
+        os.symlink(td, td_link)
+        self.assertTrue(os.path.exists(td))
+        self.assertTrue(os.path.exists(td_renamed))
+        # Note: Since recursive isn't set, only td_link is deleted, not the directory td its
+        # pointing to
+        safe_concurrent_rename(td_link, td_renamed)
+        self.assertTrue(os.path.exists(td_renamed))
+        self.assertTrue(os.path.exists(td))
+        self.assertFalse(os.path.exists(td_link))
+
+  def test_safe_concurrent_rename_with_link_recursive(self):
+    with temporary_dir() as td:
+      with temporary_dir() as td_renamed:
+        td_link = os.path.join(td, 'link')
+        os.symlink(td, td_link)
+        self.assertTrue(os.path.exists(td))
+        self.assertTrue(os.path.exists(td_renamed))
+        safe_concurrent_rename(td_link, td_renamed, recursive=True)
+        self.assertTrue(os.path.exists(td_renamed))
+        self.assertFalse(os.path.exists(td))
+        self.assertFalse(os.path.exists(td_link))
 
   def test_safe_rm_oldest_items_in_dir(self):
     with temporary_dir() as td:

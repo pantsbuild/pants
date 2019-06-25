@@ -26,7 +26,6 @@ class Clean(Task):
     register('--recursive', type=bool, default=True,
             help='Allows clean-all to walk symlinks, if any.')
 
-
   def execute(self):
     pants_wd = self.get_options().pants_workdir
     pants_trash = os.path.join(pants_wd, "trash")
