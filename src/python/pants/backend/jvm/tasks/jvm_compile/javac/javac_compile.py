@@ -3,6 +3,7 @@
 
 import logging
 import os
+import subprocess
 
 from future.utils import text_type
 
@@ -18,7 +19,6 @@ from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.dirutil import fast_relpath, safe_walk
 from pants.util.meta import classproperty
-from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)

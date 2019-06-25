@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import subprocess
 from contextlib import contextmanager
 
 from pex.pex import PEX
@@ -16,7 +17,6 @@ from pants.base.hash_utils import stable_json_sha1
 from pants.base.workunit import WorkUnitLabel
 from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation
-from pants.util.process_handler import subprocess
 from pants.util.strutil import ensure_binary, safe_shlex_join
 
 

@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import subprocess
 import unittest
 from contextlib import contextmanager
 from textwrap import dedent
@@ -11,7 +12,6 @@ from pants.scm.git import Git
 from pants.scm.scm import Scm
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_mkdir, safe_mkdtemp, safe_open, safe_rmtree, touch
-from pants.util.process_handler import subprocess
 from pants_test.testutils.git_util import MIN_REQUIRED_GIT_VERSION, git_version
 
 

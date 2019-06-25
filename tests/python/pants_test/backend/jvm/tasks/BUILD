@@ -19,7 +19,6 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:binary_create',
     'src/python/pants/java/jar',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
   ]
 )
@@ -37,7 +36,6 @@ python_tests(
     'src/python/pants/java:executor',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
   ]
 )
@@ -421,7 +419,6 @@ python_tests(
     'src/python/pants/java:executor',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:task_test_base',
@@ -434,7 +431,6 @@ python_tests(
   dependencies = [
     ':missing_jvm_check',
     'src/python/pants/base:build_environment',
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
@@ -799,7 +795,6 @@ python_tests(
     'src/python/pants/java:nailgun_executor',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
   ],
 )

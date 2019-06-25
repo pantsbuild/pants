@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import subprocess
 from textwrap import dedent
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
@@ -10,7 +11,6 @@ from pants.base.exceptions import TaskError
 from pants.java.nailgun_executor import NailgunProcessGroup
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir
-from pants.util.process_handler import subprocess
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 

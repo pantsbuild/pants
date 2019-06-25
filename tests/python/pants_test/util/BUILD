@@ -27,7 +27,6 @@ python_tests(
     '3rdparty/python:future',
     '3rdparty/python:mock',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
   ]
 )
 

@@ -6,6 +6,7 @@ import io
 import itertools
 import os
 import shutil
+import subprocess
 import textwrap
 from abc import ABC, abstractmethod
 from collections import OrderedDict, defaultdict
@@ -34,7 +35,6 @@ from pants.task.task import Task
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_concurrent_creation, safe_rmtree, safe_walk
 from pants.util.memo import memoized_property
-from pants.util.process_handler import subprocess
 from pants.util.strutil import ensure_binary, ensure_text, safe_shlex_split
 
 

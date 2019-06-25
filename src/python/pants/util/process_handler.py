@@ -3,22 +3,10 @@
 
 import io
 import multiprocessing
-import os
 import sys
 from abc import ABC, abstractmethod
 
-from future.utils import PY2, PY3
-
-
-# Expose subprocess with python 3.2+ capabilities (namely timeouts) and bugfixes from this module.
-# NB: As recommended here: https://github.com/google/python-subprocess32/blob/master/README.md
-# which accounts for non-posix, ie: Windows. Although we don't support Windows yet, this sets the
-# pattern up in anticipation.
-if os.name == 'posix' and PY2:
-  import subprocess32 as subprocess3
-else:
-  import subprocess as subprocess3
-subprocess = subprocess3
+from future.utils import PY3
 
 
 class ProcessHandler(ABC):

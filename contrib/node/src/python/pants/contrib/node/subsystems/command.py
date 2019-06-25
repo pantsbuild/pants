@@ -3,9 +3,9 @@
 
 import logging
 import os
+import subprocess
 from collections import namedtuple
 
-from pants.util.process_handler import subprocess
 from pants.util.strutil import create_path_env_var
 
 

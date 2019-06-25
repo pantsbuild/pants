@@ -2,12 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
+import subprocess
 from contextlib import contextmanager
 
 from pants.base.revision import Revision
 from pants.scm.git import Git
 from pants.util.contextutil import environment_as, temporary_dir
-from pants.util.process_handler import subprocess
 
 
 MIN_REQUIRED_GIT_VERSION = Revision.semver('1.7.10')

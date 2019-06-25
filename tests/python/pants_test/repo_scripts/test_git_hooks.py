@@ -3,13 +3,13 @@
 
 import datetime
 import os
+import subprocess
 import unittest
 from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump, touch
-from pants.util.process_handler import subprocess
 from pants_test.testutils.git_util import get_repo_root, initialize_repo
 
 

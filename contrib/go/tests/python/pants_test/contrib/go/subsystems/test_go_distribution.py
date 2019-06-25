@@ -2,10 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import subprocess
 import unittest
 
 from pants.util.contextutil import environment_as
-from pants.util.process_handler import subprocess
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 from pants.contrib.go.subsystems.go_distribution import GoDistribution

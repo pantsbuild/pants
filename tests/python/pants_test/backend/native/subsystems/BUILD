@@ -6,7 +6,6 @@ python_tests(
     'src/python/pants/backend/native/subsystems/binaries',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:osutil',
-    'src/python/pants/util:process_handler',
     'src/python/pants/util:strutil',
     'tests/python/pants_test:test_base',
     'tests/python/pants_test/backend/native/util',

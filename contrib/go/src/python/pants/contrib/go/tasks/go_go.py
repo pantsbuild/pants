@@ -2,12 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import subprocess
 from abc import abstractmethod
 
 from colors import green, red, yellow
 from pants.base.exceptions import TaskError
 from pants.task.task import QuietTaskMixin
-from pants.util.process_handler import subprocess
 from twitter.common.collections import OrderedSet
 
 from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask

@@ -4,6 +4,7 @@
 import errno
 import logging
 import os
+import subprocess
 import sys
 from contextlib import contextmanager
 
@@ -14,7 +15,6 @@ from pants.pantsd.process_manager import (ProcessGroup, ProcessManager, ProcessM
                                           swallow_psutil_exceptions)
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump
-from pants.util.process_handler import subprocess
 from pants_test.test_base import TestBase
 
 

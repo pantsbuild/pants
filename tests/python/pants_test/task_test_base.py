@@ -3,6 +3,7 @@
 
 import glob
 import os
+import subprocess
 from abc import abstractmethod
 from contextlib import closing, contextmanager
 from io import BytesIO
@@ -17,7 +18,6 @@ from pants.util.contextutil import temporary_dir
 from pants.util.memo import memoized_method
 from pants.util.meta import classproperty
 from pants.util.objects import SubclassesOf, TypedCollection, datatype
-from pants.util.process_handler import subprocess
 from pants_test.test_base import TestBase
 
 

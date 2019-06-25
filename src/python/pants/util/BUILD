@@ -36,7 +36,6 @@ python_library(
   sources = ['desktop.py'],
   dependencies = [
     ':osutil',
-    ':process_handler',
   ],
 )
 
@@ -121,7 +120,6 @@ python_library(
   sources = ['process_handler.py'],
   dependencies= [
     '3rdparty/python:future',
-    '3rdparty/python:subprocess32',
   ]
 )
 

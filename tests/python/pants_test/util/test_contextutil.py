@@ -5,6 +5,7 @@ import os
 import pstats
 import shutil
 import signal
+import subprocess
 import sys
 import unittest
 import uuid
@@ -17,7 +18,6 @@ from future.utils import PY3
 from pants.util.contextutil import (InvalidZipPath, Timer, environment_as, exception_logging,
                                     hermetic_environment_as, maybe_profiled, open_zip, pushd,
                                     signal_handler_as, stdio_as, temporary_dir, temporary_file)
-from pants.util.process_handler import subprocess
 
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)

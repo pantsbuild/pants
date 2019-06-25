@@ -2,11 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import subprocess
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_tool import NativeTool
-from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)

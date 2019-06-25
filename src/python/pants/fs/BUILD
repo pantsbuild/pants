@@ -5,7 +5,6 @@ python_library(
   dependencies = [
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:process_handler',
     'src/python/pants/util:strutil',
   ]
 )
