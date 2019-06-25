@@ -2,8 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-
-import mock
+import unittest.mock
 
 from pants.base.specs import SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address, BuildFileAddress
@@ -82,7 +81,7 @@ class LegacyAddressMapperTest(TestBase):
     self.assertEqual(build_files, set())
 
   def test_is_declaring_file(self):
-    scheduler = mock.Mock()
+    scheduler = unittest.mock.Mock()
     mapper = LegacyAddressMapper(scheduler, '')
     self.assertTrue(mapper.is_declaring_file(Address('path', 'name'), 'path/BUILD'))
     self.assertTrue(mapper.is_declaring_file(Address('path', 'name'), 'path/BUILD.suffix'))

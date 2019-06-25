@@ -5,8 +5,8 @@ import os
 from collections import OrderedDict
 from contextlib import contextmanager
 from textwrap import dedent
+from unittest.mock import Mock
 
-from mock import Mock
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 

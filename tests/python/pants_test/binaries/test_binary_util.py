@@ -4,8 +4,8 @@
 import glob
 import logging
 import os
+import unittest.mock
 
-import mock
 from future.utils import PY2
 
 from pants.binaries.binary_util import (BinaryRequest, BinaryToolFetcher, BinaryToolUrlGenerator,
@@ -95,7 +95,7 @@ class BinaryUtilTest(TestBase):
       return result_file.read()
 
   def test_timeout(self):
-    fetcher = mock.create_autospec(Fetcher, spec_set=True)
+    fetcher = unittest.mock.create_autospec(Fetcher, spec_set=True)
     timeout_value = 42
     binary_util = self._gen_binary_util(baseurls=['http://binaries.example.com'],
                                         timeout_secs=timeout_value,
@@ -105,8 +105,8 @@ class BinaryUtilTest(TestBase):
     fetch_path = binary_util.select_script(supportdir='a-binary', version='v1.2', name='a-binary')
     logger.debug("fetch_path: {}".format(fetch_path))
     fetcher.download.assert_called_once_with('http://binaries.example.com/a-binary/v1.2/a-binary',
-                                             listener=mock.ANY,
-                                             path_or_fd=mock.ANY,
+                                             listener=unittest.mock.ANY,
+                                             path_or_fd=unittest.mock.ANY,
                                              timeout_secs=timeout_value)
 
   def test_no_base_urls_error(self):

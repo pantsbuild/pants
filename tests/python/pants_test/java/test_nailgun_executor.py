@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import unittest.mock
 from contextlib import contextmanager
 
-import mock
 import psutil
 
 from pants.java.nailgun_executor import NailgunExecutor
@@ -15,7 +15,7 @@ PATCH_OPTS = dict(autospec=True, spec_set=True)
 
 
 def fake_process(**kwargs):
-  proc = mock.create_autospec(psutil.Process, spec_set=True)
+  proc = unittest.mock.create_autospec(psutil.Process, spec_set=True)
   [setattr(getattr(proc, k), 'return_value', v) for k, v in kwargs.items()]
   return proc
 
@@ -50,11 +50,11 @@ class NailgunExecutorTest(TestBase):
     self.executor = NailgunExecutor(identity='test',
                                     workdir='/__non_existent_dir',
                                     nailgun_classpath=[],
-                                    distribution=mock.Mock(),
+                                    distribution=unittest.mock.Mock(),
                                     metadata_base_dir=self.subprocess_dir)
 
   def test_is_alive_override(self):
-    with mock.patch.object(NailgunExecutor, '_as_process', **PATCH_OPTS) as mock_as_process:
+    with unittest.mock.patch.object(NailgunExecutor, '_as_process', **PATCH_OPTS) as mock_as_process:
       mock_as_process.return_value = fake_process(
         name='java',
         pid=3,
@@ -65,7 +65,7 @@ class NailgunExecutorTest(TestBase):
       mock_as_process.assert_called_with(self.executor)
 
   def test_is_alive_override_not_my_process(self):
-    with mock.patch.object(NailgunExecutor, '_as_process', **PATCH_OPTS) as mock_as_process:
+    with unittest.mock.patch.object(NailgunExecutor, '_as_process', **PATCH_OPTS) as mock_as_process:
       mock_as_process.return_value = fake_process(
         name='java',
         pid=3,
@@ -77,8 +77,8 @@ class NailgunExecutorTest(TestBase):
 
   def test_connect_timeout(self):
     with rw_pipes() as (stdout_read, _),\
-         mock.patch('pants.java.nailgun_executor.safe_open') as mock_open,\
-         mock.patch('pants.java.nailgun_executor.read_file') as mock_read_file:
+         unittest.mock.patch('pants.java.nailgun_executor.safe_open') as mock_open,\
+         unittest.mock.patch('pants.java.nailgun_executor.read_file') as mock_read_file:
       mock_open.return_value = stdout_read
       mock_read_file.return_value = 'err'
       # The stdout write pipe has no input and hasn't been closed, so the select.select() should

@@ -5,9 +5,9 @@ import errno
 import logging
 import os
 import sys
+import unittest.mock
 from contextlib import contextmanager
 
-import mock
 import psutil
 
 from pants.pantsd.process_manager import (ProcessGroup, ProcessManager, ProcessMetadataManager,
@@ -22,7 +22,7 @@ PATCH_OPTS = dict(autospec=True, spec_set=True)
 
 
 def fake_process(**kwargs):
-  proc = mock.create_autospec(psutil.Process, spec_set=True)
+  proc = unittest.mock.create_autospec(psutil.Process, spec_set=True)
   [setattr(getattr(proc, k), 'return_value', v) for k, v in kwargs.items()]
   return proc
 
@@ -37,14 +37,14 @@ class TestProcessGroup(TestBase):
       raise psutil.NoSuchProcess('test')
 
   def test_iter_processes(self):
-    with mock.patch('psutil.process_iter', **PATCH_OPTS) as mock_process_iter:
+    with unittest.mock.patch('psutil.process_iter', **PATCH_OPTS) as mock_process_iter:
       mock_process_iter.return_value = [5, 4, 3, 2, 1]
       items = [item for item in self.pg.iter_processes()]
       self.assertEqual(items, [5, 4, 3, 2, 1])
 
   def test_iter_processes_filter_raises_psutil_exception(self):
     """If the filter triggers a psutil exception, skip the proc and continue."""
-    with mock.patch('psutil.process_iter', **PATCH_OPTS) as mock_process_iter:
+    with unittest.mock.patch('psutil.process_iter', **PATCH_OPTS) as mock_process_iter:
       def noop():
         return True
       def raises():
@@ -66,7 +66,7 @@ class TestProcessGroup(TestBase):
         raise o
       else:
         return o
-    with mock.patch('psutil.process_iter', **PATCH_OPTS) as mock_process_iter:
+    with unittest.mock.patch('psutil.process_iter', **PATCH_OPTS) as mock_process_iter:
       mock_process_iter.return_value= (id_or_raise(i)
                                        for i in ['first',
                                                  psutil.NoSuchProcess('The Exception'),
@@ -76,13 +76,13 @@ class TestProcessGroup(TestBase):
       self.assertEqual(['first'], items)
 
   def test_iter_processes_filtered(self):
-    with mock.patch('psutil.process_iter', **PATCH_OPTS) as mock_process_iter:
+    with unittest.mock.patch('psutil.process_iter', **PATCH_OPTS) as mock_process_iter:
       mock_process_iter.return_value = [5, 4, 3, 2, 1]
       items = [item for item in self.pg.iter_processes(lambda x: x != 3)]
       self.assertEqual(items, [5, 4, 2, 1])
 
   def test_iter_instances(self):
-    with mock.patch('psutil.process_iter', **PATCH_OPTS) as mock_process_iter:
+    with unittest.mock.patch('psutil.process_iter', **PATCH_OPTS) as mock_process_iter:
       mock_process_iter.return_value = [
         fake_process(name='a_test', pid=3, status=psutil.STATUS_IDLE),
         fake_process(name='b_test', pid=4, status=psutil.STATUS_IDLE)
@@ -118,14 +118,14 @@ class TestProcessMetadataManager(TestBase):
                      os.path.join(self.BUILDROOT, self.NAME))
 
   def test_maybe_init_metadata_dir_by_name(self):
-    with mock.patch('pants.pantsd.process_manager.safe_mkdir', **PATCH_OPTS) as mock_mkdir:
+    with unittest.mock.patch('pants.pantsd.process_manager.safe_mkdir', **PATCH_OPTS) as mock_mkdir:
       self.pmm._maybe_init_metadata_dir_by_name(self.NAME)
       mock_mkdir.assert_called_once_with(
         self.pmm._get_metadata_dir_by_name(self.NAME, self.subprocess_dir))
 
   def test_readwrite_metadata_by_name(self):
     with temporary_dir() as tmpdir, \
-         mock.patch('pants.pantsd.process_manager.get_buildroot', return_value=tmpdir):
+         unittest.mock.patch('pants.pantsd.process_manager.get_buildroot', return_value=tmpdir):
       self.pmm.write_metadata_by_name(self.NAME, self.TEST_KEY, self.TEST_VALUE)
       self.assertEqual(
         self.pmm.read_metadata_by_name(self.NAME, self.TEST_KEY),
@@ -156,7 +156,7 @@ class TestProcessMetadataManager(TestBase):
 
   def test_await_metadata_by_name(self):
     with temporary_dir() as tmpdir, \
-         mock.patch('pants.pantsd.process_manager.get_buildroot', return_value=tmpdir):
+         unittest.mock.patch('pants.pantsd.process_manager.get_buildroot', return_value=tmpdir):
       self.pmm.write_metadata_by_name(self.NAME, self.TEST_KEY, self.TEST_VALUE)
 
       self.assertEqual(
@@ -165,12 +165,12 @@ class TestProcessMetadataManager(TestBase):
       )
 
   def test_purge_metadata(self):
-    with mock.patch('pants.pantsd.process_manager.rm_rf') as mock_rm:
+    with unittest.mock.patch('pants.pantsd.process_manager.rm_rf') as mock_rm:
       self.pmm.purge_metadata_by_name(self.NAME)
     self.assertGreater(mock_rm.call_count, 0)
 
   def test_purge_metadata_error(self):
-    with mock.patch('pants.pantsd.process_manager.rm_rf') as mock_rm:
+    with unittest.mock.patch('pants.pantsd.process_manager.rm_rf') as mock_rm:
       mock_rm.side_effect = OSError(errno.EACCES, os.strerror(errno.EACCES))
       with self.assertRaises(ProcessMetadataManager.MetadataError):
         self.pmm.purge_metadata_by_name(self.NAME)
@@ -189,7 +189,7 @@ class TestProcessManager(TestBase):
     self.pm = ProcessManager('test', metadata_base_dir=self.subprocess_dir)
 
   def test_process_properties(self):
-    with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
+    with unittest.mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
       mock_as_process.return_value = fake_process(name='name',
                                                   cmdline=['cmd', 'line'],
                                                   status='status')
@@ -197,12 +197,12 @@ class TestProcessManager(TestBase):
       self.assertEqual(self.pm.cmd, 'cmd')
 
   def test_process_properties_cmd_indexing(self):
-    with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
+    with unittest.mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
       mock_as_process.return_value = fake_process(cmdline='')
       self.assertEqual(self.pm.cmd, None)
 
   def test_process_properties_none(self):
-    with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_asproc:
+    with unittest.mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_asproc:
       mock_asproc.return_value = None
       self.assertEqual(self.pm.cmdline, None)
       self.assertEqual(self.pm.cmd, None)
@@ -236,40 +236,40 @@ class TestProcessManager(TestBase):
       self.pm.get_subprocess_output(['false'])
 
   def test_await_pid(self):
-    with mock.patch.object(ProcessManager, 'await_metadata_by_name') as mock_await:
+    with unittest.mock.patch.object(ProcessManager, 'await_metadata_by_name') as mock_await:
       self.pm.await_pid(5)
-    mock_await.assert_called_once_with(self.pm.name, 'pid', 5, mock.ANY)
+    mock_await.assert_called_once_with(self.pm.name, 'pid', 5, unittest.mock.ANY)
 
   def test_await_socket(self):
-    with mock.patch.object(ProcessManager, 'await_metadata_by_name') as mock_await:
+    with unittest.mock.patch.object(ProcessManager, 'await_metadata_by_name') as mock_await:
       self.pm.await_socket(5)
-    mock_await.assert_called_once_with(self.pm.name, 'socket', 5, mock.ANY)
+    mock_await.assert_called_once_with(self.pm.name, 'socket', 5, unittest.mock.ANY)
 
   def test_write_pid(self):
-    with mock.patch.object(ProcessManager, 'write_metadata_by_name') as mock_write:
+    with unittest.mock.patch.object(ProcessManager, 'write_metadata_by_name') as mock_write:
       self.pm.write_pid(31337)
     mock_write.assert_called_once_with(self.pm.name, 'pid', '31337')
 
   def test_write_socket(self):
-    with mock.patch.object(ProcessManager, 'write_metadata_by_name') as mock_write:
+    with unittest.mock.patch.object(ProcessManager, 'write_metadata_by_name') as mock_write:
       self.pm.write_socket('/path/to/unix/socket')
     mock_write.assert_called_once_with(self.pm.name, 'socket', '/path/to/unix/socket')
 
   def test_write_named_socket(self):
-    with mock.patch.object(ProcessManager, 'write_metadata_by_name') as mock_write:
+    with unittest.mock.patch.object(ProcessManager, 'write_metadata_by_name') as mock_write:
       self.pm.write_named_socket('pailgun', '31337')
     mock_write.assert_called_once_with(self.pm.name, 'socket_pailgun', '31337')
 
   def test_as_process(self):
     sentinel = 3333
-    with mock.patch('psutil.Process', **PATCH_OPTS) as mock_proc:
+    with unittest.mock.patch('psutil.Process', **PATCH_OPTS) as mock_proc:
       mock_proc.return_value = sentinel
       self.pm._pid = sentinel
       self.assertEqual(self.pm._as_process(), sentinel)
 
   def test_as_process_no_pid(self):
     fake_pid = 3
-    with mock.patch('psutil.Process', **PATCH_OPTS) as mock_proc:
+    with unittest.mock.patch('psutil.Process', **PATCH_OPTS) as mock_proc:
       mock_proc.side_effect = psutil.NoSuchProcess(fake_pid)
       self.pm._pid = fake_pid
       with self.assertRaises(psutil.NoSuchProcess):
@@ -279,31 +279,31 @@ class TestProcessManager(TestBase):
     self.assertEqual(self.pm._as_process(), None)
 
   def test_is_alive_neg(self):
-    with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
+    with unittest.mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
       mock_as_process.return_value = None
       self.assertFalse(self.pm.is_alive())
       mock_as_process.assert_called_once_with(self.pm)
 
   def test_is_alive(self):
-    with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
+    with unittest.mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
       mock_as_process.return_value = fake_process(name='test', pid=3, status=psutil.STATUS_IDLE)
       self.assertTrue(self.pm.is_alive())
       mock_as_process.assert_called_with(self.pm)
 
   def test_is_alive_zombie(self):
-    with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
+    with unittest.mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
       mock_as_process.return_value = fake_process(name='test', pid=3, status=psutil.STATUS_ZOMBIE)
       self.assertFalse(self.pm.is_alive())
       mock_as_process.assert_called_with(self.pm)
 
   def test_is_alive_zombie_exception(self):
-    with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
+    with unittest.mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
       mock_as_process.side_effect = psutil.NoSuchProcess(0)
       self.assertFalse(self.pm.is_alive())
       mock_as_process.assert_called_with(self.pm)
 
   def test_is_alive_stale_pid(self):
-    with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
+    with unittest.mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
       mock_as_process.return_value = fake_process(name='not_test', pid=3, status=psutil.STATUS_IDLE)
       self.pm._process_name = 'test'
       self.assertFalse(self.pm.is_alive())
@@ -313,38 +313,38 @@ class TestProcessManager(TestBase):
     def extra_check(process):
       return False
 
-    with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
+    with unittest.mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
       mock_as_process.return_value = fake_process(name='test', pid=3, status=psutil.STATUS_IDLE)
       self.assertFalse(self.pm.is_alive(extra_check))
       mock_as_process.assert_called_with(self.pm)
 
   def test_purge_metadata_aborts(self):
-    with mock.patch.object(ProcessManager, 'is_alive', return_value=True):
+    with unittest.mock.patch.object(ProcessManager, 'is_alive', return_value=True):
       with self.assertRaises(ProcessManager.MetadataError):
         self.pm.purge_metadata()
 
   def test_purge_metadata_alive_but_forced(self):
-    with mock.patch.object(ProcessManager, 'is_alive', return_value=True), \
-         mock.patch('pants.pantsd.process_manager.rm_rf') as mock_rm_rf:
+    with unittest.mock.patch.object(ProcessManager, 'is_alive', return_value=True), \
+         unittest.mock.patch('pants.pantsd.process_manager.rm_rf') as mock_rm_rf:
       self.pm.purge_metadata(force=True)
       self.assertGreater(mock_rm_rf.call_count, 0)
 
   def test_kill(self):
-    with mock.patch('os.kill', **PATCH_OPTS) as mock_kill:
+    with unittest.mock.patch('os.kill', **PATCH_OPTS) as mock_kill:
       self.pm._pid = 42
       self.pm._kill(0)
       mock_kill.assert_called_once_with(42, 0)
 
   def test_kill_no_pid(self):
-    with mock.patch('os.kill', **PATCH_OPTS) as mock_kill:
+    with unittest.mock.patch('os.kill', **PATCH_OPTS) as mock_kill:
       self.pm._kill(0)
       self.assertFalse(mock_kill.called, 'If we have no pid, kills should noop gracefully.')
 
   @contextmanager
   def setup_terminate(self):
-    with mock.patch.object(ProcessManager, '_kill', **PATCH_OPTS) as mock_kill, \
-         mock.patch.object(ProcessManager, 'is_alive', **PATCH_OPTS) as mock_alive, \
-         mock.patch.object(ProcessManager, 'purge_metadata', **PATCH_OPTS) as mock_purge:
+    with unittest.mock.patch.object(ProcessManager, '_kill', **PATCH_OPTS) as mock_kill, \
+         unittest.mock.patch.object(ProcessManager, 'is_alive', **PATCH_OPTS) as mock_alive, \
+         unittest.mock.patch.object(ProcessManager, 'purge_metadata', **PATCH_OPTS) as mock_purge:
       yield mock_kill, mock_alive, mock_purge
       self.assertGreater(mock_alive.call_count, 0)
 
@@ -381,15 +381,15 @@ class TestProcessManager(TestBase):
 
   @contextmanager
   def mock_daemonize_context(self, chk_pre=True, chk_post_child=False, chk_post_parent=False):
-    with mock.patch.object(ProcessManager, 'post_fork_parent', **PATCH_OPTS) as mock_post_parent, \
-         mock.patch.object(ProcessManager, 'post_fork_child', **PATCH_OPTS) as mock_post_child, \
-         mock.patch.object(ProcessManager, 'pre_fork', **PATCH_OPTS) as mock_pre, \
-         mock.patch.object(ProcessManager, 'purge_metadata', **PATCH_OPTS) as mock_purge, \
-         mock.patch('os._exit', **PATCH_OPTS), \
-         mock.patch('os.chdir', **PATCH_OPTS), \
-         mock.patch('os.setsid', **PATCH_OPTS), \
-         mock.patch('os.waitpid', **PATCH_OPTS), \
-         mock.patch('os.fork', **PATCH_OPTS) as mock_fork:
+    with unittest.mock.patch.object(ProcessManager, 'post_fork_parent', **PATCH_OPTS) as mock_post_parent, \
+         unittest.mock.patch.object(ProcessManager, 'post_fork_child', **PATCH_OPTS) as mock_post_child, \
+         unittest.mock.patch.object(ProcessManager, 'pre_fork', **PATCH_OPTS) as mock_pre, \
+         unittest.mock.patch.object(ProcessManager, 'purge_metadata', **PATCH_OPTS) as mock_purge, \
+         unittest.mock.patch('os._exit', **PATCH_OPTS), \
+         unittest.mock.patch('os.chdir', **PATCH_OPTS), \
+         unittest.mock.patch('os.setsid', **PATCH_OPTS), \
+         unittest.mock.patch('os.waitpid', **PATCH_OPTS), \
+         unittest.mock.patch('os.fork', **PATCH_OPTS) as mock_fork:
       yield mock_fork
 
       mock_purge.assert_called_once_with(self.pm)

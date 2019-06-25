@@ -3,8 +3,8 @@
 
 import unittest
 from textwrap import dedent
+from unittest.mock import Mock
 
-from mock import Mock
 from pex.orderedset import OrderedSet
 
 from pants.build_graph.address import Address, BuildFileAddress

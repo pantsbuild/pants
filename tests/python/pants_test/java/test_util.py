@@ -4,8 +4,7 @@
 import os
 import unittest
 from contextlib import contextmanager
-
-from mock import Mock, patch
+from unittest.mock import Mock, patch
 
 from pants.java.executor import Executor
 from pants.java.jar.manifest import Manifest

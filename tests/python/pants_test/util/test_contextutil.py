@@ -7,11 +7,11 @@ import shutil
 import signal
 import sys
 import unittest
+import unittest.mock
 import uuid
 import zipfile
 from contextlib import contextmanager
 
-import mock
 from future.utils import PY3
 
 from pants.util.contextutil import (InvalidZipPath, Timer, environment_as, exception_logging,
@@ -290,7 +290,7 @@ class ContextutilTest(unittest.TestCase):
   def test_signal_handler_as(self):
     mock_initial_handler = 1
     mock_new_handler = 2
-    with mock.patch('signal.signal', **PATCH_OPTS) as mock_signal:
+    with unittest.mock.patch('signal.signal', **PATCH_OPTS) as mock_signal:
       mock_signal.return_value = mock_initial_handler
       try:
         with signal_handler_as(signal.SIGUSR2, mock_new_handler):
@@ -299,8 +299,8 @@ class ContextutilTest(unittest.TestCase):
         pass
     self.assertEqual(mock_signal.call_count, 2)
     mock_signal.assert_has_calls([
-      mock.call(signal.SIGUSR2, mock_new_handler),
-      mock.call(signal.SIGUSR2, mock_initial_handler)
+      unittest.mock.call(signal.SIGUSR2, mock_new_handler),
+      unittest.mock.call(signal.SIGUSR2, mock_initial_handler)
     ])
 
   def test_permissions(self):
@@ -311,7 +311,7 @@ class ContextutilTest(unittest.TestCase):
       self.assertEqual(0o644, os.stat(path)[0] & 0o777)
 
   def test_exception_logging(self):
-    fake_logger = mock.Mock()
+    fake_logger = unittest.mock.Mock()
 
     with self.assertRaises(AssertionError):
       with exception_logging(fake_logger, 'error!'):

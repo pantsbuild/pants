@@ -2,8 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import unittest
-
-import mock
+import unittest.mock
 
 from pants.task.scm_publish_mixin import Namedver, ScmPublishMixin
 
@@ -13,8 +12,8 @@ class ScmPublishMixinTest(unittest.TestCase):
     def __init__(self, restrict_push_branches=None, restrict_push_urls=None, scm_available=True):
       self._restrict_push_branches = restrict_push_branches
       self._restrict_push_urls = restrict_push_urls
-      self._scm = mock.Mock() if scm_available else None
-      self._log = mock.MagicMock()
+      self._scm = unittest.mock.Mock() if scm_available else None
+      self._log = unittest.mock.MagicMock()
 
     @property
     def restrict_push_branches(self):
@@ -48,8 +47,8 @@ class ScmPublishMixinTest(unittest.TestCase):
   def test_check_clean_master_dry_run_bad_remote(self):
     scm_publish = self.ScmPublish(restrict_push_urls=['amy'])
     # Property mocks must be installed on the type instead of on the instance, see:
-    #   http://www.voidspace.org.uk/python/mock/mock.html#mock.PropertyMock
-    type(scm_publish.scm).server_url = mock.PropertyMock(side_effect=AssertionError)
+    #   https://docs.python.org/3/library/unittest.mock.html#unittest.mock.PropertyMock
+    type(scm_publish.scm).server_url = unittest.mock.PropertyMock(side_effect=AssertionError)
     scm_publish.check_clean_master(commit=False)
 
   def test_check_clean_master_dry_run_unclean(self):

@@ -25,7 +25,6 @@ python_tests(
   coverage = ['pants.util.contextutil'],
   dependencies = [
     '3rdparty/python:future',
-    '3rdparty/python:mock',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:process_handler',
   ]
@@ -36,7 +35,6 @@ python_tests(
   sources = ['test_dirutil.py'],
   coverage = ['pants.util.dirutil'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:objects',
@@ -56,7 +54,6 @@ python_tests(
   name = 'fileutil',
   sources = ['test_fileutil.py'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:fileutil',
   ]
@@ -93,7 +90,6 @@ python_tests(
   sources = ['test_netrc.py'],
   dependencies = [
     '3rdparty/python:future',
-    '3rdparty/python:mock',
     'src/python/pants/util:netrc',
   ]
 )
@@ -131,7 +127,6 @@ python_tests(
   name = 'retry',
   sources = ['test_retry.py'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/util:retry',
   ]
 )
@@ -151,7 +146,6 @@ python_tests(
   coverage = ['pants.util.socket'],
   dependencies = [
     '3rdparty/python:future',
-    '3rdparty/python:mock',
     'src/python/pants/util:socket',
   ]
 )

@@ -2,8 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import unittest
-
-import mock
+import unittest.mock
 
 from pants.contrib.node.subsystems.package_managers import (PackageInstallationTypeOption,
                                                             PackageInstallationVersionOption,
@@ -15,7 +14,7 @@ def fake_install():
   return 'fake_install_dir'
 
 
-@mock.patch('pants.contrib.node.subsystems.package_managers.command_gen')
+@unittest.mock.patch('pants.contrib.node.subsystems.package_managers.command_gen')
 class TestYarnpkg(unittest.TestCase):
 
   def setUp(self):
@@ -101,7 +100,7 @@ class TestYarnpkg(unittest.TestCase):
       mock_command_gen.reset_mock()
 
 
-@mock.patch('pants.contrib.node.subsystems.package_managers.command_gen')
+@unittest.mock.patch('pants.contrib.node.subsystems.package_managers.command_gen')
 class TestNpm(unittest.TestCase):
 
   def setUp(self):

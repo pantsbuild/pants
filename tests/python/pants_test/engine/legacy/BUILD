@@ -5,7 +5,6 @@ python_tests(
   name = 'address_mapper',
   sources = ['test_address_mapper.py'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/base:specs',
     'src/python/pants/bin',
     'src/python/pants/build_graph',
@@ -117,7 +116,6 @@ python_tests(
   name = 'graph',
   sources = ['test_graph.py'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/bin',
     'src/python/pants/build_graph',
     'src/python/pants/engine/legacy:graph',
@@ -155,7 +153,6 @@ python_tests(
   name = 'options_parsing',
   sources = ['test_options_parsing.py'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/bin',
     'src/python/pants/build_graph',
     'src/python/pants/init',

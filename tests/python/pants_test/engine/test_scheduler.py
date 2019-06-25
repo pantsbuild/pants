@@ -3,10 +3,9 @@
 
 import re
 import sys
+import unittest.mock
 from contextlib import contextmanager
 from textwrap import dedent
-
-import mock
 
 from pants.engine.native import Native
 from pants.engine.rules import RootRule, UnionRule, rule, union
@@ -284,9 +283,9 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
     # Test that CFFI extern method errors result in an ExecutionError, even if .execution_request()
     # succeeds.
     with self.assertRaises(ExecutionError) as cm:
-      with mock.patch.object(SchedulerSession, 'execution_request',
+      with unittest.mock.patch.object(SchedulerSession, 'execution_request',
                              **PATCH_OPTS) as mock_exe_request:
-        with mock.patch.object(Native, 'cffi_extern_method_runtime_exceptions',
+        with unittest.mock.patch.object(Native, 'cffi_extern_method_runtime_exceptions',
                                **PATCH_OPTS) as mock_cffi_exceptions:
           mock_exe_request.return_value = None
           mock_cffi_exceptions.return_value = [create_cffi_exception()]
@@ -300,7 +299,7 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
     # are no CFFI extern methods.
     class TestError(Exception): pass
     with self.assertRaisesWithMessage(TestError, 'non-CFFI error'):
-      with mock.patch.object(SchedulerSession, 'execution_request',
+      with unittest.mock.patch.object(SchedulerSession, 'execution_request',
                              **PATCH_OPTS) as mock_exe_request:
         mock_exe_request.side_effect = TestError('non-CFFI error')
         self.scheduler.product_request(C, [Params(CollectionType([1, 2, 3]))])

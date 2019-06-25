@@ -6,12 +6,12 @@ import http.server
 import os
 import socketserver
 import unittest
+import unittest.mock
 from contextlib import closing, contextmanager
 from functools import reduce
 from io import BytesIO
 from threading import Thread
 
-import mock
 import requests
 
 from pants.net.http.fetcher import Fetcher
@@ -21,21 +21,21 @@ from pants.util.dirutil import safe_open, touch
 
 class FetcherTest(unittest.TestCase):
   def setUp(self):
-    self.requests = mock.Mock(spec=requests.Session)
-    self.response = mock.Mock(spec=requests.Response)
+    self.requests = unittest.mock.Mock(spec=requests.Session)
+    self.response = unittest.mock.Mock(spec=requests.Response)
     self.fetcher = Fetcher('/unused/root/dir', requests_api=self.requests)
-    self.listener = mock.create_autospec(Fetcher.Listener, spec_set=True)
+    self.listener = unittest.mock.create_autospec(Fetcher.Listener, spec_set=True)
 
   def status_call(self, status_code, content_length=None):
-    return mock.call.status(status_code, content_length=content_length)
+    return unittest.mock.call.status(status_code, content_length=content_length)
 
   def ok_call(self, chunks):
     return self.status_call(200, content_length=sum(len(c) for c in chunks))
 
   def assert_listener_calls(self, expected_listener_calls, chunks, expect_finished=True):
-    expected_listener_calls.extend(mock.call.recv_chunk(chunk) for chunk in chunks)
+    expected_listener_calls.extend(unittest.mock.call.recv_chunk(chunk) for chunk in chunks)
     if expect_finished:
-      expected_listener_calls.append(mock.call.finished())
+      expected_listener_calls.append(unittest.mock.call.finished())
     self.assertEqual(expected_listener_calls, self.listener.method_calls)
 
   def assert_local_file_fetch(self, url_prefix=''):
@@ -120,7 +120,7 @@ class FetcherTest(unittest.TestCase):
       self.response.close.expect_called_once_with()
 
   def test_checksum_listener(self):
-    digest = mock.Mock(spec=hashlib.md5())
+    digest = unittest.mock.Mock(spec=hashlib.md5())
     digest.hexdigest.return_value = '42'
     checksum_listener = Fetcher.ChecksumListener(digest=digest)
 
@@ -137,8 +137,8 @@ class FetcherTest(unittest.TestCase):
 
     def expected_digest_calls():
       for chunk in chunks:
-        yield mock.call.update(chunk)
-      yield mock.call.hexdigest()
+        yield unittest.mock.call.update(chunk)
+      yield unittest.mock.call.hexdigest()
 
     self.assertEqual(list(expected_digest_calls()), digest.method_calls)
 
@@ -283,7 +283,7 @@ class FetcherTest(unittest.TestCase):
       with open(path, 'rb') as fp:
         self.assertEqual(downloaded, fp.read())
 
-  @mock.patch('time.time')
+  @unittest.mock.patch('time.time')
   def test_progress_listener(self, timer):
     timer.side_effect = [0, 1.137]
 
