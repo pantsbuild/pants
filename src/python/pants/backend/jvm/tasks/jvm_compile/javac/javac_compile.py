@@ -172,7 +172,9 @@ class JavacCompile(JvmCompile):
           if return_code:
             raise TaskError('javac exited with return code {rc}'.format(rc=return_code))
         self.context._scheduler.materialize_directories((
-          DirectoryToMaterialize(text_type(ctx.classes_dir.path), self.extra_post_compile_resources_digest(ctx)),
+          DirectoryToMaterialize(
+            text_type(ctx.classes_dir.path),
+            self.extra_post_compile_resources_digest(ctx, prepend_post_merge_relative_path=False)),
         ))
 
     self._create_context_jar(ctx)

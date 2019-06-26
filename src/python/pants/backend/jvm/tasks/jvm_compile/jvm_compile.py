@@ -279,7 +279,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
     return result
 
-  def extra_post_compile_resources_digest(self, compile_context):
+  def extra_post_compile_resources_digest(self, compile_context, prepend_post_merge_relative_path=True):
     """Compute a Digest for the post_compile_extra_resources for the given context."""
     # TODO: Switch to using #7739 once it is available.
     extra_resources = self.post_compile_extra_resources(compile_context)
@@ -287,19 +287,26 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       return EMPTY_DIRECTORY_DIGEST
 
     with temporary_dir() as tmpdir:
-      rel_post_compile_merge_dir = fast_relpath(compile_context.post_compile_merge_dir, get_buildroot())
-      root_dir = os.path.join(tmpdir, rel_post_compile_merge_dir)
-      safe_mkdir(root_dir)
+      if prepend_post_merge_relative_path:
+        rel_post_compile_merge_dir = fast_relpath(compile_context.post_compile_merge_dir, get_buildroot())
+        root_dir = os.path.join(tmpdir, rel_post_compile_merge_dir)
+        for filename, filecontent in extra_resources.items():
+          safe_file_dump(os.path.join(root_dir, filename), filecontent)
 
-      for filename, filecontent in extra_resources.items():
-        safe_file_dump(os.path.join(root_dir, filename), filecontent)
+        extra_resources_relative_to_rootdir = {os.path.join(rel_post_compile_merge_dir, k): v for k, v in
+                                               extra_resources.items()}
+        snapshot, = self.context._scheduler.capture_snapshots([
+          PathGlobsAndRoot(PathGlobs(extra_resources_relative_to_rootdir), tmpdir)
+        ])
+        return snapshot.directory_digest
 
-      extra_resources_relative_to_rootdir = {os.path.join(rel_post_compile_merge_dir, k): v for k, v in
-                                             extra_resources.items()}
-      snapshot, = self.context._scheduler.capture_snapshots([
-        PathGlobsAndRoot(PathGlobs(extra_resources_relative_to_rootdir), tmpdir)
-      ])
-      return snapshot.directory_digest
+      else:
+        for filename, filecontent in extra_resources.items():
+          safe_file_dump(os.path.join(tmpdir, filename), filecontent)
+        snapshot, = self.context._scheduler.capture_snapshots([
+          PathGlobsAndRoot(PathGlobs(extra_resources), tmpdir)
+        ])
+        return snapshot.directory_digest
 
   def write_argsfile(self, ctx, args):
     """Write the argsfile for this context."""
