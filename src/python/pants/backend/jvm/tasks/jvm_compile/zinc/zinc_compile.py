@@ -366,7 +366,7 @@ class BaseZincCompile(JvmCompile):
     # Populate the resources to merge post compile onto disk for the nonhermetic case,
     # where `--post-compile-merge-dir` was added is the relevant part.
     self.context._scheduler.materialize_directories((
-      DirectoryToMaterialize(get_buildroot(), self.extra_post_compile_resources_digest(ctx)),
+      DirectoryToMaterialize(get_buildroot(), self.post_compile_extra_resources_digest(ctx)),
     ))
 
     exit_code = self.runjava(classpath=self.get_zinc_compiler_classpath(),
@@ -464,7 +464,7 @@ class BaseZincCompile(JvmCompile):
       tuple(s.directory_digest for s in snapshots) +
       directory_digests +
       native_image_snapshots +
-      (self.extra_post_compile_resources_digest(ctx), argfile_snapshot.directory_digest)
+      (self.post_compile_extra_resources_digest(ctx), argfile_snapshot.directory_digest)
     )
 
     req = ExecuteProcessRequest(

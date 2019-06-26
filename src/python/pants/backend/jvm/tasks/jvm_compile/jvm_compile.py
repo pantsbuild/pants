@@ -279,7 +279,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
     return result
 
-  def extra_post_compile_resources_digest(self, compile_context, prepend_post_merge_relative_path=True):
+  def post_compile_extra_resources_digest(self, compile_context, prepend_post_merge_relative_path=True):
     """Compute a Digest for the post_compile_extra_resources for the given context."""
     # TODO: Switch to using #7739 once it is available.
     extra_resources = self.post_compile_extra_resources(compile_context)
