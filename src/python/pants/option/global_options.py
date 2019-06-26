@@ -395,6 +395,11 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
 
     # This should eventually deprecate the RunTracker worker count, which is used for legacy cache
     # lookups via CacheSetup in TaskBase.
+    register('--process-execution-parallelism', type=int, dest='local_execution_parallelism',
+             # FIXME (hrfuller) what is the correct deprecation start version?
+             deprecation_start_version='1.18.0', advanced=True,
+             help='Number of concurrent processes that may be executed locally. '
+                  'Use --local-execution-parallelism, and/or --remote-execution-parallelism instead.')
     register('--local-execution-parallelism', type=int, default=DEFAULT_EXECUTION_OPTIONS.local_execution_parallelism,
              advanced=True,
              help='Number of concurrent processes that may be executed locally.')
