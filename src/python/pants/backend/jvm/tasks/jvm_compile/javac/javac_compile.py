@@ -234,7 +234,7 @@ class JavacCompile(JvmCompile):
     # Dump the output to the .pants.d directory where it's expected by downstream tasks.
     merged_directories = self.context._scheduler.merge_directories([
         exec_result.output_directory_digest,
-        self.post_compile_extra_resources_digest(ctx),
+        self.post_compile_extra_resources_digest(ctx, prepend_post_merge_relative_path=False),
       ])
     classes_directory = ctx.classes_dir.path
     self.context._scheduler.materialize_directories((
