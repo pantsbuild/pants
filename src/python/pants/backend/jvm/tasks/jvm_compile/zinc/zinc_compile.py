@@ -91,7 +91,7 @@ class BaseZincCompile(JvmCompile):
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('BaseZincCompile', 7)]
+    return super().implementation_version() + [('BaseZincCompile', 8)]
 
   @classmethod
   def get_jvm_options_default(cls, bootstrap_option_values):
@@ -227,9 +227,9 @@ class BaseZincCompile(JvmCompile):
     if self.context.products.is_required_data('zinc_args'):
       self.context.products.safe_create_data('zinc_args', lambda: defaultdict(list))
 
-  def extra_resources(self, compile_context):
-    """Override `extra_resources` to additionally include scalac_plugin info."""
-    result = super().extra_resources(compile_context)
+  def post_compile_extra_resources(self, compile_context):
+    """Override `post_compile_extra_resources` to additionally include scalac_plugin info."""
+    result = super().post_compile_extra_resources(compile_context)
     target = compile_context.target
 
     if isinstance(target, ScalacPlugin):
@@ -288,6 +288,10 @@ class BaseZincCompile(JvmCompile):
     ])
     if not self.get_options().colors:
       zinc_args.append('-no-color')
+
+    if self.post_compile_extra_resources(ctx):
+      post_compile_merge_dir = relative_to_exec_root(ctx.post_compile_merge_dir)
+      zinc_args.extend(['--post-compile-merge-dir', post_compile_merge_dir])
 
     compiler_bridge_classpath_entry = self._zinc.compile_compiler_bridge(self.context)
     zinc_args.extend(['-compiled-bridge-jar', relative_to_exec_root(compiler_bridge_classpath_entry.path)])
@@ -359,6 +363,12 @@ class BaseZincCompile(JvmCompile):
     """An exception type specifically to signal a failed zinc execution."""
 
   def _compile_nonhermetic(self, jvm_options, ctx, classes_directory):
+    # Populate the resources to merge post compile onto disk for the nonhermetic case,
+    # where `--post-compile-merge-dir` was added is the relevant part.
+    self.context._scheduler.materialize_directories((
+      DirectoryToMaterialize(get_buildroot(), self.post_compile_extra_resources_digest(ctx)),
+    ))
+
     exit_code = self.runjava(classpath=self.get_zinc_compiler_classpath(),
                              main=Zinc.ZINC_COMPILE_MAIN,
                              jvm_options=jvm_options,
@@ -368,9 +378,6 @@ class BaseZincCompile(JvmCompile):
                              dist=self._zinc.dist)
     if exit_code != 0:
       raise self.ZincCompileError('Zinc compile failed.', exit_code=exit_code)
-    self.context._scheduler.materialize_directories((
-      DirectoryToMaterialize(text_type(classes_directory), self.extra_resources_digest(ctx)),
-    ))
 
   def _compile_hermetic(self, jvm_options, ctx, classes_dir, jar_file,
                         compiler_bridge_classpath_entry, dependency_classpath,
@@ -457,7 +464,7 @@ class BaseZincCompile(JvmCompile):
       tuple(s.directory_digest for s in snapshots) +
       directory_digests +
       native_image_snapshots +
-      (self.extra_resources_digest(ctx), argfile_snapshot.directory_digest)
+      (self.post_compile_extra_resources_digest(ctx), argfile_snapshot.directory_digest)
     )
 
     req = ExecuteProcessRequest(

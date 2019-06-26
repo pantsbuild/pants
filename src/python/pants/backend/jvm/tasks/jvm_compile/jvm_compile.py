@@ -262,7 +262,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     """Classpath entries containing scalac plugins."""
     return []
 
-  def extra_resources(self, compile_context):
+  def post_compile_extra_resources(self, compile_context):
     """Produces a dictionary of any extra, out-of-band resources for a target.
 
     E.g., targets that produce scala compiler plugins or annotation processor files
@@ -279,19 +279,33 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
     return result
 
-  def extra_resources_digest(self, compile_context):
-    """Compute a Digest for the extra_resources for the given context."""
+  def post_compile_extra_resources_digest(self, compile_context,
+                                          prepend_post_merge_relative_path=True):
+    """Compute a Digest for the post_compile_extra_resources for the given context."""
     # TODO: Switch to using #7739 once it is available.
-    extra_resources = self.extra_resources(compile_context)
+    extra_resources = self.post_compile_extra_resources(compile_context)
     if not extra_resources:
       return EMPTY_DIRECTORY_DIGEST
-    with temporary_dir() as tmpdir:
-      for filename, filecontent in extra_resources.items():
-        safe_file_dump(os.path.join(tmpdir, filename), filecontent)
-      snapshot, = self.context._scheduler.capture_snapshots([
-          PathGlobsAndRoot(PathGlobs(extra_resources), tmpdir)
+
+    def _snapshot_resources(resources, prefix='.'):
+      with temporary_dir() as root_dir:
+        for filename, filecontent in resources.items():
+          safe_file_dump(os.path.join(os.path.join(root_dir, prefix), filename), filecontent)
+
+        extra_resources_relative_to_rootdir = {os.path.join(prefix, k): v for k, v in
+                                               resources.items()}
+        snapshot, = self.context._scheduler.capture_snapshots([
+          PathGlobsAndRoot(PathGlobs(extra_resources_relative_to_rootdir), root_dir)
         ])
+
       return snapshot.directory_digest
+
+    if prepend_post_merge_relative_path:
+      rel_post_compile_merge_dir = fast_relpath(compile_context.post_compile_merge_dir,
+                                                get_buildroot())
+      return _snapshot_resources(extra_resources, prefix=rel_post_compile_merge_dir)
+    else:
+      return _snapshot_resources(extra_resources)
 
   def write_argsfile(self, ctx, args):
     """Write the argsfile for this context."""
@@ -367,13 +381,15 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       self.get_options().class_not_found_error_patterns))
 
   def create_compile_context(self, target, target_workdir):
-    return CompileContext(target,
-                          os.path.join(target_workdir, 'z.analysis'),
-                          ClasspathEntry(os.path.join(target_workdir, 'classes')),
-                          ClasspathEntry(os.path.join(target_workdir, 'z.jar')),
-                          os.path.join(target_workdir, 'logs'),
-                          os.path.join(target_workdir, 'zinc_args'),
-                          self._compute_sources_for_target(target))
+    return CompileContext(target=target,
+                          analysis_file=os.path.join(target_workdir, 'z.analysis'),
+                          classes_dir=ClasspathEntry(os.path.join(target_workdir, 'classes')),
+                          jar_file=ClasspathEntry(os.path.join(target_workdir, 'z.jar')),
+                          log_dir=os.path.join(target_workdir, 'logs'),
+                          args_file=os.path.join(target_workdir, 'zinc_args'),
+                          post_compile_merge_dir=os.path.join(target_workdir,
+                                                              'post_compile_merge_dir'),
+                          sources=self._compute_sources_for_target(target))
 
   def execute(self):
     if JvmPlatform.global_instance().get_options().compiler != self.compiler_name:

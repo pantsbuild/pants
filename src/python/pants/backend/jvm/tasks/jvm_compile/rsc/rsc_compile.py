@@ -92,9 +92,10 @@ class RscCompileContext(CompileContext):
                jar_file,
                log_dir,
                args_file,
+               post_compile_merge_dir,
                sources,
                workflow):
-    super().__init__(target, analysis_file, classes_dir, jar_file, log_dir, args_file, sources)
+    super().__init__(target, analysis_file, classes_dir, jar_file, log_dir, args_file, post_compile_merge_dir, sources)
     self.workflow = workflow
     self.rsc_jar_file = rsc_jar_file
 
@@ -122,7 +123,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('RscCompile', 172)]
+    return super().implementation_version() + [('RscCompile', 173)]
 
   class JvmCompileWorkflowType(enum(['zinc-only', 'zinc-java', 'rsc-and-zinc'])):
     """Target classifications used to correctly schedule Zinc and Rsc jobs.
@@ -538,6 +539,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         args_file=os.path.join(rsc_dir, 'rsc_args'),
         rsc_jar_file=ClasspathEntry(os.path.join(rsc_dir, 'm.jar')),
         log_dir=os.path.join(rsc_dir, 'logs'),
+        post_compile_merge_dir=os.path.join(rsc_dir, 'post_compile_merge_dir'),
         sources=sources,
         workflow=self._classify_target_compile_workflow(target),
       ),
@@ -548,6 +550,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         jar_file=ClasspathEntry(os.path.join(zinc_dir, 'z.jar'), None),
         log_dir=os.path.join(zinc_dir, 'logs'),
         args_file=os.path.join(zinc_dir, 'zinc_args'),
+        post_compile_merge_dir=os.path.join(zinc_dir, 'post_compile_merge_dir'),
         sources=sources,
       ))
 
