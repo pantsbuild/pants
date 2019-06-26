@@ -22,7 +22,7 @@ use core::clone::Clone;
 use fs::{safe_create_dir_all_ioerror, PosixFS};
 use graph::{EntryId, Graph, NodeContext};
 use parking_lot::RwLock;
-use process_execution::{self, BoundedCommandRunner, CommandRunner};
+use process_execution::{self, BoundedCommandRunner};
 use rand::seq::SliceRandom;
 use reqwest;
 use rule_graph::RuleGraph;
@@ -70,7 +70,8 @@ impl Core {
     remote_store_chunk_upload_timeout: Duration,
     remote_store_rpc_retries: usize,
     remote_execution_extra_platform_properties: BTreeMap<String, String>,
-    process_execution_parallelism: usize,
+    local_execution_parallelism: usize,
+    remote_execution_parallelism: usize,
     process_execution_cleanup_local_dirs: bool,
   ) -> Core {
     // Randomize CAS address order to avoid thundering herds from common config.
@@ -126,27 +127,26 @@ impl Core {
       })
       .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
 
-    let underlying_command_runner: Box<dyn CommandRunner> = match &remote_execution_server {
-      Some(ref address) => Box::new(process_execution::remote::CommandRunner::new(
+    let command_runner = match &remote_execution_server {
+      Some(ref address) => BoundedCommandRunner::new(Box::new(process_execution::remote::CommandRunner::new(
         address,
         remote_execution_process_cache_namespace.clone(),
         remote_instance_name.clone(),
         root_ca_certs.clone(),
         oauth_bearer_token.clone(),
         remote_execution_extra_platform_properties.clone(),
+        // This param sets the grpc thread pool size. We use the local_execution_parallelism,
+        // because it is likely to be related to the processor count on this platform.
         // Allow for some overhead for bookkeeping threads (if any).
-        process_execution_parallelism + 2,
+        local_execution_parallelism + 2,
         store.clone(),
-      )),
-      None => Box::new(process_execution::local::CommandRunner::new(
+      )), remote_execution_parallelism),
+      None => BoundedCommandRunner::new(Box::new(process_execution::local::CommandRunner::new(
         store.clone(),
         work_dir.clone(),
         process_execution_cleanup_local_dirs,
-      )),
+      )), local_execution_parallelism),
     };
-
-    let command_runner =
-      BoundedCommandRunner::new(underlying_command_runner, process_execution_parallelism);
 
     let http_client = reqwest::r#async::Client::new();
     let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);
