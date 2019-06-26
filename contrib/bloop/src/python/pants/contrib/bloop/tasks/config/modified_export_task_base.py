@@ -33,7 +33,9 @@ class ModifiedExportTaskBase(ExportTask):
     super(ModifiedExportTaskBase, cls).register_options(register)
 
     register('--allow-synthetic-sources', type=bool, default=True, fingerprint=True,
-             help='???')
+             help='Whether to collect source files for synthetic targets.')
+    register('--flatten-java-sources', type=bool, default=True, fingerprint=True,
+             help='Whether to represent scala_library() targets with java_sources as one target.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -72,7 +74,7 @@ class ModifiedExportTaskBase(ExportTask):
 
     target_roots_set = set(self.context.target_roots)
 
-    def process_target(current_target):
+    def process_target(current_target, is_java_sources=False):
       """
       :type current_target:pants.build_graph.target.Target
       """
@@ -104,8 +106,12 @@ class ModifiedExportTaskBase(ExportTask):
       }
 
       if (not current_target.is_synthetic) or self.get_options().allow_synthetic_sources:
-        info['globs'] = current_target.globs_relative_to_buildroot()
-        info['sources'] = list(current_target.sources_relative_to_buildroot())
+        if self.get_options().flatten_java_sources and is_java_sources:
+          info['globs'] = []
+          info['sources'] = []
+        else:
+          info['globs'] = current_target.globs_relative_to_buildroot()
+          info['sources'] = list(current_target.sources_relative_to_buildroot())
 
       info['transitive'] = current_target.transitive
       info['scope'] = str(current_target.scope)
@@ -181,8 +187,13 @@ class ModifiedExportTaskBase(ExportTask):
 
       if isinstance(current_target, ScalaLibrary):
         for dep in current_target.java_sources:
-          info['targets'].append(dep.address.spec)
-          process_target(dep)
+          if self.get_options().flatten_java_sources:
+            info['globs'].update(dep.globs_relative_to_buildroot())
+            info['sources'].extend(dep.sources_relative_to_buildroot())
+            process_target(dep, is_java_sources=True)
+          else:
+            info['targets'].append(dep.address.spec)
+            process_target(dep, is_java_sources=True)
 
       if isinstance(current_target, JvmTarget):
         info['excludes'] = [self._exclude_id(exclude) for exclude in current_target.excludes]

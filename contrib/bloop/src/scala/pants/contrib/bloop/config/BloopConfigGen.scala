@@ -63,6 +63,7 @@ object BloopConfigGen extends App {
 
       val sources = target.sources.getOrElse(Seq())
         .map(srcRelPath => buildRootPath / RelPath(srcRelPath))
+      // val sources = target.sourceRoots.map(Path(_))
 
       val curPlatformString = target.platform
         .getOrElse(pantsExportParsed.jvmPlatforms.defaultPlatform)

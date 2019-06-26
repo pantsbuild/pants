@@ -87,7 +87,7 @@ object PantsCompileMain {
 
   // implicit lazy val scheduler: Scheduler = Scheduler.Implicits.global
   implicit lazy val scheduler: Scheduler = Scheduler(
-    Executors.newFixedThreadPool(8),
+    Executors.newFixedThreadPool(10),
     ExecutionModel.AlwaysAsyncExecution
   )
 
@@ -141,7 +141,7 @@ object PantsCompileMain {
             diagnostics.foreach { d =>
               d.severity match {
                 case Some(bsp.DiagnosticSeverity.Error) => logger.error(printDiagnostic(d))
-                case Some(bsp.DiagnosticSeverity.Warning) => logger.warn(printDiagnostic(d))
+                case Some(bsp.DiagnosticSeverity.Warning) => () // logger.warn(printDiagnostic(d))
                 case Some(bsp.DiagnosticSeverity.Information) => logger.info(printDiagnostic(d))
                 case Some(bsp.DiagnosticSeverity.Hint) => logger.debug(printDiagnostic(d))
                 case None => logger.info(printDiagnostic(d))
@@ -153,13 +153,18 @@ object PantsCompileMain {
           case _ => ()
         }.notification(endpoints.Build.taskProgress) {
           case bsp.TaskProgressParams(_, _, Some(message), Some(total), Some(progress), Some(unit), _, _) =>
-            logger.debug(s"Task progress ($progress/$total $unit): $message")
+            // logger.debug(s"Task progress ($progress/$total $unit): $message")
+            ()
           case bsp.TaskProgressParams(_, _, Some(message), _, _, _, _, _) =>
-            logger.debug(s"Task progress: $message")
+            // logger.debug(s"Task progress: $message")
+            ()
           case _ => ()
         }.notification(endpoints.Build.taskFinish) {
-          case bsp.TaskFinishParams(_, _, Some(message), status, _, _) =>
-            logger.info(s"Task finished with status [$status]: $message")
+          case bsp.TaskFinishParams(_, _, Some(message), status, _, _) => status match {
+            case bsp.StatusCode.Ok => logger.info(s"Task finished with status [$status]: $message")
+            case bsp.StatusCode.Error => logger.error(s"Task finished with status [$status]: $message")
+            case bsp.StatusCode.Cancelled => logger.warn(s"Task finished with status [$status]: $message")
+          }
           case _ => ()
         }
 
@@ -181,7 +186,7 @@ object PantsCompileMain {
         version = bloopVersion,
         bspVersion = bspVersion,
         rootUri = bsp.Uri(Environment.cwd.toUri),
-        capabilities = bsp.BuildClientCapabilities(List("scala")),
+        capabilities = bsp.BuildClientCapabilities(List("scala", "java")),
         data = None
       )).map(err(_))
         .flatMap { result =>
@@ -205,8 +210,20 @@ object PantsCompileMain {
             arguments = None
           ))
         }.map(err(_))
-        .map { compileResult =>
-          logger.info(s"compileResult: $compileResult")
+        .map {
+          case bsp.CompileResult(_, bsp.StatusCode.Ok, _, _) => {
+            logger.info("compile succeeded!")
+            ()
+          }
+          case x => {
+            throw new Exception(s"compile failed: $x")
+            ()
+          }
+        }.flatMap { Unit => endpoints.Build.shutdown.request(bsp.Shutdown()) }
+        .map(err(_))
+        .flatMap { Unit => Task.fromFuture(endpoints.Build.exit.notify(bsp.Exit())) }
+        .map(ack(_))
+        .map { Unit =>
           println("compile complete!")
           sys.exit(0)
         }
@@ -218,6 +235,7 @@ object PantsCompileMain {
       out = System.err,
       charset = StandardCharsets.UTF_8,
       shell = Shell.default,
+      // nailgunPort = Some(8212),
       nailgunPort = None,
       startedServer = startedServer,
       generateBloopInstallerURL = Installer.defaultWebsiteURL(_)

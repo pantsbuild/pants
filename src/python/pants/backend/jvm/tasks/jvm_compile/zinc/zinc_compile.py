@@ -379,7 +379,7 @@ class BaseZincCompile(JvmCompile):
     self.log_zinc_file(ctx.analysis_file)
     self.write_argsfile(ctx, zinc_args)
 
-    ctx.ensure_output_dirs_exist()
+    # ctx.ensure_output_dirs_exist()
     if not self.get_options().empty_compilation:
       return self.execution_strategy_enum.resolve_for_enum_variant({
         self.HERMETIC: lambda: self._compile_hermetic(
