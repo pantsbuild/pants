@@ -42,6 +42,12 @@ class PantsRunner:
     init_rust_logger(levelname, global_bootstrap_options.log_show_rust_3rdparty)
     setup_logging_to_stderr(logging.getLogger(None), levelname)
 
+  def _should_run_with_pantsd(self, global_bootstrap_options):
+    # If we want concurrent pants runs, we can't have pantsd enabled.
+    return global_bootstrap_options.enable_pantsd and \
+           not self.will_terminate_pantsd() and \
+           not global_bootstrap_options.concurrent
+
   def run(self):
     # Register our exiter at the beginning of the run() method so that any code in this process from
     # this point onwards will use that exiter in the case of a fatal error.
@@ -62,7 +68,7 @@ class PantsRunner:
       warnings.filterwarnings(action='ignore', message=message_regexp)
 
     # TODO https://github.com/pantsbuild/pants/issues/7205
-    if global_bootstrap_options.enable_pantsd and not self.will_terminate_pantsd():
+    if self._should_run_with_pantsd(global_bootstrap_options):
       try:
         return RemotePantsRunner(self._exiter, self._args, self._env, options_bootstrapper).run()
       except RemotePantsRunner.Fallback as e:

@@ -26,6 +26,9 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+#[macro_use]
+extern crate derivative;
+
 use boxfuture::BoxFuture;
 use bytes::Bytes;
 use std::collections::{BTreeMap, BTreeSet};
@@ -43,7 +46,8 @@ pub mod remote;
 ///
 /// A process to be executed.
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Derivative, Clone, Debug, Eq)]
+#[derivative(PartialEq, Hash)]
 pub struct ExecuteProcessRequest {
   ///
   /// The arguments to execute.
@@ -70,6 +74,7 @@ pub struct ExecuteProcessRequest {
 
   pub timeout: std::time::Duration,
 
+  #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub description: String,
 
   ///
@@ -151,5 +156,47 @@ impl CommandRunner for BoundedCommandRunner {
   fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let inner = self.inner.clone();
     self.inner.1.with_acquired(move || inner.0.run(req))
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::ExecuteProcessRequest;
+  use std::collections::hash_map::DefaultHasher;
+  use std::collections::{BTreeMap, BTreeSet};
+  use std::hash::{Hash, Hasher};
+  use std::time::Duration;
+
+  #[test]
+  fn execute_process_request_equality() {
+    let execute_process_request_generator =
+      |description: String, timeout: Duration| ExecuteProcessRequest {
+        argv: vec![],
+        env: BTreeMap::new(),
+        input_files: hashing::EMPTY_DIGEST,
+        output_files: BTreeSet::new(),
+        output_directories: BTreeSet::new(),
+        timeout,
+        description,
+        jdk_home: None,
+      };
+
+    fn hash<Hashable: Hash>(hashable: &Hashable) -> u64 {
+      let mut hasher = DefaultHasher::new();
+      hashable.hash(&mut hasher);
+      hasher.finish()
+    }
+
+    let a = execute_process_request_generator("One thing".to_string(), Duration::new(0, 0));
+    let b = execute_process_request_generator("Another".to_string(), Duration::new(0, 0));
+    let c = execute_process_request_generator("One thing".to_string(), Duration::new(5, 0));
+
+    // ExecuteProcessRequest should derive a PartialEq and Hash that ignores the description
+    assert!(a == b);
+    assert!(hash(&a) == hash(&b));
+
+    // but not other fields
+    assert!(a != c);
+    assert!(hash(&a) != hash(&c));
   }
 }
