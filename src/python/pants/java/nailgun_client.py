@@ -320,6 +320,9 @@ class NailgunClient(object):
     """Send the signal `signum` send if the PID and/or PGRP chunks have been received.
 
     No error is raised if the pid or pgrp are None or point to an already-dead process.
+
+    :param signum: The signal number to send to the remote process.
+    :param include_pgrp: If True, it will try to kill the pgrp as well
     """
     remote_pid = self._maybe_last_pid()
     if remote_pid is not None:

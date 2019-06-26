@@ -33,6 +33,7 @@ class PailgunClientSignalHandler(SignalHandler):
     super(PailgunClientSignalHandler, self).__init__(*args, **kwargs)
 
   def _forward_signal_with_timeout(self, signum, signame):
+    # TODO Consider not accessing the private function _maybe_last_pid here, or making it public.
     logger.info(
       'Sending {} to pantsd with pid {}, waiting up to {} seconds before sending SIGKILL...'
       .format(signame, self._pailgun_client._maybe_last_pid(), self._timeout))
@@ -42,7 +43,12 @@ class PailgunClientSignalHandler(SignalHandler):
     self._pailgun_client.maybe_send_signal(signum)
 
   def handle_sigint(self, signum, _frame):
-    self._forward_signal_with_timeout(signum, 'SIGINT')
+    if self._pailgun_client._maybe_last_pid():
+      self._forward_signal_with_timeout(signum, 'SIGINT')
+    else:
+      # NB: We consider not having received a PID yet as "not having started substantial work".
+      # So in this case, we let the client die gracefully, and the server handle the closed socket.
+      super(PailgunClientSignalHandler, self).handle_sigint(signum, _frame)
 
   def handle_sigquit(self, signum, _frame):
     self._forward_signal_with_timeout(signum, 'SIGQUIT')

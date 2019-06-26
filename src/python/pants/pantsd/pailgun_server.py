@@ -269,6 +269,7 @@ class PailgunServer(ThreadingMixIn, TCPServer):
       with yield_and_release(time_polled):
         yield
     else:
+      self.logger.debug("request {} didn't aquire the lock on the first try, polling...".format(request))
       # We have to wait for another request to finish being handled.
       NailgunProtocol.send_stderr(request, "Another pants invocation is running. Will wait {} for it to finish before giving up.\n".format(
         "forever" if self._should_poll_forever(timeout) else "up to {} seconds".format(timeout)
@@ -295,6 +296,9 @@ class PailgunServer(ThreadingMixIn, TCPServer):
         # Attempt to handle a request with the handler.
         handler.handle_request()
         self.request_complete_callback()
+    except BrokenPipeError as e:
+      # The client has closed the connection, most likely from a SIGINT
+      self.logger.error("Request {} abruptly closed with {}, probably because the client crashed or was sent a SIGINT.".format(request, type(e)))
     except Exception as e:
       # If that fails, (synchronously) handle the error with the error handler sans-fork.
       try:
