@@ -1,17 +1,9 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import errno
 import io
+import selectors
 import socket
-
-from future.utils import PY3
-
-
-if PY3:
-  import selectors
-else:
-  import select
 
 
 def teardown_socket(s):
@@ -24,38 +16,16 @@ def teardown_socket(s):
     s.close()
 
 
-# TODO(6071): Remove this once we drop Python 2, because 1) we no longer want to use select.select()
-# in favor of https://docs.python.org/3/library/selectors.html, which uses more efficient and robust
-# algorithms at a better level of abstraction, and because 2) PEP 474 fixed the issue with SIGINT
-# https://www.python.org/dev/peps/pep-0475/.
-def safe_select(*args, **kwargs):
-  # N.B. This while loop is purely to facilitate SA_RESTART-like behavior for select(), which is
-  # (apparently) not covered by signal.siginterrupt(signal.SIGINT, False) when a timeout is passed.
-  # This helps avoid an unhandled select.error(4, 'Interrupted system call') on SIGINT.
-  # See https://bugs.python.org/issue12224 for more info.
-  while 1:
-    try:
-      return select.select(*args, **kwargs)
-    except (OSError, select.error) as e:
-      if e[0] != errno.EINTR:
-        raise
-
-
-# TODO(6071): require kwarg-only args after `fileobj`.
-def is_readable(fileobj, timeout=None):
+def is_readable(fileobj, *, timeout=None):
   """Check that the file-like resource is readable within the given timeout via polling.
   :param Union[int, SupportsFileNo] fileobj:
   :param Optional[int] timeout: (in seconds)
   :return bool
   """
-  if PY3:
-    with selectors.DefaultSelector() as selector:
-      selector.register(fileobj, selectors.EVENT_READ)
-      events = selector.select(timeout=timeout)
-    return bool(events)
-  else:
-    readable, _, _ = safe_select([fileobj], [], [], timeout)
-    return bool(readable)
+  with selectors.DefaultSelector() as selector:
+    selector.register(fileobj, selectors.EVENT_READ)
+    events = selector.select(timeout=timeout)
+  return bool(events)
 
 
 class RecvBufferedSocket:

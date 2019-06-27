@@ -81,7 +81,7 @@ class NailgunExecutorTest(TestBase):
          unittest.mock.patch('pants.java.nailgun_executor.read_file') as mock_read_file:
       mock_open.return_value = stdout_read
       mock_read_file.return_value = 'err'
-      # The stdout write pipe has no input and hasn't been closed, so the select.select() should
+      # The stdout write pipe has no input and hasn't been closed, so the selector.select() should
       # time out regardless of the timemout argument, and raise.
       with self.assertRaisesWithMessage(NailgunExecutor.InitialNailgunConnectTimedOut, """\
 Failed to read nailgun output after 0.0001 seconds!
