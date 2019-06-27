@@ -6,6 +6,7 @@ import glob
 import os
 import re
 import shutil
+import subprocess
 import unittest
 from contextlib import contextmanager
 from operator import eq, ne
@@ -22,7 +23,7 @@ from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import fast_relpath, safe_mkdir, safe_mkdir_for, safe_open
 from pants.util.objects import Exactly, datatype, string_type
 from pants.util.osutil import IntegerForPid
-from pants.util.process_handler import SubprocessProcessHandler, subprocess
+from pants.util.process_handler import SubprocessProcessHandler
 from pants.util.strutil import ensure_binary
 from pants_test.testutils.file_test_util import check_symlinks, contains_exact_files
 
