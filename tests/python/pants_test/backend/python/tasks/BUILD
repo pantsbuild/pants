@@ -37,7 +37,6 @@ python_tests(
   dependencies = [
     'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
@@ -66,7 +65,6 @@ python_tests(
   dependencies = [
     '3rdparty/python:pex',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test:int-test',
     'tests/python/pants_test/backend/python:interpreter_selection_utils',
   ],
@@ -81,7 +79,6 @@ python_tests(
     'src/python/pants/backend/python/tasks',
     'src/python/pants/base:exceptions',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test/backend/python:interpreter_selection_utils',
     ':python_task_test_base',
   ],
@@ -136,7 +133,6 @@ python_tests(
     'src/python/pants/backend/python/tasks',
     'src/python/pants/base:run_info',
     'src/python/pants/build_graph',
-    'src/python/pants/util:process_handler',
     ':python_task_test_base',
   ],
 )
@@ -215,7 +211,6 @@ python_tests(
     'src/python/pants/base:build_environment',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test:task_test_base',
   ],
 )

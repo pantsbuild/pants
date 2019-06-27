@@ -28,7 +28,6 @@ python_library(
     'src/python/pants/base:revision',
     'src/python/pants/scm:git',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
   ],
 )
 

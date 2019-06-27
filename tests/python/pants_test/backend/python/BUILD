@@ -66,7 +66,6 @@ python_library(
   name='interpreter_selection_utils',
   sources=['interpreter_selection_utils.py'],
   dependencies=[
-    'src/python/pants/util:process_handler',
     '3rdparty/python:future',
   ]
 )

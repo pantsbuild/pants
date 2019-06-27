@@ -26,7 +26,6 @@ python_tests(
   dependencies = [
     '3rdparty/python:future',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
   ]
 )
 

@@ -6,7 +6,6 @@ python_tests(
   dependencies = [
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test/testutils:git_util',
   ]
 )

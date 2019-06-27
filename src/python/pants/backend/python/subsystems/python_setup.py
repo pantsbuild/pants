@@ -3,13 +3,13 @@
 
 import logging
 import os
+import subprocess
 
 from pex.variables import Variables
 
 from pants.option.custom_types import UnsetBool
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
-from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)

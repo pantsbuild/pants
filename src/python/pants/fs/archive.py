@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import subprocess
 import sys
 from abc import ABC, abstractmethod
 from collections import OrderedDict
@@ -12,7 +13,6 @@ from future.utils import PY2
 
 from pants.util.contextutil import open_tar, open_zip, temporary_dir
 from pants.util.dirutil import is_executable, safe_concurrent_rename, safe_walk
-from pants.util.process_handler import subprocess
 from pants.util.strutil import ensure_text
 
 

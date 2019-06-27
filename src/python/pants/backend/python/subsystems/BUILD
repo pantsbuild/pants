@@ -15,6 +15,5 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/subsystem',
     'src/python/pants/util:memo',
-    'src/python/pants/util:process_handler',
   ],
 )

@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import subprocess
 
 from pants.backend.native.config.environment import Linker, Platform
 from pants.backend.native.targets.native_artifact import NativeArtifact
@@ -13,7 +14,6 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
-from pants.util.process_handler import subprocess
 
 
 class SharedLibrary(datatype(['name', 'path'])): pass

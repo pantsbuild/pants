@@ -3,9 +3,9 @@
 
 import json
 import os
+import subprocess
 import unittest
 
-from pants.util.process_handler import subprocess
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 from pants.contrib.node.subsystems.node_distribution import NodeDistribution

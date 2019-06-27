@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import subprocess
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 
@@ -12,7 +13,6 @@ from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import classproperty
 from pants.util.objects import datatype
-from pants.util.process_handler import subprocess
 
 
 class NativeCompileRequest(datatype([

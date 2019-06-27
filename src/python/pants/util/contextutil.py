@@ -75,10 +75,10 @@ def _copy_and_decode_env(env):
 
 
 def _purge_env():
-  # N.B. Without the use of `del` here (which calls `os.unsetenv` under the hood), subprocess32
+  # N.B. Without the use of `del` here (which calls `os.unsetenv` under the hood), subprocess
   # invokes or other things that may access the environment at the C level may not see the
   # correct env vars (i.e. we can't just replace os.environ with an empty dict).
-  # See https://docs.python.org/2/library/os.html#os.unsetenv for more info.
+  # See https://docs.python.org/3/library/os.html#os.unsetenv for more info.
   #
   # Wraps iterable in list() to make a copy and avoid issues with deleting while iterating.
   for k in list(os.environ.keys()):

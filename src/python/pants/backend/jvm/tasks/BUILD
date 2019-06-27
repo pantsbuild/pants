@@ -404,7 +404,6 @@ python_library(
     'src/python/pants/util:desktop',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
-    'src/python/pants/util:process_handler',
     'src/python/pants/util:strutil',
   ],
 )
@@ -538,7 +537,6 @@ python_library(
     'src/python/pants/task',
     'src/python/pants/util:desktop',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:process_handler',
   ],
 )
 

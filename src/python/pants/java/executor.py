@@ -3,6 +3,7 @@
 
 import logging
 import os
+import subprocess
 import sys
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
@@ -11,7 +12,6 @@ from six import string_types
 from twitter.common.collections import maybe_list
 
 from pants.util.contextutil import environment_as
-from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)

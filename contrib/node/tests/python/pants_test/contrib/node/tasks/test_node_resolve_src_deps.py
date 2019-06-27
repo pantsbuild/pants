@@ -2,10 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import subprocess
 from textwrap import dedent
 
 from pants.base.exceptions import TaskError
-from pants.util.process_handler import subprocess
 from pants_test.task_test_base import TaskTestBase
 
 from pants.contrib.node.subsystems.resolvers.node_preinstalled_module_resolver import \

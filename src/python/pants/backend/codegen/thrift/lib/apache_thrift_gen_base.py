@@ -4,6 +4,7 @@
 import os
 import re
 import shutil
+import subprocess
 
 from twitter.common.collections import OrderedSet
 
@@ -14,7 +15,6 @@ from pants.base.workunit import WorkUnitLabel
 from pants.option.custom_types import target_option
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.memo import memoized_property
-from pants.util.process_handler import subprocess
 
 
 class ApacheThriftGenBase(SimpleCodegenTask):

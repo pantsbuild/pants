@@ -2,11 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import subprocess
 from unittest import skipIf
 
 from future.utils import PY2
-
-from pants.util.process_handler import subprocess
 
 
 PY_2 = '2'

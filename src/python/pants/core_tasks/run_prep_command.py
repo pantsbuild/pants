@@ -2,13 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import subprocess
 from collections import namedtuple
 
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.prep_command import PrepCommand
 from pants.task.task import Task
-from pants.util.process_handler import subprocess
 
 
 class RunPrepCommandBase(Task):

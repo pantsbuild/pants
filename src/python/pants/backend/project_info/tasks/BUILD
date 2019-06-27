@@ -86,7 +86,6 @@ python_library(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:desktop',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:process_handler',
   ],
 )
 
