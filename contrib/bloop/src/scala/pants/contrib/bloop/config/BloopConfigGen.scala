@@ -26,6 +26,7 @@ object BloopConfigGen extends App {
     .split(":")
     .map(jar => buildRootPath / RelPath(jar))
 
+  // TODO: unused for now! It's probably preferable to do the target filtering on the pants side.
   // val sourceTargetTypes = sys.env("PANTS_TARGET_TYPES")
   //   .split(":")
   //   .toSet
@@ -62,9 +63,13 @@ object BloopConfigGen extends App {
         .flatMap(sourceTargetMap.get(_))
         .flatMap(_.classesDir.map(Path(_)))
 
-      val sources = target.sources.getOrElse(Seq())
-        .map(srcRelPath => buildRootPath / RelPath(srcRelPath))
-      // val sources = target.sourceRoots.map(_.sourceRootPath).map(Path(_))
+      // TODO: Metals currently doesn't handle complete source file paths
+      // (https://github.com/scalameta/metals/issues/770), although bloop/BSP does and may require
+      // it to compile correctly. Until that is fixed, we can use "source roots" like we do for the
+      // IntelliJ plugin to get the IDE experience working.
+      // val sources = target.sources.getOrElse(Seq())
+      //   .map(srcRelPath => buildRootPath / RelPath(srcRelPath))
+      val sources = target.sourceRoots.map(_.sourceRootPath).map(Path(_))
 
       val curPlatformString = target.platform
         .getOrElse(pantsExportParsed.jvmPlatforms.defaultPlatform)

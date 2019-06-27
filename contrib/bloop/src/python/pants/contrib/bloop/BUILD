@@ -5,7 +5,6 @@ contrib_plugin(
   name='plugin',
   dependencies=[
     'contrib/bloop/src/python/pants/contrib/bloop/tasks/config',
-    'contrib/bloop/src/python/pants/contrib/bloop/tasks/compile',
   ],
   distribution_name='pantsbuild.pants.contrib.bloop',
   description='Bloop support for pants.',

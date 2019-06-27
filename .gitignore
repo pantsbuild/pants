@@ -55,3 +55,4 @@ GSYMS
 GTAGS
 .mypy_cache/
 /.bloop/
+/.metals/
