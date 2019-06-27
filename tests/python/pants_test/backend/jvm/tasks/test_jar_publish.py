@@ -3,8 +3,7 @@
 
 import os
 import unittest
-
-from mock import Mock
+from unittest.mock import Mock
 
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository

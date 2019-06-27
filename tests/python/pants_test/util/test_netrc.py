@@ -4,9 +4,9 @@
 import re
 import unittest
 from contextlib import contextmanager
+from unittest.mock import MagicMock, mock_open, patch
 
 from future.utils import PY3
-from mock import MagicMock, mock_open, patch
 
 from pants.util.netrc import Netrc
 

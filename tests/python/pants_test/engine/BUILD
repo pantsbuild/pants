@@ -111,7 +111,6 @@ python_tests(
 python_tests(
   sources=['test_engine.py'],
   dependencies=[
-    '3rdparty/python:mock',
     ':scheduler_test_base',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/build_graph',
@@ -192,7 +191,6 @@ python_tests(
   sources=['test_scheduler.py'],
   coverage=['pants.engine.nodes', 'pants.engine.scheduler'],
   dependencies=[
-    '3rdparty/python:mock',
     ':util',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/build_graph',

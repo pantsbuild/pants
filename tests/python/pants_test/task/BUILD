@@ -50,7 +50,6 @@ python_tests(
   sources=['test_scm_publish_mixin.py'],
   coverage=['pants.task.scm_publish_mixin'],
   dependencies=[
-    '3rdparty/python:mock',
     'src/python/pants/task',
   ]
 )
@@ -73,7 +72,6 @@ python_tests(
   name='testrunner_task_mixin',
   sources=['test_testrunner_task_mixin.py'],
   dependencies=[
-    '3rdparty/python:mock',
     'src/python/pants/task',
     'src/python/pants/util:process_handler',
     'tests/python/pants_test:task_test_base',

@@ -8,7 +8,6 @@ python_tests(
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     '3rdparty/python:coverage',
     '3rdparty/python:future',
-    '3rdparty/python:mock',
     '3rdparty/python:pex',
     'src/python/pants/backend/native',
     'src/python/pants/backend/python/subsystems',

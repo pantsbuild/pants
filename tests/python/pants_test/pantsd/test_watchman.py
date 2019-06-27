@@ -4,9 +4,9 @@
 import json
 import os
 import sys
+import unittest.mock
 from contextlib import contextmanager
 
-import mock
 import pywatchman
 
 from pants.pantsd.watchman import Watchman
@@ -19,11 +19,11 @@ class TestWatchman(TestBase):
   BUILD_ROOT = '/path/to/a/fake/build_root'
   WATCHMAN_PATH = '/path/to/a/fake/watchman'
   TEST_DIR = '/path/to/a/fake/test'
-  HANDLERS = [Watchman.EventHandler('test', {}, mock.Mock())]
+  HANDLERS = [Watchman.EventHandler('test', {}, unittest.mock.Mock())]
 
   def setUp(self):
     super().setUp()
-    with mock.patch.object(Watchman, '_is_valid_executable', **self.PATCH_OPTS) as mock_is_valid:
+    with unittest.mock.patch.object(Watchman, '_is_valid_executable', **self.PATCH_OPTS) as mock_is_valid:
       mock_is_valid.return_value = True
       self.watchman = Watchman('/fake/path/to/watchman', self.subprocess_dir)
 
@@ -55,8 +55,8 @@ class TestWatchman(TestBase):
 
   def test_maybe_init_metadata(self):
     # TODO(#7106): is this the right path to patch?
-    with mock.patch('pants.pantsd.watchman.safe_mkdir', **self.PATCH_OPTS) as mock_mkdir, \
-         mock.patch('pants.pantsd.watchman.safe_file_dump', **self.PATCH_OPTS) as mock_file_dump:
+    with unittest.mock.patch('pants.pantsd.watchman.safe_mkdir', **self.PATCH_OPTS) as mock_mkdir, \
+         unittest.mock.patch('pants.pantsd.watchman.safe_file_dump', **self.PATCH_OPTS) as mock_file_dump:
       self.watchman._maybe_init_metadata()
 
       mock_mkdir.assert_called_once_with(self._watchman_dir)
@@ -97,10 +97,10 @@ class TestWatchman(TestBase):
       self.watchman._parse_pid_from_output(output)
 
   def test_launch(self):
-    with mock.patch.object(Watchman, '_maybe_init_metadata') as mock_initmeta, \
-         mock.patch.object(Watchman, 'get_subprocess_output') as mock_getsubout, \
-         mock.patch.object(Watchman, 'write_pid') as mock_writepid, \
-         mock.patch.object(Watchman, 'write_socket') as mock_writesock:
+    with unittest.mock.patch.object(Watchman, '_maybe_init_metadata') as mock_initmeta, \
+         unittest.mock.patch.object(Watchman, 'get_subprocess_output') as mock_getsubout, \
+         unittest.mock.patch.object(Watchman, 'write_pid') as mock_writepid, \
+         unittest.mock.patch.object(Watchman, 'write_socket') as mock_writesock:
       mock_getsubout.return_value = json.dumps(dict(pid='3'))
       self.watchman.launch()
       assert mock_getsubout.called
@@ -109,13 +109,13 @@ class TestWatchman(TestBase):
       mock_writesock.assert_called_once_with(self.watchman._sock_file)
 
   def test_watch_project(self):
-    self.watchman._watchman_client = mock.create_autospec(StreamableWatchmanClient, spec_set=True)
+    self.watchman._watchman_client = unittest.mock.create_autospec(StreamableWatchmanClient, spec_set=True)
     self.watchman.watch_project(self.TEST_DIR)
     self.watchman._watchman_client.query.assert_called_once_with('watch-project', self.TEST_DIR)
 
   @contextmanager
   def setup_subscribed(self, iterable):
-    mock_client = mock.create_autospec(StreamableWatchmanClient, spec_set=True)
+    mock_client = unittest.mock.create_autospec(StreamableWatchmanClient, spec_set=True)
     mock_client.stream_query.return_value = iter(iterable)
     self.watchman._watchman_client = mock_client
     yield mock_client

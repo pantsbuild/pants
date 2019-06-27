@@ -61,7 +61,6 @@ python_tests(
   name = 'deprecated',
   sources = ['test_deprecated.py'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/base:deprecated',
     'src/python/pants/util:collections',
     'src/python/pants:version',
@@ -197,7 +196,6 @@ python_tests(
   name = 'exception_sink',
   sources = ['test_exception_sink.py'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/base:exception_sink',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
@@ -213,7 +211,6 @@ python_tests(
   sources = ['test_exception_sink_integration.py'],
   dependencies = [
     '3rdparty/python:future',
-    '3rdparty/python:mock',
     'src/python/pants/base:exception_sink',
     'src/python/pants/util:osutil',
     'tests/python/pants_test:int-test',

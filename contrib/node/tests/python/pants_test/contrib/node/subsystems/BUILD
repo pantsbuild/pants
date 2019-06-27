@@ -16,7 +16,6 @@ python_tests(
   name='package_managers',
   sources=['test_package_managers.py'],
   dependencies=[
-    '3rdparty/python:mock',
     'contrib/node/src/python/pants/contrib/node/subsystems',
   ]
 )

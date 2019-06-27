@@ -3,9 +3,9 @@
 
 import json
 import os
+import unittest.mock
 from textwrap import dedent
 
-import mock
 from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
 from pants_test.task_test_base import TaskTestBase
@@ -291,7 +291,7 @@ class NodeResolveTest(TaskTestBase):
     task = self.create_task(context)
 
     package_manager_obj = task.get_package_manager(target=target)
-    with mock.patch.object(package_manager_obj, 'run_command') as exec_call:
+    with unittest.mock.patch.object(package_manager_obj, 'run_command') as exec_call:
       exec_call.return_value.run.return_value.wait.return_value = 0
       task.execute()
       exec_call.assert_called_once_with(

@@ -5,9 +5,8 @@ import collections
 import os
 from contextlib import contextmanager
 from unittest import TestCase
+from unittest.mock import Mock, patch
 from xml.etree.ElementTree import ParseError
-
-from mock import Mock, patch
 
 from pants.base.exceptions import ErrorWhileTesting
 from pants.task.task import TaskBase

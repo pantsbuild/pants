@@ -224,7 +224,6 @@ python_tests(
   name = 'select_interpreter',
   sources = ['test_select_interpreter.py'],
   dependencies = [
-    '3rdparty/python:mock',
     '3rdparty/python:pex',
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/backend/python/subsystems',
@@ -240,7 +239,6 @@ python_tests(
   name = 'setup_py',
   sources = ['test_setup_py.py'],
   dependencies = [
-    '3rdparty/python:mock',
     '3rdparty/python:pex',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',

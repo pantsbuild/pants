@@ -283,7 +283,6 @@ python_tests(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:future',
-    '3rdparty/python:mock',
     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
@@ -362,7 +361,6 @@ python_tests(
   name = 'jar_publish',
   sources = ['test_jar_publish.py'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jar_publish',
@@ -409,7 +407,6 @@ python_tests(
   name = 'junit_run',
   sources = ['test_junit_run.py'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/backend/jvm/subsystems:junit',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/tasks:junit_run',

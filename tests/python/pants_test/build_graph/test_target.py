@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os.path
+import unittest.mock
 from hashlib import sha1
 
-import mock
 from future.utils import PY3
 
 from pants.base.exceptions import TargetDefinitionException
@@ -290,7 +290,7 @@ class TargetTest(TestBase):
 
   def test_strict_dependencies(self):
     self._generate_strict_dependencies()
-    dep_context = mock.Mock()
+    dep_context = unittest.mock.Mock()
     dep_context.types_with_closure = ()
     dep_context.codegen_types = ()
     dep_context.alias_types = (Target,)

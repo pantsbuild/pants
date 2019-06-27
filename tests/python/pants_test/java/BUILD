@@ -18,7 +18,6 @@ python_tests(
   sources = ['test_nailgun_client.py'],
   coverage = ['pants.java.nailgun_client'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/java:nailgun_client',
   ]
 )
@@ -28,7 +27,6 @@ python_tests(
   sources = ['test_nailgun_executor.py'],
   coverage = ['pants.java.nailgun_executor'],
   dependencies = [
-    '3rdparty/python:mock',
     '3rdparty/python:psutil',
     'src/python/pants/java:nailgun_executor',
     'tests/python/pants_test:test_base'
@@ -40,7 +38,6 @@ python_tests(
   sources = ['test_nailgun_io.py'],
   coverage = ['pants.java.nailgun_io'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/java:nailgun_io',
   ]
 )
@@ -50,7 +47,6 @@ python_tests(
   sources = ['test_nailgun_protocol.py'],
   coverage = ['pants.java.nailgun_protocol'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/java:nailgun_protocol',
   ]
 )
@@ -59,7 +55,6 @@ python_tests(
   name = 'util',
   sources = ['test_util.py'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/java:util',
     'src/python/pants/util:dirutil',
   ]

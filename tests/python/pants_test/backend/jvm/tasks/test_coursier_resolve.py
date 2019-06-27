@@ -4,9 +4,9 @@
 import os
 import re
 from contextlib import contextmanager
+from unittest.mock import MagicMock
 
 from future.utils import PY3
-from mock import MagicMock
 from psutil.tests import safe_rmpath
 
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,

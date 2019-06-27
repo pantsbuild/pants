@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import unittest.mock
 from textwrap import dedent
 
-import mock
 from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
@@ -81,7 +81,7 @@ class SelectInterpreterTest(TaskTestBase):
 
     task = self.create_task(context)
     if should_invalidate is not None:
-      task._select_interpreter = mock.MagicMock(wraps=task._select_interpreter)
+      task._select_interpreter = unittest.mock.MagicMock(wraps=task._select_interpreter)
 
     task.execute()
 
