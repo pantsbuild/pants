@@ -4,11 +4,11 @@
 jar_library(
   name='ammonite-ops',
   jars=[
-    scala_jar(org='com.lihaoyi', name='ammonite-ops', rev='1.1.2'),
+    scala_jar(org='com.lihaoyi', name='ammonite-ops', rev='1.6.8'),
   ],
 )
 
-BLOOP_REV = '1.3.2+6-a58d9626+20190625-1923'
+BLOOP_REV = '1.3.2+8-6a9cf1e9+20190626-1944'
 
 jar_library(
   name='bloop-frontend',

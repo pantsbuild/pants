@@ -1,5 +1,6 @@
 package pants.contrib.bloop.compile
 
+import ammonite.ops._
 import bloop.bsp.BloopLanguageClient
 import bloop.bsp.BloopLanguageServer
 import bloop.internal.build.BuildInfo
@@ -11,6 +12,10 @@ import bloop.logging.DebugFilter
 import bloop.logging.Logger
 import ch.epfl.scala.bsp
 import ch.epfl.scala.bsp.endpoints
+import io.circe.Encoder
+import io.circe.derivation.JsonCodec
+import io.circe.syntax._
+import io.circe._
 import monix.eval.Task
 import monix.execution.Ack
 import monix.execution.ExecutionModel
@@ -211,22 +216,35 @@ object PantsCompileMain {
           ))
         }.map(err(_))
         .map {
+          case bsp.CompileResult(_, bsp.StatusCode.Ok,
+            Some("project-name-classes-dir-mapping"),
+            Some(mapping)) => {
+            logger.info(s"mapped: $mapping")
+
+            val outputDir = pwd / ".pants.d" / ".tmp"
+            rm(outputDir)
+            mkdir(outputDir)
+            val nonTempDirMapping = err(mapping.as[Map[String, String]]).map {
+              case (targetId, tempClassesDir) =>
+                val curTargetOutputDir = outputDir / RelPath(targetId)
+                logger.info(s"copying temp dir $tempClassesDir to $curTargetOutputDir!!")
+                // TODO: for some reason ammonite-ops `cp` just hangs here???
+                %%("cp", "-r", Path(tempClassesDir).toString, curTargetOutputDir.toString)(pwd)
+                (targetId -> curTargetOutputDir.toString)
+            }.toMap
+
+            System.out.println(nonTempDirMapping.asJson)
+            System.out.close()
+            sys.exit(0)
+            ()
+          }
           case bsp.CompileResult(_, bsp.StatusCode.Ok, _, _) => {
-            logger.info("compile succeeded!")
+            logger.info("(weirdly empty!!!!) compile succeeded!")
+            sys.exit(0)
             ()
           }
-          case x => {
-            throw new Exception(s"compile failed: $x")
-            ()
-          }
-        }.flatMap { Unit => endpoints.Build.shutdown.request(bsp.Shutdown()) }
-        .map(err(_))
-        .flatMap { Unit => Task.fromFuture(endpoints.Build.exit.notify(bsp.Exit())) }
-        .map(ack(_))
-        .map { Unit =>
-          println("compile complete!")
-          sys.exit(0)
-        }
+          case x => throw new Exception(s"compile failed: $x")
+        }.map { Unit => sys.exit(0) }
     }.runAsync(scheduler)
 
     val launcherTask = Task.eval(new LauncherMain(
@@ -235,7 +253,6 @@ object PantsCompileMain {
       out = System.err,
       charset = StandardCharsets.UTF_8,
       shell = Shell.default,
-      // nailgunPort = Some(8212),
       nailgunPort = None,
       startedServer = startedServer,
       generateBloopInstallerURL = Installer.defaultWebsiteURL(_)

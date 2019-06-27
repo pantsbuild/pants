@@ -7,6 +7,7 @@ scala_library(
   ),
   dependencies=[
     '3rdparty/jvm/org/scala-sbt:util-logging',
+    'contrib/bloop/3rdparty/jvm:ammonite-ops',
     'contrib/bloop/3rdparty/jvm:bloop-frontend',
     'contrib/bloop/3rdparty/jvm:bloop-launcher',
   ],

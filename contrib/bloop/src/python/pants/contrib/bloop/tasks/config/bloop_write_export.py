@@ -66,6 +66,7 @@ class BloopWriteExport(NailgunTask):
 
     env = {
       'SCALA_COMPILER_JARS_CLASSPATH': ':'.join(bloop_export.scala_compiler_jars),
+      # NB: This is unused right now!!
       'PANTS_TARGET_TYPES': ':'.join(bloop_export.pants_target_types),
     }
 

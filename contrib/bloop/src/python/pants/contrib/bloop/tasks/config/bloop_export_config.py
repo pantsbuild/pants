@@ -32,6 +32,7 @@ class BloopExportConfig(ModifiedExportTaskBase):
   @classproperty
   def relevant_target_types(cls):
     """???"""
+    # NB: This is unused right now!!
     return [
       "scala_library",
       "java_library",
@@ -65,7 +66,7 @@ class BloopExportConfig(ModifiedExportTaskBase):
     return ScalaPlatform.global_instance()
 
   def execute(self):
-    exported_targets_map = self.generate_targets_map(self.context.targets())
+    exported_targets_map = self.generate_targets_map(self.get_targets())
     # self.context.log.debug('exported_targets_map: {}'.format(exported_targets_map))
 
     # TODO: use JvmPlatform for jvm options!

@@ -26,13 +26,14 @@ object BloopConfigGen extends App {
     .split(":")
     .map(jar => buildRootPath / RelPath(jar))
 
-  val sourceTargetTypes = sys.env("PANTS_TARGET_TYPES")
-    .split(":")
-    .toSet
+  // val sourceTargetTypes = sys.env("PANTS_TARGET_TYPES")
+  //   .split(":")
+  //   .toSet
+  // val sourceTargets = pantsExportParsed.targets.filter { case (_, target) =>
+  //   sourceTargetTypes(target.targetType)
+  // }
+  val sourceTargets = pantsExportParsed.targets
 
-  val sourceTargets = pantsExportParsed.targets.filter { case (_, target) =>
-    sourceTargetTypes(target.targetType)
-  }
   // Refer to dependencies by their `id`, not by `depName` (which is a pants target spec -- not
   // allowed).
   val sourceTargetMap = sourceTargets.toMap
@@ -63,7 +64,7 @@ object BloopConfigGen extends App {
 
       val sources = target.sources.getOrElse(Seq())
         .map(srcRelPath => buildRootPath / RelPath(srcRelPath))
-      // val sources = target.sourceRoots.map(Path(_))
+      // val sources = target.sourceRoots.map(_.sourceRootPath).map(Path(_))
 
       val curPlatformString = target.platform
         .getOrElse(pantsExportParsed.jvmPlatforms.defaultPlatform)
