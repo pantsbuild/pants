@@ -70,8 +70,8 @@ impl Core {
     remote_store_chunk_upload_timeout: Duration,
     remote_store_rpc_retries: usize,
     remote_execution_extra_platform_properties: BTreeMap<String, String>,
-    local_execution_parallelism: usize,
-    remote_execution_parallelism: usize,
+    process_execution_local_parallelism: usize,
+    process_execution_remote_parallelism: usize,
     process_execution_cleanup_local_dirs: bool,
   ) -> Core {
     // Randomize CAS address order to avoid thundering herds from common config.
@@ -128,24 +128,30 @@ impl Core {
       .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
 
     let command_runner = match &remote_execution_server {
-      Some(ref address) => BoundedCommandRunner::new(Box::new(process_execution::remote::CommandRunner::new(
-        address,
-        remote_execution_process_cache_namespace.clone(),
-        remote_instance_name.clone(),
-        root_ca_certs.clone(),
-        oauth_bearer_token.clone(),
-        remote_execution_extra_platform_properties.clone(),
-        // This param sets the grpc thread pool size. We use the local_execution_parallelism,
-        // because it is likely to be related to the processor count on this platform.
-        // Allow for some overhead for bookkeeping threads (if any).
-        local_execution_parallelism + 2,
-        store.clone(),
-      )), remote_execution_parallelism),
-      None => BoundedCommandRunner::new(Box::new(process_execution::local::CommandRunner::new(
-        store.clone(),
-        work_dir.clone(),
-        process_execution_cleanup_local_dirs,
-      )), local_execution_parallelism),
+      Some(ref address) => BoundedCommandRunner::new(
+        Box::new(process_execution::remote::CommandRunner::new(
+          address,
+          remote_execution_process_cache_namespace.clone(),
+          remote_instance_name.clone(),
+          root_ca_certs.clone(),
+          oauth_bearer_token.clone(),
+          remote_execution_extra_platform_properties.clone(),
+          // This param sets the grpc thread pool size. We use the local_execution_parallelism,
+          // because it is likely to be related to the processor count on this platform, via the option default.
+          // Allow for some overhead for bookkeeping threads (if any).
+          process_execution_local_parallelism + 2,
+          store.clone(),
+        )),
+        process_execution_remote_parallelism,
+      ),
+      None => BoundedCommandRunner::new(
+        Box::new(process_execution::local::CommandRunner::new(
+          store.clone(),
+          work_dir.clone(),
+          process_execution_cleanup_local_dirs,
+        )),
+        process_execution_local_parallelism,
+      ),
     };
 
     let http_client = reqwest::r#async::Client::new();

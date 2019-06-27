@@ -824,8 +824,8 @@ class Native(Singleton):
         execution_options.remote_store_chunk_upload_timeout_seconds,
         execution_options.remote_store_rpc_retries,
         self.context.utf8_buf_buf(execution_options.remote_execution_extra_platform_properties),
-        execution_options.local_execution_parallelism,
-        execution_options.remote_execution_parallelism,
+        execution_options.process_execution_local_parallelism,
+        execution_options.process_execution_remote_parallelism,
         execution_options.process_execution_cleanup_local_dirs,
       )
     return self.gc(scheduler, self.lib.scheduler_destroy)

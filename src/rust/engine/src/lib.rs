@@ -214,8 +214,8 @@ pub extern "C" fn scheduler_create(
   remote_store_chunk_upload_timeout_seconds: u64,
   remote_store_rpc_retries: u64,
   remote_execution_extra_platform_properties_buf: BufferBuffer,
-  local_execution_parallelism: u64,
-  remote_execution_parallelism: u64,
+  process_execution_local_parallelism: u64,
+  process_execution_remote_parallelism: u64,
   process_execution_cleanup_local_dirs: bool,
 ) -> *const Scheduler {
   let root_type_ids = root_type_ids.to_vec();
@@ -321,8 +321,8 @@ pub extern "C" fn scheduler_create(
     Duration::from_secs(remote_store_chunk_upload_timeout_seconds),
     remote_store_rpc_retries as usize,
     remote_execution_extra_platform_properties_map,
-    local_execution_parallelism as usize,
-    remote_execution_parallelism as usize,
+    process_execution_local_parallelism as usize,
+    process_execution_remote_parallelism as usize,
     process_execution_cleanup_local_dirs as bool,
   ))))
 }
