@@ -280,7 +280,6 @@ python_tests(
   ],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:future',
     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',

@@ -111,7 +111,6 @@ python_tests(
   name = 'target',
   sources = ['test_target.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/base:payload',

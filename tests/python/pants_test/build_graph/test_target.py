@@ -5,8 +5,6 @@ import os.path
 import unittest.mock
 from hashlib import sha1
 
-from future.utils import PY3
-
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.payload import Payload
@@ -153,17 +151,16 @@ class TargetTest(TestBase):
     # No key_arg.
     with self.assertRaises(TargetDefinitionException) as cm:
       target.create_sources_field(sources='a-string', sources_rel_path='')
-    self.assertIn("Expected a glob, an address or a list, but was {}"
-                  .format('<class \'str\'>' if PY3 else '<type \'unicode\'>'),
-                  str(cm.exception))
+    self.assertIn("Expected a glob, an address or a list, but was <class 'str'>", str(cm.exception))
 
     # With key_arg.
     with self.assertRaises(TargetDefinitionException) as cm:
       target.create_sources_field(sources='a-string', sources_rel_path='', key_arg='my_cool_field')
-    self.assertIn("Expected 'my_cool_field' to be a glob, an address or a list, but was {}"
-                  .format('<class \'str\'>' if PY3 else '<type \'unicode\'>'),
-                  str(cm.exception))
-    #could also test address case, but looks like nothing really uses it.
+    self.assertIn(
+      "Expected 'my_cool_field' to be a glob, an address or a list, but was <class 'str'>",
+      str(cm.exception)
+    )
+    # could also test address case, but looks like nothing really uses it.
 
   def test_max_recursion(self):
     target_a = self.make_target('a', Target)

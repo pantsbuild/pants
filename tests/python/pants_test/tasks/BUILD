@@ -40,7 +40,7 @@ python_tests(
   sources = ['test_execution_graph.py'],
   dependencies = [
     'src/python/pants/backend/jvm/tasks/jvm_compile:execution_graph',
-    ]
+  ]
 )
 
 python_tests(
