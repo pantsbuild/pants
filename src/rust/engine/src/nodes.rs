@@ -864,10 +864,21 @@ impl Task {
           .ok_or_else(|| throw(&format!("no edges for task {:?} exist!", entry)))
           .and_then(|edges| {
             edges.entry_for(&dependency_key).cloned().ok_or_else(|| {
-              throw(&format!(
-                "{:?} did not declare a dependency on {:?}",
-                entry, dependency_key
-              ))
+              let is_union = get.declared_subject.map(externs::is_union).unwrap_or(false);
+              if is_union {
+                let union_ty = get.declared_subject.unwrap();
+                let value = externs::get_value_from_type_id(union_ty);
+                let description = externs::project_str(&value, "union_description");
+                throw(&format!(
+                  "Type {} is not a member of the {} @union (\"{}\")",
+                  get.subject, union_ty, description
+                ))
+              } else {
+                throw(&format!(
+                  "{:?} did not declare a dependency on {:?}",
+                  entry, dependency_key
+                ))
+              }
             })
           });
         // The subject of the get is a new parameter that replaces an existing param of the same
