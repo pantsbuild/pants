@@ -10,8 +10,6 @@ from collections import defaultdict, namedtuple
 from itertools import zip_longest
 from textwrap import dedent
 
-from six import string_types
-
 from pants.base.build_environment import get_buildroot
 from pants.base.mustache import MustacheRenderer
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -279,7 +277,7 @@ class HtmlReporter(Reporter):
     # Update the artifact cache stats.
     def render_cache_stats(artifact_cache_stats):
       def fix_detail_id(e, _id):
-        return e if isinstance(e, string_types) else e + (_id, )
+        return e if isinstance(e, str) else e + (_id, )
 
       msg_elements = []
       for cache_name, stat in artifact_cache_stats.stats_per_cache.items():
@@ -377,7 +375,7 @@ class HtmlReporter(Reporter):
       # preserved through refreshes. For example, when looking at the artifact cache stats,
       # if "hits" are open and "misses" are closed, we want to remember that even after
       # the cache stats are updated and the message re-rendered.
-      if isinstance(element, string_types):
+      if isinstance(element, str):
         element = [element]
 
       # zip_longest assumes None for missing values, so this generator will pick the default for those.
