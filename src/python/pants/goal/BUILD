@@ -57,7 +57,6 @@ python_library(
 python_library(
   sources = ['goal.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':error',
     'src/python/pants/option',
     'src/python/pants/util:memo',

@@ -128,7 +128,6 @@ python_library(
   name='objects',
   sources=['objects.py'],
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/util:memo',
     'src/python/pants/util:objects',
   ]
@@ -194,7 +193,6 @@ python_library(
   name='native',
   sources=['native.py'],
   dependencies=[
-    '3rdparty/python:future',
     ':native_engine_shared_library',
     ':selectors',
     '3rdparty/python:cffi',

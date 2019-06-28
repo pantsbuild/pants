@@ -12,7 +12,6 @@ from contextlib import closing
 
 import cffi
 import pkg_resources
-from future.utils import PY2
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.engine.selectors import Get
@@ -134,8 +133,6 @@ def bootstrap_c_source(scheduler_bindings_path, output_dir, module_name=NATIVE_E
     temp_output_prefix = os.path.join(tempdir, module_name)
     real_output_prefix = os.path.join(output_dir, module_name)
     temp_c_file = '{}.c'.format(temp_output_prefix)
-    if PY2:
-      temp_c_file = temp_c_file.encode('utf-8')
     c_file = '{}.c'.format(real_output_prefix)
     env_script = '{}.cflags'.format(real_output_prefix)
 

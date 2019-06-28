@@ -6,8 +6,6 @@ import logging
 import os
 import re
 
-from future.utils import PY3
-
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext  # noqa
 from pants.backend.jvm.subsystems.rsc import Rsc
 from pants.backend.jvm.subsystems.shader import Shader
@@ -313,7 +311,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       tgt, = vts.targets
 
       if not hit_cache:
-        counter_val = str(counter()).rjust(counter.format_length(), ' ' if PY3 else b' ')
+        counter_val = str(counter()).rjust(counter.format_length(), ' ')
         counter_str = '[{}/{}] '.format(counter_val, counter.size)
         self.context.log.info(
           counter_str,

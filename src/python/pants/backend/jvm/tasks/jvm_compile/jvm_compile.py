@@ -5,7 +5,6 @@ import functools
 import os
 from multiprocessing import cpu_count
 
-from future.utils import PY2, PY3
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
@@ -39,7 +38,6 @@ from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_file_
                                 safe_rmtree)
 from pants.util.fileutil import create_size_estimators
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.strutil import ensure_text
 
 
 # Well known metadata file to register javac plugins.
@@ -273,7 +271,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     target = compile_context.target
 
     if isinstance(target, JavacPlugin):
-      result[_JAVAC_PLUGIN_INFO_FILE] = target.classname if PY3 else target.classname.decode('utf-8')
+      result[_JAVAC_PLUGIN_INFO_FILE] = target.classname
     elif isinstance(target, AnnotationProcessor) and target.processors:
       result[_PROCESSOR_INFO_FILE] = '{}\n'.format('\n'.join(p.strip() for p in target.processors))
 
@@ -311,11 +309,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     """Write the argsfile for this context."""
     with open(ctx.args_file, 'w') as fp:
       for arg in args:
-        # NB: in Python 2, options are stored sometimes as bytes and sometimes as unicode in the OptionValueContainer.
-        # This is due to how Python 2 natively stores attributes as a map of `str` (aka `bytes`) to their value. So,
-        # the setattr() and getattr() functions sometimes use bytes.
-        if PY2:
-          arg = ensure_text(arg)
         fp.write(arg)
         fp.write('\n')
 

@@ -16,7 +16,7 @@ from queue import Queue
 from socketserver import TCPServer
 
 from colors import green
-from future.utils import PY3, string_types
+from future.utils import string_types
 
 from pants.util.dirutil import safe_delete
 from pants.util.tarutil import TarFile
@@ -49,7 +49,7 @@ def environment_as(**kwargs):
 
   def setenv(key, val):
     if val is not None:
-      os.environ[key] = val if PY3 else _os_encode(val)
+      os.environ[key] = val
     else:
       if key in os.environ:
         del os.environ[key]
@@ -62,10 +62,6 @@ def environment_as(**kwargs):
   finally:
     for key, val in old_environment.items():
       setenv(key, val)
-
-
-def _copy_and_decode_env(env):
-  return {k: _os_decode(v) for k, v in env.items()}
 
 
 def _purge_env():
@@ -81,13 +77,13 @@ def _purge_env():
 
 def _restore_env(env):
   for k, v in env.items():
-    os.environ[k] = v if PY3 else _os_encode(v)
+    os.environ[k] = v
 
 
 @contextmanager
 def hermetic_environment_as(**kwargs):
   """Set the environment to the supplied values from an empty state."""
-  old_environment = os.environ.copy() if PY3 else _copy_and_decode_env(os.environ)
+  old_environment = os.environ.copy()
   _purge_env()
   try:
     with environment_as(**kwargs):

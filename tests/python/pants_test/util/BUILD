@@ -24,7 +24,6 @@ python_tests(
   sources = ['test_contextutil.py'],
   coverage = ['pants.util.contextutil'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:contextutil',
   ]
 )

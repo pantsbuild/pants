@@ -6,8 +6,6 @@ import sys
 from abc import ABC, abstractmethod
 from collections import namedtuple
 
-from future.utils import PY2
-
 from pants.util.memo import memoized_classmethod
 from pants.util.objects import Exactly, TypedCollection, datatype
 
@@ -165,8 +163,6 @@ class Collection:
   def of(cls, *element_types):
     union = '|'.join(element_type.__name__ for element_type in element_types)
     type_name = '{}.of({})'.format(cls.__name__, union)
-    if PY2:
-      type_name = type_name.encode('utf-8')
     type_checked_collection_class = datatype([
       # Create a datatype with a single field 'dependencies' which is type-checked on construction
       # to be a collection containing elements of only the exact `element_types` specified.

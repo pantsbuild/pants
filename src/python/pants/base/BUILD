@@ -47,7 +47,6 @@ python_library(
   name = 'build_root',
   sources = ['build_root.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:meta',
   ],
 )
