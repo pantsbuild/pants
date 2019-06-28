@@ -48,9 +48,6 @@ python_library(
 python_library(
   name = 'eval',
   sources = ['eval.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
 )
 
 python_library(

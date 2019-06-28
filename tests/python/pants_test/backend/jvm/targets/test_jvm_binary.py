@@ -122,7 +122,7 @@ class JvmBinaryTest(TestBase):
       'jvm_binary(name = "foo", main = "com.example.Foo", source = ["foo.py"])',
     )
     with self.assertRaisesRegexp(AddressLookupError,
-                                 r'Invalid target.*foo.*source must be a string'):
+                                 r'Invalid target.*foo.*source must be a str'):
       self.target(':foo')
 
   def test_bad_sources_declaration(self):

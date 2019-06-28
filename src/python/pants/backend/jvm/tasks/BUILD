@@ -579,9 +579,6 @@ python_library(
 python_library(
   name = 'properties',
   sources = ['properties.py'],
-  dependencies = [
-    '3rdparty/python:six',
-  ],
 )
 
 python_library(

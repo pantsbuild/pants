@@ -1,16 +1,13 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
-from future.utils import string_types
-
 from pants.backend.jvm.artifact import PublicationMetadata
 from pants.base.validation import assert_list
 
 
 def _validate_maybe_string(name, item):
-  if item and not isinstance(item, string_types):
-    raise ValueError('{} was expected to be of type {} but given {}'.format(name, type(item), item))
+  if item and not isinstance(item, str):
+    raise ValueError('{} was expected to be of type str but given {}'.format(name, type(item)))
   return item
 
 
