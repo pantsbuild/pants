@@ -5,8 +5,6 @@ import re
 from abc import ABCMeta
 from hashlib import sha1
 
-from future.utils import string_types
-
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
@@ -20,8 +18,8 @@ class JarRule(FingerprintedMixin, metaclass=ABCMeta):
 
   def __init__(self, apply_pattern, payload=None):
     self.payload = payload or Payload()
-    if not isinstance(apply_pattern, string_types):
-      raise ValueError('The supplied apply_pattern is not a string, given: {}'
+    if not isinstance(apply_pattern, str):
+      raise ValueError('The supplied apply_pattern is not a str, given: {}'
                        .format(apply_pattern))
     try:
       self._apply_pattern = re.compile(apply_pattern)
@@ -63,7 +61,7 @@ class Duplicate(JarRule):
 
       :param string path: The path of the duplicate entry.
       """
-      assert path and isinstance(path, string_types), 'A non-empty path must be supplied.'
+      assert path and isinstance(path, str), 'A non-empty path must be supplied.'
       super(Duplicate.Error, self).__init__('Duplicate entry encountered for path {}'.format(path))
       self._path = path
 
@@ -262,7 +260,7 @@ class ManifestEntries(FingerprintedMixin):
       if not isinstance(entries, dict):
         raise self.ExpectedDictionaryError("entries must be a dictionary of strings.")
       for key in entries.keys():
-        if not isinstance(key, string_types):
+        if not isinstance(key, str):
           raise self.ExpectedDictionaryError(
             "entries must be dictionary of strings, got key {} type {}"
             .format(key, type(key).__name__))
@@ -337,7 +335,7 @@ class JvmBinary(JvmTarget):
       binary. Example: ['-Dexample.property=1', '-DMyFlag', '-Xmx4G'] If unspecified, no extra jvm options will be added.
     """
     self.address = address  # Set in case a TargetDefinitionException is thrown early
-    if main and not isinstance(main, string_types):
+    if main and not isinstance(main, str):
       raise TargetDefinitionException(self, 'main must be a fully qualified classname')
     if deploy_jar_rules and not isinstance(deploy_jar_rules, JarRules):
       raise TargetDefinitionException(self,

@@ -5,7 +5,6 @@ import os
 from abc import ABC, abstractmethod
 from hashlib import sha1
 
-from six import string_types
 from twitter.common.dirutil.fileset import Fileset
 
 from pants.base.build_environment import get_buildroot
@@ -180,7 +179,7 @@ class FilesetRelPathWrapper(ABC):
                     NB: this argument is contained within **kwargs!
     """
     for pattern in patterns:
-      if not isinstance(pattern, string_types):
+      if not isinstance(pattern, str):
         raise ValueError("Expected string patterns for {}: got {}".format(cls.__name__, patterns))
 
     raw_exclude = kwargs.pop('exclude', [])
@@ -233,13 +232,13 @@ class FilesetRelPathWrapper(ABC):
 
   @staticmethod
   def process_raw_exclude(raw_exclude):
-    if isinstance(raw_exclude, string_types):
+    if isinstance(raw_exclude, str):
       raise ValueError("Expected exclude parameter to be a list of globs, lists, or strings,"
                        " but was a string: {}".format(raw_exclude))
 
     # You can't subtract raw strings from globs
     def ensure_string_wrapped_in_list(element):
-      if isinstance(element, string_types):
+      if isinstance(element, str):
         return [element]
       else:
         return element

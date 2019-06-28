@@ -6,7 +6,6 @@ import os
 import weakref
 from hashlib import sha1
 
-from six import string_types
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
@@ -371,7 +370,7 @@ class Target(AbstractTarget):
     """
     return self._tags
 
-  def assert_list(self, putative_list, expected_type=string_types, key_arg=None):
+  def assert_list(self, putative_list, expected_type=str, key_arg=None):
     """
     :API: public
     """

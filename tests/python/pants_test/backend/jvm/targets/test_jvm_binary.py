@@ -23,9 +23,9 @@ class JarRulesTest(unittest.TestCase):
     self.assertEqual('Skip(apply_pattern=foo)', repr(skip_rule))
 
   def test_invalid_apply_pattern(self):
-    with self.assertRaisesRegexp(ValueError, r'The supplied apply_pattern is not a string'):
+    with self.assertRaisesRegexp(ValueError, r'The supplied apply_pattern is not a str'):
       Skip(None)
-    with self.assertRaisesRegexp(ValueError, r'The supplied apply_pattern is not a string'):
+    with self.assertRaisesRegexp(ValueError, r'The supplied apply_pattern is not a str'):
       Duplicate(None, Duplicate.SKIP)
     with self.assertRaisesRegexp(ValueError, r'The supplied apply_pattern: \) is not a valid'):
       Skip(r')')

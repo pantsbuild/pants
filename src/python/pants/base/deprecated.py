@@ -7,7 +7,6 @@ import warnings
 from contextlib import contextmanager
 from functools import wraps
 
-import six
 from future.utils import PY2
 from packaging.version import InvalidVersion, Version
 
@@ -68,7 +67,7 @@ def validate_deprecation_semver(version_string, version_description):
   """
   if version_string is None:
     raise MissingSemanticVersionError('The {} must be provided.'.format(version_description))
-  if not isinstance(version_string, six.string_types):
+  if not isinstance(version_string, str):
     raise BadSemanticVersionError('The {} must be a version string.'.format(version_description))
   try:
     # NB: packaging will see versions like 1.a.0 as 1a0, and are "valid"

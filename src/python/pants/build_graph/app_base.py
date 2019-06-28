@@ -5,7 +5,6 @@ import os
 from collections import OrderedDict, namedtuple
 from hashlib import sha1
 
-import six
 from twitter.common.dirutil import Fileset
 
 from pants.base.build_environment import get_buildroot
@@ -150,7 +149,7 @@ class Bundle:
     # A fileset is either a glob, a string or a list of strings.
     if isinstance(fileset, FilesetWithSpec):
       pass
-    elif isinstance(fileset, six.string_types):
+    elif isinstance(fileset, str):
       fileset = [fileset]
     else:
       fileset = assert_list(fileset, key_arg='fileset')

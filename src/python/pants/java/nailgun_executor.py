@@ -10,7 +10,6 @@ import threading
 import time
 from contextlib import closing
 
-from future.utils import string_types
 from twitter.common.collections import maybe_list
 
 from pants.base.build_environment import get_buildroot
@@ -87,7 +86,7 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
                                          process_name=self._PROCESS_NAME,
                                          metadata_base_dir=metadata_base_dir)
 
-    if not isinstance(workdir, string_types):
+    if not isinstance(workdir, str):
       raise ValueError('Workdir must be a path string, not: {workdir}'.format(workdir=workdir))
 
     self._identity = identity

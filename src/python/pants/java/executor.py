@@ -8,7 +8,6 @@ import sys
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 
-from six import string_types
 from twitter.common.collections import maybe_list
 
 from pants.util.contextutil import environment_as
@@ -26,7 +25,7 @@ class Executor(ABC):
   @staticmethod
   def _scrub_args(classpath, main, jvm_options, args):
     classpath = maybe_list(classpath)
-    if not isinstance(main, string_types) or not main:
+    if not isinstance(main, str) or not main:
       raise ValueError('A non-empty main classname is required, given: {}'.format(main))
     jvm_options = maybe_list(jvm_options or ())
     args = maybe_list(args or ())
