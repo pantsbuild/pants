@@ -1477,7 +1477,6 @@ mod tests {
       None,
       None,
       BTreeMap::new(),
-      1,
       store,
     );
     let result = runtime
@@ -1849,7 +1848,6 @@ mod tests {
       None,
       None,
       BTreeMap::new(),
-      1,
       store,
     );
 
@@ -1943,7 +1941,6 @@ mod tests {
       None,
       None,
       BTreeMap::new(),
-      1,
       store,
     )
     .run(cat_roland_request())
@@ -2009,7 +2006,6 @@ mod tests {
       None,
       None,
       BTreeMap::new(),
-      1,
       store,
     );
 
@@ -2628,7 +2624,7 @@ mod tests {
     )
     .expect("Failed to make store");
 
-    CommandRunner::new(&address, None, None, None, None, BTreeMap::new(), 1, store)
+    CommandRunner::new(&address, None, None, None, None, BTreeMap::new(), store)
   }
 
   fn extract_execute_response(
