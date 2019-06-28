@@ -31,7 +31,6 @@ python_library(
   name = 'context',
   sources = ['context.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':products',
     ':workspace',
     'src/python/pants/base:build_environment',

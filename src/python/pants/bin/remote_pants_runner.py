@@ -6,7 +6,7 @@ import sys
 import time
 from contextlib import contextmanager
 
-from future.utils import PY3, raise_with_traceback
+from future.utils import raise_with_traceback
 
 from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.console.stty_utils import STTYSettings
@@ -85,8 +85,8 @@ class RemotePantsRunner:
     self._options_bootstrapper = options_bootstrapper
     self._bootstrap_options = options_bootstrapper.bootstrap_options
     self._stdin = stdin or sys.stdin
-    self._stdout = stdout or (sys.stdout.buffer if PY3 else sys.stdout)
-    self._stderr = stderr or (sys.stderr.buffer if PY3 else sys.stderr)
+    self._stdout = stdout or sys.stdout.buffer
+    self._stderr = stderr or sys.stderr.buffer
 
   @contextmanager
   def _trapped_signals(self, client):

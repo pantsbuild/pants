@@ -17,7 +17,6 @@ python_library(
   name = 'nailgun_client',
   sources = ['nailgun_client.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:psutil',
     ':nailgun_io',
     ':nailgun_protocol',

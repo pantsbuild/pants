@@ -141,7 +141,7 @@ def stdio_as(stdout_fd, stderr_fd, stdin_fd):
   impossible for this method to locate all python objects which refer to those fds, so it's up
   to the caller to guarantee that `0, 1, 2` are safe to replace.
 
-  In Python3, the streams expect unicode. To write and read bytes, access their buffer, e.g. `stdin.buffer.read()`.
+  The streams expect unicode. To write and read bytes, access their buffer, e.g. `stdin.buffer.read()`.
   """
   with _stdio_stream_as(stdin_fd,  0, 'stdin',  'r'),\
        _stdio_stream_as(stdout_fd, 1, 'stdout', 'w'),\

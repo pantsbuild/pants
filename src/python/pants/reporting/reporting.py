@@ -5,8 +5,6 @@ import os
 import sys
 from io import BytesIO
 
-from future.utils import PY3
-
 from pants.base.workunit import WorkUnitLabel
 from pants.reporting.html_reporter import HtmlReporter
 from pants.reporting.invalidation_report import InvalidationReport
@@ -173,8 +171,8 @@ class Reporting(Subsystem):
                                                               timing=timing, cache_stats=cache_stats))
     else:
       # Set up the new console reporter.
-      stdout = sys.stdout.buffer if PY3 else sys.stdout
-      stderr = sys.stderr.buffer if PY3 else sys.stderr
+      stdout = sys.stdout.buffer
+      stderr = sys.stderr.buffer
       settings = PlainTextReporter.Settings(log_level=log_level, outfile=stdout, errfile=stderr,
                                             color=color, indent=True, timing=timing, cache_stats=cache_stats,
                                             label_format=self.get_options().console_label_format,

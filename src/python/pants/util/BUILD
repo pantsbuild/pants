@@ -110,9 +110,6 @@ python_library(
 python_library(
   name = 'process_handler',
   sources = ['process_handler.py'],
-  dependencies= [
-    '3rdparty/python:future',
-  ]
 )
 
 python_library(
