@@ -864,10 +864,20 @@ impl Task {
           .ok_or_else(|| throw(&format!("no edges for task {:?} exist!", entry)))
           .and_then(|edges| {
             edges.entry_for(&dependency_key).cloned().ok_or_else(|| {
-              throw(&format!(
-                "{:?} did not declare a dependency on {:?}",
-                entry, dependency_key
-              ))
+              let declared_type_union = get.declared_subject.and_then(externs::get_union_for);
+              match declared_type_union {
+                Some(union_ty) => {
+                  let description = "dummy description";
+                  throw(&format!(
+                    "Type {} is not a member of the {} @union (\"{}\")",
+                    get.subject, union_ty, description
+                  ))
+                }
+                None => throw(&format!(
+                  "{:?} did not declare a dependency on {:?}",
+                  entry, dependency_key
+                )),
+              }
             })
           });
         // The subject of the get is a new parameter that replaces an existing param of the same
