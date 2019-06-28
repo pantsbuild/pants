@@ -66,6 +66,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Greg Shuflin
 + Guy Marom
 + Harley Cooper
++ Henry Fuller
 + Hwasung Lee
 + Ian Tabolt
 + Igor Morozov
