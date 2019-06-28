@@ -6,8 +6,6 @@ import multiprocessing
 import sys
 from abc import ABC, abstractmethod
 
-from future.utils import PY3
-
 
 class ProcessHandler(ABC):
   """An abstraction of process handling calls using the same interface as subprocess(32).Popen.
@@ -91,6 +89,6 @@ def _tee(infile, outfile, return_function):
   accumulator = io.BytesIO()
   for line in iter(infile.readline, b""):
     accumulator.write(line)
-    outfile.buffer.write(line) if PY3 else outfile.write(line)
+    outfile.buffer.write(line)
   infile.close()
   return_function(accumulator.getvalue())
