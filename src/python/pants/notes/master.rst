@@ -4,7 +4,7 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
-1.18.0.dev2 (6/21/2019)
+1.18.0.dev2 (6/28/2019)
 -----------------------
 
 Bugfixes
@@ -27,7 +27,6 @@ Refactoring, Improvements, and Tooling
   `PR #7965 <https://github.com/pantsbuild/pants/pull/7965>`_
 
 * Revert "Workaround Travis timeout for OSX platforms test (#7919)" (#7967)
-  `PR #7919 <https://github.com/pantsbuild/pants/pull/7919>`_
   `PR #7967 <https://github.com/pantsbuild/pants/pull/7967>`_
 
 * Add Option for remote concurrency. (#7960)
@@ -52,7 +51,6 @@ Refactoring, Improvements, and Tooling
   `PR #7958 <https://github.com/pantsbuild/pants/pull/7958>`_
 
 * Crash pailgun client on SIGINT if we haven't received the pid yet (#7924)
->`_ttps://github.com/pantsbuild/pants/issues/7920
   `PR #7924 <https://github.com/pantsbuild/pants/pull/7924>`_
 
 * Add whitelist of folders that must remain Python 2 compatible (#7941)
@@ -60,7 +58,6 @@ Refactoring, Improvements, and Tooling
 
 * Add concurrent flag, which overrides --enable-pantsd (#7944)
   `PR #7944 <https://github.com/pantsbuild/pants/pull/7944>`_
-  `PR #7913#issuecomment-504523310 <https://github.com/pantsbuild/pants/pull/7913#issuecomment-504523310>`_
 
 * Report zipkin spans regardless of goal version. (#7915)
   `PR #7915 <https://github.com/pantsbuild/pants/pull/7915>`_
@@ -70,7 +67,6 @@ Refactoring, Improvements, and Tooling
 
 * Modernize classes to use Python 3 syntax (#7937)
   `PR #7937 <https://github.com/pantsbuild/pants/pull/7937>`_
-  `PR #files#diff-1597b620408328537d56e23e6d721849) <https://github.com/foursquare/fsqio/pull/60/files#diff-1597b620408328537d56e23e6d721849)>`_
 
 * Remove configparser backport (#7939)
   `PR #7939 <https://github.com/pantsbuild/pants/pull/7939>`_
@@ -86,7 +82,6 @@ Refactoring, Improvements, and Tooling
 
 * Remove `builtins` imports (#7934)
   `PR #7934 <https://github.com/pantsbuild/pants/pull/7934>`_
-  `PR #files#diff-47a2d4f81bdce5c3dd5a7d46311df103) <https://github.com/foursquare/fsqio/pull/60/files#diff-47a2d4f81bdce5c3dd5a7d46311df103)>`_
 
 * Modernize `abc` stdlib usage. (#7928)
   `PR #7928 <https://github.com/pantsbuild/pants/pull/7928>`_
