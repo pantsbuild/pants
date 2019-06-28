@@ -8,8 +8,6 @@ import os
 from collections import defaultdict
 from urllib import parse
 
-from future.utils import PY3
-
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
                                                                     PinnedJarArtifactSet)
@@ -494,8 +492,7 @@ class CoursierMixin(JvmResolverBase):
       compile_classpath.add_jars_for_targets([target], conf, jars_to_add)
 
   def _populate_results_dir(self, vts_results_dir, results):
-    mode = 'w' if PY3 else 'wb'
-    with open(os.path.join(vts_results_dir, self.RESULT_FILENAME), mode) as f:
+    with open(os.path.join(vts_results_dir, self.RESULT_FILENAME), 'w') as f:
       json.dump(results, f)
 
   def _load_from_results_dir(self, compile_classpath, vts_results_dir,

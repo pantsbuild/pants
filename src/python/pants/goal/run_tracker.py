@@ -14,7 +14,6 @@ from collections import OrderedDict
 from contextlib import contextmanager
 
 import requests
-from future.utils import PY3
 
 from pants.auth.cookies import Cookies
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
@@ -407,9 +406,8 @@ class RunTracker(Subsystem):
   def write_stats_to_json(cls, file_name, stats):
     """Write stats to a local json file."""
     params = cls._json_dump_options(stats)
-    mode = 'w' if PY3 else 'wb'
     try:
-      safe_file_dump(file_name, params, mode=mode)
+      safe_file_dump(file_name, params, mode='w')
     except Exception as e: # Broad catch - we don't want to fail in stats related failure.
       print('WARNING: Failed to write stats to {} due to Error: {}'.format(file_name, e),
             file=sys.stderr)

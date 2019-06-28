@@ -83,7 +83,6 @@ python_tests(
   name='node_task',
   sources=['test_node_task.py'],
   dependencies=[
-    '3rdparty/python:future',
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
     'contrib/node/src/python/pants/contrib/node/targets:node_remote_module',
     'contrib/node/src/python/pants/contrib/node/targets:node_test',

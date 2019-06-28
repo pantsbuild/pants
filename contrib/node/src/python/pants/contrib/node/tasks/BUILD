@@ -50,7 +50,6 @@ python_library(
   name='node_repl',
   sources=['node_repl.py'],
   dependencies=[
-    '3rdparty/python:future',
     ':node_paths',
     ':node_task',
     'src/python/pants/base:exceptions',
