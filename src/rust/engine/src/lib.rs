@@ -65,10 +65,10 @@ use crate::context::Core;
 use crate::core::{Function, Key, Params, TypeId, Value};
 use crate::externs::{
   Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern, DropHandlesExtern,
-  EqualsExtern, ExternContext, Externs, GeneratorSendExtern, GetTypeForExtern, GetUnionForExtern,
-  HandleBuffer, IdentifyExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult, RawBuffer,
-  StoreBoolExtern, StoreBytesExtern, StoreF64Extern, StoreI64Extern, StoreTupleExtern,
-  StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
+  EqualsExtern, ExternContext, Externs, GeneratorSendExtern, GetHandleFromTypeIdExtern,
+  GetTypeForExtern, GetUnionForExtern, HandleBuffer, IdentifyExtern, ProjectIgnoringTypeExtern,
+  ProjectMultiExtern, PyResult, RawBuffer, StoreBoolExtern, StoreBytesExtern, StoreF64Extern,
+  StoreI64Extern, StoreTupleExtern, StoreUtf8Extern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern,
 };
 use crate::handles::Handle;
 use crate::scheduler::{ExecutionRequest, RootResult, Scheduler, Session};
@@ -113,6 +113,7 @@ pub extern "C" fn externs_set(
   call: CallExtern,
   generator_send: GeneratorSendExtern,
   get_type_for: GetTypeForExtern,
+  get_handle_from_type_id: GetHandleFromTypeIdExtern,
   get_union_for: GetUnionForExtern,
   identify: IdentifyExtern,
   equals: EqualsExtern,
@@ -139,6 +140,7 @@ pub extern "C" fn externs_set(
     call,
     generator_send,
     get_type_for,
+    get_handle_from_type_id,
     get_union_for,
     identify,
     equals,

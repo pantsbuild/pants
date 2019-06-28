@@ -867,7 +867,8 @@ impl Task {
               let declared_type_union = get.declared_subject.and_then(externs::get_union_for);
               match declared_type_union {
                 Some(union_ty) => {
-                  let description = "dummy description";
+                  let value = externs::get_value_from_type_id(union_ty);
+                  let description = externs::project_str(&value, "description");
                   throw(&format!(
                     "Type {} is not a member of the {} @union (\"{}\")",
                     get.subject, union_ty, description

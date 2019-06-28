@@ -20,6 +20,13 @@ pub fn none() -> Handle {
   with_externs(|e| (e.clone_val)(e.context, &e.none))
 }
 
+pub fn get_value_from_type_id(ty: TypeId) -> Value {
+  with_externs(|e| {
+    let handle = (e.get_handle_from_type_id)(e.context, ty);
+    Value::new(handle)
+  })
+}
+
 pub fn get_type_for(val: &Value) -> TypeId {
   with_externs(|e| (e.get_type_for)(e.context, val as &Handle))
 }
@@ -329,6 +336,7 @@ pub struct Externs {
   pub call: CallExtern,
   pub generator_send: GeneratorSendExtern,
   pub get_type_for: GetTypeForExtern,
+  pub get_handle_from_type_id: GetHandleFromTypeIdExtern,
   pub get_union_for: GetUnionForExtern,
   pub identify: IdentifyExtern,
   pub equals: EqualsExtern,
@@ -354,6 +362,8 @@ unsafe impl Sync for Externs {}
 unsafe impl Send for Externs {}
 
 pub type GetTypeForExtern = extern "C" fn(*const ExternContext, *const Handle) -> TypeId;
+
+pub type GetHandleFromTypeIdExtern = extern "C" fn(*const ExternContext, TypeId) -> Handle;
 
 pub type GetUnionForExtern = extern "C" fn(*const ExternContext, TypeId) -> TypeId;
 

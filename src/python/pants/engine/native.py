@@ -284,6 +284,11 @@ class _FFISpecification(object):
     type_id = c.to_id(type(obj))
     return TypeId(type_id)
 
+  @_extern_decl('Handle', ['ExternContext*', 'TypeId'])
+  def extern_get_handle_from_type_id(self, context_handle, ty):
+    c = self._ffi.from_handle(context_handle)
+    return c.to_value(ty)
+
   @_extern_decl('TypeId', ['ExternContext*', 'TypeId'])
   def extern_get_union_for(self, context_handle, type_id):
     """Return an optional union if the type belongs to one"""
@@ -294,7 +299,7 @@ class _FFISpecification(object):
     union_rules = self._build_configuration.union_rules()
 
     if input_type in union_rules:
-      return TypeId(c.to_id(type(input_type)))
+      return TypeId(c.to_id(input_type))
     else:
       return TypeId(0)
 
@@ -675,6 +680,7 @@ class Native(Singleton):
                            self.ffi_lib.extern_call,
                            self.ffi_lib.extern_generator_send,
                            self.ffi_lib.extern_get_type_for,
+                           self.ffi_lib.extern_get_handle_from_type_id,
                            self.ffi_lib.extern_get_union_for,
                            self.ffi_lib.extern_identify,
                            self.ffi_lib.extern_equals,
