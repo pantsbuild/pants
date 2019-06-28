@@ -384,7 +384,7 @@ def enum(all_values):
   # Python requires creating an explicit closure to save the value on each loop iteration.
   accessor_generator = lambda case: lambda cls: cls(case)
   for case in all_values_realized:
-    if _string_type_constraint.satisfied_by(case):
+    if SubclassesOf(str).satisfied_by(case):
       accessor = classproperty(accessor_generator(case))
       attr_name = re.sub(r'-', '_', case)
       setattr(ChoiceDatatype, attr_name, accessor)
@@ -536,11 +536,6 @@ class SubclassesOf(TypeOnlyConstraint):
     return issubclass(obj_type, self._types)
 
 
-# TODO(#6071): We should in general not allow bytes _and_ str. The whole point of Py3 was to decide
-# for each case which to use, not to support both.
-_string_type_constraint = SubclassesOf(bytes, str)
-
-
 class TypedCollection(TypeConstraint):
   """A `TypeConstraint` which accepts a TypeOnlyConstraint and validates a collection."""
 
@@ -557,12 +552,12 @@ class TypedCollection(TypeConstraint):
   def exclude_iterable_constraint(cls):
     """Define what collection inputs are *not* accepted by this type constraint.
 
-    Strings in Python are considered iterables of substrings, but we only want to allow explicit
-    collection types.
+    Strings (unicode and byte) in Python are considered iterables of substrings, but we only want
+    to allow explicit collection types.
 
     :rtype: TypeConstraint
     """
-    return _string_type_constraint
+    return SubclassesOf(str, bytes)
 
   def __init__(self, constraint):
     """Create a `TypeConstraint` which validates each member of a collection with `constraint`.
