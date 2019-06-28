@@ -366,7 +366,7 @@ class Fetcher:
     """
     @contextmanager
     def download_fp(_path_or_fd):
-      if _path_or_fd and not isinstance(_path_or_fd, six.string_types):
+      if _path_or_fd and not isinstance(_path_or_fd, str):
         yield _path_or_fd, _path_or_fd.name
       else:
         if not _path_or_fd:
