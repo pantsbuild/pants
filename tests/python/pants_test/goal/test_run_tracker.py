@@ -4,8 +4,7 @@
 import http.server
 import json
 import threading
-
-from future.moves.urllib.parse import parse_qs
+from urllib.parse import parse_qs
 
 from pants.auth.cookies import Cookies
 from pants.goal.run_tracker import RunTracker

@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from collections import defaultdict, namedtuple
+from itertools import zip_longest
 
-from future.moves.itertools import zip_longest
 from six import string_types
 
 from pants.reporting.reporter import Reporter

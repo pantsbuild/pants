@@ -6,8 +6,8 @@ import itertools
 import json
 import os
 from collections import defaultdict
+from urllib import parse
 
-from future.moves.urllib import parse
 from future.utils import PY3
 
 from pants.backend.jvm.ivy_utils import IvyUtils

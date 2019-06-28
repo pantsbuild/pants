@@ -5,8 +5,7 @@ import base64
 import os
 import threading
 from contextlib import contextmanager
-
-from future.moves.http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from pants.auth.basic_auth import BasicAuth, BasicAuthCreds, BasicAuthException
 from pants.auth.cookies import Cookies
