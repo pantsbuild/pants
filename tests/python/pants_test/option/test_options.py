@@ -851,8 +851,8 @@ class OptionsTest(TestBase):
     single_warning = assert_single_element(w)
     self.assertEqual(single_warning.category, DeprecationWarning)
     warning_message = single_warning.message
-    self.assertIn("will be removed in version", warning_message)
-    self.assertIn(option_string, warning_message)
+    self.assertIn("will be removed in version", str(warning_message))
+    self.assertIn(option_string, str(warning_message))
 
   def test_deprecated_options_flag(self):
     with self.warnings_catcher() as w:

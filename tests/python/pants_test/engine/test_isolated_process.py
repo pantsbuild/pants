@@ -108,7 +108,7 @@ def get_javac_version_output(javac_version_command):
   javac_version_proc_result = yield Get(
     ExecuteProcessResult, ExecuteProcessRequest, javac_version_proc_req)
 
-  yield JavacVersionOutput(javac_version_proc_result.stderr)
+  yield JavacVersionOutput(javac_version_proc_result.stderr.decode())
 
 
 class JavacSources(datatype([('java_files', tuple)])):
@@ -165,8 +165,8 @@ def javac_compile_process_result(javac_compile_req):
   javac_proc_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, process_request)
 
   yield JavacCompileResult(
-    javac_proc_result.stdout,
-    javac_proc_result.stderr,
+    javac_proc_result.stdout.decode(),
+    javac_proc_result.stderr.decode(),
     javac_proc_result.output_directory_digest,
   )
 

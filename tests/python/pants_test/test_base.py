@@ -721,7 +721,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     single_warning = assert_single_element(w)
     self.assertEqual(single_warning.category, category)
     warning_message = single_warning.message
-    self.assertEqual(warning_text, warning_message)
+    self.assertEqual(warning_text, str(warning_message))
 
   def retrieve_single_product_at_target_base(self, product_mapping, target):
     mapping_for_target = product_mapping.get(target)
