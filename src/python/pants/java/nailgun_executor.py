@@ -5,6 +5,7 @@ import hashlib
 import logging
 import os
 import re
+import selectors
 import threading
 import time
 from contextlib import closing
@@ -18,12 +19,6 @@ from pants.java.nailgun_client import NailgunClient
 from pants.pantsd.process_manager import FingerprintedProcessManager, ProcessGroup
 from pants.util.dirutil import read_file, safe_file_dump, safe_open
 from pants.util.memo import memoized_classproperty
-
-
-if PY3:
-  import selectors
-else:
-  import select
 
 
 logger = logging.getLogger(__name__)
@@ -220,37 +215,23 @@ Stderr:
           stderr=stderr,
         )
 
-    if PY3:
-      # NB: We use PollSelector, rather than the more efficient DefaultSelector, because
-      # DefaultSelector results in using the epoll() syscall on Linux, which does not work with
-      # regular text files like ng_stdout. See https://stackoverflow.com/a/8645770.
-      with selectors.PollSelector() as selector, \
-        safe_open(self._ng_stdout, 'r') as ng_stdout:
-        selector.register(ng_stdout, selectors.EVENT_READ)
-        while 1:
-          remaining_time = calculate_remaining_time()
-          possibly_raise_timeout(remaining_time)
-          events = selector.select(timeout=-1 * remaining_time)
-          if events:
-            line = ng_stdout.readline()  # TODO: address deadlock risk here.
-            try:
-              return self._NG_PORT_REGEX.match(line).group(1)
-            except AttributeError:
-              pass
-            accumulated_stdout += line
-    else:
-      with safe_open(self._ng_stdout, 'r') as ng_stdout:
-        while 1:
-          remaining_time = calculate_remaining_time()
-          possibly_raise_timeout(remaining_time)
-          readable, _, _ = select.select([ng_stdout], [], [], (-1 * remaining_time))
-          if readable:
-            line = ng_stdout.readline()  # TODO: address deadlock risk here.
-            try:
-              return self._NG_PORT_REGEX.match(line).group(1)
-            except AttributeError:
-              pass
-            accumulated_stdout += line
+    # NB: We use PollSelector, rather than the more efficient DefaultSelector, because
+    # DefaultSelector results in using the epoll() syscall on Linux, which does not work with
+    # regular text files like ng_stdout. See https://stackoverflow.com/a/8645770.
+    with selectors.PollSelector() as selector, \
+      safe_open(self._ng_stdout, 'r') as ng_stdout:
+      selector.register(ng_stdout, selectors.EVENT_READ)
+      while 1:
+        remaining_time = calculate_remaining_time()
+        possibly_raise_timeout(remaining_time)
+        events = selector.select(timeout=-1 * remaining_time)
+        if events:
+          line = ng_stdout.readline()  # TODO: address deadlock risk here.
+          try:
+            return self._NG_PORT_REGEX.match(line).group(1)
+          except AttributeError:
+            pass
+          accumulated_stdout += line
 
   def _create_ngclient(self, port, stdout, stderr, stdin):
     return NailgunClient(port=port, ins=stdin, out=stdout, err=stderr)

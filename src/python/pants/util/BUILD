@@ -157,9 +157,6 @@ python_binary(
 python_library(
   name = 'socket',
   sources = ['socket.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
 )
 
 python_library(
