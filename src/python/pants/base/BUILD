@@ -128,16 +128,12 @@ python_library(
 python_library(
   name = 'payload',
   sources = ['payload.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
 )
 
 python_library(
   name = 'payload_field',
   sources = ['payload_field.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':deprecated',
     ':hash_utils',

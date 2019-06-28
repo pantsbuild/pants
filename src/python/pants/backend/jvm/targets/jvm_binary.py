@@ -5,7 +5,7 @@ import re
 from abc import ABCMeta
 from hashlib import sha1
 
-from future.utils import PY3, string_types
+from future.utils import string_types
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TargetDefinitionException
@@ -238,7 +238,7 @@ class JarRules(FingerprintedMixin):
     hasher.update(self.payload.fingerprint().encode('utf-8'))
     for rule in self.rules:
       hasher.update(rule.fingerprint().encode('utf-8'))
-    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+    return hasher.hexdigest()
 
   @property
   def value(self):
