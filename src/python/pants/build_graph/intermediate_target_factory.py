@@ -4,7 +4,7 @@
 from abc import ABC
 from hashlib import sha1
 
-from future.utils import PY3, string_types
+from future.utils import string_types
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
@@ -14,7 +14,7 @@ def hash_target(address, suffix):
   hasher = sha1()
   hasher.update(address.encode('utf-8'))
   hasher.update(suffix.encode('utf-8'))
-  return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+  return hasher.hexdigest()
 
 
 class IntermediateTargetFactoryBase(ABC):

@@ -6,7 +6,6 @@ from collections import defaultdict, namedtuple
 from hashlib import sha1
 
 from colors import red
-from future.utils import PY3
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TaskError
@@ -135,7 +134,7 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
       hasher = sha1()
       if hasattr(target, 'platform'):
         hasher.update(str(tuple(target.platform)).encode('utf-8'))
-      return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+      return hasher.hexdigest()
 
     def __eq__(self, other):
       return type(self) == type(other)

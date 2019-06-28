@@ -890,7 +890,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
       fingerprint = fingerprint_internal(internal_target)
       sha.update(fingerprint.encode('utf-8'))
 
-    return sha.hexdigest() if PY3 else sha.hexdigest().decode('utf-8')
+    return sha.hexdigest()
 
   def changelog(self, target, sha):
     # Filter synthetic files.

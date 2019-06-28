@@ -8,8 +8,6 @@ from contextlib import contextmanager
 from hashlib import sha1
 from itertools import repeat
 
-from future.utils import PY3
-
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
 from pants.build_graph.target_filter_subsystem import TargetFilter
@@ -315,7 +313,7 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
       include_passthru=self.supports_passthru_args(),
     )
     options_hasher.update(options_fp.encode('utf-8'))
-    return options_hasher.hexdigest() if PY3 else options_hasher.hexdigest().decode('utf-8')
+    return options_hasher.hexdigest()
 
   @memoized_property
   def fingerprint(self):
@@ -333,7 +331,7 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     hasher.update(self.implementation_version_str().encode('utf-8'))
     for dep in self.subsystem_closure_iter():
       hasher.update(self._options_fingerprint(dep.options_scope).encode('utf-8'))
-    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+    return hasher.hexdigest()
 
   def artifact_cache_reads_enabled(self):
     return self._cache_factory.read_cache_available()

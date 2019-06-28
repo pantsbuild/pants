@@ -3,8 +3,6 @@
 
 import hashlib
 
-from future.utils import PY3
-
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
@@ -98,7 +96,7 @@ class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
         [target])
       for _, entry in classpath_entries:
         hasher.update(str(entry.coordinate).encode('utf-8'))
-    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+    return hasher.hexdigest()
 
   def direct(self, target):
     return self._dep_context.defaulted_property(target, 'strict_deps')

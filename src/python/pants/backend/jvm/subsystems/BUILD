@@ -5,7 +5,6 @@ python_library(
   name = 'dependency_context',
   sources = ['dependency_context.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':java',
     ':scala_platform',
     'src/python/pants/backend/codegen/thrift/java',

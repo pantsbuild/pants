@@ -4,7 +4,6 @@
 from abc import ABC, abstractmethod
 from hashlib import sha1
 
-from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
 from pants.base.hash_utils import stable_json_sha1
@@ -17,7 +16,7 @@ def combine_hashes(hashes):
   for h in sorted(hashes):
     h = ensure_binary(h)
     hasher.update(h)
-  return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+  return hasher.hexdigest()
 
 
 class PayloadField(ABC):

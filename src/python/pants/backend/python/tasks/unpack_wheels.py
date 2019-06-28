@@ -4,7 +4,6 @@
 import os
 from hashlib import sha1
 
-from future.utils import PY3
 from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
@@ -32,7 +31,7 @@ class UnpackWheelsFingerprintStrategy(DefaultFingerprintHashingMixin, Fingerprin
       for cache_key in sorted(req.cache_key() for req in target.all_imported_requirements):
         hasher.update(cache_key.encode('utf-8'))
       hasher.update(target.payload.fingerprint().encode('utf-8'))
-      return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+      return hasher.hexdigest()
     return None
 
 

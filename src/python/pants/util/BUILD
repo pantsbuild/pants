@@ -20,15 +20,11 @@ python_library(
 python_library(
   name = 'collections',
   sources = ['collections.py'],
-  dependencies = [
-  ]
 )
 
 python_library(
   name = 'debug',
   sources = ['debug.py'],
-  dependencies = [
-  ],
 )
 
 python_library(
@@ -84,15 +80,11 @@ python_library(
 python_library(
   name = 'meta',
   sources = ['meta.py'],
-  dependencies = [
-  ]
 )
 
 python_library(
   name = 'netrc',
   sources = ['netrc.py'],
-  dependencies = [
-  ]
 )
 
 python_library(
@@ -126,8 +118,6 @@ python_library(
 python_library(
   name = 'retry',
   sources = ['retry.py'],
-  dependencies = [
-  ]
 )
 
 python_library(
