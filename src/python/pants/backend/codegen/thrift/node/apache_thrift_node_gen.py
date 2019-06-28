@@ -17,4 +17,10 @@ class ApacheThriftNodeGen(ApacheThriftGenBase):
 
 
 	def execute_codegen(selt, target, target_workdir):
-		super().execute_codegen(target, target_workdir)
+ 		thrift_target_deps = target.closure(lambda t: isinstance(t, ThriftTargetMixin))
+ 		all_thrift_sources = [
+ 		  s
+ 		  for s in t.sources_relative_to_buildroot()
+ 		  for t in thrift_target_deps
+ 		]
+		super().execute_codegen(target, target_workdir, extra_sources)
