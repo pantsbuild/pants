@@ -18,12 +18,14 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
+from pants.backend.native.config.environment import Platform
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
 from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
 from pants.engine.isolated_process import ExecuteProcessRequest
+from pants.option.custom_types import dir_option
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_method, memoized_property
@@ -141,6 +143,10 @@ class BaseZincCompile(JvmCompile):
              help='When set, the results of incremental compiles will be written to the cache. '
                   'This is unset by default, because it is generally a good precaution to cache '
                   'only clean/cold builds.')
+
+    register('--native-image-agent-library-dir', type=dir_option, default=None,
+             help='Location of the directory containing libnative-image-agent.(so|dylib) so that '
+                  'it can be passed onto the hermetic subprocess.')
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -438,9 +444,8 @@ class BaseZincCompile(JvmCompile):
         '-Dscala.usejavacp=true',
       ]
     else:
-      # TODO: Extract something common from Executor._create_command to make the command line
-      # TODO: Lean on distribution for the bin/java appending here
       native_image_snapshots = ()
+      # TODO: Lean on distribution for the bin/java appending here
       image_specific_argv =  ['.jdk/bin/java'] + jvm_options + [
         '-cp', zinc_relpath,
         Zinc.ZINC_COMPILE_MAIN
@@ -453,6 +458,7 @@ class BaseZincCompile(JvmCompile):
         ),
       ])
 
+    # TODO: Extract something common from Executor._create_command to make the command line
     argv = image_specific_argv + ['@{}'.format(argfile_snapshot.files[0])]
 
     merged_input_digest = self.context._scheduler.merge_directories(
@@ -462,8 +468,18 @@ class BaseZincCompile(JvmCompile):
       (self.post_compile_extra_resources_digest(ctx), argfile_snapshot.directory_digest)
     )
 
+    env = {}
+    agent_lib_dir = self.get_options().native_image_agent_library_dir
+    if agent_lib_dir:
+      lib_path_env_var = Platform.current.resolve_for_enum_variant({
+        'darwin': 'DYLD_LIBRARY_PATH',
+        'linux': 'LD_LIBRARY_PATH',
+      })
+      env[lib_path_env_var] = agent_lib_dir
+
     req = ExecuteProcessRequest(
       argv=tuple(argv),
+      env=env,
       input_files=merged_input_digest,
       output_files=(jar_file,) if self.get_options().use_classpath_jars else (),
       output_directories=() if self.get_options().use_classpath_jars else (classes_dir,),
