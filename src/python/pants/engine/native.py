@@ -12,7 +12,7 @@ from contextlib import closing
 
 import cffi
 import pkg_resources
-from future.utils import PY2, binary_type, text_type
+from future.utils import PY2
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.engine.selectors import Get
@@ -321,7 +321,7 @@ class _FFISpecification(object):
   def extern_type_to_str(self, context_handle, type_id):
     """Given a TypeId, write type.__name__ and return it."""
     c = self._ffi.from_handle(context_handle)
-    return c.utf8_buf(text_type(c.from_id(type_id.tup_0).__name__))
+    return c.utf8_buf(str(c.from_id(type_id.tup_0).__name__))
 
   @_extern_decl('Buffer', ['ExternContext*', 'Handle*'])
   def extern_val_to_str(self, context_handle, val):
@@ -329,7 +329,7 @@ class _FFISpecification(object):
     c = self._ffi.from_handle(context_handle)
     v = c.from_value(val[0])
     # Consistently use the empty string to indicate None.
-    v_str = '' if v is None else text_type(v)
+    v_str = '' if v is None else str(v)
     return c.utf8_buf(v_str)
 
   @_extern_decl('Handle', ['ExternContext*', 'Handle**', 'uint64_t'])
@@ -363,7 +363,7 @@ class _FFISpecification(object):
   def extern_store_bytes(self, context_handle, bytes_ptr, bytes_len):
     """Given a context and raw bytes, return a new Handle to represent the content."""
     c = self._ffi.from_handle(context_handle)
-    return c.to_value(binary_type(self._ffi.buffer(bytes_ptr, bytes_len)))
+    return c.to_value(bytes(self._ffi.buffer(bytes_ptr, bytes_len)))
 
   @_extern_decl('Handle', ['ExternContext*', 'uint8_t*', 'uint64_t'])
   def extern_store_utf8(self, context_handle, utf8_ptr, utf8_len):
@@ -803,8 +803,8 @@ class Native(Singleton):
         ti(type_process_result),
         ti(type_generator),
         ti(type_url_to_fetch),
-        ti(text_type),
-        ti(binary_type),
+        ti(str),
+        ti(bytes),
         # Project tree.
         self.context.utf8_buf(build_root),
         self.context.utf8_buf(work_dir),

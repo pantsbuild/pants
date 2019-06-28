@@ -7,8 +7,6 @@ from abc import abstractmethod
 from collections import OrderedDict
 from textwrap import dedent
 
-from future.utils import text_type
-
 from pants.util.objects import (EnumVariantSelectionError, Exactly, HashableTypedCollection,
                                 SubclassesOf, SuperclassesOf, TypeCheckError, TypeConstraintError,
                                 TypedCollection, TypedDatatypeInstanceConstructionError,
@@ -207,7 +205,7 @@ class TypedCollectionTest(TypeConstraintTestBase):
       collection_exactly_a_or_b.validate_satisfied_by([self.C()])
 
   def test_iterable_detection(self):
-    class StringCollectionField(datatype([('hello_strings', TypedCollection(Exactly(text_type)))])):
+    class StringCollectionField(datatype([('hello_strings', TypedCollection(Exactly(str)))])):
       pass
 
     self.assertEqual(['xxx'], StringCollectionField(hello_strings=['xxx']).hello_strings)
@@ -256,20 +254,20 @@ class SomeMixin:
     return self.as_str().strip()
 
 
-class TypedWithMixin(datatype([('val', text_type)]), SomeMixin):
+class TypedWithMixin(datatype([('val', str)]), SomeMixin):
   """Example of using `datatype()` with a mixin."""
 
   def as_str(self):
     return self.val
 
 
-class AnotherTypedDatatype(datatype([('string', text_type), ('elements', list)])): pass
+class AnotherTypedDatatype(datatype([('string', str), ('elements', list)])): pass
 
 
-class WithExplicitTypeConstraint(datatype([('a_string', text_type), ('an_int', Exactly(int))])): pass
+class WithExplicitTypeConstraint(datatype([('a_string', str), ('an_int', Exactly(int))])): pass
 
 
-class MixedTyping(datatype(['value', ('name', text_type)])): pass
+class MixedTyping(datatype(['value', ('name', str)])): pass
 
 
 class SomeBaseClass:
@@ -455,7 +453,7 @@ class TypedDatatypeTest(TestBase):
 
     expected_msg = "Type names and field names must be valid identifiers: \"<class 'str'>\""
     with self.assertRaisesWithMessage(ValueError, expected_msg):
-      class JustTypeField(datatype([text_type])): pass
+      class JustTypeField(datatype([str])): pass
 
     expected_msg = "Type names and field names must be valid identifiers: '3'"
     with self.assertRaisesWithMessage(ValueError, expected_msg):
@@ -494,7 +492,7 @@ class TypedDatatypeTest(TestBase):
     self.assertEqual(repr(some_val), "SomeTypedDatatype(val=3)")
     self.assertEqual(str(some_val), "SomeTypedDatatype(val<Exactly(int)>=3)")
 
-    some_object = WithExplicitTypeConstraint(text_type('asdf'), 45)
+    some_object = WithExplicitTypeConstraint('asdf', 45)
     self.assertEqual(some_object.a_string, 'asdf')
     self.assertEqual(some_object.an_int, 45)
     self.assertEqual(str(some_object), "WithExplicitTypeConstraint(a_string<Exactly(str)>=asdf, an_int<Exactly(int)>=45)")
@@ -515,7 +513,7 @@ class TypedDatatypeTest(TestBase):
       str(wrapped_nonneg_int),
       "CamelCaseWrapper(nonneg_int<Exactly(NonNegativeInt)>=NonNegativeInt(an_int<Exactly(int)>=45))")
 
-    mixed_type_obj = MixedTyping(value=3, name=text_type('asdf'))
+    mixed_type_obj = MixedTyping(value=3, name='asdf')
     self.assertEqual(3, mixed_type_obj.value)
     self.assertEqual(repr(mixed_type_obj), "MixedTyping(value=3, name='asdf')")
     self.assertEqual(str(mixed_type_obj), "MixedTyping(value=3, name<Exactly(str)>=asdf)")
@@ -585,7 +583,7 @@ field 'val' was invalid: value [] (with type 'list') must satisfy this type cons
       """type check error in class AnotherTypedDatatype: 1 error type checking constructor arguments:
 field 'elements' was invalid: value 'should be list' (with type 'str') must satisfy this type constraint: Exactly(list).""")
     with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
-      AnotherTypedDatatype(text_type('correct'), text_type('should be list'))
+      AnotherTypedDatatype('correct', 'should be list')
 
     # type checking failure on both arguments
     expected_msg = (
@@ -593,13 +591,13 @@ field 'elements' was invalid: value 'should be list' (with type 'str') must sati
 field 'string' was invalid: value 3 (with type 'int') must satisfy this type constraint: Exactly(str).
 field 'elements' was invalid: value 'should be list' (with type 'str') must satisfy this type constraint: Exactly(list).""")
     with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
-      AnotherTypedDatatype(3, text_type('should be list'))
+      AnotherTypedDatatype(3, 'should be list')
 
     expected_msg = (
         """type check error in class NonNegativeInt: 1 error type checking constructor arguments:
 field 'an_int' was invalid: value 'asdf' (with type 'str') must satisfy this type constraint: Exactly(int).""")
     with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
-      NonNegativeInt(text_type('asdf'))
+      NonNegativeInt('asdf')
 
     expected_msg = "type check error in class NonNegativeInt: value is negative: -3."
     with self.assertRaisesWithMessage(TypeCheckError, expected_msg):

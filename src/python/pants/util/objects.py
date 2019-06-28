@@ -6,7 +6,6 @@ from abc import ABC, abstractmethod
 from collections import OrderedDict, namedtuple
 from collections.abc import Iterable
 
-from future.utils import binary_type, text_type
 from twitter.common.collections import OrderedSet
 
 from pants.util.memo import memoized_classproperty
@@ -537,7 +536,9 @@ class SubclassesOf(TypeOnlyConstraint):
     return issubclass(obj_type, self._types)
 
 
-_string_type_constraint = SubclassesOf(binary_type, text_type)
+# TODO(#6071): We should in general not allow bytes _and_ str. The whole point of Py3 was to decide
+# for each case which to use, not to support both.
+_string_type_constraint = SubclassesOf(bytes, str)
 
 
 class TypedCollection(TypeConstraint):
@@ -627,9 +628,9 @@ class HashableTypedCollection(TypedCollection):
   iterable_constraint = hashable_collection_constraint
 
 
-string_type = Exactly(text_type)
+string_type = Exactly(str)
 string_list = TypedCollection(string_type)
-string_optional = Exactly(text_type, type(None))
+string_optional = Exactly(str, type(None))
 
 
 hashable_string_list = HashableTypedCollection(string_type)

@@ -10,7 +10,6 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 import yaml
-from future.utils import text_type
 from packaging.version import Version
 
 from pants.base.deprecated import CodeRemovedError
@@ -852,8 +851,8 @@ class OptionsTest(TestBase):
     single_warning = assert_single_element(w)
     self.assertEqual(single_warning.category, DeprecationWarning)
     warning_message = single_warning.message
-    self.assertIn("will be removed in version", text_type(warning_message))
-    self.assertIn(option_string, text_type(warning_message))
+    self.assertIn("will be removed in version", str(warning_message))
+    self.assertIn(option_string, str(warning_message))
 
   def test_deprecated_options_flag(self):
     with self.warnings_catcher() as w:

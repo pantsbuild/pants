@@ -3,7 +3,6 @@
 
 import os
 
-from future.utils import binary_type, text_type
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 
@@ -67,7 +66,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     """
     return ()
 
-  class ExtraFile(datatype([('path', text_type), ('content', binary_type)])):
+  class ExtraFile(datatype([('path', str), ('content', bytes)])):
     """Models an extra file to place in a PEX."""
 
     @classmethod

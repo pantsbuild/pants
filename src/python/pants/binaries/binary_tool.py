@@ -5,8 +5,6 @@ import logging
 import os
 import threading
 
-from future.utils import text_type
-
 from pants.binaries.binary_util import BinaryRequest, BinaryUtil
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.fs.archive import XZCompressedTarArchiver, create_archiver
@@ -187,7 +185,7 @@ class BinaryToolBase(Subsystem):
     snapshot = context._scheduler.capture_snapshots((
       PathGlobsAndRoot(
         PathGlobs((relpath,)),
-        text_type(bootstrapdir),
+        bootstrapdir,
       ),
     ))[0]
     return (relpath, snapshot)

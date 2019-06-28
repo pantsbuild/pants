@@ -92,7 +92,6 @@ python_library(
   sources = ['objects.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:future',
     ':strutil',
     ':memo',
     ':meta',

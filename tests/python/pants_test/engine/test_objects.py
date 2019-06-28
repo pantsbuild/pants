@@ -3,8 +3,6 @@
 
 import re
 
-from future.utils import text_type
-
 from pants.engine.objects import Collection
 from pants.util.objects import TypeCheckError
 from pants_test.test_base import TestBase
@@ -22,7 +20,7 @@ class CollectionTest(TestBase):
       "type constraint: Exactly(int).")):
       IntColl([3, "hello"])
 
-    IntOrStringColl = Collection.of(int, text_type)
+    IntOrStringColl = Collection.of(int, str)
     self.assertEqual([3, "hello"], [x for x in IntOrStringColl([3, "hello"])])
     with self.assertRaisesRegexp(TypeCheckError, re.escape(
       "field 'dependencies' was invalid: in wrapped constraint TypedCollection(Exactly(int or "

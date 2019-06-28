@@ -5,7 +5,7 @@ import functools
 import os
 from multiprocessing import cpu_count
 
-from future.utils import PY2, PY3, text_type
+from future.utils import PY2, PY3
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
@@ -902,7 +902,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       libs_unrooted = [self._unroot_lib_path(l) for l in libs_abs]
       path_globs = PathGlobsAndRoot(
         PathGlobs(tuple(libs_unrooted)),
-        text_type(self._underlying.home))
+        self._underlying.home)
       return (libs_unrooted, path_globs)
 
     @property

@@ -131,7 +131,6 @@ python_library(
   name = 'zinc',
   sources = ['zinc.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':dependency_context',
     ':jvm_tool_mixin',
     ':shader',

@@ -66,7 +66,6 @@ python_tests(
   sources=['test_fs.py'],
   dependencies=[
     ':scheduler_test_base',
-    '3rdparty/python:future',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:nodes',
     'tests/python/pants_test:test_base',
@@ -78,7 +77,6 @@ python_tests(
   name='isolated_process',
   sources=['test_isolated_process.py'],
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:isolated_process',
     'src/python/pants/engine:rules',

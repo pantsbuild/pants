@@ -10,8 +10,6 @@ from collections import defaultdict
 from contextlib import closing
 from xml.etree import ElementTree
 
-from future.utils import text_type
-
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
@@ -456,9 +454,6 @@ class BaseZincCompile(JvmCompile):
       ])
 
     argv = image_specific_argv + ['@{}'.format(argfile_snapshot.files[0])]
-    # TODO(#6071): Our ExecuteProcessRequest expects a specific string type for arguments,
-    # which py2 doesn't default to. This can be removed when we drop python 2.
-    argv = [text_type(arg) for arg in argv]
 
     merged_input_digest = self.context._scheduler.merge_directories(
       tuple(s.directory_digest for s in snapshots) +
