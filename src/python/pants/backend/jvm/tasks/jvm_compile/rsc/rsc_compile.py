@@ -6,7 +6,7 @@ import logging
 import os
 import re
 
-from future.utils import PY3, text_type
+from future.utils import PY3
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext  # noqa
 from pants.backend.jvm.subsystems.rsc import Rsc
@@ -571,13 +571,10 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       additional_snapshots = [native_image_snapshot]
       initial_args = [native_image_path]
     else:
-      # TODO(#6071): Our ExecuteProcessRequest expects a specific string type for arguments,
-      # which py2 doesn't default to. This can be removed when we drop python 2.
-      str_jvm_options = [text_type(opt) for opt in self.get_options().jvm_options]
       additional_snapshots = []
       initial_args = [
         distribution.java,
-      ] + str_jvm_options + [
+      ] + self.get_options().jvm_options + [
         '-cp', os.pathsep.join(tool_classpath),
         main,
       ]
@@ -596,7 +593,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     if pathglobs:
       root = PathGlobsAndRoot(
         PathGlobs(tuple(pathglobs)),
-        text_type(get_buildroot()))
+        get_buildroot())
       # dont capture snapshot, if pathglobs is empty
       path_globs_input_digest = self.context._scheduler.capture_snapshots((root,))[0].directory_digest
 
@@ -616,7 +613,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       # TODO: These should always be unicodes
       # Since this is always hermetic, we need to use `underlying.home` because
       # ExecuteProcessRequest requires an existing, local jdk location.
-      jdk_home=text_type(distribution.underlying_home),
+      jdk_home=distribution.underlying_home,
     )
     res = self.context.execute_process_synchronously_without_raising(
       epr,
@@ -635,7 +632,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     self.context._scheduler.materialize_directories((
       DirectoryToMaterialize(
         # NB the first element here is the root to materialize into, not the dir to snapshot
-        text_type(get_buildroot()),
+        get_buildroot(),
         res.output_directory_digest),
     ))
 

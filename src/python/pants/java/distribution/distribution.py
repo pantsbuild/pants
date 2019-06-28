@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from collections import namedtuple
 from contextlib import contextmanager
 
-from future.utils import PY3, text_type
+from future.utils import PY3
 from six import string_types
 
 from pants.base.revision import Revision
@@ -149,7 +149,7 @@ class Distribution:
         if self._is_executable(os.path.join(jdk_dir, 'bin', 'javac')):
           home = jdk_dir
       self._home = home
-    return text_type(self._home)
+    return self._home
 
   @property
   def real_home(self):

@@ -5,8 +5,6 @@ import logging
 import os
 import subprocess
 
-from future.utils import text_type
-
 from pants.backend.jvm import argfile
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -173,7 +171,7 @@ class JavacCompile(JvmCompile):
             raise TaskError('javac exited with return code {rc}'.format(rc=return_code))
         self.context._scheduler.materialize_directories((
           DirectoryToMaterialize(
-            text_type(ctx.classes_dir.path),
+            ctx.classes_dir.path,
             self.post_compile_extra_resources_digest(ctx, prepend_post_merge_relative_path=False)),
         ))
 
@@ -215,12 +213,8 @@ class JavacCompile(JvmCompile):
       for f in input_snapshot.files if f.endswith('.java')
     )
 
-    # TODO(#6071): Our ExecuteProcessRequest expects a specific string type for arguments,
-    # which py2 doesn't default to. This can be removed when we drop python 2.
-    argv = [text_type(arg) for arg in cmd]
-
     exec_process_request = ExecuteProcessRequest(
-      argv=tuple(argv),
+      argv=tuple(cmd),
       input_files=input_snapshot.directory_digest,
       output_files=output_files,
       description='Compiling {} with javac'.format(ctx.target.address.spec),
@@ -238,5 +232,5 @@ class JavacCompile(JvmCompile):
       ])
     classes_directory = ctx.classes_dir.path
     self.context._scheduler.materialize_directories((
-      DirectoryToMaterialize(text_type(classes_directory), merged_directories),
+      DirectoryToMaterialize(classes_directory, merged_directories),
     ))

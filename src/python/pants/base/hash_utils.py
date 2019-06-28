@@ -7,7 +7,6 @@ import logging
 from collections import OrderedDict
 from collections.abc import Iterable, Mapping, Set
 
-from future.utils import binary_type, text_type
 from twitter.common.collections import OrderedSet
 
 from pants.util.objects import DatatypeMixin
@@ -64,7 +63,7 @@ class CoercingEncoder(json.JSONEncoder):
       return self.encode(key_obj)
 
   def _is_natively_encodable(self, o):
-    return isinstance(o, (type(None), bool, int, list, text_type, binary_type))
+    return isinstance(o, (type(None), bool, int, list, str, bytes))
 
   def default(self, o):
     if self._is_natively_encodable(o):

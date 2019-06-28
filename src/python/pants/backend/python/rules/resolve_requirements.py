@@ -1,8 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from future.utils import text_type
-
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment, PythonNativeCode
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.engine.fs import Digest, Snapshot, UrlToFetch
@@ -38,7 +36,7 @@ def resolve_requirements(request, python_setup, pex_build_environment):
   digest = Digest('61bb79384db0da8c844678440bd368bcbfac17bbdb865721ad3f9cb0ab29b629', 1826945)
   pex_snapshot = yield Get(Snapshot, UrlToFetch(url, digest))
 
-  interpreter_search_paths = text_type(create_path_env_var(python_setup.interpreter_search_paths))
+  interpreter_search_paths = create_path_env_var(python_setup.interpreter_search_paths)
   env = {"PATH": interpreter_search_paths}
   # TODO(#6071): merge the two dicts via ** unpacking once we drop Py2.
   env.update(pex_build_environment.invocation_environment_dict)

@@ -7,7 +7,6 @@ import sys
 import threading
 from contextlib import contextmanager
 
-from future.utils import text_type
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
@@ -100,7 +99,7 @@ class PantsDaemon(FingerprintedProcessManager):
   class RuntimeFailure(Exception):
     """Represents a pantsd failure at runtime, usually from an underlying service failure."""
 
-  class Handle(datatype([('pid', int), ('port', int), ('metadata_base_dir', text_type)])):
+  class Handle(datatype([('pid', int), ('port', int), ('metadata_base_dir', str)])):
     """A handle to a "probably running" pantsd instance.
 
     We attempt to verify that the pantsd instance is still running when we create a Handle, but
@@ -127,7 +126,7 @@ class PantsDaemon(FingerprintedProcessManager):
           return PantsDaemon.Handle(
               stub_pantsd.await_pid(10),
               stub_pantsd.read_named_socket('pailgun', int),
-              text_type(stub_pantsd._metadata_base_dir),
+              stub_pantsd._metadata_base_dir,
           )
 
     @classmethod
@@ -484,7 +483,7 @@ class PantsDaemon(FingerprintedProcessManager):
     listening_port = self.read_named_socket('pailgun', int)
     self._logger.debug('pantsd is running at pid {}, pailgun port is {}'
                        .format(self.pid, listening_port))
-    return self.Handle(pantsd_pid, listening_port, text_type(self._metadata_base_dir))
+    return self.Handle(pantsd_pid, listening_port, self._metadata_base_dir)
 
   def terminate(self, include_watchman=True):
     """Terminates pantsd and watchman.

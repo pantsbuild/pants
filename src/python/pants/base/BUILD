@@ -103,7 +103,6 @@ python_library(
   name = 'hash_utils',
   sources = ['hash_utils.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':deprecated',
     'src/python/pants/util:objects',
   ]
@@ -114,15 +113,12 @@ python_library(
   sources = ['mustache.py'],
   dependencies = [
     '3rdparty/python:pystache',
-    '3rdparty/python:six',
   ]
 )
 
 python_library(
   name = 'parse_context',
   sources = ['parse_context.py'],
-  dependencies = [
-  ]
 )
 
 python_library(

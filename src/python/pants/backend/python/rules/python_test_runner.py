@@ -1,9 +1,6 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
-from future.utils import text_type
-
 from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.rules.resolve_requirements import (ResolvedRequirementsPex,
                                                              ResolveRequirementsRequest)
@@ -58,9 +55,8 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
   resolved_requirements_pex = yield Get(
     ResolvedRequirementsPex, ResolveRequirementsRequest(
       output_filename=output_pytest_requirements_pex_filename,
-      # TODO(#7061): This text_type() wrapping can be removed after we drop py2!
-      requirements=tuple(sorted(text_type(requirement) for requirement in all_requirements)),
-      interpreter_constraints=tuple(sorted(text_type(constraint) for constraint in interpreter_constraints)),
+      requirements=tuple(sorted(all_requirements)),
+      interpreter_constraints=tuple(sorted(interpreter_constraints)),
       entry_point="pytest:main",
     )
   )
@@ -106,7 +102,7 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
     DirectoriesToMerge(directories=tuple(all_input_digests)),
   )
 
-  interpreter_search_paths = text_type(create_path_env_var(python_setup.interpreter_search_paths))
+  interpreter_search_paths = create_path_env_var(python_setup.interpreter_search_paths)
   pex_exe_env = {'PATH': interpreter_search_paths}
   # TODO(#6071): merge the two dicts via ** unpacking once we drop Py2.
   pex_exe_env.update(subprocess_encoding_environment.invocation_environment_dict)

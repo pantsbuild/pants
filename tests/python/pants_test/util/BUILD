@@ -98,7 +98,6 @@ python_tests(
   sources = ['test_objects.py'],
   coverage = ['pants.util.objects'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:objects',
     'tests/python/pants_test:test_base',
   ]

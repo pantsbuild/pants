@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
 
-from future.utils import PY2, text_type
+from future.utils import PY2
 
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -670,7 +670,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
       for file_name, content in files.items():
         safe_file_dump(os.path.join(temp_dir, file_name), content)
       return self.scheduler.capture_snapshots((
-        PathGlobsAndRoot(PathGlobs(('**',)), text_type(temp_dir)),
+        PathGlobsAndRoot(PathGlobs(('**',)), temp_dir),
       ))[0]
 
   class LoggingRecorder:
@@ -721,7 +721,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     single_warning = assert_single_element(w)
     self.assertEqual(single_warning.category, category)
     warning_message = single_warning.message
-    self.assertEqual(warning_text, text_type(warning_message))
+    self.assertEqual(warning_text, warning_message)
 
   def retrieve_single_product_at_target_base(self, product_mapping, target):
     mapping_for_target = product_mapping.get(target)

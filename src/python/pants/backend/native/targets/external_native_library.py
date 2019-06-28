@@ -3,8 +3,6 @@
 
 import re
 
-from future.utils import text_type
-
 from pants.base.hash_utils import stable_json_sha1
 from pants.base.payload import Payload
 from pants.base.payload_field import PayloadField
@@ -22,9 +20,9 @@ class ConanRequirementSetField(tuple, PayloadField):
 
 
 class ConanRequirement(datatype([
-    ('pkg_spec', text_type),
-    ('include_relpath', text_type),
-    ('lib_relpath', text_type),
+    ('pkg_spec', str),
+    ('include_relpath', str),
+    ('lib_relpath', str),
     ('lib_names', tuple),
 ])):
   """A specification for a conan package to be resolved against a remote repository.
@@ -54,9 +52,9 @@ class ConanRequirement(datatype([
     """
     return super().__new__(
       cls,
-      text_type(pkg_spec),
-      include_relpath=text_type(include_relpath or 'include'),
-      lib_relpath=text_type(lib_relpath or 'lib'),
+      pkg_spec,
+      include_relpath=include_relpath or 'include',
+      lib_relpath=lib_relpath or 'lib',
       lib_names=tuple(lib_names or ()))
 
   def parse_conan_stdout_for_pkg_sha(self, stdout):
