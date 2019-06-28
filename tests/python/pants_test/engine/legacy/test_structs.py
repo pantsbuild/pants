@@ -3,8 +3,6 @@
 
 import unittest
 
-from future.utils import PY3
-
 from pants.engine.legacy.structs import Files
 
 
@@ -19,5 +17,5 @@ class StructTest(unittest.TestCase):
   def test_excludes_of_wrong_type(self):
     with self.assertRaises(ValueError) as cm:
       Files(exclude='*.md', spec_path='')
-    self.assertEqual('Excludes of type `{}` are not supported: got "*.md"'.format('str' if PY3 else 'unicode'),
+    self.assertEqual('Excludes of type `str` are not supported: got "*.md"',
                      str(cm.exception))

@@ -6,8 +6,6 @@ import logging
 import os
 import unittest.mock
 
-from future.utils import PY2
-
 from pants.binaries.binary_util import (BinaryRequest, BinaryToolFetcher, BinaryToolUrlGenerator,
                                         BinaryUtil, select)
 from pants.net.http.fetcher import Fetcher
@@ -249,9 +247,9 @@ class BinaryUtilTest(TestBase):
       "Error resolving binary request BinaryRequest(supportdir=mysupportdir, version=myversion, "
       "name=myname, platform_dependent=True, external_url_generator=None, archiver=None): "
       "Pants could not resolve binaries for the current host. Update --binaries-path-by-id to "
-      "find binaries for the current host platform ({unicode_literal}\'linux\', "
-      "{unicode_literal}\'quantum_computer\').\\n--binaries-path-by-id was:"
-    ).format(unicode_literal='u' if PY2 else '')
+      "find binaries for the current host platform (\'linux\', "
+      "\'quantum_computer\').\\n--binaries-path-by-id was:"
+    )
     self.assertIn(expected_msg, the_raised_exception_message)
 
   def test_select_script_missing_arch(self):
@@ -270,9 +268,9 @@ class BinaryUtilTest(TestBase):
       # platform_dependent=False when doing select_script()
       "name=myname, platform_dependent=False, external_url_generator=None, archiver=None): Pants "
       "could not resolve binaries for the current host. Update --binaries-path-by-id to find "
-      "binaries for the current host platform ({unicode_literal}\'linux\', "
-      "{unicode_literal}\'quantum_computer\').\\n--binaries-path-by-id was:"
-    ).format(unicode_literal='u' if PY2 else '')
+      "binaries for the current host platform (\'linux\', "
+      "\'quantum_computer\').\\n--binaries-path-by-id was:"
+    )
     self.assertIn(expected_msg, the_raised_exception_message)
 
   def test_select_binary_base_path_override(self):
