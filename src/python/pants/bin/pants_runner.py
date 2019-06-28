@@ -8,6 +8,7 @@ import warnings
 
 from pants.base.exception_sink import ExceptionSink
 from pants.bin.remote_pants_runner import RemotePantsRunner
+from pants.engine.native import Native
 from pants.init.logging import init_rust_logger, setup_logging_to_stderr
 from pants.option.options_bootstrapper import OptionsBootstrapper
 
@@ -37,9 +38,9 @@ class PantsRunner:
   def will_terminate_pantsd(self):
     return not frozenset(self._args).isdisjoint(self._DAEMON_KILLING_GOALS)
 
-  def _enable_rust_logging(self, global_bootstrap_options):
+  def _enable_rust_logging(self, native, global_bootstrap_options):
     levelname = global_bootstrap_options.level.upper()
-    init_rust_logger(levelname, global_bootstrap_options.log_show_rust_3rdparty)
+    init_rust_logger(native, levelname, global_bootstrap_options.log_show_rust_3rdparty)
     setup_logging_to_stderr(logging.getLogger(None), levelname)
 
   def _should_run_with_pantsd(self, global_bootstrap_options):
@@ -57,9 +58,15 @@ class PantsRunner:
     bootstrap_options = options_bootstrapper.bootstrap_options
     global_bootstrap_options = bootstrap_options.for_global_scope()
 
+    # N.B. Inlining this import speeds up the python thin client run by about 100ms.
+    from pants.bin.local_pants_runner import LocalPantsRunner
+
+    options, build_config, options_bootstrapper = LocalPantsRunner.parse_options(self._args, self._env, options_bootstrapper=options_bootstrapper)
+    native = Native(build_config)
+
     # We enable Rust logging here,
     # and everything before it will be routed through regular Python logging.
-    self._enable_rust_logging(global_bootstrap_options)
+    self._enable_rust_logging(native, global_bootstrap_options)
 
     ExceptionSink.reset_should_print_backtrace_to_terminal(global_bootstrap_options.print_exception_stacktrace)
     ExceptionSink.reset_log_location(global_bootstrap_options.pants_workdir)
@@ -74,15 +81,15 @@ class PantsRunner:
       except RemotePantsRunner.Fallback as e:
         logger.warn('caught client exception: {!r}, falling back to non-daemon mode'.format(e))
 
-    # N.B. Inlining this import speeds up the python thin client run by about 100ms.
-    from pants.bin.local_pants_runner import LocalPantsRunner
 
     if self.will_terminate_pantsd():
       logger.debug("Pantsd terminating goal detected: {}".format(self._args))
 
     runner = LocalPantsRunner.create(
         self._exiter,
-        self._args,
+        options,
+        native,
+        build_config,
         self._env,
         options_bootstrapper=options_bootstrapper
     )

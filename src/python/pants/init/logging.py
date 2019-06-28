@@ -41,8 +41,7 @@ def _maybe_configure_extended_logging(logger):
     _configure_requests_debug_logging()
 
 
-def init_rust_logger(level, log_show_rust_3rdparty):
-  native = Native()
+def init_rust_logger(native, level, log_show_rust_3rdparty):
   levelno = get_numeric_level(level)
   native.init_rust_logging(levelno, log_show_rust_3rdparty)
 

@@ -8,7 +8,6 @@ from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, Exiter
 from pants.base.workunit import WorkUnit
 from pants.bin.goal_runner import GoalRunner
-from pants.engine.native import Native
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import EngineInitializer
@@ -85,9 +84,8 @@ class LocalPantsRunner:
     return options, build_config, options_bootstrapper
 
   @staticmethod
-  def _maybe_init_graph_session(graph_session, options_bootstrapper,build_config, options):
+  def _maybe_init_graph_session(graph_session, native, options_bootstrapper,build_config, options):
     if not graph_session:
-      native = Native()
       native.set_panic_handler()
       graph_scheduler_helper = EngineInitializer.setup_legacy_graph(
         native,
@@ -115,7 +113,7 @@ class LocalPantsRunner:
     )
 
   @classmethod
-  def create(cls, exiter, args, env, target_roots=None, daemon_graph_session=None,
+  def create(cls, exiter, options, native, build_config, env, target_roots=None, daemon_graph_session=None,
              options_bootstrapper=None):
     """Creates a new LocalPantsRunner instance by parsing options.
 
@@ -128,11 +126,6 @@ class LocalPantsRunner:
     """
     build_root = get_buildroot()
 
-    options, build_config, options_bootstrapper = cls.parse_options(
-      args,
-      env,
-      options_bootstrapper=options_bootstrapper,
-    )
     global_options = options.for_global_scope()
     # This works as expected due to the encapsulated_logger in DaemonPantsRunner and
     # we don't have to gate logging setup anymore.
@@ -151,6 +144,7 @@ class LocalPantsRunner:
     # resident graph helper - otherwise initialize a new one here.
     graph_session, scheduler_session = cls._maybe_init_graph_session(
       daemon_graph_session,
+      native,
       options_bootstrapper,
       build_config,
       options

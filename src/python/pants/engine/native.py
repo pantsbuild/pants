@@ -219,9 +219,10 @@ def _extern_decl(return_type, arg_types):
 
 class _FFISpecification(object):
 
-  def __init__(self, ffi, lib):
+  def __init__(self, ffi, lib, build_configuration):
     self._ffi = ffi
     self._lib = lib
+    self._build_configuration = build_configuration
 
   @memoized_classproperty
   def _extern_fields(cls):
@@ -566,6 +567,9 @@ class ExternContext:
 class Native(Singleton):
   """Encapsulates fetching a platform specific version of the native portion of the engine."""
 
+  def __init__(self, build_configuration):
+    self.build_configuration = build_configuration
+
   _errors_during_execution = None
 
   class CFFIExternMethodRuntimeErrorInfo(datatype([
@@ -622,7 +626,7 @@ class Native(Singleton):
   def lib(self):
     """Load and return the native engine module."""
     lib = self.ffi.dlopen(self.binary)
-    _FFISpecification(self.ffi, lib).register_cffi_externs(self)
+    _FFISpecification(self.ffi, lib, self.build_configuration).register_cffi_externs(self)
     return lib
 
   @memoized_property

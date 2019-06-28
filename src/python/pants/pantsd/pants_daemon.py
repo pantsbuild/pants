@@ -159,8 +159,8 @@ class PantsDaemon(FingerprintedProcessManager):
 
       if full_init:
         build_root = get_buildroot()
-        native = Native()
         build_config = BuildConfigInitializer.get(options_bootstrapper)
+        native = Native(build_config)
         legacy_graph_scheduler = EngineInitializer.setup_legacy_graph(native,
                                                                       options_bootstrapper,
                                                                       build_config)
@@ -336,7 +336,7 @@ class PantsDaemon(FingerprintedProcessManager):
     # for further forks.
     with stdio_as(stdin_fd=-1, stdout_fd=-1, stderr_fd=-1):
       # Reinitialize logging for the daemon context.
-      init_rust_logger(self._log_level, self._log_show_rust_3rdparty)
+      init_rust_logger(self._native, self._log_level, self._log_show_rust_3rdparty)
       result = setup_logging(self._log_level, log_dir=self._log_dir, log_name=self.LOG_NAME, native=self._native)
       self._native.override_thread_logging_destination_to_just_pantsd()
 
@@ -354,12 +354,11 @@ class PantsDaemon(FingerprintedProcessManager):
       self._logger.info('setting up service {}'.format(service))
       service.setup(self._services)
 
-  @staticmethod
-  def _make_thread(service):
+  def _make_thread(self, service):
     name = "{}Thread".format(service.__class__.__name__)
 
     def target():
-      Native().override_thread_logging_destination_to_just_pantsd()
+      self._native.override_thread_logging_destination_to_just_pantsd()
       service.run()
 
     t = threading.Thread(target=target, name=name)
