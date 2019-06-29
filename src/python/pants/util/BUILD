@@ -94,6 +94,7 @@ python_library(
 python_library(
   name = 'osutil',
   sources = ['osutil.py'],
+  tags={'type_checked'},
 )
 
 python_library(
