@@ -63,7 +63,6 @@ python_library(
   name = 'util',
   sources = ['util.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':executor',
     ':nailgun_executor',
     'src/python/pants/base:workunit',

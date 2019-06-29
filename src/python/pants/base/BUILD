@@ -149,8 +149,6 @@ python_library(
 python_library(
   name = 'revision',
   sources = ['revision.py'],
-  dependencies = [
-  ]
 )
 
 python_library(
@@ -186,7 +184,6 @@ python_library(
   name = 'worker_pool',
   sources = ['worker_pool.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':workunit',
     'src/python/pants/reporting:report', # TODO(pl): Bust this out
   ],

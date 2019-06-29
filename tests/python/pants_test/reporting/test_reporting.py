@@ -3,9 +3,9 @@
 
 import json
 import os
+from urllib.parse import urlencode
 
 import requests
-from future.moves.urllib.parse import urlencode
 
 from pants.goal.run_tracker import RunTracker
 from pants.reporting.reporting import Reporting

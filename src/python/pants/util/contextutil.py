@@ -12,20 +12,14 @@ import time
 import uuid
 import zipfile
 from contextlib import closing, contextmanager
+from queue import Queue
+from socketserver import TCPServer
 
 from colors import green
-from future.utils import PY2, PY3, string_types
+from future.utils import PY3, string_types
 
 from pants.util.dirutil import safe_delete
 from pants.util.tarutil import TarFile
-
-
-if PY2:
-  from Queue import Queue
-  from SocketServer import TCPServer
-else:
-  from queue import Queue
-  from socketserver import TCPServer
 
 
 class InvalidZipPath(ValueError):

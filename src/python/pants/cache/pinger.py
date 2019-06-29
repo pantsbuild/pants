@@ -4,9 +4,9 @@
 from collections import Counter, deque
 from contextlib import contextmanager
 from multiprocessing.pool import ThreadPool
+from urllib.parse import urlparse
 
 import requests
-from future.moves.urllib.parse import urlparse
 
 from pants.cache.artifact_cache import ArtifactCacheError
 from pants.util.contextutil import Timer

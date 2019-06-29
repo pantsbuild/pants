@@ -5,7 +5,6 @@ python_library(
   dependencies=[
     '3rdparty/python:requests',
     '3rdparty/python:pyopenssl',
-    '3rdparty/python:six',
     'contrib/go/src/python/pants/contrib/go/targets',
     'src/python/pants/base:workunit',
     'src/python/pants/binaries',

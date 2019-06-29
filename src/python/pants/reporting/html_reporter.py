@@ -7,9 +7,9 @@ import re
 import time
 import uuid
 from collections import defaultdict, namedtuple
+from itertools import zip_longest
 from textwrap import dedent
 
-from future.moves.itertools import zip_longest
 from six import string_types
 
 from pants.base.build_environment import get_buildroot

@@ -3,10 +3,10 @@
 
 import unittest.mock
 from contextlib import contextmanager
+from urllib.parse import urlparse
 
 import requests
 import responses
-from future.moves.urllib.parse import urlparse
 from requests import RequestException
 
 from pants.cache.pinger import BestUrlSelector, InvalidRESTfulCacheProtoError, Pinger

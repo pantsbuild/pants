@@ -12,9 +12,9 @@ import re
 from collections import namedtuple
 from datetime import date, datetime
 from textwrap import dedent
+from urllib.parse import parse_qs, urlencode, urlsplit, urlunparse
 
 import pystache
-from future.moves.urllib.parse import parse_qs, urlencode, urlsplit, urlunparse
 
 from pants.base.build_environment import get_buildroot
 from pants.base.mustache import MustacheRenderer

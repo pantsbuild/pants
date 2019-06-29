@@ -6,8 +6,7 @@ import socket
 import threading
 import traceback
 from contextlib import contextmanager
-
-from six.moves.socketserver import BaseRequestHandler, BaseServer, TCPServer, ThreadingMixIn
+from socketserver import BaseRequestHandler, BaseServer, TCPServer, ThreadingMixIn
 
 from pants.engine.native import Native
 from pants.java.nailgun_protocol import NailgunProtocol

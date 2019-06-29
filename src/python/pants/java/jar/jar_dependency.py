@@ -2,8 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-
-from future.moves.urllib import parse
+from urllib import parse
 
 from pants.base.build_environment import get_buildroot
 from pants.base.hash_utils import stable_json_sha1

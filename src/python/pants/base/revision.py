@@ -3,8 +3,7 @@
 
 import re
 from functools import total_ordering
-
-from future.moves.itertools import zip_longest
+from itertools import zip_longest
 
 
 @total_ordering

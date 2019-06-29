@@ -5,12 +5,12 @@ import logging
 import os
 import shutil
 from contextlib import closing, contextmanager
+from urllib.parse import urlparse
 
 import requests
 from pants.fs.archive import archiver_for_path
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir, temporary_file
-from six.moves.urllib.parse import urlparse
 
 from pants.contrib.go.subsystems.fetch_error import FetchError
 

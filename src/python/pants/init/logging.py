@@ -2,14 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import copy
+import http.client
 import logging
 import os
 import sys
 from collections import namedtuple
 from contextlib import contextmanager
 from logging import StreamHandler
-
-from future.moves.http import client
 
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.native import Native
@@ -31,7 +30,7 @@ class LoggingSetupResult(namedtuple('LoggingSetupResult', ['log_filename', 'log_
 
 
 def _configure_requests_debug_logging():
-  client.HTTPConnection.debuglevel = 1
+  http.client.HTTPConnection.debuglevel = 1
   requests_logger = logging.getLogger('requests.packages.urllib3')
   requests_logger.setLevel(TRACE)
   requests_logger.propagate = True

@@ -4,8 +4,7 @@
 import os
 import threading
 from collections import namedtuple
-
-from future.moves.urllib.parse import urlparse
+from urllib.parse import urlparse
 
 from pants.base.build_environment import get_buildroot
 from pants.cache.artifact import TarballArtifact
