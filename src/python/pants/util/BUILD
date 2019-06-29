@@ -96,9 +96,6 @@ python_library(
 python_library(
   name = 'osutil',
   sources = ['osutil.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
 )
 
 python_library(

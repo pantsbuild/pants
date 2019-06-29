@@ -39,7 +39,6 @@ python_library(
   dependencies = [
     '3rdparty/python:six',
     'src/python/pants/util:objects',
-    'src/python/pants/util:osutil',
   ]
 )
 
