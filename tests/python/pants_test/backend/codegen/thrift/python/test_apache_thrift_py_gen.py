@@ -5,7 +5,6 @@ import os
 import subprocess
 from textwrap import dedent
 
-import six
 from pex.resolver import resolve
 
 from pants.backend.codegen.thrift.lib.thrift import Thrift
@@ -57,7 +56,7 @@ class ApacheThriftPyGenTest(TaskTestBase):
 
     symbols = {}
     with open(self.init_py_path(target, package_rel_dir), 'rb') as fp:
-      six.exec_(fp.read(), symbols)
+      exec(fp.read(), symbols)
 
     self.assertIn('__all__', symbols)
     self.assertEqual(sorted(('constants', 'ttypes') + services), sorted(symbols['__all__']))

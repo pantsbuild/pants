@@ -216,7 +216,7 @@ class PythonAssignmentsParser(Parser):
 
     python = filecontent
     symbols = {}
-    six.exec_(python, parse_globals, symbols)
+    exec(python, parse_globals, symbols)
 
     objects = []
     for name, obj in symbols.items():
@@ -276,5 +276,5 @@ class PythonCallbacksParser(Parser):
     python = filecontent
     with self._lock:
       del objects[:]
-      six.exec_(python, parse_globals, {})
+      exec(python, parse_globals, {})
       return list(objects)

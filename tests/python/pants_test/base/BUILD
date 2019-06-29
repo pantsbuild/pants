@@ -72,7 +72,6 @@ python_tests(
   sources = ['test_filesystem_build_file.py'],
   dependencies = [
     '3rdparty/python:pathspec',
-    '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_file',
     'src/python/pants/util:dirutil',
