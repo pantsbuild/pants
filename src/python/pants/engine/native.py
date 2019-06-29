@@ -287,7 +287,8 @@ class _FFISpecification(object):
   @_extern_decl('Handle', ['ExternContext*', 'TypeId'])
   def extern_get_handle_from_type_id(self, context_handle, ty):
     c = self._ffi.from_handle(context_handle)
-    return c.to_value(ty)
+    obj = c.from_id(ty.tup_0)
+    return c.to_value(obj)
 
   @_extern_decl('TypeId', ['ExternContext*', 'TypeId'])
   def extern_get_union_for(self, context_handle, type_id):

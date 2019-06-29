@@ -302,6 +302,7 @@ def union(cls):
   assert isinstance(cls, type)
   return type(cls.__name__, (cls,), {
     '_is_union': True,
+    'union_description': cls.__doc__,
   })
 
 
