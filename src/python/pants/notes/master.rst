@@ -4,6 +4,98 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.18.0.dev2 (6/28/2019)
+-----------------------
+
+Bugfixes
+~~~~~~~~
+* Fix the wheel count check for pex building. (#7933)
+  `PR #7933 <https://github.com/pantsbuild/pants/pull/7933>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Remove `text_type` and `binary_type` wrappers (#7970)
+  `PR #7970 <https://github.com/pantsbuild/pants/pull/7970>`_
+
+* Fix `cargo.sh` to use Python 3 (#7972)
+  `PR #7972 <https://github.com/pantsbuild/pants/pull/7972>`_
+
+* Remove Python 2 use of `std{out,err}` over `std{out,err}.buffer` (#7968)
+  `PR #7968 <https://github.com/pantsbuild/pants/pull/7968>`_
+
+* Remove Python 2 `hashlib.hexdigest()` decoding (#7965)
+  `PR #7965 <https://github.com/pantsbuild/pants/pull/7965>`_
+
+* Revert "Workaround Travis timeout for OSX platforms test (#7919)" (#7967)
+  `PR #7967 <https://github.com/pantsbuild/pants/pull/7967>`_
+
+* Add Option for remote concurrency. (#7960)
+  `PR #7960 <https://github.com/pantsbuild/pants/pull/7960>`_
+
+* Remove Python 2 select.select() code (#7964)
+  `PR #7964 <https://github.com/pantsbuild/pants/pull/7964>`_
+
+* Simplify tests to no longer check for `u""` character or `unicode` type (#7966)
+  `PR #7966 <https://github.com/pantsbuild/pants/pull/7966>`_
+
+* Remove subprocess, futures, and faulthandler backports (#7950)
+  `PR #7950 <https://github.com/pantsbuild/pants/pull/7950>`_
+
+* Remove unittest.mock backport (#7951)
+  `PR #7951 <https://github.com/pantsbuild/pants/pull/7951>`_
+
+* Hand over post-compile resources to zinc wrapper to keep classes/ and z.jar consistent (#7932)
+  `PR #7932 <https://github.com/pantsbuild/pants/pull/7932>`_
+
+* Add some of the wording from #7913 that wasn't merged in #7924  (#7958)
+  `PR #7958 <https://github.com/pantsbuild/pants/pull/7958>`_
+
+* Crash pailgun client on SIGINT if we haven't received the pid yet (#7924)
+  `PR #7924 <https://github.com/pantsbuild/pants/pull/7924>`_
+
+* Add whitelist of folders that must remain Python 2 compatible (#7941)
+  `PR #7941 <https://github.com/pantsbuild/pants/pull/7941>`_
+
+* Add concurrent flag, which overrides --enable-pantsd (#7944)
+  `PR #7944 <https://github.com/pantsbuild/pants/pull/7944>`_
+
+* Report zipkin spans regardless of goal version. (#7915)
+  `PR #7915 <https://github.com/pantsbuild/pants/pull/7915>`_
+
+* Don't memoize description in process execute memoization (#7916)
+  `PR #7916 <https://github.com/pantsbuild/pants/pull/7916>`_
+
+* Modernize classes to use Python 3 syntax (#7937)
+  `PR #7937 <https://github.com/pantsbuild/pants/pull/7937>`_
+
+* Remove configparser backport (#7939)
+  `PR #7939 <https://github.com/pantsbuild/pants/pull/7939>`_
+
+* Remove `collections.abc` backport (#7940)
+  `PR #7940 <https://github.com/pantsbuild/pants/pull/7940>`_
+
+* Remove `self.assertRegex` backport (#7938)
+  `PR #7938 <https://github.com/pantsbuild/pants/pull/7938>`_
+
+* Add --post-compile-merge-dir option in zinc (#7917)
+  `PR #7917 <https://github.com/pantsbuild/pants/pull/7917>`_
+
+* Remove `builtins` imports (#7934)
+  `PR #7934 <https://github.com/pantsbuild/pants/pull/7934>`_
+
+* Modernize `abc` stdlib usage. (#7928)
+  `PR #7928 <https://github.com/pantsbuild/pants/pull/7928>`_
+
+* Workaround Travis timeout for OSX platforms test (#7919)
+  `PR #7919 <https://github.com/pantsbuild/pants/pull/7919>`_
+
+* Modernize all headers to Python 3 style (#7926)
+  `PR #7926 <https://github.com/pantsbuild/pants/pull/7926>`_
+
+* Kill `AbstractClass` in favor of `abc.ABC{,Meta}`. (#7929)
+  `PR #7929 <https://github.com/pantsbuild/pants/pull/7929>`_
+
+
 1.18.0.dev1 (6/21/2019)
 -----------------------
 
