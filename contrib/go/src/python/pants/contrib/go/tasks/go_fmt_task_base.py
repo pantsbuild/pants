@@ -35,7 +35,7 @@ class GoFmtTaskBase(GoWorkspaceTask):
       if sources:
         args = [os.path.join(self.go_dist.goroot, 'bin', 'gofmt')] + flags + list(sources)
         try:
-          output = subprocess.check_output(args)
+          output = subprocess.check_output(args).decode()
         except subprocess.CalledProcessError as e:
           raise TaskError('{} failed with exit code {}'.format(' '.join(args), e.returncode),
                           exit_code=e.returncode)
