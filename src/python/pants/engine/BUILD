@@ -71,7 +71,6 @@ python_library(
   name='build_files',
   sources=['build_files.py'],
   dependencies=[
-    '3rdparty/python:future',
     ':addressable',
     ':fs',
     ':mapper',

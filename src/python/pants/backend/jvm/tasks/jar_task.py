@@ -7,7 +7,6 @@ import tempfile
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 
-from future.utils import iteritems
 from twitter.common.collections import maybe_list
 
 from pants.backend.jvm.argfile import safe_args
@@ -386,7 +385,7 @@ class JarBuilderTask(JarTask):
       :param JvmBinary jvm_binary_target:
       :param Manifest manifest:
       """
-      for header, value in iteritems(jvm_binary_target.manifest_entries.entries):
+      for header, value in jvm_binary_target.manifest_entries.entries.items():
         manifest.addentry(header, value)
 
     @staticmethod
