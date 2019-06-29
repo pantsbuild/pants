@@ -3,7 +3,6 @@
 
 python_tests(
   dependencies = [
-    '3rdparty/python:six',
     'src/python/pants/process',
     'tests/python/pants_test:test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',

@@ -19,7 +19,6 @@ python_library(
   dependencies = [
     '3rdparty/python:pathspec',
     '3rdparty/python:scandir',
-    '3rdparty/python:six',
     ':build_environment',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
