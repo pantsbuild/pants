@@ -11,7 +11,6 @@ from abc import ABC, abstractmethod
 from contextlib import closing, contextmanager
 
 import requests
-import six
 
 from pants.util.dirutil import safe_open
 from pants.util.strutil import strip_prefix
@@ -38,7 +37,7 @@ class Fetcher:
 
     def __init__(self, value=None, response_code=None):
       super(Fetcher.PermanentError, self).__init__(value)
-      if response_code and not isinstance(response_code, six.integer_types):
+      if response_code and not isinstance(response_code, int):
         raise ValueError('response_code must be an integer, got {}'.format(response_code))
       self._response_code = response_code
 
@@ -152,7 +151,7 @@ class Fetcher:
       :type stream: :class:`io.RawIOBase`
       """
       self._width = width or 50
-      if not isinstance(self._width, six.integer_types):
+      if not isinstance(self._width, int):
         raise ValueError('The width must be an integer, given {}'.format(self._width))
       self._chunk_size_bytes = chunk_size_bytes or 10 * 1024
       self._stream = stream or sys.stderr.buffer

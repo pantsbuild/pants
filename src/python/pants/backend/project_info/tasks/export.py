@@ -5,7 +5,6 @@ import json
 import os
 from collections import defaultdict
 
-import six
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -336,7 +335,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
       default_interpreter = min(python_interpreter_targets_mapping.keys())
 
       interpreters_info = {}
-      for interpreter, targets in six.iteritems(python_interpreter_targets_mapping):
+      for interpreter, targets in python_interpreter_targets_mapping.items():
         req_libs = [target for target in Target.closure_for_targets(targets)
                     if has_python_requirements(target)]
         chroot = self.resolve_requirements(interpreter, req_libs)
