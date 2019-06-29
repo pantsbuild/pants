@@ -15,11 +15,10 @@ python_library(
     }
   ),
   dependencies=[
-    # NB: See https://github.com/pantsbuild/pants/issues/7158 before introducing additional
-    # dependencies here.
-    '3rdparty/python:pycodestyle',
-    '3rdparty/python:pyflakes',
-    '3rdparty/python:six',
+    # NB: Dependencies should only come from this directory's own 3rdparty folder.
+    'contrib/python/src/python/pants/contrib/python/checks/checker/3rdparty:pycodestyle',
+    'contrib/python/src/python/pants/contrib/python/checks/checker/3rdparty:pyflakes',
+    'contrib/python/src/python/pants/contrib/python/checks/checker/3rdparty:six',
   ]
 )
 
