@@ -6,8 +6,6 @@ import os
 import tokenize
 from io import StringIO
 
-import six
-
 from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.base.parse_context import ParseContext
 from pants.engine.legacy.structs import BundleAdaptor, Globs, RGlobs, TargetAdaptor, ZGlobs
@@ -131,7 +129,7 @@ class LegacyPythonCallbacksParser(Parser):
     # _intentional_ mutation would require a deep clone, which doesn't seem worth the cost at
     # this juncture.
     self._parse_context._storage.clear(os.path.dirname(filepath))
-    six.exec_(python, dict(self._symbols))
+    exec(python, dict(self._symbols))
 
     # Perform this check after successful execution, so we know the python is valid (and should
     # tokenize properly!)
