@@ -6,7 +6,6 @@ import os
 import string
 from textwrap import dedent
 
-from future.utils import PY3
 from pants.build_graph.target import Target
 from pants.util.contextutil import pushd, temporary_dir
 from pants_test.task_test_base import TaskTestBase
@@ -109,8 +108,7 @@ class NodeTaskTest(TaskTestBase):
           'proof': 'echo "42" > {}'.format(proof)
         }
       }
-      mode = 'w' if PY3 else 'wb'
-      with open(os.path.join(chroot, 'package.json'), mode) as fp:
+      with open(os.path.join(chroot, 'package.json'), 'w') as fp:
         json.dump(package, fp)
       with pushd(chroot):
         returncode, _ = task.run_script(
@@ -135,8 +133,7 @@ class NodeTaskTest(TaskTestBase):
           'proof': 'echo "42" > {}'.format(proof)
         }
       }
-      mode = 'w' if PY3 else 'wb'
-      with open(os.path.join(chroot, 'package.json'), mode) as fp:
+      with open(os.path.join(chroot, 'package.json'), 'w') as fp:
         json.dump(package, fp)
       with pushd(chroot):
         returncode, _ = task.run_script(

@@ -12,7 +12,6 @@ from collections import OrderedDict, defaultdict, namedtuple
 from functools import total_ordering
 
 import six
-from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
@@ -366,8 +365,7 @@ class FrozenResolution:
       ])
 
     with safe_concurrent_creation(filename) as tmp_filename:
-      mode = 'w' if PY3 else 'wb'
-      with open(tmp_filename, mode) as f:
+      with open(tmp_filename, 'w') as f:
         json.dump(res, f)
 
 

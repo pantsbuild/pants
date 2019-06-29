@@ -5,7 +5,6 @@ import glob
 import os
 from contextlib import contextmanager
 
-from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.ivy_utils import IvyInfo, IvyModule, IvyModuleRef, IvyResolveResult
@@ -251,7 +250,7 @@ class IvyResolveTest(NailgunTaskTestBase):
       ivy_resolve_workdir = self._find_resolve_workdir(workdir)
       raw_classpath_path = os.path.join(ivy_resolve_workdir, 'classpath.raw')
       with open(raw_classpath_path, 'a') as raw_f:
-        raw_f.write(os.pathsep if PY3 else os.pathsep.decode('utf-8'))
+        raw_f.write(os.pathsep)
         raw_f.write(os.path.join('non-existent-file'))
 
       self.resolve([jar_lib])
@@ -394,7 +393,7 @@ class IvyResolveTest(NailgunTaskTestBase):
         ivy_resolve_workdir = self._find_resolve_workdir(workdir)
         raw_classpath_path = os.path.join(ivy_resolve_workdir, 'classpath.raw')
         with open(raw_classpath_path, 'a') as raw_f:
-          raw_f.write(os.pathsep if PY3 else os.pathsep.decode('utf-8'))
+          raw_f.write(os.pathsep)
           raw_f.write(os.path.join('non-existent-file'))
 
         self.resolve([jar_lib])

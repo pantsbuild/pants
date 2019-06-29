@@ -4,7 +4,6 @@
 import json
 import os
 
-from future.utils import PY3
 from pants.base.exceptions import TaskError
 from pants.task.repl_task_mixin import ReplTaskMixin
 from pants.util.contextutil import pushd, temporary_dir
@@ -53,8 +52,7 @@ class NodeRepl(ReplTaskMixin, NodeTask):
           else target.version for target in targets
         }
       }
-      mode = 'w' if PY3 else 'wb'
-      with open(package_json_path, mode) as fp:
+      with open(package_json_path, 'w') as fp:
         json.dump(package, fp, indent=2)
 
       args = self.get_passthru_args()

@@ -12,8 +12,6 @@ from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
 
-from future.utils import PY2
-
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
@@ -467,8 +465,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         subclass_name = 'test_{}_{}_{}'.format(
           task_type.__name__, task_type.goal_options_registrar_cls.options_scope,
           task_type.options_scope)
-        if PY2:
-          subclass_name = subclass_name.encode('utf-8')
         optionables.add(type(subclass_name, (task_type.goal_options_registrar_cls, ),
                              {'options_scope': task_type.options_scope}))
 

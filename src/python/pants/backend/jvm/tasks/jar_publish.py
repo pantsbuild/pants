@@ -11,7 +11,6 @@ import sys
 from collections import OrderedDict, defaultdict, namedtuple
 from copy import copy
 
-from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.ossrh_publication_metadata import OSSRHPublicationMetadata
@@ -746,8 +745,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
                   coordinate(jar.org, jar.name), oldentry.version(), oldentry.sha, changelog)
               # The stdout encoding can be detected as None when running without a tty (common in
               # tests), in which case we want to force encoding with a unicode-supporting codec.
-              # In Py3, sys.stdout is a unicode stream.
-              sys.stdout.write(message) if PY3 else sys.stdout.write(message.encode('utf-8'))
+              sys.stdout.write(message)
           if not self.confirm_push(coordinate(jar.org, jar.name), newentry.version()):
             raise TaskError('User aborted push')
 

@@ -8,8 +8,6 @@ from abc import abstractmethod
 from contextlib import closing, contextmanager
 from io import BytesIO
 
-from future.utils import PY2
-
 from pants.goal.goal import Goal
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.task.console_task import ConsoleTask
@@ -108,8 +106,6 @@ class TaskTestBase(TestBase):
     :return: A pair (type, options_scope)
     """
     subclass_name = 'test_{0}_{1}'.format(task_type.__name__, options_scope)
-    if PY2:
-      subclass_name = subclass_name.encode('utf-8')
     return type(subclass_name, (task_type,), {'_stable_name': task_type._compute_stable_name(),
                                               'options_scope': options_scope})
 

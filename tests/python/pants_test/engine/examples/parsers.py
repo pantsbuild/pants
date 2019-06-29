@@ -9,7 +9,6 @@ from json.decoder import JSONDecoder
 from json.encoder import JSONEncoder
 
 import six
-from future.utils import PY2
 
 from pants.build_graph.address import Address
 from pants.engine.objects import Resolvable, Serializable
@@ -58,13 +57,7 @@ class JsonParser(Parser):
     symbol_table = self.symbol_table.table
     decoder = functools.partial(self._object_decoder,
                                 symbol_table=symbol_table.__getitem__ if symbol_table else self._as_type)
-    kwargs = {
-      'object_hook': decoder,
-      'strict': True,
-    }
-    if PY2:
-      kwargs['encoding'] = 'UTF-8'
-    return JSONDecoder(**kwargs)
+    return JSONDecoder(object_hook=decoder, strict=True)
 
   def parse(self, filepath, filecontent):
     """Parse the given json encoded string into a list of top-level objects found.
@@ -193,10 +186,7 @@ def encode_json(obj, inline=False, **kwargs):
   :rtype: string
   :raises: :class:`ParseError` if there were any problems encoding the given `obj` in json.
   """
-  kwargs.update({'default': functools.partial(_object_encoder, inline=inline)})
-  if PY2:
-    kwargs.update({'encoding': 'utf-8'})
-  encoder = JSONEncoder(**kwargs)
+  encoder = JSONEncoder(default=functools.partial(_object_encoder, inline=inline), **kwargs)
   return encoder.encode(obj)
 
 

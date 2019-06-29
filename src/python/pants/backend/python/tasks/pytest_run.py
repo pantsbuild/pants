@@ -14,8 +14,6 @@ from contextlib import contextmanager
 from io import StringIO
 from textwrap import dedent
 
-from future.utils import PY3
-
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.pytest_prep import PytestPrep
@@ -383,8 +381,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     # it to pick the buildroot.
     with temporary_dir(root_dir=self.workdir) as comm_dir:
       sources_map_path = os.path.join(comm_dir, 'sources_map.json')
-      mode = 'w' if PY3 else 'wb'
-      with open(sources_map_path, mode) as fp:
+      with open(sources_map_path, 'w') as fp:
         json.dump(sources_map, fp)
 
       renaming_args = [

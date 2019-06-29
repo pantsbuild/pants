@@ -60,7 +60,6 @@ python_library(
   name = 'test_base',
   sources = ['test_base.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/base:build_root',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/base:exceptions',

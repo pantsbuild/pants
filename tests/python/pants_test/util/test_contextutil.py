@@ -13,8 +13,6 @@ import uuid
 import zipfile
 from contextlib import contextmanager
 
-from future.utils import PY3
-
 from pants.util.contextutil import (InvalidZipPath, Timer, environment_as, exception_logging,
                                     hermetic_environment_as, maybe_profiled, open_zip, pushd,
                                     signal_handler_as, stdio_as, temporary_dir, temporary_file)
@@ -83,15 +81,12 @@ class ContextutilTest(unittest.TestCase):
       self.assertNotIn('AAA', os.environ)
 
   def test_hermetic_environment_unicode(self):
-    UNICODE_CHAR = '¡'
-    ENCODED_CHAR = UNICODE_CHAR.encode('utf-8')
-    expected_output = UNICODE_CHAR if PY3 else ENCODED_CHAR
-    with environment_as(XXX=UNICODE_CHAR):
-      self.assertEqual(os.environ['XXX'], expected_output)
-      with hermetic_environment_as(AAA=UNICODE_CHAR):
+    with environment_as(XXX='¡'):
+      self.assertEqual(os.environ['XXX'], '¡')
+      with hermetic_environment_as(AAA='¡'):
         self.assertIn('AAA', os.environ)
-        self.assertEqual(os.environ['AAA'], expected_output)
-      self.assertEqual(os.environ['XXX'], expected_output)
+        self.assertEqual(os.environ['AAA'], '¡')
+      self.assertEqual(os.environ['XXX'], '¡')
 
   def test_simple_pushd(self):
     pre_cwd = os.getcwd()

@@ -4,8 +4,6 @@
 import re
 import shlex
 
-from future.utils import PY3
-
 
 def ensure_binary(text_or_binary):
   if isinstance(text_or_binary, bytes):
@@ -34,7 +32,7 @@ def safe_shlex_split(text_or_binary):
 
   Safe even on python versions whose shlex.split() method doesn't accept unicode.
   """
-  value = ensure_text(text_or_binary) if PY3 else ensure_binary(text_or_binary)
+  value = ensure_text(text_or_binary)
   return shlex.split(value)
 
 

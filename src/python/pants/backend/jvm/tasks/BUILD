@@ -274,7 +274,6 @@ python_library(
   name = 'coursier_resolve',
   sources = ['coursier_resolve.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':classpath_products',
     ':nailgun_task',
     'src/python/pants/backend/jvm/tasks/coursier',
@@ -312,7 +311,6 @@ python_library(
   name = 'jar_publish',
   sources = ['jar_publish.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':jar_publish_resources',
     ':jar_task',
@@ -462,7 +460,6 @@ python_library(
   name = 'jvm_dependency_usage',
   sources = ['jvm_dependency_usage.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':jvm_dependency_analyzer',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
