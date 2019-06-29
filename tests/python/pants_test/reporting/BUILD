@@ -14,7 +14,6 @@ python_tests(
   name = 'reporting_integration',
   sources = ['test_reporting_integration.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:parameterized',
     '3rdparty/python:py-zipkin',
     'src/python/pants/util:contextutil',

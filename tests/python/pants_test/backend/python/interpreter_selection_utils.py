@@ -5,8 +5,6 @@ import os
 import subprocess
 from unittest import skipIf
 
-from future.utils import PY2
-
 
 PY_2 = '2'
 PY_3 = '3'
@@ -32,8 +30,6 @@ def python_interpreter_path(version):
   :returns: the normalized path to the interpreter binary if found; otherwise `None`
   :rtype: string
   """
-  if PY2:
-    FileNotFoundError = IOError
   try:
     command = ['python{}'.format(version), '-c', 'import sys; print(sys.executable)']
     py_path = subprocess.check_output(command).decode('utf-8').strip()

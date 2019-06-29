@@ -11,8 +11,6 @@ from abc import ABC, abstractmethod
 from collections import namedtuple
 from contextlib import contextmanager
 
-from future.utils import PY3
-
 from pants.base.revision import Revision
 from pants.java.util import execute_java, execute_java_async
 from pants.subsystem.subsystem import Subsystem
@@ -365,8 +363,7 @@ class _OSXEnvironment(_DistributionEnvironment):
     if os.path.exists(self._osx_java_home_exe):
       try:
         plist = subprocess.check_output([self._osx_java_home_exe, '--failfast', '--xml'])
-        plist_results = plistlib.loads(plist) if PY3 else plistlib.readPlistFromString(plist)
-        for distribution in plist_results:
+        for distribution in plistlib.loads(plist):
           home = distribution['JVMHomePath']
           yield self.Location.from_home(home)
       except subprocess.CalledProcessError:

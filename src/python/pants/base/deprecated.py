@@ -7,7 +7,6 @@ import warnings
 from contextlib import contextmanager
 from functools import wraps
 
-from future.utils import PY2
 from packaging.version import InvalidVersion, Version
 
 from pants.util.memo import memoized_method
@@ -189,7 +188,7 @@ def warn_or_error(removal_version, deprecated_entity_description, hint=None,
       # This output is filtered by warning filters.
       with _greater_warnings_context(context_lines):
         warnings.warn_explicit(
-          message=DeprecationWarning(msg) if PY2 else msg,
+          message=msg,
           category=DeprecationWarning,
           filename=filename,
           lineno=line_number)

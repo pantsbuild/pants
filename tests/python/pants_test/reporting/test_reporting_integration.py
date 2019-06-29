@@ -8,7 +8,6 @@ import unittest
 from collections import defaultdict
 from http.server import BaseHTTPRequestHandler
 
-from future.utils import PY3
 from parameterized import parameterized
 from py_zipkin import Encoding
 from py_zipkin.encoding import convert_spans
@@ -322,7 +321,7 @@ def zipkin_handler():
     traces = defaultdict(list)
 
     def do_POST(self):
-      content_length = self.headers.get('content-length') if PY3 else self.headers.getheader('content-length')
+      content_length = self.headers.get('content-length')
       thrift_trace = self.rfile.read(int(content_length))
       json_trace = convert_spans(thrift_trace, Encoding.V1_JSON, Encoding.V1_THRIFT)
       trace = json.loads(json_trace)
