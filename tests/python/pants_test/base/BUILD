@@ -207,7 +207,6 @@ python_tests(
   name = 'exception_sink_integration',
   sources = ['test_exception_sink_integration.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/base:exception_sink',
     'src/python/pants/util:osutil',
     'tests/python/pants_test:int-test',

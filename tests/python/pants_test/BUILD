@@ -4,7 +4,6 @@
 python_library(
   name='test_infra',
   dependencies=[
-    '3rdparty/python:future',
     'tests/python/pants_test:int-test-for-export',
     'tests/python/pants_test:test_base',
     'tests/python/pants_test/jvm:jar_task_test_base',

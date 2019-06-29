@@ -17,9 +17,6 @@ target(
 python_library(
   name='node_paths',
   sources=['node_paths.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ],
 )
 
 python_library(

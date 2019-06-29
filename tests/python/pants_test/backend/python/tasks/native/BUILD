@@ -7,7 +7,6 @@ python_tests(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     '3rdparty/python:coverage',
-    '3rdparty/python:future',
     '3rdparty/python:pex',
     'src/python/pants/backend/native',
     'src/python/pants/backend/python/subsystems',
@@ -40,7 +39,6 @@ python_tests(
   name='integration',
   sources=globs('*_integration.py'),
   dependencies=[
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/native',
     'src/python/pants/backend/native/targets',

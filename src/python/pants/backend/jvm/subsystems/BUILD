@@ -143,7 +143,6 @@ python_library(
   name = 'zinc_language_mixin',
   sources = ['zinc_language_mixin.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/build_graph',
     'src/python/pants/subsystem',
   ]
@@ -161,7 +160,6 @@ python_library(
   name='rsc',
   sources=['rsc.py'],
   dependencies=[
-    '3rdparty/python:future',
     ':jvm_tool_mixin',
     ':shader',
     ':zinc',

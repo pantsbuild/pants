@@ -5,7 +5,6 @@ python_library(
   name = 'build_environment',
   sources = ['build_environment.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':build_root',
     'src/python/pants/scm',
     'src/python/pants/scm:git',

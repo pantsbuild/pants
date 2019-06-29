@@ -59,9 +59,6 @@ python_library(
 python_library(
   name = 'filtering',
   sources = ['filtering.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
 )
 
 python_library(

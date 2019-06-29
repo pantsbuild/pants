@@ -104,7 +104,6 @@ python_tests(
   name = 'osutil',
   sources = ['test_osutil.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:osutil',
     'tests/python/pants_test:test_base',
   ]
