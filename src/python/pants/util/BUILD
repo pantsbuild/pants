@@ -33,6 +33,7 @@ python_library(
   dependencies = [
     ':osutil',
   ],
+  tags={'type_checked'},
 )
 
 python_library(
