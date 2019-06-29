@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import unittest
-from builtins import object, open
 
 # NB: The Test -> JUnitTest import re-name above is needed to work around conflicts with pytest test
 # collection and a conflicting Test type in scope during that process.
@@ -135,7 +131,7 @@ class TestParseFailedTargets(unittest.TestCase):
   def _raise_handler(e):
     raise e
 
-  class CollectHandler(object):
+  class CollectHandler:
     def __init__(self):
       self._errors = []
 

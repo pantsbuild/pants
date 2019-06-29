@@ -1,13 +1,11 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import contextlib
 import multiprocessing
 import os
 import re
+import subprocess
 from collections import namedtuple
 from multiprocessing.pool import ThreadPool
 
@@ -19,7 +17,6 @@ from pants.task.target_restriction_mixins import (HasSkipAndTransitiveOptionsMix
 from pants.util import desktop
 from pants.util.dirutil import safe_mkdir, safe_walk
 from pants.util.memo import memoized_property
-from pants.util.process_handler import subprocess
 
 
 Jvmdoc = namedtuple('Jvmdoc', ['tool_name', 'product_type'])
@@ -40,7 +37,7 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
 
   @classmethod
   def register_options(cls, register):
-    super(JvmdocGen, cls).register_options(register)
+    super().register_options(register)
     tool_name = cls.jvmdoc().tool_name
 
     register('--include-codegen', type=bool,
@@ -67,7 +64,7 @@ class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMi
     return [cls.jvmdoc().product_type]
 
   def __init__(self, *args, **kwargs):
-    super(JvmdocGen, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     options = self.get_options()
     self._include_codegen = options.include_codegen

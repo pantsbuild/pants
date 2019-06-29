@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import threading
 import time
-from builtins import bytes, object, str
 
 
 class ReportingError(Exception):
@@ -21,7 +17,7 @@ class EmitterThread(threading.Thread):
   """
 
   def __init__(self, report, name):
-    super(EmitterThread, self).__init__(name=name)
+    super().__init__(name=name)
     self._report = report
     # N.B. We must not use the name `self._stop`, as it is already used by Threading.thread
     # and overriding it results in `TypeError: 'Event' object is not callable` when ran with Py3.
@@ -40,7 +36,7 @@ class EmitterThread(threading.Thread):
     self._stopper.set()
 
 
-class Report(object):
+class Report:
   """A report of a pants run."""
 
   # Log levels.

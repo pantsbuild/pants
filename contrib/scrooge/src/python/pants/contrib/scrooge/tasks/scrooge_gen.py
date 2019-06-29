@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import re
 import tempfile
-from builtins import next, open
 from collections import defaultdict, namedtuple
 
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
@@ -42,7 +38,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
   @classmethod
   def register_options(cls, register):
-    super(ScroogeGen, cls).register_options(register)
+    super().register_options(register)
     register('--verbose', type=bool, help='Emit verbose output.')
     register('--strict', fingerprint=True, type=bool,
              help='Enable strict compilation.')
@@ -67,7 +63,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ScroogeGen, cls).subsystem_dependencies() + (ThriftDefaults,)
+    return super().subsystem_dependencies() + (ThriftDefaults,)
 
   @classmethod
   def product_types(cls):
@@ -75,14 +71,14 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
   @classmethod
   def implementation_version(cls):
-    return super(ScroogeGen, cls).implementation_version() + [('ScroogeGen', 3)]
+    return super().implementation_version() + [('ScroogeGen', 3)]
 
   @classmethod
   def get_fingerprint_strategy(cls):
     return JavaThriftLibraryFingerprintStrategy(ThriftDefaults.global_instance())
 
   def __init__(self, *args, **kwargs):
-    super(ScroogeGen, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._thrift_defaults = ThriftDefaults.global_instance()
     self._depinfo = None
 

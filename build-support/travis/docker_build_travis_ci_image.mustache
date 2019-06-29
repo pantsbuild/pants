@@ -1,0 +1,8 @@
+docker build
+--rm -t travis_ci
+--build-arg "BASE_IMAGE=pantsbuild/centos${docker_centos_version:-6}:latest"
+--build-arg "TRAVIS_USER=$(id -un)"
+--build-arg "TRAVIS_UID=$(id -u)"
+--build-arg "TRAVIS_GROUP=$(id -gn)"
+--build-arg "TRAVIS_GID=$(id -g)"
+build-support/docker/travis_ci/

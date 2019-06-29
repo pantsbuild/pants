@@ -1,13 +1,10 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 from textwrap import dedent
+from unittest.mock import MagicMock
 
-from mock import MagicMock
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
@@ -30,7 +27,7 @@ class ScroogeGenTest(NailgunTaskTestBase):
 
   @classmethod
   def alias_groups(cls):
-    return super(ScroogeGenTest, cls).alias_groups().merge(
+    return super().alias_groups().merge(
       BuildFileAliases(targets={'java_thrift_library': JavaThriftLibrary,
                                 'java_library': JavaLibrary,
                                 'scala_library': ScalaLibrary}))

@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
-from builtins import object, str, zip
 from collections import defaultdict, deque
 from contextlib import contextmanager
 from os.path import dirname
@@ -75,7 +71,7 @@ class LegacyBuildGraph(BuildGraph):
     """
     self._scheduler = scheduler
     self._target_types = target_types
-    super(LegacyBuildGraph, self).__init__()
+    super().__init__()
 
   def clone_new(self):
     """Returns a new BuildGraph instance of the same type and with the same __init__ params."""

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 
@@ -45,7 +42,7 @@ class UnpackedJars(ImportJarsMixin, Target):
       'exclude_patterns' : PrimitiveField(exclude_patterns or ()),
       'intransitive': PrimitiveField(intransitive)
     })
-    super(UnpackedJars, self).__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, **kwargs)
 
     if not libraries:
       raise self.ExpectedLibrariesError('Expected non-empty libraries attribute for {spec}'

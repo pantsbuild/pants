@@ -1,10 +1,7 @@
-# coding=utf-8
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from abc import abstractmethod
+from abc import ABCMeta, abstractmethod
 from contextlib import contextmanager
 
 from pants.cache.cache_setup import CacheSetup
@@ -12,13 +9,13 @@ from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.memo import memoized_classproperty
-from pants.util.meta import AbstractClass, classproperty
+from pants.util.meta import classproperty
 from pants.util.objects import datatype
 
 
-class Goal(datatype([('exit_code', int)]), AbstractClass):
+class Goal(datatype([('exit_code', int)]), metaclass=ABCMeta):
   """The named product of a `@console_rule`.
-  
+
   This abstract class should be subclassed and given a `Goal.name` that it will be referred to by
   when invoked from the command line. The `Goal.name` also acts as the options_scope for the `Goal`.
 
@@ -110,12 +107,12 @@ class _GoalOptions(object):
   """A marker trait for the anonymous inner `Goal.Options` classes for `Goal`s."""
 
 
-class LineOriented(object):
+class LineOriented:
   """A mixin for Goal that adds Options to support the `line_oriented` context manager."""
 
   @classmethod
   def register_options(cls, register):
-    super(LineOriented, cls).register_options(register)
+    super().register_options(register)
     register('--sep', default='\\n', metavar='<separator>',
              help='String to use to separate result lines.')
     register('--output-file', metavar='<path>',

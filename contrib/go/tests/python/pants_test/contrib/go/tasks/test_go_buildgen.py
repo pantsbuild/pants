@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import types
-from builtins import object
 from textwrap import dedent
 
 from pants.build_graph.target import Target
@@ -27,7 +23,7 @@ class FakeFetcher(Fetcher):
     raise AssertionError('No fetches should be executed during go.buildgen')
 
 
-class FakeFetcherFactory(object):
+class FakeFetcherFactory:
   def get_fetcher(self, import_path):
     return FakeFetcher(import_path)
 
@@ -39,7 +35,7 @@ class GoBuildgenTest(TaskTestBase):
     return GoBuildgen
 
   def create_task(self, context, workdir=None):
-    task = super(GoBuildgenTest, self).create_task(context, workdir)
+    task = super().create_task(context, workdir)
     task.get_fetcher_factory = types.MethodType(lambda s: FakeFetcherFactory(), task)
     return task
 

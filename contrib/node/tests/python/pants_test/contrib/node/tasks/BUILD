@@ -5,7 +5,6 @@ python_tests(
   name='node_build',
   sources=['test_node_build.py'],
   dependencies=[
-    '3rdparty/python:future',
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
     'contrib/node/src/python/pants/contrib/node/tasks:node_build',
     'src/python/pants/build_graph',
@@ -74,7 +73,6 @@ python_tests(
   name='node_test_integration',
   sources=['test_node_test_integration.py'],
   dependencies=[
-    '3rdparty/python:future',
     'tests/python/pants_test:int-test',
   ],
   timeout=240,
@@ -101,8 +99,6 @@ python_tests(
   name='node_resolve',
   sources=['test_node_resolve.py'],
   dependencies=[
-    '3rdparty/python:future',
-    '3rdparty/python:mock',
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
     'contrib/node/src/python/pants/contrib/node/targets:node_preinstalled_module',
     'contrib/node/src/python/pants/contrib/node/targets:node_remote_module',
@@ -141,7 +137,6 @@ python_tests(
   sources=['test_node_resolve_src_deps.py'],
   dependencies=[
     '3rdparty/python:future',
-    '3rdparty/python:mock',
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
     'contrib/node/src/python/pants/contrib/node/targets:node_preinstalled_module',
     'contrib/node/src/python/pants/contrib/node/targets:node_remote_module',

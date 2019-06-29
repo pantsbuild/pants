@@ -5,7 +5,6 @@ python_library(
   name = 'resolve_jars_test_mixin',
   sources = ['resolve_jars_test_mixin.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:contextutil',
   ],
 )
@@ -72,7 +71,6 @@ python_tests(
   name = 'export_integration',
   sources = ['test_export_integration.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':resolve_jars_test_mixin',
     'src/python/pants/base:build_environment',
@@ -80,7 +78,6 @@ python_tests(
     'src/python/pants/ivy',
     'src/python/pants/java/distribution',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:int-test',
   ],
@@ -105,7 +102,6 @@ python_tests(
   name = 'idea_plugin_integration',
   sources = ['test_idea_plugin_integration.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/backend/project_info/tasks:idea_plugin_gen',
     'tests/python/pants_test:int-test',
   ],

@@ -1,11 +1,9 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import re
+import subprocess
 from contextlib import contextmanager
 
 from pants.backend.native.config.environment import Platform
@@ -18,7 +16,6 @@ from pants.backend.native.subsystems.native_toolchain import (GCCCppToolchain, G
                                                               NativeToolchain)
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import is_executable, safe_open
-from pants.util.process_handler import subprocess
 from pants.util.strutil import safe_shlex_join
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.subsystem.subsystem_util import global_subsystem_instance, init_subsystems
@@ -28,7 +25,7 @@ from pants_test.test_base import TestBase
 class TestNativeToolchain(TestBase, SchedulerTestBase):
 
   def setUp(self):
-    super(TestNativeToolchain, self).setUp()
+    super().setUp()
 
     init_subsystems([LibcDev, NativeToolchain], options={
       'libc': {

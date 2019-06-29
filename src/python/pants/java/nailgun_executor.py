@@ -1,19 +1,16 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
 import logging
 import os
 import re
-import select
+import selectors
 import threading
 import time
 from contextlib import closing
 
-from future.utils import PY3, string_types
+from future.utils import string_types
 from twitter.common.collections import maybe_list
 
 from pants.base.build_environment import get_buildroot
@@ -21,6 +18,7 @@ from pants.java.executor import Executor, SubprocessExecutor
 from pants.java.nailgun_client import NailgunClient
 from pants.pantsd.process_manager import FingerprintedProcessManager, ProcessGroup
 from pants.util.dirutil import read_file, safe_file_dump, safe_open
+from pants.util.memo import memoized_classproperty
 
 
 logger = logging.getLogger(__name__)
@@ -30,7 +28,7 @@ class NailgunProcessGroup(ProcessGroup):
   _NAILGUN_KILL_LOCK = threading.Lock()
 
   def __init__(self, metadata_base_dir=None):
-    super(NailgunProcessGroup, self).__init__(name='nailgun', metadata_base_dir=metadata_base_dir)
+    super().__init__(name='nailgun', metadata_base_dir=metadata_base_dir)
     # TODO: this should enumerate the .pids dir first, then fallback to ps enumeration (& warn).
 
   def _iter_nailgun_instances(self, everywhere=False):
@@ -72,7 +70,10 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
   FINGERPRINT_CMD_KEY = '-Dpants.nailgun.fingerprint'
   _PANTS_NG_ARG_PREFIX = '-Dpants.buildroot'
   _PANTS_OWNER_ARG_PREFIX = '-Dpants.nailgun.owner'
-  _PANTS_NG_BUILDROOT_ARG = '='.join((_PANTS_NG_ARG_PREFIX, get_buildroot()))
+
+  @memoized_classproperty
+  def _PANTS_NG_BUILDROOT_ARG(cls):
+    return '='.join((cls._PANTS_NG_ARG_PREFIX, get_buildroot()))
 
   _NAILGUN_SPAWN_LOCK = threading.Lock()
   _PROCESS_NAME = 'java'
@@ -125,9 +126,9 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
     encoded_java_version = repr(java_version).encode('utf-8')
     for item in (encoded_jvm_options, encoded_classpath, encoded_java_version):
       digest.update(str(item).encode('utf-8'))
-    return digest.hexdigest() if PY3 else digest.hexdigest().decode('utf-8')
+    return digest.hexdigest()
 
-  def _runner(self, classpath, main, jvm_options, args, cwd=None):
+  def _runner(self, classpath, main, jvm_options, args):
     """Runner factory. Called via Executor.execute()."""
     command = self._create_command(classpath, main, jvm_options, args)
 
@@ -181,9 +182,10 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
         self.terminate()
 
       if (not running) or (running and updated):
-        return self._spawn_nailgun_server(new_fingerprint, jvm_options, classpath, stdout, stderr, stdin)
+        return self._spawn_nailgun_server(new_fingerprint, jvm_options, classpath, stdout, stderr,
+                                          stdin)
 
-    return self._create_ngclient(self.socket, stdout, stderr, stdin)
+    return self._create_ngclient(port=self.socket, stdout=stdout, stderr=stderr, stdin=stdin)
 
   class InitialNailgunConnectTimedOut(Exception):
     _msg_fmt = """Failed to read nailgun output after {timeout} seconds!
@@ -198,24 +200,33 @@ Stderr:
 
   def _await_socket(self, timeout):
     """Blocks for the nailgun subprocess to bind and emit a listening port in the nailgun stdout."""
-    with safe_open(self._ng_stdout, 'r') as ng_stdout:
-      start_time = time.time()
-      accumulated_stdout = ''
-      while 1:
-        # TODO: share the decreasing timeout logic here with NailgunProtocol.iter_chunks() by adding
-        # a method to pants.util.contextutil!
-        remaining_time = time.time() - (start_time + timeout)
-        if remaining_time > 0:
-          stderr = read_file(self._ng_stderr, binary_mode=True)
-          raise self.InitialNailgunConnectTimedOut(
-            timeout=timeout,
-            stdout=accumulated_stdout,
-            stderr=stderr,
-          )
+    start_time = time.time()
+    accumulated_stdout = ''
 
-        readable, _, _ = select.select([ng_stdout], [], [], (-1 * remaining_time))
-        if readable:
-          line = ng_stdout.readline()                          # TODO: address deadlock risk here.
+    def calculate_remaining_time():
+      return time.time() - (start_time + timeout)
+
+    def possibly_raise_timeout(remaining_time):
+      if remaining_time > 0:
+        stderr = read_file(self._ng_stderr, binary_mode=True)
+        raise self.InitialNailgunConnectTimedOut(
+          timeout=timeout,
+          stdout=accumulated_stdout,
+          stderr=stderr,
+        )
+
+    # NB: We use PollSelector, rather than the more efficient DefaultSelector, because
+    # DefaultSelector results in using the epoll() syscall on Linux, which does not work with
+    # regular text files like ng_stdout. See https://stackoverflow.com/a/8645770.
+    with selectors.PollSelector() as selector, \
+      safe_open(self._ng_stdout, 'r') as ng_stdout:
+      selector.register(ng_stdout, selectors.EVENT_READ)
+      while 1:
+        remaining_time = calculate_remaining_time()
+        possibly_raise_timeout(remaining_time)
+        events = selector.select(timeout=-1 * remaining_time)
+        if events:
+          line = ng_stdout.readline()  # TODO: address deadlock risk here.
           try:
             return self._NG_PORT_REGEX.match(line).group(1)
           except AttributeError:
@@ -223,7 +234,7 @@ Stderr:
           accumulated_stdout += line
 
   def _create_ngclient(self, port, stdout, stderr, stdin):
-    return NailgunClient(port=port, ins=stdin, out=stdout, err=stderr, workdir=get_buildroot())
+    return NailgunClient(port=port, ins=stdin, out=stdout, err=stderr)
 
   def ensure_connectable(self, nailgun):
     """Ensures that a nailgun client is connectable or raises NailgunError."""
@@ -269,7 +280,7 @@ Stderr:
     logger.debug('Spawned nailgun server {i} with fingerprint={f}, pid={pid} port={port}'
                  .format(i=self._identity, f=fingerprint, pid=self.pid, port=self.socket))
 
-    client = self._create_ngclient(self.socket, stdout, stderr, stdin)
+    client = self._create_ngclient(port=self.socket, stdout=stdout, stderr=stderr, stdin=stdin)
     self.ensure_connectable(client)
 
     return client
@@ -281,7 +292,7 @@ Stderr:
   def is_alive(self):
     """A ProcessManager.is_alive() override that ensures buildroot flags are present in the process
     command line arguments."""
-    return super(NailgunExecutor, self).is_alive(self._check_process_buildroot)
+    return super().is_alive(self._check_process_buildroot)
 
   def post_fork_child(self, fingerprint, jvm_options, classpath, stdout, stderr):
     """Post-fork() child callback for ProcessManager.daemon_spawn()."""

@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
+import unittest.mock
 from contextlib import contextmanager
-
-import mock
 
 from pants.pantsd.service.fs_event_service import FSEventService
 from pants.pantsd.watchman import Watchman
@@ -21,8 +17,8 @@ class TestFSEventService(TestBase):
   WORKER_COUNT = 1
 
   def setUp(self):
-    super(TestFSEventService, self).setUp()
-    self.mock_watchman = mock.create_autospec(Watchman, spec_set=True)
+    super().setUp()
+    self.mock_watchman = unittest.mock.create_autospec(Watchman, spec_set=True)
     self.service = FSEventService(self.mock_watchman, self.BUILD_ROOT)
     self.service.setup(None)
     self.service.register_all_files_handler(lambda x: True, name='test')
@@ -48,7 +44,7 @@ class TestFSEventService(TestBase):
 
   @contextmanager
   def mocked_run(self, asserts=True):
-    self.service.fire_callback = mock.Mock()
+    self.service.fire_callback = unittest.mock.Mock()
     yield self.service.fire_callback
     if asserts:
       self.mock_watchman.watch_project.assert_called_once_with(self.BUILD_ROOT)
@@ -62,7 +58,7 @@ class TestFSEventService(TestBase):
     with self.mocked_run() as mock_callback:
       self.mock_watchman.subscribed.return_value = self.FAKE_EVENT_STREAM
       self.service.run()
-      mock_callback.assert_has_calls([mock.call(*self.FAKE_EVENT), mock.call(*self.FAKE_EVENT)],
+      mock_callback.assert_has_calls([unittest.mock.call(*self.FAKE_EVENT), unittest.mock.call(*self.FAKE_EVENT)],
                                      any_order=True)
 
   def test_run_failed_callback(self):
@@ -70,7 +66,7 @@ class TestFSEventService(TestBase):
       self.mock_watchman.subscribed.return_value = self.FAKE_EVENT_STREAM
       mock_callback.side_effect = [False, True]
       self.service.run()
-      mock_callback.assert_has_calls([mock.call(*self.FAKE_EVENT), mock.call(*self.FAKE_EVENT)],
+      mock_callback.assert_has_calls([unittest.mock.call(*self.FAKE_EVENT), unittest.mock.call(*self.FAKE_EVENT)],
                                      any_order=True)
 
   def test_run_breaks_on_kill_switch(self):

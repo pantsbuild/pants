@@ -1,15 +1,10 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from abc import abstractmethod, abstractproperty
-
-from pants.util.meta import AbstractClass
+from abc import ABC, abstractmethod
 
 
-class Scm(AbstractClass):
+class Scm(ABC):
   """Abstracts high-level scm operations needed by pants core and pants tasks.
 
   :API: public
@@ -33,32 +28,37 @@ class Scm(AbstractClass):
     :API: public
     """
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def current_rev_identifier(self):
     """Identifier for the tip/head of the current branch eg. "HEAD" in git.
 
     :API: public
     """
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def commit_id(self):
     """Returns the id of the current commit.
 
     :API: public
     """
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def server_url(self):
     """Returns the url of the (default) remote server."""
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def tag_name(self):
     """Returns the name of the current tag if any.
 
     :API: public
     """
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def branch_name(self):
     """Returns the name of the current branch if any.
 
@@ -72,7 +72,8 @@ class Scm(AbstractClass):
     :API: public
     """
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def worktree(self):
     """Returns the worktree for the SCM.
 

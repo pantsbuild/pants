@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
 import inspect
@@ -24,7 +21,7 @@ def equal_args(*args, **kwargs):
   return key
 
 
-class InstanceKey(object):
+class InstanceKey:
   """An equality wrapper for an arbitrary object instance.
 
   This wrapper leverages `id` and `is` for fast `__hash__` and `__eq__` but both of these rely on
@@ -149,14 +146,14 @@ def memoized_method(func=None, key_factory=per_instance, **kwargs):
 
   Applied like so:
 
-  >>> class Foo(object):
+  >>> class Foo:
   ...   @memoized_method
   ...   def name(self):
   ...     pass
 
   Is equivalent to:
 
-  >>> class Foo(object):
+  >>> class Foo:
   ...   @memoized(key_factory=per_instance)
   ...   def name(self):
   ...     pass
@@ -179,14 +176,14 @@ def memoized_property(func=None, key_factory=per_instance, **kwargs):
 
   Applied like so:
 
-  >>> class Foo(object):
+  >>> class Foo:
   ...   @memoized_property
   ...   def name(self):
   ...     pass
 
   Is equivalent to:
 
-  >>> class Foo(object):
+  >>> class Foo:
   ...   @property
   ...   @memoized_method
   ...   def name(self):
@@ -194,7 +191,7 @@ def memoized_property(func=None, key_factory=per_instance, **kwargs):
 
   Which is equivalent to:
 
-  >>> class Foo(object):
+  >>> class Foo:
   ...   @property
   ...   @memoized(key_factory=per_instance)
   ...   def name(self):
@@ -204,7 +201,7 @@ def memoized_property(func=None, key_factory=per_instance, **kwargs):
   property access re-computes the value.  In other words, for this `now` @memoized_property:
 
   >>> import time
-  >>> class Bar(object):
+  >>> class Bar:
   ...   @memoized_property
   ...   def now(self):
   ...     return time.time()

@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import re
-from builtins import open, range
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -25,7 +21,7 @@ class BaseJarTaskTest(JarTaskTestBase):
 
   @classmethod
   def alias_groups(cls):
-    return super(BaseJarTaskTest, cls).alias_groups().merge(BuildFileAliases(
+    return super().alias_groups().merge(BuildFileAliases(
       targets={
         'java_agent': JavaAgent,
         'jvm_binary': JvmBinary,
@@ -33,13 +29,13 @@ class BaseJarTaskTest(JarTaskTestBase):
     ))
 
   def setUp(self):
-    super(BaseJarTaskTest, self).setUp()
+    super().setUp()
 
     self.workdir = safe_mkdtemp()
     self.jar_task = self.prepare_execute(self.context())
 
   def tearDown(self):
-    super(BaseJarTaskTest, self).tearDown()
+    super().tearDown()
 
     if self.workdir:
       safe_rmtree(self.workdir)
@@ -59,7 +55,6 @@ class JarTaskTest(BaseJarTaskTest):
   MAX_SUBPROC_ARGS = 50
 
   class TestJarTask(JarTask):
-
     def execute(self):
       pass
 
@@ -68,7 +63,7 @@ class JarTaskTest(BaseJarTaskTest):
     return cls.TestJarTask
 
   def setUp(self):
-    super(JarTaskTest, self).setUp()
+    super().setUp()
     self.set_options(max_subprocess_args=self.MAX_SUBPROC_ARGS)
     self.jar_task = self.prepare_execute(self.context())
 
@@ -234,7 +229,6 @@ class JarTaskTest(BaseJarTaskTest):
 class JarBuilderTest(BaseJarTaskTest):
 
   class TestJarBuilderTask(JarBuilderTask):
-
     def execute(self):
       pass
 
@@ -243,7 +237,7 @@ class JarBuilderTest(BaseJarTaskTest):
     return cls.TestJarBuilderTask
 
   def setUp(self):
-    super(JarBuilderTest, self).setUp()
+    super().setUp()
     self.set_options(max_subprocess_args=100)
 
   def test_agent_manifest(self):

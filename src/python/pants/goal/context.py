@@ -1,16 +1,11 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import sys
-from builtins import filter, object
 from collections import defaultdict
 from contextlib import contextmanager
 
-from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_scm
@@ -26,7 +21,7 @@ from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.source.source_root import SourceRootConfig
 
 
-class Context(object):
+class Context:
   """Contains the context for a single run of pants.
 
   Task implementations can access configuration data from pants.ini and any flags they have exposed
@@ -66,7 +61,7 @@ class Context(object):
     self._lock = OwnerPrintingInterProcessFileLock(os.path.join(self._buildroot, '.pants.workdir.file_lock'))
     self._java_sysprops = None  # Computed lazily.
     self.requested_goals = requested_goals or []
-    self._console_outstream = console_outstream or (sys.stdout.buffer if PY3 else sys.stdout)
+    self._console_outstream = console_outstream or sys.stdout.buffer
     self._scm = scm or get_scm()
     self._workspace = workspace or (ScmWorkspace(self._scm) if self._scm else None)
     self._replace_targets(target_roots)
@@ -156,11 +151,6 @@ class Context(object):
     """A contextmanager that sets metrics in the context of a (v1) engine execution."""
     self._set_target_root_count_in_runtracker()
     yield
-    metrics = self._scheduler.metrics()
-    self.run_tracker.pantsd_stats.set_scheduler_metrics(metrics)
-    engine_workunits = self._scheduler.engine_workunits(metrics)
-    if engine_workunits:
-      self.run_tracker.report.bulk_record_workunits(engine_workunits)
     self._set_affected_target_count_in_runtracker()
 
   def _set_target_root_count_in_runtracker(self):

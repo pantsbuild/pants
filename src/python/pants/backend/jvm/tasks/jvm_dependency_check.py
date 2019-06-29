@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import filter, next
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
@@ -29,7 +25,7 @@ class JvmDependencyCheck(Task):
 
   @classmethod
   def register_options(cls, register):
-    super(JvmDependencyCheck, cls).register_options(register)
+    super().register_options(register)
     register('--missing-direct-deps', choices=['off', 'warn', 'fatal'],
              default='off',
              fingerprint=True,
@@ -53,7 +49,10 @@ class JvmDependencyCheck(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JvmDependencyCheck, cls).subsystem_dependencies() + (DependencyContext,)
+    return super().subsystem_dependencies() + (
+      DependencyContext,
+      DistributionLocator
+    )
 
   @staticmethod
   def _skip(options):
@@ -63,14 +62,14 @@ class JvmDependencyCheck(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JvmDependencyCheck, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     if not cls._skip(options):
       round_manager.require_data('product_deps_by_src')
       round_manager.require_data('runtime_classpath')
       round_manager.require_data('zinc_analysis')
 
   def __init__(self, *args, **kwargs):
-    super(JvmDependencyCheck, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     # Set up dep checking if needed.
     def munge_flag(flag):
@@ -86,8 +85,13 @@ class JvmDependencyCheck(Task):
     return True
 
   @memoized_property
+  def _distribution(self):
+    return DistributionLocator.cached()
+
+  @memoized_property
   def _analyzer(self):
     return JvmDependencyAnalyzer(get_buildroot(),
+                                 self._distribution,
                                  self.context.products.get_data('runtime_classpath'))
 
   def execute(self):
@@ -180,7 +184,7 @@ class JvmDependencyCheck(Task):
       # We don't require explicit deps on the java runtime, so we shouldn't consider that
       # a missing dep.
       return (dep not in analyzer.bootstrap_jar_classfiles
-              and not dep.startswith(DistributionLocator.cached().real_home))
+              and not dep.startswith(self._distribution.real_home))
 
     def target_or_java_dep_in_targets(target, targets):
       # We want to check if the target is in the targets collection

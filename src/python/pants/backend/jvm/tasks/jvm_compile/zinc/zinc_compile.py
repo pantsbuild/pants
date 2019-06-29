@@ -1,20 +1,16 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import errno
 import logging
 import os
 import re
 import textwrap
-from builtins import open
 from collections import defaultdict
 from contextlib import closing
 from xml.etree import ElementTree
 
-from future.utils import PY2, text_type
+from future.utils import text_type
 
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -28,13 +24,13 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
-from pants.engine.fs import DirectoryToMaterialize
+from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import classproperty
-from pants.util.strutil import ensure_text, safe_shlex_join
+from pants.util.strutil import safe_shlex_join
 
 
 # Well known metadata file required to register scalac plugins with nsc.
@@ -95,7 +91,7 @@ class BaseZincCompile(JvmCompile):
 
   @classmethod
   def implementation_version(cls):
-    return super(BaseZincCompile, cls).implementation_version() + [('BaseZincCompile', 7)]
+    return super().implementation_version() + [('BaseZincCompile', 8)]
 
   @classmethod
   def get_jvm_options_default(cls, bootstrap_option_values):
@@ -125,7 +121,7 @@ class BaseZincCompile(JvmCompile):
 
   @classmethod
   def register_options(cls, register):
-    super(BaseZincCompile, cls).register_options(register)
+    super().register_options(register)
     register('--whitelisted-args', advanced=True, type=dict,
              default={
                '-S.*': False,
@@ -150,11 +146,11 @@ class BaseZincCompile(JvmCompile):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(BaseZincCompile, cls).subsystem_dependencies() + (Zinc.Factory, JvmPlatform,)
+    return super().subsystem_dependencies() + (Zinc.Factory, JvmPlatform,)
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(BaseZincCompile, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     ScalaPlatform.prepare_tools(round_manager)
 
   @property
@@ -176,7 +172,7 @@ class BaseZincCompile(JvmCompile):
     return Zinc.Factory.global_instance().create(self.context.products, self.execution_strategy)
 
   def __init__(self, *args, **kwargs):
-    super(BaseZincCompile, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     # A directory to contain per-target subdirectories with apt processor info files.
     self._processor_info_dir = os.path.join(self.workdir, 'apt-processor-info')
 
@@ -220,7 +216,7 @@ class BaseZincCompile(JvmCompile):
 
     if zinc_args is not None:
       for compile_context in compile_contexts:
-        with open(compile_context.zinc_args_file, 'r') as fp:
+        with open(compile_context.args_file, 'r') as fp:
           args = fp.read().split()
         zinc_args[compile_context.target] = args
 
@@ -231,9 +227,9 @@ class BaseZincCompile(JvmCompile):
     if self.context.products.is_required_data('zinc_args'):
       self.context.products.safe_create_data('zinc_args', lambda: defaultdict(list))
 
-  def extra_resources(self, compile_context):
-    """Override `extra_resources` to additionally include scalac_plugin info."""
-    result = super(BaseZincCompile, self).extra_resources(compile_context)
+  def post_compile_extra_resources(self, compile_context):
+    """Override `post_compile_extra_resources` to additionally include scalac_plugin info."""
+    result = super().post_compile_extra_resources(compile_context)
     target = compile_context.target
 
     if isinstance(target, ScalacPlugin):
@@ -293,6 +289,10 @@ class BaseZincCompile(JvmCompile):
     if not self.get_options().colors:
       zinc_args.append('-no-color')
 
+    if self.post_compile_extra_resources(ctx):
+      post_compile_merge_dir = relative_to_exec_root(ctx.post_compile_merge_dir)
+      zinc_args.extend(['--post-compile-merge-dir', post_compile_merge_dir])
+
     compiler_bridge_classpath_entry = self._zinc.compile_compiler_bridge(self.context)
     zinc_args.extend(['-compiled-bridge-jar', relative_to_exec_root(compiler_bridge_classpath_entry.path)])
     zinc_args.extend(['-scala-path', ':'.join(scala_path)])
@@ -349,42 +349,37 @@ class BaseZincCompile(JvmCompile):
     zinc_args.extend(ctx.sources)
 
     self.log_zinc_file(ctx.analysis_file)
-    with open(ctx.zinc_args_file, 'w') as fp:
-      for arg in zinc_args:
-        # NB: in Python 2, options are stored sometimes as bytes and sometimes as unicode in the OptionValueContainer.
-        # This is due to how Python 2 natively stores attributes as a map of `str` (aka `bytes`) to their value. So,
-        # the setattr() and getattr() functions sometimes use bytes.
-        if PY2:
-          arg = ensure_text(arg)
-        fp.write(arg)
-        fp.write('\n')
+    self.write_argsfile(ctx, zinc_args)
 
     return self.execution_strategy_enum.resolve_for_enum_variant({
       self.HERMETIC: lambda: self._compile_hermetic(
-        jvm_options, ctx, classes_dir, jar_file, zinc_args, compiler_bridge_classpath_entry,
+        jvm_options, ctx, classes_dir, jar_file, compiler_bridge_classpath_entry,
         dependency_classpath, scalac_classpath_entries),
-      self.SUBPROCESS: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir, zinc_args),
-      self.NAILGUN: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir, zinc_args),
+      self.SUBPROCESS: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir),
+      self.NAILGUN: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir),
     })()
 
   class ZincCompileError(TaskError):
     """An exception type specifically to signal a failed zinc execution."""
 
-  def _compile_nonhermetic(self, jvm_options, ctx, classes_directory, zinc_args):
+  def _compile_nonhermetic(self, jvm_options, ctx, classes_directory):
+    # Populate the resources to merge post compile onto disk for the nonhermetic case,
+    # where `--post-compile-merge-dir` was added is the relevant part.
+    self.context._scheduler.materialize_directories((
+      DirectoryToMaterialize(get_buildroot(), self.post_compile_extra_resources_digest(ctx)),
+    ))
+
     exit_code = self.runjava(classpath=self.get_zinc_compiler_classpath(),
                              main=Zinc.ZINC_COMPILE_MAIN,
                              jvm_options=jvm_options,
-                             args=zinc_args,
+                             args=['@{}'.format(ctx.args_file)],
                              workunit_name=self.name(),
                              workunit_labels=[WorkUnitLabel.COMPILER],
                              dist=self._zinc.dist)
     if exit_code != 0:
       raise self.ZincCompileError('Zinc compile failed.', exit_code=exit_code)
-    self.context._scheduler.materialize_directories((
-      DirectoryToMaterialize(text_type(classes_directory), self.extra_resources_digest(ctx)),
-    ))
 
-  def _compile_hermetic(self, jvm_options, ctx, classes_dir, jar_file, zinc_args,
+  def _compile_hermetic(self, jvm_options, ctx, classes_dir, jar_file,
                         compiler_bridge_classpath_entry, dependency_classpath,
                         scalac_classpath_entries):
     zinc_relpath = fast_relpath(self._zinc.zinc, get_buildroot())
@@ -453,18 +448,24 @@ class BaseZincCompile(JvmCompile):
         Zinc.ZINC_COMPILE_MAIN
       ]
 
+    argfile_snapshot, = self.context._scheduler.capture_snapshots([
+        PathGlobsAndRoot(
+          PathGlobs([fast_relpath(ctx.args_file, get_buildroot())]),
+          get_buildroot(),
+        ),
+      ])
+
+    argv = image_specific_argv + ['@{}'.format(argfile_snapshot.files[0])]
+    # TODO(#6071): Our ExecuteProcessRequest expects a specific string type for arguments,
+    # which py2 doesn't default to. This can be removed when we drop python 2.
+    argv = [text_type(arg) for arg in argv]
+
     merged_input_digest = self.context._scheduler.merge_directories(
       tuple(s.directory_digest for s in snapshots) +
       directory_digests +
       native_image_snapshots +
-      (self.extra_resources_digest(ctx),)
+      (self.post_compile_extra_resources_digest(ctx), argfile_snapshot.directory_digest)
     )
-
-
-    argv = image_specific_argv + zinc_args
-    # TODO(#6071): Our ExecuteProcessRequest expects a specific string type for arguments,
-    # which py2 doesn't default to. This can be removed when we drop python 2.
-    argv = [text_type(arg) for arg in argv]
 
     req = ExecuteProcessRequest(
       argv=tuple(argv),

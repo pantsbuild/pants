@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import object
 
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
@@ -17,7 +13,7 @@ class Depmap(ConsoleTask):
   Generates either a textual dependency tree or a graphviz digraph dot file for the dependency
   set of a target.
   """
-  class SourceRootTypes(object):
+  class SourceRootTypes:
     """Defines SourceRoot Types Constants"""
     SOURCE = 'SOURCE'  # Source Target
     TEST = 'TEST'  # Test Target
@@ -28,7 +24,7 @@ class Depmap(ConsoleTask):
 
   @classmethod
   def register_options(cls, register):
-    super(Depmap, cls).register_options(register)
+    super().register_options(register)
     register('--internal-only', type=bool,
              help='Specifies that only internal dependencies should be included in the graph '
                   'output (no external jars).')
@@ -50,7 +46,7 @@ class Depmap(ConsoleTask):
                   'dependency\'s fully qualified name.')
 
   def __init__(self, *args, **kwargs):
-    super(Depmap, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     self.is_internal_only = self.get_options().internal_only
     self.is_external_only = self.get_options().external_only

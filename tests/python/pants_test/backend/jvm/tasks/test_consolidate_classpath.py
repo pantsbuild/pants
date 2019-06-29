@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -25,7 +22,7 @@ class TestConsolidateClasspath(JvmBinaryTaskTestBase):
 
   def setUp(self):
     """Prepare targets, context, runtime classpath. """
-    super(TestConsolidateClasspath, self).setUp()
+    super().setUp()
     self.task = self.prepare_execute(self.context())
 
     self.jar_artifact = self.create_artifact(org='org.example', name='foo', rev='1.0.0')

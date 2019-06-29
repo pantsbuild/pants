@@ -1,18 +1,15 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
 import os
+import subprocess
 
 from pex.variables import Variables
 
 from pants.option.custom_types import UnsetBool
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
-from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)
@@ -24,7 +21,7 @@ class PythonSetup(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(PythonSetup, cls).register_options(register)
+    super().register_options(register)
     register('--interpreter-constraints', advanced=True, default=['CPython>=2.7,<3', 'CPython>=3.6,<4'], type=list,
              metavar='<requirement>', fingerprint=True,
              help="Constrain the selected Python interpreter.  Specify with requirement syntax, "

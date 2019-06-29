@@ -1,14 +1,10 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.testutils.py2_compat import assertRegex
 
 
 class FilemapIntegrationTest(PantsRunIntegrationTest):
@@ -20,7 +16,7 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
   }
 
   def setUp(self):
-    super(FilemapIntegrationTest, self).setUp()
+    super().setUp()
 
     project_tree = FileSystemProjectTree(os.path.abspath(self.PATH_PREFIX), ['BUILD', '.*'])
     scan_set = set()
@@ -62,8 +58,7 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.do_command('filemap',
                                   self._mk_target('exclude_strings_disallowed'),
                                   success=False)
-      assertRegex(self, pants_run.stderr_data,
-                               r'Excludes of type `.*` are not supported')
+      self.assertRegex(pants_run.stderr_data, r'Excludes of type `.*` are not supported')
 
   def test_exclude_list_of_strings(self):
     test_out = self._extract_exclude_output('exclude_list_of_strings')

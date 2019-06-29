@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import object
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
@@ -16,19 +12,19 @@ from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.build_graph.aliased_target import AliasTarget
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.target import Target
-from pants.java.distribution.distribution import DistributionLocator
 from pants.util.memo import memoized_method, memoized_property
 
 
-class JvmDependencyAnalyzer(object):
+class JvmDependencyAnalyzer:
   """Helper class for tasks which need to analyze source dependencies.
 
   Primary purpose is to provide a classfile --> target mapping, which subclasses can use in
   determining which targets correspond to the actual source dependencies of any given target.
   """
 
-  def __init__(self, buildroot, runtime_classpath):
+  def __init__(self, buildroot, distribution, runtime_classpath):
     self.buildroot = buildroot
+    self.distribution = distribution
     self.runtime_classpath = runtime_classpath
 
   @memoized_method
@@ -122,7 +118,7 @@ class JvmDependencyAnalyzer(object):
 
   def _find_all_bootstrap_jars(self):
     def get_path(key):
-      return DistributionLocator.cached().system_properties.get(key, '').split(':')
+      return self.distribution.system_properties.get(key, '').split(':')
 
     def find_jars_in_dirs(dirs):
       ret = []

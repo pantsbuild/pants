@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import str
 
 from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -37,7 +33,7 @@ class JUnitTests(JvmTarget):
 
   @classmethod
   def subsystems(cls):
-    return super(JUnitTests, cls).subsystems() + (JUnit,)
+    return super().subsystems() + (JUnit,)
 
   def __init__(self, cwd=None, test_platform=None, payload=None, timeout=None,
                extra_jvm_options=None, extra_env_vars=None, concurrency=None,
@@ -75,7 +71,7 @@ class JUnitTests(JvmTarget):
       'extra_jvm_options': PrimitiveField(tuple(extra_jvm_options or ())),
       'extra_env_vars': PrimitiveField(tuple(extra_env_vars.items())),
     })
-    super(JUnitTests, self).__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, **kwargs)
 
     # These parameters don't need to go into the fingerprint:
     self._concurrency = concurrency
@@ -96,7 +92,7 @@ class JUnitTests(JvmTarget):
 
   @classmethod
   def compute_dependency_specs(cls, kwargs=None, payload=None):
-    for spec in super(JUnitTests, cls).compute_dependency_specs(kwargs, payload):
+    for spec in super().compute_dependency_specs(kwargs, payload):
       yield spec
 
     for spec in JUnit.global_instance().injectables_specs_for_key('library'):

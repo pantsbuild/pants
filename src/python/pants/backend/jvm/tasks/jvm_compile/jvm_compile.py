@@ -1,15 +1,11 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import functools
 import os
-from builtins import object, open, str
 from multiprocessing import cpu_count
 
-from future.utils import PY3, text_type
+from future.utils import PY2, PY3, text_type
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
@@ -43,6 +39,7 @@ from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_file_
                                 safe_rmtree)
 from pants.util.fileutil import create_size_estimators
 from pants.util.memo import memoized_method, memoized_property
+from pants.util.strutil import ensure_text
 
 
 # Well known metadata file to register javac plugins.
@@ -67,7 +64,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   @classmethod
   def register_options(cls, register):
-    super(JvmCompile, cls).register_options(register)
+    super().register_options(register)
 
     register('--args', advanced=True, type=list,
              default=list(cls.get_args_default(register.bootstrap)), fingerprint=True,
@@ -142,11 +139,11 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   @classmethod
   def implementation_version(cls):
-    return super(JvmCompile, cls).implementation_version() + [('JvmCompile', 3)]
+    return super().implementation_version() + [('JvmCompile', 3)]
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JvmCompile, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
 
     round_manager.require_data('compile_classpath')
 
@@ -169,7 +166,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JvmCompile, cls).subsystem_dependencies() + (DependencyContext,
+    return super().subsystem_dependencies() + (DependencyContext,
                                                               Java,
                                                               JvmPlatform,
                                                               ScalaPlatform,
@@ -265,7 +262,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     """Classpath entries containing scalac plugins."""
     return []
 
-  def extra_resources(self, compile_context):
+  def post_compile_extra_resources(self, compile_context):
     """Produces a dictionary of any extra, out-of-band resources for a target.
 
     E.g., targets that produce scala compiler plugins or annotation processor files
@@ -282,19 +279,45 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
     return result
 
-  def extra_resources_digest(self, compile_context):
-    """Compute a Digest for the extra_resources for the given context."""
+  def post_compile_extra_resources_digest(self, compile_context,
+                                          prepend_post_merge_relative_path=True):
+    """Compute a Digest for the post_compile_extra_resources for the given context."""
     # TODO: Switch to using #7739 once it is available.
-    extra_resources = self.extra_resources(compile_context)
+    extra_resources = self.post_compile_extra_resources(compile_context)
     if not extra_resources:
       return EMPTY_DIRECTORY_DIGEST
-    with temporary_dir() as tmpdir:
-      for filename, filecontent in extra_resources.items():
-        safe_file_dump(os.path.join(tmpdir, filename), filecontent)
-      snapshot, = self.context._scheduler.capture_snapshots([
-          PathGlobsAndRoot(PathGlobs(extra_resources), tmpdir)
+
+    def _snapshot_resources(resources, prefix='.'):
+      with temporary_dir() as root_dir:
+        for filename, filecontent in resources.items():
+          safe_file_dump(os.path.join(os.path.join(root_dir, prefix), filename), filecontent)
+
+        extra_resources_relative_to_rootdir = {os.path.join(prefix, k): v for k, v in
+                                               resources.items()}
+        snapshot, = self.context._scheduler.capture_snapshots([
+          PathGlobsAndRoot(PathGlobs(extra_resources_relative_to_rootdir), root_dir)
         ])
+
       return snapshot.directory_digest
+
+    if prepend_post_merge_relative_path:
+      rel_post_compile_merge_dir = fast_relpath(compile_context.post_compile_merge_dir,
+                                                get_buildroot())
+      return _snapshot_resources(extra_resources, prefix=rel_post_compile_merge_dir)
+    else:
+      return _snapshot_resources(extra_resources)
+
+  def write_argsfile(self, ctx, args):
+    """Write the argsfile for this context."""
+    with open(ctx.args_file, 'w') as fp:
+      for arg in args:
+        # NB: in Python 2, options are stored sometimes as bytes and sometimes as unicode in the OptionValueContainer.
+        # This is due to how Python 2 natively stores attributes as a map of `str` (aka `bytes`) to their value. So,
+        # the setattr() and getattr() functions sometimes use bytes.
+        if PY2:
+          arg = ensure_text(arg)
+        fp.write(arg)
+        fp.write('\n')
 
   def create_empty_extra_products(self):
     """Create any products the subclass task supports in addition to the runtime_classpath.
@@ -316,7 +339,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     return ccs
 
   def __init__(self, *args, **kwargs):
-    super(JvmCompile, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._targets_to_compile_settings = None
 
     # JVM options for running the compiler.
@@ -352,18 +375,21 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
   @memoized_property
   def _missing_deps_finder(self):
     dep_analyzer = JvmDependencyAnalyzer(get_buildroot(),
+                                         self._get_jvm_distribution(),
                                          self.context.products.get_data('runtime_classpath'))
     return MissingDependencyFinder(dep_analyzer, CompileErrorExtractor(
       self.get_options().class_not_found_error_patterns))
 
   def create_compile_context(self, target, target_workdir):
-    return CompileContext(target,
-                          os.path.join(target_workdir, 'z.analysis'),
-                          ClasspathEntry(os.path.join(target_workdir, 'classes')),
-                          ClasspathEntry(os.path.join(target_workdir, 'z.jar')),
-                          os.path.join(target_workdir, 'logs'),
-                          os.path.join(target_workdir, 'zinc_args'),
-                          self._compute_sources_for_target(target))
+    return CompileContext(target=target,
+                          analysis_file=os.path.join(target_workdir, 'z.analysis'),
+                          classes_dir=ClasspathEntry(os.path.join(target_workdir, 'classes')),
+                          jar_file=ClasspathEntry(os.path.join(target_workdir, 'z.jar')),
+                          log_dir=os.path.join(target_workdir, 'logs'),
+                          args_file=os.path.join(target_workdir, 'zinc_args'),
+                          post_compile_merge_dir=os.path.join(target_workdir,
+                                                              'post_compile_merge_dir'),
+                          sources=self._compute_sources_for_target(target))
 
   def execute(self):
     if JvmPlatform.global_instance().get_options().compiler != self.compiler_name:
@@ -682,7 +708,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     return "compile({})".format(compile_target.address.spec)
 
   def _create_compile_jobs(self, compile_contexts, invalid_targets, invalid_vts, classpath_product):
-    class Counter(object):
+    class Counter:
       def __init__(self, size, initial=0):
         self.size = size
         self.count = initial
@@ -774,8 +800,14 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   def _record_target_stats(self, target, classpath_len, sources_len, compiletime, is_incremental,
     stats_key):
+    # TODO: classpath_len doesn't *really* capture what we're looking for -- the cumulative size of
+    # classpath files might be, though. Capturing the digest of the input classpath might give us
+    # that, though (as well as the source files?).
     def record(k, v):
       self.context.run_tracker.report_target_info(self.options_scope, target, [stats_key, k], v)
+    self.context.log.debug(
+      '[Timing({})] {}: {} sec; {} sources; {} classpath elements'
+      .format(stats_key, target.address.spec, compiletime, sources_len, classpath_len))
     record('time', compiletime)
     record('classpath_len', classpath_len)
     record('sources_len', sources_len)

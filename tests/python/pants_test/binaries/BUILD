@@ -4,8 +4,6 @@
 python_tests(
   sources=globs('test_*.py', exclude=[globs('*_integration.py')]),
   dependencies=[
-    '3rdparty/python:future',
-    '3rdparty/python:mock',
     'src/python/pants/binaries',
     'src/python/pants/net',
     'src/python/pants/option',

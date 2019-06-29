@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import sys
@@ -55,7 +52,7 @@ class Checkstyle(LintTaskMixin, Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(Task, cls).subsystem_dependencies() + cls.plugin_subsystems + (
+    return super().subsystem_dependencies() + cls.plugin_subsystems + (
       PexBuilderWrapper.Factory,
       PythonInterpreterCache,
       PythonSetup,
@@ -63,11 +60,11 @@ class Checkstyle(LintTaskMixin, Task):
 
   @classmethod
   def implementation_version(cls):
-    return super(Checkstyle, cls).implementation_version() + [('Checkstyle', 1)]
+    return super().implementation_version() + [('Checkstyle', 1)]
 
   @classmethod
   def register_options(cls, register):
-    super(Checkstyle, cls).register_options(register)
+    super().register_options(register)
     register('--severity', fingerprint=True, default='COMMENT', type=str,
              help='Only messages at this severity or higher are logged. [COMMENT WARNING ERROR].')
     register('--strict', fingerprint=True, type=bool,

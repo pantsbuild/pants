@@ -3,8 +3,6 @@
 
 python_library(
   dependencies=[
-    'src/python/pants/util:collections_abc_backport',
-    '3rdparty/python:future',
     '3rdparty/python:pex',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
@@ -32,10 +30,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:fileutil',
     'src/python/pants/util:memo',
-    'src/python/pants/util:meta',
     'src/python/pants/util:objects',
-    'src/python/pants/util:process_handler',
-    'src/python/pants/util:py2_compat',
     'src/python/pants/util:xml_parser',
   ]
 )

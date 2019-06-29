@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import threading
-from builtins import str
 
 from future.utils import text_type
 
@@ -52,12 +48,12 @@ class BinaryToolBase(Subsystem):
   extra_version_option_kwargs = None
 
   def __init__(self, *args, **kwargs):
-    super(BinaryToolBase, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._snapshot_lock = threading.Lock()
 
   @classmethod
   def subsystem_dependencies(cls):
-    sub_deps = super(BinaryToolBase, cls).subsystem_dependencies() + (BinaryUtil.Factory,)
+    sub_deps = super().subsystem_dependencies() + (BinaryUtil.Factory,)
 
     # TODO: if we need to do more conditional subsystem dependencies, do it declaratively with a
     # dict class field so that we only try to create or access it if we declared a dependency on it.
@@ -102,7 +98,7 @@ class BinaryToolBase(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(BinaryToolBase, cls).register_options(register)
+    super().register_options(register)
 
     version_registration_kwargs = {
       'type': str,

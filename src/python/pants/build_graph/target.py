@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import weakref
-from builtins import object, str
 from hashlib import sha1
 
 from six import string_types
@@ -34,7 +30,7 @@ from pants.util.memo import memoized_method, memoized_property
 logger = logging.getLogger(__name__)
 
 
-class AbstractTarget(object):
+class AbstractTarget:
 
   @classmethod
   def subsystems(cls):
@@ -157,7 +153,7 @@ class Target(AbstractTarget):
 
   @classmethod
   def subsystems(cls):
-    return super(Target, cls).subsystems() + (cls.Arguments, cls.TagAssignments)
+    return super().subsystems() + (cls.Arguments, cls.TagAssignments)
 
   @classmethod
   def get_addressable_type(target_cls):

@@ -3,7 +3,6 @@
 
 python_tests(
   dependencies=[
-    '3rdparty/python:future',
     '3rdparty/python:parameterized',
     '3rdparty/python:pex',
     '3rdparty/python:wheel',
@@ -15,7 +14,6 @@ python_tests(
     'src/python/pants/base:exceptions',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test/backend/python/tasks:python_task_test_base',
   ]
 )

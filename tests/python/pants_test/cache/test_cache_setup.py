@@ -1,13 +1,8 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import object
-
-from mock import Mock
+from unittest.mock import Mock
 
 from pants.cache.cache_setup import (CacheFactory, CacheSetup, CacheSpec, CacheSpecFormatError,
                                      EmptyCacheSpecError, InvalidCacheSpecError,
@@ -30,12 +25,12 @@ class DummyTask(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(DummyTask, cls).subsystem_dependencies() + (CacheSetup, )
+    return super().subsystem_dependencies() + (CacheSetup, )
 
   def execute(self): pass
 
 
-class MockPinger(object):
+class MockPinger:
 
   def __init__(self, hosts_to_times):
     self._hosts_to_times = hosts_to_times
@@ -66,7 +61,7 @@ class TestCacheSetup(TestBase):
                      self.pants_workdir)
 
   def setUp(self):
-    super(TestCacheSetup, self).setUp()
+    super().setUp()
 
     self.resolver = Mock(spec=Resolver)
     self.resolver.resolve = Mock(return_value=[self.REMOTE_URI_1, self.REMOTE_URI_2])

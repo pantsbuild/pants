@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.tasks.jvmdoc_gen import Jvmdoc, JvmdocGen
@@ -21,11 +18,11 @@ class ScaladocGen(JvmdocGen):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ScaladocGen, cls).subsystem_dependencies() + (DistributionLocator, ScalaPlatform.scoped(cls))
+    return super().subsystem_dependencies() + (DistributionLocator, ScalaPlatform.scoped(cls))
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(ScaladocGen, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     ScalaPlatform.prepare_tools(round_manager)
 
   def execute(self):

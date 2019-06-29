@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
 import logging
@@ -35,7 +32,7 @@ class IsortRun(FmtTaskMixin, Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(IsortRun, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(IsortPrep.tool_instance_cls)
 
   def execute(self):

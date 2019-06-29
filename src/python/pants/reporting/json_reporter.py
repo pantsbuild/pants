@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import list, str
 from collections import defaultdict, namedtuple
 
 from future.moves.itertools import zip_longest
@@ -28,7 +24,7 @@ class JsonReporter(Reporter):
   Settings = namedtuple('Settings', Reporter.Settings._fields)
 
   def __init__(self, run_tracker, settings):
-    super(JsonReporter, self).__init__(run_tracker, settings)
+    super().__init__(run_tracker, settings)
 
     # We accumulate build state into this dict.
     self.results = {}

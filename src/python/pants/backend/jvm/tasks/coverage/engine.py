@@ -1,19 +1,15 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
-class CoverageEngine(AbstractClass):
+class CoverageEngine(ABC):
   """The interface JVM code coverage processors must support.
 
   This is a stateful interface that will be called via the following sequence:

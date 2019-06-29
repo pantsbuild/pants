@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField, PrimitivesSetField
@@ -43,7 +40,7 @@ class PackagedNativeLibrary(Target):
       'lib_relpath': PrimitiveField(lib_relpath),
       'native_lib_names': PrimitivesSetField(native_lib_names),
     })
-    super(PackagedNativeLibrary, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   @property
   def include_relpath(self):

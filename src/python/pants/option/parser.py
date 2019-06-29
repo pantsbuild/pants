@@ -1,15 +1,11 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import copy
 import json
 import os
 import re
 import traceback
-from builtins import next, object, open, str
 from collections import defaultdict
 
 import Levenshtein
@@ -33,7 +29,7 @@ from pants.option.scope import ScopeInfo
 from pants.util.objects import SubclassesOf, datatype
 
 
-class Parser(object):
+class Parser:
   """An argument parser in a hierarchy.
 
   Each node in the hierarchy is a 'scope': the root is the global scope, and the parent of

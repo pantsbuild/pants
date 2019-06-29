@@ -1,12 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
+import subprocess
 import unittest
-from builtins import open
 from contextlib import contextmanager
 from textwrap import dedent
 from unittest import skipIf
@@ -15,7 +12,6 @@ from pants.scm.git import Git
 from pants.scm.scm import Scm
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_mkdir, safe_mkdtemp, safe_open, safe_rmtree, touch
-from pants.util.process_handler import subprocess
 from pants_test.testutils.git_util import MIN_REQUIRED_GIT_VERSION, git_version
 
 

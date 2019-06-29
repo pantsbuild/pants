@@ -4,7 +4,6 @@
 python_tests(
   sources = globs('*.py', exclude=[globs('*_integration.py')]),
   dependencies=[
-    '3rdparty/python:future',
     'contrib/go/src/python/pants/contrib/go/subsystems',
     'contrib/go/src/python/pants/contrib/go/targets',
     'contrib/go/src/python/pants/contrib/go/tasks',
@@ -30,7 +29,6 @@ python_tests(
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test/testutils:file_test_util',
-    'tests/python/pants_test/testutils:py2_compat',
     'tests/python/pants_test:int-test',
   ],
   tags={'integration'},

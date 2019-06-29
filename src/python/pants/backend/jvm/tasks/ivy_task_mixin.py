@@ -1,15 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
 import logging
 import os
-from builtins import str
-
-from future.utils import PY3
 
 from pants.backend.jvm.ivy_utils import NO_RESOLVE_RUN_RESULT, IvyFetchStep, IvyResolveStep
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
@@ -30,7 +24,7 @@ logger = logging.getLogger(__name__)
 class IvyResolveFingerprintStrategy(FingerprintStrategy):
 
   def __init__(self, confs):
-    super(IvyResolveFingerprintStrategy, self).__init__()
+    super().__init__()
     self._confs = sorted(confs or [])
 
   def compute_fingerprint(self, target):
@@ -60,7 +54,7 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
     for element in hash_elements_for_target:
       hasher.update(element.encode('utf-8'))
 
-    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+    return hasher.hexdigest()
 
   def __hash__(self):
     return hash((type(self), '-'.join(self._confs)))
@@ -87,11 +81,11 @@ class IvyTaskMixin(JvmResolverBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(IvyTaskMixin, cls).subsystem_dependencies() + (IvySubsystem, JarDependencyManagement)
+    return super().subsystem_dependencies() + (IvySubsystem, JarDependencyManagement)
 
   @classmethod
   def register_options(cls, register):
-    super(IvyTaskMixin, cls).register_options(register)
+    super().register_options(register)
     # TODO: Register an --ivy-jvm-options here and use that, instead of the --jvm-options
     # registered by the task we mix into. That task may have intended those options for some
     # other JVM run than the Ivy one.
@@ -101,7 +95,7 @@ class IvyTaskMixin(JvmResolverBase):
 
   @classmethod
   def implementation_version(cls):
-    return super(IvyTaskMixin, cls).implementation_version() + [('IvyTaskMixin', 5)]
+    return super().implementation_version() + [('IvyTaskMixin', 5)]
 
   @memoized_property
   def ivy_repository_cache_dir(self):

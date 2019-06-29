@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import str
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.task.task import Task
@@ -23,7 +19,7 @@ class NodeTask(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(NodeTask, cls).subsystem_dependencies() + (NodeDistribution.scoped(cls),)
+    return super().subsystem_dependencies() + (NodeDistribution.scoped(cls),)
 
   @memoized_property
   def node_distribution(self):

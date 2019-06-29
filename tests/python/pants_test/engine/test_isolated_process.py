@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import unittest
-from builtins import str
 
 from future.utils import text_type
 
@@ -28,7 +24,7 @@ class Concatted(datatype([('value', text_type)])): pass
 class BinaryLocation(datatype([('bin_path', text_type)])):
 
   def __new__(cls, bin_path):
-    this_object = super(BinaryLocation, cls).__new__(cls, text_type(bin_path))
+    this_object = super().__new__(cls, text_type(bin_path))
 
     bin_path = this_object.bin_path
 
@@ -266,7 +262,7 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
 
   @classmethod
   def rules(cls):
-    return super(IsolatedProcessTest, cls).rules() + [
+    return super().rules() + [
       RootRule(JavacVersionExecutionRequest),
       get_javac_version_output,
     ] + create_cat_stdout_rules() + create_javac_compile_rules()

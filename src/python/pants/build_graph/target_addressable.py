@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 
@@ -33,7 +30,7 @@ class TargetAddressable(Addressable):
   logger = logging.getLogger(__name__)
 
   def __init__(self, alias, target_type, *args, **kwargs):
-    super(TargetAddressable, self).__init__(alias, target_type)
+    super().__init__(alias, target_type)
     # We assert this here even though the name keyword now defaults to the directory
     # name, as an extra check that this defaulting did in fact happen.
     if 'name' not in kwargs:
@@ -84,7 +81,7 @@ class TargetAddressable(Addressable):
     # Addressables today, so we expose exactly the instantiate it expects.  This may need to be
     # fixed up when BuildGraph learns how to deal with other Addressables.
     type_alias = self._kwargs.setdefault('type_alias', self.addressed_alias)
-    target = super(TargetAddressable, self).instantiate(build_graph=build_graph,
+    target = super().instantiate(build_graph=build_graph,
                                                         address=address,
                                                         **self._kwargs)
     if not type_alias:

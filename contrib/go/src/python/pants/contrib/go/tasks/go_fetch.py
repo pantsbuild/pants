@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import shutil
-from builtins import open
 from collections import defaultdict
 
 from pants.base.exceptions import TaskError
@@ -25,11 +21,11 @@ class GoFetch(GoTask):
 
   @classmethod
   def implementation_version(cls):
-    return super(GoFetch, cls).implementation_version() + [('GoFetch', 2)]
+    return super().implementation_version() + [('GoFetch', 2)]
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(GoFetch, cls).subsystem_dependencies() + (FetcherFactory,)
+    return super().subsystem_dependencies() + (FetcherFactory,)
 
   @classmethod
   def product_types(cls):

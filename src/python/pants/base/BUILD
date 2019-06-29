@@ -17,14 +17,12 @@ python_library(
   name = 'project_tree',
   sources = ['file_system_project_tree.py', 'project_tree.py', 'project_tree_factory.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:pathspec',
     '3rdparty/python:scandir',
     '3rdparty/python:six',
     ':build_environment',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
-    'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ]
 )
@@ -36,7 +34,6 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:pathspec',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:meta',
     ':project_tree',
   ]
 )
@@ -44,9 +41,6 @@ python_library(
 python_library(
   name = 'build_file_target_factory',
   sources = ['build_file_target_factory.py'],
-  dependencies = [
-    'src/python/pants/util:meta',
-  ]
 )
 
 python_library(
@@ -73,7 +67,6 @@ python_library(
   name = 'exception_sink',
   sources = ['exception_sink.py'],
   dependencies = [
-    '3rdparty/python:faulthandler',
     '3rdparty/python:setproctitle',
     'src/python/pants/util:dirutil',
     ':build_environment',
@@ -93,9 +86,7 @@ python_library(
   name = 'fingerprint_strategy',
   sources = ['fingerprint_strategy.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':deprecated',
-    'src/python/pants/util:meta',
   ]
 )
 
@@ -104,7 +95,6 @@ python_library(
   sources = ['generator.py'],
   dependencies = [
     ':mustache',
-    '3rdparty/python:future',
     '3rdparty/python:pystache',
   ]
 )
@@ -115,7 +105,6 @@ python_library(
   dependencies = [
     '3rdparty/python:future',
     ':deprecated',
-    'src/python/pants/util:collections_abc_backport',
     'src/python/pants/util:objects',
   ]
 )
@@ -124,7 +113,6 @@ python_library(
   name = 'mustache',
   sources = ['mustache.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:pystache',
     '3rdparty/python:six',
   ]
@@ -134,27 +122,21 @@ python_library(
   name = 'parse_context',
   sources = ['parse_context.py'],
   dependencies = [
-    '3rdparty/python:future',
   ]
 )
 
 python_library(
   name = 'payload',
   sources = ['payload.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
 )
 
 python_library(
   name = 'payload_field',
   sources = ['payload_field.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':deprecated',
     ':hash_utils',
-    'src/python/pants/util:meta',
   ]
 )
 
@@ -164,7 +146,6 @@ python_library(
   dependencies = [
     'src/python/pants/util:collections',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ],
 )
@@ -173,7 +154,6 @@ python_library(
   name = 'revision',
   sources = ['revision.py'],
   dependencies = [
-    '3rdparty/python:future',
   ]
 )
 
@@ -181,8 +161,6 @@ python_library(
   name = 'run_info',
   sources = ['run_info.py'],
   dependencies = [
-    'src/python/pants/util:collections_abc_backport',
-    '3rdparty/python:future',
     ':build_environment',
     'src/python/pants/util:dirutil',
     'src/python/pants:version',
@@ -193,7 +171,6 @@ python_library(
   name = 'cmd_line_spec_parser',
   sources = ['cmd_line_spec_parser.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':build_file',
     ':specs',
@@ -223,7 +200,6 @@ python_library(
   name = 'workunit',
   sources = ['workunit.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:rwbuf',
@@ -244,7 +220,6 @@ python_library(
   name='exiter',
   sources=['exiter.py'],
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/util:fileutil',
     'src/python/pants/util:strutil',
   ]

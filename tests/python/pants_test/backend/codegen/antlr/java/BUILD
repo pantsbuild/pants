@@ -5,7 +5,6 @@
 python_tests(
   sources = globs('*.py', exclude=[globs('*_integration.py')]),
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     'src/python/pants/backend/codegen/antlr/java',
     'src/python/pants/base:exceptions',

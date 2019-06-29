@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import importlib
 import logging
@@ -11,7 +8,6 @@ import re
 import sys
 import sysconfig
 import traceback
-from builtins import bytes, object, open, str
 from contextlib import closing
 
 import cffi
@@ -480,7 +476,7 @@ class PyResult(datatype(['is_throw', 'handle'])):
   """Corresponds to the native object of the same name."""
 
 
-class ExternContext(object):
+class ExternContext:
   """A wrapper around python objects used in static extern functions in this module.
 
   See comments in `src/rust/engine/src/interning.rs` for more information on the relationship
@@ -828,7 +824,8 @@ class Native(Singleton):
         execution_options.remote_store_chunk_upload_timeout_seconds,
         execution_options.remote_store_rpc_retries,
         self.context.utf8_buf_buf(execution_options.remote_execution_extra_platform_properties),
-        execution_options.process_execution_parallelism,
+        execution_options.process_execution_local_parallelism,
+        execution_options.process_execution_remote_parallelism,
         execution_options.process_execution_cleanup_local_dirs,
       )
     return self.gc(scheduler, self.lib.scheduler_destroy)

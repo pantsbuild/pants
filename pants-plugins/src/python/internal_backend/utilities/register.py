@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open
 
 from twitter.common.collections import OrderedSet
 
@@ -93,7 +89,7 @@ class PantsReleases(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(PantsReleases, cls).register_options(register)
+    super().register_options(register)
     register('--branch-notes', type=dict,
              help='A dict from branch name to release notes rst-file location.')
 
@@ -181,7 +177,7 @@ class PantsPlugin(PythonLibrary):
                                     description,
                                     additional_classifiers=additional_classifiers)
 
-    super(PantsPlugin, self).__init__(address,
+    super().__init__(address,
                                       payload,
                                       provides=setup_py,
                                       **kwargs)

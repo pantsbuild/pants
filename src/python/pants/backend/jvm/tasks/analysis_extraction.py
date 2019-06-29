@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import json
 import os
-from builtins import open
 from collections import defaultdict
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
@@ -28,15 +24,15 @@ class AnalysisExtraction(NailgunTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(AnalysisExtraction, cls).subsystem_dependencies() + (DependencyContext, Zinc.Factory)
+    return super().subsystem_dependencies() + (DependencyContext, Zinc.Factory)
 
   @classmethod
   def register_options(cls, register):
-    super(AnalysisExtraction, cls).register_options(register)
+    super().register_options(register)
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(AnalysisExtraction, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data('zinc_analysis')
     round_manager.require_data('runtime_classpath')
 

@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import shutil
-from builtins import str
 from collections import defaultdict
 from textwrap import dedent
 
@@ -32,7 +28,7 @@ class PythonInterpreterCache(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(PythonInterpreterCache, cls).subsystem_dependencies() + (PythonSetup,)
+    return super().subsystem_dependencies() + (PythonSetup,)
 
   class UnsatisfiableInterpreterConstraintsError(TaskError):
     """Indicates a Python interpreter matching given constraints could not be located."""

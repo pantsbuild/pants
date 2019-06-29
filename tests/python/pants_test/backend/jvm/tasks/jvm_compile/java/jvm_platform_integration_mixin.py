@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import re
-from builtins import object, open, str
 from subprocess import PIPE, Popen
 from textwrap import dedent
 
@@ -14,7 +10,7 @@ from pants.fs.archive import ZIP
 from pants.util.contextutil import temporary_dir
 
 
-class JvmPlatformIntegrationMixin(object):
+class JvmPlatformIntegrationMixin:
   """Mixin providing lots of JvmPlatform-related integration tests to java compilers (eg, zinc)."""
 
   def get_pants_compile_args(self):

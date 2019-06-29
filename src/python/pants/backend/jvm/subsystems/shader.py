@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import re
-from builtins import object
 from collections import namedtuple
 from contextlib import contextmanager
 
@@ -58,7 +54,7 @@ class RelocateRule(namedtuple('Rule', ['from_pattern', 'to_pattern'])):
     return 'rule {0} {1}\n'.format(self.from_pattern, self.to_pattern)
 
 
-class Shading(object):
+class Shading:
   """Wrapper around relocate and exclude shading rules exposed in BUILD files."""
 
   SHADE_PREFIX = '__shaded_by_pants__.'
@@ -219,7 +215,7 @@ class Shading(object):
     return '{package}.{capture}'.format(package=package_name, capture='**' if recursive else '*')
 
 
-class Shader(object):
+class Shader:
   """Creates shaded jars."""
 
   class Error(Exception):

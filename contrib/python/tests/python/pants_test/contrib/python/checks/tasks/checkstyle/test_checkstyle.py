@@ -1,12 +1,9 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
+import subprocess
 import sys
-from builtins import str
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -17,7 +14,6 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
-from pants.util.process_handler import subprocess
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from parameterized import parameterized
 from pex.interpreter import PythonInterpreter

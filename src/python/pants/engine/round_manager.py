@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import object
 from collections import defaultdict, namedtuple
 
 from pants.goal.goal import Goal
@@ -14,7 +10,7 @@ class ProducerInfo(namedtuple('ProducerInfo', ['product_type', 'task_type', 'goa
   """Describes the producer of a given product type."""
 
 
-class RoundManager(object):
+class RoundManager:
   """
   :API: public
   """

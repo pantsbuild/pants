@@ -4,10 +4,6 @@
 python_library(
   name='interpreter_cache_test_mixin',
   sources=['interpreter_cache_test_mixin.py'],
-  dependencies = [
-    'src/python/pants/util:collections_abc_backport',
-    '3rdparty/python:future',
-  ]
 )
 
 python_library(
@@ -15,7 +11,6 @@ python_library(
   sources=['python_task_test_base.py'],
   dependencies=[
     ':interpreter_cache_test_mixin',
-    '3rdparty/python:future',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
@@ -42,9 +37,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test:int-test',
-    'tests/python/pants_test/testutils:py2_compat',
   ],
   tags = {'integration'},
   timeout=450
@@ -54,7 +47,6 @@ python_tests(
   name = 'gather_sources',
   sources = ['test_gather_sources.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:pex',
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/backend/python/subsystems',
@@ -73,7 +65,6 @@ python_tests(
   dependencies = [
     '3rdparty/python:pex',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test:int-test',
     'tests/python/pants_test/backend/python:interpreter_selection_utils',
   ],
@@ -85,11 +76,9 @@ python_tests(
   name = 'isort_run',
   sources = ['test_isort_run.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/backend/python/tasks',
     'src/python/pants/base:exceptions',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test/backend/python:interpreter_selection_utils',
     ':python_task_test_base',
   ],
@@ -110,7 +99,6 @@ python_tests(
   sources = ['test_pytest_run.py'],
   dependencies = [
     '3rdparty/python:coverage',
-    '3rdparty/python:future',
     'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python/tasks',
     'src/python/pants/base:exceptions',
@@ -118,7 +106,6 @@ python_tests(
     'src/python/pants/source',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:py2_compat',
     'tests/python/pants_test:task_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
     ':python_task_test_base',
@@ -143,11 +130,9 @@ python_tests(
   name = 'python_binary_create',
   sources = ['test_python_binary_create.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/backend/python/tasks',
     'src/python/pants/base:run_info',
     'src/python/pants/build_graph',
-    'src/python/pants/util:process_handler',
     ':python_task_test_base',
   ],
 )
@@ -168,7 +153,6 @@ python_tests(
   name = 'python_repl',
   sources = ['test_python_repl.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/backend/python/tasks',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
@@ -183,7 +167,6 @@ python_tests(
   sources = ['test_python_repl_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test',
-    'tests/python/pants_test/testutils:py2_compat',
   ],
   tags = {'integration'},
   timeout=120,
@@ -219,7 +202,6 @@ python_tests(
   name = 'resolve_requirements',
   sources = ['test_resolve_requirements.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:pex',
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/backend/python:python_requirement',
@@ -229,7 +211,6 @@ python_tests(
     'src/python/pants/base:build_environment',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test:task_test_base',
   ],
 )
@@ -238,8 +219,6 @@ python_tests(
   name = 'select_interpreter',
   sources = ['test_select_interpreter.py'],
   dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python:mock',
     '3rdparty/python:pex',
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/backend/python/subsystems',
@@ -255,8 +234,6 @@ python_tests(
   name = 'setup_py',
   sources = ['test_setup_py.py'],
   dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python:mock',
     '3rdparty/python:pex',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
@@ -266,7 +243,6 @@ python_tests(
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/fs',
-    'src/python/pants/util:collections_abc_backport',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/backend/python:interpreter_selection_utils',

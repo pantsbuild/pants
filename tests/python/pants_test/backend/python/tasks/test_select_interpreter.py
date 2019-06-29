@@ -1,14 +1,10 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open, str
+import unittest.mock
 from textwrap import dedent
 
-import mock
 from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
@@ -28,7 +24,7 @@ class SelectInterpreterTest(TaskTestBase):
     return SelectInterpreter
 
   def setUp(self):
-    super(SelectInterpreterTest, self).setUp()
+    super().setUp()
 
     # We're tied tightly to pex implementation details here faking out a python binary that outputs
     # only one value no matter what arguments, environment or input stream it has attached. That
@@ -85,7 +81,7 @@ class SelectInterpreterTest(TaskTestBase):
 
     task = self.create_task(context)
     if should_invalidate is not None:
-      task._select_interpreter = mock.MagicMock(wraps=task._select_interpreter)
+      task._select_interpreter = unittest.mock.MagicMock(wraps=task._select_interpreter)
 
     task.execute()
 

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import textwrap
@@ -25,7 +22,7 @@ class ConfluencePublish(Task):
   
   @classmethod
   def register_options(cls, register):
-    super(ConfluencePublish, cls).register_options(register)
+    super().register_options(register)
     
     # TODO: https://github.com/pantsbuild/pants/issues/395:
     # url should probably be a param of the wiki, not a config.
@@ -42,7 +39,7 @@ class ConfluencePublish(Task):
     round_manager.require(MarkdownToHtml.WIKI_HTML_PRODUCT)
   
   def __init__(self, *args, **kwargs):
-    super(ConfluencePublish, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     
     self.url = str(self.get_options().url)
     self.force = self.get_options().force

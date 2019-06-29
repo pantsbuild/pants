@@ -63,6 +63,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Gabriel Gonzalez
 + Garrett Malmquist
 + Gary M. Josack
++ Greg Shuflin
 + Guy Marom
 + Harley Cooper
 + Hwasung Lee
@@ -134,6 +135,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Michael Doherty
 + Mike Cripps
 + Mike Lindsey
++ Mike Solomon
 + Misho Krastev
 + Moses Nakamura
 + Nadav Samet

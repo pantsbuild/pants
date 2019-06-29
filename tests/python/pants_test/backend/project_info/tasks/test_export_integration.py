@@ -1,19 +1,15 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import os
 import re
-from builtins import open
+import subprocess
 
 from twitter.common.collections import maybe_list
 
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.intermediate_target_factory import hash_target
-from pants.util.process_handler import subprocess
 from pants_test.backend.project_info.tasks.resolve_jars_test_mixin import ResolveJarsTestMixin
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_resolver
 

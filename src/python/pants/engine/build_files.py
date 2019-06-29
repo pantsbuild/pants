@@ -1,11 +1,8 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
-from builtins import next
+from collections.abc import MutableMapping, MutableSequence
 from os.path import dirname, join
 
 import six
@@ -24,7 +21,6 @@ from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
 from pants.engine.struct import Struct
-from pants.util.collections_abc_backport import MutableMapping, MutableSequence
 from pants.util.objects import TypeConstraintError
 
 

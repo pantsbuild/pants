@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.ossrh_publication_metadata import (Developer, License,
@@ -80,7 +77,7 @@ from pants.java.jar.jar_dependency import JarDependencyParseContextWrapper
 
 class DeprecatedJavaTests(JUnitTests):
   def __init__(self, *args, **kwargs):
-    super(DeprecatedJavaTests, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     warn_or_error('1.4.0.dev0',
                   'java_tests(...) target type',
                   'Use junit_tests(...) instead for target {}.'.format(self.address.spec))

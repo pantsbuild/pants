@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import logging
@@ -10,7 +7,7 @@ import os
 import pkgutil
 import re
 import shutil
-from builtins import open
+import subprocess
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.python.targets.python_target import PythonTarget
@@ -21,7 +18,6 @@ from pants.task.console_task import ConsoleTask
 from pants.util import desktop
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
-from pants.util.process_handler import subprocess
 
 
 _TEMPLATE_BASEDIR = 'templates/idea'
@@ -58,7 +54,7 @@ class IdeaPluginGen(ConsoleTask):
 
   @classmethod
   def register_options(cls, register):
-    super(IdeaPluginGen, cls).register_options(register)
+    super().register_options(register)
     # TODO: https://github.com/pantsbuild/pants/issues/3198
     # scala/java-language level should use what Pants already knows.
     register('--open', type=bool, default=True,
@@ -79,7 +75,7 @@ class IdeaPluginGen(ConsoleTask):
              help='Sets the java language and jdk used to compile the project\'s java sources.')
 
   def __init__(self, *args, **kwargs):
-    super(IdeaPluginGen, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     self.open = self.get_options().open
 

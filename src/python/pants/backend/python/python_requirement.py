@@ -1,15 +1,11 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import object, str
 
 from pkg_resources import Requirement
 
 
-class PythonRequirement(object):
+class PythonRequirement:
   """Pants wrapper around pkg_resources.Requirement
 
   Describes an external dependency as understood by ``easy_install`` or

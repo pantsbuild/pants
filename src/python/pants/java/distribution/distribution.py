@@ -1,16 +1,13 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import itertools
 import logging
 import os
 import pkgutil
 import plistlib
-from abc import abstractproperty
-from builtins import object, open, str
+import subprocess
+from abc import ABC, abstractmethod
 from collections import namedtuple
 from contextlib import contextmanager
 
@@ -22,9 +19,7 @@ from pants.java.util import execute_java, execute_java_async
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.meta import AbstractClass
 from pants.util.osutil import OS_ALIASES, normalize_os_name
-from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)
@@ -46,7 +41,7 @@ def _parse_java_version(name, version):
   return version
 
 
-class Distribution(object):
+class Distribution:
   """Represents a java distribution - either a JRE or a JDK installed on the local system.
 
   In particular provides access to the distribution's binaries; ie: java while ensuring basic
@@ -283,7 +278,7 @@ class Distribution(object):
             self._bin_path, self._minimum_version, self._maximum_version, self._jdk))
 
 
-class _DistributionEnvironment(AbstractClass):
+class _DistributionEnvironment(ABC):
   class Location(namedtuple('Location', ['home_path', 'bin_path'])):
     """Represents the location of a java distribution."""
 
@@ -305,7 +300,8 @@ class _DistributionEnvironment(AbstractClass):
       """
       return cls(home_path=None, bin_path=bin_path)
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def jvm_locations(self):
     """Return the jvm locations discovered in this environment.
 
@@ -581,7 +577,7 @@ class DistributionLocator(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(DistributionLocator, cls).register_options(register)
+    super().register_options(register)
     human_readable_os_aliases = ', '.join('{}: [{}]'.format(str(key), ', '.join(sorted(val)))
                                           for key, val in OS_ALIASES.items())
     register('--paths', advanced=True, type=dict,

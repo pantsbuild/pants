@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import re
-from builtins import str
 from io import StringIO
 from types import GeneratorType
 
@@ -106,7 +102,7 @@ def create_scheduler(rules, union_rules=None, validate=True, native=None):
 
 class Target(Struct):
   def __init__(self, name=None, configurations=None, **kwargs):
-    super(Target, self).__init__(name=name, **kwargs)
+    super().__init__(name=name, **kwargs)
     self.configurations = configurations
 
   @addressable_list(SubclassesOf(Struct))
@@ -144,7 +140,7 @@ def remove_locations_from_traceback(trace):
   return new_trace
 
 
-class MockConsole(object):
+class MockConsole:
   """An implementation of pants.engine.console.Console which captures output."""
 
   def __init__(self, use_colors=True):

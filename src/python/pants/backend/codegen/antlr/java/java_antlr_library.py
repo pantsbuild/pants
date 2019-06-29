@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TargetDefinitionException
@@ -41,7 +38,7 @@ class JavaAntlrLibrary(JvmTarget):
     elif not sources:
       raise TargetDefinitionException(self, "Missing required 'sources' parameter.")
 
-    super(JavaAntlrLibrary, self).__init__(name=name,
+    super().__init__(name=name,
                                            sources=sources,
                                            provides=provides,
                                            excludes=excludes,

@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import object
 from hashlib import sha1
 from threading import Lock
 
@@ -32,10 +28,10 @@ from pants.util.fileutil import safe_hardlink_or_copy
 from pants.util.memo import memoized_method, memoized_property
 
 
-_ZINC_COMPILER_VERSION = '0.0.12'
+_ZINC_COMPILER_VERSION = '0.0.14'
 
 
-class Zinc(object):
+class Zinc:
   """Configuration for Pants' zinc wrapper tool."""
 
   ZINC_COMPILE_MAIN = 'org.pantsbuild.zinc.compiler.Main'

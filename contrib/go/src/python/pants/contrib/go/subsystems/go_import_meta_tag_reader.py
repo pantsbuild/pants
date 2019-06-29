@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import re
 
@@ -22,7 +19,7 @@ class GoImportMetaTagReader(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(GoImportMetaTagReader, cls).register_options(register)
+    super().register_options(register)
     register('--retries', type=int, default=1, advanced=True,
              help='How many times to retry when fetching meta tags.')
 

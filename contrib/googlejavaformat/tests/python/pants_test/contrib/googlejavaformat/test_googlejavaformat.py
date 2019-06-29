@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import open
 from textwrap import dedent
 
 from pants.backend.jvm.register import build_file_aliases as register_jvm
@@ -40,7 +36,7 @@ class TestBase(NailgunTaskTestBase):
 
   @classmethod
   def alias_groups(cls):
-    return super(TestBase, cls).alias_groups().merge(
+    return super().alias_groups().merge(
       register_core().merge(register_jvm())
     )
 

@@ -1,18 +1,15 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
 import json
 import logging
-from builtins import bytes, object, open, str
+from collections import OrderedDict
+from collections.abc import Iterable, Mapping, Set
 
-from future.utils import PY3, binary_type, text_type
+from future.utils import binary_type, text_type
 from twitter.common.collections import OrderedSet
 
-from pants.util.collections_abc_backport import Iterable, Mapping, OrderedDict, Set
 from pants.util.objects import DatatypeMixin
 from pants.util.strutil import ensure_binary
 
@@ -29,7 +26,7 @@ def hash_all(strs, digest=None):
   for s in strs:
     s = ensure_binary(s)
     digest.update(s)
-  return digest.hexdigest() if PY3 else digest.hexdigest().decode('utf-8')
+  return digest.hexdigest()
 
 
 def hash_file(path, digest=None):
@@ -43,7 +40,7 @@ def hash_file(path, digest=None):
     while s:
       digest.update(s)
       s = fd.read(8192)
-  return digest.hexdigest() if PY3 else digest.hexdigest().decode('utf-8')
+  return digest.hexdigest()
 
 
 class CoercingEncoder(json.JSONEncoder):
@@ -119,7 +116,7 @@ class CoercingEncoder(json.JSONEncoder):
     return o
 
   def encode(self, o):
-    return super(CoercingEncoder, self).encode(self.default(o))
+    return super().encode(self.default(o))
 
 
 def json_hash(obj, digest=None, encoder=None):
@@ -152,7 +149,7 @@ def stable_json_sha1(obj, digest=None):
   return json_hash(obj, digest=digest, encoder=CoercingEncoder)
 
 
-class Sharder(object):
+class Sharder:
   """Assigns strings to shards pseudo-randomly, but stably."""
 
   class InvalidShardSpec(Exception):

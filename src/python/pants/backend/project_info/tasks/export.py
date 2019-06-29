@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import json
 import os
-from builtins import object, str
 from collections import defaultdict
 
 import six
@@ -64,11 +60,11 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ExportTask, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       DistributionLocator, JvmPlatform, PythonInterpreterCache
     )
 
-  class SourceRootTypes(object):
+  class SourceRootTypes:
     """Defines SourceRoot Types Constants"""
     SOURCE = 'SOURCE'  # Source Target
     TEST = 'TEST'  # Test Target
@@ -102,7 +98,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
 
   @classmethod
   def register_options(cls, register):
-    super(ExportTask, cls).register_options(register)
+    super().register_options(register)
     register('--libraries', default=True, type=bool,
              help='Causes libraries to be output.')
     register('--libraries-sources', type=bool,
@@ -118,7 +114,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(ExportTask, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     if options.libraries or options.libraries_sources or options.libraries_javadocs:
       round_manager.optional_data('java')
       round_manager.optional_data('scala')
@@ -408,7 +404,7 @@ class Export(ExportTask, ConsoleTask):
   """
 
   def __init__(self, *args, **kwargs):
-    super(ExportTask, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
   def console_output(self, targets, classpath_products=None):
     graph_info = self.generate_targets_map(targets, classpath_products=classpath_products)

@@ -1,12 +1,10 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.java import util
 from pants.java.executor import SubprocessExecutor
@@ -28,7 +26,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
 
   @classmethod
   def register_options(cls, register):
-    super(NailgunTaskBase, cls).register_options(register)
+    super().register_options(register)
     register('--execution-strategy',
              default=cls.ExecutionStrategy.nailgun, type=cls.ExecutionStrategy,
              help='If set to nailgun, nailgun will be enabled and repeated invocations of this '
@@ -54,13 +52,13 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(NailgunTaskBase, cls).subsystem_dependencies() + (Subprocess.Factory,)
+    return super().subsystem_dependencies() + (Subprocess.Factory,)
 
   def __init__(self, *args, **kwargs):
     """
     :API: public
     """
-    super(NailgunTaskBase, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     id_tuple = (self.ID_PREFIX, self.__class__.__name__)
 
@@ -112,6 +110,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
                                main=main,
                                jvm_options=jvm_options,
                                args=args,
+                               cwd=get_buildroot(),
                                executor=executor,
                                workunit_factory=self.context.new_workunit,
                                workunit_name=workunit_name,
@@ -136,7 +135,7 @@ class NailgunKillall(Task):
 
   @classmethod
   def register_options(cls, register):
-    super(NailgunKillall, cls).register_options(register)
+    super().register_options(register)
     register('--everywhere', type=bool,
              help='Kill all nailguns servers launched by pants for all workspaces on the system.')
 

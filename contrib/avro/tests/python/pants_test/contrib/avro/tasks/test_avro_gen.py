@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -31,7 +28,7 @@ class AvroJavaGenTest(NailgunTaskTestBase):
 
   @classmethod
   def alias_groups(cls):
-    return super(AvroJavaGenTest, cls).alias_groups().merge(
+    return super().alias_groups().merge(
       BuildFileAliases(targets={'java_avro_library': JavaAvroLibrary}))
 
   def _test_avro(self, target_spec):

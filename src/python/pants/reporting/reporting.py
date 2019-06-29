@@ -1,15 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import sys
-from builtins import open
 from io import BytesIO
-
-from future.utils import PY3
 
 from pants.base.workunit import WorkUnitLabel
 from pants.reporting.html_reporter import HtmlReporter
@@ -29,7 +23,7 @@ class Reporting(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(Reporting, cls).register_options(register)
+    super().register_options(register)
     register('--invalidation-report', type=bool,
              help='Write a formatted report on the invalid objects to the specified path.')
     register('--reports-dir', advanced=True, metavar='<dir>',
@@ -177,8 +171,8 @@ class Reporting(Subsystem):
                                                               timing=timing, cache_stats=cache_stats))
     else:
       # Set up the new console reporter.
-      stdout = sys.stdout.buffer if PY3 else sys.stdout
-      stderr = sys.stderr.buffer if PY3 else sys.stderr
+      stdout = sys.stdout.buffer
+      stderr = sys.stderr.buffer
       settings = PlainTextReporter.Settings(log_level=log_level, outfile=stdout, errfile=stderr,
                                             color=color, indent=True, timing=timing, cache_stats=cache_stats,
                                             label_format=self.get_options().console_label_format,

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from functools import wraps
 
@@ -47,7 +44,7 @@ class ThriftLinterTest(PantsRunIntegrationTest):
         updated = full_config.get(scope, {})
         updated.update(scoped_cfgs)
         full_config[scope] = updated
-    return super(ThriftLinterTest, self).run_pants(command, full_config, stdin_data, extra_env,
+    return super().run_pants(command, full_config, stdin_data, extra_env,
                                                    **kwargs)
 
   @rename_build_file

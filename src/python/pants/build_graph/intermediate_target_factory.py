@@ -1,27 +1,23 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import str
+from abc import ABC
 from hashlib import sha1
 
-from future.utils import PY3, string_types
+from future.utils import string_types
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
-from pants.util.meta import AbstractClass
 
 
 def hash_target(address, suffix):
   hasher = sha1()
   hasher.update(address.encode('utf-8'))
   hasher.update(suffix.encode('utf-8'))
-  return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+  return hasher.hexdigest()
 
 
-class IntermediateTargetFactoryBase(AbstractClass):
+class IntermediateTargetFactoryBase(ABC):
   """Convenience factory which constructs an intermediate target with the appropriate attributes."""
 
   class ExpectedAddressError(TargetDefinitionException):

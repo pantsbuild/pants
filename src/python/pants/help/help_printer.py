@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import sys
-from builtins import object
 
 from pants.base.build_environment import pants_release, pants_version
 from pants.goal.goal import Goal
@@ -16,7 +12,7 @@ from pants.option.arg_splitter import (GLOBAL_SCOPE, GoalsHelp, NoGoalHelp, Opti
 from pants.option.scope import ScopeInfo
 
 
-class HelpPrinter(object):
+class HelpPrinter:
   """Prints help to the console."""
 
   def __init__(self, options):

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.build_graph.build_graph import sort_targets
 from pants.task.console_task import ConsoleTask
@@ -13,7 +10,7 @@ class SortTargets(ConsoleTask):
 
   @classmethod
   def register_options(cls, register):
-    super(SortTargets, cls).register_options(register)
+    super().register_options(register)
     register('--reverse', type=bool,
              help='Sort least-dependent to most-dependent.')
 

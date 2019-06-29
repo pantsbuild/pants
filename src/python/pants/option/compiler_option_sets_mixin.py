@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
-from builtins import object
 
 from pants.util.meta import classproperty
 
@@ -13,12 +9,12 @@ from pants.util.meta import classproperty
 logger = logging.getLogger(__name__)
 
 
-class CompilerOptionSetsMixin(object):
+class CompilerOptionSetsMixin:
   """A mixin for language-scoped that support compiler option sets."""
 
   @classmethod
   def register_options(cls, register):
-    super(CompilerOptionSetsMixin, cls).register_options(register)
+    super().register_options(register)
     register('--compiler-option-sets-enabled-args', advanced=True, type=dict, fingerprint=True,
              default=cls.get_compiler_option_sets_enabled_default_value,
              help='Extra compiler args to use for each enabled option set.')

@@ -1,15 +1,11 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import itertools
 import logging
 import weakref
-from abc import abstractmethod
-from builtins import filter, object
-from collections import defaultdict, deque
+from abc import ABC, abstractmethod
+from collections import OrderedDict, defaultdict, deque
 
 from twitter.common.collections import OrderedSet
 
@@ -17,14 +13,12 @@ from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.injectables_mixin import InjectablesMixin
 from pants.build_graph.target import Target
-from pants.util.collections_abc_backport import OrderedDict
-from pants.util.meta import AbstractClass
 
 
 logger = logging.getLogger(__name__)
 
 
-class BuildGraph(AbstractClass):
+class BuildGraph(ABC):
   """A directed acyclic graph of Targets and dependencies. Not necessarily connected.
 
   :API: public
@@ -52,7 +46,7 @@ class BuildGraph(AbstractClass):
       super(BuildGraph.ManualSyntheticTargetError, self).__init__(
           'Found a manually-defined target at synthetic address {}'.format(addr.spec))
 
-  class NoDepPredicateWalk(object):
+  class NoDepPredicateWalk:
     """This is a utility class to aid in graph traversals that don't have predicates on dependency edges."""
 
     def __init__(self):
@@ -643,7 +637,7 @@ class CycleException(Exception):
   """
 
   def __init__(self, cycle):
-    super(CycleException, self).__init__('Cycle detected:\n\t{}'.format(
+    super().__init__('Cycle detected:\n\t{}'.format(
         ' ->\n\t'.join(target.address.spec for target in cycle)
     ))
 

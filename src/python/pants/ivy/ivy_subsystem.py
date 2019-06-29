@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -26,7 +23,7 @@ class IvySubsystem(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(IvySubsystem, cls).register_options(register)
+    super().register_options(register)
     register('--http-proxy', advanced=True,
              help='Specify a proxy URL for http requests.')
     register('--https-proxy', advanced=True,
@@ -53,7 +50,7 @@ class IvySubsystem(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(IvySubsystem, cls).subsystem_dependencies() + (DistributionLocator,)
+    return super().subsystem_dependencies() + (DistributionLocator,)
 
   def http_proxy(self):
     """Set ivy to use an http proxy.

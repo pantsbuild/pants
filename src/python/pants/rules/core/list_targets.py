@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.base.specs import Specs
 from pants.engine.addressable import BuildFileAddresses
@@ -22,7 +19,7 @@ class List(LineOriented, Goal):
 
   @classmethod
   def register_options(cls, register):
-    super(List, cls).register_options(register)
+    super().register_options(register)
     register('--provides', type=bool,
              help='List only targets that provide an artifact, displaying the columns specified by '
                   '--provides-columns.')

@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
 import sys
-from builtins import object
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -24,7 +20,7 @@ from pants.task.task import QuietTaskMixin
 logger = logging.getLogger(__name__)
 
 
-class GoalRunnerFactory(object):
+class GoalRunnerFactory:
   def __init__(self, root_dir, options, build_config, run_tracker, reporting, graph_session,
                target_roots, exiter=sys.exit):
     """
@@ -130,7 +126,7 @@ class GoalRunnerFactory(object):
                       kill_nailguns=self._kill_nailguns)
 
 
-class GoalRunner(object):
+class GoalRunner:
   """Lists installed goals or else executes a named goal.
 
   NB: GoalRunner represents a v1-only codepath. v2 goals are registered via `@console_rule` and

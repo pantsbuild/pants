@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -12,7 +9,7 @@ from pants.java import util
 from pants.net.http.fetcher import Fetcher
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_concurrent_rename
-from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
+from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
 class DummyRunJavaTask(NailgunTask):
@@ -20,14 +17,10 @@ class DummyRunJavaTask(NailgunTask):
     pass
 
 
-class SyntheticClasspathTest(JvmToolTaskTestBase):
+class SyntheticClasspathTest(NailgunTaskTestBase):
   @classmethod
   def task_type(cls):
     return DummyRunJavaTask
-
-  def setUp(self):
-    super(SyntheticClasspathTest, self).setUp()
-    self.set_options(execution_strategy=NailgunTask.ExecutionStrategy.subprocess)
 
   def test_execute_java_no_error_weird_path(self):
     """

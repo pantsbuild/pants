@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -28,11 +25,11 @@ class ProvideToolsJar(JvmToolTaskMixin):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ProvideToolsJar, cls).subsystem_dependencies() + (Java,)
+    return super().subsystem_dependencies() + (Java,)
 
   @classmethod
   def implementation_version(cls):
-    return super(ProvideToolsJar, cls).implementation_version() + [('ProvideToolsJar', 2)]
+    return super().implementation_version() + [('ProvideToolsJar', 2)]
 
   @property
   def create_target_dirs(self):

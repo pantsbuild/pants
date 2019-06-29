@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from pants.dummies.example_transitive_source import add_four
 
 

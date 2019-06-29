@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import getpass
-from builtins import input
 
 from colors import cyan, green, red
 
@@ -22,7 +18,7 @@ class Login(ConsoleTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(Login, cls).subsystem_dependencies() + (BasicAuth,)
+    return super().subsystem_dependencies() + (BasicAuth,)
 
   @classmethod
   def supports_passthru_args(cls):
@@ -30,7 +26,7 @@ class Login(ConsoleTask):
 
   @classmethod
   def register_options(cls, register):
-    super(Login, cls).register_options(register)
+    super().register_options(register)
     register('--to', fingerprint=True,
              help='Log in to this provider.  Can also be specified as a passthru arg.')
 

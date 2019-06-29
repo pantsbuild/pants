@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from hashlib import sha1
 
-from future.utils import PY3
 from pants.base.build_environment import get_buildroot
 from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
 from pants.base.workunit import WorkUnitLabel
@@ -48,7 +44,7 @@ class NodeResolveFingerprintStrategy(DefaultFingerprintHashingMixin, Fingerprint
           with open(absolute_lockfile_path, 'r') as lockfile:
             contents = lockfile.read().encode('utf-8')
             hasher.update(contents)
-      return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+      return hasher.hexdigest()
     return None
 
 
@@ -77,7 +73,7 @@ class NodeResolve(NodeTask):
   @classmethod
   def prepare(cls, options, round_manager):
     """Allow each resolver to declare additional product requirements."""
-    super(NodeResolve, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     for resolver in cls._resolver_by_type.values():
       resolver.prepare(options, round_manager)
 

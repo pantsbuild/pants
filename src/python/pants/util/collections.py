@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import collections
-from builtins import next
 
 
 def combined_dict(*dicts):
@@ -31,7 +27,7 @@ def factory_dict(value_factory, *args, **kwargs):
                            '__missing__.')
 
     def __init__(self):
-      super(FactoryDict, self).__init__(self.__never_called, *args, **kwargs)
+      super().__init__(self.__never_called, *args, **kwargs)
 
     def __missing__(self, key):
       value = value_factory(key)

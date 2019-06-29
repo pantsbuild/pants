@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import multiprocessing
 import os
 import sys
-from builtins import str
 from textwrap import dedent
 
 from pants.base.build_environment import (get_buildroot, get_default_pants_config_file,
@@ -36,7 +32,8 @@ class ExecutionOptions(datatype([
   'remote_store_chunk_bytes',
   'remote_store_chunk_upload_timeout_seconds',
   'remote_store_rpc_retries',
-  'process_execution_parallelism',
+  'process_execution_local_parallelism',
+  'process_execution_remote_parallelism',
   'process_execution_cleanup_local_dirs',
   'remote_execution_process_cache_namespace',
   'remote_instance_name',
@@ -59,7 +56,8 @@ class ExecutionOptions(datatype([
       remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
       remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
       remote_store_rpc_retries=bootstrap_options.remote_store_rpc_retries,
-      process_execution_parallelism=bootstrap_options.process_execution_parallelism,
+      process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
+      process_execution_remote_parallelism=bootstrap_options.process_execution_remote_parallelism,
       process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
       remote_execution_process_cache_namespace=bootstrap_options.remote_execution_process_cache_namespace,
       remote_instance_name=bootstrap_options.remote_instance_name,
@@ -76,7 +74,8 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_chunk_bytes=1024*1024,
     remote_store_chunk_upload_timeout_seconds=60,
     remote_store_rpc_retries=2,
-    process_execution_parallelism=multiprocessing.cpu_count()*2,
+    process_execution_local_parallelism=multiprocessing.cpu_count()*2,
+    process_execution_remote_parallelism=128,
     process_execution_cleanup_local_dirs=True,
     remote_execution_process_cache_namespace=None,
     remote_instance_name=None,
@@ -266,6 +265,14 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--enable-pantsd', advanced=True, type=bool, default=False,
              help='Enables use of the pants daemon (and implicitly, the v2 engine). (Beta)')
 
+    # Whether or not to make necessary arrangements to have concurrent runs in pants.
+    # In practice, this means that if this is set, a run will not even try to use pantsd.
+    # NB: Eventually, we would like to deprecate this flag in favor of making pantsd runs parallelizable.
+    register('--concurrent', advanced=True, type=bool, default=False, daemon=False,
+             help='Enable concurrent runs of pants. Without this enabled, pants will '
+                  'start up all concurrent invocations (e.g. in other terminals) without pantsd. '
+                  'Enabling this option requires parallel pants invocations to block on the first')
+
     # Shutdown pantsd after the current run.
     # This needs to be accessed at the same time as enable_pantsd,
     # so we register it at bootstrap time.
@@ -388,9 +395,16 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
 
     # This should eventually deprecate the RunTracker worker count, which is used for legacy cache
     # lookups via CacheSetup in TaskBase.
-    register('--process-execution-parallelism', type=int, default=multiprocessing.cpu_count(),
+    register('--process-execution-parallelism', type=int, dest='local_execution_parallelism',
+             removal_version='1.20.0.dev2', advanced=True,
+             removal_hint='Use --process-execution-local-parallelism, and/or --process-execution-remote-parallelism instead.',
+             help='Number of concurrent processes that may be executed locally.')
+    register('--process-execution-local-parallelism', type=int, default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_parallelism,
              advanced=True,
-             help='Number of concurrent processes that may be executed either locally and remotely.')
+             help='Number of concurrent processes that may be executed locally.')
+    register('--process-execution-remote-parallelism', type=int, default=DEFAULT_EXECUTION_OPTIONS.process_execution_remote_parallelism,
+             advanced=True,
+             help='Number of concurrent processes that may be executed remotely.')
     register('--process-execution-cleanup-local-dirs', type=bool, default=True, advanced=True,
              help='Whether or not to cleanup directories used for local process execution '
                   '(primarily useful for e.g. debugging).')

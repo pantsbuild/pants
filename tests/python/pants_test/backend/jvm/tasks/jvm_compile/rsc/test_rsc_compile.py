@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from textwrap import dedent
@@ -19,11 +16,11 @@ from pants.backend.jvm.tasks.jvm_compile.rsc.rsc_compile import RscCompile, _cre
 from pants.java.jar.jar_dependency import JarDependency
 from pants.option.ranked_value import RankedValue
 from pants.util.contextutil import temporary_dir
+from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.task_test_base import TaskTestBase
 
 
-class LightWeightVTS(object):
+class LightWeightVTS:
   # Simple test double that covers the properties referred to by the _compile_jobs method.
 
   def __init__(self, target):
@@ -36,7 +33,7 @@ class LightWeightVTS(object):
     pass
 
 
-class RscCompileTest(TaskTestBase):
+class RscCompileTest(NailgunTaskTestBase):
   DEFAULT_CONF = 'default'
 
   @classmethod
@@ -76,8 +73,8 @@ class RscCompileTest(TaskTestBase):
       dependee_graph = self.construct_dependee_graph_str(jobs, task)
       print(dependee_graph)
       self.assertEqual(dedent("""
-                     zinc[zinc-java](java/classpath:java_lib) -> {}
-                     zinc[zinc-only](scala/classpath:scala_lib) -> {}""").strip(),
+                     zinc[zinc-java](java/classpath:java_lib) <- {}
+                     zinc[zinc-only](scala/classpath:scala_lib) <- {}""").strip(),
         dependee_graph)
 
   def test_no_dependencies_between_scala_and_java_targets(self):
@@ -112,9 +109,9 @@ class RscCompileTest(TaskTestBase):
       dependee_graph = self.construct_dependee_graph_str(jobs, task)
       print(dependee_graph)
       self.assertEqual(dedent("""
-                     zinc[zinc-java](java/classpath:java_lib) -> {}
-                     rsc(scala/classpath:scala_lib) -> {}
-                     zinc[rsc-and-zinc](scala/classpath:scala_lib) -> {}""").strip(),
+                     zinc[zinc-java](java/classpath:java_lib) <- {}
+                     rsc(scala/classpath:scala_lib) <- {}
+                     zinc[rsc-and-zinc](scala/classpath:scala_lib) <- {}""").strip(),
         dependee_graph)
 
   def test_default_workflow_of_zinc_only_zincs_scala(self):
@@ -143,7 +140,7 @@ class RscCompileTest(TaskTestBase):
       dependee_graph = self.construct_dependee_graph_str(jobs, task)
       print(dependee_graph)
       self.assertEqual(dedent("""
-                    zinc[zinc-only](scala/classpath:scala_lib) -> {}""").strip(),
+                    zinc[zinc-only](scala/classpath:scala_lib) <- {}""").strip(),
         dependee_graph)
 
   def test_rsc_dep_for_scala_java_and_test_targets(self):
@@ -195,20 +192,20 @@ class RscCompileTest(TaskTestBase):
       dependee_graph = self.construct_dependee_graph_str(jobs, task)
 
       self.assertEqual(dedent("""
-                     zinc[zinc-java](java/classpath:java_lib) -> {}
-                     rsc(scala/classpath:scala_lib) -> {
+                     zinc[zinc-java](java/classpath:java_lib) <- {}
+                     rsc(scala/classpath:scala_lib) <- {
                        zinc[zinc-only](scala/classpath:scala_test)
                      }
-                     zinc[rsc-and-zinc](scala/classpath:scala_lib) -> {}
-                     rsc(scala/classpath:scala_dep) -> {
+                     zinc[rsc-and-zinc](scala/classpath:scala_lib) <- {}
+                     rsc(scala/classpath:scala_dep) <- {
                        rsc(scala/classpath:scala_lib),
                        zinc[rsc-and-zinc](scala/classpath:scala_lib),
                        zinc[zinc-only](scala/classpath:scala_test)
                      }
-                     zinc[rsc-and-zinc](scala/classpath:scala_dep) -> {
+                     zinc[rsc-and-zinc](scala/classpath:scala_dep) <- {
                        zinc[zinc-java](java/classpath:java_lib)
                      }
-                     zinc[zinc-only](scala/classpath:scala_test) -> {}""").strip(),
+                     zinc[zinc-only](scala/classpath:scala_test) <- {}""").strip(),
         dependee_graph)
 
   def test_scala_lib_with_java_sources_not_passed_to_rsc(self):
@@ -252,9 +249,9 @@ class RscCompileTest(TaskTestBase):
       dependee_graph = self.construct_dependee_graph_str(jobs, task)
 
       self.assertEqual(dedent("""
-                     zinc[zinc-java](java/classpath:java_lib) -> {}
-                     zinc[zinc-java](scala/classpath:scala_with_direct_java_sources) -> {}
-                     zinc[zinc-java](scala/classpath:scala_with_indirect_java_sources) -> {}""").strip(),
+                     zinc[zinc-java](java/classpath:java_lib) <- {}
+                     zinc[zinc-java](scala/classpath:scala_with_direct_java_sources) <- {}
+                     zinc[zinc-java](scala/classpath:scala_with_indirect_java_sources) <- {}""").strip(),
         dependee_graph)
 
   def test_desandbox_fn(self):

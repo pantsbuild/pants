@@ -1,22 +1,17 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import json
 import unittest
-from builtins import object, str
 from textwrap import dedent
 
 from pants.engine import parser
 from pants.engine.objects import Resolvable
 from pants_test.engine.examples import parsers
-from pants_test.testutils.py2_compat import assertRegex
 
 
 # A duck-typed Serializable with an `==` suitable for ease of testing.
-class Bob(object):
+class Bob:
   def __init__(self, **kwargs):
     self._kwargs = kwargs
 
@@ -228,8 +223,8 @@ class JsonParserTest(unittest.TestCase):
     actual_lines = [line.rstrip() for line in str(exc.exception).splitlines()]
 
     # This message from the json stdlib varies between python releases, so fuzz the match a bit.
-    assertRegex(self, actual_lines[0],
-                             r'Expecting (?:,|\',\'|",") delimiter: line 3 column 12 \(char 67\)')
+    self.assertRegex(actual_lines[0],
+                     r'Expecting (?:,|\',\'|",") delimiter: line 3 column 12 \(char 67\)')
 
     self.assertEqual(dedent("""
       In document at {filepath}:

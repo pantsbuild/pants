@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open, str
 from contextlib import contextmanager
 
 from pants.cache.artifact import TarballArtifact
@@ -54,7 +50,7 @@ class TestArtifactCache(TestBase):
       yield path
 
   def setUp(self):
-    super(TestArtifactCache, self).setUp()
+    super().setUp()
     # Init engine because decompression now goes through native code.
     self._init_engine()
     TarballArtifact.NATIVE_BINARY = self._scheduler._scheduler._native

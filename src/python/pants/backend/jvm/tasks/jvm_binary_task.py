@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from contextlib import contextmanager
@@ -42,13 +39,13 @@ class JvmBinaryTask(JarBuilderTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JvmBinaryTask, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data('runtime_classpath')
     Shader.Factory.prepare_tools(round_manager)
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JvmBinaryTask, cls).subsystem_dependencies() + (Shader.Factory,)
+    return super().subsystem_dependencies() + (Shader.Factory,)
 
   def list_external_jar_dependencies(self, binary):
     """Returns the external jar dependencies of the given binary.

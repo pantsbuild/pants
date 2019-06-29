@@ -1,13 +1,10 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import unittest
 from textwrap import dedent
+from unittest.mock import Mock
 
-from mock import Mock
 from pex.orderedset import OrderedSet
 
 from pants.build_graph.address import Address, BuildFileAddress

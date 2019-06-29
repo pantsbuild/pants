@@ -1,18 +1,14 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import re
-from builtins import map, object, str
 from functools import total_ordering
 
 from future.moves.itertools import zip_longest
 
 
 @total_ordering
-class Revision(object):
+class Revision:
   """Represents a software revision that is comparable to another revision describing the same
   software.
 

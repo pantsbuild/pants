@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
@@ -81,7 +78,7 @@ class PrepCommand(Target):
       'prep_command_args': PrimitiveField(prep_args or []),
       'prep_environ': PrimitiveField(prep_environ),
     })
-    super(PrepCommand, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   @memoized_property
   def goals(self):

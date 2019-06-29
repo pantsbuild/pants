@@ -1,18 +1,14 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import functools
 import re
-from abc import abstractproperty
-from builtins import str
+from abc import ABC, ABCMeta, abstractmethod
 
 from pants.engine.selectors import Get
 from pants.option.errors import OptionsError
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo
-from pants.util.meta import AbstractClass, classproperty
+from pants.util.meta import classproperty
 
 
 def _construct_optionable(optionable_factory):
@@ -21,18 +17,20 @@ def _construct_optionable(optionable_factory):
   yield optionable_factory.optionable_cls(scope, scoped_options.options)
 
 
-class OptionableFactory(AbstractClass):
+class OptionableFactory(ABC):
   """A mixin that provides a method that returns an @rule to construct subclasses of Optionable.
 
   Optionable subclasses constructed in this manner must have a particular constructor shape, which is
   loosely defined by `_construct_optionable` and `OptionableFactory.signature`.
   """
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def optionable_cls(self):
     """The Optionable class that is constructed by this OptionableFactory."""
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def options_scope(self):
     """The scope from which the ScopedOptions for the target Optionable will be parsed."""
 
@@ -54,7 +52,7 @@ class OptionableFactory(AbstractClass):
       )
 
 
-class Optionable(OptionableFactory, AbstractClass):
+class Optionable(OptionableFactory, metaclass=ABCMeta):
   """A mixin for classes that can register options on some scope."""
 
   # Subclasses must override.

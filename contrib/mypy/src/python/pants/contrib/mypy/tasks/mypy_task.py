@@ -1,11 +1,8 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import filter, open, str
+import subprocess
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -18,7 +15,6 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.contextutil import temporary_file_path
 from pants.util.memo import memoized_property
-from pants.util.process_handler import subprocess
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_info import PexInfo
@@ -32,12 +28,12 @@ class MypyTask(ResolveRequirementsTaskBase):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(MypyTask, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(PythonInterpreter)
 
   @classmethod
   def register_options(cls, register):
-    register('--mypy-version', default='0.670', help='The version of mypy to use.')
+    register('--mypy-version', default='0.710', help='The version of mypy to use.')
     register('--config-file', default=None,
              help='Path mypy configuration file, relative to buildroot.')
 
@@ -47,7 +43,7 @@ class MypyTask(ResolveRequirementsTaskBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(MypyTask, cls).subsystem_dependencies() + (PythonInterpreterCache,)
+    return super().subsystem_dependencies() + (PythonInterpreterCache,)
 
   def find_mypy_interpreter(self):
     interpreters = self._interpreter_cache.setup(

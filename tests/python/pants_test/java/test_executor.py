@@ -1,20 +1,16 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
+import subprocess
 import textwrap
 import unittest
-from builtins import object
 from contextlib import contextmanager
 
 from pants.java.distribution.distribution import Distribution
 from pants.java.executor import Executor, SubprocessExecutor
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_open
-from pants.util.process_handler import subprocess
 
 
 class SubprocessExecutorTest(unittest.TestCase):
@@ -57,26 +53,9 @@ class SubprocessExecutorTest(unittest.TestCase):
   def test_scrubbed_java_tool_options(self):
     self.do_test_jre_env_var('JAVA_TOOL_OPTIONS', '-Xmx1g')
 
-  def do_test_executor_classpath_relativize(self, executor):
-    """Test that 'executor' relativizes the classpath."""
-    here = os.path.abspath(".")
-    runner = executor.runner([here], "bogus")
-    self.assertFalse(here in runner.cmd)
-    parts = runner.cmd.split(" ")
-    found = False
-    for i, part in enumerate(parts):
-      if part == "-cp":
-        self.assertTrue(os.path.abspath(parts[i + 1]) == here)
-        found = True
-    self.assertTrue(found)
-
-  def test_subprocess_classpath_relativize(self):
-    with self.jre("FOO") as jre:
-      self.do_test_executor_classpath_relativize(SubprocessExecutor(Distribution(bin_path=jre)))
-
   def test_fails_with_bad_distribution(self):
 
-    class DefinitelyNotADistribution(object):
+    class DefinitelyNotADistribution:
       pass
 
     with self.assertRaises(Executor.InvalidDistribution):

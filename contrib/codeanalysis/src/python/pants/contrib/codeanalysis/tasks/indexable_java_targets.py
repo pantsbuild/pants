@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import str
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.build_graph.target_scopes import Scope
@@ -17,7 +13,7 @@ class IndexableJavaTargets(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(IndexableJavaTargets, cls).register_options(register)
+    super().register_options(register)
     register('--exclude-scopes', type=list, member_type=str, fingerprint=True,
              help='Dependency scopes to exclude from indexing.')
     register('--recursive', type=bool, fingerprint=True,

@@ -1,32 +1,13 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import io
 import multiprocessing
-import os
 import sys
-from abc import abstractmethod
-
-from future.utils import PY2, PY3
-
-from pants.util.meta import AbstractClass
+from abc import ABC, abstractmethod
 
 
-# Expose subprocess with python 3.2+ capabilities (namely timeouts) and bugfixes from this module.
-# NB: As recommended here: https://github.com/google/python-subprocess32/blob/master/README.md
-# which accounts for non-posix, ie: Windows. Although we don't support Windows yet, this sets the
-# pattern up in anticipation.
-if os.name == 'posix' and PY2:
-  import subprocess32 as subprocess3
-else:
-  import subprocess as subprocess3
-subprocess = subprocess3
-
-
-class ProcessHandler(AbstractClass):
+class ProcessHandler(ABC):
   """An abstraction of process handling calls using the same interface as subprocess(32).Popen.
 
   See SubprocessProcessHandler below for an example.
@@ -108,6 +89,6 @@ def _tee(infile, outfile, return_function):
   accumulator = io.BytesIO()
   for line in iter(infile.readline, b""):
     accumulator.write(line)
-    outfile.buffer.write(line) if PY3 else outfile.write(line)
+    outfile.buffer.write(line)
   infile.close()
   return_function(accumulator.getvalue())

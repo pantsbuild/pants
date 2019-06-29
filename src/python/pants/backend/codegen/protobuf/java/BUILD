@@ -3,8 +3,6 @@
 
 python_library(
   dependencies = [
-    'src/python/pants/util:collections_abc_backport',
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/codegen/protobuf/subsystems',
     'src/python/pants/backend/jvm/targets:java',
@@ -20,6 +18,5 @@ python_library(
     'src/python/pants/fs',
     'src/python/pants/goal:task_registrar',
     'src/python/pants/task',
-    'src/python/pants/util:process_handler',
   ],
 )

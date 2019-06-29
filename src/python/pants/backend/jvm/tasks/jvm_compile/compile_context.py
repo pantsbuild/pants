@@ -1,17 +1,13 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import zipfile
-from builtins import object
 from contextlib import contextmanager
 
 from pants.util.contextutil import open_zip
 
 
-class CompileContext(object):
+class CompileContext:
   """A context for the compilation of a target.
 
   This can be used to differentiate between a partially completed compile in a temporary location
@@ -19,13 +15,14 @@ class CompileContext(object):
   """
 
   def __init__(self, target, analysis_file, classes_dir, jar_file,
-               log_dir, zinc_args_file, sources):
+               log_dir, args_file, post_compile_merge_dir, sources):
     self.target = target
     self.analysis_file = analysis_file
     self.classes_dir = classes_dir
     self.jar_file = jar_file
     self.log_dir = log_dir
-    self.zinc_args_file = zinc_args_file
+    self.args_file = args_file
+    self.post_compile_merge_dir = post_compile_merge_dir
     self.sources = sources
 
   @contextmanager

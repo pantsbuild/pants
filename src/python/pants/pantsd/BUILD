@@ -5,12 +5,10 @@ python_library(
   name = 'process_manager',
   sources = ['process_manager.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:psutil',
     'src/python/pants/base:build_environment',
     'src/python/pants/process',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:process_handler',
   ]
 )
 
@@ -29,7 +27,6 @@ python_library(
   name = 'watchman',
   sources = ['watchman.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:retry',
     ':process_manager',
@@ -41,7 +38,6 @@ python_library(
   name = 'watchman_launcher',
   sources = ['watchman_launcher.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':watchman',
     'src/python/pants/binaries',
     'src/python/pants/util:memo',

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from twitter.common.collections import maybe_list
 
@@ -31,7 +28,7 @@ class PythonTests(PythonTarget):
     """
     self._coverage = maybe_list(coverage) if coverage is not None else []
     self._timeout = timeout
-    super(PythonTests, self).__init__(**kwargs)
+    super().__init__(**kwargs)
 
   @property
   def coverage(self):

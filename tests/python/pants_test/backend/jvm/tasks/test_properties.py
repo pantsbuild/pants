@@ -1,16 +1,12 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import unittest
-from builtins import open
+from collections import OrderedDict
 from io import StringIO
 from tempfile import NamedTemporaryFile
 
 from pants.backend.jvm.tasks.properties import Properties
-from pants.util.collections_abc_backport import OrderedDict
 
 
 class PropertiesTest(unittest.TestCase):

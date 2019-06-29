@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 
@@ -55,7 +52,7 @@ class ZipkinReporter(Reporter):
     :param string parent_id: The 64-bit ID for a parent span that invokes Pants. May be None.
     :param float sample_rate: Rate at which to sample Zipkin traces. Value 0.0 - 100.0.
     """
-    super(ZipkinReporter, self).__init__(run_tracker, settings)
+    super().__init__(run_tracker, settings)
     # Create a transport handler
     self.handler = HTTPTransportHandler(endpoint)
     self.trace_id = trace_id

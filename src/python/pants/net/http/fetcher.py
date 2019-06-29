@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
 import os
@@ -10,20 +7,17 @@ import re
 import sys
 import tempfile
 import time
-from abc import abstractmethod, abstractproperty
-from builtins import object, open, str
+from abc import ABC, abstractmethod
 from contextlib import closing, contextmanager
 
 import requests
 import six
-from future.utils import PY3
 
 from pants.util.dirutil import safe_open
-from pants.util.meta import AbstractClass
 from pants.util.strutil import strip_prefix
 
 
-class Fetcher(object):
+class Fetcher:
   """A streaming URL fetcher that supports listeners."""
 
   class Error(Exception):
@@ -56,7 +50,7 @@ class Fetcher(object):
       """
       return self._response_code
 
-  class Listener(object):
+  class Listener:
     """A listener callback interface for HTTP GET requests made by a Fetcher."""
 
     def status(self, code, content_length=None):
@@ -161,7 +155,7 @@ class Fetcher(object):
       if not isinstance(self._width, six.integer_types):
         raise ValueError('The width must be an integer, given {}'.format(self._width))
       self._chunk_size_bytes = chunk_size_bytes or 10 * 1024
-      self._stream = stream or (sys.stderr.buffer if PY3 else sys.stderr)
+      self._stream = stream or sys.stderr.buffer
       self._start = time.time()
 
     def status(self, code, content_length=None):
@@ -210,17 +204,19 @@ class Fetcher(object):
     self._root_dir = root_dir
     self._requests = requests_api or requests
 
-  class _Response(AbstractClass):
+  class _Response(ABC):
     """Abstracts a fetch response."""
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def status_code(self):
       """The HTTP status code for the fetch.
 
       :rtype: int
       """
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def size(self):
       """The size of the fetched file in bytes if known; otherwise, `None`.
 

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
@@ -23,9 +20,8 @@ from pants.util.process_handler import ProcessHandler, SubprocessProcessHandler
 logger = logging.getLogger(__name__)
 
 
-def _get_runner(classpath, main, jvm_options, args, executor,
-               cwd, distribution,
-               create_synthetic_jar, synthetic_jar_dir):
+def _get_runner(classpath, main, jvm_options, args, executor, distribution, create_synthetic_jar,
+                synthetic_jar_dir):
   """Gets the java runner for execute_java and execute_java_async."""
 
   executor = executor or SubprocessExecutor(distribution)
@@ -35,7 +31,7 @@ def _get_runner(classpath, main, jvm_options, args, executor,
     safe_cp = safe_classpath(classpath, synthetic_jar_dir)
     logger.debug('Bundling classpath {} into {}'.format(':'.join(classpath), safe_cp))
 
-  return executor.runner(safe_cp, main, args=args, jvm_options=jvm_options, cwd=cwd)
+  return executor.runner(safe_cp, main, args=args, jvm_options=jvm_options)
 
 
 def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
@@ -68,7 +64,7 @@ def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
   Raises `pants.java.Executor.Error` if there was a problem launching java itself.
   """
 
-  runner = _get_runner(classpath, main, jvm_options, args, executor, cwd, distribution,
+  runner = _get_runner(classpath, main, jvm_options, args, executor, distribution,
                        create_synthetic_jar, synthetic_jar_dir)
   workunit_name = workunit_name or main
 
@@ -77,7 +73,8 @@ def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
                         workunit_name=workunit_name,
                         workunit_labels=workunit_labels,
                         workunit_log_config=workunit_log_config,
-                        stdin=stdin)
+                        stdin=stdin,
+                        cwd=cwd)
 
 
 def execute_java_async(classpath, main, jvm_options=None, args=None, executor=None,
@@ -109,7 +106,7 @@ def execute_java_async(classpath, main, jvm_options=None, args=None, executor=No
   Raises `pants.java.Executor.Error` if there was a problem launching java itself.
   """
 
-  runner = _get_runner(classpath, main, jvm_options, args, executor, cwd, distribution,
+  runner = _get_runner(classpath, main, jvm_options, args, executor, distribution,
                        create_synthetic_jar, synthetic_jar_dir)
   workunit_name = workunit_name or main
 
@@ -117,11 +114,23 @@ def execute_java_async(classpath, main, jvm_options=None, args=None, executor=No
                               workunit_factory=workunit_factory,
                               workunit_name=workunit_name,
                               workunit_labels=workunit_labels,
-                              workunit_log_config=workunit_log_config)
+                              workunit_log_config=workunit_log_config,
+                              cwd=cwd)
+
+
+def _create_workunit_generator(runner, workunit_factory, workunit_name, workunit_labels=None,
+                               workunit_log_config=None):
+
+  is_nailgun = isinstance(runner.executor, NailgunExecutor)
+  execution_mode_label = WorkUnitLabel.NAILGUN if is_nailgun else WorkUnitLabel.JVM
+  workunit_labels = [WorkUnitLabel.TOOL, execution_mode_label] + (workunit_labels or [])
+
+  return workunit_factory(name=workunit_name, labels=workunit_labels, cmd=runner.cmd,
+                          log_config=workunit_log_config)
 
 
 def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_labels=None,
-                   workunit_log_config=None, stdin=None):
+                   workunit_log_config=None, stdin=None, cwd=None):
   """Executes the given java runner.
 
   If `workunit_factory` is supplied, does so in the context of a workunit.
@@ -133,6 +142,7 @@ def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_l
   :param WorkUnit.LogConfig workunit_log_config: an optional tuple of task options affecting reporting
   :param file stdin: The stdin handle to use: by default None, meaning that stdin will
     not be propagated into the process.
+  :param string cwd: optionally set the working directory
 
   Returns the exit code of the java runner.
   Raises `pants.java.Executor.Error` if there was a problem launching java itself.
@@ -142,24 +152,20 @@ def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_l
                      'given {} of type {}'.format(runner, type(runner)))
 
   if workunit_factory is None:
-    return runner.run(stdin=stdin)
+    return runner.run(stdin=stdin, cwd=cwd)
   else:
-    workunit_labels = [
-        WorkUnitLabel.TOOL,
-        WorkUnitLabel.NAILGUN if isinstance(runner.executor, NailgunExecutor) else WorkUnitLabel.JVM
-    ] + (workunit_labels or [])
-
-    with workunit_factory(name=workunit_name, labels=workunit_labels,
-                          cmd=runner.cmd, log_config=workunit_log_config) as workunit:
+    with _create_workunit_generator(runner, workunit_factory, workunit_name, workunit_labels,
+                                    workunit_log_config) as workunit:
       ret = runner.run(stdout=workunit.output('stdout'),
                        stderr=workunit.output('stderr'),
-                       stdin=stdin)
+                       stdin=stdin,
+                       cwd=cwd)
       workunit.set_outcome(WorkUnit.FAILURE if ret else WorkUnit.SUCCESS)
       return ret
 
 
 def execute_runner_async(runner, workunit_factory=None, workunit_name=None, workunit_labels=None,
-                         workunit_log_config=None):
+                         workunit_log_config=None, cwd=None):
   """Executes the given java runner asynchronously.
 
   We can't use 'with' here because the workunit_generator's __exit__ function
@@ -189,15 +195,12 @@ def execute_runner_async(runner, workunit_factory=None, workunit_name=None, work
   if workunit_factory is None:
     return SubprocessProcessHandler(runner.spawn())
   else:
-    workunit_labels = [
-                        WorkUnitLabel.TOOL,
-                        WorkUnitLabel.NAILGUN if isinstance(runner.executor, NailgunExecutor) else WorkUnitLabel.JVM
-                      ] + (workunit_labels or [])
-
-    workunit_generator = workunit_factory(name=workunit_name, labels=workunit_labels,
-                                cmd=runner.cmd, log_config=workunit_log_config)
+    workunit_generator = _create_workunit_generator(runner, workunit_factory, workunit_name,
+                                                    workunit_labels, workunit_log_config)
     workunit = workunit_generator.__enter__()
-    process = runner.spawn(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
+    process = runner.spawn(stdout=workunit.output('stdout'),
+                           stderr=workunit.output('stderr'),
+                           cwd=cwd)
 
     class WorkUnitProcessHandler(ProcessHandler):
       def wait(_, timeout=None):

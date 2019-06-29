@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -26,7 +23,7 @@ class MetaRenameTest(TaskTestBase):
     return BuildFileAliases(targets={ 'java_library': JavaLibrary })
 
   def setUp(self):
-    super(MetaRenameTest, self).setUp()
+    super().setUp()
 
     self.new_name = 'goo'
     self.spec_path = 'a'

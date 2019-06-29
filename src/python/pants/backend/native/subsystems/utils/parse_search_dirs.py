@@ -1,19 +1,16 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import re
+import subprocess
 
 from twitter.common.collections import OrderedSet
 
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import is_readable_dir
 from pants.util.memo import memoized_classproperty
-from pants.util.process_handler import subprocess
 from pants.util.strutil import safe_shlex_join
 
 

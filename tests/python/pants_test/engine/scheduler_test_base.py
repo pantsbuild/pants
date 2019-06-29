@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import shutil
-from builtins import object
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.nodes import Throw
@@ -17,7 +13,7 @@ from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants_test.engine.util import init_native
 
 
-class SchedulerTestBase(object):
+class SchedulerTestBase:
   """A mixin for classes (tests, presumably) which need to create temporary schedulers.
 
   TODO: In the medium term, this should be part of pants_test.test_base.TestBase.

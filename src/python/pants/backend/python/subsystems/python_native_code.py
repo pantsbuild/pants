@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
@@ -39,7 +36,7 @@ class PythonNativeCode(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(PythonNativeCode, cls).register_options(register)
+    super().register_options(register)
 
     register('--native-source-extensions', type=list, default=cls.default_native_source_extensions,
              fingerprint=True, advanced=True,
@@ -56,7 +53,7 @@ class PythonNativeCode(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(PythonNativeCode, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       NativeToolchain.scoped(cls),
       PythonSetup,
     )
@@ -133,7 +130,7 @@ class BuildSetupRequiresPex(ExecutablePexTool):
 
   @classmethod
   def register_options(cls, register):
-    super(BuildSetupRequiresPex, cls).register_options(register)
+    super().register_options(register)
     register('--setuptools-version', advanced=True, fingerprint=True, default='40.6.3',
              help='The setuptools version to use when executing `setup.py` scripts.')
     register('--wheel-version', advanced=True, fingerprint=True, default='0.32.3',

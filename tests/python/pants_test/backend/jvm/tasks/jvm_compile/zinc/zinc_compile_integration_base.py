@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import unittest
 import xml.etree.ElementTree as ET
-from builtins import object
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
@@ -19,7 +15,7 @@ SHAPELESS_CLSFILE = 'org/pantsbuild/testproject/unicode/shapeless/ShapelessExamp
 SHAPELESS_TARGET = 'testprojects/src/scala/org/pantsbuild/testproject/unicode/shapeless'
 
 
-class BaseZincCompileIntegrationTest(object):
+class BaseZincCompileIntegrationTest:
 
   def create_file(self, path, value):
     with safe_open(path, 'w') as f:
@@ -110,6 +106,77 @@ class BaseZincCompileIntegrationTest(object):
           self.get_only(found, 'JavaSource.class').endswith(
               'org/pantsbuild/testproject/javasources/JavaSource.class'))
 
+  def test_apt_compile(self):
+    with self.do_test_compile('testprojects/src/java/org/pantsbuild/testproject/annotation/processor',
+                              expected_files=['ResourceMappingProcessor.class',
+                                              'javax.annotation.processing.Processor']) as found:
+
+      self.assertTrue(
+          self.get_only(found, 'ResourceMappingProcessor.class').endswith(
+              'org/pantsbuild/testproject/annotation/processor/ResourceMappingProcessor.class'))
+
+      # processor info file under classes/ dir
+      processor_service_files = list(filter(lambda x: 'classes' in x,
+                                            found['javax.annotation.processing.Processor']))
+      # There should be only a per-target service info file.
+      self.assertEqual(1, len(processor_service_files))
+      processor_service_file = list(processor_service_files)[0]
+      self.assertTrue(processor_service_file.endswith(
+          'META-INF/services/javax.annotation.processing.Processor'))
+      with open(processor_service_file, 'r') as fp:
+        self.assertEqual('org.pantsbuild.testproject.annotation.processor.ResourceMappingProcessor',
+                          fp.read().strip())
+
+  def test_apt_compile_and_run(self):
+    with self.do_test_compile('testprojects/src/java/org/pantsbuild/testproject/annotation/main',
+                              expected_files=['Main.class',
+                                              'deprecation_report.txt']) as found:
+
+      self.assertTrue(
+          self.get_only(found, 'Main.class').endswith(
+              'org/pantsbuild/testproject/annotation/main/Main.class'))
+
+      # This is the proof that the ResourceMappingProcessor annotation processor was compiled in a
+      # round and then the Main was compiled in a later round with the annotation processor and its
+      # service info file from on its compile classpath.
+      with open(self.get_only(found, 'deprecation_report.txt'), 'r') as fp:
+        self.assertIn('org.pantsbuild.testproject.annotation.main.Main', fp.read().splitlines())
+
+  def test_stale_apt_with_deps(self):
+    """An annotation processor with a dependency doesn't pollute other annotation processors.
+
+    At one point, when you added an annotation processor, it stayed configured for all subsequent
+    compiles.  Meaning that if that annotation processor had a dep that wasn't on the classpath,
+    subsequent compiles would fail with missing symbols required by the stale annotation processor.
+    """
+
+    # Demonstrate that the annotation processor is working
+    with self.do_test_compile(
+        'testprojects/src/java/org/pantsbuild/testproject/annotation/processorwithdep/main',
+        expected_files=['Main.class', 'Main_HelloWorld.class', 'Main_HelloWorld.java']) as found:
+      gen_file = self.get_only(found, 'Main_HelloWorld.java')
+      self.assertTrue(gen_file.endswith(
+        'org/pantsbuild/testproject/annotation/processorwithdep/main/Main_HelloWorld.java'),
+        msg='{} does not match'.format(gen_file))
+
+
+    # Try to reproduce second compile that fails with missing symbol
+    with self.temporary_workdir() as workdir:
+      with self.temporary_cachedir() as cachedir:
+        # This annotation processor has a unique external dependency
+        self.assert_success(self.run_test_compile(
+          workdir,
+          cachedir,
+          'testprojects/src/java/org/pantsbuild/testproject/annotation/processorwithdep::'))
+
+        # When we run a second compile with annotation processors, make sure the previous annotation
+        # processor doesn't stick around to spoil the compile
+        self.assert_success(self.run_test_compile(
+          workdir,
+          cachedir,
+          'testprojects/src/java/org/pantsbuild/testproject/annotation/processor::',
+          clean_all=False))
+
   def test_scalac_plugin_compile(self):
     with self.do_test_compile(
         'examples/src/scala/org/pantsbuild/example/scalac/plugin:other_simple_scalac_plugin',
@@ -119,8 +186,13 @@ class BaseZincCompileIntegrationTest(object):
           self.get_only(found, 'OtherSimpleScalacPlugin.class').endswith(
               'org/pantsbuild/example/scalac/plugin/OtherSimpleScalacPlugin.class'))
 
+      # Grab only the files under classes/ dir
+      scalac_xml_under_classes_dir = list(filter(lambda x: 'classes' in x,
+                                                 found['scalac-plugin.xml']))
+      self.assertEqual(1, len(scalac_xml_under_classes_dir))
+
       # Ensure that the plugin registration file is written to the root of the classpath.
-      path = self.get_only(found, 'scalac-plugin.xml')
+      path = scalac_xml_under_classes_dir[0]
       self.assertTrue(path.endswith('/classes/scalac-plugin.xml'),
                       'plugin registration file `{}` not located at the '
                       'root of the classpath'.format(path))

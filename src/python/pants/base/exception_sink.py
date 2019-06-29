@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import datetime
 import faulthandler
@@ -12,11 +9,9 @@ import signal
 import sys
 import threading
 import traceback
-from builtins import object, str
 from contextlib import contextmanager
 
 import setproctitle
-from future.utils import PY3
 
 from pants.base.exiter import Exiter
 from pants.util.dirutil import safe_mkdir, safe_open
@@ -26,7 +21,7 @@ from pants.util.osutil import IntegerForPid
 logger = logging.getLogger(__name__)
 
 
-class SignalHandler(object):
+class SignalHandler:
   """A specification for how to handle a fixed set of nonfatal signals.
 
   This is subclassed and registered with ExceptionSink.reset_signal_handler() whenever the signal
@@ -102,7 +97,7 @@ class SignalHandler(object):
     raise self.SignalHandledNonLocalExit(signum, 'SIGTERM')
 
 
-class ExceptionSink(object):
+class ExceptionSink:
   """A mutable singleton object representing where exceptions should be logged to."""
 
   # NB: see the bottom of this file where we call reset_log_location() and other mutators in order
@@ -491,7 +486,7 @@ ExceptionSink.reset_log_location(os.path.join(os.getcwd(), '.pants.d'))
 # Sets except hook for exceptions at import time.
 ExceptionSink.reset_exiter(Exiter(exiter=sys.exit))
 # Sets a SIGUSR2 handler.
-ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer if PY3 else sys.stderr)
+ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer)
 # Sets a handler that logs nonfatal signals to the exception sink before exiting.
 ExceptionSink.reset_signal_handler(SignalHandler())
 # Set whether to print stacktraces on exceptions or signals during import time.

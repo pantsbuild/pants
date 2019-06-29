@@ -1,10 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-import mock
+import unittest.mock
 
 from pants.pantsd.watchman import Watchman
 from pants.pantsd.watchman_launcher import WatchmanLauncher
@@ -17,7 +14,7 @@ class TestWatchmanLauncher(TestBase):
     return WatchmanLauncher.create(bootstrap_options)
 
   def create_mock_watchman(self, is_alive):
-    mock_watchman = mock.create_autospec(Watchman, spec_set=False)
+    mock_watchman = unittest.mock.create_autospec(Watchman, spec_set=False)
     mock_watchman.ExecutionError = Watchman.ExecutionError
     mock_watchman.is_alive.return_value = is_alive
     return mock_watchman

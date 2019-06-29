@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import hashlib
 import os
 import pkgutil
-from builtins import open, str
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.pex_build_util import (PexBuilderWrapper,
@@ -44,7 +40,7 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(PythonEval, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       PexBuilderWrapper.Factory,
       PythonInterpreterCache
     )
@@ -60,7 +56,7 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
 
   @classmethod
   def register_options(cls, register):
-    super(PythonEval, cls).register_options(register)
+    super().register_options(register)
     register('--fail-slow', type=bool,
              help='Compile all targets and present the full list of errors.')
 

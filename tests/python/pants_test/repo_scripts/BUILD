@@ -4,10 +4,8 @@
 python_tests(
   name = 'git_hooks',
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test/testutils:git_util',
   ]
 )

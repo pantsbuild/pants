@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open
 
 from pants.backend.codegen.thrift.lib.apache_thrift_gen_base import ApacheThriftGenBase
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
@@ -27,7 +23,7 @@ class ApacheThriftPyGen(ApacheThriftGenBase):
     return PythonLibrary
 
   def execute_codegen(self, target, target_workdir):
-    super(ApacheThriftPyGen, self).execute_codegen(target, target_workdir)
+    super().execute_codegen(target, target_workdir)
 
     # Thrift generates code with all parent namespaces with empty __init__.py's. Since pants allows
     # splitting a thrift namespace hierarchy across multiple packages, we explicitly insert
@@ -53,7 +49,7 @@ class ApacheThriftPyGen(ApacheThriftGenBase):
 
   @property
   def _copy_target_attributes(self):
-    return super(ApacheThriftPyGen, self)._copy_target_attributes + ['compatibility']
+    return super()._copy_target_attributes + ['compatibility']
 
   def ignore_dup(self, tgt1, tgt2, rel_src):
     # Thrift generates all the intermediate __init__.py files, and they shouldn't

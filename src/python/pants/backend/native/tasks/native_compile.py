@@ -1,11 +1,9 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from abc import abstractmethod
+import subprocess
+from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 
 from pants.backend.native.tasks.native_task import NativeTask
@@ -13,9 +11,8 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.meta import AbstractClass, classproperty
+from pants.util.meta import classproperty
 from pants.util.objects import datatype
-from pants.util.process_handler import subprocess
 
 
 class NativeCompileRequest(datatype([
@@ -36,7 +33,7 @@ class ObjectFiles(datatype(['root_dir', 'filenames'])):
     return [os.path.join(self.root_dir, fname) for fname in self.filenames]
 
 
-class NativeCompile(NativeTask, AbstractClass):
+class NativeCompile(NativeTask, metaclass=ABCMeta):
   # `NativeCompile` will use the `source_target_constraint` to determine what targets have "sources"
   # to compile, and the `dependent_target_constraint` to determine which dependent targets to
   # operate on for `strict_deps` calculation.
@@ -64,7 +61,7 @@ class NativeCompile(NativeTask, AbstractClass):
 
   @classmethod
   def implementation_version(cls):
-    return super(NativeCompile, cls).implementation_version() + [('NativeCompile', 1)]
+    return super().implementation_version() + [('NativeCompile', 1)]
 
   class NativeCompileError(TaskError):
     """Raised for errors in this class's logic.

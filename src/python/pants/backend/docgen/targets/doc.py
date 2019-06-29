@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.base.hash_utils import stable_json_sha1
 from pants.base.payload import Payload
@@ -10,7 +7,7 @@ from pants.base.payload_field import PayloadField, PrimitiveField, combine_hashe
 from pants.build_graph.target import Target
 
 
-class WikiArtifact(object):
+class WikiArtifact:
   """Binds a single documentation page to a wiki instance.
 
   This object allows you to specify which wiki a page should be published to, along with additional
@@ -37,7 +34,7 @@ class WikiArtifact(object):
     return self.wiki.name
 
 
-class Wiki(object):
+class Wiki:
   """Identifies a wiki where pages can be published."""
 
   def __init__(self, name, url_builder):
@@ -108,7 +105,7 @@ class Page(Target):
       'links': PrimitiveField(links or []),
       'provides': self.ProvidesTupleField(provides or []),
     })
-    super(Page, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
     if provides and not isinstance(provides[0], WikiArtifact):
       raise ValueError('Page must provide a wiki_artifact. Found instead: {}'.format(provides))
@@ -120,7 +117,7 @@ class Page(Target):
 
   @classmethod
   def compute_injectable_specs(cls, kwargs=None, payload=None):
-    for spec in super(Page, cls).compute_injectable_specs(kwargs, payload):
+    for spec in super().compute_injectable_specs(kwargs, payload):
       yield spec
 
     target_representation = kwargs or payload.as_dict()

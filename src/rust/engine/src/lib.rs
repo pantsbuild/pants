@@ -42,7 +42,6 @@ mod selectors;
 mod tasks;
 mod types;
 
-use fs;
 use futures;
 
 use hashing;
@@ -81,6 +80,7 @@ use log::{error, Log};
 use logging::logger::LOGGER;
 use logging::{Destination, Logger};
 use rule_graph::{GraphMaker, RuleGraph};
+use workunit_store::WorkUnitStore;
 
 // TODO: Consider renaming and making generic for collections of PyResults.
 #[repr(C)]
@@ -214,7 +214,8 @@ pub extern "C" fn scheduler_create(
   remote_store_chunk_upload_timeout_seconds: u64,
   remote_store_rpc_retries: u64,
   remote_execution_extra_platform_properties_buf: BufferBuffer,
-  process_execution_parallelism: u64,
+  process_execution_local_parallelism: u64,
+  process_execution_remote_parallelism: u64,
   process_execution_cleanup_local_dirs: bool,
 ) -> *const Scheduler {
   let root_type_ids = root_type_ids.to_vec();
@@ -320,7 +321,8 @@ pub extern "C" fn scheduler_create(
     Duration::from_secs(remote_store_chunk_upload_timeout_seconds),
     remote_store_rpc_retries as usize,
     remote_execution_extra_platform_properties_map,
-    process_execution_parallelism as usize,
+    process_execution_local_parallelism as usize,
+    process_execution_remote_parallelism as usize,
     process_execution_cleanup_local_dirs as bool,
   ))))
 }
@@ -378,12 +380,10 @@ pub extern "C" fn scheduler_fork_context(
   scheduler_ptr: *mut Scheduler,
   func: Function,
 ) -> PyResult {
-  with_scheduler(scheduler_ptr, |scheduler| {
-    scheduler.core.fork_context(|| {
-      externs::exclusive_call(&func.0)
-        .map_err(|f| format!("{:?}", f))
-        .into()
-    })
+  with_scheduler(scheduler_ptr, |_| {
+    externs::exclusive_call(&func.0)
+      .map_err(|f| format!("{:?}", f))
+      .into()
   })
 }
 
@@ -667,8 +667,8 @@ pub extern "C" fn set_panic_handler() {
 pub extern "C" fn garbage_collect_store(scheduler_ptr: *mut Scheduler) {
   with_scheduler(scheduler_ptr, |scheduler| {
     match scheduler.core.store().garbage_collect(
-      fs::DEFAULT_LOCAL_STORE_GC_TARGET_BYTES,
-      fs::ShrinkBehavior::Fast,
+      store::DEFAULT_LOCAL_STORE_GC_TARGET_BYTES,
+      store::ShrinkBehavior::Fast,
     ) {
       Ok(_) => {}
       Err(err) => error!("{}", err),
@@ -739,25 +739,25 @@ pub extern "C" fn capture_snapshots(
 
   with_scheduler(scheduler_ptr, |scheduler| {
     let core = scheduler.core.clone();
-    futures::future::join_all(
-      path_globs_and_roots
-        .into_iter()
-        .map(|(path_globs, root, digest_hint)| {
-          let core = core.clone();
-          fs::Snapshot::capture_snapshot_from_arbitrary_root(
-            core.store(),
-            core.fs_pool.clone(),
-            root,
-            path_globs,
-            digest_hint,
-          )
-          .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
-        })
-        .collect::<Vec<_>>(),
+    core.block_on(
+      futures::future::join_all(
+        path_globs_and_roots
+          .into_iter()
+          .map(|(path_globs, root, digest_hint)| {
+            let core = core.clone();
+            store::Snapshot::capture_snapshot_from_arbitrary_root(
+              core.store(),
+              root,
+              path_globs,
+              digest_hint,
+            )
+            .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
+          })
+          .collect::<Vec<_>>(),
+      )
+      .map(|values| externs::store_tuple(&values)),
     )
   })
-  .map(|values| externs::store_tuple(&values))
-  .wait()
   .into()
 }
 
@@ -780,8 +780,12 @@ pub extern "C" fn merge_directories(
   };
 
   with_scheduler(scheduler_ptr, |scheduler| {
-    fs::Snapshot::merge_directories(scheduler.core.store(), digests)
-      .wait()
+    scheduler
+      .core
+      .block_on(store::Snapshot::merge_directories(
+        scheduler.core.store(),
+        digests,
+      ))
       .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
       .into()
   })
@@ -812,15 +816,16 @@ pub extern "C" fn materialize_directories(
   };
 
   with_scheduler(scheduler_ptr, |scheduler| {
-    futures::future::join_all(
-      dir_and_digests
-        .into_iter()
-        .map(|(dir, digest)| scheduler.core.store().materialize_directory(dir, digest))
-        .collect::<Vec<_>>(),
+    scheduler.core.block_on(
+      futures::future::join_all(
+        dir_and_digests
+          .into_iter()
+          .map(|(dir, digest)| scheduler.core.store().materialize_directory(dir, digest))
+          .collect::<Vec<_>>(),
+      )
+      .map(|_| ()),
     )
   })
-  .map(|_| ())
-  .wait()
   .into()
 }
 

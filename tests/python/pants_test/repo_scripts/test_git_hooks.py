@@ -1,19 +1,15 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import datetime
 import os
+import subprocess
 import unittest
-from builtins import str
 from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump, touch
-from pants.util.process_handler import subprocess
 from pants_test.testutils.git_util import get_repo_root, initialize_repo
 
 
@@ -165,18 +161,6 @@ subdir/__init__.py
         added_files=[rel_new_py_path],
         expected_excerpt="subdir/file.py: copyright year must be {} (was {})".format(cur_year, last_year)
       )
-
-      # Check that we also support Python 2-style headers.
-      safe_file_dump(new_py_path, dedent("""\
-        # coding=utf-8
-        # Copyright {} Pants project contributors (see CONTRIBUTORS.md).
-        # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-        from __future__ import absolute_import, division, print_function, unicode_literals
-
-        """.format(cur_year))
-      )
-      self._assert_subprocess_success(worktree, [header_check_script, 'subdir'])
 
       # Check that a file isn't checked against the current year if it is not passed as an
       # arg to the script.

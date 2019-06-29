@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from abc import abstractmethod
 
@@ -29,7 +26,7 @@ class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsys
 
   @classmethod
   def register_options(cls, register):
-    super(NativeBuildStep, cls).register_options(register)
+    super().register_options(register)
 
     register('--compiler-option-sets', advanced=True, default=(), type=list,
              fingerprint=True,
@@ -56,7 +53,7 @@ class CompileSettingsBase(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(CompileSettingsBase, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       NativeBuildStep.scoped(cls),
     )
 
@@ -67,7 +64,7 @@ class CompileSettingsBase(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(CompileSettingsBase, cls).register_options(register)
+    super().register_options(register)
     register('--header-file-extensions', advanced=True, default=cls.header_file_extensions_default,
              type=list, fingerprint=True,
              help="The file extensions which should not be provided to the compiler command line.")

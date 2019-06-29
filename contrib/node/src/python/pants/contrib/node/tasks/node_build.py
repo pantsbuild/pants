@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from collections import defaultdict
@@ -28,7 +25,7 @@ class NodeBuild(NodeTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(NodeBuild, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(NodePaths)
 
   @property

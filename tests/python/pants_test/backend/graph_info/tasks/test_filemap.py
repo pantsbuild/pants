@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from textwrap import dedent
@@ -27,7 +24,7 @@ class FilemapTest(ConsoleTaskTestBase):
     return Filemap
 
   def setUp(self):
-    super(FilemapTest, self).setUp()
+    super().setUp()
 
     def add_to_build_file(path, name, *files):
       for f in files:

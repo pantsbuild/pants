@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import sys
-from builtins import open
 
 from test_pants_plugin.subsystems.lifecycle_stubs import LifecycleStubs
 
@@ -19,12 +15,12 @@ class MessagingExiter(Exiter):
   """An Exiter that prints a provided message to stderr."""
 
   def __init__(self, message):
-    super(MessagingExiter, self).__init__()
+    super().__init__()
     self._message = message
 
   def exit(self, *args, **kwargs):
     print(self._message, file=sys.stderr)
-    super(MessagingExiter, self).exit(*args, **kwargs)
+    super().exit(*args, **kwargs)
 
 
 class LifecycleStubTask(Task):
@@ -32,7 +28,7 @@ class LifecycleStubTask(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(LifecycleStubTask, cls).subsystem_dependencies() + (LifecycleStubs.scoped(cls),)
+    return super().subsystem_dependencies() + (LifecycleStubs.scoped(cls),)
 
   @memoized_property
   def _lifecycle_stubs(self):

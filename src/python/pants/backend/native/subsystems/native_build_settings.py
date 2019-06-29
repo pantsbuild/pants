@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.build_graph.mirrored_target_option_mixin import MirroredTargetOptionMixin
 from pants.subsystem.subsystem import Subsystem
@@ -18,7 +15,7 @@ class NativeBuildSettings(Subsystem, MirroredTargetOptionMixin):
 
   @classmethod
   def register_options(cls, register):
-    super(NativeBuildSettings, cls).register_options(register)
+    super().register_options(register)
 
     # TODO: rename this so it's clear it is not the same option as JVM strict deps!
     register('--strict-deps', type=bool, default=True, fingerprint=True, advanced=True,

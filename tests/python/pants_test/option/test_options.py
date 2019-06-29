@@ -1,18 +1,14 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import io
 import json
 import os
 import shlex
-from builtins import open, str
+import unittest.mock
 from contextlib import contextmanager
 from textwrap import dedent
 
-import mock
 import yaml
 from future.utils import text_type
 from packaging.version import Version
@@ -927,7 +923,7 @@ class OptionsTest(TestBase):
       self.assertEqual('stale_and_crufty', options.for_scope('stale').crufty)
       self.assertOptionWarning(w, 'crufty')
 
-  @mock.patch('pants.base.deprecated.PANTS_SEMVER', Version(_FAKE_CUR_VERSION))
+  @unittest.mock.patch('pants.base.deprecated.PANTS_SEMVER', Version(_FAKE_CUR_VERSION))
   def test_delayed_deprecated_option(self):
     with self.warnings_catcher() as w:
       delayed_deprecation_option_value = (

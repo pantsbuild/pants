@@ -1,23 +1,18 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import re
-from abc import abstractmethod
-from builtins import str
+from abc import ABC, abstractmethod
 
 from pants.util.collections import assert_single_element
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
 from pants.util.filtering import create_filters, wrap_filters
 from pants.util.memo import memoized_property
-from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
-class Spec(AbstractClass):
+class Spec(ABC):
   """Represents address selectors as passed from the command line.
 
   Supports `Single` target addresses as well as `Sibling` (:) and `Descendant` (::) selector forms.
@@ -89,7 +84,7 @@ class SingleAddress(datatype(['directory', 'name']), Spec):
     if directory is None or name is None:
       raise ValueError('A SingleAddress must have both a directory and name. Got: '
                        '{}:{}'.format(directory, name))
-    return super(SingleAddress, cls).__new__(cls, directory, name)
+    return super().__new__(cls, directory, name)
 
   def to_spec_string(self):
     return '{}:{}'.format(self.directory, self.name)
@@ -196,7 +191,7 @@ class SpecsMatcher(datatype([('tags', tuple), ('exclude_patterns', tuple)])):
   """
 
   def __new__(cls, tags=None, exclude_patterns=tuple()):
-    return super(SpecsMatcher, cls).__new__(
+    return super().__new__(
       cls,
       tags=tuple(tags or []),
       exclude_patterns=tuple(exclude_patterns))
@@ -231,7 +226,7 @@ class Specs(datatype([('dependencies', tuple), ('matcher', SpecsMatcher)])):
   """A collection of Specs representing Spec subclasses, and a SpecsMatcher to filter results."""
 
   def __new__(cls, dependencies, tags=None, exclude_patterns=tuple()):
-    return super(Specs, cls).__new__(
+    return super().__new__(
       cls,
       dependencies=tuple(dependencies),
       matcher=SpecsMatcher(tags=tags, exclude_patterns=exclude_patterns),

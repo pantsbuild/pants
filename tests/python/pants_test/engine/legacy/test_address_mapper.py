@@ -1,13 +1,8 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import object, str
-
-import mock
+import unittest.mock
 
 from pants.base.specs import SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address, BuildFileAddress
@@ -86,7 +81,7 @@ class LegacyAddressMapperTest(TestBase):
     self.assertEqual(build_files, set())
 
   def test_is_declaring_file(self):
-    scheduler = mock.Mock()
+    scheduler = unittest.mock.Mock()
     mapper = LegacyAddressMapper(scheduler, '')
     self.assertTrue(mapper.is_declaring_file(Address('path', 'name'), 'path/BUILD'))
     self.assertTrue(mapper.is_declaring_file(Address('path', 'name'), 'path/BUILD.suffix'))
@@ -161,7 +156,7 @@ class LegacyAddressMapperTest(TestBase):
 
   def test_other_throw_is_fail(self):
     # scan_addresses() should raise an error if the scheduler returns an error it can't ignore.
-    class ThrowReturningScheduler(object):
+    class ThrowReturningScheduler:
       def execution_request(self, *args):
         pass
 

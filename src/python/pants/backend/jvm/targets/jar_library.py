@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
@@ -31,7 +28,7 @@ class JarLibrary(Target):
       'excludes': ExcludesField([]),
       'managed_dependencies': PrimitiveField(managed_dependencies),
     })
-    super(JarLibrary, self).__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, **kwargs)
     # NB: Waiting to validate until superclasses are initialized.
     if not jars:
       raise TargetDefinitionException(self, 'Must have a non-empty list of jars.')

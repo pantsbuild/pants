@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.workunit import WorkUnitLabel
@@ -22,12 +19,12 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
   """
 
   def __init__(self, *args, **kwargs):
-    super(NodeTest, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._currently_executing_test_targets = []
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(NodeTest, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(NodePaths)
 
   @classmethod

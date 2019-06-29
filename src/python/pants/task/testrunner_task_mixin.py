@@ -1,16 +1,13 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import functools
 import os
 import re
 import shutil
+import subprocess
 import xml.etree.ElementTree as ET
 from abc import abstractmethod
-from builtins import filter, next, object, str
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
@@ -21,10 +18,9 @@ from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_mkdir_for
 from pants.util.memo import memoized_classproperty, memoized_property
-from pants.util.process_handler import subprocess
 
 
-class TestResult(object):
+class TestResult:
   @memoized_classproperty
   def successful(cls):
     return cls.rc(0)
@@ -91,7 +87,7 @@ class TestResult(object):
     return self
 
 
-class TestRunnerTaskMixin(object):
+class TestRunnerTaskMixin:
   """A mixin to combine with test runner tasks.
 
   The intent is to migrate logic over time out of JUnitRun and PytestRun, so the functionality
@@ -100,7 +96,7 @@ class TestRunnerTaskMixin(object):
 
   @classmethod
   def register_options(cls, register):
-    super(TestRunnerTaskMixin, cls).register_options(register)
+    super().register_options(register)
     register('--skip', type=bool, help='Skip running tests.')
     register('--timeouts', type=bool, default=True,
              help='Enable test target timeouts. If timeouts are enabled then tests with a '
@@ -202,7 +198,7 @@ class TestRunnerTaskMixin(object):
       """Indicates an error parsing a xml report file."""
 
       def __init__(self, xml_path, cause):
-        super(ParseError, self).__init__('Error parsing test result file {}: {}'
+        super().__init__('Error parsing test result file {}: {}'
           .format(xml_path, cause))
         self.xml_path = xml_path
         self.cause = cause
@@ -402,7 +398,7 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
 
   @classmethod
   def register_options(cls, register):
-    super(PartitionedTestRunnerTaskMixin, cls).register_options(register)
+    super().register_options(register)
 
     # TODO(John Sirois): Implement sanity checks on options wrt caching:
     # https://github.com/pantsbuild/pants/issues/5073

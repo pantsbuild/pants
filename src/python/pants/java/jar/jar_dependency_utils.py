@@ -1,15 +1,11 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import object
 
 from pants.util.memo import memoized_property
 
 
-class ResolvedJar(object):
+class ResolvedJar:
   """Represents an artifact resolved from the dependency resolution process."""
 
   def __init__(self, coordinate, cache_path, pants_path=None, directory_digest=None):

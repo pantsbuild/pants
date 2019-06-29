@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import str
 
 from pants.option.option_value_container import OptionValueContainer
 from pants.util.objects import datatype
@@ -40,7 +36,7 @@ class ScopeInfo(datatype([
   INTERMEDIATE = 'INTERMEDIATE'  # Scope added automatically to fill out the scope hierarchy.
 
   def __new__(cls, scope, category, optionable_cls=None, removal_version=None, removal_hint=None):
-    return super(ScopeInfo, cls).__new__(cls, scope, category, optionable_cls, removal_version, removal_hint)
+    return super().__new__(cls, scope, category, optionable_cls, removal_version, removal_hint)
 
   @property
   def description(self):

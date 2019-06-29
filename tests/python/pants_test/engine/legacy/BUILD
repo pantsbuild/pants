@@ -5,8 +5,6 @@ python_tests(
   name = 'address_mapper',
   sources = ['test_address_mapper.py'],
   dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python:mock',
     'src/python/pants/base:specs',
     'src/python/pants/bin',
     'src/python/pants/build_graph',
@@ -22,7 +20,6 @@ python_tests(
   name = 'build_ignore_integration',
   sources = [ 'test_build_ignore_integration.py' ],
   dependencies = [
-    '3rdparty/python:future',
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
@@ -43,13 +40,11 @@ python_tests(
   name = 'changed_integration',
   sources = ['test_changed_integration.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:process_handler',
     'tests/python/pants_test/testutils:git_util',
-    'tests/python/pants_test/testutils:py2_compat',
     'tests/python/pants_test:test_base',
     'tests/python/pants_test:int-test',
   ],
@@ -101,7 +96,6 @@ python_tests(
   dependencies = [
     'src/python/pants/base:project_tree',
     'tests/python/pants_test:int-test',
-    'tests/python/pants_test/testutils:py2_compat',
   ],
   tags = {'integration'},
   timeout = 180,
@@ -122,8 +116,6 @@ python_tests(
   name = 'graph',
   sources = ['test_graph.py'],
   dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python:mock',
     'src/python/pants/bin',
     'src/python/pants/build_graph',
     'src/python/pants/engine/legacy:graph',
@@ -137,7 +129,6 @@ python_tests(
   name='graph_integration',
   sources=['test_graph_integration.py'],
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/build_graph',
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/option',
@@ -152,7 +143,6 @@ python_tests(
   sources = ['test_list_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test',
-    'tests/python/pants_test/testutils:py2_compat',
   ],
   tags = {'integration'},
   timeout = 180,
@@ -162,7 +152,6 @@ python_tests(
   name = 'options_parsing',
   sources = ['test_options_parsing.py'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/bin',
     'src/python/pants/build_graph',
     'src/python/pants/init',
@@ -185,7 +174,6 @@ python_tests(
   name = 'structs',
   sources = ['test_structs.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/engine/legacy:structs',
   ]
 )

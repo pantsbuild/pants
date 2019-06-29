@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -26,7 +23,7 @@ class MavenLayoutTest(TestBase):
     )
 
   def setUp(self):
-    super(MavenLayoutTest, self).setUp()
+    super().setUp()
     init_subsystems([SourceRootConfig, JUnit])
     self.add_to_build_file('projectB/src/test/scala',
                            'junit_tests(name="test", sources=["a/source"])')

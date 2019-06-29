@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open
 
 from future.utils import text_type
 
@@ -22,11 +18,11 @@ class CountLinesOfCode(ConsoleTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(CountLinesOfCode, cls).subsystem_dependencies() + (ClocBinary,)
+    return super().subsystem_dependencies() + (ClocBinary,)
 
   @classmethod
   def register_options(cls, register):
-    super(CountLinesOfCode, cls).register_options(register)
+    super().register_options(register)
     register('--transitive', type=bool, fingerprint=True, default=True,
              help='Operate on the transitive dependencies of the specified targets.  '
                   'Unset to operate only on the specified targets.')

@@ -1,17 +1,12 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import errno
 import os
 import time
 import unittest
-from builtins import open, str
+import unittest.mock
 from contextlib import contextmanager
-
-import mock
 
 from pants.util import dirutil
 from pants.util.contextutil import pushd, temporary_dir
@@ -25,7 +20,7 @@ from pants.util.objects import datatype
 
 
 def strict_patch(target, **kwargs):
-  return mock.patch(target, autospec=True, spec_set=True, **kwargs)
+  return unittest.mock.patch(target, autospec=True, spec_set=True, **kwargs)
 
 
 class DirutilTest(unittest.TestCase):
@@ -111,8 +106,8 @@ class DirutilTest(unittest.TestCase):
 
     atexit_register.assert_called_once_with(faux_cleaner)
     self.assertTrue(os_getpid.called)
-    self.assertEqual([mock.call(dir='1'), mock.call(dir='2')], tempfile_mkdtemp.mock_calls)
-    self.assertEqual(sorted([mock.call(DIR1), mock.call(DIR2)]), sorted(dirutil_safe_rmtree.mock_calls))
+    self.assertEqual([unittest.mock.call(dir='1'), unittest.mock.call(dir='2')], tempfile_mkdtemp.mock_calls)
+    self.assertEqual(sorted([unittest.mock.call(DIR1), unittest.mock.call(DIR2)]), sorted(dirutil_safe_rmtree.mock_calls))
 
   def test_safe_walk(self):
     """Test that directory names are correctly represented as unicode strings"""
@@ -380,7 +375,7 @@ class DirutilTest(unittest.TestCase):
 
   def test_rm_rf_permission_error_raises(self, file_name='./perm_guarded_file'):
     with temporary_dir() as td, pushd(td), \
-         mock.patch('pants.util.dirutil.shutil.rmtree') as mock_rmtree, \
+         unittest.mock.patch('pants.util.dirutil.shutil.rmtree') as mock_rmtree, \
          self.assertRaises(OSError):
       mock_rmtree.side_effect = OSError(errno.EACCES, os.strerror(errno.EACCES))
       touch(file_name)
@@ -388,7 +383,7 @@ class DirutilTest(unittest.TestCase):
 
   def test_rm_rf_no_such_file_not_an_error(self, file_name='./vanishing_file'):
     with temporary_dir() as td, pushd(td), \
-         mock.patch('pants.util.dirutil.shutil.rmtree') as mock_rmtree:
+         unittest.mock.patch('pants.util.dirutil.shutil.rmtree') as mock_rmtree:
       mock_rmtree.side_effect = OSError(errno.ENOENT, os.strerror(errno.ENOENT))
       touch(file_name)
       rm_rf(file_name)

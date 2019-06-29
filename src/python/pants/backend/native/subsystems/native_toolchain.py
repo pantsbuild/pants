@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import object
 
 from pants.backend.native.config.environment import (Assembler, CCompiler, CppCompiler,
                                                      CppToolchain, CToolchain, Linker, Platform)
@@ -37,7 +33,7 @@ class NativeToolchain(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(NativeToolchain, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       Binutils.scoped(cls),
       GCC.scoped(cls),
       LibcDev.scoped(cls),
@@ -69,7 +65,7 @@ class NativeToolchain(Subsystem):
 class LibcObjects(datatype(['crti_object_paths'])): pass
 
 
-class LinkerWrapperMixin(object):
+class LinkerWrapperMixin:
 
   def for_compiler(self, compiler, platform):
     """Return a Linker object which is intended to be compatible with the given `compiler`."""

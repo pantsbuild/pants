@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.subsystem.subsystem import Subsystem
 
@@ -18,7 +15,7 @@ class PythonToolBase(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(PythonToolBase, cls).register_options(register)
+    super().register_options(register)
     register('--interpreter-constraints', type=list, advanced=True, fingerprint=True,
              default=cls.default_interpreter_constraints,
              help='Python interpreter constraints for this tool. An empty list uses the default '

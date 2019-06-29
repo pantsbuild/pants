@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.subsystems.jvm import JVM
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
@@ -26,11 +23,11 @@ class JvmTask(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JvmTask, cls).subsystem_dependencies() + (JVM.scoped(cls),)
+    return super().subsystem_dependencies() + (JVM.scoped(cls),)
 
   @classmethod
   def register_options(cls, register):
-    super(JvmTask, cls).register_options(register)
+    super().register_options(register)
     register('--confs', type=list, default=['default'],
              help='Use only these Ivy configurations of external deps.')
 
@@ -39,7 +36,7 @@ class JvmTask(Task):
     round_manager.require_data('runtime_classpath')
 
   def __init__(self, *args, **kwargs):
-    super(JvmTask, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.jvm = JVM.scoped_instance(self)
     self.jvm_options = self.jvm.get_jvm_options()
     self.args = self.jvm.get_program_args()

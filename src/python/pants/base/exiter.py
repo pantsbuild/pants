@@ -1,15 +1,9 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import sys
 import traceback
-from builtins import object
-
-from future.utils import PY3
 
 from pants.util.strutil import ensure_binary
 
@@ -23,7 +17,7 @@ PANTS_SUCCEEDED_EXIT_CODE = 0
 PANTS_FAILED_EXIT_CODE = 1
 
 
-class Exiter(object):
+class Exiter:
   """A class that provides standard runtime exit behavior.
 
   `pants.base.exception_sink.ExceptionSink` handles exceptions and fatal signals, delegating to an
@@ -57,7 +51,7 @@ class Exiter(object):
     """
     if msg:
       out = out or sys.stderr
-      if PY3 and hasattr(out, 'buffer'):
+      if hasattr(out, 'buffer'):
         out = out.buffer
 
       msg = ensure_binary(msg)

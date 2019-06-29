@@ -1,18 +1,14 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import inspect
-from builtins import object
+from collections.abc import MutableMapping, MutableSequence
 from functools import update_wrapper
 
 from future.utils import string_types
 
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.objects import Collection, Resolvable, Serializable
-from pants.util.collections_abc_backport import MutableMapping, MutableSequence
 from pants.util.objects import TypeConstraintError
 
 
@@ -38,7 +34,7 @@ class AddressableTypeValidationError(TypeConstraintError):
   """Indicates a value provided to an `AddressableDescriptor` failed to satisfy a type constraint."""
 
 
-class AddressableDescriptor(object):
+class AddressableDescriptor:
   """A data descriptor for fields containing one or more addressable items.
 
   An addressable descriptor has lifecycle expectations tightly coupled with the contract of
@@ -74,7 +70,7 @@ class AddressableDescriptor(object):
 
      >>> class Thing(Struct):
      ...   def __init__(self, thing):
-     ...     super(Thing, self).__init__()
+     ...     super().__init__()
      ...     self.thing = thing
      ...   @property
      ...   def parent(self):
@@ -209,7 +205,7 @@ def _addressable_wrapper(addressable_descriptor, type_constraint):
     #
     # class Thing(Struct):
     #   def __init__(self, thing):
-    #      super(Thing, self).__init__()
+    #      super().__init__()
     #      self.thing = thing
     #
     #   @property

@@ -1,14 +1,11 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import json
 import os
+import subprocess
 import unittest
 
-from pants.util.process_handler import subprocess
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 from pants.contrib.node.subsystems.node_distribution import NodeDistribution

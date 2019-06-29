@@ -1,14 +1,9 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import hashlib
 import os
-from builtins import open
 
-from future.utils import PY3
 from pex.executor import Executor
 from pex.interpreter import PythonInterpreter
 
@@ -37,7 +32,7 @@ class PythonInterpreterFingerprintStrategy(DefaultFingerprintHashingMixin, Finge
     hasher = hashlib.sha1()
     for element in hash_elements_for_target:
       hasher.update(element.encode('utf-8'))
-    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+    return hasher.hexdigest()
 
 
 class SelectInterpreter(Task):
@@ -47,11 +42,11 @@ class SelectInterpreter(Task):
   def implementation_version(cls):
     # TODO(John Sirois): Fixup this task to use VTS results_dirs. Right now version bumps aren't
     # effective in dealing with workdir data format changes.
-    return super(SelectInterpreter, cls).implementation_version() + [('SelectInterpreter', 4)]
+    return super().implementation_version() + [('SelectInterpreter', 4)]
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(SelectInterpreter, cls).subsystem_dependencies() + (PythonInterpreterCache,)
+    return super().subsystem_dependencies() + (PythonInterpreterCache,)
 
   @classmethod
   def product_types(cls):

@@ -1,15 +1,12 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
+import subprocess
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.task.task import Task
-from pants.util.process_handler import subprocess
 
 from pants.contrib.buildrefactor.buildozer_binary import BuildozerBinary
 
@@ -38,7 +35,7 @@ class Buildozer(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(Buildozer, cls).subsystem_dependencies() + (BuildozerBinary.scoped(cls),)
+    return super().subsystem_dependencies() + (BuildozerBinary.scoped(cls),)
 
   @classmethod
   def register_options(cls, register):

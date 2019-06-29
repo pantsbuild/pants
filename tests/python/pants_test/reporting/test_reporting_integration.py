@@ -1,14 +1,10 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import os.path
 import re
 import unittest
-from builtins import open
 from collections import defaultdict
 from http.server import BaseHTTPRequestHandler
 
@@ -244,6 +240,30 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
         '--reporting-zipkin-trace-v2',
         'cloc',
         'src/python/pants:version'
+      ]
+
+      pants_run = self.run_pants(command)
+      self.assert_success(pants_run)
+
+      trace = assert_single_element(ZipkinHandler.traces.values())
+
+      v2_span_name_part = "Scandir"
+      self.assertTrue(any(v2_span_name_part in span['name'] for span in trace),
+        "There is no span that contains '{}' in it's name. The trace:{}".format(
+        v2_span_name_part, trace
+        ))
+
+  def test_zipkin_reports_for_pure_v2_goals(self):
+    ZipkinHandler = zipkin_handler()
+    with http_server(ZipkinHandler) as port:
+      endpoint = "http://localhost:{}".format(port)
+      command = [
+        '--no-v1',
+        '--v2',
+        '--reporting-zipkin-endpoint={}'.format(endpoint),
+        '--reporting-zipkin-trace-v2',
+        'list',
+        '3rdparty:'
       ]
 
       pants_run = self.run_pants(command)

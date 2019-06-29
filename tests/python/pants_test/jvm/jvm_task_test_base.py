@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -22,7 +19,7 @@ class JvmTaskTestBase(TaskTestBase):
     """
     :API: public
     """
-    super(JvmTaskTestBase, self).setUp()
+    super().setUp()
     init_subsystem(JvmResolveSubsystem)
     self.set_options_for_scope('resolver', resolver='ivy')
 

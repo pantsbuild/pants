@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import errno
 import logging
@@ -11,10 +8,8 @@ import signal
 import socket
 import sys
 import time
-from builtins import object, str
 
 import psutil
-from future.utils import PY3
 
 from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, MaybeShutdownSocket, NailgunProtocol
@@ -176,7 +171,7 @@ class NailgunClientSession(NailgunProtocol, NailgunProtocol.TimeoutProvider):
     return self._process_session()
 
 
-class NailgunClient(object):
+class NailgunClient:
   """A python nailgun client (see http://martiansoftware.com/nailgun for more info)."""
 
   class NailgunError(Exception):
@@ -226,8 +221,8 @@ class NailgunClient(object):
   DEFAULT_NG_HOST = '127.0.0.1'
   DEFAULT_NG_PORT = 2113
 
-  def __init__(self, host=DEFAULT_NG_HOST, port=DEFAULT_NG_PORT, ins=sys.stdin, out=None, err=None,
-               workdir=None, exit_on_broken_pipe=False, metadata_base_dir=None):
+  def __init__(self, host=None, port=None, ins=sys.stdin, out=None, err=None,
+               exit_on_broken_pipe=False, metadata_base_dir=None):
     """Creates a nailgun client that can be used to issue zero or more nailgun commands.
 
     :param string host: the nailgun server to contact (defaults to '127.0.0.1')
@@ -237,7 +232,6 @@ class NailgunClient(object):
                      in which case no input is read
     :param file out: a stream to write command standard output to (defaults to stdout)
     :param file err: a stream to write command standard error to (defaults to stderr)
-    :param string workdir: the default working directory for all nailgun commands (defaults to CWD)
     :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are
                                      encountered
     :param string metadata_base_dir: If a PID and PGRP are received from the server (only for
@@ -245,14 +239,13 @@ class NailgunClient(object):
                                      written under this directory. For non-pailgun connections this
                                      may be None.
     """
-    self._host = host
-    self._port = port
-    self._address = (host, port)
+    self._host = host or self.DEFAULT_NG_HOST
+    self._port = port or self.DEFAULT_NG_PORT
+    self._address = (self._host, self._port)
     self._address_string = ':'.join(str(i) for i in self._address)
     self._stdin = ins
-    self._stdout = out or (sys.stdout.buffer if PY3 else sys.stdout)
-    self._stderr = err or (sys.stderr.buffer if PY3 else sys.stderr)
-    self._workdir = workdir or os.path.abspath(os.path.curdir)
+    self._stdout = out or sys.stdout.buffer
+    self._stderr = err or sys.stderr.buffer
     self._exit_on_broken_pipe = exit_on_broken_pipe
     self._metadata_base_dir = metadata_base_dir
     # Mutable session state.
@@ -292,7 +285,9 @@ class NailgunClient(object):
     :returns: a connected `socket.socket`.
     :raises: `NailgunClient.NailgunConnectionError` on failure to connect.
     """
-    sock = RecvBufferedSocket(socket.socket(socket.AF_INET, socket.SOCK_STREAM))
+    sock = RecvBufferedSocket(
+      sock=socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
+    )
     try:
       sock.connect(self._address)
     except (socket.error, socket.gaierror) as e:
@@ -318,6 +313,9 @@ class NailgunClient(object):
     """Send the signal `signum` send if the PID and/or PGRP chunks have been received.
 
     No error is raised if the pid or pgrp are None or point to an already-dead process.
+
+    :param signum: The signal number to send to the remote process.
+    :param include_pgrp: If True, it will try to kill the pgrp as well
     """
     remote_pid = self._maybe_last_pid()
     if remote_pid is not None:
@@ -339,7 +337,7 @@ class NailgunClient(object):
     """
     environment = dict(**environment)
     environment.update(self.ENV_DEFAULTS)
-    cwd = cwd or self._workdir
+    cwd = cwd or os.getcwd()
 
     sock = self.try_connect()
 
@@ -370,6 +368,4 @@ class NailgunClient(object):
       self._session = None
 
   def __repr__(self):
-    return 'NailgunClient(host={!r}, port={!r}, workdir={!r})'.format(self._host,
-                                                                      self._port,
-                                                                      self._workdir)
+    return 'NailgunClient(host={!r}, port={!r})'.format(self._host, self._port)

@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import str
 from collections import defaultdict
 from contextlib import contextmanager
 from functools import reduce
@@ -19,11 +15,11 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
 from pants.util.osutil import get_os_name, normalize_os_name
 from pants_test.java.distribution.test_distribution import EXE, distribution
+from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.task_test_base import TaskTestBase
 
 
-class JavaCompileSettingsPartitioningTest(TaskTestBase):
+class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
 
   @classmethod
   def task_type(cls):

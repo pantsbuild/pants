@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import json
 import os
-from builtins import open
 
 from future.utils import PY3
 from pants.base.exceptions import TaskError
@@ -28,7 +24,7 @@ class NpmResolver(Subsystem, NodeResolverBase):
 
   @classmethod
   def register_options(cls, register):
-    super(NpmResolver, cls).register_options(register)
+    super().register_options(register)
     register(
       '--install-optional', type=bool, default=False, fingerprint=True,
       help='If enabled, install optional dependencies.')

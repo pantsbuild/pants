@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import re
@@ -26,7 +23,7 @@ class JaxbGen(SimpleCodegenTask, NailgunTask):
 
   @classmethod
   def register_options(cls, register):
-    super(JaxbGen, cls).register_options(register)
+    super().register_options(register)
     cls.register_jvm_tool(register,
                           'xjc',
                           classpath=[
@@ -54,7 +51,7 @@ class JaxbGen(SimpleCodegenTask, NailgunTask):
     :param context: inherited parameter from Task
     :param workdir: inherited parameter from Task
     """
-    super(JaxbGen, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.set_distribution(jdk=True)
     self.gen_langs = set()
     lang = 'java'

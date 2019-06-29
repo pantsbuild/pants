@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -20,7 +17,7 @@ class PythonEvalTest(PythonTaskTestBase):
     return PythonEval
 
   def setUp(self):
-    super(PythonEvalTest, self).setUp()
+    super().setUp()
     self._create_graph()
 
   def _create_graph(self, broken_c_library=True):

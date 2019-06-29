@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import object, open, str
 from hashlib import sha1
 
 from pants.base.build_environment import get_buildroot
@@ -18,14 +14,14 @@ class CoercingOptionEncoder(CoercingEncoder):
   def default(self, o):
     if o is UnsetBool:
       return '_UNSET_BOOL_ENCODING'
-    return super(CoercingOptionEncoder, self).default(o)
+    return super().default(o)
 
 
 def stable_option_fingerprint(obj):
   return json_hash(obj, encoder=CoercingOptionEncoder)
 
 
-class OptionsFingerprinter(object):
+class OptionsFingerprinter:
   """Handles fingerprinting options under a given build_graph.
 
   :API: public

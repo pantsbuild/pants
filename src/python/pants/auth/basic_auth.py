@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from collections import namedtuple
 
@@ -20,13 +17,13 @@ class BasicAuthException(Exception):
 class BasicAuthAttemptFailed(BasicAuthException):
   def __init__(self, url, status_code, reason):
     msg = 'Failed to auth against {}. Status code: {}. Reason: {}.'.format(url, status_code, reason)
-    super(BasicAuthAttemptFailed, self).__init__(msg)
+    super().__init__(msg)
     self.url = url
 
 
 class Challenged(BasicAuthAttemptFailed):
   def __init__(self, url, status_code, reason, realm):
-    super(Challenged, self).__init__(url, status_code, reason)
+    super().__init__(url, status_code, reason)
     self.realm = realm
 
 
@@ -38,7 +35,7 @@ class BasicAuth(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(BasicAuth, cls).register_options(register)
+    super().register_options(register)
     register('--providers', advanced=True, type=dict,
              help='Map from provider name to config dict. This dict contains the following items: '
                   '{url: <url of endpoint that accepts basic auth and sets a session cookie>}')
@@ -47,7 +44,7 @@ class BasicAuth(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(BasicAuth, cls).subsystem_dependencies() + (Cookies,)
+    return super().subsystem_dependencies() + (Cookies,)
 
   def authenticate(self, provider, creds=None, cookies=None):
     """Authenticate against the specified provider.

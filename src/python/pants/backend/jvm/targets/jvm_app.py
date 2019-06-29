@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.base.payload import Payload
@@ -30,7 +27,7 @@ class JvmApp(AppBase):
     """
     payload = payload or Payload()
     payload.add_field('deployjar', PrimitiveField(deployjar))
-    super(JvmApp, self).__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, **kwargs)
 
   @classmethod
   def binary_target_type(cls):

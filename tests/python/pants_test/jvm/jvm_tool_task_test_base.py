@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import shutil
@@ -10,6 +7,7 @@ import shutil
 from pants.backend.jvm.register import build_file_aliases
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
+from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_pants_cachedir
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
@@ -36,7 +34,7 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
     """
     :API: public
     """
-    super(JvmToolTaskTestBase, self).setUp()
+    super().setUp()
 
     # Use a synthetic subclass for proper isolation when bootstrapping within the test.
     bootstrap_scope = 'bootstrap_scope'
@@ -60,7 +58,9 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
     # TODO: We really need a straightforward way for pants's own tests to get to the enclosing
     # pants instance's options values.
     artifact_caches = [os.path.join(get_pants_cachedir(), 'artifact_cache')]
-    self.set_options_for_scope(bootstrap_scope, jvm_options=['-Xmx128m'])
+    self.set_options_for_scope(bootstrap_scope,
+                               execution_strategy=NailgunTask.ExecutionStrategy.subprocess,
+                               jvm_options=['-Xmx128m'])
     self.set_options_for_scope('cache.{}'.format(bootstrap_scope),
                                read_from=artifact_caches,
                                write_to=artifact_caches)
@@ -80,7 +80,7 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
     """
     # Add in the bootstrapper task type, so its options get registered and set.
     for_task_types = [self.bootstrap_task_type] + (for_task_types or [])
-    return super(JvmToolTaskTestBase, self).context(for_task_types=for_task_types, **kwargs)
+    return super().context(for_task_types=for_task_types, **kwargs)
 
   def prepare_execute(self, context):
     """Prepares a jvm tool-using task for execution, first bootstrapping any required jvm tools.

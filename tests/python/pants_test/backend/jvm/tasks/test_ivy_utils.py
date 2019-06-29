@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import os
 import xml.etree.ElementTree as ET
-from builtins import open, str
 from collections import namedtuple
 from textwrap import dedent
 
@@ -20,7 +16,6 @@ from pants.backend.jvm.ivy_utils import (FrozenResolution, IvyFetchStep, IvyInfo
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
 from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.ivy.ivy_subsystem import IvySubsystem
@@ -55,7 +50,7 @@ class IvyUtilsTestBase(TestBase):
 class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
   def setUp(self):
-    super(IvyUtilsGenerateIvyTest, self).setUp()
+    super().setUp()
 
     self.add_to_build_file('src/java/targets',
         dedent("""
@@ -401,8 +396,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
   def test_missing_ivy_report(self):
     self.set_options_for_scope(IvySubsystem.options_scope,
-                               cache_dir='DOES_NOT_EXIST',
-                               execution_strategy=NailgunTask.ExecutionStrategy.subprocess)
+                               cache_dir='DOES_NOT_EXIST')
 
     with self.assertRaises(IvyUtils.IvyResolveReportError):
       IvyUtils.parse_xml_report('default', IvyUtils.xml_report_path('INVALID_CACHE_DIR',

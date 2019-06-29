@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import unittest
-from builtins import bytes
 
 from pants.util.strutil import camelcase, ensure_binary, ensure_text, pluralize, strip_prefix
 

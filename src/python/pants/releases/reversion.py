@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import argparse
 import base64
@@ -12,7 +9,6 @@ import hashlib
 import os
 import re
 import zipfile
-from builtins import open, str
 
 from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import read_file, safe_file_dump

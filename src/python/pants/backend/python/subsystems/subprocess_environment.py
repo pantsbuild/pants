@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -18,7 +15,7 @@ class SubprocessEnvironment(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(SubprocessEnvironment, cls).register_options(register)
+    super().register_options(register)
 
     # TODO(#7735): move the --lang and --lc-all flags to a general subprocess support subystem.
     register('--lang',

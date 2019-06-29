@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import json
 import os
-from builtins import open
 
 from future.utils import PY3
 from pants.base.exceptions import TaskError
@@ -25,7 +21,7 @@ class NodeRepl(ReplTaskMixin, NodeTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(NodeRepl, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(NodePaths)
 
   @classmethod

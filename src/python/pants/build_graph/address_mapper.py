@@ -1,21 +1,17 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 from pants.base.specs import SingleAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants.util.meta import AbstractClass
 
 
 logger = logging.getLogger(__name__)
 
 
-class AddressMapper(AbstractClass):
+class AddressMapper(ABC):
   """Maps specs into valid addresses and their associated addressables."""
 
   class AddressNotInBuildFile(AddressLookupError):

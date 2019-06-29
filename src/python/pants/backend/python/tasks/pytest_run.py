@@ -1,9 +1,7 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
+import configparser
 import itertools
 import json
 import os
@@ -11,7 +9,7 @@ import shutil
 import time
 import traceback
 import uuid
-from builtins import open, str
+from collections import OrderedDict
 from contextlib import contextmanager
 from io import StringIO
 from textwrap import dedent
@@ -30,13 +28,11 @@ from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
 from pants.task.task import Task
 from pants.task.testrunner_task_mixin import PartitionedTestRunnerTaskMixin, TestResult
-from pants.util.collections_abc_backport import OrderedDict
 from pants.util.contextutil import environment_as, pushd, temporary_dir, temporary_file
 from pants.util.dirutil import mergetree, safe_mkdir, safe_mkdir_for
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.objects import datatype
 from pants.util.process_handler import SubprocessProcessHandler
-from pants.util.py2_compat import configparser
 from pants.util.strutil import safe_shlex_join, safe_shlex_split
 from pants.util.xml_parser import XmlParser
 
@@ -94,11 +90,11 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
   @classmethod
   def implementation_version(cls):
-    return super(PytestRun, cls).implementation_version() + [('PytestRun', 3)]
+    return super().implementation_version() + [('PytestRun', 3)]
 
   @classmethod
   def register_options(cls, register):
-    super(PytestRun, cls).register_options(register)
+    super().register_options(register)
 
     # NB: We always produce junit xml privately, and if this option is specified, we then copy
     # it to the user-specified directory, post any interaction with the cache to retrieve the
@@ -147,7 +143,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(PytestRun, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(PytestPrep.PytestBinary)
 
   def _test_target_filter(self):

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -19,7 +16,7 @@ class Cookies(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(Cookies, cls).register_options(register)
+    super().register_options(register)
     register('--path', advanced=True, fingerprint=True,
              default=os.path.join(register.bootstrap.pants_bootstrapdir, 'auth', 'cookies'),
              help='Path to file that stores persistent cookies. '

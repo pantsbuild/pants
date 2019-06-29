@@ -1,23 +1,19 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import getpass
 import os
 import re
 import socket
 import time
-from builtins import object, open, str
+from collections import OrderedDict
 
 from pants import version
 from pants.base.build_environment import get_buildroot, get_scm
-from pants.util.collections_abc_backport import OrderedDict
 from pants.util.dirutil import safe_mkdir_for
 
 
-class RunInfo(object):
+class RunInfo:
   """A little plaintext file containing very basic info about a pants run.
 
   Can only be appended to, never edited.

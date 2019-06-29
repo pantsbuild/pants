@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
 import os
-from builtins import str
 from collections import defaultdict
 
 from future.utils import PY2
@@ -136,7 +132,7 @@ def dump_sources(builder, tgt, log):
                     'Depend on resources() targets instead.'.format(tgt.address.spec))
 
 
-class PexBuilderWrapper(object):
+class PexBuilderWrapper:
   """Wraps PEXBuilder to provide an API that consumes targets and other BUILD file entities."""
 
   class Factory(Subsystem):

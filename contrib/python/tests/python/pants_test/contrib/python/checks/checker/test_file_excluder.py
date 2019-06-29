@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import textwrap
@@ -18,7 +15,7 @@ logger = logging.getLogger(__name__)
 class TestExcluder(TestBase):
 
   def setUp(self):
-    super(TestExcluder, self).setUp()
+    super().setUp()
     excludes_text = textwrap.dedent("""
       # ignore C++
       .*\.cpp::.*

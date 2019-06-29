@@ -1,11 +1,7 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
-from builtins import object
 
 from pants.backend.docgen.targets.doc import Page
 from pants.backend.jvm.targets.jvm_app import JvmApp
@@ -231,7 +227,7 @@ class LegacyGraphSession(datatype(['scheduler_session', 'build_file_aliases', 'g
     return graph, address_mapper
 
 
-class EngineInitializer(object):
+class EngineInitializer:
   """Constructs the components necessary to run the v2 engine with v1 BuildGraph compatibility."""
 
   class GoalMappingError(Exception):

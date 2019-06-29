@@ -16,7 +16,6 @@ python_library(
   name = 'dependencies',
   sources = ['dependencies.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
@@ -29,7 +28,6 @@ python_library(
   name = 'depmap',
   sources = ['depmap.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/java/jar',
     'src/python/pants/base:exceptions',
     'src/python/pants/task',
@@ -40,7 +38,6 @@ python_library(
   name = 'export',
   sources = ['export.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/targets:jvm',
@@ -79,7 +76,6 @@ python_library(
   name = 'idea_plugin_gen',
   sources = ['idea_plugin_gen.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':idea_resources',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/python/targets:python',
@@ -90,7 +86,6 @@ python_library(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:desktop',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:process_handler',
   ],
 )
 

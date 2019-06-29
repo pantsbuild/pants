@@ -1,17 +1,14 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import glob
 import os
+import subprocess
 
 from pex.executor import Executor
 from pex.interpreter import PythonInterpreter
 
 from pants.util.contextutil import temporary_dir
-from pants.util.process_handler import subprocess
 from pants_test.backend.python.interpreter_selection_utils import (
   PY_3, PY_27, skip_unless_python3_present, skip_unless_python27_and_python3_present,
   skip_unless_python27_present)

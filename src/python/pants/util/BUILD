@@ -20,25 +20,11 @@ python_library(
 python_library(
   name = 'collections',
   sources = ['collections.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
-)
-
-python_library(
-  name = 'collections_abc_backport',
-  sources = ['collections_abc_backport.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
 )
 
 python_library(
   name = 'debug',
   sources = ['debug.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ],
 )
 
 python_library(
@@ -46,7 +32,6 @@ python_library(
   sources = ['desktop.py'],
   dependencies = [
     ':osutil',
-    ':process_handler',
   ],
 )
 
@@ -72,7 +57,6 @@ python_library(
   name = 'fileutil',
   sources = ['fileutil.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':contextutil',
   ],
 )
@@ -96,17 +80,11 @@ python_library(
 python_library(
   name = 'meta',
   sources = ['meta.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
 )
 
 python_library(
   name = 'netrc',
   sources = ['netrc.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
 )
 
 python_library(
@@ -115,7 +93,6 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:future',
-    ':collections_abc_backport',
     ':strutil',
     ':memo',
     ':meta',
@@ -133,35 +110,17 @@ python_library(
 python_library(
   name = 'process_handler',
   sources = ['process_handler.py'],
-  dependencies= [
-    '3rdparty/python:future',
-    '3rdparty/python:subprocess32',
-    ':meta',
-  ]
-)
-
-python_library(
-  name = 'py2_compat',
-  sources = ['py2_compat.py'],
-  dependencies= [
-    '3rdparty/python:future',
-    '3rdparty/python:configparser',
-  ]
 )
 
 python_library(
   name = 'retry',
   sources = ['retry.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
 )
 
 python_library(
   name = 'rwbuf',
   sources = ['rwbuf.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:six',
   ]
 )
@@ -170,7 +129,6 @@ python_library(
   name = 's3_log_aggregator',
   sources = ['s3_log_aggregator.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:s3logparse'
   ]
 )
@@ -186,9 +144,6 @@ python_binary(
 python_library(
   name = 'socket',
   sources = ['socket.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
 )
 
 python_library(
@@ -203,7 +158,6 @@ python_library(
   name = 'tarutil',
   sources = ['tarutil.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:six',
   ],
 )

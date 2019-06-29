@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 
@@ -71,7 +68,7 @@ class UnpackedWheels(ImportWheelsMixin, Target):
       # TODO: consider supporting transitive deps like UnpackedJars!
       # TODO: consider supporting `platforms` as in PythonBinary!
     })
-    super(UnpackedWheels, self).__init__(payload=payload, **kwargs)
+    super().__init__(payload=payload, **kwargs)
 
     if not libraries:
       raise self.ExpectedLibrariesError('Expected non-empty libraries attribute for {spec}'

@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import object
 from collections import namedtuple
 
 import six
@@ -18,7 +14,7 @@ from pants.util.memo import memoized_method
 from pants.util.strutil import ensure_binary
 
 
-class ToolOutputFormat(object):
+class ToolOutputFormat:
   """Configuration item for displaying Tool Output to the console."""
 
   SUPPRESS =   'SUPPRESS'    # Do not display output from the workunit unless its outcome != SUCCESS
@@ -31,7 +27,7 @@ class ToolOutputFormat(object):
     return [key for key in dir(cls) if not key.startswith('_') and key.isupper()]
 
 
-class LabelFormat(object):
+class LabelFormat:
   """Configuration item for displaying a workunit label to the console."""
 
   SUPPRESS = 'SUPPRESS'              # Don't show the label at all
@@ -93,7 +89,7 @@ class PlainTextReporter(PlainTextReporterBase):
   }
 
   def __init__(self, run_tracker, settings):
-    super(PlainTextReporter, self).__init__(run_tracker, settings)
+    super().__init__(run_tracker, settings)
 
     # We eagerly validate that our output accepts raw bytes.
     settings.outfile.write(b'')

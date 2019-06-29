@@ -6,7 +6,6 @@ python_library(
   dependencies=[
     'contrib/go/src/python/pants/contrib/go:plugin',
     'src/python/pants/build_graph',
-    'src/python/pants/util:meta',
     'tests/python/pants_test:test_base',
   ]
 )

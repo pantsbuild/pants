@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import fnmatch
 import os
-from builtins import object
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
@@ -21,7 +17,7 @@ class Test(datatype(['classname', 'methodname'])):
 
   def __new__(cls, classname, methodname=None):
     # We deliberately normalize an empty methodname ('') to None.
-    return super(Test, cls).__new__(cls, classname, methodname or None)
+    return super().__new__(cls, classname, methodname or None)
 
   def enclosing(self):
     """Return a test representing all the tests in this test's enclosing class.
@@ -44,7 +40,7 @@ class Test(datatype(['classname', 'methodname'])):
       return '{}#{}'.format(self.classname, self.methodname)
 
 
-class RegistryOfTests(object):
+class RegistryOfTests:
   """A registry of tests and the targets that own them."""
 
   def __init__(self, mapping_or_seq):
@@ -132,7 +128,7 @@ class ParseError(Exception):
   """Indicates an error parsing a junit xml report file."""
 
   def __init__(self, xml_path, cause):
-    super(ParseError, self).__init__('Error parsing test result file {}: {}'
+    super().__init__('Error parsing test result file {}: {}'
                                      .format(xml_path, cause))
     self._xml_path = xml_path
     self._cause = cause

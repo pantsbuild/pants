@@ -1,21 +1,15 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import re
-from builtins import open, str
-
-import mock
+import unittest.mock
 
 from pants.base.exception_sink import ExceptionSink
 from pants.util.contextutil import temporary_dir
 from pants.util.osutil import get_normalized_os_name
 from pants_test.test_base import TestBase
-from pants_test.testutils.py2_compat import assertRegex
 
 
 class TestExceptionSink(TestBase):
@@ -73,7 +67,7 @@ class TestExceptionSink(TestBase):
       # Check that tmpdir exists, and log an exception into that directory.
       sink.reset_log_location(tmpdir)
 
-      with mock.patch('setproctitle.getproctitle', autospec=True, spec_set=True) \
+      with unittest.mock.patch('setproctitle.getproctitle', autospec=True, spec_set=True) \
            as getproctitle_mock:
         getproctitle_mock.return_value = fake_process_title
         sink.log_exception(msg)
@@ -101,16 +95,16 @@ pid: {pid}
            pid=pid,
            msg=msg)
       with open(cur_process_error_log_path, 'r') as cur_pid_file:
-        assertRegex(self, cur_pid_file.read(), err_rx)
+        self.assertRegex(cur_pid_file.read(), err_rx)
       with open(shared_error_log_path, 'r') as shared_log_file:
-        assertRegex(self, shared_log_file.read(), err_rx)
+        self.assertRegex(shared_log_file.read(), err_rx)
 
   def test_backup_logging_on_fatal_error(self):
     sink = self._gen_sink_subclass()
     with self.captured_logging(level=logging.ERROR) as captured:
       with temporary_dir() as tmpdir:
         sink.reset_log_location(tmpdir)
-        with mock.patch.object(sink, '_try_write_with_flush', autospec=sink) as mock_write:
+        with unittest.mock.patch.object(sink, '_try_write_with_flush', autospec=sink) as mock_write:
           mock_write.side_effect = ExceptionSink.ExceptionSinkError('fake write failure')
           sink.log_exception('XXX')
     errors = list(captured.errors())
@@ -124,5 +118,5 @@ pid: {pid}
         "\nfake write failure",
       ])
 
-    assertRegex(self, str(errors[0]), format_log_rx('pid-specific'))
-    assertRegex(self, str(errors[1]), format_log_rx('shared'))
+    self.assertRegex(str(errors[0]), format_log_rx('pid-specific'))
+    self.assertRegex(str(errors[1]), format_log_rx('shared'))

@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 
@@ -26,7 +23,7 @@ class AvroJavaGenTask(SimpleCodegenTask, NailgunTask):
 
   @classmethod
   def register_options(cls, register):
-    super(AvroJavaGenTask, cls).register_options(register)
+    super().register_options(register)
     # pylint: disable=no-member
     cls.register_jvm_tool(register,
                           'avro-tools',
@@ -36,7 +33,7 @@ class AvroJavaGenTask(SimpleCodegenTask, NailgunTask):
              help='A list of specs pointing to dependencies of Avro generated code.')
 
   def __init__(self, *args, **kwargs):
-    super(AvroJavaGenTask, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
   @memoized_property
   def avro_runtime_deps(self):

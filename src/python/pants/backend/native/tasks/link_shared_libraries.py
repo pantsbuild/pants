@@ -1,10 +1,8 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
+import subprocess
 
 from pants.backend.native.config.environment import Linker, Platform
 from pants.backend.native.targets.native_artifact import NativeArtifact
@@ -16,7 +14,6 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
-from pants.util.process_handler import subprocess
 
 
 class SharedLibrary(datatype(['name', 'path'])): pass
@@ -43,7 +40,7 @@ class LinkSharedLibraries(NativeTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(LinkSharedLibraries, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require(ObjectFiles)
 
   @property
@@ -52,7 +49,7 @@ class LinkSharedLibraries(NativeTask):
 
   @classmethod
   def implementation_version(cls):
-    return super(LinkSharedLibraries, cls).implementation_version() + [('LinkSharedLibraries', 1)]
+    return super().implementation_version() + [('LinkSharedLibraries', 1)]
 
   class LinkSharedLibrariesError(TaskError): pass
 

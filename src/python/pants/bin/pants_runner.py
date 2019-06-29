@@ -1,14 +1,10 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
 import sys
 import warnings
-from builtins import object
 
 from pants.base.exception_sink import ExceptionSink
 from pants.bin.remote_pants_runner import RemotePantsRunner
@@ -19,7 +15,7 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 logger = logging.getLogger(__name__)
 
 
-class PantsRunner(object):
+class PantsRunner:
   """A higher-level runner that delegates runs to either a LocalPantsRunner or RemotePantsRunner."""
 
   def __init__(self, exiter, args=None, env=None, start_time=None):
@@ -46,6 +42,12 @@ class PantsRunner(object):
     init_rust_logger(levelname, global_bootstrap_options.log_show_rust_3rdparty)
     setup_logging_to_stderr(logging.getLogger(None), levelname)
 
+  def _should_run_with_pantsd(self, global_bootstrap_options):
+    # If we want concurrent pants runs, we can't have pantsd enabled.
+    return global_bootstrap_options.enable_pantsd and \
+           not self.will_terminate_pantsd() and \
+           not global_bootstrap_options.concurrent
+
   def run(self):
     # Register our exiter at the beginning of the run() method so that any code in this process from
     # this point onwards will use that exiter in the case of a fatal error.
@@ -66,7 +68,7 @@ class PantsRunner(object):
       warnings.filterwarnings(action='ignore', message=message_regexp)
 
     # TODO https://github.com/pantsbuild/pants/issues/7205
-    if global_bootstrap_options.enable_pantsd and not self.will_terminate_pantsd():
+    if self._should_run_with_pantsd(global_bootstrap_options):
       try:
         return RemotePantsRunner(self._exiter, self._args, self._env, options_bootstrapper).run()
       except RemotePantsRunner.Fallback as e:

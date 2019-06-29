@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from twitter.common.collections import OrderedDict
 
@@ -26,7 +23,7 @@ class TestBuildLocalDistsWithCtypesNativeSources(BuildLocalPythonDistributionsTe
       CCompile,
       CppCompile,
       LinkSharedLibraries,
-    ] + super(TestBuildLocalDistsWithCtypesNativeSources, cls).run_before_task_types
+    ] + super().run_before_task_types
 
   dist_specs = OrderedDict([
 

@@ -1,15 +1,11 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from abc import abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 
 from pants.engine.rules import rule
 from pants.util.memo import memoized_classproperty
-from pants.util.meta import AbstractClass
 from pants.util.objects import datatype, enum
 from pants.util.osutil import all_normalized_os_names, get_normalized_os_name
 from pants.util.strutil import create_path_env_var
@@ -23,14 +19,10 @@ class Platform(enum(all_normalized_os_names())):
     return cls(get_normalized_os_name())
 
 
-def _list_field(func):
-  """A decorator for methods corresponding to list-valued fields of an `ExtensibleAlgebraic`.
-
-  The result is also wrapped in `abstractproperty`.
-  """
-  wrapped = abstractproperty(func)
-  wrapped._field_type = 'list'
-  return wrapped
+class _list_field(property):
+  """A decorator for methods corresponding to list-valued fields of an `ExtensibleAlgebraic`."""
+  __isabstractmethod__ = True
+  _field_type = 'list'
 
 
 def _algebraic_data(metaclass):
@@ -45,7 +37,7 @@ def _algebraic_data(metaclass):
 # NB: prototypal inheritance seems *deeply* linked with the idea here!
 # TODO: since we are calling these methods from other files, we should remove the leading underscore
 # and add testing!
-class _ExtensibleAlgebraic(AbstractClass):
+class _ExtensibleAlgebraic(ABC):
   """A mixin to make it more concise to coalesce datatypes with related collection fields."""
 
   @memoized_classproperty
@@ -133,7 +125,8 @@ class _Executable(_ExtensibleAlgebraic):
     :rtype: list of str
     """
 
-  @abstractproperty
+  @property
+  @abstractmethod
   def exe_filename(self):
     """The "entry point" -- which file to invoke when PATH is set to `path_entries()`.
 
@@ -264,7 +257,7 @@ class CCompiler(datatype([
 
   @property
   def invocation_environment_dict(self):
-    ret = super(CCompiler, self).invocation_environment_dict.copy()
+    ret = super().invocation_environment_dict.copy()
 
     ret['CC'] = self.exe_filename
 
@@ -282,7 +275,7 @@ class CppCompiler(datatype([
 
   @property
   def invocation_environment_dict(self):
-    ret = super(CppCompiler, self).invocation_environment_dict.copy()
+    ret = super().invocation_environment_dict.copy()
 
     ret['CXX'] = self.exe_filename
 

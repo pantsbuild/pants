@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 from contextlib import contextmanager
@@ -20,7 +17,7 @@ class JaxWsGenTest(PantsRunIntegrationTest):
     return True
 
   def setUp(self):
-    super(JaxWsGenTest, self).setUp()
+    super().setUp()
     self.full_config = {
       'GLOBAL': {
         'pythonpath': ["%(buildroot)s/contrib/jax_ws/src/python"],

@@ -1,14 +1,10 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
+import unittest.mock
 import warnings
-from builtins import object, str
 from contextlib import contextmanager
 
-import mock
 from packaging.version import Version
 
 from pants.base.deprecated import (BadDecoratorNestingError, BadSemanticVersionError,
@@ -55,7 +51,7 @@ class DeprecatedTest(TestBase):
   def test_deprecated_method(self):
     expected_return = 'deprecated_method'
 
-    class Test(object):
+    class Test:
       @deprecated(self.FUTURE_VERSION)
       def deprecated_method(self):
         return expected_return
@@ -76,7 +72,7 @@ class DeprecatedTest(TestBase):
   def test_deprecated_property(self):
     expected_return = 'deprecated_property'
 
-    class Test(object):
+    class Test:
       @property
       @deprecated(self.FUTURE_VERSION)
       def deprecated_property(self):
@@ -157,7 +153,7 @@ class DeprecatedTest(TestBase):
       def test_func1a():
         pass
 
-  @mock.patch('pants.base.deprecated.PANTS_SEMVER', Version(_FAKE_CUR_VERSION))
+  @unittest.mock.patch('pants.base.deprecated.PANTS_SEMVER', Version(_FAKE_CUR_VERSION))
   def test_removal_version_same(self):
     with self.assertRaises(CodeRemovedError):
       warn_or_error(_FAKE_CUR_VERSION, 'dummy description')
@@ -180,7 +176,7 @@ class DeprecatedTest(TestBase):
 
   def test_bad_decorator_nesting(self):
     with self.assertRaises(BadDecoratorNestingError):
-      class Test(object):
+      class Test:
         @deprecated(self.FUTURE_VERSION)
         @property
         def test_prop(this):
@@ -197,7 +193,7 @@ class DeprecatedTest(TestBase):
                     deprecated_entity_description='dummy',
                     deprecation_start_version='1.0.0.dev0')
 
-  @mock.patch('pants.base.deprecated.PANTS_SEMVER', Version(_FAKE_CUR_VERSION))
+  @unittest.mock.patch('pants.base.deprecated.PANTS_SEMVER', Version(_FAKE_CUR_VERSION))
   def test_deprecation_start_period(self):
     with self.assertRaises(CodeRemovedError):
       warn_or_error(removal_version=_FAKE_CUR_VERSION,

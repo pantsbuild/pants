@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import time
@@ -21,7 +18,7 @@ class GoCompileTest(TaskTestBase):
     return GoCompile
 
   def setUp(self):
-    super(GoCompileTest, self).setUp()
+    super().setUp()
     self.go_compile = self.create_task(self.context())
 
   def _create_binary(self, target):

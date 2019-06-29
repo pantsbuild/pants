@@ -1,13 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import copy
 import re
 import sys
-from builtins import object, open, str
 
 from future.utils import text_type
 
@@ -35,7 +31,7 @@ def make_flag_regex(long_name, short_name=None):
   return re.compile(rx_str)
 
 
-class Options(object):
+class Options:
   """The outward-facing API for interacting with options.
 
   Supports option registration and fetching option values.

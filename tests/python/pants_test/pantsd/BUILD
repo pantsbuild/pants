@@ -4,7 +4,6 @@
 target(
   name = 'test_deps',
   dependencies = [
-    '3rdparty/python:mock',
     'tests/python/pants_test:test_base'
   ]
 )
@@ -16,7 +15,6 @@ python_tests(
   dependencies = [
     ':test_deps',
     'src/python/pants/pantsd:process_manager',
-    'src/python/pants/util:process_handler',
   ]
 )
 
@@ -80,11 +78,9 @@ python_tests(
   name = 'pantsd_integration',
   sources = ['test_pantsd_integration.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':pantsd_integration_test_base',
     'tests/python/pants_test:int-test',
     'tests/python/pants_test/testutils:process_test_util',
-    'tests/python/pants_test/testutils:py2_compat',
   ],
   tags = {'integration'},
   timeout = 900

@@ -1,12 +1,10 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import glob
 import os
 import re
+import subprocess
 import sys
 from functools import wraps
 from unittest import skipIf
@@ -18,7 +16,6 @@ from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import is_executable, read_file, safe_file_dump
-from pants.util.process_handler import subprocess
 from pants_test.backend.python.tasks.python_task_test_base import name_and_platform
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 

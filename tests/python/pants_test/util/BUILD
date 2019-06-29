@@ -15,7 +15,6 @@ python_tests(
   sources = ['test_collections.py'],
   coverage = ['pants.util.collections'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:collections',
   ]
 )
@@ -26,9 +25,7 @@ python_tests(
   coverage = ['pants.util.contextutil'],
   dependencies = [
     '3rdparty/python:future',
-    '3rdparty/python:mock',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
   ]
 )
 
@@ -37,8 +34,6 @@ python_tests(
   sources = ['test_dirutil.py'],
   coverage = ['pants.util.dirutil'],
   dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python:mock',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:objects',
@@ -58,8 +53,6 @@ python_tests(
   name = 'fileutil',
   sources = ['test_fileutil.py'],
   dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python:mock',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:fileutil',
   ]
@@ -77,7 +70,6 @@ python_tests(
   name = 'memo',
   sources = ['test_memo.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
   ]
@@ -87,7 +79,6 @@ python_tests(
   name = 'meta',
   sources = ['test_meta.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:meta',
     'tests/python/pants_test:test_base',
   ]
@@ -98,7 +89,6 @@ python_tests(
   sources = ['test_netrc.py'],
   dependencies = [
     '3rdparty/python:future',
-    '3rdparty/python:mock',
     'src/python/pants/util:netrc',
   ]
 )
@@ -136,7 +126,6 @@ python_tests(
   name = 'retry',
   sources = ['test_retry.py'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/util:retry',
   ]
 )
@@ -155,7 +144,6 @@ python_tests(
   sources = ['test_socket.py'],
   coverage = ['pants.util.socket'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/util:socket',
   ]
 )
@@ -164,7 +152,6 @@ python_tests(
   name = 'strutil',
   sources = ['test_strutil.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:strutil',
   ]
 )
@@ -173,7 +160,6 @@ python_tests(
   name = 'tarutil',
   sources = ['test_tarutil.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:tarutil',
   ]

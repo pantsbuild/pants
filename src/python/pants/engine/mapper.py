@@ -1,14 +1,11 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import re
+from collections import OrderedDict
 
 from pants.build_graph.address import BuildFileAddress
 from pants.engine.objects import Serializable
-from pants.util.collections_abc_backport import OrderedDict
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
 
@@ -181,7 +178,7 @@ class AddressMapper(datatype([
     build_ignore_patterns = tuple(build_ignore_patterns or [])
     exclude_target_regexps = tuple(exclude_target_regexps or [])
     subproject_roots = tuple(subproject_roots or [])
-    return super(AddressMapper, cls).__new__(
+    return super().__new__(
         cls,
         parser,
         build_patterns,

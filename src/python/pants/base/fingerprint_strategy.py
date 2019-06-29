@@ -1,20 +1,14 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
-from abc import abstractmethod
-from builtins import object
-
-from pants.util.meta import AbstractClass
+from abc import ABC, abstractmethod
 
 
 logger = logging.getLogger(__name__)
 
 
-class DefaultFingerprintHashingMixin(object):
+class DefaultFingerprintHashingMixin:
   """Default definitions for __hash__ and __eq__.
 
   Warning: Don't use this when the mixed in class has instance attributes mixed into its
@@ -28,7 +22,7 @@ class DefaultFingerprintHashingMixin(object):
     return type(self) == type(other)
 
 
-class FingerprintStrategy(AbstractClass):
+class FingerprintStrategy(ABC):
   """A helper object for doing per-task, finer grained invalidation of Targets."""
 
   @abstractmethod

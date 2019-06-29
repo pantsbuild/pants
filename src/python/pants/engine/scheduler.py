@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import multiprocessing
@@ -10,7 +7,6 @@ import os
 import sys
 import time
 import traceback
-from builtins import object, open, str, zip
 from textwrap import dedent
 from types import GeneratorType
 
@@ -47,11 +43,11 @@ class ExecutionRequest(datatype(['roots', 'native'])):
 
 class ExecutionError(Exception):
   def __init__(self, message, wrapped_exceptions=None):
-    super(ExecutionError, self).__init__(message)
+    super().__init__(message)
     self.wrapped_exceptions = wrapped_exceptions or ()
 
 
-class Scheduler(object):
+class Scheduler:
   def __init__(
     self,
     native,
@@ -359,7 +355,7 @@ _DirectoryDigests = Collection.of(Digest)
 _DirectoriesToMaterialize = Collection.of(DirectoryToMaterialize)
 
 
-class SchedulerSession(object):
+class SchedulerSession:
   """A handle to a shared underlying Scheduler and a unique Session.
 
   Generally a Session corresponds to a single run of pants: some metrics are specific to

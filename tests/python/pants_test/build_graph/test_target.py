@@ -1,15 +1,9 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os.path
-from builtins import range, str
+import unittest.mock
 from hashlib import sha1
-
-import mock
-from future.utils import PY3
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
@@ -39,7 +33,7 @@ class SourcesTarget(Target):
                                                            sources_rel_path=address.spec_path,
                                                            key_arg='sources'))
     payload.add_field('exports', PrimitivesSetField(exports or []))
-    super(SourcesTarget, self).__init__(address=address, payload=payload, **kwargs)
+    super().__init__(address=address, payload=payload, **kwargs)
 
   @property
   def export_specs(self):
@@ -157,17 +151,16 @@ class TargetTest(TestBase):
     # No key_arg.
     with self.assertRaises(TargetDefinitionException) as cm:
       target.create_sources_field(sources='a-string', sources_rel_path='')
-    self.assertIn("Expected a glob, an address or a list, but was {}"
-                  .format('<class \'str\'>' if PY3 else '<type \'unicode\'>'),
-                  str(cm.exception))
+    self.assertIn("Expected a glob, an address or a list, but was <class 'str'>", str(cm.exception))
 
     # With key_arg.
     with self.assertRaises(TargetDefinitionException) as cm:
       target.create_sources_field(sources='a-string', sources_rel_path='', key_arg='my_cool_field')
-    self.assertIn("Expected 'my_cool_field' to be a glob, an address or a list, but was {}"
-                  .format('<class \'str\'>' if PY3 else '<type \'unicode\'>'),
-                  str(cm.exception))
-    #could also test address case, but looks like nothing really uses it.
+    self.assertIn(
+      "Expected 'my_cool_field' to be a glob, an address or a list, but was <class 'str'>",
+      str(cm.exception)
+    )
+    # could also test address case, but looks like nothing really uses it.
 
   def test_max_recursion(self):
     target_a = self.make_target('a', Target)
@@ -294,7 +287,7 @@ class TargetTest(TestBase):
 
   def test_strict_dependencies(self):
     self._generate_strict_dependencies()
-    dep_context = mock.Mock()
+    dep_context = unittest.mock.Mock()
     dep_context.types_with_closure = ()
     dep_context.codegen_types = ()
     dep_context.alias_types = (Target,)

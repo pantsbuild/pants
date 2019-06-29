@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import logging
 import os
@@ -14,7 +11,6 @@ import threading
 import time
 import uuid
 import zipfile
-from builtins import object, open
 from contextlib import closing, contextmanager
 
 from colors import green
@@ -79,10 +75,10 @@ def _copy_and_decode_env(env):
 
 
 def _purge_env():
-  # N.B. Without the use of `del` here (which calls `os.unsetenv` under the hood), subprocess32
+  # N.B. Without the use of `del` here (which calls `os.unsetenv` under the hood), subprocess
   # invokes or other things that may access the environment at the C level may not see the
   # correct env vars (i.e. we can't just replace os.environ with an empty dict).
-  # See https://docs.python.org/2/library/os.html#os.unsetenv for more info.
+  # See https://docs.python.org/3/library/os.html#os.unsetenv for more info.
   #
   # Wraps iterable in list() to make a copy and avoid issues with deleting while iterating.
   for k in list(os.environ.keys()):
@@ -145,7 +141,7 @@ def stdio_as(stdout_fd, stderr_fd, stdin_fd):
   impossible for this method to locate all python objects which refer to those fds, so it's up
   to the caller to guarantee that `0, 1, 2` are safe to replace.
 
-  In Python3, the streams expect unicode. To write and read bytes, access their buffer, e.g. `stdin.buffer.read()`.
+  The streams expect unicode. To write and read bytes, access their buffer, e.g. `stdin.buffer.read()`.
   """
   with _stdio_stream_as(stdin_fd,  0, 'stdin',  'r'),\
        _stdio_stream_as(stdout_fd, 1, 'stdout', 'w'),\
@@ -312,7 +308,7 @@ def open_tar(path_or_file, *args, **kwargs):
     yield tar
 
 
-class Timer(object):
+class Timer:
   """Very basic with-context to time operations
 
   Example usage:

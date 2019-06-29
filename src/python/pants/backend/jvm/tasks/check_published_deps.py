@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -16,12 +13,12 @@ class CheckPublishedDeps(ConsoleTask):
 
   @classmethod
   def register_options(cls, register):
-    super(CheckPublishedDeps, cls).register_options(register)
+    super().register_options(register)
     register('--print-uptodate', type=bool,
              help='Print up-to-date dependencies.')
 
   def __init__(self, *args, **kwargs):
-    super(CheckPublishedDeps, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     self._print_uptodate = self.get_options().print_uptodate
     # We look at the repos for the JarPublish task.

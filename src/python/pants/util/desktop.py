@@ -1,11 +1,9 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
+import subprocess
 
 from pants.util.osutil import get_os_name
-from pants.util.process_handler import subprocess
 
 
 class OpenError(Exception):

@@ -1,10 +1,6 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from builtins import next, object
 
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
                                                                     JarDependencyManagementSetup)
@@ -288,7 +284,7 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
       'jar_library': JarLibrary,
     }
 
-    class FakeContext(object):
+    class FakeContext:
       def create_object(fake, target_type, name, **kwargs):
         return self.make_target(target_type=target_aliases[target_type],
                                 spec='//foo:{}'.format(name), **kwargs)

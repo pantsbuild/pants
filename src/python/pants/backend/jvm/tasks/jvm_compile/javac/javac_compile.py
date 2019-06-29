@@ -1,12 +1,9 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
 import os
-from builtins import str
+import subprocess
 
 from future.utils import text_type
 
@@ -22,7 +19,6 @@ from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.dirutil import fast_relpath, safe_walk
 from pants.util.meta import classproperty
-from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)
@@ -56,22 +52,22 @@ class JavacCompile(JvmCompile):
 
   @classmethod
   def register_options(cls, register):
-    super(JavacCompile, cls).register_options(register)
+    super().register_options(register)
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JavacCompile, cls).subsystem_dependencies() + (JvmPlatform,)
+    return super().subsystem_dependencies() + (JvmPlatform,)
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JavacCompile, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
 
   @classmethod
   def product_types(cls):
     return ['runtime_classpath']
 
   def __init__(self, *args, **kwargs):
-    super(JavacCompile, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.set_distribution(jdk=True)
 
     if self.get_options().use_classpath_jars:
@@ -176,7 +172,9 @@ class JavacCompile(JvmCompile):
           if return_code:
             raise TaskError('javac exited with return code {rc}'.format(rc=return_code))
         self.context._scheduler.materialize_directories((
-          DirectoryToMaterialize(text_type(ctx.classes_dir.path), self.extra_resources_digest(ctx)),
+          DirectoryToMaterialize(
+            text_type(ctx.classes_dir.path),
+            self.post_compile_extra_resources_digest(ctx, prepend_post_merge_relative_path=False)),
         ))
 
     self._create_context_jar(ctx)
@@ -236,7 +234,7 @@ class JavacCompile(JvmCompile):
     # Dump the output to the .pants.d directory where it's expected by downstream tasks.
     merged_directories = self.context._scheduler.merge_directories([
         exec_result.output_directory_digest,
-        self.extra_resources_digest(ctx),
+        self.post_compile_extra_resources_digest(ctx, prepend_post_merge_relative_path=False),
       ])
     classes_directory = ctx.classes_dir.path
     self.context._scheduler.materialize_directories((

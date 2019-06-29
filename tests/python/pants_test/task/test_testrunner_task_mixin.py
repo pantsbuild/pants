@@ -1,28 +1,24 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import collections
 import os
-from builtins import next, object, open
+import subprocess
 from contextlib import contextmanager
 from unittest import TestCase
+from unittest.mock import Mock, patch
 from xml.etree.ElementTree import ParseError
-
-from mock import Mock, patch
 
 from pants.base.exceptions import ErrorWhileTesting
 from pants.task.task import TaskBase
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
-from pants.util.process_handler import ProcessHandler, subprocess
+from pants.util.process_handler import ProcessHandler
 from pants_test.task_test_base import TaskTestBase
 
 
-class DummyTestTarget(object):
+class DummyTestTarget:
   def __init__(self, name, timeout=None):
     self.name = name
     self.timeout = timeout
@@ -384,7 +380,7 @@ class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):
   def _raise_handler(e):
     raise e
 
-  class CollectHandler(object):
+  class CollectHandler:
     def __init__(self):
       self._errors = []
 

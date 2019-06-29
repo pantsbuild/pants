@@ -1,14 +1,10 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import shutil
 import tempfile
-from abc import abstractmethod
-from builtins import bytes, object, open
+from abc import ABC, abstractmethod
 from contextlib import contextmanager
 
 from future.utils import iteritems, string_types
@@ -25,10 +21,9 @@ from pants.java.jar.manifest import Manifest
 from pants.java.util import relativize_classpath
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdtemp
-from pants.util.meta import AbstractClass
 
 
-class Jar(object):
+class Jar:
   """Encapsulates operations to build up or update a jar file.
 
   Upon construction the jar is conceptually opened for writes.  The write methods are called to
@@ -41,7 +36,7 @@ class Jar(object):
   class Error(Exception):
     """Indicates an error creating or updating a jar on disk."""
 
-  class Entry(AbstractClass):
+  class Entry(ABC):
     """An entry to be written to a jar."""
 
     def __init__(self, dest):
@@ -279,11 +274,11 @@ class JarTask(NailgunTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JarTask, cls).subsystem_dependencies() + (JarTool,)
+    return super().subsystem_dependencies() + (JarTool,)
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JarTask, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     JarTool.prepare_tools(round_manager)
 
   @staticmethod
@@ -306,7 +301,7 @@ class JarTask(NailgunTask):
     return name
 
   def __init__(self, *args, **kwargs):
-    super(JarTask, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.set_distribution(jdk=True)
     # TODO(John Sirois): Consider poking a hole for custom jar-tool jvm args - namely for Xmx
     # control.
@@ -363,7 +358,7 @@ class JarTask(NailgunTask):
 
 class JarBuilderTask(JarTask):
 
-  class JarBuilder(AbstractClass):
+  class JarBuilder(ABC):
     """A utility to aid in adding the classes and resources associated with targets to a jar.
 
     :API: public
@@ -483,7 +478,7 @@ class JarBuilderTask(JarTask):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JarBuilderTask, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     cls.JarBuilder.prepare(round_manager)
 
   @contextmanager

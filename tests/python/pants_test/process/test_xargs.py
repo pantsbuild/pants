@@ -1,21 +1,17 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import errno
 import os
 import unittest
-
-import mock
+import unittest.mock
 
 from pants.process.xargs import Xargs
 
 
 class XargsTest(unittest.TestCase):
   def setUp(self):
-    self.call = mock.Mock()
+    self.call = unittest.mock.Mock()
     self.xargs = Xargs(self.call)
 
   def test_execute_nosplit_success(self):
@@ -49,9 +45,9 @@ class XargsTest(unittest.TestCase):
 
     self.assertEqual(0, self.xargs.execute(['one', 'two', 'three', 'four']))
 
-    self.assertEqual([mock.call(['one', 'two', 'three', 'four']),
-                      mock.call(['one', 'two']),
-                      mock.call(['three', 'four'])],
+    self.assertEqual([unittest.mock.call(['one', 'two', 'three', 'four']),
+                      unittest.mock.call(['one', 'two']),
+                      unittest.mock.call(['three', 'four'])],
                      self.call.mock_calls)
 
   def test_execute_uneven(self):
@@ -60,10 +56,10 @@ class XargsTest(unittest.TestCase):
     self.assertEqual(0, self.xargs.execute(['one', 'two', 'three']))
 
     self.assertEqual(3, self.call.call_count)
-    self.assertEqual(mock.call(['one', 'two', 'three']),
+    self.assertEqual(unittest.mock.call(['one', 'two', 'three']),
                      self.call.mock_calls[0])
 
-    self.assertEqual(sorted((mock.call(['one']), mock.call(['two', 'three']))),
+    self.assertEqual(sorted((unittest.mock.call(['one']), unittest.mock.call(['two', 'three']))),
                      sorted(self.call.mock_calls[1:]))
 
   def test_execute_split_multirecurse(self):
@@ -71,11 +67,11 @@ class XargsTest(unittest.TestCase):
 
     self.assertEqual(0, self.xargs.execute(['one', 'two', 'three', 'four']))
 
-    self.assertEqual([mock.call(['one', 'two', 'three', 'four']),
-                      mock.call(['one', 'two']),
-                      mock.call(['one']),
-                      mock.call(['two']),
-                      mock.call(['three', 'four'])],
+    self.assertEqual([unittest.mock.call(['one', 'two', 'three', 'four']),
+                      unittest.mock.call(['one', 'two']),
+                      unittest.mock.call(['one']),
+                      unittest.mock.call(['two']),
+                      unittest.mock.call(['three', 'four'])],
                      self.call.mock_calls)
 
   def test_execute_split_fail_fast(self):
@@ -83,8 +79,8 @@ class XargsTest(unittest.TestCase):
 
     self.assertEqual(42, self.xargs.execute(['one', 'two', 'three', 'four']))
 
-    self.assertEqual([mock.call(['one', 'two', 'three', 'four']),
-                      mock.call(['one', 'two'])],
+    self.assertEqual([unittest.mock.call(['one', 'two', 'three', 'four']),
+                      unittest.mock.call(['one', 'two'])],
                      self.call.mock_calls)
 
   def test_execute_split_fail_slow(self):
@@ -92,7 +88,7 @@ class XargsTest(unittest.TestCase):
 
     self.assertEqual(42, self.xargs.execute(['one', 'two', 'three', 'four']))
 
-    self.assertEqual([mock.call(['one', 'two', 'three', 'four']),
-                      mock.call(['one', 'two']),
-                      mock.call(['three', 'four'])],
+    self.assertEqual([unittest.mock.call(['one', 'two', 'three', 'four']),
+                      unittest.mock.call(['one', 'two']),
+                      unittest.mock.call(['three', 'four'])],
                      self.call.mock_calls)

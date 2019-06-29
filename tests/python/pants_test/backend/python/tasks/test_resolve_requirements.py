@@ -1,12 +1,9 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
 import re
-from builtins import str
+import subprocess
 
 from future.utils import PY3
 from pex.interpreter import PythonInterpreter
@@ -18,7 +15,6 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir, temporary_file
-from pants.util.process_handler import subprocess
 from pants_test.task_test_base import TaskTestBase
 
 

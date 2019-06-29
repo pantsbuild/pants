@@ -1,17 +1,12 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import errno
 import os
 import random
 import stat
 import unittest
-from builtins import open
-
-from mock import mock
+import unittest.mock
 
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
 from pants.util.fileutil import (atomic_copy, create_size_estimators, safe_hardlink_or_copy,
@@ -74,7 +69,7 @@ class FileutilTest(unittest.TestCase):
     content = b'hello'
 
     # Mock os.link to throw an CROSS-DEVICE error
-    with mock.patch('os.link') as os_mock:
+    with unittest.mock.patch('os.link') as os_mock:
       err = OSError()
       err.errno = errno.EXDEV
       os_mock.side_effect = err

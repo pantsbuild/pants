@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from test_pants_plugin.pants_infra_tests import PantsInfraTests
 from test_pants_plugin.subsystems.pants_test_infra import PantsTestInfra

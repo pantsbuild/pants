@@ -1,11 +1,8 @@
-# coding=utf-8
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import open
+import subprocess
 from textwrap import dedent
 
 from pants.backend.python.tasks.gather_sources import GatherSources
@@ -13,7 +10,6 @@ from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.base.run_info import RunInfo
 from pants.build_graph.register import build_file_aliases as register_core
-from pants.util.process_handler import subprocess
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 
@@ -24,7 +20,7 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
 
   @classmethod
   def alias_groups(cls):
-    return super(PythonBinaryCreateTest, cls).alias_groups().merge(register_core())
+    return super().alias_groups().merge(register_core())
 
   def _assert_pex(self, binary, expected_output=None, expected_shebang=None):
     # The easiest way to create products required by the PythonBinaryCreate task is to

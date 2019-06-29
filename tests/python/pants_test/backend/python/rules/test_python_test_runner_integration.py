@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -21,7 +18,7 @@ class TestPythonTestRunnerIntegration(PantsRunIntegrationTest):
     ] + trailing_args
     # Set TERM=dumb to stop pytest from trying to be clever and wrap lines which may interfere with
     # our golden data.
-    return super(TestPythonTestRunnerIntegration, self).run_pants(args, extra_env={'TERM': 'dumb'})
+    return super().run_pants(args, extra_env={'TERM': 'dumb'})
 
   # TODO: Modify flags (or pytest) so that output is hermetic and deterministic, and doesn't require fuzzy matching
   def assert_fuzzy_string_match(self, got, want):

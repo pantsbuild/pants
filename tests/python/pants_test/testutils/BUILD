@@ -5,7 +5,6 @@ python_library(
   name = 'mock_logger',
   sources = globs('mock_logger.py'),
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/reporting',
   ],
 )
@@ -16,7 +15,6 @@ python_library(
     'file_test_util.py',
   ],
   dependencies = [
-    '3rdparty/python:future',
   ],
 )
 
@@ -30,7 +28,6 @@ python_library(
     'src/python/pants/base:revision',
     'src/python/pants/scm:git',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
   ],
 )
 
@@ -50,17 +47,6 @@ python_library(
     'pexrc_util.py',
   ],
   dependencies = [
-    '3rdparty/python:future',
     ':git_util'
   ,]
-)
-
-python_library(
-  name = 'py2_compat',
-  sources = [
-    'py2_compat.py',
-  ],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
 )

@@ -1,13 +1,8 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import hashlib
-from builtins import str
 
-from future.utils import PY3
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.base.fingerprint_strategy import FingerprintStrategy
 
@@ -44,7 +39,7 @@ class JavaThriftLibraryFingerprintStrategy(FingerprintStrategy):
     if target.include_paths:
       hasher.update(str(target.include_paths).encode('utf-8'))
 
-    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+    return hasher.hexdigest()
 
   def __hash__(self):
     return hash((type(self), self._thrift_defaults))

@@ -1,14 +1,11 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
 import os
+import subprocess
 from collections import namedtuple
 
-from pants.util.process_handler import subprocess
 from pants.util.strutil import create_path_env_var
 
 

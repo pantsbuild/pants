@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
 import os.path
@@ -27,7 +24,7 @@ class TestResolveRequirements(TestBase):
 
   @classmethod
   def rules(cls):
-    return super(TestResolveRequirements, cls).rules() + [
+    return super().rules() + [
       resolve_requirements,
       RootRule(ResolveRequirementsRequest),
       RootRule(PythonSetup),
@@ -36,7 +33,7 @@ class TestResolveRequirements(TestBase):
     ]
 
   def setUp(self):
-    super(TestResolveRequirements, self).setUp()
+    super().setUp()
     init_subsystems([PythonSetup, PythonNativeCode])
 
   def create_pex_and_get_pex_info(

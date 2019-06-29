@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import re
@@ -24,7 +21,7 @@ class Tool(PythonToolBase):
 
   @classmethod
   def register_options(cls, register):
-    super(Tool, cls).register_options(register)
+    super().register_options(register)
     register('--needs-to-be-invoked-for-some-reason', type=bool, default=True)
 
 
@@ -46,7 +43,7 @@ class ToolTask(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(ToolTask, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
     round_manager.require_data(ToolPrep.tool_instance_cls)
 
   def execute(self):

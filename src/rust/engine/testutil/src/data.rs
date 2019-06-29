@@ -183,6 +183,20 @@ impl TestDirectory {
 
   // Directory structure:
   //
+  // /pets/cats/roland
+  pub fn double_nested() -> TestDirectory {
+    let mut directory = bazel_protos::remote_execution::Directory::new();
+    directory.mut_directories().push({
+      let mut subdir = bazel_protos::remote_execution::DirectoryNode::new();
+      subdir.set_name("pets".to_string());
+      subdir.set_digest((&TestDirectory::nested().digest()).into());
+      subdir
+    });
+    TestDirectory { directory }
+  }
+
+  // Directory structure:
+  //
   // /dnalor
   pub fn containing_dnalor() -> TestDirectory {
     let mut directory = bazel_protos::remote_execution::Directory::new();

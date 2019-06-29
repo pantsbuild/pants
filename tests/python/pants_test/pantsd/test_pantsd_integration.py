@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import datetime
 import itertools
@@ -13,7 +10,6 @@ import sys
 import threading
 import time
 import unittest
-from builtins import open, range, zip
 from textwrap import dedent
 
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
@@ -21,7 +17,6 @@ from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, safe_open, tou
 from pants_test.pants_run_integration_test import read_pantsd_log
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 from pants_test.testutils.process_test_util import no_lingering_process_by_command
-from pants_test.testutils.py2_compat import assertNotRegex, assertRegex
 
 
 def launch_file_toucher(f):
@@ -87,7 +82,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
           continue
 
         # Check if the line begins with W or E to check if it is a warning or error line.
-        assertNotRegex(self, line, r'^[WE].*',
+        self.assertNotRegex(line, r'^[WE].*',
                        'error message detected in log:\n{}'.format(full_log))
 
   def test_pantsd_broken_pipe(self):
@@ -329,11 +324,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         return '\n'.join(read_pantsd_log(workdir))
 
       # Check the logs.
-      assertRegex(
-        self,
-        full_pantsd_log(),
-        r'watching invalidating files:.*{}'.format(test_dir)
-      )
+      self.assertRegex(full_pantsd_log(), r'watching invalidating files:.*{}'.format(test_dir))
 
       checker.assert_running()
 
@@ -449,17 +440,17 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         safe_file_dump(test_build_file, "python_library(sources=globs('some_non_existent_file.py'))")
         result = pantsd_run(export_cmd)
         checker.assert_running()
-        assertNotRegex(self, result.stdout_data, has_source_root_regex)
+        self.assertNotRegex(result.stdout_data, has_source_root_regex)
 
         safe_file_dump(test_build_file, "python_library(sources=globs('*.py'))")
         result = pantsd_run(export_cmd)
         checker.assert_running()
-        assertNotRegex(self, result.stdout_data, has_source_root_regex)
+        self.assertNotRegex(result.stdout_data, has_source_root_regex)
 
         safe_file_dump(test_src_file, 'import this\n')
         result = pantsd_run(export_cmd)
         checker.assert_running()
-        assertRegex(self, result.stdout_data, has_source_root_regex)
+        self.assertRegex(result.stdout_data, has_source_root_regex)
     finally:
       rm_rf(test_path)
 
@@ -541,7 +532,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       self.assert_failure(waiter_run)
 
       for regexp in regexps:
-        assertRegex(self, waiter_run.stderr_data, regexp)
+        self.assertRegex(waiter_run.stderr_data, regexp)
 
       time.sleep(1)
       for proc in pantsd_runner_processes:
@@ -608,6 +599,56 @@ Interrupted by user over pailgun client!
                .format(today=re.escape(today))],
       # NB: Make the timeout very small to ensure the warning message will reliably occur in CI!
       quit_timeout=1e-6)
+
+  def test_sigint_kills_request_waiting_for_lock(self):
+    """
+    Test that, when a pailgun request is blocked waiting for another one to end,
+    sending SIGINT to the blocked run will kill it.
+
+    Regression test for issue: #7920
+    """
+    config = {'GLOBAL': {
+      'pantsd_timeout_when_multiple_invocations': -1,
+      'level': 'debug'
+    }}
+    with self.pantsd_test_context(extra_config=config) as (workdir, config, checker):
+      # Run a repl, so that any other run waiting to acquire the daemon lock waits forever.
+      first_run_handle = self.run_pants_with_workdir_without_waiting(
+        command=['repl', 'examples/src/python/example/hello::'],
+        workdir=workdir,
+        config=config
+      )
+      checker.assert_started()
+      checker.assert_running()
+
+      blocking_run_handle = self.run_pants_with_workdir_without_waiting(
+        command=['goals'],
+        workdir=workdir,
+        config=config
+      )
+
+      # Block until the second request is waiting for the lock.
+      blocked = True
+      while blocked:
+        log = '\n'.join(read_pantsd_log(workdir))
+        if "didn't aquire the lock on the first try, polling." in log:
+          blocked = False
+        # NB: This sleep is totally deterministic, it's just so that we don't spend too many cycles
+        # busy waiting.
+        time.sleep(0.1)
+
+      # Sends SIGINT to the run that is waiting.
+      blocking_run_client_pid = blocking_run_handle.process.pid
+      os.kill(blocking_run_client_pid, signal.SIGINT)
+      blocking_run_handle.join()
+
+      # Check that pantsd is still serving the other request.
+      checker.assert_running()
+
+      # Send exit() to the repl, and exit it.
+      result = first_run_handle.join(stdin_data='exit()')
+      self.assert_success(result)
+      checker.assert_running()
 
   def test_pantsd_environment_scrubbing(self):
     # This pair of JVM options causes the JVM to always crash, so the command will fail if the env
@@ -689,3 +730,16 @@ Interrupted by user over pailgun client!
         with open(os.path.join(directory, 'BUILD'), 'w') as f:
           f.write(template.format(a_deps='', b_deps='dependencies = [":A"],'))
         list_and_verify()
+
+  def test_concurrent_overrides_pantsd(self):
+    """
+    Tests that the --concurrent flag overrides the --enable-pantsd flag,
+    because we don't allow concurrent runs under pantsd.
+    """
+    config = {'GLOBAL': {'concurrent': True, 'enable_pantsd': True}}
+    with self.temporary_workdir() as workdir:
+      pants_run = self.run_pants_with_workdir(['goals'], workdir=workdir, config=config)
+      self.assert_success(pants_run)
+      # TODO migrate to pathlib when we cut 1.18.x
+      pantsd_log_location = os.path.join(workdir, 'pantsd', 'pantsd.log')
+      self.assertFalse(os.path.exists(pantsd_log_location))

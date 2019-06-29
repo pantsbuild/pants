@@ -30,7 +30,6 @@ use clap;
 use env_logger;
 use fs;
 use futures;
-use futures_timer;
 
 use rand;
 
@@ -39,7 +38,7 @@ use serde_json;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use clap::{value_t, App, Arg, SubCommand};
-use fs::{GlobMatching, ResettablePool, Snapshot, Store, StoreFileByDigest, UploadSummary};
+use fs::GlobMatching;
 use futures::future::Future;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
@@ -51,6 +50,7 @@ use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::Arc;
 use std::time::Duration;
+use store::{Snapshot, Store, StoreFileByDigest, UploadSummary};
 
 #[derive(Debug)]
 enum ExitCode {
@@ -257,7 +257,6 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
     .value_of("local-store-path")
     .map(PathBuf::from)
     .unwrap_or_else(Store::default_path);
-  let pool = Arc::new(ResettablePool::new("fsutil-pool-".to_string()));
   let mut runtime = tokio::runtime::Runtime::new().unwrap();
   let (store, store_has_remote) = {
     let (store_result, store_has_remote) = match top_match.values_of("server-address") {
@@ -290,7 +289,6 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         (
           Store::with_remote(
             &store_dir,
-            pool.clone(),
             &cas_addresses,
             top_match
               .value_of("remote-instance-name")
@@ -309,18 +307,17 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             // See https://github.com/pantsbuild/pants/pull/6433 for more context.
             Duration::from_secs(30 * 60),
             // TODO: Take a command line arg.
-            fs::BackoffConfig::new(
+            store::BackoffConfig::new(
               std::time::Duration::from_secs(1),
               1.2,
               std::time::Duration::from_secs(20),
             )?,
             value_t!(top_match.value_of("rpc-attempts"), usize).expect("Bad rpc-attempts flag"),
-            futures_timer::TimerHandle::default(),
           ),
           true,
         )
       }
-      None => (Store::local_only(&store_dir, pool.clone()), false),
+      None => (Store::local_only(&store_dir), false),
     };
     let store = store_result.map_err(|e| {
       format!(
@@ -345,12 +342,14 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           let write_result = runtime.block_on(
             store.load_file_bytes_with(digest, |bytes| io::stdout().write_all(&bytes).unwrap()),
           )?;
-          write_result.ok_or_else(|| {
-            ExitError(
-              format!("File with digest {:?} not found", digest),
-              ExitCode::NotFound,
-            )
-          })
+          write_result
+            .ok_or_else(|| {
+              ExitError(
+                format!("File with digest {:?} not found", digest),
+                ExitCode::NotFound,
+              )
+            })
+            .map(|((), _metadata)| ())
         }
         ("save", Some(args)) => {
           let path = PathBuf::from(args.value_of("path").unwrap());
@@ -361,16 +360,15 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
               .map_err(|e| format!("Error canonicalizing path {:?}: {:?}", path, e))?
               .parent()
               .ok_or_else(|| format!("File being saved must have parent but {:?} did not", path))?,
-            pool,
           );
-          let file = posix_fs
-            .stat(PathBuf::from(path.file_name().unwrap()))
+          let file = runtime
+            .block_on(posix_fs.stat(PathBuf::from(path.file_name().unwrap())))
             .unwrap();
           match file {
             fs::Stat::File(f) => {
               let digest = runtime
                 .block_on(
-                  fs::OneOffStoreFileByDigest::new(store.clone(), Arc::new(posix_fs))
+                  store::OneOffStoreFileByDigest::new(store.clone(), Arc::new(posix_fs))
                     .store_by_digest(f),
                 )
                 .unwrap();
@@ -406,6 +404,9 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         let digest = Digest(fingerprint, size_bytes);
         runtime
           .block_on(store.materialize_directory(destination, digest))
+          .map(|metadata| {
+            eprintln!("{}", serde_json::to_string_pretty(&metadata).unwrap());
+          })
           .map_err(|err| {
             if err.contains("not found") {
               ExitError(err, ExitCode::NotFound)
@@ -415,7 +416,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           })
       }
       ("save", Some(args)) => {
-        let posix_fs = Arc::new(make_posix_fs(args.value_of("root").unwrap(), pool));
+        let posix_fs = Arc::new(make_posix_fs(args.value_of("root").unwrap()));
         let store_copy = store.clone();
         let digest = runtime.block_on(
           posix_fs
@@ -435,7 +436,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             .and_then(move |paths| {
               Snapshot::from_path_stats(
                 store_copy.clone(),
-                &fs::OneOffStoreFileByDigest::new(store_copy, posix_fs),
+                &store::OneOffStoreFileByDigest::new(store_copy, posix_fs),
                 paths,
               )
             })
@@ -457,27 +458,27 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           .parse::<usize>()
           .expect("size_bytes must be a non-negative number");
         let digest = Digest(fingerprint, size_bytes);
-        let proto_bytes =
-          match args.value_of("output-format").unwrap() {
-            "binary" => runtime
-              .block_on(store.load_directory(digest))
-              .map(|maybe_d| maybe_d.map(|d| d.write_to_bytes().unwrap())),
-            "text" => runtime
-              .block_on(store.load_directory(digest))
-              .map(|maybe_p| maybe_p.map(|p| format!("{:?}\n", p).as_bytes().to_vec())),
-            "recursive-file-list" => runtime
-              .block_on(expand_files(store, digest))
-              .map(|maybe_v| {
-                maybe_v
-                  .map(|v| {
-                    v.into_iter()
-                      .map(|(name, _digest)| format!("{}\n", name))
-                      .collect::<Vec<String>>()
-                      .join("")
-                  })
-                  .map(String::into_bytes)
-              }),
-            "recursive-file-list-with-digests" => runtime
+        let proto_bytes = match args.value_of("output-format").unwrap() {
+          "binary" => runtime
+            .block_on(store.load_directory(digest))
+            .map(|maybe_d| maybe_d.map(|(d, _metadata)| d.write_to_bytes().unwrap())),
+          "text" => runtime
+            .block_on(store.load_directory(digest))
+            .map(|maybe_p| maybe_p.map(|(p, _metadata)| format!("{:?}\n", p).as_bytes().to_vec())),
+          "recursive-file-list" => runtime
+            .block_on(expand_files(store, digest))
+            .map(|maybe_v| {
+              maybe_v
+                .map(|v| {
+                  v.into_iter()
+                    .map(|(name, _digest)| format!("{}\n", name))
+                    .collect::<Vec<String>>()
+                    .join("")
+                })
+                .map(String::into_bytes)
+            }),
+          "recursive-file-list-with-digests" => {
+            runtime
               .block_on(expand_files(store, digest))
               .map(|maybe_v| {
                 maybe_v
@@ -488,12 +489,13 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
                       .join("")
                   })
                   .map(String::into_bytes)
-              }),
-            format => Err(format!(
-              "Unexpected value of --output-format arg: {}",
-              format
-            )),
-          }?;
+              })
+          }
+          format => Err(format!(
+            "Unexpected value of --output-format arg: {}",
+            format
+          )),
+        }?;
         match proto_bytes {
           Some(bytes) => {
             io::stdout().write_all(&bytes).unwrap();
@@ -517,7 +519,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
       let digest = Digest(fingerprint, size_bytes);
       let v = match runtime.block_on(store.load_file_bytes_with(digest, |bytes| bytes))? {
         None => runtime.block_on(store.load_directory(digest).map(|maybe_dir| {
-          maybe_dir.map(|dir| {
+          maybe_dir.map(|(dir, _metadata)| {
             Bytes::from(
               dir
                 .write_to_bytes()
@@ -525,7 +527,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             )
           })
         }))?,
-        some => some,
+        Some((bytes, _metadata)) => Some(bytes),
       };
       match v {
         Some(bytes) => {
@@ -541,7 +543,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
     ("gc", Some(args)) => {
       let target_size_bytes = value_t!(args.value_of("target-size-bytes"), usize)
         .expect("--target-size-bytes must be passed as a non-negative integer");
-      store.garbage_collect(target_size_bytes, fs::ShrinkBehavior::Compact)?;
+      store.garbage_collect(target_size_bytes, store::ShrinkBehavior::Compact)?;
       Ok(())
     }
 
@@ -572,7 +574,7 @@ fn expand_files_helper(
   store
     .load_directory(digest)
     .and_then(|maybe_dir| match maybe_dir {
-      Some(dir) => {
+      Some((dir, _metadata)) => {
         {
           let mut files_unlocked = files.lock();
           for file in dir.get_files() {
@@ -603,8 +605,8 @@ fn expand_files_helper(
     .to_boxed()
 }
 
-fn make_posix_fs<P: AsRef<Path>>(root: P, pool: Arc<ResettablePool>) -> fs::PosixFS {
-  fs::PosixFS::new(&root, pool, &[]).unwrap()
+fn make_posix_fs<P: AsRef<Path>>(root: P) -> fs::PosixFS {
+  fs::PosixFS::new(&root, &[]).unwrap()
 }
 
 fn ensure_uploaded_to_remote(

@@ -1,14 +1,9 @@
-# coding=utf-8
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import os
-from builtins import str
 from hashlib import sha1
 
-from future.utils import PY3
 from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
@@ -36,7 +31,7 @@ class UnpackWheelsFingerprintStrategy(DefaultFingerprintHashingMixin, Fingerprin
       for cache_key in sorted(req.cache_key() for req in target.all_imported_requirements):
         hasher.update(cache_key.encode('utf-8'))
       hasher.update(target.payload.fingerprint().encode('utf-8'))
-      return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+      return hasher.hexdigest()
     return None
 
 
@@ -50,7 +45,7 @@ class UnpackWheels(UnpackRemoteSourcesBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(UnpackWheels, cls).subsystem_dependencies() + (
+    return super().subsystem_dependencies() + (
       PexBuilderWrapper.Factory,
       PythonInterpreterCache,
       PythonSetup,

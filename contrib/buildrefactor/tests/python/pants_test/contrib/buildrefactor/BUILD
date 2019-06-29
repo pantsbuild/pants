@@ -12,7 +12,6 @@ python_tests(
   name='buildozer',
   sources=['test_buildozer.py'],
   dependencies=[
-    '3rdparty/python:future',
     ':buildozer_util',
     'contrib/buildrefactor/src/python/pants/contrib/buildrefactor',
     'src/python/pants/backend/jvm/targets:java',

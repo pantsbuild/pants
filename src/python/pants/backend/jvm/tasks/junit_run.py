@@ -1,14 +1,10 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 import fnmatch
 import itertools
 import os
 import sys
-from builtins import object, range, str
 from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
@@ -28,7 +24,6 @@ from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
-from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.java.junit.junit_xml_parser import RegistryOfTests, Test, parse_failed_targets
 from pants.process.lock import OwnerPrintingInterProcessFileLock
@@ -48,13 +43,13 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
   @classmethod
   def implementation_version(cls):
-    return super(JUnitRun, cls).implementation_version() + [('JUnitRun', 3)]
+    return super().implementation_version() + [('JUnitRun', 3)]
 
   _BATCH_ALL = sys.maxsize
 
   @classmethod
   def register_options(cls, register):
-    super(JUnitRun, cls).register_options(register)
+    super().register_options(register)
 
     register('--batch-size', advanced=True, type=int, default=cls._BATCH_ALL, fingerprint=True,
              help='Run at most this many tests in a single test process.')
@@ -107,11 +102,11 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(JUnitRun, cls).subsystem_dependencies() + (CodeCoverage, DistributionLocator, JUnit)
+    return super().subsystem_dependencies() + (CodeCoverage, JUnit)
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(JUnitRun, cls).prepare(options, round_manager)
+    super().prepare(options, round_manager)
 
     # Compilation and resource preparation must have completed.
     round_manager.require_data('runtime_classpath')
@@ -120,7 +115,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     """Indicates an invalid combination of options for this task."""
 
   def __init__(self, *args, **kwargs):
-    super(JUnitRun, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     options = self.get_options()
     self._tests_to_run = options.test
@@ -197,7 +192,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     return args
 
   def classpath(self, targets, classpath_product=None, **kwargs):
-    return super(JUnitRun, self).classpath(targets,
+    return super().classpath(targets,
                                            classpath_product=classpath_product,
                                            include_scopes=Scopes.JVM_TEST_SCOPES,
                                            **kwargs)
@@ -389,8 +384,8 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       lambda tgt: tgt.concurrency,
       lambda tgt: tgt.threads)
 
-    # N.B. Python 3 does not allow comparisons between None and other types like str. Several
-    # of the properties, which act as dictionary keys, may have None values, whereras another
+    # NB: Python 3 does not allow comparisons between None and other types like str. Several
+    # of the properties, which act as dictionary keys, may have None values, whereas another
     # may have a non-None value for the same property, so comparison when sorting would fail.
     # We provide this custom key function to avoid such invalid comparisons, while still
     # allowing us to use None to represent non-present properties.
@@ -399,8 +394,8 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       return (
         workdir or '',
         platform,
-        extra_jvm_options or [],
-        extra_env_vars or {},
+        extra_jvm_options,  # Will always be a tuple.
+        extra_env_vars,  # Will always be a tuple.
         concurrency or "",
         threads or 0)
 
@@ -488,7 +483,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
         _, error, _ = sys.exc_info()
         reports.generate(output_dir, exc=error)
 
-  class Reports(object):
+  class Reports:
     def __init__(self, junit_html_report, coverage):
       self._junit_html_report = junit_html_report
       self._coverage = coverage

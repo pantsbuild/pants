@@ -1,12 +1,8 @@
-# coding=utf-8
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import logging
 import warnings
-from builtins import object
 
 import six
 
@@ -27,7 +23,7 @@ logger = logging.getLogger(__name__)
 #
 # Note: In general, 'spec' should not be a user visible term, it is usually appropriate to
 # substitute 'address' instead.
-class BuildFileParser(object):
+class BuildFileParser:
   """Parses BUILD files for a given repo build configuration."""
 
   class BuildFileParserError(Exception):

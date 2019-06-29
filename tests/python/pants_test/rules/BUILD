@@ -6,7 +6,6 @@ python_tests(
   name='filedeps',
   source='test_filedeps.py',
   dependencies=[
-    '3rdparty/python:mock',
     'src/python/pants/build_graph',
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/rules/core',

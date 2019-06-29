@@ -1,8 +1,5 @@
-# coding=utf-8
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
-from __future__ import absolute_import, division, print_function, unicode_literals
 
 from textwrap import dedent
 
@@ -17,7 +14,7 @@ class GoRemoteLibraryTest(TestBase):
   # NB: We use  aliases and BUILD files to test proper registration of anonymous targets and macros.
 
   def setUp(self):
-    super(GoRemoteLibraryTest, self).setUp()
+    super().setUp()
     # Force setup of SourceRootConfig subsystem, as go targets do computation on source roots.
     self.context()
 

@@ -4,7 +4,6 @@
 
 python_library(
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/backend/native/config',
     'src/python/pants/backend/native/subsystems',
     'src/python/pants/backend/native/subsystems/packaging',
@@ -18,7 +17,6 @@ python_library(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:objects',
-    'src/python/pants/util:process_handler',
     'src/python/pants/util:strutil',
   ],
 )
