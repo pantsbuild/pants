@@ -102,7 +102,7 @@ class ExclusiveRequestTimeout(Exception):
 
 class PailgunHandleRequestLock:
   """Convenience lock to implement Lock.acquire(timeout), which is not available in Python 2."""
-  # TODO remove and replace for the py3 Lock() when we don't have to support py2 anymore.
+  # TODO(#6071): remove and replace for the py3 Lock() when we don't have to support py2 anymore.
 
   def __init__(self):
     self.cond = threading.Condition()
