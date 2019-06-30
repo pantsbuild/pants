@@ -28,7 +28,7 @@ class RunTrackerTest(TestBase):
             self.assertEqual('/upload', handler.path)
             self.assertEqual('application/x-www-form-urlencoded', handler.headers['Content-type'])
             length = int(handler.headers['Content-Length'])
-            post_data = parse_qs(handler.rfile.read(length).decode('utf-8'))
+            post_data = parse_qs(handler.rfile.read(length).decode())
             decoded_post_data = {k: json.loads(v[0]) for k, v in post_data.items()}
             self.assertEqual(stats, decoded_post_data)
             handler.send_response(200)

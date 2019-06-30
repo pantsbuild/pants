@@ -89,7 +89,7 @@ class BuildFileParser:
 
     def _format_context_msg(lineno, offset, error_type, message):
       """Show the line of the BUILD file that has the error along with a few line of context"""
-      build_contents = build_file.source().decode('utf-8')
+      build_contents = build_file.source().decode()
       context = "While parsing {build_file}:\n".format(build_file=build_file)
       curr_lineno = 0
       for line in build_contents.split('\n'):

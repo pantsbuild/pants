@@ -42,7 +42,7 @@ class NodeResolveFingerprintStrategy(DefaultFingerprintHashingMixin, Fingerprint
         # lockfile is not added in sources.
         if os.path.exists(absolute_lockfile_path):
           with open(absolute_lockfile_path, 'r') as lockfile:
-            contents = lockfile.read().encode('utf-8')
+            contents = lockfile.read().encode()
             hasher.update(contents)
       return hasher.hexdigest()
     return None

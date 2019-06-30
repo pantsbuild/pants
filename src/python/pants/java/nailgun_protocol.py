@@ -98,7 +98,7 @@ class NailgunProtocol:
   def _decode_unicode_seq(cls, seq):
     for item in seq:
       if isinstance(item, bytes):
-        yield item.decode('utf-8')
+        yield item.decode()
       else:
         yield item
 
@@ -209,7 +209,7 @@ class NailgunProtocol:
     if chunk_type not in ChunkType.VALID_TYPES:
       raise cls.ProtocolError('invalid chunk type: {}'.format(chunk_type))
     if not return_bytes:
-      payload = payload.decode('utf-8')
+      payload = payload.decode()
 
     return chunk_type, payload
 
@@ -352,7 +352,7 @@ class NailgunProtocol:
     The result of this method be used as the value of an environment variable in a subsequent
     NailgunClient execution.
     """
-    return str(obj).encode('utf-8')
+    return str(obj).encode()
 
   @classmethod
   def isatty_to_env(cls, stdin, stdout, stderr):

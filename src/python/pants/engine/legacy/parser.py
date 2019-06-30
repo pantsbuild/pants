@@ -121,7 +121,7 @@ class LegacyPythonCallbacksParser(Parser):
     return symbols, parse_context
 
   def parse(self, filepath, filecontent):
-    python = filecontent.decode('utf-8')
+    python = filecontent.decode()
 
     # Mutate the parse context for the new path, then exec, and copy the resulting objects.
     # We execute with a (shallow) clone of the symbols as a defense against accidental

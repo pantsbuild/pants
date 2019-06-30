@@ -55,7 +55,7 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
   def _popen_stdout(self, exe):
     proc = subprocess.Popen([exe], stdout=subprocess.PIPE)
     (stdout_data, _) = proc.communicate()
-    return stdout_data.decode('utf-8')
+    return stdout_data.decode()
 
   def _test_version(self, version):
     self._assert_version_matches(self._echo_version(version), version)

@@ -80,6 +80,6 @@ class SourcesField(PayloadField):
 
   def _compute_fingerprint(self):
     hasher = sha1()
-    hasher.update(self.rel_path.encode('utf-8'))
+    hasher.update(self.rel_path.encode())
     hasher.update(self.sources.files_hash)
     return hasher.hexdigest()

@@ -121,11 +121,11 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
     """
     digest = hashlib.sha1()
     # TODO(John Sirois): hash classpath contents?
-    encoded_jvm_options = [option.encode('utf-8') for option in sorted(jvm_options)]
-    encoded_classpath = [cp.encode('utf-8') for cp in sorted(classpath)]
-    encoded_java_version = repr(java_version).encode('utf-8')
+    encoded_jvm_options = [option.encode() for option in sorted(jvm_options)]
+    encoded_classpath = [cp.encode() for cp in sorted(classpath)]
+    encoded_java_version = repr(java_version).encode()
     for item in (encoded_jvm_options, encoded_classpath, encoded_java_version):
-      digest.update(str(item).encode('utf-8'))
+      digest.update(str(item).encode())
     return digest.hexdigest()
 
   def _runner(self, classpath, main, jvm_options, args):

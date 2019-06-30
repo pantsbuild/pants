@@ -34,7 +34,7 @@ class NodeDistributionTest(unittest.TestCase):
         break
     else:
       self.fail('Did not find the expected "Hello World!" in the REPL session '
-                'output:\n{}'.format(out.decode('utf-8')))
+                'output:\n{}'.format(out.decode()))
 
   def test_npm(self):
     npm_version_flag = self.distribution.get_package_manager('npm').run_command(

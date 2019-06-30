@@ -84,4 +84,4 @@ class ResolveRequirementsTest(TaskTestBase):
       proc = pex.run(args=[f.name], blocking=False,
                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
       stdout, stderr = proc.communicate()
-      return (stdout.decode('utf-8'), stderr.decode('utf-8'))
+      return (stdout.decode(), stderr.decode())

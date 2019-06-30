@@ -72,7 +72,7 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
       jar = "dist/manifest-with-agent.jar"
       with open_zip(jar, mode='r') as j:
         with j.open("META-INF/MANIFEST.MF") as jar_entry:
-          normalized_lines = (line.decode('utf-8').strip() for line in jar_entry.readlines() if line.strip())
+          normalized_lines = (line.decode().strip() for line in jar_entry.readlines() if line.strip())
           entries = {tuple(line.split(": ", 2)) for line in normalized_lines}
           self.assertIn(('Agent-Class', 'org.pantsbuild.testproject.manifest.Agent'), entries)
 
@@ -125,8 +125,8 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
                                stderr=subprocess.PIPE,
                                cwd=cwd)
     stdout, stderr = process.communicate()
-    stdout = stdout.decode('utf-8')
-    stderr = stderr.decode('utf-8')
+    stdout = stdout.decode()
+    stderr = stderr.decode()
 
     self.assertEqual(expected_returncode, process.returncode,
                       ('Expected exit code {} from command `{}` but got {}:\n'

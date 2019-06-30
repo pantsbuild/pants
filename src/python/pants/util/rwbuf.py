@@ -97,7 +97,7 @@ class StringWriter:
   def write(self, s):
     if not isinstance(s, str):
       raise ValueError('Expected unicode str, not {}, for argument {}'.format(type(s), s))
-    self.buffer.write(s.encode('utf-8'))
+    self.buffer.write(s.encode())
 
   def flush(self):
     self.buffer.flush()

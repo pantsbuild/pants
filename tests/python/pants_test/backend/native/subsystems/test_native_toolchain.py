@@ -133,7 +133,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
     env = env or {}
     try:
       with environment_as(**env):
-        return subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode('utf-8')
+        return subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode()
     except subprocess.CalledProcessError as e:
       raise Exception(
         "Command failed while invoking the native toolchain "

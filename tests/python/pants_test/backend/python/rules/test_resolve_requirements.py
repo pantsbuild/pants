@@ -61,7 +61,7 @@ class TestResolveRequirements(TestBase):
       ))
       with zipfile.ZipFile(os.path.join(tmp_dir, "test.pex"), "r") as pex:
         with pex.open("PEX-INFO", "r") as pex_info:
-          pex_info_content = pex_info.readline().decode("utf-8")
+          pex_info_content = pex_info.readline().decode()
     return json.loads(pex_info_content)
 
   def test_resolves_dependencies(self):

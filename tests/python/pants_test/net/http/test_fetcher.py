@@ -304,7 +304,7 @@ class FetcherTest(unittest.TestCase):
 
     # We just test the last progress line which should indicate a 100% complete download.
     # We control progress bar width (5 dots), size (1KB) and total time downloading (fake 1.137s).
-    self.assertEqual('100% ..... 1 KB 1.137s\n', stream.getvalue().decode('utf-8').split('\r')[-1])
+    self.assertEqual('100% ..... 1 KB 1.137s\n', stream.getvalue().decode().split('\r')[-1])
 
 
 class FetcherRedirectTest(unittest.TestCase):
@@ -330,7 +330,7 @@ class FetcherRedirectTest(unittest.TestCase):
         redirect_url = '{}/url1'.format(FetcherRedirectTest._URL)
         self.send_header('Location',redirect_url)
         self.end_headers()
-        self.wfile.write('redirecting you to {}'.format(redirect_url).encode('utf-8'))
+        self.wfile.write('redirecting you to {}'.format(redirect_url).encode())
         FetcherRedirectTest._URL2_ACCESSED = True
       elif self.path.endswith('url1'):
         self.send_response(200)

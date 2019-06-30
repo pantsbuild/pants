@@ -63,8 +63,8 @@ class PantsJoinHandle(datatype([
     return PantsResult(
       self.command,
       self.process.returncode,
-      stdout_data.decode("utf-8"),
-      stderr_data.decode("utf-8"),
+      stdout_data.decode(),
+      stderr_data.decode(),
       self.workdir,
       self.process.pid)
 
@@ -474,7 +474,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
         stdout, _ = java_run.communicate()
       java_returncode = java_run.returncode
       self.assertEqual(java_returncode, 0)
-      return stdout.decode('utf-8')
+      return stdout.decode()
 
   def assert_success(self, pants_run, msg=None):
     self.assert_result(pants_run, PANTS_SUCCEEDED_EXIT_CODE, expected=True, msg=msg)

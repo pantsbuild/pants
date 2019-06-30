@@ -47,8 +47,8 @@ class PythonToolInstance:
       stdin_payload = ensure_binary(stdin_payload)
     (stdout, stderr) = process.communicate(input=stdin_payload)
     if not binary_mode:
-      stdout = stdout.decode('utf-8')
-      stderr = stderr.decode('utf-8')
+      stdout = stdout.decode()
+      stderr = stderr.decode()
     return (stdout, stderr, process.returncode, self._pretty_cmdline(args))
 
   @contextmanager

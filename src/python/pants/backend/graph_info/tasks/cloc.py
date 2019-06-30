@@ -81,7 +81,7 @@ class CountLinesOfCode(ConsoleTask):
       [exec_result.output_directory_digest]
     )[0].dependencies
 
-    files_content = {fc.path: fc.content.decode('utf-8') for fc in files_content_tuple}
+    files_content = {fc.path: fc.content.decode() for fc in files_content_tuple}
     for line in files_content['report'].split('\n'):
       yield line
 

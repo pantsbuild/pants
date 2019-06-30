@@ -182,11 +182,11 @@ class BundleField(tuple, PayloadField):
   @staticmethod
   def _hash_bundle(bundle):
     hasher = sha1()
-    hasher.update(bundle.rel_path.encode('utf-8'))
+    hasher.update(bundle.rel_path.encode())
     for abs_path in sorted(bundle.filemap.keys()):
-      buildroot_relative_path = os.path.relpath(abs_path, get_buildroot()).encode('utf-8')
+      buildroot_relative_path = os.path.relpath(abs_path, get_buildroot()).encode()
       hasher.update(buildroot_relative_path)
-      hasher.update(bundle.filemap[abs_path].encode('utf-8'))
+      hasher.update(bundle.filemap[abs_path].encode())
       if os.path.isfile(abs_path):
         # Update with any additional string to differentiate empty file with non-existing file.
         hasher.update(b'e')

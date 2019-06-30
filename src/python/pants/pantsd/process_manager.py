@@ -317,7 +317,7 @@ class ProcessManager(ProcessMetadataManager):
       kwargs.setdefault('stderr', subprocess.STDOUT)
 
     try:
-      return subprocess.check_output(command, **kwargs).decode('utf-8').strip()
+      return subprocess.check_output(command, **kwargs).decode().strip()
     except (OSError, subprocess.CalledProcessError) as e:
       subprocess_output = getattr(e, 'output', '').strip()
       raise cls.ExecutionError(str(e), subprocess_output)

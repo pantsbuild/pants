@@ -374,7 +374,7 @@ def exe_path(name):
   stdout, _ = process.communicate()
   if process.returncode != 0:
     return None
-  path = stdout.decode('utf-8').strip()
+  path = stdout.decode().strip()
   return path if os.path.exists(path) and os.access(path, os.X_OK) else None
 
 

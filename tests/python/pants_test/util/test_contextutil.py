@@ -73,7 +73,7 @@ class ContextutilTest(unittest.TestCase):
   def test_hermetic_environment_subprocesses(self):
     with self.ensure_user_defined_in_environment():
       with hermetic_environment_as(AAA='333'):
-        output = subprocess.check_output('env', shell=True).decode('utf-8')
+        output = subprocess.check_output('env', shell=True).decode()
         self.assertNotIn('USER=', output)
         self.assertIn('AAA', os.environ)
         self.assertEqual(os.environ['AAA'], '333')
