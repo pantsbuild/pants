@@ -136,7 +136,7 @@ class Config(ABC):
       return default
 
     raw_value = self.get_value(section, option)
-    if type_ == str:
+    if type_ == str or issubclass(type_, str):
       return raw_value
 
     key = '{}.{}'.format(section, option)
