@@ -604,7 +604,7 @@ class GitRepositoryReader:
       rev = ensure_text(rev)
       relpath = ensure_text(relpath)
       relpath = self._fixup_dot_relative(relpath)
-      spec = f"{rev}:{relpath}\n".encode()
+      spec = f'{rev}:{relpath}\n'.encode()
 
     self._maybe_start_cat_file_process()
     self._cat_file_process.stdin.write(spec)

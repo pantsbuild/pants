@@ -186,7 +186,7 @@ class BinaryUtilTest(TestBase):
         supportdir=supportdir,
         version=version,
         name=name)
-      expected_content = f"SEEN {name.upper()}".encode()
+      expected_content = f'SEEN {name.upper()}'.encode()
       self.assertEqual(expected_content, self._read_file(binary_path_abs))
       unseen.remove(expected_content)
     self.assertEqual(0, len(unseen))  # Make sure we've seen all the SEENs.

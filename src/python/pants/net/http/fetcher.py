@@ -177,7 +177,7 @@ class Fetcher:
         self.chunks = chunk_count
         if self.size:
           self._stream.write(b'\r')
-          self._stream.write(f"{int(self.read * 1.0 / self.size * 100):3}% ".encode())
+          self._stream.write(f'{int(self.read * 1.0 / self.size * 100):3}% '.encode())
         self._stream.write(b'.' * self.chunks)
         if self.size:
           size_width = len(str(self.download_size))
@@ -189,7 +189,7 @@ class Fetcher:
 
     def finished(self):
       if self.chunks > 0:
-        self._stream.write(f" {time.time() - self._start:.3f}s\n".encode())
+        self._stream.write(f' {time.time() - self._start:.3f}s\n'.encode())
         self._stream.flush()
 
   def __init__(self, root_dir, requests_api=None):

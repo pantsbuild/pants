@@ -328,9 +328,9 @@ class FetcherRedirectTest(unittest.TestCase):
       if self.path.endswith('url2'):
         self.send_response(302)
         redirect_url = '{}/url1'.format(FetcherRedirectTest._URL)
-        self.send_header('Location',redirect_url)
+        self.send_header('Location', redirect_url)
         self.end_headers()
-        self.wfile.write(f"redirecting you to {redirect_url}".encode())
+        self.wfile.write(f'redirecting you to {redirect_url}'.encode())
         FetcherRedirectTest._URL2_ACCESSED = True
       elif self.path.endswith('url1'):
         self.send_response(200)
