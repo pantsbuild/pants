@@ -26,9 +26,9 @@ class Artifact(PayloadField):
     :param publication_metadata: Optional extra publication metadata required by the ``repo``.
     """
     if not isinstance(org, str):
-      raise ValueError("org must be str but was {}".format(org))
+      raise ValueError(f"org must be `str` but was {org} with type {type(org)}")
     if not isinstance(name, str):
-      raise ValueError("name must be str but was {}".format(name))
+      raise ValueError(f"name must be str but was {name} with type {type(name)}")
     if not isinstance(repo, Repository):
       raise ValueError("repo must be an instance of Repository")
 

@@ -19,8 +19,7 @@ class JarRule(FingerprintedMixin, metaclass=ABCMeta):
   def __init__(self, apply_pattern, payload=None):
     self.payload = payload or Payload()
     if not isinstance(apply_pattern, str):
-      raise ValueError('The supplied apply_pattern is not a str, given: {}'
-                       .format(apply_pattern))
+      raise ValueError(f"The supplied apply_pattern is not a str, given: {apply_pattern}")
     try:
       self._apply_pattern = re.compile(apply_pattern)
     except re.error as e:

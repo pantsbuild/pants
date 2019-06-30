@@ -7,7 +7,7 @@ from pants.base.validation import assert_list
 
 def _validate_maybe_string(name, item):
   if item and not isinstance(item, str):
-    raise ValueError('{} was expected to be of type str but given {}'.format(name, type(item)))
+    raise ValueError(f"{name} was expected to be of type str but given {type(item)}")
   return item
 
 

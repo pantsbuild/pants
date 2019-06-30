@@ -33,7 +33,7 @@ class Properties:
     elif isinstance(data, str):
       contents = data
     else:
-      raise TypeError('Can only process data from a str or a readable object, given: %s' % data)
+      raise TypeError(f"Can only process data from a str or a readable object, given: {data}")
 
     return Properties._parse(contents.splitlines())
 

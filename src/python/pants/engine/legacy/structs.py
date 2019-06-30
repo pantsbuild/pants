@@ -49,8 +49,8 @@ class TargetAdaptor(StructWithDeps):
       if not isinstance(source, str):
         raise Target.IllegalArgument(
           self.address.spec,
-          'source must be a str containing a path relative to the target, but got {} of type {}'
-            .format(source, type(source))
+          f"source must be a str containing a path relative to the target, but got {source} of "
+          f"type {type(source)}"
         )
       sources = [source]
 

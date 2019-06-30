@@ -36,9 +36,7 @@ class IntermediateTargetFactoryBase(ABC):
     :returns: The address of a synthetic intermediary target.
     """
     if not isinstance(address, str):
-      raise self.ExpectedAddressError("Expected str address argument, got type {type}"
-                                      .format(type=type(address)))
-
+      raise self.ExpectedAddressError(f"Expected str address argument, got type {type(address)}")
     address = Address.parse(address, self._parse_context.rel_path)
     # NB(gmalmquist): Ideally there should be a way to indicate that these targets are synthetic
     # and shouldn't show up in `./pants list` etc, because we really don't want people to write

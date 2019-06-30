@@ -21,8 +21,7 @@ def parse_expression(val, acceptable_types, name=None, raise_type=ValueError):
     return typ.__name__
 
   if not isinstance(val, str):
-    raise raise_type('The raw `val` is not a str.  Given {} of type {}.'
-                     .format(val, format_type(type(val))))
+    raise raise_type(f"The raw `val` is not a str.  Given {val} of type {format_type(type(val))}.")
 
   def get_name():
     return repr(name) if name else 'value'
