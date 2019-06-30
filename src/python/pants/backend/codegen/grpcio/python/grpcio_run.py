@@ -13,8 +13,8 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.contextutil import pushd
-from pants.util.memo import memoized_property
 from pants.util.dirutil import safe_walk
+from pants.util.memo import memoized_property
 
 
 class GrpcioRun(SimpleCodegenTask):
