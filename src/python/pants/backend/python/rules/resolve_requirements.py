@@ -37,9 +37,7 @@ def resolve_requirements(request, python_setup, pex_build_environment):
   pex_snapshot = yield Get(Snapshot, UrlToFetch(url, digest))
 
   interpreter_search_paths = create_path_env_var(python_setup.interpreter_search_paths)
-  env = {"PATH": interpreter_search_paths}
-  # TODO(#6071): merge the two dicts via ** unpacking once we drop Py2.
-  env.update(pex_build_environment.invocation_environment_dict)
+  env = {"PATH": interpreter_search_paths, **pex_build_environment.invocation_environment_dict}
 
   interpreter_constraint_args = []
   for constraint in request.interpreter_constraints:
