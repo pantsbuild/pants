@@ -34,8 +34,7 @@ class GrpcioMultipleGenTest(GrpcioTestBase):
 
     # then
     self.assertEqual(1, len(synthetic_target))
-    self.assertEqual({'__init__.py',
-                      'com/__init__.py',
+    self.assertEqual({'com/__init__.py',
                       'com/example/__init__.py',
                       'com/example/example_pb2_grpc.py',
                       'com/example/example_pb2.py'},

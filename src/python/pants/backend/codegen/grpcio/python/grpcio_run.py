@@ -50,13 +50,9 @@ class GrpcioRun(SimpleCodegenTask):
                         exit_code=exit_code)
       # Create __init__.py in each subdirectory of the target
       # directory so that setup_py recognizes them as modules.
-      def iter_module_dirs():
-        yield target_workdir
-        for root, dirs, _ in safe_walk(target_workdir):
-          for dirname in dirs:
-            yield os.path.join(root, dirname)
-      for module_dir in iter_module_dirs():
-        Path(os.path.join(module_dir, '__init__.py')).touch()
+      for root, dirs, _ in safe_walk(target_workdir):
+        for dirname in dirs:
+          Path(os.path.join(root, dirname, '__init__.py')).touch()
       logging.info("Grpcio finished code generation into: [{}]".format(target_workdir))
 
   def build_args(self, target, target_workdir):

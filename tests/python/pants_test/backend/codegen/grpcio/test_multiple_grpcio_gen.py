@@ -55,14 +55,12 @@ class GrpcioGenTest(GrpcioTestBase):
     # then
     self.assertIsNotNone(synthetic_target)
     self.assertEqual(2, len(synthetic_target))
-    self.assertEqual({'__init__.py',
-                      'com/__init__.py',
+    self.assertEqual({'com/__init__.py',
                       'com/foo/__init__.py',
                       'com/foo/foo_example_pb2_grpc.py',
                       'com/foo/foo_example_pb2.py'},
                      set(synthetic_target[0].sources_relative_to_source_root()))
-    self.assertEqual({'__init__.py',
-                      'com/__init__.py',
+    self.assertEqual({'com/__init__.py',
                       'com/bar/__init__.py',
                       'com/bar/bar_example_pb2_grpc.py',
                       'com/bar/bar_example_pb2.py'},
