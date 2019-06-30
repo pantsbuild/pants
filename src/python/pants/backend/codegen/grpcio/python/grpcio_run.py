@@ -4,6 +4,7 @@
 import functools
 import logging
 import os
+from pathlib import Path
 
 from pants.backend.codegen.grpcio.python.grpcio_prep import GrpcioPrep
 from pants.backend.codegen.grpcio.python.python_grpcio_library import PythonGrpcioLibrary
@@ -55,8 +56,7 @@ class GrpcioRun(SimpleCodegenTask):
           for dirname in dirs:
             yield os.path.join(root, dirname)
       for module_dir in iter_module_dirs():
-        with open(os.path.join(module_dir, '__init__.py'), 'a'):
-          pass
+        Path(os.path.join(module_dir, '__init__.py')).touch()
       logging.info("Grpcio finished code generation into: [{}]".format(target_workdir))
 
   def build_args(self, target, target_workdir):
