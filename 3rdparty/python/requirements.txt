@@ -15,8 +15,6 @@ parameterized==0.6.1
 pathspec==0.5.9
 pex==1.6.7
 psutil==5.4.8
-pycodestyle==2.4.0
-pyflakes==2.0.0
 Pygments==2.3.1
 pyopenssl==17.3.0
 pystache==0.5.3
