@@ -181,8 +181,6 @@ class RootedProducts:
   def __bool__(self):
     return self._rel_paths
 
-  __nonzero__ = __bool__
-
 
 class MultipleRootedProducts:
   """A product consisting of multiple roots, with associated file products.
@@ -231,8 +229,6 @@ class MultipleRootedProducts:
       if products:
         return True
     return False
-
-  __nonzero__ = __bool__
 
   def __str__(self):
     return "MultipleRootedProducts({})".format(self._rooted_products_by_root)
@@ -355,8 +351,6 @@ class Products:
 
     def __bool__(self):
       return not self.empty()
-
-    __nonzero__ = __bool__
 
   def __init__(self):
     # TODO(John Sirois): Kill products and simply have users register ProductMapping subtypes
