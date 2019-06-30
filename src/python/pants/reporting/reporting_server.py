@@ -69,7 +69,7 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
         self._handle_runs('', {})
         return
 
-      content = 'Invalid GET request {}'.format(self.path).encode(),
+      content = f"Invalid GET request {self.path}".encode(),
       self._send_content(content, 'text/html', code=400)
     except (IOError, ValueError):
       pass  # Printing these errors gets annoying, and there's nothing to do about them anyway.
@@ -154,7 +154,7 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
       with open(abspath, 'rb') as infile:
         content = infile.read()
     else:
-      content = 'No file found at {}'.format(abspath).encode()
+      content = f"No file found at {abspath}".encode()
     content_type = mimetypes.guess_type(abspath)[0] or 'text/plain'
     if not content_type.startswith('text/') and not content_type == 'application/xml':
       # Binary file. Display it as hex, split into lines.
@@ -317,7 +317,7 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
     client_ip = self._client_address[0]
     if not client_ip in self._settings.allowed_clients and \
        not 'ALL' in self._settings.allowed_clients:
-      content = 'Access from host {} forbidden.'.format(client_ip).encode()
+      content = f"Access from host {client_ip} forbidden.".encode()
       self._send_content(content, 'text/html')
       return False
     return True
