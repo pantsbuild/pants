@@ -3,6 +3,7 @@
 
 import functools
 import logging
+import os
 
 from pants.backend.codegen.grpcio.python.grpcio_prep import GrpcioPrep
 from pants.backend.codegen.grpcio.python.python_grpcio_library import PythonGrpcioLibrary
@@ -13,6 +14,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.contextutil import pushd
 from pants.util.memo import memoized_property
+from pants.util.dirutil import safe_walk
 
 
 class GrpcioRun(SimpleCodegenTask):
@@ -45,6 +47,16 @@ class GrpcioRun(SimpleCodegenTask):
       if exit_code != 0:
         raise TaskError('{} ... exited non-zero ({}).'.format(cmdline, exit_code),
                         exit_code=exit_code)
+      # Create __init__.py in each subdirectory of the target
+      # directory so that setup_py recognizes them as modules.
+      def iter_module_dirs():
+        yield target_workdir
+        for root, dirs, _ in safe_walk(target_workdir):
+          for dirname in dirs:
+            yield os.path.join(root, dirname)
+      for module_dir in iter_module_dirs():
+        with open(os.path.join(module_dir, '__init__.py'), 'a'):
+          pass
       logging.info("Grpcio finished code generation into: [{}]".format(target_workdir))
 
   def build_args(self, target, target_workdir):
