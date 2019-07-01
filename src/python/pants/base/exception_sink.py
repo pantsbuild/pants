@@ -15,7 +15,7 @@ import setproctitle
 
 from pants.base.exiter import Exiter
 from pants.util.dirutil import safe_mkdir, safe_open
-from pants.util.osutil import IntegerForPid
+from pants.util.osutil import Pid
 
 
 logger = logging.getLogger(__name__)
@@ -223,7 +223,7 @@ class ExceptionSink:
     if for_pid is None:
       intermediate_filename_component = ''
     else:
-      assert(isinstance(for_pid, IntegerForPid))
+      assert(isinstance(for_pid, Pid))
       intermediate_filename_component = '.{}'.format(for_pid)
     in_dir = in_dir or cls._log_dir
     return os.path.join(

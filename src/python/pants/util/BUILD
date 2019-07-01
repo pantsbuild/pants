@@ -39,7 +39,6 @@ python_library(
   sources = ['dirutil.py'],
   dependencies = [
     ':strutil',
-    '3rdparty/python:future',
     'src/python/pants/base:deprecated',
   ],
 )
@@ -97,9 +96,6 @@ python_library(
 python_library(
   name = 'osutil',
   sources = ['osutil.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
 )
 
 python_library(

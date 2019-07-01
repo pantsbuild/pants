@@ -29,7 +29,6 @@ python_tests(
   name = 'interpreter_cache',
   sources = ['test_interpreter_cache.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':interpreter_selection_utils',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python:interpreter_cache',
@@ -65,7 +64,4 @@ python_library(
 python_library(
   name='interpreter_selection_utils',
   sources=['interpreter_selection_utils.py'],
-  dependencies=[
-    '3rdparty/python:future',
-  ]
 )

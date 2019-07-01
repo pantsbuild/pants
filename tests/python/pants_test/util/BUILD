@@ -86,7 +86,6 @@ python_tests(
   name = 'netrc',
   sources = ['test_netrc.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:netrc',
   ]
 )

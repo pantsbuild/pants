@@ -5,8 +5,6 @@ import os
 from collections import namedtuple
 from textwrap import dedent
 
-from future.utils import PY3
-
 from pants.base.build_file import BuildFile
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import BuildFileAddress
@@ -100,7 +98,7 @@ class BuildFileParserBasicsTest(TestWithBuildFileParser):
       """
     ))
     build_file = self.create_buildfile('BUILD')
-    self.assert_parser_error(build_file, 'invalid character' if PY3 else 'invalid syntax')
+    self.assert_parser_error(build_file, 'invalid character')
 
   def test_unicode_string_in_build_file(self):
     """Demonstrates that a string containing unicode should work in a BUILD file."""

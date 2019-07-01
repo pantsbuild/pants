@@ -5,7 +5,6 @@ import os
 import re
 import subprocess
 
-from future.utils import PY3
 from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
@@ -46,7 +45,7 @@ class ResolveRequirementsTest(TaskTestBase):
 
     path = stdout_data.strip()
     # Check that the requirement resolved to what we expect.
-    self.assertTrue(path.endswith('/.deps/ansicolors-1.0.2-{}-none-any.whl/colors.py'.format('py3' if PY3 else 'py2')))
+    self.assertTrue(path.endswith('/.deps/ansicolors-1.0.2-py3-none-any.whl/colors.py'))
     # Check that the path is under the test's build root, so we know the pex was created there.
     self.assertTrue(path.startswith(os.path.realpath(get_buildroot())))
 
