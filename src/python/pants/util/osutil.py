@@ -15,6 +15,8 @@ OS_ALIASES = {
   'linux': {'linux', 'linux2'},
 }
 
+Pid = int
+
 
 def get_os_name(uname_result=None):
   """
@@ -61,7 +63,7 @@ def known_os_names():
 #     [ESRCH]            The process id was given as 0, but the sending process does not have a process group.
 def safe_kill(pid, signum):
   """Kill a process with the specified signal, catching nonfatal errors."""
-  assert(isinstance(pid, int))
+  assert(isinstance(pid, Pid))
   assert(isinstance(signum, int))
   try:
     os.kill(pid, signum)

@@ -20,7 +20,9 @@ python_library(
     ':nailgun_io',
     ':nailgun_protocol',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:socket'
+    'src/python/pants/util:osutil',
+    'src/python/pants/util:socket',
+    'src/python/pants/util:strutil',
   ]
 )
 
@@ -39,6 +41,7 @@ python_library(
   dependencies = [
     '3rdparty/python:six',
     'src/python/pants/util:objects',
+    'src/python/pants/util:osutil',
   ]
 )
 
