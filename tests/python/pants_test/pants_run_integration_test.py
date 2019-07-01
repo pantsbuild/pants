@@ -309,7 +309,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
     if config:
       config_data = config.copy()
-      ini = configparser.ConfigParser(defaults=config_data.pop('DEFAULT', None))
+      # TODO(#6071): RawConfigParser is legacy. Investigate updating to modern API.
+      ini = configparser.RawConfigParser(defaults=config_data.pop('DEFAULT', None))
       for section, section_config in config_data.items():
         ini.add_section(section)
         for key, value in section_config.items():
