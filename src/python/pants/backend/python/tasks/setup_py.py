@@ -54,7 +54,7 @@ setup(**{setup_dict})
 # literal pretty-printer here.
 #
 # Note that we must still keep this code, even though Pants only runs with Python 3, because
-# the created product may still be ran by Python 2.
+# the created product may still be run by Python 2.
 #
 # For more information, see http://bugs.python.org/issue13943.
 def distutils_repr(obj):
