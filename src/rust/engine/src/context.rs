@@ -41,7 +41,7 @@ pub struct Core {
   pub types: Types,
   pub executor: task_executor::Executor,
   store: Store,
-  pub command_runner: BoundedCommandRunner,
+  pub command_runner: process_execution::speculate::SpeculatingCommandRunner,
   pub http_client: reqwest::r#async::Client,
   pub vfs: PosixFS,
   pub build_root: PathBuf,
@@ -123,8 +123,20 @@ impl Core {
       })
       .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
 
-    let command_runner = match &remote_execution_server {
-      Some(ref address) if remote_execution => BoundedCommandRunner::new(
+      let mut primary_command_runner: BoundedCommandRunner = BoundedCommandRunner::new(
+        Box::new(process_execution::local::CommandRunner::new(
+          store.clone(),
+          executor.clone(),
+          work_dir.clone(),
+          process_execution_cleanup_local_dirs,
+        )),
+        process_execution_local_parallelism,
+      );
+
+    let mut secondary_command_runner: Option<BoundedCommandRunner> = None;
+    if let Some(address) = &remote_execution_server && remote_execution {
+      secondary_command_runner = Some(primary_command_runner);
+      primary_command_runner = BoundedCommandRunner::new(
         Box::new(process_execution::remote::CommandRunner::new(
           address,
           remote_execution_process_cache_namespace.clone(),
@@ -135,17 +147,13 @@ impl Core {
           store.clone(),
         )),
         process_execution_remote_parallelism,
-      ),
-      _ => BoundedCommandRunner::new(
-        Box::new(process_execution::local::CommandRunner::new(
-          store.clone(),
-          executor.clone(),
-          work_dir.clone(),
-          process_execution_cleanup_local_dirs,
-        )),
-        process_execution_local_parallelism,
-      ),
-    };
+      )
+    }
+
+    let command_runner = process_execution::speculate::SpeculatingCommandRunner::new(
+      primary_command_runner,
+      secondary_command_runner
+    );
 
     let http_client = reqwest::r#async::Client::new();
     let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);

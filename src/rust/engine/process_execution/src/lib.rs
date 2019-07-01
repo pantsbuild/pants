@@ -43,6 +43,7 @@ use async_semaphore::AsyncSemaphore;
 
 pub mod local;
 pub mod remote;
+pub mod speculate;
 
 ///
 /// A process to be executed.
