@@ -6,7 +6,6 @@ python_library(
   dependencies=[
     '3rdparty/python:ansicolors',
     '3rdparty/python:pystache',
-    '3rdparty/python:six',
     '3rdparty/python:py-zipkin',
     '3rdparty/python:requests',
     ':report',

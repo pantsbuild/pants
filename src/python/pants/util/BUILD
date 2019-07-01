@@ -11,7 +11,6 @@ python_library(
   sources = ['contextutil.py'],
   dependencies = [
     '3rdparty/python:ansicolors',
-    '3rdparty/python:future',
     ':dirutil',
     ':tarutil',
   ],
@@ -48,9 +47,6 @@ python_library(
 python_library(
   name = 'eval',
   sources = ['eval.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
 )
 
 python_library(

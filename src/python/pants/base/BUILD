@@ -55,7 +55,6 @@ python_library(
   name = 'deprecated',
   sources = ['deprecated.py'],
   dependencies = [
-    '3rdparty/python:six',
     ':revision',
     'src/python/pants:version',
     'src/python/pants/util:memo',
@@ -204,7 +203,6 @@ python_library(
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
-    '3rdparty/python:six',
   ],
 )
 

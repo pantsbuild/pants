@@ -8,8 +8,6 @@ import threading
 from json.decoder import JSONDecoder
 from json.encoder import JSONEncoder
 
-import six
-
 from pants.build_graph.address import Address
 from pants.engine.objects import Resolvable, Serializable
 from pants.engine.parser import ParseError, Parser
@@ -40,7 +38,7 @@ class JsonParser(Parser):
     self.symbol_table = symbol_table
 
   def _as_type(self, type_or_name):
-    return _import(type_or_name) if isinstance(type_or_name, six.string_types) else type_or_name
+    return _import(type_or_name) if isinstance(type_or_name, str) else type_or_name
 
   @staticmethod
   def _object_decoder(obj, symbol_table):

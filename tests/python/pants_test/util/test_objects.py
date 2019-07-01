@@ -9,8 +9,8 @@ from textwrap import dedent
 
 from pants.util.objects import (EnumVariantSelectionError, Exactly, HashableTypedCollection,
                                 SubclassesOf, SuperclassesOf, TypeCheckError, TypeConstraintError,
-                                TypedCollection, TypedDatatypeInstanceConstructionError,
-                                _string_type_constraint, datatype, enum)
+                                TypedCollection, TypedDatatypeInstanceConstructionError, datatype,
+                                enum)
 from pants_test.test_base import TestBase
 
 
@@ -198,7 +198,7 @@ class TypedCollectionTest(TypeConstraintTestBase):
     with self.assertRaisesWithMessage(TypeConstraintError, dedent("""\
         in wrapped constraint TypedCollection(Exactly(A or B)): value A() (with type 'A') must satisfy this type constraint: SubclassesOf(Iterable).
         Note that objects matching {} are not considered iterable.""")
-                                      .format(_string_type_constraint)):
+                                      .format(TypedCollection.exclude_iterable_constraint)):
       collection_exactly_a_or_b.validate_satisfied_by(self.A())
     with self.assertRaisesWithMessage(TypeConstraintError, dedent("""\
         in wrapped constraint TypedCollection(Exactly(A or B)) matching iterable object [C()]: value C() (with type 'C') must satisfy this type constraint: Exactly(A or B).""")):
@@ -214,7 +214,7 @@ class TypedCollectionTest(TypeConstraintTestBase):
         type check error in class StringCollectionField: 1 error type checking constructor arguments:
         field 'hello_strings' was invalid: in wrapped constraint TypedCollection(Exactly(str)): value 'xxx' (with type 'str') must satisfy this type constraint: SubclassesOf(Iterable).
         Note that objects matching {exclude_constraint} are not considered iterable.""")
-                                      .format(exclude_constraint=_string_type_constraint)):
+                                      .format(exclude_constraint=TypedCollection.exclude_iterable_constraint)):
       StringCollectionField(hello_strings='xxx')
 
   def test_hashable_collection(self):
@@ -612,7 +612,7 @@ field 'some_value' was invalid: value 3 (with type 'int') must satisfy this type
     expected_msg = """\
 type check error in class WithCollectionTypeConstraint: 1 error type checking constructor arguments:
 field 'dependencies' was invalid: in wrapped constraint TypedCollection(Exactly(int)): value 3 (with type 'int') must satisfy this type constraint: SubclassesOf(Iterable).
-Note that objects matching {} are not considered iterable.""".format(_string_type_constraint)
+Note that objects matching {} are not considered iterable.""".format(TypedCollection.exclude_iterable_constraint)
     with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       WithCollectionTypeConstraint(3)
 

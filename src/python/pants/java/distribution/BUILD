@@ -5,7 +5,6 @@ python_library(
   sources=[ 'distribution.py' ],
   dependencies=[
     '3rdparty/python:future',
-    '3rdparty/python:six',
     ':resources',
     'src/python/pants/base:revision',
     'src/python/pants/java:util',

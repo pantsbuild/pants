@@ -12,7 +12,6 @@ from collections import namedtuple
 from contextlib import contextmanager
 
 from future.utils import PY3
-from six import string_types
 
 from pants.base.revision import Revision
 from pants.java.util import execute_java, execute_java_async
@@ -34,7 +33,7 @@ def _parse_java_version(name, version):
   # We also accommodate specification versions, which just have major and minor
   # components; eg: `1.8`.  These are useful when specifying constraints a distribution must
   # satisfy; eg: to pick any 1.8 java distribution: '1.8' <= version <= '1.8.99'
-  if isinstance(version, string_types):
+  if isinstance(version, str):
     version = Revision.lenient(version)
   if version and not isinstance(version, Revision):
     raise ValueError('{} must be a string or a Revision object, given: {}'.format(name, version))

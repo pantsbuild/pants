@@ -14,7 +14,6 @@ python_library(
   name='artifact',
   sources=['artifact.py'],
   dependencies=[
-    '3rdparty/python:six',
     ':repository',
     'src/python/pants/base:hash_utils',
     'src/python/pants/base:payload_field',
@@ -89,7 +88,6 @@ python_library(
   name='ossrh_publication_metadata',
   sources=['ossrh_publication_metadata.py'],
   dependencies=[
-    '3rdparty/python:future',
     ':artifact',
     'src/python/pants/base:validation',
   ],

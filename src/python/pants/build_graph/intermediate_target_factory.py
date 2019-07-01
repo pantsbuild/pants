@@ -4,8 +4,6 @@
 from abc import ABC
 from hashlib import sha1
 
-from future.utils import string_types
-
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
 
@@ -37,10 +35,8 @@ class IntermediateTargetFactoryBase(ABC):
     :param string suffix: A string used as a suffix of the intermediate target name.
     :returns: The address of a synthetic intermediary target.
     """
-    if not isinstance(address, string_types):
-      raise self.ExpectedAddressError("Expected string address argument, got type {type}"
-                                      .format(type=type(address)))
-
+    if not isinstance(address, str):
+      raise self.ExpectedAddressError(f"Expected str address argument, got type {type(address)}")
     address = Address.parse(address, self._parse_context.rel_path)
     # NB(gmalmquist): Ideally there should be a way to indicate that these targets are synthetic
     # and shouldn't show up in `./pants list` etc, because we really don't want people to write

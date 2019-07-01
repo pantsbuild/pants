@@ -3,7 +3,6 @@
 
 from collections import namedtuple
 
-import six
 from colors import cyan, green, red, yellow
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -163,7 +162,7 @@ class PlainTextReporter(PlainTextReporterBase):
 
     # If the element is a (msg, detail) pair, we ignore the detail. There's no
     # useful way to display it on the console.
-    elements = [e if isinstance(e, six.string_types) else e[0] for e in msg_elements]
+    elements = [e if isinstance(e, str) else e[0] for e in msg_elements]
     msg = '\n' + ''.join(elements)
     if self.use_color_for_workunit(workunit, self.settings.color):
       msg = self._COLOR_BY_LEVEL.get(level, lambda x: x)(msg)

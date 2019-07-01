@@ -43,7 +43,6 @@ python_tests(
   name = 'eval',
   sources = ['test_eval.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:eval',
   ]
 )

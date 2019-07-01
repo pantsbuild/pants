@@ -3,15 +3,13 @@
 
 import unittest
 
-from future.utils import string_types
-
 from pants.util.eval import parse_expression
 
 
 class ParseLiteralTest(unittest.TestCase):
 
   def test_success_simple(self):
-    literal = parse_expression("'42'", acceptable_types=string_types)
+    literal = parse_expression("'42'", acceptable_types=str)
     self.assertEqual('42', literal)
 
   def test_success_mixed(self):

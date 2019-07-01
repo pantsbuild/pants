@@ -4,7 +4,6 @@
 import os.path
 from contextlib import contextmanager
 
-from six import string_types
 from twitter.common.collections import maybe_list
 
 from pants.java import util
@@ -33,12 +32,12 @@ class Ivy:
     """
     self._classpath = maybe_list(classpath)
     self._ivy_settings = ivy_settings
-    if self._ivy_settings and not isinstance(self._ivy_settings, string_types):
+    if self._ivy_settings and not isinstance(self._ivy_settings, str):
       raise ValueError('ivy_settings must be a string, given {} of type {}'.format(
                          self._ivy_settings, type(self._ivy_settings)))
 
     self._ivy_resolution_cache_dir = ivy_resolution_cache_dir
-    if not isinstance(self._ivy_resolution_cache_dir, string_types):
+    if not isinstance(self._ivy_resolution_cache_dir, str):
       raise ValueError('ivy_resolution_cache_dir must be a string, given {} of type {}'.format(
                          self._ivy_resolution_cache_dir, type(self._ivy_resolution_cache_dir)))
 

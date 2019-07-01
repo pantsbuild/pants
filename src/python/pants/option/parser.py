@@ -9,7 +9,6 @@ import traceback
 from collections import defaultdict
 
 import Levenshtein
-import six
 import yaml
 
 from pants.base.deprecated import validate_deprecation_semver, warn_or_error
@@ -54,7 +53,7 @@ class Parser:
 
   @staticmethod
   def _ensure_bool(s):
-    if isinstance(s, six.string_types):
+    if isinstance(s, str):
       if s.lower() == 'true':
         return True
       elif s.lower() == 'false':
