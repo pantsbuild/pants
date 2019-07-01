@@ -246,6 +246,18 @@ class WorkUnit:
       ret = ret.parent
     return ret
 
+  def is_background(self, background_root_workunit):
+    """
+    :API: public
+    """
+    ret = self
+    while ret is not None:
+      if ret is background_root_workunit:
+        return True
+      ret = ret.parent
+    return False
+
+
   def ancestors(self):
     """Returns a list consisting of this workunit and those enclosing it, up to the root.
 

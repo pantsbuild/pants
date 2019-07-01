@@ -137,6 +137,16 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       # zinc's label should be suppressed
       self.assertNotIn('[zinc]', line)
 
+  def test_suppress_background_workunits_output(self):
+    command = ['compile',
+      'examples/src/java/org/pantsbuild/example/hello::']
+    pants_run = self.run_pants(command)
+    self.assert_success(pants_run)
+    # background workunit label should be suppressed
+    self.assertNotIn('[background]', pants_run.stdout_data)
+    # labels of children of the background workunit should be suppressed
+    self.assertNotIn('[workdir_build_cleanup]', pants_run.stdout_data)
+
   def test_invalid_config(self):
     command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello::',

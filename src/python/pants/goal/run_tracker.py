@@ -180,9 +180,9 @@ class RunTracker(Subsystem):
     """
     self._threadlocal.current_workunit = parent_workunit
 
-  def is_under_main_root(self, workunit):
-    """Is the workunit running under the main thread's root."""
-    return workunit.root() == self._main_root_workunit
+  def is_under_background_root(self, workunit):
+    """Is the workunit running under the background thread's root."""
+    return workunit.is_background(self._background_root_workunit)
 
   def is_main_root_workunit(self, workunit):
     return workunit is self._main_root_workunit
