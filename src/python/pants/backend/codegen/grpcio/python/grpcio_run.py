@@ -48,7 +48,9 @@ class GrpcioRun(SimpleCodegenTask):
         raise TaskError('{} ... exited non-zero ({}).'.format(cmdline, exit_code),
                         exit_code=exit_code)
       # Create __init__.py in each subdirectory of the target directory so that setup_py recognizes
-      # them as modules.
+      # them as modules.  Note that we do not use pex_build_util.py's identify_missing_init_files()
+      # because it expects a set of all the filenames and we do not want to precompute that, as we
+      # only have the root directory name at this point.
       for root, dirs, _ in safe_walk(target_workdir):
         for dirname in dirs:
           (Path(root) / dirname / '__init__.py').touch()
