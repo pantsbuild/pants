@@ -26,6 +26,7 @@ class GlobMatchErrorBehavior(enum(['ignore', 'warn', 'error'])):
 
 
 class ExecutionOptions(datatype([
+  'enable_remoting',
   'remote_store_server',
   'remote_store_thread_count',
   'remote_execution_server',
@@ -50,6 +51,7 @@ class ExecutionOptions(datatype([
   @classmethod
   def from_bootstrap_options(cls, bootstrap_options):
     return cls(
+      enable_remoting=bootstrap_options.enable_remoting,
       remote_store_server=bootstrap_options.remote_store_server,
       remote_execution_server=bootstrap_options.remote_execution_server,
       remote_store_thread_count=bootstrap_options.remote_store_thread_count,
@@ -68,6 +70,7 @@ class ExecutionOptions(datatype([
 
 
 DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
+    enable_remoting=False,
     remote_store_server=[],
     remote_store_thread_count=1,
     remote_execution_server=None,
@@ -355,6 +358,10 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              # This default is also hard-coded into the engine's rust code in
              # fs::Store::default_path
              default=os.path.expanduser('~/.cache/pants/lmdb_store'))
+
+    register('--enable-remoting', advanced=True, type=bool,
+             default=DEFAULT_EXECUTION_OPTIONS.enable_remoting,
+             help="Enables remote workers for increased parallelism. (Alpha)")
     register('--remote-store-server', advanced=True, type=list, default=[],
              help='host:port of grpc server to use as remote execution file store.')
     register('--remote-store-thread-count', type=int, advanced=True,

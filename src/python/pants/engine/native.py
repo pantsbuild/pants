@@ -809,6 +809,7 @@ class Native(Singleton):
         self.context.utf8_buf_buf(ignore_patterns),
         self.to_ids_buf(root_subject_types),
         # Remote execution config.
+        execution_options.enable_remoting,
         self.context.utf8_buf_buf(execution_options.remote_store_server),
         # We can't currently pass Options to the rust side, so we pass empty strings for None.
         self.context.utf8_buf(execution_options.remote_execution_server or ""),
