@@ -28,7 +28,6 @@ python_library(
   sources=['node_preinstalled_module_resolver.py'],
   dependencies=[
     ':node_resolver_base',
-    '3rdparty/python:six',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/fs',

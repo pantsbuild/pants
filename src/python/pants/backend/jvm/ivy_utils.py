@@ -11,7 +11,6 @@ from abc import abstractmethod
 from collections import OrderedDict, defaultdict, namedtuple
 from functools import total_ordering
 
-import six
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
@@ -848,7 +847,7 @@ class IvyUtils:
         hardlink_map[path] = path
 
     # Create hardlinks for paths in the ivy cache dir.
-    for path, hardlink in six.iteritems(hardlink_map):
+    for path, hardlink in hardlink_map.items():
       if path == hardlink:
         # Skip paths that aren't going to be hardlinked.
         continue

@@ -115,9 +115,6 @@ python_library(
 python_library(
   name = 'rwbuf',
   sources = ['rwbuf.py'],
-  dependencies = [
-    '3rdparty/python:six',
-  ]
 )
 
 python_library(
@@ -149,9 +146,6 @@ python_library(
 python_library(
   name = 'tarutil',
   sources = ['tarutil.py'],
-  dependencies = [
-    '3rdparty/python:six',
-  ],
 )
 
 python_library(

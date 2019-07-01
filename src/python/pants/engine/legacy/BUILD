@@ -21,7 +21,6 @@ python_library(
   name='parser',
   sources=['parser.py'],
   dependencies=[
-    '3rdparty/python:six',
     ':structs',
     'src/python/pants/base:build_file_target_factory',
     'src/python/pants/base:parse_context',

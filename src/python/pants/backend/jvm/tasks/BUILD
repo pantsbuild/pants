@@ -343,7 +343,6 @@ python_library(
   dependencies = [
     '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:six',
     ':classpath_util',
     ':nailgun_task',
     'src/python/pants/backend/jvm:argfile',

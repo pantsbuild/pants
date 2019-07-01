@@ -136,7 +136,6 @@ python_library(
   name='parser',
   sources=['parser.py'],
   dependencies=[
-    '3rdparty/python:six',
     ':addressable',
     ':objects',
     'src/python/pants/build_graph',
@@ -164,7 +163,6 @@ python_library(
   sources=['selectors.py'],
   dependencies=[
     '3rdparty/python:future',
-    '3rdparty/python:six',
     'src/python/pants/util:objects',
   ]
 )
