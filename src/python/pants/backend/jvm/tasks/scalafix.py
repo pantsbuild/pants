@@ -5,6 +5,7 @@ import os
 from abc import abstractmethod
 
 from pants.backend.jvm.tasks.rewrite_base import RewriteBase
+from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
 from pants.option.custom_types import file_option
@@ -12,7 +13,7 @@ from pants.task.fmt_task_mixin import FmtTaskMixin
 from pants.task.lint_task_mixin import LintTaskMixin
 
 
-class ScalaFix(RewriteBase):
+class ScalaFix(RewriteBase, JvmTask):
   """Executes the scalafix tool."""
 
   _SCALAFIX_MAIN = 'scalafix.cli.Cli'
@@ -51,9 +52,8 @@ class ScalaFix(RewriteBase):
     if options.semantic:
       round_manager.require_data('runtime_classpath')
 
-  def _compute_classpath(self, targets):
-    classpaths = self.context.products.get_data('runtime_classpath')
-    return [entry for _, entry in classpaths.get_for_targets(targets)]
+  def _compute_full_classpath(self, targets):
+    return self.classpath(targets)
 
   def invoke_tool(self, absolute_root, target_sources):
     args = []
@@ -61,9 +61,8 @@ class ScalaFix(RewriteBase):
     if tool_classpath:
       args.append('--tool-classpath={}'.format(os.pathsep.join(tool_classpath)))
     if self.get_options().semantic:
-      # If semantic checks are enabled, pass the relevant classpath entries for these
-      # targets.
-      classpath = self._compute_classpath({target for target, _ in target_sources})
+      # If semantic checks are enabled, we need the full classpath for these targets.
+      classpath = self._compute_full_classpath({target for target, _ in target_sources})
       args.append('--sourceroot={}'.format(absolute_root))
       args.append('--classpath={}'.format(os.pathsep.join(classpath)))
     if self.get_options().configuration:
