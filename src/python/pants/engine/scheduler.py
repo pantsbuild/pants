@@ -74,10 +74,6 @@ class Scheduler:
     :type include_trace_on_error: bool
     :param validate: True to assert that the ruleset is valid.
     """
-
-    if execution_options.remote_execution_server and not execution_options.remote_store_server:
-      raise ValueError("Cannot set remote execution server without setting remote store server")
-
     self._native = native
     self.include_trace_on_error = include_trace_on_error
     self._visualize_to_dir = visualize_to_dir

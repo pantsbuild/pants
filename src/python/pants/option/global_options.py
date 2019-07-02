@@ -480,10 +480,18 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     Raises pants.option.errors.OptionsError on validation failure.
     """
     if opts.loop and (not opts.v2 or opts.v1):
-      raise OptionsError('The --loop option only works with @console_rules, and thus requires '
+      raise OptionsError('The `--loop` option only works with @console_rules, and thus requires '
                          '`--v2 --no-v1` to function as expected.')
     if opts.loop and not opts.enable_pantsd:
-      raise OptionsError('The --loop option requires `--enable-pantsd`, in order to watch files.')
+      raise OptionsError('The `--loop` option requires `--enable-pantsd`, in order to watch files.')
 
     if opts.v2_ui and not opts.v2:
-      raise OptionsError('The --v2-ui option requires --v2 to be enabled together.')
+      raise OptionsError('The `--v2-ui` option requires `--v2` to be enabled together.')
+
+    if opts.enable_remoting and not opts.remote_execution_server:
+      raise OptionsError("The `--enable-remoting` option requires also setting "
+                         "`--remote-execution-server` to work properly.")
+
+    if opts.remote_execution_server and not opts.remote_store_server:
+      raise OptionsError("The `--remote-execution-server` option requires also setting "
+                         "`--remote-store-server`. Often these have the same value.")
