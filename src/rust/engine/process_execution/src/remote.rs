@@ -308,10 +308,9 @@ impl CommandRunner {
     root_ca_certs: Option<Vec<u8>>,
     oauth_bearer_token: Option<String>,
     platform_properties: BTreeMap<String, String>,
-    thread_count: usize,
     store: Store,
   ) -> CommandRunner {
-    let env = Arc::new(grpcio::Environment::new(thread_count));
+    let env = Arc::new(grpcio::EnvBuilder::new().build());
     let channel = {
       let builder = grpcio::ChannelBuilder::new(env.clone());
       if let Some(root_ca_certs) = root_ca_certs {
@@ -1478,7 +1477,6 @@ mod tests {
       None,
       None,
       BTreeMap::new(),
-      1,
       store,
     );
     let result = runtime
@@ -1850,7 +1848,6 @@ mod tests {
       None,
       None,
       BTreeMap::new(),
-      1,
       store,
     );
 
@@ -1944,7 +1941,6 @@ mod tests {
       None,
       None,
       BTreeMap::new(),
-      1,
       store,
     )
     .run(cat_roland_request())
@@ -2010,7 +2006,6 @@ mod tests {
       None,
       None,
       BTreeMap::new(),
-      1,
       store,
     );
 
@@ -2629,7 +2624,7 @@ mod tests {
     )
     .expect("Failed to make store");
 
-    CommandRunner::new(&address, None, None, None, None, BTreeMap::new(), 1, store)
+    CommandRunner::new(&address, None, None, None, None, BTreeMap::new(), store)
   }
 
   fn extract_execute_response(

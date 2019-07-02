@@ -304,7 +304,6 @@ fn main() {
         root_ca_certs,
         oauth_bearer_token,
         platform_properties,
-        1,
         store.clone(),
       )) as Box<dyn process_execution::CommandRunner>
     }

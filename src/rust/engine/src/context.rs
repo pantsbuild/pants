@@ -136,10 +136,6 @@ impl Core {
           root_ca_certs.clone(),
           oauth_bearer_token.clone(),
           remote_execution_extra_platform_properties.clone(),
-          // This param sets the grpc thread pool size. We use the local_execution_parallelism,
-          // because it is likely to be related to the processor count on this platform, via the option default.
-          // Allow for some overhead for bookkeeping threads (if any).
-          process_execution_remote_parallelism + 2,
           store.clone(),
         )),
         process_execution_remote_parallelism,
