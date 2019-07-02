@@ -6,7 +6,6 @@ contextlib2==0.5.5
 coverage>=4.5,<4.6
 docutils==0.14
 fasteners==0.14.1
-future==0.17.1
 Markdown==2.1.1
 # TODO(6282): once we can upgrade Pytest to 4.2.1+, we can remove the more-itertools requirement
 more-itertools<6.0.0 ; python_version<'3'

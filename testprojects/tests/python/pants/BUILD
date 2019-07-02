@@ -5,7 +5,4 @@
 python_tests(
   name = 'secondary_source_file_owner',
   sources = ['dummies/test_pass.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ],
 )

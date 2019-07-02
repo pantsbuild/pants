@@ -5,7 +5,6 @@ import logging
 from collections.abc import MutableMapping, MutableSequence
 from os.path import dirname, join
 
-from future.utils import raise_from
 from twitter.common.collections import OrderedSet
 
 from pants.base.project_tree import Dir
@@ -66,7 +65,7 @@ def _raise_did_you_mean(address_family, name, source=None):
                                .format(name, address_family.namespace, possibilities))
 
   if source:
-    raise_from(resolve_error, source)
+    raise resolve_error from source
   else:
     raise resolve_error
 
@@ -203,12 +202,12 @@ def addresses_from_address_families(address_mapper, specs):
     try:
       addr_families_for_spec = spec.matching_address_families(address_family_by_directory)
     except Spec.AddressFamilyResolutionError as e:
-      raise raise_from(ResolveError(e), e)
+      raise ResolveError(e) from e
 
     try:
       all_addr_tgt_pairs = spec.address_target_pairs_from_address_families(addr_families_for_spec)
     except Spec.AddressResolutionError as e:
-      raise raise_from(AddressLookupError(e), e)
+      raise AddressLookupError(e) from e
     except SingleAddress._SingleAddressResolutionError as e:
       _raise_did_you_mean(e.single_address_family, e.name, source=e)
 

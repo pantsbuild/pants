@@ -6,8 +6,6 @@ import sys
 import time
 from contextlib import contextmanager
 
-from future.utils import raise_with_traceback
-
 from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.console.stty_utils import STTYSettings
 from pants.java.nailgun_client import NailgunClient
@@ -135,7 +133,8 @@ class RemotePantsRunner:
         # Ensure a newline.
         logger.fatal('')
         logger.fatal('lost active connection to pantsd!')
-        raise_with_traceback(self._extract_remote_exception(pantsd_handle.pid, e))
+        traceback = sys.exc_info()[2]
+        raise self._extract_remote_exception(pantsd_handle.pid, e).with_traceback(tb=traceback)
 
   def _connect_and_execute(self, pantsd_handle):
     port = pantsd_handle.port

@@ -6,8 +6,6 @@ import logging
 import os
 import sys
 
-from future.utils import iteritems
-
 from pants.base.build_environment import get_default_pants_config_file
 from pants.engine.fs import FileContent
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
@@ -149,7 +147,7 @@ class OptionsBootstrapper(datatype([
       seed_values=bootstrap_option_values
     )
 
-    env_tuples = tuple(sorted(iteritems(env), key=lambda x: x[0]))
+    env_tuples = tuple(sorted(env.items(), key=lambda x: x[0]))
     return cls(env_tuples=env_tuples, bootstrap_args=bargs, args=args, config=post_bootstrap_config)
 
   @memoized_property

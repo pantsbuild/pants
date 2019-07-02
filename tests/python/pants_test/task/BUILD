@@ -5,7 +5,6 @@ python_tests(
   name = 'console_task',
   sources = ['test_console_task.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/task',
     'tests/python/pants_test:task_test_base',
   ]

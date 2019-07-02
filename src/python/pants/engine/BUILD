@@ -71,7 +71,6 @@ python_library(
   name='build_files',
   sources=['build_files.py'],
   dependencies=[
-    '3rdparty/python:future',
     ':addressable',
     ':fs',
     ':mapper',
@@ -148,7 +147,6 @@ python_library(
   sources=['rules.py'],
   dependencies=[
     '3rdparty/python:asttokens',
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':goal',
     ':selectors',
@@ -162,7 +160,6 @@ python_library(
   name='selectors',
   sources=['selectors.py'],
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/util:objects',
   ]
 )

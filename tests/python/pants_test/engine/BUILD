@@ -23,7 +23,6 @@ python_library(
   name = 'engine_test_base',
   sources = ['base_engine_test.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
     'tests/python/pants_test:test_base',
@@ -124,7 +123,6 @@ python_tests(
   name='build_files',
   sources=['test_build_files.py'],
   dependencies=[
-    '3rdparty/python:future',
     ':scheduler_test_base',
     'src/python/pants/build_graph',
     'src/python/pants/engine:build_files',

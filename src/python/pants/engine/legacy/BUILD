@@ -63,7 +63,6 @@ python_library(
   name='graph',
   sources=['graph.py'],
   dependencies=[
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':address_mapper',
     ':structs',

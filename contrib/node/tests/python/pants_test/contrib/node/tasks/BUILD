@@ -135,7 +135,6 @@ python_tests(
   name='node_resolve_src_deps',
   sources=['test_node_resolve_src_deps.py'],
   dependencies=[
-    '3rdparty/python:future',
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
     'contrib/node/src/python/pants/contrib/node/targets:node_preinstalled_module',
     'contrib/node/src/python/pants/contrib/node/targets:node_remote_module',

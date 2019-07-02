@@ -3,8 +3,6 @@
 
 from collections import namedtuple
 
-from future.types import newstr
-
 from pants.base import deprecated
 from pants.option.option_util import is_list_option
 
@@ -90,11 +88,7 @@ class HelpInfoExtracter:
       if typ == list:
         typ = kwargs.get('member_type', str)
 
-      if typ == dict:
-        metavar = '"{\'key1\':val1,\'key2\':val2,...}"'
-      else:
-        type_name = typ.__name__ if typ != newstr else 'str'  # TODO(#6071): drop special case once Py2 removed
-        metavar = '<{}>'.format(type_name)
+      metavar = f'<{typ.__name__}>' if typ != dict else '"{\'key1\':val1,\'key2\':val2,...}"'
 
     return metavar
 
