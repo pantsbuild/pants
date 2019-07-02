@@ -1,20 +1,19 @@
 use boxfuture::BoxFuture;
 use super::{
   CommandRunner,
-  BoundedCommandRunner,
   ExecuteProcessRequest,
   FallibleExecuteProcessResult
 };
 
 pub struct SpeculatingCommandRunner {
-  primary: BoundedCommandRunner,
-  #[allow(dead_code)] // TODO(henry) actually use this command runner is certain cases
-  secondary: Option<BoundedCommandRunner>,
+  primary: Box<dyn CommandRunner>,
+  #[allow(dead_code)] // TODO(henry) actually use this command runner in certain cases
+  secondary: Box<dyn CommandRunner>,
 }
 
 impl SpeculatingCommandRunner {
 
-  pub fn new(primary: BoundedCommandRunner, secondary: Option<BoundedCommandRunner>) -> SpeculatingCommandRunner {
+  pub fn new(primary: Box<dyn CommandRunner>, secondary: Box<dyn CommandRunner>) -> SpeculatingCommandRunner {
     SpeculatingCommandRunner {
       primary: primary,
       secondary: secondary,
