@@ -231,10 +231,7 @@ def datatype(field_decls, superclass_name=None, **kwargs):
 
   # Return a new type with the given name, inheriting from the DataType class
   # just defined, with an empty class body.
-  try:  # Python3
-    return type(superclass_name, (DataType,), {})
-  except TypeError:  # Python2
-    return type(superclass_name.encode('utf-8'), (DataType,), {})
+  return type(superclass_name, (DataType,), {})
 
 
 class EnumVariantSelectionError(TypeCheckError):

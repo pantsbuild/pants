@@ -56,7 +56,7 @@ class CoercingEncoder(json.JSONEncoder):
     if isinstance(key_obj, bytes):
       # Bytes often occur as dict keys in python 2 code, but in python 3, trying to encode bytes
       # keys raises a TypeError. We explicitly check for that here and convert to str.
-      return self.default(key_obj.decode('utf-8'))
+      return self.default(key_obj.decode())
     elif isinstance(key_obj, str):
       return self.default(key_obj)
     else:

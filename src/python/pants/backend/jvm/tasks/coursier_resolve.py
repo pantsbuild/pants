@@ -730,13 +730,13 @@ class CoursierResolveFingerprintStrategy(FingerprintStrategy):
       return None
 
     hasher = hashlib.sha1()
-    hasher.update(target.payload.fingerprint().encode('utf-8'))
+    hasher.update(target.payload.fingerprint().encode())
 
     for conf in self._confs:
-      hasher.update(conf.encode('utf-8'))
+      hasher.update(conf.encode())
 
     for element in hash_elements_for_target:
-      hasher.update(element.encode('utf-8'))
+      hasher.update(element.encode())
 
     # Just in case so we do not collide with ivy cache
     hasher.update(b'coursier')

@@ -85,7 +85,7 @@ class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
       return None
 
     hasher = hashlib.sha1()
-    hasher.update(target.payload.fingerprint().encode('utf-8'))
+    hasher.update(target.payload.fingerprint().encode())
     if isinstance(target, JarLibrary):
       # NB: Collects only the jars for the current jar_library, and hashes them to ensure that both
       # the resolved coordinates, and the requested coordinates are used. This ensures that if a
@@ -95,7 +95,7 @@ class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
       classpath_entries = self._classpath_products.get_artifact_classpath_entries_for_targets(
         [target])
       for _, entry in classpath_entries:
-        hasher.update(str(entry.coordinate).encode('utf-8'))
+        hasher.update(str(entry.coordinate).encode())
     return hasher.hexdigest()
 
   def direct(self, target):

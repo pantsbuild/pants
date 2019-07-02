@@ -72,7 +72,7 @@ class NailgunTaskTest(JvmToolTaskTestBase):
             raise TaskError(exit_code=exit_code)
 
           with open(comm_file, 'rb') as fp:
-            source, java_cwd = fp.read().strip().decode('utf-8').splitlines()
+            source, java_cwd = fp.read().strip().decode().splitlines()
             return source, java_cwd, python_cwd
 
   @classmethod

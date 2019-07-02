@@ -73,7 +73,7 @@ def cat_files_process_result_concatted(cat_exe_req):
     description='cat some files',
   )
   cat_process_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, process_request)
-  yield Concatted(cat_process_result.stdout.decode('utf-8'))
+  yield Concatted(cat_process_result.stdout.decode())
 
 
 def create_cat_stdout_rules():

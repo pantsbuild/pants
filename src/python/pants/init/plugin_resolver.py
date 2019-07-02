@@ -86,7 +86,7 @@ class PluginResolver:
   def _resolve_exact_plugin_locations(self):
     hasher = hashlib.sha1()
     for req in sorted(self._plugin_requirements):
-      hasher.update(req.encode('utf-8'))
+      hasher.update(req.encode())
     resolve_hash = hasher.hexdigest()
     resolved_plugins_list = os.path.join(self.plugin_cache_dir,
                                          'plugins-{}.txt'.format(resolve_hash))

@@ -502,7 +502,7 @@ class GitRepositoryReader:
       path_so_far += component
 
       try:
-        obj = parent_tree[component.encode('utf-8')]
+        obj = parent_tree[component.encode()]
       except KeyError:
         raise self.MissingFileException(self.rev, relpath)
 
@@ -529,7 +529,7 @@ class GitRepositoryReader:
           # Is absolute, thus likely points outside the repo.
           raise self.ExternalSymlinkException(self.rev, relpath)
 
-        link_to = os.path.normpath(os.path.join(parent_path, path_data.decode('utf-8')))
+        link_to = os.path.normpath(os.path.join(parent_path, path_data.decode()))
         if link_to.startswith('../') or link_to[0] == '/':
           # Points outside the repo.
           raise self.ExternalSymlinkException(self.rev, relpath)
@@ -604,7 +604,7 @@ class GitRepositoryReader:
       rev = ensure_text(rev)
       relpath = ensure_text(relpath)
       relpath = self._fixup_dot_relative(relpath)
-      spec = '{}:{}\n'.format(rev, relpath).encode('utf-8')
+      spec = f'{rev}:{relpath}\n'.encode()
 
     self._maybe_start_cat_file_process()
     self._cat_file_process.stdin.write(spec)

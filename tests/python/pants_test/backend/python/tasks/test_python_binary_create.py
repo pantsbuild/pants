@@ -53,7 +53,7 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
     self.assertTrue(os.path.isfile(pex_copy))
 
     # Check that the pex runs.
-    output = subprocess.check_output(pex_copy).decode('utf-8')
+    output = subprocess.check_output(pex_copy).decode()
     if expected_output:
       self.assertEqual(expected_output, output)
 

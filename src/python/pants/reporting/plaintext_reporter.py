@@ -152,7 +152,7 @@ class PlainTextReporter(PlainTextReporterBase):
         self._emit_indented_workunit_label(workunit)
       for name, outbuf in workunit.outputs().items():
         self.emit(self._prefix(workunit, '\n==== {} ====\n'.format(name)))
-        self.emit(self._prefix(workunit, outbuf.read_from(0).decode('utf-8')))
+        self.emit(self._prefix(workunit, outbuf.read_from(0).decode()))
         self.flush()
 
   def do_handle_log(self, workunit, level, *msg_elements):

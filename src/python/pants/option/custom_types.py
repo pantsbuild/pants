@@ -215,7 +215,7 @@ class ListValueComponent:
     :rtype: `ListValueComponent`
     """
     if isinstance(value, bytes):
-      value = value.decode('utf-8')
+      value = value.decode()
 
     if isinstance(value, str):
       comma_separated_exprs = cls._split_modifier_expr(value)
@@ -297,7 +297,7 @@ class DictValueComponent:
     :rtype: `DictValueComponent`
     """
     if isinstance(value, bytes):
-      value = value.decode('utf-8')
+      value = value.decode()
     if isinstance(value, cls):  # Ensure idempotency.
       action = value.action
       val = value.val

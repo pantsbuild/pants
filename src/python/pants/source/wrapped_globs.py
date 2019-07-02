@@ -102,7 +102,7 @@ class EagerFilesetWithSpec(FilesetWithSpec):
 
   @property
   def files_hash(self):
-    return self._snapshot.directory_digest.fingerprint.encode('utf-8')
+    return self._snapshot.directory_digest.fingerprint.encode()
 
   @property
   def snapshot(self):
@@ -139,7 +139,7 @@ class LazyFilesetWithSpec(FilesetWithSpec):
   def files_hash(self):
     h = sha1()
     for path in sorted(self.files):
-      h.update(path.encode('utf-8'))
+      h.update(path.encode())
       with open(os.path.join(get_buildroot(), self.rel_root, path), 'rb') as f:
         h.update(f.read())
     return h.digest()

@@ -16,7 +16,7 @@ def ensure_binary(text_or_binary):
 
 def ensure_text(text_or_binary):
   if isinstance(text_or_binary, bytes):
-    return text_or_binary.decode('utf-8')
+    return text_or_binary.decode()
   elif isinstance(text_or_binary, str):
     return text_or_binary
   else:

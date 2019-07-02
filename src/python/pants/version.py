@@ -12,7 +12,7 @@ _PANTS_VERSION_OVERRIDE = '_PANTS_VERSION_OVERRIDE'
 
 
 VERSION = (os.environ.get(_PANTS_VERSION_OVERRIDE) or
-           pkgutil.get_data(__name__, 'VERSION').strip().decode('utf-8'))
+           pkgutil.get_data(__name__, 'VERSION').strip().decode())
 
 
 PANTS_SEMVER = Version(VERSION)

@@ -119,7 +119,7 @@ class Payload:
           empty_hash = False
           fp = ensure_binary(fp)
           key = ensure_binary(key)
-          key_sha1 = sha1(key).hexdigest().encode('utf-8')
+          key_sha1 = sha1(key).hexdigest().encode()
           hasher.update(key_sha1)
           hasher.update(fp)
     if empty_hash:

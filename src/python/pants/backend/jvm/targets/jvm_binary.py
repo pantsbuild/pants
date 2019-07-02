@@ -232,9 +232,9 @@ class JarRules(FingerprintedMixin):
 
   def fingerprint(self):
     hasher = sha1()
-    hasher.update(self.payload.fingerprint().encode('utf-8'))
+    hasher.update(self.payload.fingerprint().encode())
     for rule in self.rules:
-      hasher.update(rule.fingerprint().encode('utf-8'))
+      hasher.update(rule.fingerprint().encode())
     return hasher.hexdigest()
 
   @property

@@ -73,7 +73,7 @@ class GoTask(Task):
                                     goarch=self._lookup_go_env_var('GOARCH'))
 
   def _lookup_go_env_var(self, var):
-    return self.go_dist.create_go_cmd('env', args=[var]).check_output().decode('utf-8').strip()
+    return self.go_dist.create_go_cmd('env', args=[var]).check_output().decode().strip()
 
 
 class ImportOracle:
@@ -93,7 +93,7 @@ class ImportOracle:
     :rtype: frozenset of string
     """
     out = self._go_dist.create_go_cmd('list', args=['std']).check_output()
-    return frozenset(out.decode('utf-8').strip().split())
+    return frozenset(out.decode().strip().split())
 
   # This simple regex mirrors the behavior of the relevant go code in practice (see
   # repoRootForImportDynamic and surrounding code in
@@ -154,7 +154,7 @@ class ImportOracle:
       if returncode != 0:
         raise self.ListDepsError('Problem listing imports for {}: {} failed with exit code {}'
                                  .format(pkg, go_cmd, returncode))
-      data = json.loads(out.decode('utf-8'))
+      data = json.loads(out.decode())
 
       # XTestImports are for black box tests.  These test files live inside the package dir but
       # declare a different package and thus can only access the public members of the package's

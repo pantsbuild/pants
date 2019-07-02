@@ -56,7 +56,7 @@ def fingerprint_file(workspace, filename):
   content = read_file(os.path.join(workspace, filename), binary_mode=True)
   fingerprint = hashlib.sha256(content)
   b64_encoded = base64.b64encode(fingerprint.digest())
-  return 'sha256={}'.format(b64_encoded.decode('utf-8')), str(len(content))
+  return f'sha256={b64_encoded.decode()}', str(len(content))
 
 
 def rewrite_record_file(workspace, src_record_file, mutated_file_tuples):

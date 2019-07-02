@@ -35,7 +35,7 @@ class JvmPlatformIntegrationMixin:
     p = Popen(['file', path], stdout=PIPE, stderr=PIPE)
     out, err = p.communicate()
     self.assertEqual(0, p.returncode, 'Failed to run file on {}.'.format(path))
-    match = re.search(r'version (\d+[.]\d+)', out.decode('utf-8'))
+    match = re.search(r'version (\d+[.]\d+)', out.decode())
     self.assertTrue(match is not None, 'Could not determine version for {}'.format(path))
     return version_map[match.group(1)]
 

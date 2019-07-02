@@ -126,5 +126,5 @@ class SafeClasspathTest(unittest.TestCase):
       # manifest should contain the relative path of both jar and resource directory
       expected = ('{}: ../{}/{} ../{}/{}/\n'
                   .format(Manifest.CLASS_PATH, LIB_DIR, JAR_FILE, LIB_DIR, RESOURCES)
-                  .encode('utf-8'))
+                  .encode())
       self.assertEqual(expected, synthetic_jar.read(Manifest.PATH).replace(b'\n ', b''))

@@ -182,14 +182,14 @@ class TargetTest(TestBase):
     self.assertEqual(hash_value, target_a.transitive_invalidation_hash())
 
     hasher = sha1()
-    hasher.update(hash_value.encode('utf-8'))
+    hasher.update(hash_value.encode())
     dep_hash = hasher.hexdigest()[:12]
     target_hash = target_b.invalidation_hash()
     hash_value = '{}.{}'.format(target_hash, dep_hash)
     self.assertEqual(hash_value, target_b.transitive_invalidation_hash())
 
     hasher = sha1()
-    hasher.update(hash_value.encode('utf-8'))
+    hasher.update(hash_value.encode())
     dep_hash = hasher.hexdigest()[:12]
     target_hash = target_c.invalidation_hash()
     hash_value = '{}.{}'.format(target_hash, dep_hash)
@@ -202,7 +202,7 @@ class TargetTest(TestBase):
 
     fingerprint_strategy = TestFingerprintStrategy()
     hasher = sha1()
-    hasher.update(target_b.invalidation_hash(fingerprint_strategy=fingerprint_strategy).encode('utf-8'))
+    hasher.update(target_b.invalidation_hash(fingerprint_strategy=fingerprint_strategy).encode())
     dep_hash = hasher.hexdigest()[:12]
     target_hash = target_c.invalidation_hash(fingerprint_strategy=fingerprint_strategy)
     hash_value = '{}.{}'.format(target_hash, dep_hash)

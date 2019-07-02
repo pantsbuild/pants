@@ -127,8 +127,8 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
 
   yield TestResult(
     status=status,
-    stdout=result.stdout.decode('utf-8'),
-    stderr=result.stderr.decode('utf-8'),
+    stdout=result.stdout.decode(),
+    stderr=result.stderr.decode(),
   )
 
 

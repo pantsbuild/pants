@@ -81,7 +81,7 @@ class ExcludeTargetRegexpIntegrationTest(PantsRunIntegrationTest):
                                       stdout=subprocess.PIPE,
                                       cwd=path)
           java_retcode = java_run.wait()
-          java_out = java_run.stdout.read().decode('utf-8')
+          java_out = java_run.stdout.read().decode()
           self.assertEqual(java_retcode, 0)
           self.assertTrue(expected in java_out, "Expected '{output}' from {jar}, not '{stdout}'."
                                                 .format(output=expected, jar=jar, stdout=java_out))

@@ -44,14 +44,14 @@ class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
       return None
 
     hasher.update(b'version=2')
-    hasher.update(base_fingerprint.encode('utf-8'))
+    hasher.update(base_fingerprint.encode())
 
     # NB: this series of updates must always cover the same fields that populate `_tuple`'s slots
     # to ensure proper invalidation.
-    hasher.update(self._main.encode('utf-8'))
+    hasher.update(self._main.encode())
     if self._custom_rules:
       for rule in self._custom_rules:
-        hasher.update(rule.render().encode('utf-8'))
+        hasher.update(rule.render().encode())
 
     return hasher.hexdigest()
 

@@ -80,7 +80,7 @@ class RunPrepCommandBase(Task):
 
           if environ:
             if not process.returncode:
-              environment_vars = stdout.decode('utf-8').split('\0')
+              environment_vars = stdout.decode().split('\0')
               for kvpair in environment_vars:
                 var, value = kvpair.split('=', 1)
                 os.environ[var] = value

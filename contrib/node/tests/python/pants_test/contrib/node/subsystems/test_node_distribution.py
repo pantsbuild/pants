@@ -33,8 +33,9 @@ class NodeDistributionTest(unittest.TestCase):
       if line.endswith(b'Hello World!'):
         break
     else:
-      self.fail('Did not find the expected "Hello World!" in the REPL session '
-                'output:\n{}'.format(out.decode('utf-8')))
+      self.fail(
+        f'Did not find the expected "Hello World!" in the REPL session output:\n{out.decode()}'
+      )
 
   def test_npm(self):
     npm_version_flag = self.distribution.get_package_manager('npm').run_command(

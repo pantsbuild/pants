@@ -10,8 +10,8 @@ from pants.build_graph.address import Address
 
 def hash_target(address, suffix):
   hasher = sha1()
-  hasher.update(address.encode('utf-8'))
-  hasher.update(suffix.encode('utf-8'))
+  hasher.update(address.encode())
+  hasher.update(suffix.encode())
   return hasher.hexdigest()
 
 

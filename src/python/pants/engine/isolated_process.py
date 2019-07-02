@@ -101,8 +101,8 @@ stderr:
     msg = self.MSG_FMT.format(
       desc=process_description,
       code=exit_code,
-      stdout=stdout.decode('utf-8'),
-      stderr=stderr.decode('utf-8')
+      stdout=stdout.decode(),
+      stderr=stderr.decode()
     )
 
     super().__init__(msg)

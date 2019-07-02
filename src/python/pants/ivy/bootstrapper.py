@@ -106,7 +106,7 @@ class Bootstrapper:
       with open(self._version_or_ivyxml, 'rb') as fp:
         digest.update(fp.read())
     else:
-      digest.update(self._version_or_ivyxml.encode('utf-8'))
+      digest.update(self._version_or_ivyxml.encode())
     classpath = os.path.join(ivy_bootstrap_dir, '{}.classpath'.format(digest.hexdigest()))
 
     if not os.path.exists(classpath):

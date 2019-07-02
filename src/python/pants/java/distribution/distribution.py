@@ -234,10 +234,10 @@ class Distribution:
         stdout, stderr = process.communicate()
         if process.returncode != 0:
           raise self.Error('Failed to determine java system properties for {} with {} - exit code'
-                           ' {}: {}'.format(java, ' '.join(cmd), process.returncode, stderr.decode('utf-8')))
+                           ' {}: {}'.format(java, ' '.join(cmd), process.returncode, stderr.decode()))
 
       props = {}
-      for line in stdout.decode('utf-8').split(os.linesep):
+      for line in stdout.decode().split(os.linesep):
         key, _, val = line.partition('=')
         props[key] = val
       self._system_properties = props

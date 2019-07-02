@@ -16,7 +16,7 @@ from pants.util.fileutil import (atomic_copy, create_size_estimators, safe_hardl
 class FileutilTest(unittest.TestCase):
   def test_atomic_copy(self):
     with temporary_file() as src:
-      src.write(src.name.encode('utf-8'))
+      src.write(src.name.encode())
       src.flush()
       with temporary_file() as dst:
         atomic_copy(src.name, dst.name)

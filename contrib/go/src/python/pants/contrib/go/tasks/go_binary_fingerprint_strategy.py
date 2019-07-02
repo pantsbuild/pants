@@ -27,8 +27,8 @@ class GoBinaryFingerprintStrategy(FingerprintStrategy):
       return fp
 
     hasher = hashlib.sha1()
-    hasher.update(fp.encode('utf-8'))
-    hasher.update(str(self._get_build_flags_func(target)).encode('utf-8'))
+    hasher.update(fp.encode())
+    hasher.update(str(self._get_build_flags_func(target)).encode())
     return hasher.hexdigest()
 
   def __hash__(self):

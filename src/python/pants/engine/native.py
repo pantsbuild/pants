@@ -261,7 +261,7 @@ class _FFISpecification(object):
       self._ffi.def_extern(onerror=exc_handler)(bound_method)
 
   def to_py_str(self, msg_ptr, msg_len):
-    return bytes(self._ffi.buffer(msg_ptr, msg_len)).decode('utf-8')
+    return bytes(self._ffi.buffer(msg_ptr, msg_len)).decode()
 
   @classmethod
   def call(cls, c, func, args):
@@ -366,7 +366,7 @@ class _FFISpecification(object):
   def extern_store_utf8(self, context_handle, utf8_ptr, utf8_len):
     """Given a context and UTF8 bytes, return a new Handle to represent the content."""
     c = self._ffi.from_handle(context_handle)
-    return c.to_value(self._ffi.string(utf8_ptr, utf8_len).decode('utf-8'))
+    return c.to_value(self._ffi.string(utf8_ptr, utf8_len).decode())
 
   @_extern_decl('Handle', ['ExternContext*', 'int64_t'])
   def extern_store_i64(self, context_handle, i64):
@@ -502,7 +502,7 @@ class ExternContext:
     return (buf, len(bytestring), self.to_value(buf))
 
   def utf8_buf(self, string):
-    return self.buf(string.encode('utf-8'))
+    return self.buf(string.encode())
 
   def utf8_buf_buf(self, strings):
     bufs = [self.utf8_buf(string) for string in strings]
@@ -607,8 +607,8 @@ class Native(Singleton):
       with closing(pkg_resources.resource_stream(__name__, lib_name)) as input_fp:
         # NB: The header stripping code here must be coordinated with header insertion code in
         #     build-support/bin/native/bootstrap_code.sh
-        engine_version = input_fp.readline().decode('utf-8').strip()
-        repo_version = input_fp.readline().decode('utf-8').strip()
+        engine_version = input_fp.readline().decode().strip()
+        repo_version = input_fp.readline().decode().strip()
         logger.debug('using {} built at {}'.format(engine_version, repo_version))
         with open(lib_path, 'wb') as output_fp:
           output_fp.write(input_fp.read())
@@ -705,7 +705,7 @@ class Native(Singleton):
     return self.lib.init_logging(level, log_show_rust_3rdparty)
 
   def setup_pantsd_logger(self, log_file_path, level):
-    log_file_path = log_file_path.encode("utf-8")
+    log_file_path = log_file_path.encode()
     result = self.lib.setup_pantsd_logger(log_file_path, level)
     return self.context.raise_or_return(result)
 
@@ -713,8 +713,8 @@ class Native(Singleton):
     return self.lib.setup_stderr_logger(level)
 
   def write_log(self, msg, level, target):
-    msg = msg.encode("utf-8")
-    target = target.encode("utf-8")
+    msg = msg.encode()
+    target = target.encode()
     return self.lib.write_log(msg, level, target)
 
   def flush_log(self):

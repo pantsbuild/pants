@@ -20,8 +20,8 @@ class UnpackJarsFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintS
     if isinstance(target, UnpackedJars):
       hasher = sha1()
       for cache_key in sorted(jar.cache_key() for jar in target.all_imported_jar_deps):
-        hasher.update(cache_key.encode('utf-8'))
-      hasher.update(target.payload.fingerprint().encode('utf-8'))
+        hasher.update(cache_key.encode())
+      hasher.update(target.payload.fingerprint().encode())
       return hasher.hexdigest()
     return None
 

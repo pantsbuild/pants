@@ -29,8 +29,8 @@ class UnpackWheelsFingerprintStrategy(DefaultFingerprintHashingMixin, Fingerprin
     if isinstance(target, UnpackedWheels):
       hasher = sha1()
       for cache_key in sorted(req.cache_key() for req in target.all_imported_requirements):
-        hasher.update(cache_key.encode('utf-8'))
-      hasher.update(target.payload.fingerprint().encode('utf-8'))
+        hasher.update(cache_key.encode())
+      hasher.update(target.payload.fingerprint().encode())
       return hasher.hexdigest()
     return None
 

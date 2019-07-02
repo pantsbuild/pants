@@ -85,7 +85,7 @@ class Config(ABC):
       with open_ctx(config_item) as ini:
         content = ini.read()
         content_digest = sha1(content).hexdigest()
-        parser.read_string(content.decode('utf-8'))
+        parser.read_string(content.decode())
       config_path = config_item.path if hasattr(config_item, 'path') else config_item
       single_file_configs.append(_SingleFileConfig(config_path, content_digest, parser))
 
