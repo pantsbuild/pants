@@ -182,8 +182,3 @@ class Collection:
 
   def __bool__(self):
     return bool(self.dependencies)
-
-  def __nonzero__(self):
-    # For python 2 compatibility.
-    # TODO(6071): Remove this function when we no longer support python 2 (in 1.17.x)
-    return self.__bool__()

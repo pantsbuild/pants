@@ -53,7 +53,10 @@ setup(**{setup_dict})
 # but that embeds u's in the string itself during conversion. For that reason we roll out own
 # literal pretty-printer here.
 #
-# For more information, see http://bugs.python.org/issue13943
+# Note that we must still keep this code, even though Pants only runs with Python 3, because
+# the created product may still be run by Python 2.
+#
+# For more information, see http://bugs.python.org/issue13943.
 def distutils_repr(obj):
   output = io.StringIO()
   linesep = os.linesep

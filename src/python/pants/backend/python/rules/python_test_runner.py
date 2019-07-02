@@ -103,9 +103,10 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
   )
 
   interpreter_search_paths = create_path_env_var(python_setup.interpreter_search_paths)
-  pex_exe_env = {'PATH': interpreter_search_paths}
-  # TODO(#6071): merge the two dicts via ** unpacking once we drop Py2.
-  pex_exe_env.update(subprocess_encoding_environment.invocation_environment_dict)
+  pex_exe_env = {
+    'PATH': interpreter_search_paths,
+    **subprocess_encoding_environment.invocation_environment_dict
+  }
 
   # NB: we use the hardcoded and generic bin name `python`, rather than something dynamic like
   # `sys.executable`, to ensure that the interpreter may be discovered both locally and in remote

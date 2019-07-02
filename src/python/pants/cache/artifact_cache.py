@@ -35,13 +35,8 @@ class UnreadableArtifact:
     self.key = key
     self.err = err
 
-  # For python 3
   def __bool__(self):
     return False
-
-  # For python 2
-  def __nonzero__(self):
-    return self.__bool__()
 
   def __str__(self):
     return "key={} err={}".format(self.key, self.err)
