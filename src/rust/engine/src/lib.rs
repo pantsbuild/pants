@@ -203,7 +203,7 @@ pub extern "C" fn scheduler_create(
   local_store_dir_buf: Buffer,
   ignore_patterns_buf: BufferBuffer,
   root_type_ids: TypeIdBuffer,
-  enable_remoting: bool,
+  remote_execution: bool,
   remote_store_servers_buf: BufferBuffer,
   remote_execution_server: Buffer,
   remote_execution_process_cache_namespace: Buffer,
@@ -299,7 +299,7 @@ pub extern "C" fn scheduler_create(
     &ignore_patterns,
     PathBuf::from(work_dir_buf.to_os_string()),
     PathBuf::from(local_store_dir_buf.to_os_string()),
-    enable_remoting as bool,
+    remote_execution as bool,
     remote_store_servers_vec,
     if remote_execution_server_string.is_empty() {
       None

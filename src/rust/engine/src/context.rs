@@ -59,7 +59,7 @@ impl Core {
     ignore_patterns: &[String],
     work_dir: PathBuf,
     local_store_dir: PathBuf,
-    enable_remoting: bool,
+    remote_execution: bool,
     remote_store_servers: Vec<String>,
     remote_execution_server: Option<String>,
     remote_execution_process_cache_namespace: Option<String>,
@@ -129,7 +129,7 @@ impl Core {
       .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
 
     let command_runner = match &remote_execution_server {
-      Some(ref address) if enable_remoting => BoundedCommandRunner::new(
+      Some(ref address) if remote_execution => BoundedCommandRunner::new(
         Box::new(process_execution::remote::CommandRunner::new(
           address,
           remote_execution_process_cache_namespace.clone(),

@@ -26,7 +26,7 @@ class GlobMatchErrorBehavior(enum(['ignore', 'warn', 'error'])):
 
 
 class ExecutionOptions(datatype([
-  'enable_remoting',
+  'remote_execution',
   'remote_store_server',
   'remote_store_thread_count',
   'remote_execution_server',
@@ -51,7 +51,7 @@ class ExecutionOptions(datatype([
   @classmethod
   def from_bootstrap_options(cls, bootstrap_options):
     return cls(
-      enable_remoting=bootstrap_options.enable_remoting,
+      remote_execution=bootstrap_options.remote_execution,
       remote_store_server=bootstrap_options.remote_store_server,
       remote_execution_server=bootstrap_options.remote_execution_server,
       remote_store_thread_count=bootstrap_options.remote_store_thread_count,
@@ -70,7 +70,7 @@ class ExecutionOptions(datatype([
 
 
 DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
-    enable_remoting=False,
+    remote_execution=False,
     remote_store_server=[],
     remote_store_thread_count=1,
     remote_execution_server=None,
@@ -359,8 +359,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              # fs::Store::default_path
              default=os.path.expanduser('~/.cache/pants/lmdb_store'))
 
-    register('--enable-remoting', advanced=True, type=bool,
-             default=DEFAULT_EXECUTION_OPTIONS.enable_remoting,
+    register('--remote-execution', advanced=True, type=bool,
+             default=DEFAULT_EXECUTION_OPTIONS.remote_execution,
              help="Enables remote workers for increased parallelism. (Alpha)")
     register('--remote-store-server', advanced=True, type=list, default=[],
              help='host:port of grpc server to use as remote execution file store.')
@@ -488,8 +488,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     if opts.v2_ui and not opts.v2:
       raise OptionsError('The `--v2-ui` option requires `--v2` to be enabled together.')
 
-    if opts.enable_remoting and not opts.remote_execution_server:
-      raise OptionsError("The `--enable-remoting` option requires also setting "
+    if opts.remote_execution and not opts.remote_execution_server:
+      raise OptionsError("The `--remote-execution` option requires also setting "
                          "`--remote-execution-server` to work properly.")
 
     if opts.remote_execution_server and not opts.remote_store_server:
