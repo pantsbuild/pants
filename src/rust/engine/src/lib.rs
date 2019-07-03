@@ -203,6 +203,7 @@ pub extern "C" fn scheduler_create(
   local_store_dir_buf: Buffer,
   ignore_patterns_buf: BufferBuffer,
   root_type_ids: TypeIdBuffer,
+  remote_execution: bool,
   remote_store_servers_buf: BufferBuffer,
   remote_execution_server: Buffer,
   remote_execution_process_cache_namespace: Buffer,
@@ -298,6 +299,7 @@ pub extern "C" fn scheduler_create(
     &ignore_patterns,
     PathBuf::from(work_dir_buf.to_os_string()),
     PathBuf::from(local_store_dir_buf.to_os_string()),
+    remote_execution,
     remote_store_servers_vec,
     if remote_execution_server_string.is_empty() {
       None
@@ -323,7 +325,7 @@ pub extern "C" fn scheduler_create(
     remote_execution_extra_platform_properties_map,
     process_execution_local_parallelism as usize,
     process_execution_remote_parallelism as usize,
-    process_execution_cleanup_local_dirs as bool,
+    process_execution_cleanup_local_dirs,
   ))))
 }
 

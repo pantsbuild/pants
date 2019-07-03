@@ -26,6 +26,7 @@ class GlobMatchErrorBehavior(enum(['ignore', 'warn', 'error'])):
 
 
 class ExecutionOptions(datatype([
+  'remote_execution',
   'remote_store_server',
   'remote_store_thread_count',
   'remote_execution_server',
@@ -50,6 +51,7 @@ class ExecutionOptions(datatype([
   @classmethod
   def from_bootstrap_options(cls, bootstrap_options):
     return cls(
+      remote_execution=bootstrap_options.remote_execution,
       remote_store_server=bootstrap_options.remote_store_server,
       remote_execution_server=bootstrap_options.remote_execution_server,
       remote_store_thread_count=bootstrap_options.remote_store_thread_count,
@@ -68,6 +70,7 @@ class ExecutionOptions(datatype([
 
 
 DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
+    remote_execution=False,
     remote_store_server=[],
     remote_store_thread_count=1,
     remote_execution_server=None,
@@ -355,6 +358,10 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              # This default is also hard-coded into the engine's rust code in
              # fs::Store::default_path
              default=os.path.expanduser('~/.cache/pants/lmdb_store'))
+
+    register('--remote-execution', advanced=True, type=bool,
+             default=DEFAULT_EXECUTION_OPTIONS.remote_execution,
+             help="Enables remote workers for increased parallelism. (Alpha)")
     register('--remote-store-server', advanced=True, type=list, default=[],
              help='host:port of grpc server to use as remote execution file store.')
     register('--remote-store-thread-count', type=int, advanced=True,
@@ -473,10 +480,18 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     Raises pants.option.errors.OptionsError on validation failure.
     """
     if opts.loop and (not opts.v2 or opts.v1):
-      raise OptionsError('The --loop option only works with @console_rules, and thus requires '
+      raise OptionsError('The `--loop` option only works with @console_rules, and thus requires '
                          '`--v2 --no-v1` to function as expected.')
     if opts.loop and not opts.enable_pantsd:
-      raise OptionsError('The --loop option requires `--enable-pantsd`, in order to watch files.')
+      raise OptionsError('The `--loop` option requires `--enable-pantsd`, in order to watch files.')
 
     if opts.v2_ui and not opts.v2:
-      raise OptionsError('The --v2-ui option requires --v2 to be enabled together.')
+      raise OptionsError('The `--v2-ui` option requires `--v2` to be enabled together.')
+
+    if opts.remote_execution and not opts.remote_execution_server:
+      raise OptionsError("The `--remote-execution` option requires also setting "
+                         "`--remote-execution-server` to work properly.")
+
+    if opts.remote_execution_server and not opts.remote_store_server:
+      raise OptionsError("The `--remote-execution-server` option requires also setting "
+                         "`--remote-store-server`. Often these have the same value.")
