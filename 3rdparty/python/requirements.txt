@@ -12,7 +12,7 @@ more-itertools<6.0.0 ; python_version<'3'
 packaging==16.8
 parameterized==0.6.1
 pathspec==0.5.9
-pex==1.6.7
+pex==1.6.8
 psutil==5.4.8
 Pygments==2.3.1
 pyopenssl==17.3.0

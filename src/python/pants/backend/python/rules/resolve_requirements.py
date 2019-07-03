@@ -32,8 +32,8 @@ def resolve_requirements(request, python_setup, pex_build_environment):
   interpreter constraints."""
 
   # TODO: Inject versions and digests here through some option, rather than hard-coding it.
-  url = 'https://github.com/pantsbuild/pex/releases/download/v1.6.6/pex'
-  digest = Digest('61bb79384db0da8c844678440bd368bcbfac17bbdb865721ad3f9cb0ab29b629', 1826945)
+  url = 'https://github.com/pantsbuild/pex/releases/download/v1.6.8/pex'
+  digest = Digest('2ca320aede7e7bbcb907af54c9de832707a1df965fb5a0d560f2df29ba8a2f3d', 1866441)
   pex_snapshot = yield Get(Snapshot, UrlToFetch(url, digest))
 
   interpreter_search_paths = create_path_env_var(python_setup.interpreter_search_paths)

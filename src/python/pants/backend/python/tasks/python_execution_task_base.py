@@ -22,24 +22,21 @@ from pants.util.objects import datatype
 def ensure_interpreter_search_path_env(interpreter):
   """Produces an environment dict that ensures that the given interpreter is discovered at runtime.
 
-  At build time, a pex contains constraints on which interpreter version ranges are legal, but
-  at runtime it will apply those constraints to the current (PEX_PYTHON_)PATH to locate a
-  relevant interpreter.
+  At pex build time, if any interpreter constraints are specified (e.g.: 'CPython>=2.7,<3'), they
+  are added to the resulting pex binary's metadata. At runtime, pex will apply those constraints to
+  locate a relevant interpreter on the `PATH`. If `PEX_PYTHON_PATH` is set in the environment, it
+  will be used instead of a `PATH` search. Unlike a typical `PATH`, `PEX_PYTHON_PATH` can contain a
+  mix of files and directories. We exploit this to set up a singluar `PEX_PYTHON_PATH` pointing
+  directly at the given `interpreter` (which should match the constraints that were provided at
+  build time).
 
-  This environment is for use at runtime to ensure that a particular interpreter (which should
-  match the constraints that were provided at build time) is locatable. PEX no longer allows
-  for forcing use of a particular interpreter (the PEX_PYTHON_PATH is additive), so use
-  of this method does not guarantee that the given interpreter is used: rather, that it is
-  definitely considered for use.
-
-  Subclasses of PythonExecutionTaskBase can use `self.ensure_interpreter_search_path_env`
-  to get the relevant interpreter, but this method is exposed as static for cases where
-  the building of the pex is separated from the execution of the pex.
+  Subclasses of PythonExecutionTaskBase can use `self.ensure_interpreter_search_path_env` to get the
+  relevant interpreter, but this method is exposed as static for cases where the building of the pex
+  is separated from the execution of the pex.
   """
   chosen_interpreter_binary_path = interpreter.binary
   return {
     'PEX_IGNORE_RCFILES': '1',
-    'PEX_PYTHON': chosen_interpreter_binary_path,
     'PEX_PYTHON_PATH': chosen_interpreter_binary_path,
   }
 
