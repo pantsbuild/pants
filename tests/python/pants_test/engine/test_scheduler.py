@@ -58,7 +58,9 @@ def transitive_coroutine_rule(c):
 
 
 @union
-class UnionBase: pass
+class UnionBase:
+  """Docstring for UnionBase"""
+  pass
 
 
 class UnionWrapper:
@@ -206,7 +208,7 @@ class SchedulerTest(TestBase):
     self.assertTrue(isinstance(a, A))
     # Fails due to no union relationship from A -> UnionBase.
     expected_msg = """\
-Exception: WithDeps(Inner(InnerEntry { params: {UnionWrapper}, rule: Task(Task { product: A, clause: [Select { product: UnionWrapper }], gets: [Get { product: A, subject: UnionA }, Get { product: A, subject: UnionB }], func: a_union_test(), cacheable: true }) })) did not declare a dependency on JustGet(Get { product: A, subject: A })
+Type A is not a member of the UnionBase @union ("Docstring for UnionBase")
 """
     with self._assert_execution_error(expected_msg):
       self.scheduler.product_request(A, [Params(UnionWrapper(A()))])
