@@ -107,7 +107,7 @@ impl Core {
     let store = safe_create_dir_all_ioerror(&local_store_dir)
       .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))
       .and_then(|()| {
-        if remote_store_servers.is_empty() {
+        if !remote_execution || remote_store_servers.is_empty() {
           Store::local_only(local_store_dir)
         } else {
           Store::with_remote(
