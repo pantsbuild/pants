@@ -260,7 +260,6 @@ class WorkUnit:
       curr_workunit = curr_workunit.parent
     return False
 
-
   def ancestors(self):
     """Returns a list consisting of this workunit and those enclosing it, up to the root.
 
