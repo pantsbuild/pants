@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
+from collections import OrderedDict
 
 import pex.resolver
-from twitter.common.collections import OrderedDict
 
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_distribution import PythonDistribution
