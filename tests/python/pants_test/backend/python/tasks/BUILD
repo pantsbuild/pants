@@ -24,7 +24,6 @@ python_tests(
   sources = ['test_build_local_python_distributions.py'],
   dependencies = [
     '3rdparty/python:pex',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/backend/python/targets',
     'tests/python/pants_test/backend/python/tasks/util',
