@@ -31,8 +31,8 @@ def ensure_interpreter_search_path_env(interpreter):
   build time).
 
   Subclasses of PythonExecutionTaskBase can use `self.ensure_interpreter_search_path_env` to get the
-  relevant interpreter, but this method is exposed as static for cases where the building of the pex
-  is separated from the execution of the pex.
+  relevant interpreter, but this function is exposed for cases where the building of the pex is
+  separated from the execution of the pex.
   """
   chosen_interpreter_binary_path = interpreter.binary
   return {
