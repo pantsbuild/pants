@@ -69,6 +69,9 @@ function _build_native_code() {
     "${REPO_ROOT}/build-support/bin/native/cargo" build ${MODE_FLAG} \
       --manifest-path "${NATIVE_ROOT}/Cargo.toml" -p engine
   ) || die
+  if [[ -n "${PANTS_BYPASS_CBINDGEN:-}" ]]; then
+    die "Successful no-op build with PANTS_BYPASS_CBINDGEN set -- would experience runtime link errors! Exiting."
+  fi
   echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
 }
 

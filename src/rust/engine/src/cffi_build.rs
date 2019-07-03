@@ -48,6 +48,7 @@ native engine binary, allowing us to address it both as an importable python mod
 */
 
 use std::env;
+use std::fmt;
 use std::fs;
 use std::io::{self, Read};
 use std::path::Path;
@@ -55,11 +56,44 @@ use std::process::{exit, Command};
 
 use build_utils::BuildRoot;
 
-#[derive(Debug)]
 enum CffiBuildError {
   IoError(io::Error),
   EnvError(env::VarError),
   CbindgenError(cbindgen::Error),
+}
+
+///
+/// N.B. In this build script, we read our rust sources with cbindgen to create the scheduler.h C
+/// header file, which we then generate C source code for in a generated file native_engine.c. We
+/// compile that with the `cc` crate, and then link the result into our rust code.
+///
+/// This works well, but in cases where rust source files are broken (e.g. a missing semicolon),
+/// this means cbindgen processes that broken code before we try to compile it with rustc,
+/// resulting in very difficult-to-read error messages, e.g.:
+///
+/// Error: CbindgenError(ParseSyntaxError { crate_name: "engine", src_path: "/Users/dmcclanahan/tools/pants/src/rust/engine/src/nodes.rs", error: Error { start_span: Span, end_span: Span, message: "expected one of: `extern`, `use`, `static`, `const`, `unsafe`, `async`, `fn`, `mod`, `type`, `existential`, `struct`, `enum`, `union`, `trait`, `auto`, `impl`, `default`, `macro`, identifier, `self`, `super`, `extern`, `crate`, `::`" } })
+///
+/// Setting `PANTS_BYPASS_CBINDGEN=y` in the environment will avoid calling cbindgen or producing
+/// the cffi bindings. This will fail if we try to run it, but in the above case, it allows rustc to
+/// process the broken code first, with a nicer error message:
+///
+/// error: expected item, found `;`
+///    --> src/nodes.rs:823:2
+///     |
+/// 823 | };
+///     |  ^ help: remove this semicolon
+///
+impl fmt::Debug for CffiBuildError {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    match self {
+      CffiBuildError::IoError(e) => write!(f, "{}", e),
+      CffiBuildError::EnvError(e) => write!(f, "{}", e),
+      CffiBuildError::CbindgenError(e) => write!(
+        f,
+        "Error while processing cbindgen -- re-run with PANTS_BYPASS_CBINDGEN=y for a better error message!\n{}",
+        e),
+    }
+  }
 }
 
 impl From<env::VarError> for CffiBuildError {
@@ -74,14 +108,50 @@ impl From<io::Error> for CffiBuildError {
   }
 }
 
+/* "Error while processing cbindgen -- re-run with PANTS_BYPASS_CBINDGEN=y for a better error message!" */
 impl From<cbindgen::Error> for CffiBuildError {
   fn from(err: cbindgen::Error) -> Self {
     CffiBuildError::CbindgenError(err)
   }
 }
 
+enum BuildMode {
+  WithCodeGeneration,
+  WithoutGeneratedCodeForErrorMessaging,
+}
+
+fn maybe_cbindgen_noop() -> BuildMode {
+  // We produce broken artifacts without cbindgen, so we want to ensure that doesn't get mixed up
+  // with the real build by forcing cargo to re-run.
+  println!("cargo:rerun-if-env-changed=PANTS_BYPASS_CBINDGEN");
+  // When we run without cbindgen, the build will fail with an expected link error. We print a
+  // better error message in the wrapper script that calls this one, so we still force weak linking.
+  if cfg!(target_os = "macos") {
+    // N.B. On OSX, we force weak linking by passing the param `-undefined dynamic_lookup` to
+    // the underlying linker. This avoids "missing symbol" errors for Python symbols
+    // (e.g. `_PyImport_ImportModule`) at build time when bundling the CFFI C sources.
+    // The missing symbols will instead be dynamically resolved in the address space of the parent
+    // binary (e.g. `python`) at runtime. We do this to avoid needing to link to libpython
+    // (which would constrain us to specific versions of Python).
+    println!("cargo:rustc-cdylib-link-arg=-undefined");
+    println!("cargo:rustc-cdylib-link-arg=dynamic_lookup");
+  }
+
+  match env::var("PANTS_BYPASS_CBINDGEN") {
+    Ok(_) => BuildMode::WithoutGeneratedCodeForErrorMessaging,
+    Err(_) => BuildMode::WithCodeGeneration,
+  }
+}
+
 // A message is printed to stderr, and the script fails, if main() results in a CffiBuildError.
 fn main() -> Result<(), CffiBuildError> {
+
+  match maybe_cbindgen_noop() {
+    BuildMode::WithoutGeneratedCodeForErrorMessaging => return Ok(()),
+    BuildMode::WithCodeGeneration => (),
+  }
+
+
   // NB: When built with Python 3, `native_engine.so` only works with a Python 3 interpreter.
   // When built with Python 2, it works with both Python 2 and Python 3.
   // So, we check to see if the under-the-hood interpreter has changed and rebuild the native engine
@@ -152,17 +222,6 @@ fn main() -> Result<(), CffiBuildError> {
   config.flag("-Wno-missing-field-initializers");
 
   config.compile("libnative_engine_ffi.a");
-
-  if cfg!(target_os = "macos") {
-    // N.B. On OSX, we force weak linking by passing the param `-undefined dynamic_lookup` to
-    // the underlying linker. This avoids "missing symbol" errors for Python symbols
-    // (e.g. `_PyImport_ImportModule`) at build time when bundling the CFFI C sources.
-    // The missing symbols will instead by dynamically resolved in the address space of the parent
-    // binary (e.g. `python`) at runtime. We do this to avoid needing to link to libpython
-    // (which would constrain us to specific versions of Python).
-    println!("cargo:rustc-cdylib-link-arg=-undefined");
-    println!("cargo:rustc-cdylib-link-arg=dynamic_lookup");
-  }
 
   Ok(())
 }
