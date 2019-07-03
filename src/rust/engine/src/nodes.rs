@@ -871,7 +871,9 @@ impl Task {
                 let description = externs::project_str(&value, "union_description");
                 throw(&format!(
                   "Type {} is not a member of the {} @union (\"{}\")",
-                  get.subject, union_ty, description
+                  get.subject.type_id(),
+                  union_ty,
+                  description
                 ))
               } else {
                 throw(&format!(
