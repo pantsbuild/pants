@@ -11,6 +11,7 @@ PY_3 = '3'
 
 PY_27 = '2.7'
 PY_36 = '3.6'
+PY_37 = '3.7'
 
 
 def has_python_version(version):
@@ -77,3 +78,8 @@ def skip_unless_python27_and_python3_present(func):
 def skip_unless_python27_and_python36_present(func):
   """A test skip decorator that only runs a test method if python2.7 and python3.6 are present."""
   return skip_unless_all_pythons_present(PY_27, PY_36)(func)
+
+
+def skip_unless_python36_and_python37_present(func):
+  """A test skip decorator that only runs a test method if python3.6 and python3.7 are present."""
+  return skip_unless_all_pythons_present(PY_36, PY_37)(func)
