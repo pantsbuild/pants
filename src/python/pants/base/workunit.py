@@ -247,14 +247,17 @@ class WorkUnit:
     return ret
 
   def is_background(self, background_root_workunit):
-    """
+    """ Returns True if this workunit is a background root workunit or its successor.
+
+    :param WorkUnit background_root_workunit: parent of all background workunits.
+
     :API: public
     """
-    ret = self
-    while ret is not None:
-      if ret is background_root_workunit:
+    curr_workunit = self
+    while curr_workunit is not None:
+      if curr_workunit is background_root_workunit:
         return True
-      ret = ret.parent
+      curr_workunit = curr_workunit.parent
     return False
 
 
