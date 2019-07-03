@@ -7,13 +7,13 @@ from pathlib import Path
 
 from pants.backend.codegen.grpcio.python.grpcio_prep import GrpcioPrep
 from pants.backend.codegen.grpcio.python.python_grpcio_library import PythonGrpcioLibrary
+from pants.backend.python.subsystems.pex_build_util import identify_missing_init_files
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.contextutil import pushd
-from pants.util.dirutil import safe_walk
 from pants.util.memo import memoized_property
 
 
@@ -48,12 +48,11 @@ class GrpcioRun(SimpleCodegenTask):
         raise TaskError('{} ... exited non-zero ({}).'.format(cmdline, exit_code),
                         exit_code=exit_code)
       # Create __init__.py in each subdirectory of the target directory so that setup_py recognizes
-      # them as modules.  Note that we do not use pex_build_util.py's identify_missing_init_files()
-      # because it expects a set of all the filenames and we do not want to precompute that, as we
-      # only have the root directory name at this point.
-      for root, dirs, _ in safe_walk(target_workdir):
-        for dirname in dirs:
-          (Path(root) / dirname / '__init__.py').touch()
+      # them as modules.
+      target_workdir_obj = Path(target_workdir)
+      sources = [str(p.relative_to(target_workdir)) for p in target_workdir_obj.rglob("*.py")]
+      for missing_init in identify_missing_init_files(sources):
+        (target_workdir_obj / missing_init).touch()
       logging.info("Grpcio finished code generation into: [{}]".format(target_workdir))
 
   def build_args(self, target, target_workdir):
