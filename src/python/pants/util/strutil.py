@@ -3,9 +3,10 @@
 
 import re
 import shlex
+from typing import Any, Dict, List, Optional, Union
 
 
-def ensure_binary(text_or_binary):
+def ensure_binary(text_or_binary: Union[bytes, str]) -> bytes:
   if isinstance(text_or_binary, bytes):
     return text_or_binary
   elif isinstance(text_or_binary, str):
@@ -14,7 +15,7 @@ def ensure_binary(text_or_binary):
     raise TypeError('Argument is neither text nor binary type.({})'.format(type(text_or_binary)))
 
 
-def ensure_text(text_or_binary):
+def ensure_text(text_or_binary: Union[bytes, str]) -> str:
   if isinstance(text_or_binary, bytes):
     return text_or_binary.decode()
   elif isinstance(text_or_binary, str):
@@ -23,11 +24,11 @@ def ensure_text(text_or_binary):
     raise TypeError('Argument is neither text nor binary type ({})'.format(type(text_or_binary)))
 
 
-def is_text_or_binary(obj):
+def is_text_or_binary(obj: Any) -> bool:
   return isinstance(obj, (str, bytes))
 
 
-def safe_shlex_split(text_or_binary):
+def safe_shlex_split(text_or_binary: Union[bytes, str]) -> List[str]:
   """Split a string using shell-like syntax.
 
   Safe even on python versions whose shlex.split() method doesn't accept unicode.
@@ -41,7 +42,7 @@ def safe_shlex_split(text_or_binary):
 _shell_unsafe_chars_pattern = re.compile(r'[^\w@%+=:,./-]').search
 
 
-def shell_quote(s):
+def shell_quote(s: str) -> str:
   """Return a shell-escaped version of the string *s*."""
   if not s:
     return "''"
@@ -53,7 +54,7 @@ def shell_quote(s):
   return "'" + s.replace("'", "'\"'\"'") + "'"
 
 
-def safe_shlex_join(arg_list):
+def safe_shlex_join(arg_list: List[str]) -> str:
   """Join a list of strings into a shlex-able string.
 
   Shell-quotes each argument with `shell_quote()`.
@@ -61,14 +62,20 @@ def safe_shlex_join(arg_list):
   return ' '.join(shell_quote(arg) for arg in arg_list)
 
 
-def create_path_env_var(new_entries, env=None, env_var='PATH', delimiter=':', prepend=False):
+def create_path_env_var(
+  new_entries: List[str],
+  env: Optional[Dict[str, str]] = None,
+  env_var: str = 'PATH',
+  delimiter: str = ':',
+  prepend: bool = False
+):
   """Join path entries, combining with an environment variable if specified."""
   if env is None:
     env = {}
 
   prev_path = env.get(env_var, None)
   if prev_path is None:
-    path_dirs = list()
+    path_dirs: List[str] = []
   else:
     path_dirs = list(prev_path.split(delimiter))
 
@@ -82,21 +89,20 @@ def create_path_env_var(new_entries, env=None, env_var='PATH', delimiter=':', pr
   return delimiter.join(path_dirs)
 
 
-def camelcase(string):
+def camelcase(string: str) -> str:
   """Convert snake casing (containing - or _ characters) to camel casing."""
   return ''.join(word.capitalize() for word in re.split('[-_]', string))
 
 
-def pluralize(count, item_type):
+def pluralize(count: int, item_type: str) -> str:
   """Pluralizes the item_type if the count does not equal one.
 
   For example `pluralize(1, 'apple')` returns '1 apple',
   while `pluralize(0, 'apple') returns '0 apples'.
 
   :return The count and inflected item_type together as a string
-  :rtype string
   """
-  def pluralize_string(x):
+  def pluralize_string(x: str) -> str:
     if x.endswith('s'):
       return x + 'es'
     else:
@@ -106,17 +112,16 @@ def pluralize(count, item_type):
   return text
 
 
-def strip_prefix(string, prefix):
+def strip_prefix(string: str, prefix: str) -> str:
   """Returns a copy of the string from which the multi-character prefix has been stripped.
 
   Use strip_prefix() instead of lstrip() to remove a substring (instead of individual characters)
   from the beginning of a string, if the substring is present.  lstrip() does not match substrings
   but rather treats a substring argument as a set of characters.
 
-  :param str string: The string from which to strip the specified prefix.
-  :param str prefix: The substring to strip from the left of string, if present.
+  :param string: The string from which to strip the specified prefix.
+  :param prefix: The substring to strip from the left of string, if present.
   :return: The string with prefix stripped from the left, if present.
-  :rtype: string
   """
   if string.startswith(prefix):
     return string[len(prefix):]

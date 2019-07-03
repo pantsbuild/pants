@@ -4,6 +4,7 @@
 python_library(
   name = 'argutil',
   sources = ['argutil.py'],
+  tags = {'type_checked'},
 )
 
 python_library(
@@ -32,6 +33,7 @@ python_library(
   dependencies = [
     ':osutil',
   ],
+  tags = {'type_checked'},
 )
 
 python_library(
@@ -93,6 +95,7 @@ python_library(
 python_library(
   name = 'osutil',
   sources = ['osutil.py'],
+  tags = {'type_checked'},
 )
 
 python_library(
@@ -134,6 +137,7 @@ python_library(
 python_library(
   name = 'strutil',
   sources = ['strutil.py'],
+  tags = {'type_checked'},
 )
 
 python_library(

@@ -8,6 +8,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:argutil',
   ],
+  tags = {'type_checked'},
 )
 
 python_tests(
@@ -148,7 +149,8 @@ python_tests(
   sources = ['test_strutil.py'],
   dependencies = [
     'src/python/pants/util:strutil',
-  ]
+  ],
+  tags = {'type_checked'},
 )
 
 python_tests(

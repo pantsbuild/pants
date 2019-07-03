@@ -4,7 +4,9 @@
 import errno
 import logging
 import os
+import posix
 from functools import reduce
+from typing import Dict, List, Optional, Set, Tuple
 
 
 logger = logging.getLogger(__name__)
@@ -18,7 +20,7 @@ OS_ALIASES = {
 Pid = int
 
 
-def get_os_name(uname_result=None):
+def get_os_name(uname_result: Optional[posix.uname_result] = None) -> str:
   """
   :API: public
   """
@@ -27,7 +29,7 @@ def get_os_name(uname_result=None):
   return uname_result[0].lower()
 
 
-def normalize_os_name(os_name):
+def normalize_os_name(os_name: str) -> str:
   """
   :API: public
   """
@@ -40,15 +42,15 @@ def normalize_os_name(os_name):
   return os_name
 
 
-def get_normalized_os_name():
+def get_normalized_os_name() -> str:
   return normalize_os_name(get_os_name())
 
 
-def all_normalized_os_names():
+def all_normalized_os_names() -> List[str]:
   return list(OS_ALIASES.keys())
 
 
-def known_os_names():
+def known_os_names() -> Set[str]:
   return reduce(set.union, OS_ALIASES.values())
 
 
@@ -61,7 +63,7 @@ def known_os_names():
 #     [ESRCH]            No process or process group can be found corresponding to that specified by pid.
 #
 #     [ESRCH]            The process id was given as 0, but the sending process does not have a process group.
-def safe_kill(pid, signum):
+def safe_kill(pid: Pid, signum: int) -> None:
   """Kill a process with the specified signal, catching nonfatal errors."""
   assert(isinstance(pid, Pid))
   assert(isinstance(signum, int))
@@ -97,8 +99,10 @@ SUPPORTED_PLATFORM_NORMALIZED_NAMES = {
 }
 
 
-def get_closest_mac_host_platform_pair(darwin_version_upper_bound,
-                                       platform_name_map=SUPPORTED_PLATFORM_NORMALIZED_NAMES):
+def get_closest_mac_host_platform_pair(
+  darwin_version_upper_bound: str,
+  platform_name_map: Dict[Tuple[str, str], Tuple[str, str]] = SUPPORTED_PLATFORM_NORMALIZED_NAMES
+) -> Tuple[Optional[str], Optional[str]]:
   """Return the (host, platform) pair for the highest known darwin version less than the bound."""
   darwin_versions = [int(x[1]) for x in platform_name_map if x[0] == 'darwin']
   bounded_darwin_versions = [v for v in darwin_versions if v <= int(darwin_version_upper_bound)]
