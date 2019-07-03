@@ -134,7 +134,7 @@ class RemotePantsRunner:
         logger.fatal('')
         logger.fatal('lost active connection to pantsd!')
         traceback = sys.exc_info()[2]
-        raise self._extract_remote_exception(pantsd_handle.pid, e).with_traceback(tb=traceback)
+        raise self._extract_remote_exception(pantsd_handle.pid, e).with_traceback(traceback)
 
   def _connect_and_execute(self, pantsd_handle):
     port = pantsd_handle.port
