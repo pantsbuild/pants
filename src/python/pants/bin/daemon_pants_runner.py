@@ -114,7 +114,7 @@ class _PantsProductPrecomputeFailed(Exception):
     """
     :param wrapped_exception: Original exception raised by the engine.
     """
-    super().__init__('Product precomputation in the daemon raised an exception: {}'.format(wrapped_exception))
+    super(_PantsProductPrecomputeFailed, self).__init__('Product precomputation in the daemon raised an exception: {}'.format(wrapped_exception))
 
 
 class DaemonPantsRunner:
@@ -128,6 +128,8 @@ class DaemonPantsRunner:
     maybe_shutdown_socket = MaybeShutdownSocket(sock)
     exception = None
 
+    # TODO(#8002) This can probably be moved to the try:except block in DaemonPantsRunner.run() function,
+    #             Making exception handling a lot easier.
     try:
       # N.B. This will redirect stdio in the daemon's context to the nailgun session.
       with cls.nailgunned_stdio(maybe_shutdown_socket, env, handle_stdin=False) as finalizer:
@@ -142,8 +144,6 @@ class DaemonPantsRunner:
       # TODO: this should no longer be necessary, remove the creation of subprocess_dir
       subprocess_dir = os.path.join(get_buildroot(), '.pids')
       exception = _PantsProductPrecomputeFailed(e)
-      # TODO This used to raise the _GracefulTerminationException, and maybe it should again, or notify in some way that the prefork has failed.
-
 
     return cls(
       maybe_shutdown_socket,
@@ -328,4 +328,4 @@ class DaemonPantsRunner:
         # and calling this method, we emulate the normal, expected sys.excepthook override.
         ExceptionSink._log_unhandled_exception_and_exit(exc=e)
       else:
-        self._exiter.exit(self.exit_code if self.exit_code else PANTS_SUCCEEDED_EXIT_CODE)
+        self._exiter.exit(PANTS_SUCCEEDED_EXIT_CODE)
