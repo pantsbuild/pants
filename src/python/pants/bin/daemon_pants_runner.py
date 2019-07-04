@@ -116,6 +116,8 @@ class _PantsProductPrecomputeFailed(Exception):
     """
     super(_PantsProductPrecomputeFailed, self).__init__('Product precomputation in the daemon raised an exception: {}'.format(wrapped_exception))
 
+    self.wrapped_exception = wrapped_exception
+
 
 class DaemonPantsRunner:
   """A daemonizing PantsRunner that speaks the nailgun protocol to a remote client.
@@ -144,6 +146,13 @@ class DaemonPantsRunner:
       # TODO: this should no longer be necessary, remove the creation of subprocess_dir
       subprocess_dir = os.path.join(get_buildroot(), '.pids')
       exception = _PantsProductPrecomputeFailed(e)
+
+    # NB: If a scheduler_service.prefork finishes with a non-0 exit code but doesn't raise an exception
+    # (e.g. ./pants list-and-die-for-testing ...). We still want to know about it.
+    if exception is None and exit_code != PANTS_SUCCEEDED_EXIT_CODE:
+      exception = _PantsProductPrecomputeFailed(
+        _PantsRunFinishedWithFailureException(exit_code=exit_code)
+      )
 
     return cls(
       maybe_shutdown_socket,
@@ -321,6 +330,10 @@ class DaemonPantsRunner:
         ExceptionSink.log_exception(
           'Pants run failed with exception: {}; exiting'.format(e))
         self._exiter.exit(e.exit_code)
+      except _PantsProductPrecomputeFailed as e:
+        exit_code = e.wrapped_exception.exit_code if e.wrapped_exception.exit_code else PANTS_FAILED_EXIT_CODE
+        ExceptionSink.log_exception(repr(e))
+        self._exiter.exit(exit_code)
       except Exception as e:
         # TODO: We override sys.excepthook above when we call ExceptionSink.set_exiter(). That
         # excepthook catches `SignalHandledNonLocalExit`s from signal handlers, which isn't
