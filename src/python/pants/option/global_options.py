@@ -361,8 +361,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
 
     register('--remote-execution', advanced=True, type=bool,
              default=DEFAULT_EXECUTION_OPTIONS.remote_execution,
-             help="Enables the remote store and remote build execution for increased "
-                  "parallelism. (Alpha)")
+             help="Enables remote workers for increased parallelism. (Alpha)")
     register('--remote-store-server', advanced=True, type=list, default=[],
              help='host:port of grpc server to use as remote execution file store.')
     register('--remote-store-thread-count', type=int, advanced=True,
