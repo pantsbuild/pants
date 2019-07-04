@@ -122,7 +122,7 @@ class PlainTextReporter(PlainTextReporterBase):
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
-    if not self.is_under_main_root(workunit):
+    if self.is_under_background_root(workunit):
       return
 
     label_format = self._get_label_format(workunit)
@@ -143,7 +143,7 @@ class PlainTextReporter(PlainTextReporterBase):
 
   def end_workunit(self, workunit):
     """Implementation of Reporter callback."""
-    if not self.is_under_main_root(workunit):
+    if self.is_under_background_root(workunit):
       return
 
     if workunit.outcome() != WorkUnit.SUCCESS and not self._show_output(workunit):
@@ -157,7 +157,7 @@ class PlainTextReporter(PlainTextReporterBase):
 
   def do_handle_log(self, workunit, level, *msg_elements):
     """Implementation of Reporter callback."""
-    if not self.is_under_main_root(workunit):
+    if self.is_under_background_root(workunit):
       return
 
     # If the element is a (msg, detail) pair, we ignore the detail. There's no
@@ -172,7 +172,7 @@ class PlainTextReporter(PlainTextReporterBase):
 
   def handle_output(self, workunit, label, s):
     """Implementation of Reporter callback."""
-    if not self.is_under_main_root(workunit):
+    if self.is_under_background_root(workunit):
       return
     tool_output_format = self._get_tool_output_format(workunit)
     if tool_output_format == ToolOutputFormat.INDENT:
