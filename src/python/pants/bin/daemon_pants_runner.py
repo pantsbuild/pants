@@ -118,6 +118,13 @@ class _PantsProductPrecomputeFailed(Exception):
 
     self.wrapped_exception = wrapped_exception
 
+  @property
+  def exit_code(self):
+    if isinstance(self.wrapped_exception, _PantsRunFinishedWithFailureException):
+      return self.wrapped_exception.exit_code
+    else:
+      return PANTS_FAILED_EXIT_CODE
+
 
 class DaemonPantsRunner:
   """A daemonizing PantsRunner that speaks the nailgun protocol to a remote client.
@@ -331,9 +338,8 @@ class DaemonPantsRunner:
           'Pants run failed with exception: {}; exiting'.format(e))
         self._exiter.exit(e.exit_code)
       except _PantsProductPrecomputeFailed as e:
-        exit_code = e.wrapped_exception.exit_code if e.wrapped_exception.exit_code else PANTS_FAILED_EXIT_CODE
         ExceptionSink.log_exception(repr(e))
-        self._exiter.exit(exit_code)
+        self._exiter.exit(e.exit_code)
       except Exception as e:
         # TODO: We override sys.excepthook above when we call ExceptionSink.set_exiter(). That
         # excepthook catches `SignalHandledNonLocalExit`s from signal handlers, which isn't
