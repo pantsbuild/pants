@@ -49,10 +49,10 @@ class GrpcioRun(SimpleCodegenTask):
                         exit_code=exit_code)
       # Create __init__.py in each subdirectory of the target directory so that setup_py recognizes
       # them as modules.
-      target_workdir_obj = Path(target_workdir)
-      sources = [str(p.relative_to(target_workdir)) for p in target_workdir_obj.rglob("*.py")]
+      target_workdir_path = Path(target_workdir)
+      sources = [str(p.relative_to(target_workdir_path)) for p in target_workdir_path.rglob("*.py")]
       for missing_init in identify_missing_init_files(sources):
-        (target_workdir_obj / missing_init).touch()
+        (target_workdir_path / missing_init).touch()
       logging.info("Grpcio finished code generation into: [{}]".format(target_workdir))
 
   def build_args(self, target, target_workdir):
