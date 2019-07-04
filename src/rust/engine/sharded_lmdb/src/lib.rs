@@ -62,8 +62,6 @@ impl ShardedLmdb {
     trace!("Initializing ShardedLmdb at root {:?}", root_path);
     let mut lmdbs = HashMap::new();
 
-    #[allow(clippy::identity_conversion)]
-    // False positive: https://github.com/rust-lang/rust-clippy/issues/3913
     for (env, dir, fingerprint_prefix) in ShardedLmdb::envs(&root_path, max_size)? {
       trace!("Making ShardedLmdb content database for {:?}", dir);
       let content_database = env
