@@ -139,6 +139,8 @@ class PluginResolverTest(unittest.TestCase):
           self.fail('Plugin re-resolution is expected for an incompatible interpreter and it is '
                     'expected to fail since we removed the dist `repo_dir` above.')
 
+      # But for a compatible interpreter the exact resolve results should be re-used and load
+      # directly from the still in-tact cache.
       with self.plugin_resolution(interpreter=python36,
                                   chroot=chroot,
                                   plugins=[('jake', '1.2.3'), ('jane', '3.4.5')]) as results2:
