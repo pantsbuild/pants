@@ -13,6 +13,7 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:memo',
     'src/python/pants/task',
   ],
 )

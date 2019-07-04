@@ -3,9 +3,11 @@
 
 import functools
 import logging
+from pathlib import Path
 
 from pants.backend.codegen.grpcio.python.grpcio_prep import GrpcioPrep
 from pants.backend.codegen.grpcio.python.python_grpcio_library import PythonGrpcioLibrary
+from pants.backend.python.subsystems.pex_build_util import identify_missing_init_files
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -45,6 +47,12 @@ class GrpcioRun(SimpleCodegenTask):
       if exit_code != 0:
         raise TaskError('{} ... exited non-zero ({}).'.format(cmdline, exit_code),
                         exit_code=exit_code)
+      # Create __init__.py in each subdirectory of the target directory so that setup_py recognizes
+      # them as modules.
+      target_workdir_path = Path(target_workdir)
+      sources = [str(p.relative_to(target_workdir_path)) for p in target_workdir_path.rglob("*.py")]
+      for missing_init in identify_missing_init_files(sources):
+        (target_workdir_path / missing_init).touch()
       logging.info("Grpcio finished code generation into: [{}]".format(target_workdir))
 
   def build_args(self, target, target_workdir):
