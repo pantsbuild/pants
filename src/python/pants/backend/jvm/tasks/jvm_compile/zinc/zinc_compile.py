@@ -274,7 +274,7 @@ class BaseZincCompile(JvmCompile):
 
     # list of classpath entries
     scalac_classpath_entries = self.scalac_classpath_entries()
-    scala_path = [classpath_entry.path for classpath_entry in scalac_classpath_entries]
+    scala_path = [relative_to_exec_root(classpath_entry.path) for classpath_entry in scalac_classpath_entries]
 
     zinc_args = []
     zinc_args.extend([
