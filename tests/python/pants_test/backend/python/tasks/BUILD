@@ -65,7 +65,7 @@ python_tests(
     '3rdparty/python:pex',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
-    'tests/python/pants_test/backend/python:interpreter_selection_utils',
+    'tests/python/pants_test:interpreter_selection_utils',
   ],
   tags = {'integration'},
   timeout=240,
@@ -78,7 +78,7 @@ python_tests(
     'src/python/pants/backend/python/tasks',
     'src/python/pants/base:exceptions',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/backend/python:interpreter_selection_utils',
+    'tests/python/pants_test:interpreter_selection_utils',
     ':python_task_test_base',
   ],
 )
@@ -118,7 +118,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
-    'tests/python/pants_test/backend/python:interpreter_selection_utils',
+    'tests/python/pants_test:interpreter_selection_utils',
     'tests/python/pants_test/testutils:pexrc_util',
   ],
   tags = {'integration'},
@@ -178,7 +178,7 @@ python_tests(
     '3rdparty/python:pex',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
-    'tests/python/pants_test/backend/python:interpreter_selection_utils',
+    'tests/python/pants_test:interpreter_selection_utils',
     'tests/python/pants_test/testutils:pexrc_util',
   ],
   tags = {'integration'},
@@ -233,9 +233,10 @@ python_tests(
   name = 'setup_py',
   sources = ['test_setup_py.py'],
   dependencies = [
-    '3rdparty/python:pex',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
+    '3rdparty/python:pex',
+    ':python_task_test_base',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python/tasks',
@@ -244,9 +245,8 @@ python_tests(
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/backend/python:interpreter_selection_utils',
     'tests/python/pants_test/subsystem:subsystem_utils',
-    ':python_task_test_base',
+    'tests/python/pants_test:interpreter_selection_utils',
   ],
 )
 

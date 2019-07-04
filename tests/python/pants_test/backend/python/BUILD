@@ -29,11 +29,11 @@ python_tests(
   name = 'interpreter_cache',
   sources = ['test_interpreter_cache.py'],
   dependencies = [
-    ':interpreter_selection_utils',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/testutils:pexrc_util',
+    'tests/python/pants_test:interpreter_selection_utils',
     'tests/python/pants_test:test_base',
   ],
 )
@@ -58,9 +58,4 @@ python_library(
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:int-test',
   ]
-)
-
-python_library(
-  name='interpreter_selection_utils',
-  sources=['interpreter_selection_utils.py'],
 )
