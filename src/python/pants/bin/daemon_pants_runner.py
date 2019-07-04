@@ -136,6 +136,7 @@ class DaemonPantsRunner:
   def create(cls, sock, args, env, services, scheduler_service):
     maybe_shutdown_socket = MaybeShutdownSocket(sock)
     exception = None
+    exit_code = PANTS_SUCCEEDED_EXIT_CODE
 
     # TODO(#8002) This can probably be moved to the try:except block in DaemonPantsRunner.run() function,
     #             Making exception handling a lot easier.
