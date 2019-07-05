@@ -590,33 +590,33 @@ impl PosixFS {
     &self,
     dir_relative_to_root: Dir,
   ) -> impl Future<Item = DirectoryListing, Error = io::Error> {
-    let dir_abs = self.root.0.join(&dir_relative_to_root.0);
     let posix_fs = self.clone();
-    let ignore = self.ignore.clone();
     self
       .io_pool
-      .spawn_fn(move || std::fs::read_dir(&dir_abs))
-      .and_then(move |readdir| {
-        futures::future::join_all(
-          readdir
-            .map(move |dir_entry| {
-              let dir_relative_to_root = dir_relative_to_root.clone();
-              let posix_fs = posix_fs.clone();
-              futures::future::done(dir_entry).and_then(move |dir_entry| {
-                posix_fs.stat(dir_relative_to_root.0.join(dir_entry.file_name()))
-              })
-            })
-            .collect::<Vec<_>>(),
+      .spawn_fn(move || posix_fs.scandir_sync(&dir_relative_to_root))
+      .map(DirectoryListing)
+  }
+
+  fn scandir_sync(&self, dir_relative_to_root: &Dir) -> Result<Vec<Stat>, std::io::Error> {
+    let dir_abs = self.root.0.join(&dir_relative_to_root.0);
+    let ignore = self.ignore.clone();
+    let mut stats: Vec<Stat> = dir_abs
+      .read_dir()?
+      .map(|readdir| {
+        let dir_entry = readdir?;
+        PosixFS::stat_internal(
+          dir_relative_to_root.0.join(dir_entry.file_name()),
+          &dir_abs,
+          &std::fs::symlink_metadata(dir_abs.join(dir_entry.file_name()))?,
         )
       })
-      .map(|stats| {
-        let mut stats: Vec<_> = stats
-          .into_iter()
-          .filter(move |s| !ignore.is_ignored(s))
-          .collect();
-        stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
-        DirectoryListing(stats)
+      .filter(|stat| match stat {
+        Ok(ref s) => !ignore.is_ignored(s),
+        Err(..) => true,
       })
+      .collect::<Result<Vec<_>, std::io::Error>>()?;
+    stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
+    Ok(stats)
   }
 
   pub fn is_ignored(&self, stat: &Stat) -> bool {
