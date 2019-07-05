@@ -29,6 +29,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Christopher Livingston
 + Cody Gibb
 + Craig Schertz
++ Damon Revoe
 + Dan Davydov
 + Dan Fabulich
 + Dan Harrison
