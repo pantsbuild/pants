@@ -1,8 +1,10 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
+import re
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants.java.jar.jar_dependency import JarDependency
+from pants.util.dirutil import read_file
 
 
 TEST_DIR = 'testprojects/src/scala/org/pantsbuild/testproject'
@@ -10,39 +12,85 @@ TEST_DIR = 'testprojects/src/scala/org/pantsbuild/testproject'
 
 class ScalaFixIntegrationTest(PantsRunIntegrationTest):
 
-  _rules = {'rules': 'ProcedureSyntax'}
-  _options = {
-      'lint.scalafix': _rules,
-      'fmt.scalafix': _rules,
-      'lint.scalastyle': {'skip': True}
-    }
-
   @classmethod
   def hermetic(cls):
     return True
 
   def test_scalafix_fail(self):
-    target = '{}/procedure_syntax'.format(TEST_DIR)
+
+    rules = {'rules': 'ProcedureSyntax'}
+    options = {
+      'lint.scalafix': rules,
+      'fmt.scalafix': rules,
+      'lint.scalastyle': {'skip': True}
+    }
+
+    target = f'{TEST_DIR}/procedure_syntax'
     # lint should fail because the rule has an impact.
-    failing_test = self.run_pants(['lint', target], self._options)
+    failing_test = self.run_pants(['lint', target], options)
     self.assert_failure(failing_test)
 
   def test_scalafix_disabled(self):
+
+    rules = {'rules': 'ProcedureSyntax'}
+    options = {
+      'lint.scalafix': rules,
+      'fmt.scalafix': rules,
+      'lint.scalastyle': {'skip': True}
+    }
+
     # take a snapshot of the file which we can write out
     # after the test finishes executing.
-    test_file_name = '{}/procedure_syntax/ProcedureSyntax.scala'.format(TEST_DIR)
-    with open(test_file_name, 'r') as f:
-      contents = f.read()
+    test_file_name = f'{TEST_DIR}/procedure_syntax/ProcedureSyntax.scala'
+    
+    contents = read_file(test_file_name)
 
     try:
       # format an incorrectly formatted file.
-      target = '{}/procedure_syntax'.format(TEST_DIR)
-      fmt_result = self.run_pants(['fmt', target], self._options)
+      target = f'{TEST_DIR}/procedure_syntax'
+      fmt_result = self.run_pants(['fmt', target], options)
       self.assert_success(fmt_result)
 
       # verify that the lint check passes.
-      test_fix = self.run_pants(['lint', target], self._options)
+      test_fix = self.run_pants(['lint', target], options)
       self.assert_success(test_fix)
+    finally:
+      # restore the file to its original state.
+      f = open(test_file_name, 'w')
+      f.write(contents)
+      f.close()
+
+  def test_rsccompat_fmt(self):
+    options =  {
+      'scala': {
+        'scalac_plugin_dep': f'{TEST_DIR}/rsc_compat:semanticdb-scalac',
+        'scalac_plugins': '+["semanticdb"]'
+      },
+      'fmt.scalafix': {
+        'rules': 'scala:rsc.rules.RscCompat',
+        'semantic': True,
+        'transitive': True,
+        'scalafix_tool_classpath': f'{TEST_DIR}/rsc_compat:rsc-compat',
+      },
+      'lint.scalafix': {'skip': True},
+      'lint.scalastyle': {'skip': True},
+    }
+    
+    test_file_name = f'{TEST_DIR}/rsc_compat/RscCompat.scala'
+    fixed_file_name = f'{TEST_DIR}/rsc_compat/RscCompatFixed.scala'
+
+    contents = read_file(test_file_name)
+
+    try:
+      # format an incorrectly formatted file.
+      target = f'{TEST_DIR}/rsc_compat'
+      fmt_result = self.run_pants(['fmt', target], options)
+      self.assert_success(fmt_result)
+
+      result = read_file(test_file_name)
+      result = re.sub(re.escape('object RscCompat {'), 'object RscCompatFixed {', result)
+      expected = read_file(fixed_file_name)
+      assert(result == expected)
     finally:
       # restore the file to its original state.
       f = open(test_file_name, 'w')
