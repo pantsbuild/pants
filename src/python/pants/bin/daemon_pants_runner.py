@@ -102,6 +102,30 @@ class _PantsRunFinishedWithFailureException(Exception):
     return self._exit_code
 
 
+class _PantsProductPrecomputeFailed(Exception):
+  """
+  Represents a failure in the precompute step of v2 products for pants runs.
+  (e.g. The user called ./pants dependees and there was a broken link)
+
+  Will be raised by the DaemonPantsRunner at creation time.
+  """
+
+  def __init__(self, wrapped_exception):
+    """
+    :param wrapped_exception: Original exception raised by the engine.
+    """
+    super(_PantsProductPrecomputeFailed, self).__init__('Product precomputation in the daemon raised an exception: {}'.format(wrapped_exception))
+
+    self.wrapped_exception = wrapped_exception
+
+  @property
+  def exit_code(self):
+    if isinstance(self.wrapped_exception, _PantsRunFinishedWithFailureException):
+      return self.wrapped_exception.exit_code
+    else:
+      return PANTS_FAILED_EXIT_CODE
+
+
 class DaemonPantsRunner:
   """A daemonizing PantsRunner that speaks the nailgun protocol to a remote client.
 
@@ -111,7 +135,11 @@ class DaemonPantsRunner:
   @classmethod
   def create(cls, sock, args, env, services, scheduler_service):
     maybe_shutdown_socket = MaybeShutdownSocket(sock)
+    exception = None
+    exit_code = PANTS_SUCCEEDED_EXIT_CODE
 
+    # TODO(#8002) This can probably be moved to the try:except block in DaemonPantsRunner.run() function,
+    #             Making exception handling a lot easier.
     try:
       # N.B. This will redirect stdio in the daemon's context to the nailgun session.
       with cls.nailgunned_stdio(maybe_shutdown_socket, env, handle_stdin=False) as finalizer:
@@ -119,14 +147,20 @@ class DaemonPantsRunner:
         subprocess_dir = options.for_global_scope().pants_subprocessdir
         graph_helper, target_roots, exit_code = scheduler_service.prefork(options, options_bootstrapper)
         finalizer()
-    except Exception:
+    except Exception as e:
       graph_helper = None
       target_roots = None
       options_bootstrapper = None
       # TODO: this should no longer be necessary, remove the creation of subprocess_dir
       subprocess_dir = os.path.join(get_buildroot(), '.pids')
-      exit_code = 1
-      # TODO This used to raise the _GracefulTerminationException, and maybe it should again, or notify in some way that the prefork has failed.
+      exception = _PantsProductPrecomputeFailed(e)
+
+    # NB: If a scheduler_service.prefork finishes with a non-0 exit code but doesn't raise an exception
+    # (e.g. ./pants list-and-die-for-testing ...). We still want to know about it.
+    if exception is None and exit_code != PANTS_SUCCEEDED_EXIT_CODE:
+      exception = _PantsProductPrecomputeFailed(
+        _PantsRunFinishedWithFailureException(exit_code=exit_code)
+      )
 
     return cls(
       maybe_shutdown_socket,
@@ -137,11 +171,11 @@ class DaemonPantsRunner:
       services,
       subprocess_dir,
       options_bootstrapper,
-      exit_code
+      exception
     )
 
   def __init__(self, maybe_shutdown_socket, args, env, graph_helper, target_roots, services,
-               metadata_base_dir, options_bootstrapper, exit_code):
+               metadata_base_dir, options_bootstrapper, exception):
     """
     :param socket socket: A connected socket capable of speaking the nailgun protocol.
     :param list args: The arguments (i.e. sys.argv) for this run.
@@ -163,8 +197,8 @@ class DaemonPantsRunner:
     self._target_roots = target_roots
     self._services = services
     self._options_bootstrapper = options_bootstrapper
-    self.exit_code = exit_code
     self._exiter = DaemonExiter(maybe_shutdown_socket)
+    self._exception = exception
 
   # TODO: this should probably no longer be necesary, remove.
   def _make_identity(self):
@@ -275,6 +309,11 @@ class DaemonPantsRunner:
       hermetic_environment_as(**self._env), \
       encapsulated_global_logger():
       try:
+        # Raise any exceptions we may have found when precomputing products.
+        # NB: We raise it here as opposed to earlier because we have setup logging and stdio.
+        if self._exception is not None:
+          raise self._exception
+
         # Clean global state.
         clean_global_runtime_state(reset_subsystem=True)
 
@@ -299,6 +338,9 @@ class DaemonPantsRunner:
         ExceptionSink.log_exception(
           'Pants run failed with exception: {}; exiting'.format(e))
         self._exiter.exit(e.exit_code)
+      except _PantsProductPrecomputeFailed as e:
+        ExceptionSink.log_exception(repr(e))
+        self._exiter.exit(e.exit_code)
       except Exception as e:
         # TODO: We override sys.excepthook above when we call ExceptionSink.set_exiter(). That
         # excepthook catches `SignalHandledNonLocalExit`s from signal handlers, which isn't
@@ -306,4 +348,4 @@ class DaemonPantsRunner:
         # and calling this method, we emulate the normal, expected sys.excepthook override.
         ExceptionSink._log_unhandled_exception_and_exit(exc=e)
       else:
-        self._exiter.exit(self.exit_code if self.exit_code else PANTS_SUCCEEDED_EXIT_CODE)
+        self._exiter.exit(PANTS_SUCCEEDED_EXIT_CODE)

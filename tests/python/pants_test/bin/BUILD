@@ -12,3 +12,13 @@ python_tests(
   ],
   tags = {'integration'},
 )
+
+python_tests(
+  name='daemon_pants_runner',
+  sources=['test_daemon_pants_runner.py'],
+  dependencies=[
+    'src/python/pants/base:exiter',
+    'src/python/pants/bin',
+    'tests/python/pants_test:test_infra',
+  ]
+)
