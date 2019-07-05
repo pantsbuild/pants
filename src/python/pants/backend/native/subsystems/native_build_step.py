@@ -4,6 +4,7 @@
 from abc import abstractmethod
 
 from pants.build_graph.mirrored_target_option_mixin import MirroredTargetOptionMixin
+from pants.engine.rules import VariantRule
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
@@ -93,3 +94,7 @@ class CppCompileSettings(CompileSettingsBase):
 # TODO: add a fatal_warnings kwarg to NativeArtifact and make a LinkSharedLibrariesSettings subclass
 # of NativeBuildStep here! The method should work even though NativeArtifact is not a
 # Target.
+def rules():
+  return [
+    VariantRule(ToolchainVariant),
+  ]

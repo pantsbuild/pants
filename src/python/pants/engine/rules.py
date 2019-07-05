@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import ast
+import functools
 import inspect
 import itertools
 import logging
@@ -16,8 +17,8 @@ from twitter.common.collections import OrderedSet
 from pants.engine.goal import Goal
 from pants.engine.selectors import Get
 from pants.util.collections import assert_single_element
-from pants.util.memo import memoized
-from pants.util.objects import SubclassesOf, TypedCollection, datatype
+from pants.util.memo import memoized, memoized_classmethod, memoized_staticmethod
+from pants.util.objects import ChoicesMixin, SubclassesOf, TypedCollection, datatype
 
 
 logger = logging.getLogger(__name__)
@@ -188,7 +189,7 @@ def _get_starting_indent(source):
   return 0
 
 
-def _make_rule(output_type, input_selectors, cacheable=True):
+def _make_rule(output_type, input_selectors, cacheable=True, given=None):
   """A @decorator that declares that a particular static function may be used as a TaskRule.
 
   As a special case, if the output_type is a subclass of `Goal`, the `Goal.Options` for the `Goal`
@@ -203,6 +204,11 @@ def _make_rule(output_type, input_selectors, cacheable=True):
   if is_goal_cls == cacheable:
     raise TypeError('An `@rule` that produces a `Goal` must be declared with @console_rule in order '
                     'to signal that it is not cacheable.')
+
+  pre_args = [
+    VariantRule.anon_union_class_for(enum_instance)
+    for enum_instance in (given or [])
+  ]
 
   def wrapper(func):
     if not inspect.isfunction(func):
@@ -253,10 +259,17 @@ def _make_rule(output_type, input_selectors, cacheable=True):
     else:
       dependency_rules = None
 
+    @functools.wraps(func)
+    def func_wrapper(*args):
+      pre = args[:len(pre_args)]
+      logger.debug(f'pre args dropped: {pre}')
+      post = args[len(pre_args):]
+      return func(*post)
+
     func.rule = TaskRule(
         output_type,
-        tuple(input_selectors),
-        func,
+        tuple(pre_args + input_selectors),
+        func_wrapper,
         input_gets=tuple(gets),
         dependency_rules=dependency_rules,
         cacheable=cacheable,
@@ -266,8 +279,8 @@ def _make_rule(output_type, input_selectors, cacheable=True):
   return wrapper
 
 
-def rule(output_type, input_selectors):
-  return _make_rule(output_type, input_selectors)
+def rule(output_type, input_selectors, given=[]):
+  return _make_rule(output_type, input_selectors, given=given)
 
 
 def console_rule(goal_cls, input_selectors):
@@ -317,11 +330,48 @@ class UnionRule(datatype([
 ])):
   """Specify that an instance of `union_member` can be substituted wherever `union_base` is used."""
 
-  def __new__(cls, union_base, union_member):
-    if not getattr(union_base, '_is_union', False):
-      raise cls.make_type_error('union_base must be a type annotated with @union: was {} (type {})'
-                                .format(union_base, type(union_base).__name__))
+  def __new__(cls, union_base, union_member, validate_union_base=True):
+    if validate_union_base:
+      if not getattr(union_base, '_is_union', False):
+        raise cls.make_type_error('union_base must be a type annotated with @union: was {} (type {})'
+                                  .format(union_base, type(union_base).__name__))
     return super().__new__(cls, union_base, union_member)
+
+
+class VariantRule(datatype(['tag_cls'])):
+  """???"""
+
+  def __new__(cls, tag_cls):
+    assert isinstance(tag_cls, type)
+    assert issubclass(tag_cls, ChoicesMixin)
+    return super().__new__(cls, tag_cls)
+
+  @memoized_staticmethod
+  def _anonymous_enum_unions(tag_cls):
+    assert isinstance(tag_cls, type)
+    assert issubclass(tag_cls, ChoicesMixin)
+    return {
+      variant: type(f'Variant<{tag_cls.__name__}={variant.value}>', (datatype([
+        ('value', tag_cls),
+      ]),), {})
+      for variant in tag_cls.all_variants
+    }
+
+  @memoized_classmethod
+  def anon_union_class_for(cls, tag):
+    return cls._anonymous_enum_unions(type(tag))[tag]
+
+  @classmethod
+  def anon_union_instance_for(cls, tag):
+    wrapper_class = cls.anon_union_class_for(tag)
+    return wrapper_class(tag)
+
+  def anonymous_wrapper_classes_rules(self):
+    rules = []
+    for tag, anon_cls in self._anonymous_enum_unions(self.tag_cls).items():
+      rules.append(UnionRule(self.tag_cls, anon_cls, validate_union_base=False))
+      rules.append(RootRule(anon_cls))
+    return rules
 
 
 class Rule(ABC):
@@ -447,17 +497,23 @@ class RuleIndex(datatype(['rules', 'roots', 'union_rules'])):
       # NB: This does not require that union bases be supplied to `def rules():`, as the union type
       # is never instantiated!
       union_base = union_rule.union_base
-      assert union_base._is_union
+      # assert union_base._is_union
       union_member = union_rule.union_member
       if union_base not in union_rules:
         union_rules[union_base] = OrderedSet()
       union_rules[union_base].add(union_member)
 
-    for entry in rule_entries:
+    def add_rule_variants(variant_rule):
+      for new_rule in variant_rule.anonymous_wrapper_classes_rules():
+        process_rule(new_rule)
+
+    def process_rule(entry):
       if isinstance(entry, Rule):
         add_rule(entry)
       elif isinstance(entry, UnionRule):
         add_type_transition_rule(entry)
+      elif isinstance(entry, VariantRule):
+        add_rule_variants(entry)
       elif hasattr(entry, '__call__'):
         rule = getattr(entry, 'rule', None)
         if rule is None:
@@ -467,6 +523,9 @@ class RuleIndex(datatype(['rules', 'roots', 'union_rules'])):
         raise TypeError("""\
 Rule entry {} had an unexpected type: {}. Rules either extend Rule or UnionRule, or are static \
 functions decorated with @rule.""".format(entry, type(entry)))
+
+    for entry in rule_entries:
+      process_rule(entry)
 
     return cls(serializable_rules, serializable_roots, union_rules)
 

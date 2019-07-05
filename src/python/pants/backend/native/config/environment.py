@@ -4,7 +4,7 @@
 import os
 from abc import ABC, abstractmethod
 
-from pants.engine.rules import rule
+from pants.engine.rules import VariantRule, rule
 from pants.util.memo import memoized_classproperty
 from pants.util.objects import datatype, enum
 from pants.util.osutil import all_normalized_os_names, get_normalized_os_name
@@ -301,4 +301,5 @@ def platform_singleton():
 def create_native_environment_rules():
   return [
     platform_singleton,
+    VariantRule(Platform),
   ]

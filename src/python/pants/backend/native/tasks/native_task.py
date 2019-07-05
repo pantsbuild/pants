@@ -3,14 +3,15 @@
 
 from abc import abstractmethod
 
-from pants.backend.native.config.environment import CppToolchain, CToolchain
+from pants.backend.native.config.environment import CppToolchain, CToolchain, Platform
 from pants.backend.native.subsystems.native_build_settings import NativeBuildSettings
 from pants.backend.native.subsystems.native_build_step import NativeBuildStep
-from pants.backend.native.subsystems.native_toolchain import (NativeToolchain,
-                                                              ToolchainVariantRequest)
+from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.targets.packaged_native_library import PackagedNativeLibrary
 from pants.build_graph.dependency_context import DependencyContext
+from pants.engine.rules import VariantRule
+from pants.engine.selectors import Params
 from pants.task.task import Task
 from pants.util.collections import assert_single_element
 from pants.util.memo import memoized_method, memoized_property
@@ -85,11 +86,6 @@ class NativeTask(Task):
   def _native_toolchain(self):
     return NativeToolchain.scoped_instance(self)
 
-  def _toolchain_variant_request(self, variant):
-    return ToolchainVariantRequest(
-      toolchain=self._native_toolchain,
-      variant=variant)
-
   def get_c_toolchain_variant(self, native_library_target):
     return self._get_toolchain_variant(CToolchain, native_library_target)
 
@@ -99,7 +95,13 @@ class NativeTask(Task):
   def _get_toolchain_variant(self, toolchain_type, native_library_target):
     selected_variant = self._native_build_step.get_toolchain_variant_for_target(
       native_library_target)
-    return self._request_single(toolchain_type, self._toolchain_variant_request(selected_variant))
+    return self._request_single(
+      toolchain_type,
+      Params(
+        VariantRule.anon_union_instance_for(selected_variant),
+        VariantRule.anon_union_instance_for(Platform.current),
+        self._native_toolchain,
+      ))
 
   @memoized_method
   def native_deps(self, target):

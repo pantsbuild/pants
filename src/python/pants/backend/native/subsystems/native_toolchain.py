@@ -94,22 +94,30 @@ class LLVMCToolchain(datatype([('c_toolchain', CToolchain)])): pass
 class LLVMCppToolchain(datatype([('cpp_toolchain', CppToolchain)])): pass
 
 
-@rule(LibcObjects, [Platform, NativeToolchain])
-def select_libc_objects(platform, native_toolchain):
-  # We use lambdas here to avoid searching for libc on osx, where it will fail.
-  paths = platform.resolve_for_enum_variant({
-    'darwin': lambda: [],
-    'linux': lambda: native_toolchain._libc_dev.get_libc_objects(),
-  })()
-  yield LibcObjects(paths)
+@rule(LibcObjects, [NativeToolchain], given=[Platform.darwin])
+def select_libc_objects_darwin(native_toolchain):
+  """???/libc search will fail on osx/not supported"""
+  return LibcObjects([])
+
+# # ^desugars to...?
+# @rule(LibcObjects, [Anon(Platform.darwin), NativeToolchain])
+# def select_libc_objects_darwin(anon_enum_wrapper, native_toolchain):
+#   return original_function(native_toolchain)
+
+@rule(LibcObjects, [NativeToolchain], given=[Platform.linux])
+def select_libc_objects_linux(native_toolchain):
+  return LibcObjects(native_toolchain._libc_dev.get_libc_objects())
 
 
-@rule(Assembler, [Platform, NativeToolchain])
-def select_assembler(platform, native_toolchain):
-  if platform == Platform.darwin:
-    assembler = yield Get(Assembler, XCodeCLITools, native_toolchain._xcode_cli_tools)
-  else:
-    assembler = yield Get(Assembler, Binutils, native_toolchain._binutils)
+@rule(Assembler, [NativeToolchain], given=[Platform.darwin])
+def select_assembler_darwin(native_toolchain):
+  assembler = yield Get(Assembler, XCodeCLITools, native_toolchain._xcode_cli_tools)
+  yield assembler
+
+
+@rule(Assembler, [NativeToolchain], given=[Platform.linux])
+def select_assembler_linux(native_toolchain):
+  assembler = yield Get(Assembler, Binutils, native_toolchain._binutils)
   yield assembler
 
 
@@ -120,7 +128,6 @@ class BaseLinker(datatype([('linker', Linker)])):
   usable by a specific compiler."""
 
 
-# TODO: select the appropriate `Platform` in the `@rule` decl using variants!
 @rule(BaseLinker, [Platform, NativeToolchain])
 def select_base_linker(platform, native_toolchain):
   if platform == Platform.darwin:
@@ -291,46 +298,36 @@ def select_gcc_cpp_toolchain(platform, native_toolchain):
   yield GCCCppToolchain(CppToolchain(working_cpp_compiler, working_linker))
 
 
-class ToolchainVariantRequest(datatype([
-    ('toolchain', NativeToolchain),
-    ('variant', ToolchainVariant),
-])): pass
-
-
-@rule(CToolchain, [ToolchainVariantRequest])
-def select_c_toolchain(toolchain_variant_request):
-  native_toolchain = toolchain_variant_request.toolchain
-  # TODO(#5933): make an enum exhaustiveness checking method that works with `yield Get(...)`!
-  use_gcc = toolchain_variant_request.variant.resolve_for_enum_variant({
-    'gnu': True,
-    'llvm': False,
-  })
-  if use_gcc:
-    toolchain_resolved = yield Get(GCCCToolchain, NativeToolchain, native_toolchain)
-  else:
-    toolchain_resolved = yield Get(LLVMCToolchain, NativeToolchain, native_toolchain)
+@rule(CToolchain, [NativeToolchain], given=[ToolchainVariant.gnu])
+def select_c_toolchain_gnu(native_toolchain):
+  toolchain_resolved = yield Get(GCCCToolchain, NativeToolchain, native_toolchain)
   yield toolchain_resolved.c_toolchain
 
 
-@rule(CppToolchain, [ToolchainVariantRequest])
-def select_cpp_toolchain(toolchain_variant_request):
-  native_toolchain = toolchain_variant_request.toolchain
-  # TODO(#5933): make an enum exhaustiveness checking method that works with `yield Get(...)`!
-  use_gcc = toolchain_variant_request.variant.resolve_for_enum_variant({
-    'gnu': True,
-    'llvm': False,
-  })
-  if use_gcc:
-    toolchain_resolved = yield Get(GCCCppToolchain, NativeToolchain, native_toolchain)
-  else:
-    toolchain_resolved = yield Get(LLVMCppToolchain, NativeToolchain, native_toolchain)
+@rule(CToolchain, [NativeToolchain], given=[ToolchainVariant.llvm])
+def select_c_toolchain_llvm(native_toolchain):
+  toolchain_resolved = yield Get(LLVMCToolchain, NativeToolchain, native_toolchain)
+  yield toolchain_resolved.c_toolchain
+
+
+@rule(CppToolchain, [NativeToolchain], given=[ToolchainVariant.gnu])
+def select_cpp_toolchain_gnu(native_toolchain):
+  toolchain_resolved = yield Get(GCCCppToolchain, NativeToolchain, native_toolchain)
+  yield toolchain_resolved.cpp_toolchain
+
+
+@rule(CppToolchain, [NativeToolchain], given=[ToolchainVariant.llvm])
+def select_cpp_toolchain_llvm(native_toolchain):
+  toolchain_resolved = yield Get(LLVMCppToolchain, NativeToolchain, native_toolchain)
   yield toolchain_resolved.cpp_toolchain
 
 
 def create_native_toolchain_rules():
   return [
-    select_libc_objects,
-    select_assembler,
+    select_libc_objects_darwin,
+    select_libc_objects_linux,
+    select_assembler_darwin,
+    select_assembler_linux,
     select_base_linker,
     select_gcc_linker,
     select_llvm_linker,
@@ -339,8 +336,9 @@ def create_native_toolchain_rules():
     select_llvm_cpp_toolchain,
     select_gcc_c_toolchain,
     select_gcc_cpp_toolchain,
-    select_c_toolchain,
-    select_cpp_toolchain,
+    select_c_toolchain_gnu,
+    select_c_toolchain_llvm,
+    select_cpp_toolchain_gnu,
+    select_cpp_toolchain_llvm,
     RootRule(NativeToolchain),
-    RootRule(ToolchainVariantRequest),
   ]

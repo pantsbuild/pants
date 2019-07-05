@@ -6,6 +6,7 @@ from pants.backend.native.subsystems.binaries.binutils import create_binutils_ru
 from pants.backend.native.subsystems.binaries.gcc import create_gcc_rules
 from pants.backend.native.subsystems.binaries.llvm import create_llvm_rules
 from pants.backend.native.subsystems.native_build_settings import NativeBuildSettings
+from pants.backend.native.subsystems.native_build_step import rules as native_build_step_rules
 from pants.backend.native.subsystems.native_toolchain import create_native_toolchain_rules
 from pants.backend.native.subsystems.xcode_cli_tools import create_xcode_cli_tools_rules
 from pants.backend.native.targets.external_native_library import (ConanRequirement,
@@ -58,5 +59,6 @@ def rules():
     create_xcode_cli_tools_rules() +
     create_binutils_rules() +
     create_gcc_rules() +
-    create_llvm_rules()
+    create_llvm_rules() +
+    native_build_step_rules()
   )
