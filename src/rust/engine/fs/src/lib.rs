@@ -32,7 +32,7 @@ pub use crate::glob_matching::GlobMatching;
 use ::ignore::gitignore::{Gitignore, GitignoreBuilder};
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
-use futures::{future, Future, Stream};
+use futures::{future, Future};
 use glob::{MatchOptions, Pattern};
 use lazy_static::lazy_static;
 use std::cmp::min;
@@ -593,17 +593,27 @@ impl PosixFS {
     let dir_abs = self.root.0.join(&dir_relative_to_root.0);
     let posix_fs = self.clone();
     let ignore = self.ignore.clone();
-    tokio_fs::read_dir(dir_abs.clone())
+    self
+      .io_pool
+      .spawn_fn(move || std::fs::read_dir(&dir_abs))
       .and_then(move |readdir| {
-        readdir
-          .and_then(move |dir_entry| {
-            let dir_relative_to_root = dir_relative_to_root.clone();
-            posix_fs.stat(dir_relative_to_root.0.join(dir_entry.file_name()))
-          })
-          .filter(move |s| !ignore.is_ignored(s))
-          .collect()
+        futures::future::join_all(
+          readdir
+            .map(move |dir_entry| {
+              let dir_relative_to_root = dir_relative_to_root.clone();
+              let posix_fs = posix_fs.clone();
+              futures::future::done(dir_entry).and_then(move |dir_entry| {
+                posix_fs.stat(dir_relative_to_root.0.join(dir_entry.file_name()))
+              })
+            })
+            .collect::<Vec<_>>(),
+        )
       })
-      .map(|mut stats| {
+      .map(|stats| {
+        let mut stats: Vec<_> = stats
+          .into_iter()
+          .filter(move |s| !ignore.is_ignored(s))
+          .collect();
         stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
         DirectoryListing(stats)
       })
@@ -616,33 +626,37 @@ impl PosixFS {
   pub fn read_file(&self, file: &File) -> impl Future<Item = FileContent, Error = io::Error> {
     let path = file.path.clone();
     let path_abs = self.root.0.join(&file.path);
-    tokio_fs::File::open(path_abs)
-      .and_then(|file| {
-        tokio_io::io::read_to_end(file, Vec::new()).map(|(_file, bytes)| Bytes::from(bytes))
-      })
+    self
+      .io_pool
+      .spawn_fn(|| std::fs::read(path_abs))
+      .map(Bytes::from)
       .map(|content| FileContent { path, content })
   }
 
   pub fn read_link(&self, link: &Link) -> impl Future<Item = PathBuf, Error = io::Error> {
     let link_parent = link.0.parent().map(Path::to_owned);
     let link_abs = self.root.0.join(link.0.as_path()).to_owned();
-    tokio_fs::read_link(link_abs.clone()).and_then(move |path_buf| {
-      if path_buf.is_absolute() {
-        Err(io::Error::new(
-          io::ErrorKind::InvalidData,
-          format!("Absolute symlink: {:?}", link_abs),
-        ))
-      } else {
-        link_parent
-          .map(|parent| parent.join(path_buf))
-          .ok_or_else(|| {
-            io::Error::new(
-              io::ErrorKind::InvalidData,
-              format!("Symlink without a parent?: {:?}", link_abs),
-            )
-          })
-      }
-    })
+    let link_abs2 = link_abs.clone();
+    self
+      .io_pool
+      .spawn_fn(move || std::fs::read_link(link_abs2))
+      .and_then(move |path_buf| {
+        if path_buf.is_absolute() {
+          Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("Absolute symlink: {:?}", link_abs),
+          ))
+        } else {
+          link_parent
+            .map(|parent| parent.join(path_buf))
+            .ok_or_else(|| {
+              io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Symlink without a parent?: {:?}", link_abs),
+              )
+            })
+        }
+      })
   }
 
   ///
@@ -696,7 +710,10 @@ impl PosixFS {
 
   pub fn stat(&self, relative_path: PathBuf) -> impl Future<Item = Stat, Error = io::Error> {
     let root = self.root.0.clone();
-    tokio_fs::symlink_metadata(self.root.0.join(&relative_path))
+    let path = self.root.0.join(&relative_path);
+    self
+      .io_pool
+      .spawn_fn(move || std::fs::symlink_metadata(path))
       .and_then(move |metadata| PosixFS::stat_internal(relative_path, &root, &metadata))
   }
 }
