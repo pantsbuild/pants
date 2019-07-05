@@ -309,6 +309,7 @@ fn main() {
     }
     None => Box::new(process_execution::local::CommandRunner::new(
       store.clone(),
+      futures_cpupool::CpuPool::new_num_cpus(),
       work_dir,
       true,
     )) as Box<dyn process_execution::CommandRunner>,

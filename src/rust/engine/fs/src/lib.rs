@@ -547,10 +547,15 @@ pub struct GlobWithSource {
 pub struct PosixFS {
   root: Dir,
   ignore: Arc<GitignoreStyleExcludes>,
+  io_pool: futures_cpupool::CpuPool,
 }
 
 impl PosixFS {
-  pub fn new<P: AsRef<Path>>(root: P, ignore_patterns: &[String]) -> Result<PosixFS, String> {
+  pub fn new<P: AsRef<Path>>(
+    root: P,
+    io_pool: futures_cpupool::CpuPool,
+    ignore_patterns: &[String],
+  ) -> Result<PosixFS, String> {
     let root: &Path = root.as_ref();
     let canonical_root = root
       .canonicalize()
@@ -577,6 +582,7 @@ impl PosixFS {
     Ok(PosixFS {
       root: canonical_root,
       ignore: ignore,
+      io_pool: io_pool,
     })
   }
 
@@ -1168,7 +1174,7 @@ mod posixfs_test {
   }
 
   fn new_posixfs<P: AsRef<Path>>(dir: P) -> PosixFS {
-    PosixFS::new(dir.as_ref(), &[]).unwrap()
+    PosixFS::new(dir.as_ref(), futures_cpupool::CpuPool::new_num_cpus(), &[]).unwrap()
   }
 
   ///

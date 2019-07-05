@@ -9,6 +9,7 @@ publish = false
 boxfuture = { path = "../boxfuture" }
 bytes = "0.4.5"
 futures = "^0.1.16"
+futures-cpupool = "0.1"
 glob = "0.2.11"
 ignore = "0.4.4"
 lazy_static = "1"

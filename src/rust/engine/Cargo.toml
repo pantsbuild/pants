@@ -88,6 +88,7 @@ bytes = "0.4.5"
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures = "0.1.27"
+futures-cpupool = "0.1"
 graph = { path = "graph" }
 hashing = { path = "hashing" }
 indexmap = "1.0.2"

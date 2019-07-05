@@ -606,7 +606,7 @@ fn expand_files_helper(
 }
 
 fn make_posix_fs<P: AsRef<Path>>(root: P) -> fs::PosixFS {
-  fs::PosixFS::new(&root, &[]).unwrap()
+  fs::PosixFS::new(&root, futures_cpupool::CpuPool::new_num_cpus(), &[]).unwrap()
 }
 
 fn ensure_uploaded_to_remote(

@@ -43,6 +43,7 @@ pub struct Core {
   pub rule_graph: RuleGraph<Rule>,
   pub types: Types,
   runtime: Arc<RwLock<Runtime>>,
+  pub io_pool: futures_cpupool::CpuPool,
   store: Store,
   pub command_runner: BoundedCommandRunner,
   pub http_client: reqwest::r#async::Client,
@@ -128,6 +129,8 @@ impl Core {
       })
       .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
 
+    let io_pool = futures_cpupool::CpuPool::new_num_cpus();
+
     let command_runner = match &remote_execution_server {
       Some(ref address) if remote_execution => BoundedCommandRunner::new(
         Box::new(process_execution::remote::CommandRunner::new(
@@ -144,6 +147,7 @@ impl Core {
       _ => BoundedCommandRunner::new(
         Box::new(process_execution::local::CommandRunner::new(
           store.clone(),
+          io_pool.clone(),
           work_dir.clone(),
           process_execution_cleanup_local_dirs,
         )),
@@ -153,6 +157,9 @@ impl Core {
 
     let http_client = reqwest::r#async::Client::new();
     let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);
+    let vfs = PosixFS::new(&build_root, io_pool.clone(), &ignore_patterns).unwrap_or_else(|e| {
+      panic!("Could not initialize VFS: {:?}", e);
+    });
 
     Core {
       graph: Graph::new(),
@@ -160,14 +167,13 @@ impl Core {
       rule_graph: rule_graph,
       types: types,
       runtime: runtime,
+      io_pool,
       store,
       command_runner,
       http_client,
       // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
-      vfs: PosixFS::new(&build_root, &ignore_patterns).unwrap_or_else(|e| {
-        panic!("Could not initialize VFS: {:?}", e);
-      }),
+      vfs,
       build_root: build_root,
     }
   }

@@ -467,6 +467,7 @@ impl Snapshot {
   ///
   pub fn capture_snapshot_from_arbitrary_root<P: AsRef<Path> + Send + 'static>(
     store: Store,
+    io_pool: futures_cpupool::CpuPool,
     root_path: P,
     path_globs: PathGlobs,
     digest_hint: Option<Digest>,
@@ -477,7 +478,7 @@ impl Snapshot {
     future::result(digest_hint.ok_or_else(|| "No digest hint provided.".to_string()))
       .and_then(move |digest| Snapshot::from_digest(store, digest))
       .or_else(|_| {
-        let posix_fs = Arc::new(try_future!(PosixFS::new(root_path, &[])));
+        let posix_fs = Arc::new(try_future!(PosixFS::new(root_path, io_pool, &[])));
 
         posix_fs
           .expand(path_globs)
@@ -605,7 +606,8 @@ mod tests {
     )
     .unwrap();
     let dir = tempfile::Builder::new().prefix("root").tempdir().unwrap();
-    let posix_fs = Arc::new(PosixFS::new(dir.path(), &[]).unwrap());
+    let posix_fs =
+      Arc::new(PosixFS::new(dir.path(), futures_cpupool::CpuPool::new_num_cpus(), &[]).unwrap());
     let file_saver = OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone());
     let runtime = tokio::runtime::Runtime::new().unwrap();
     (store, dir, posix_fs, file_saver, runtime)

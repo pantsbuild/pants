@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 clap = "2"
 env_logger = "0.5.4"
+futures-cpupool = "0.1"
 hashing = { path = "../hashing" }
 process_execution = { path = "../process_execution" }
 store = { path = "../fs/store" }

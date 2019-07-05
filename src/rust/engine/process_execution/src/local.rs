@@ -24,14 +24,21 @@ use bytes::{Bytes, BytesMut};
 
 pub struct CommandRunner {
   store: Store,
+  io_pool: futures_cpupool::CpuPool,
   work_dir: PathBuf,
   cleanup_local_dirs: bool,
 }
 
 impl CommandRunner {
-  pub fn new(store: Store, work_dir: PathBuf, cleanup_local_dirs: bool) -> CommandRunner {
+  pub fn new(
+    store: Store,
+    io_pool: futures_cpupool::CpuPool,
+    work_dir: PathBuf,
+    cleanup_local_dirs: bool,
+  ) -> CommandRunner {
     CommandRunner {
       store,
+      io_pool,
       work_dir,
       cleanup_local_dirs,
     }
@@ -217,6 +224,7 @@ impl super::CommandRunner for CommandRunner {
     let workdir_path2 = workdir_path.clone();
     let workdir_path3 = workdir_path.clone();
     let store = self.store.clone();
+    let io_pool = self.io_pool.clone();
 
     let env = req.env;
     let output_file_paths = req.output_files;
@@ -277,7 +285,7 @@ impl super::CommandRunner for CommandRunner {
           future::ok(store::Snapshot::empty()).to_boxed()
         } else {
           // Use no ignore patterns, because we are looking for explicitly listed paths.
-          future::done(fs::PosixFS::new(workdir_path2, &[]))
+          future::done(fs::PosixFS::new(workdir_path2, io_pool, &[]))
             .map_err(|err| {
               format!(
                 "Error making posix_fs to fetch local process execution output files: {}",
@@ -892,6 +900,7 @@ mod tests {
     let store = Store::local_only(store_dir.path()).unwrap();
     let runner = super::CommandRunner {
       store: store,
+      io_pool: futures_cpupool::CpuPool::new_num_cpus(),
       work_dir: dir,
       cleanup_local_dirs: cleanup,
     };
