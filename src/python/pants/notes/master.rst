@@ -4,6 +4,108 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.18.0rc0 (7/5/2019)
+--------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Add conftest.py to the python_tests default sources. (#7946)
+  `PR #7946 <https://github.com/pantsbuild/pants/pull/7946>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add `--[no-]remote-execution` flag (#7991)
+  `PR #7991 <https://github.com/pantsbuild/pants/pull/7991>`_
+
+Bugfixes
+~~~~~~~~
+
+* Make precomputing fail more usefully (#7994)
+  `PR #7994 <https://github.com/pantsbuild/pants/pull/7994>`_
+
+* Add __init__.py to directories created by grpcio (#7984)
+  `PR #7984 <https://github.com/pantsbuild/pants/pull/7984>`_
+
+* Don't use remote store when --no-remote-execution specified (#8010)
+  `PR #8010 <https://github.com/pantsbuild/pants/pull/8010>`_
+
+* Fix bug background workunits were printed in UI (#7997)
+  `PR #7997 <https://github.com/pantsbuild/pants/pull/7997>`_
+
+* relativize path for scalac classpath entry (#8011)
+  `PR #8011 <https://github.com/pantsbuild/pants/pull/8011>`_
+
+* Fix bad `with_traceback()` change from #7988 (#8004)
+  `PR #8004 <https://github.com/pantsbuild/pants/pull/8004>`_
+
+* Fix gocheckstyle decoding error (#7978)
+  `PR #7978 <https://github.com/pantsbuild/pants/pull/7978>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Set up pants.remote.ini for remoting Python unit tests (#7990)
+  `PR #7990 <https://github.com/pantsbuild/pants/pull/7990>`_
+
+* Add type checking to several `util` files (#7998)
+  `PR #7998 <https://github.com/pantsbuild/pants/pull/7998>`_
+
+* Kill all uses of t.c.collections.OrderedDict. (#8003)
+  `PR #8003 <https://github.com/pantsbuild/pants/pull/8003>`_
+
+* Use default utf-8 encoding for string `decode()` and `encode()` (#7983)
+  `PR #7983 <https://github.com/pantsbuild/pants/pull/7983>`_
+
+* fix grpc threadpool size (#7974)
+  `PR #7974 <https://github.com/pantsbuild/pants/pull/7974>`_
+
+* Fix most Python 2 issues from #6071 (#7989)
+  `PR #7989 <https://github.com/pantsbuild/pants/pull/7989>`_
+
+* Remove `future` library (#7988)
+  `PR #7988 <https://github.com/pantsbuild/pants/pull/7988>`_
+
+* Remove remaining `if PY{2,3}` snippets (#7986)
+  `PR #7986 <https://github.com/pantsbuild/pants/pull/7986>`_
+
+* Remove `six` library (#7985)
+  `PR #7985 <https://github.com/pantsbuild/pants/pull/7985>`_
+
+* No longer use `string_types` (#7980)
+  `PR #7980 <https://github.com/pantsbuild/pants/pull/7980>`_
+
+* Use dedicated requirements.txt for `contrib.python.checks.checker` (#7982)
+  `PR #7982 <https://github.com/pantsbuild/pants/pull/7982>`_
+
+* Replace `six.exec_()` with `exec()` (#7981)
+  `PR #7981 <https://github.com/pantsbuild/pants/pull/7981>`_
+
+* Remove Python 2 handling of unicode (#7973)
+  `PR #7973 <https://github.com/pantsbuild/pants/pull/7973>`_
+
+* Remove `future.moves` and `six.moves` imports (#7975)
+  `PR #7975 <https://github.com/pantsbuild/pants/pull/7975>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Fix ensure_interpreter_search_path_env docs. (#8000)
+  `PR #8000 <https://github.com/pantsbuild/pants/pull/8000>`_
+
+* Update style guide to use f-strings (#7987)
+  `PR #7987 <https://github.com/pantsbuild/pants/pull/7987>`_
+
+Version updates
+~~~~~~~~~~~~~~~
+
+* Update to rust 1.36.0 (#8014)
+  `PR #8014 <https://github.com/pantsbuild/pants/pull/8014>`_
+
+* Upgrade to pex 1.6.8. (#7962)
+  `PR #7962 <https://github.com/pantsbuild/pants/pull/7962>`_
+
 1.18.0.dev2 (6/28/2019)
 -----------------------
 
