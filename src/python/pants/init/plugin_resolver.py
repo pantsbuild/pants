@@ -8,6 +8,7 @@ import site
 
 from pex import resolver
 from pex.base import requirement_is_exact
+from pex.interpreter import PythonInterpreter
 from pkg_resources import Requirement
 from pkg_resources import working_set as global_working_set
 from wheel.install import WheelFile
@@ -52,8 +53,9 @@ class PluginResolver:
                                     'data': install_dir
                                   })
 
-  def __init__(self, options_bootstrapper):
+  def __init__(self, options_bootstrapper, *, interpreter=None):
     self._options_bootstrapper = options_bootstrapper
+    self._interpreter = interpreter or PythonInterpreter.get()
 
     bootstrap_options = self._options_bootstrapper.get_bootstrap_options().for_global_scope()
     self._plugin_requirements = bootstrap_options.plugins
@@ -85,11 +87,15 @@ class PluginResolver:
 
   def _resolve_exact_plugin_locations(self):
     hasher = hashlib.sha1()
+
+    # Assume we have platform-specific plugin requirements and pessimistically mix the ABI
+    # identifier into the hash to ensure re-resolution of plugins for different interpreter ABIs.
+    hasher.update(self._interpreter.identity.abi_tag.encode())  # EG: cp36m
+
     for req in sorted(self._plugin_requirements):
       hasher.update(req.encode())
     resolve_hash = hasher.hexdigest()
-    resolved_plugins_list = os.path.join(self.plugin_cache_dir,
-                                         'plugins-{}.txt'.format(resolve_hash))
+    resolved_plugins_list = os.path.join(self.plugin_cache_dir, f'plugins-{resolve_hash}.txt')
 
     if not os.path.exists(resolved_plugins_list):
       tmp_plugins_list = resolved_plugins_list + '~'
@@ -106,6 +112,7 @@ class PluginResolver:
     logger.info('Resolving new plugins...:\n  {}'.format('\n  '.join(self._plugin_requirements)))
     resolved_dists = resolver.resolve(self._plugin_requirements,
                                       fetchers=self._python_repos.get_fetchers(),
+                                      interpreter=self._interpreter,
                                       context=self._python_repos.get_network_context(),
                                       cache=self.plugin_cache_dir,
                                       # Effectively never expire.

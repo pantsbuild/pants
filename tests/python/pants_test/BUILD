@@ -110,3 +110,8 @@ python_tests(
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
+
+python_library(
+  name='interpreter_selection_utils',
+  sources=['interpreter_selection_utils.py'],
+)
