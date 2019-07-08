@@ -291,8 +291,7 @@ class _FFISpecification(object):
 
   @_extern_decl('bool', ['ExternContext*', 'TypeId'])
   def extern_is_union(self, context_handle, type_id):
-    "Return whether or not a type is a member of a union"
-
+    """Return whether or not a type is a member of a union"""
     c = self._ffi.from_handle(context_handle)
     input_type = c.from_id(type_id.tup_0)
     return bool(getattr(input_type, '_is_union', None))
