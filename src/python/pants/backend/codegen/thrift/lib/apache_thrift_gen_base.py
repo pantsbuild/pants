@@ -57,9 +57,6 @@ class ApacheThriftGenBase(SimpleCodegenTask):
     return self._deps
 
   def execute_codegen(self, target, target_workdir):
-    self._do_execute_codegen(target, target_workdir)
-
-  def _do_execute_codegen(self, target, target_workdir, extra_sources=[]):
     target_cmd = self._thrift_cmd[:]
 
     bases = OrderedSet(tgt.target_base for tgt in target.closure() if self.is_gentarget(tgt))
@@ -71,8 +68,7 @@ class ApacheThriftGenBase(SimpleCodegenTask):
 
     target_cmd.extend(('-o', target_workdir))
 
-    all_sources = target.sources_relative_to_buildroot() + extra_sources
-    for source in all_sources:
+    for source in target.sources_relative_to_buildroot():
       cmd = target_cmd[:]
       cmd.append(os.path.join(get_buildroot(), source))
       with self.context.new_workunit(name=source,

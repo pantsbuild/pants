@@ -9,6 +9,7 @@ contrib_plugin(
     'contrib/node/src/python/pants/contrib/node/tasks',
     'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
+    'src/python/pants/backend/codegen/thrift/node',
   ],
   distribution_name='pantsbuild.pants.contrib.node',
   description='Node.js support for pants.',

@@ -30,6 +30,14 @@ python_library(
 )
 
 python_library(
+  name='node_thrift_library',
+  sources=['node_thrift._library.py'],
+  dependencies=[
+    ':node_module',
+  ],
+)
+
+python_library(
   name='node_preinstalled_module',
   sources=['node_preinstalled_module.py'],
   dependencies=[

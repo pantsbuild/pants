@@ -9,6 +9,7 @@ from pants.contrib.node.subsystems.resolvers.node_preinstalled_module_resolver i
 from pants.contrib.node.subsystems.resolvers.npm_resolver import NpmResolver
 from pants.contrib.node.targets.node_bundle import NodeBundle
 from pants.contrib.node.targets.node_module import NodeModule
+from pants.contrib.node.targets.node_thrift_library import NodeThriftLibrary  
 from pants.contrib.node.targets.node_preinstalled_module import NodePreinstalledModule
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
 from pants.contrib.node.targets.node_test import NodeTest as NodeTestTarget
@@ -30,6 +31,7 @@ def build_file_aliases():
       'node_preinstalled_module': NodePreinstalledModule,
       'node_remote_module': NodeRemoteModule,
       'node_test': NodeTestTarget,
+      'node_thrift_library' : NodeThriftLibrary,
     },
   )
 
