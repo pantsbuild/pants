@@ -63,6 +63,11 @@ class UnionBase:
   pass
 
 
+@union
+class NoDocstringUnion:
+  pass
+
+
 class UnionWrapper:
   def __init__(self, inner):
     self.inner = inner
@@ -95,6 +100,16 @@ def select_union_b(union_b):
 def a_union_test(union_wrapper):
   union_a = yield Get(A, UnionBase, union_wrapper.inner)
   yield union_a
+
+
+class UnionX:
+  pass
+
+
+@rule(UnionX, [UnionWrapper])
+def no_docstring_test_rule(union_wrapper):
+  union_x = yield Get(UnionX, NoDocstringUnion, union_wrapper.inner)
+  yield union_x
 
 
 class TypeCheckFailWrapper:
@@ -151,11 +166,14 @@ class SchedulerTest(TestBase):
       # B is both a RootRule and an intermediate product here.
       RootRule(B),
       RootRule(C),
+      RootRule(UnionX),
+      no_docstring_test_rule,
       consumes_a_and_b,
       transitive_b_c,
       transitive_coroutine_rule,
       RootRule(UnionWrapper),
       UnionRule(UnionBase, UnionA),
+      UnionRule(NoDocstringUnion, UnionX),
       RootRule(UnionA),
       select_union_a,
       UnionRule(union_base=UnionBase, union_member=UnionB),
@@ -212,6 +230,13 @@ Type A is not a member of the UnionBase @union ("Docstring for UnionBase")
 """
     with self._assert_execution_error(expected_msg):
       self.scheduler.product_request(A, [Params(UnionWrapper(A()))])
+
+  def test_union_rules_no_docstring(self):
+    expected_msg = """\
+Type UnionA is not a member of the NoDocstringUnion @union ("NoDocstringUnion")
+"""
+    with self._assert_execution_error(expected_msg):
+      self.scheduler.product_request(UnionX, [Params(UnionWrapper(UnionA()))])
 
 
 class SchedulerWithNestedRaiseTest(TestBase):
