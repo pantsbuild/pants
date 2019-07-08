@@ -715,7 +715,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     counter = Counter(len(invalid_vts))
 
     jobs = []
-
     jobs.extend(self.pre_compile_jobs(counter))
     invalid_target_set = set(invalid_targets)
     for ivts in invalid_vts:
@@ -724,7 +723,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       invalid_dependencies = self._collect_invalid_compile_dependencies(compile_target,
                                                                         invalid_target_set,
                                                                         compile_contexts)
-
       jobs.extend(
         self.create_compile_jobs(compile_target, compile_contexts, invalid_dependencies, ivts,
           counter, classpath_product))
@@ -740,7 +738,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   def create_compile_jobs(self, compile_target, all_compile_contexts, invalid_dependencies, ivts,
     counter, classpath_product):
-
     context_for_target = all_compile_contexts[compile_target]
     compile_context = self.select_runtime_context(context_for_target)
 

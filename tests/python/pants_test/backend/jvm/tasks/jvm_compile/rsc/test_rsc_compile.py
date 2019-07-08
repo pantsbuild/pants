@@ -69,7 +69,7 @@ class RscCompileTest(NailgunTaskTestBase):
         invalid_targets=invalid_targets,
         invalid_vts=self.wrap_in_vts(invalid_targets),
         classpath_product=None)
-
+      #self.assertEqual(False == True)
       dependee_graph = self.construct_dependee_graph_str(jobs, task)
       print(dependee_graph)
       self.assertEqual(dedent("""
@@ -128,15 +128,14 @@ class RscCompileTest(NailgunTaskTestBase):
       invalid_targets = [scala_target]
       task = self.create_task_with_target_roots(
         target_roots=[scala_target],
-        default_workflow='zinc-only',
+        default_workflow=RscCompile.JvmCompileWorkflowType.ZINC_ONLY,
       )
-
+      compile_context = self.create_compile_contexts([scala_target], task, tmp_dir)
       jobs = task._create_compile_jobs(
-        compile_contexts=self.create_compile_contexts([scala_target], task, tmp_dir),
+        compile_contexts=compile_context,
         invalid_targets=invalid_targets,
         invalid_vts=self.wrap_in_vts(invalid_targets),
         classpath_product=None)
-
       dependee_graph = self.construct_dependee_graph_str(jobs, task)
       print(dependee_graph)
       self.assertEqual(dedent("""
@@ -145,7 +144,7 @@ class RscCompileTest(NailgunTaskTestBase):
 
   def test_rsc_dep_for_scala_java_and_test_targets(self):
     self.set_options(workflow=RankedValue(
-      value=RscCompile.JvmCompileWorkflowType.rsc_and_zinc,
+      value=RscCompile.JvmCompileWorkflowType.MIXED,
       rank=RankedValue.CONFIG,
     ))
     self.init_dependencies_for_scala_libraries()
@@ -307,7 +306,7 @@ class RscCompileTest(NailgunTaskTestBase):
 
   def create_task_with_target_roots(self, target_roots, default_workflow=None):
     if default_workflow:
-      self.set_options(workflow=RscCompile.JvmCompileWorkflowType(default_workflow))
+      self.set_options(workflow=default_workflow)
     context = self.context(target_roots=target_roots)
     self.init_products(context)
     task = self.create_task(context)
