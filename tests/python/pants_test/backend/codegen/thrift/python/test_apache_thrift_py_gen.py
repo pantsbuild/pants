@@ -85,6 +85,31 @@ class ApacheThriftPyGenTest(TaskTestBase):
     self.assert_ns_package(synthetic_target, 'foo')
     self.assert_leaf_package(synthetic_target, 'foo/bar', 'ThingService')
 
+  def test_inserts_unicode_header(self):
+    """Test that the thrift compiler inserts utf-8 coding header."""
+    self.create_file('src/thrift/com/foo/one.thrift', contents=dedent("""
+    namespace py foo.bar
+    /**
+     * This comment has a unicode string:	🐈
+     * That is a cat, and it's used for testing purposes.
+     * When this is compiled, the thrift compiler should include the "coding=UTF-8".
+     * at the beginning of the python file.
+     **/
+    struct Foo {
+      1: i64 id,
+    }(persisted='true')
+    """))
+    one = self.make_target(spec='src/thrift/com/foo:one',
+      target_type=PythonThriftLibrary,
+      sources=['one.thrift'])
+
+    _, synthetic_target = self.generate_single_thrift_target(one)
+    print(os.getcwd())
+    for file in synthetic_target.sources_relative_to_buildroot():
+      if '__init__' not in file:
+        with open(os.path.join(get_buildroot(), file), 'r') as f:
+          self.assertEqual(f.readline(), "# -*- coding: utf-8 -*-\n")
+
   def test_nested_namespaces(self):
     self.create_file('src/thrift/com/foo/one.thrift', contents=dedent("""
     namespace py foo.bar
