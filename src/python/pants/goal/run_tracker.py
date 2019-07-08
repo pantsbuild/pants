@@ -381,13 +381,13 @@ class RunTracker(Subsystem):
     def do_post(url, num_redirects_allowed):
       if num_redirects_allowed < 0:
         return error('too many redirects.')
-      r = requests.post(url, data=params, timeout=timeout,
+      res = requests.post(url, data=params, timeout=timeout,
                         cookies=cookies.get_cookie_jar(), allow_redirects=False)
-      if r.status_code in {307, 308}:
-        return do_post(r.headers['location'], num_redirects_allowed - 1)
-      elif r.status_code != 200:
-        error('HTTP error code: {}. Reason: {}.'.format(r.status_code, r.reason))
-        if 300 <= r.status_code < 400 or r.status_code == 401:
+      if res.status_code in {307, 308}:
+        return do_post(res.headers['location'], num_redirects_allowed - 1)
+      elif res.status_code != 200:
+        error('HTTP error code: {}. Reason: {}.'.format(res.status_code, res.reason))
+        if 300 <= res.status_code < 400 or res.status_code == 401:
           print('Use `path/to/pants login --to={}` to authenticate against the stats '
                 'upload service.'.format(auth_provider), file=sys.stderr)
         return False
