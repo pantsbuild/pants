@@ -3,6 +3,7 @@
 
 import os
 import subprocess
+from pathlib import Path
 from textwrap import dedent
 
 from pex.resolver import resolve
@@ -104,11 +105,10 @@ class ApacheThriftPyGenTest(TaskTestBase):
       sources=['one.thrift'])
 
     _, synthetic_target = self.generate_single_thrift_target(one)
-    print(os.getcwd())
-    for file in synthetic_target.sources_relative_to_buildroot():
-      if '__init__' not in file:
-        with open(os.path.join(get_buildroot(), file), 'r') as f:
-          self.assertEqual(f.readline(), "# -*- coding: utf-8 -*-\n")
+    for filepath in synthetic_target.sources_relative_to_buildroot():
+      if '__init__' not in filepath:
+        first_line = (Path(get_buildroot()) / filepath).read_text().splitlines()[0]
+        self.assertEqual(first_line, "# -*- coding: utf-8 -*-")
 
   def test_nested_namespaces(self):
     self.create_file('src/thrift/com/foo/one.thrift', contents=dedent("""
