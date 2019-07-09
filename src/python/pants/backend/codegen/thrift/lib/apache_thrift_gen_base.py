@@ -4,6 +4,7 @@
 import os
 import re
 import shutil
+import subprocess
 
 from twitter.common.collections import OrderedSet
 
@@ -14,13 +15,17 @@ from pants.base.workunit import WorkUnitLabel
 from pants.option.custom_types import target_option
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.memo import memoized_property
-from pants.util.process_handler import subprocess
+from pants.util.meta import classproperty
 
 
 class ApacheThriftGenBase(SimpleCodegenTask):
   # The name of the thrift generator to use. Subclasses must set.
   # E.g., java, py (see `thrift -help` for all available generators).
   thrift_generator = None
+  # The name of the 
+  @classproperty
+  def gen_directory(cls):
+    return thrift_generator
 
   # Subclasses may set their own default generator options.
   default_gen_options_map = None
@@ -57,6 +62,7 @@ class ApacheThriftGenBase(SimpleCodegenTask):
     return self._deps
 
   def execute_codegen(self, target, target_workdir):
+    # import pdb; pdb.set_trace()
     target_cmd = self._thrift_cmd[:]
 
     bases = OrderedSet(tgt.target_base for tgt in target.closure() if self.is_gentarget(tgt))
@@ -83,7 +89,8 @@ class ApacheThriftGenBase(SimpleCodegenTask):
     # The thrift compiler generates sources to a gen-[lang] subdir of the `-o` argument.  We
     # relocate the generated sources to the root of the `target_workdir` so that our base class
     # maps them properly.
-    gen_dir = os.path.join(target_workdir, 'gen-{}'.format(self.thrift_generator))
+    # raise Exception(os.listdir(target_workdir))
+    gen_dir = os.path.join(target_workdir, 'gen-{}'.format(self.gen_directory))
     for path in os.listdir(gen_dir):
       shutil.move(os.path.join(gen_dir, path), target_workdir)
     os.rmdir(gen_dir)

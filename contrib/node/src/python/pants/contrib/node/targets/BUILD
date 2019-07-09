@@ -31,7 +31,7 @@ python_library(
 
 python_library(
   name='node_thrift_library',
-  sources=['node_thrift._library.py'],
+  sources=['node_thrift_library.py'],
   dependencies=[
     ':node_module',
   ],

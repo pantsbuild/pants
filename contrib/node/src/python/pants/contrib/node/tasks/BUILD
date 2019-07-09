@@ -15,6 +15,15 @@ target(
 )
 
 python_library(
+  name='apache_thrift_node_gen',
+  sources=['apache_thrift_node_gen.py'],
+  dependencies=[
+    'contrib/node/src/python/pants/contrib/node/targets:node_module',
+    'contrib/node/src/python/pants/contrib/node/targets:node_thrift_library',
+    'src/python/pants/backend/codegen/thrift/lib',
+  ]
+)
+python_library(
   name='node_paths',
   sources=['node_paths.py'],
   dependencies = [

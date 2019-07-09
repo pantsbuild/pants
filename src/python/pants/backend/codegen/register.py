@@ -44,7 +44,6 @@ def build_file_aliases():
 
 def register_goals():
   task(name='thrift-java', action=ApacheThriftJavaGen).install('gen')
-  task(name='thrift-node', action=ApachetThriftNodeGen).install('gen')
   task(name='thrift-py', action=ApacheThriftPyGen).install('gen')
   task(name='grpcio-prep', action=GrpcioPrep).install('gen')
   task(name='grpcio-run', action=GrpcioRun).install('gen')

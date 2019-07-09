@@ -11,7 +11,6 @@ python_library(
     'src/python/pants/backend/codegen/protobuf/java',
     'src/python/pants/backend/codegen/ragel/java',
     'src/python/pants/backend/codegen/thrift/java',
-    'src/python/pants/backend/codegen/thrift/node',
     'src/python/pants/backend/codegen/thrift/python',
     'src/python/pants/backend/codegen/wire/java',
     'src/python/pants/backend/codegen/grpcio/python',

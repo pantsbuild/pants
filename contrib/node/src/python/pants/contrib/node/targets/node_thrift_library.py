@@ -6,5 +6,3 @@ class NodeThriftLibrary(NodeModule):
   A Node library generated from Thrift IDL Files
   """
 
-  def __init__(self, **kwargs):
-    super().__init__(**kwargs)

@@ -79,6 +79,7 @@ class NpmResolver(Subsystem, NodeResolverBase):
         raise TaskError(
           'Cannot find package.json. Did you forget to put it in target sources?')
       # TODO: remove/remodel the following section when node_module dependency is fleshed out.
+      # import pdb; pdb.set_trace()
       package_manager = node_task.get_package_manager(target=target).name
       if package_manager == PACKAGE_MANAGER_NPM:
         if resolve_locally:
