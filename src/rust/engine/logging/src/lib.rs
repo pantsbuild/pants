@@ -52,6 +52,10 @@ pub use logger::{get_destination, set_destination, Destination};
 
 pub type Logger = logger::Logger;
 
+mod executor;
+
+pub use executor::Executor;
+
 use num_enum::TryFromPrimitive;
 
 // This is a hard-coding of constants in the standard logging python package.

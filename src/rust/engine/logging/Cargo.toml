@@ -7,11 +7,13 @@ publish = false
 
 [dependencies]
 futures = "0.1.27"
+futures-cpupool = "0.1"
 lazy_static = "1"
 log = "0.4"
 num_enum = "0.1.1"
 parking_lot = "0.6"
 simplelog = "0.5.3"
+tokio = "0.1"
 ui = { path = "../ui" }
 
 [build-dependencies]
