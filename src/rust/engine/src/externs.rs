@@ -20,8 +20,19 @@ pub fn none() -> Handle {
   with_externs(|e| (e.clone_val)(e.context, &e.none))
 }
 
+pub fn get_value_from_type_id(ty: TypeId) -> Value {
+  with_externs(|e| {
+    let handle = (e.get_handle_from_type_id)(e.context, ty);
+    Value::new(handle)
+  })
+}
+
 pub fn get_type_for(val: &Value) -> TypeId {
   with_externs(|e| (e.get_type_for)(e.context, val as &Handle))
+}
+
+pub fn is_union(ty: TypeId) -> bool {
+  with_externs(|e| (e.is_union)(e.context, ty))
 }
 
 pub fn identify(val: &Value) -> Ident {
@@ -214,11 +225,12 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
   match response {
     PyGeneratorResponse::Broke(h) => Ok(GeneratorResponse::Break(Value::new(h))),
     PyGeneratorResponse::Throw(h) => Err(PyResult::failure_from(Value::new(h))),
-    PyGeneratorResponse::Get(product, handle, ident) => {
+    PyGeneratorResponse::Get(product, handle, ident, declared_subject) => {
       let mut interns = INTERNS.write();
       let g = Get {
         product,
         subject: interns.insert_with(Value::new(handle), ident),
+        declared_subject: Some(declared_subject),
       };
       Ok(GeneratorResponse::Get(g))
     }
@@ -235,6 +247,7 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
         .map(|((p, v), i)| Get {
           product: p,
           subject: interns.insert_with(v, i),
+          declared_subject: None,
         })
         .collect();
       Ok(GeneratorResponse::GetMulti(gets))
@@ -317,6 +330,8 @@ pub struct Externs {
   pub call: CallExtern,
   pub generator_send: GeneratorSendExtern,
   pub get_type_for: GetTypeForExtern,
+  pub get_handle_from_type_id: GetHandleFromTypeIdExtern,
+  pub is_union: IsUnionExtern,
   pub identify: IdentifyExtern,
   pub equals: EqualsExtern,
   pub clone_val: CloneValExtern,
@@ -341,6 +356,10 @@ unsafe impl Sync for Externs {}
 unsafe impl Send for Externs {}
 
 pub type GetTypeForExtern = extern "C" fn(*const ExternContext, *const Handle) -> TypeId;
+
+pub type GetHandleFromTypeIdExtern = extern "C" fn(*const ExternContext, TypeId) -> Handle;
+
+pub type IsUnionExtern = extern "C" fn(*const ExternContext, TypeId) -> bool;
 
 pub type IdentifyExtern = extern "C" fn(*const ExternContext, *const Handle) -> Ident;
 
@@ -440,7 +459,7 @@ impl From<Result<(), String>> for PyResult {
 ///
 #[repr(C)]
 pub enum PyGeneratorResponse {
-  Get(TypeId, Handle, Ident),
+  Get(TypeId, Handle, Ident, TypeId),
   GetMulti(TypeIdBuffer, HandleBuffer, IdentBuffer),
   // NB: Broke not Break because C keyword.
   Broke(Handle),
@@ -451,6 +470,7 @@ pub enum PyGeneratorResponse {
 pub struct Get {
   pub product: TypeId,
   pub subject: Key,
+  pub declared_subject: Option<TypeId>,
 }
 
 impl fmt::Display for Get {
