@@ -14,7 +14,8 @@ class ApacheThriftPyGen(ApacheThriftGenBase):
   gentarget_type = PythonThriftLibrary
   thrift_generator = 'py'
   default_gen_options_map = {
-    'new_style': None
+    'new_style': None,
+    'coding': 'utf-8',
   }
 
   sources_globs = ('**/*',)
