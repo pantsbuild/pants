@@ -50,7 +50,7 @@ pub struct ShardedLmdb {
   lmdbs: HashMap<u8, (Arc<Environment>, Database, Database)>,
   root_path: PathBuf,
   max_size: usize,
-  executor: logging::Executor,
+  executor: task_executor::Executor,
 }
 
 impl ShardedLmdb {
@@ -62,7 +62,7 @@ impl ShardedLmdb {
   pub fn new(
     root_path: PathBuf,
     max_size: usize,
-    executor: logging::Executor,
+    executor: task_executor::Executor,
   ) -> Result<ShardedLmdb, String> {
     trace!("Initializing ShardedLmdb at root {:?}", root_path);
     let mut lmdbs = HashMap::new();

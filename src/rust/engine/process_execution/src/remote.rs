@@ -1430,7 +1430,7 @@ mod tests {
 
   #[test]
   fn ensure_inline_stdio_is_stored() {
-    let runtime = logging::Executor::new();
+    let runtime = task_executor::Executor::new();
 
     let test_stdout = TestData::roland();
     let test_stderr = TestData::catnip();
@@ -1793,7 +1793,7 @@ mod tests {
 
   #[test]
   fn execute_missing_file_uploads_if_known() {
-    let runtime = logging::Executor::new();
+    let runtime = task_executor::Executor::new();
 
     let roland = TestData::roland();
 
@@ -1920,7 +1920,7 @@ mod tests {
       .directory(&TestDirectory::containing_roland())
       .build();
     let store = Store::with_remote(
-      logging::Executor::new(),
+      task_executor::Executor::new(),
       store_dir,
       &[cas.address()],
       None,
@@ -1988,7 +1988,7 @@ mod tests {
       .file(&TestData::roland())
       .directory(&TestDirectory::containing_roland())
       .build();
-    let runtime = logging::Executor::new();
+    let runtime = task_executor::Executor::new();
     let store = Store::with_remote(
       runtime.clone(),
       store_dir,
@@ -2616,7 +2616,7 @@ mod tests {
   fn create_command_runner(address: String, cas: &mock::StubCAS) -> CommandRunner {
     let store_dir = TempDir::new().unwrap();
     let store = Store::with_remote(
-      logging::Executor::new(),
+      task_executor::Executor::new(),
       store_dir,
       &[cas.address()],
       None,

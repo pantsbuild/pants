@@ -547,14 +547,14 @@ pub struct GlobWithSource {
 pub struct PosixFS {
   root: Dir,
   ignore: Arc<GitignoreStyleExcludes>,
-  executor: logging::Executor,
+  executor: task_executor::Executor,
 }
 
 impl PosixFS {
   pub fn new<P: AsRef<Path>>(
     root: P,
     ignore_patterns: &[String],
-    executor: logging::Executor,
+    executor: task_executor::Executor,
   ) -> Result<PosixFS, String> {
     let root: &Path = root.as_ref();
     let canonical_root = root
@@ -1202,7 +1202,7 @@ mod posixfs_test {
   }
 
   fn new_posixfs<P: AsRef<Path>>(dir: P) -> PosixFS {
-    PosixFS::new(dir.as_ref(), &[], logging::Executor::new()).unwrap()
+    PosixFS::new(dir.as_ref(), &[], task_executor::Executor::new()).unwrap()
   }
 
   ///

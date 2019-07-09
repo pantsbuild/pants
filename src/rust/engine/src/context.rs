@@ -39,7 +39,7 @@ pub struct Core {
   pub tasks: Tasks,
   pub rule_graph: RuleGraph<Rule>,
   pub types: Types,
-  pub executor: logging::Executor,
+  pub executor: task_executor::Executor,
   store: Store,
   pub command_runner: BoundedCommandRunner,
   pub http_client: reqwest::r#async::Client,
@@ -76,7 +76,7 @@ impl Core {
     let mut remote_store_servers = remote_store_servers;
     remote_store_servers.shuffle(&mut rand::thread_rng());
 
-    let executor = logging::Executor::new();
+    let executor = task_executor::Executor::new();
     // We re-use these certs for both the execution and store service; they're generally tied together.
     let root_ca_certs = if let Some(path) = remote_root_ca_certs_path {
       Some(

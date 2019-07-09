@@ -177,7 +177,10 @@ impl Store {
   ///
   /// Make a store which only uses its local storage.
   ///
-  pub fn local_only<P: AsRef<Path>>(executor: logging::Executor, path: P) -> Result<Store, String> {
+  pub fn local_only<P: AsRef<Path>>(
+    executor: task_executor::Executor,
+    path: P,
+  ) -> Result<Store, String> {
     Ok(Store {
       local: local::ByteStore::new(executor, path)?,
       remote: None,
@@ -189,7 +192,7 @@ impl Store {
   /// will attempt to back-fill its local storage from a remote CAS.
   ///
   pub fn with_remote<P: AsRef<Path>>(
-    executor: logging::Executor,
+    executor: task_executor::Executor,
     path: P,
     cas_addresses: &[String],
     instance_name: Option<String>,
@@ -883,11 +886,14 @@ mod local {
     //  2. It's nice to know whether we should be able to parse something as a proto.
     file_dbs: Result<Arc<ShardedLmdb>, String>,
     directory_dbs: Result<Arc<ShardedLmdb>, String>,
-    executor: logging::Executor,
+    executor: task_executor::Executor,
   }
 
   impl ByteStore {
-    pub fn new<P: AsRef<Path>>(executor: logging::Executor, path: P) -> Result<ByteStore, String> {
+    pub fn new<P: AsRef<Path>>(
+      executor: task_executor::Executor,
+      path: P,
+    ) -> Result<ByteStore, String> {
       let root = path.as_ref();
       let files_root = root.join("files");
       let directories_root = root.join("directories");
@@ -1620,7 +1626,7 @@ mod local {
     }
 
     pub fn new_store<P: AsRef<Path>>(dir: P) -> ByteStore {
-      ByteStore::new(logging::Executor::new(), dir).unwrap()
+      ByteStore::new(task_executor::Executor::new(), dir).unwrap()
     }
 
     pub fn load_file_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
@@ -2440,7 +2446,7 @@ mod tests {
   /// Create a new local store with whatever was already serialized in dir.
   ///
   fn new_local_store<P: AsRef<Path>>(dir: P) -> Store {
-    Store::local_only(logging::Executor::new(), dir).expect("Error creating local store")
+    Store::local_only(task_executor::Executor::new(), dir).expect("Error creating local store")
   }
 
   ///
@@ -2448,7 +2454,7 @@ mod tests {
   ///
   fn new_store<P: AsRef<Path>>(dir: P, cas_address: String) -> Store {
     Store::with_remote(
-      logging::Executor::new(),
+      task_executor::Executor::new(),
       dir,
       &[cas_address],
       None,
@@ -3129,7 +3135,7 @@ mod tests {
       .expect("Error storing catnip locally");
 
     let store_with_remote = Store::with_remote(
-      logging::Executor::new(),
+      task_executor::Executor::new(),
       dir.path(),
       &[cas.address()],
       Some("dark-tower".to_owned()),
@@ -3156,7 +3162,7 @@ mod tests {
       .build();
 
     let store_with_remote = Store::with_remote(
-      logging::Executor::new(),
+      task_executor::Executor::new(),
       dir.path(),
       &[cas.address()],
       Some("dark-tower".to_owned()),
@@ -3197,7 +3203,7 @@ mod tests {
       .expect("Error storing catnip locally");
 
     let store_with_remote = Store::with_remote(
-      logging::Executor::new(),
+      task_executor::Executor::new(),
       dir.path(),
       &[cas.address()],
       None,
@@ -3224,7 +3230,7 @@ mod tests {
       .build();
 
     let store_with_remote = Store::with_remote(
-      logging::Executor::new(),
+      task_executor::Executor::new(),
       dir.path(),
       &[cas.address()],
       None,

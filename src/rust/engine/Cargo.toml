@@ -44,6 +44,7 @@ members = [
   "serverset",
   "sharded_lmdb",
   "tar_api",
+  "task_executor",
   "testutil",
   "testutil/mock",
   "testutil/local_cas",
@@ -75,6 +76,7 @@ default-members = [
   "serverset",
   "sharded_lmdb",
   "tar_api",
+  "task_executor",
   "testutil",
   "testutil/mock",
   "testutil/local_cas",
@@ -106,6 +108,7 @@ tempfile = "3"
 ui = { path = "ui" }
 url = "1.7.1"
 tar_api = { path = "tar_api" }
+task_executor = { path = "task_executor" }
 workunit_store = { path = "workunit_store" }
 
 [patch.crates-io]

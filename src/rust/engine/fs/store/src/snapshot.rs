@@ -467,7 +467,7 @@ impl Snapshot {
   ///
   pub fn capture_snapshot_from_arbitrary_root<P: AsRef<Path> + Send + 'static>(
     store: Store,
-    executor: logging::Executor,
+    executor: task_executor::Executor,
     root_path: P,
     path_globs: PathGlobs,
     digest_hint: Option<Digest>,
@@ -595,9 +595,9 @@ mod tests {
     tempfile::TempDir,
     Arc<PosixFS>,
     OneOffStoreFileByDigest,
-    logging::Executor,
+    task_executor::Executor,
   ) {
-    let executor = logging::Executor::new();
+    let executor = task_executor::Executor::new();
     // TODO: Pass a remote CAS address through.
     let store = Store::local_only(
       executor.clone(),
@@ -608,7 +608,7 @@ mod tests {
     )
     .unwrap();
     let dir = tempfile::Builder::new().prefix("root").tempdir().unwrap();
-    let posix_fs = Arc::new(PosixFS::new(dir.path(), &[], logging::Executor::new()).unwrap());
+    let posix_fs = Arc::new(PosixFS::new(dir.path(), &[], task_executor::Executor::new()).unwrap());
     let file_saver = OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone());
     (store, dir, posix_fs, file_saver, executor)
   }
@@ -1091,7 +1091,10 @@ mod tests {
     )
   }
 
-  fn expand_all_sorted(posix_fs: Arc<PosixFS>, executor: &logging::Executor) -> Vec<PathStat> {
+  fn expand_all_sorted(
+    posix_fs: Arc<PosixFS>,
+    executor: &task_executor::Executor,
+  ) -> Vec<PathStat> {
     let mut v = executor
       .block_on(
         posix_fs.expand(

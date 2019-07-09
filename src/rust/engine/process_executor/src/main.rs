@@ -224,7 +224,7 @@ fn main() {
     BTreeSet::new()
   };
 
-  let executor = logging::Executor::new();
+  let executor = task_executor::Executor::new();
 
   let store = match (server_arg, args.value_of("cas-server")) {
     (Some(_server), Some(cas_server)) => {

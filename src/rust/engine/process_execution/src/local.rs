@@ -24,7 +24,7 @@ use bytes::{Bytes, BytesMut};
 
 pub struct CommandRunner {
   store: Store,
-  executor: logging::Executor,
+  executor: task_executor::Executor,
   work_dir: PathBuf,
   cleanup_local_dirs: bool,
 }
@@ -32,7 +32,7 @@ pub struct CommandRunner {
 impl CommandRunner {
   pub fn new(
     store: Store,
-    executor: logging::Executor,
+    executor: task_executor::Executor,
     work_dir: PathBuf,
     cleanup_local_dirs: bool,
   ) -> CommandRunner {
@@ -897,7 +897,7 @@ mod tests {
     cleanup: bool,
   ) -> Result<FallibleExecuteProcessResult, String> {
     let store_dir = TempDir::new().unwrap();
-    let executor = logging::Executor::new();
+    let executor = task_executor::Executor::new();
     let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
     let runner = super::CommandRunner {
       store: store,

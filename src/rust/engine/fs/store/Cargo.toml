@@ -18,7 +18,6 @@ indexmap = "1.0.2"
 itertools = "0.7.2"
 lmdb = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "06bdfbfc6348f6804127176e561843f214fc17f8" }
 log = "0.4"
-logging = { path = "../../logging" }
 parking_lot = "0.6"
 protobuf = { version = "2.0.6", features = ["with-bytes"] }
 serverset = { path = "../../serverset" }
@@ -26,6 +25,7 @@ sha2 = "0.8"
 serde = "1.0"
 serde_derive = "1.0"
 sharded_lmdb = { path = "../../sharded_lmdb" }
+task_executor = { path = "../../task_executor" }
 tempfile = "3"
 tokio-threadpool = "0.1.12"
 uuid = { version = "0.7.1", features = ["v4"] }

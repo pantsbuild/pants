@@ -257,7 +257,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
     .value_of("local-store-path")
     .map(PathBuf::from)
     .unwrap_or_else(Store::default_path);
-  let runtime = logging::Executor::new();
+  let runtime = task_executor::Executor::new();
   let (store, store_has_remote) = {
     let (store_result, store_has_remote) = match top_match.values_of("server-address") {
       Some(cas_address) => {
@@ -610,7 +610,7 @@ fn expand_files_helper(
     .to_boxed()
 }
 
-fn make_posix_fs<P: AsRef<Path>>(executor: logging::Executor, root: P) -> fs::PosixFS {
+fn make_posix_fs<P: AsRef<Path>>(executor: task_executor::Executor, root: P) -> fs::PosixFS {
   fs::PosixFS::new(&root, &[], executor).unwrap()
 }
 
