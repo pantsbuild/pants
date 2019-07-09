@@ -883,6 +883,7 @@ mod local {
     //  2. It's nice to know whether we should be able to parse something as a proto.
     file_dbs: Result<Arc<ShardedLmdb>, String>,
     directory_dbs: Result<Arc<ShardedLmdb>, String>,
+    executor: logging::Executor,
   }
 
   impl ByteStore {
@@ -910,9 +911,10 @@ mod local {
           directory_dbs: ShardedLmdb::new(
             directories_root.clone(),
             5 * 1024 * 1024 * 1024,
-            executor,
+            executor.clone(),
           )
           .map(Arc::new),
+          executor: executor,
         }),
       })
     }
@@ -1123,22 +1125,28 @@ mod local {
       entry_type: EntryType,
       bytes: Bytes,
       initial_lease: bool,
-    ) -> BoxFuture<Digest, String> {
+    ) -> impl Future<Item = Digest, Error = String> {
       let dbs = match entry_type {
         EntryType::Directory => self.inner.directory_dbs.clone(),
         EntryType::File => self.inner.file_dbs.clone(),
       };
-
-      let fingerprint = {
-        let mut hasher = Sha256::default();
-        hasher.input(&bytes);
-        Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
-      };
-      let digest = Digest(fingerprint, bytes.len());
-      try_future!(dbs)
-        .store_bytes(digest.0, bytes, initial_lease)
-        .map(move |()| digest)
-        .to_boxed()
+      let bytes2 = bytes.clone();
+      self
+        .inner
+        .executor
+        .spawn_on_io_pool(futures::future::lazy(move || {
+          let fingerprint = {
+            let mut hasher = Sha256::default();
+            hasher.input(&bytes);
+            Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
+          };
+          Ok(Digest(fingerprint, bytes.len()))
+        }))
+        .and_then(move |digest| {
+          future::done(dbs)
+            .and_then(move |db| db.store_bytes(digest.0, bytes2, initial_lease))
+            .map(move |()| digest)
+        })
     }
 
     pub fn load_bytes_with<T: Send + 'static, F: Fn(Bytes) -> T + Send + Sync + 'static>(
