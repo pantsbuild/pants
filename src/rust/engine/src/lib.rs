@@ -745,7 +745,7 @@ pub extern "C" fn capture_snapshots(
 
   with_scheduler(scheduler_ptr, |scheduler| {
     let core = scheduler.core.clone();
-    core.block_on(
+    core.executor.block_on(
       futures::future::join_all(
         path_globs_and_roots
           .into_iter()
@@ -788,6 +788,7 @@ pub extern "C" fn merge_directories(
   with_scheduler(scheduler_ptr, |scheduler| {
     scheduler
       .core
+      .executor
       .block_on(store::Snapshot::merge_directories(
         scheduler.core.store(),
         digests,
@@ -822,7 +823,7 @@ pub extern "C" fn materialize_directories(
   };
 
   with_scheduler(scheduler_ptr, |scheduler| {
-    scheduler.core.block_on(
+    scheduler.core.executor.block_on(
       futures::future::join_all(
         dir_and_digests
           .into_iter()
