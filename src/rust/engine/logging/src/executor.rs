@@ -2,6 +2,11 @@ use futures::Future;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
+// TODO: It's strange that this is an exposed interface from the logging crate, rather than an
+// implementation of a trait that lives elsewhere. This can't currently be a trait because its
+// methods have generic types, which isn't allowed on traits. If we can move the API somewhere else
+// in the future, that could be nice.
+
 #[derive(Clone)]
 pub struct Executor {
   runtime: Arc<Runtime>,
