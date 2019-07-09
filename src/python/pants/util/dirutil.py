@@ -6,6 +6,7 @@ import errno
 import os
 import shutil
 import stat
+import subprocess
 import tempfile
 import threading
 import uuid
@@ -66,7 +67,15 @@ def safe_mkdir(directory, clean=False):
   if clean:
     safe_rmtree(directory)
   try:
-    os.makedirs(directory)
+    if directory.endswith(get_repo_root() + '/.pants.d'):
+      # make sure the base directory for .pants.d(symlink) exists
+      if not os.path.isdir('/tmp/.pants.d'):
+        os.makedirs('/tmp/.pants.d')
+      # create a symlink for .pants.d if it doesn't exist
+      if not os.path.isdir(directory):
+        absolute_symlink('/tmp/.pants.d', directory)
+    else:
+      os.makedirs(directory)
   except OSError as e:
     if e.errno != errno.EEXIST:
       raise
@@ -326,6 +335,13 @@ def safe_concurrent_rename(src, dst):
   """
   # Delete dst, in case it existed (with old content) even before any concurrent processes
   # attempted this write. This ensures that at least one process writes the new content.
+
+  # For .pants.d directory, since it is a symlink, use the base dir('/tmp/.pants.d') instead
+  if src.endswith(get_repo_root() + '/.pants.d'):
+    src = '/tmp/.pants.d'
+  if dst.endswith(get_repo_root() + '/.pants.d'):
+    dst = '/tmp/.pants.d'
+
   if os.path.isdir(src):  # Note that dst may not exist, so we test for the type of src.
     safe_rmtree(dst)
   else:
@@ -575,3 +591,8 @@ def is_writable_dir(path):
   We call is_readable_dir(), so this definition of "writable" is a superset of that.
   """
   return is_readable_dir(path) and os.access(path, os.W_OK)
+
+
+def get_repo_root():
+  """Return the absolute path to the root directory of the Pants git repo."""
+  return subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).strip().decode()
