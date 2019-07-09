@@ -555,6 +555,9 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         ').')
       with self.context.new_workunit('compile', labels=[WorkUnitLabel.COMPILER]) as compile_workunit:
         try:
+          with open('testing', 'a') as f:
+            f.write(str(self._get_plugin_map('scalac', ScalaPlatform.global_instance(), ctx.target)))
+            f.write(str(self._get_plugin_map('javac', Java.global_instance(), ctx.target)))
           directory_digest = self.compile(
             ctx,
             self._args,

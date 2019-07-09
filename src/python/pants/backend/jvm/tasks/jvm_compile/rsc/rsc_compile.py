@@ -5,15 +5,19 @@ import functools
 import logging
 import os
 import re
+from collections import defaultdict
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext  # noqa
+from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.rsc import Rsc
+from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.shader import Shader
+from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import Job
-from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
+from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
@@ -101,7 +105,7 @@ class RscCompileContext(CompileContext):
     safe_mkdir(os.path.dirname(self.rsc_jar_file.path))
 
 
-class RscCompile(ZincCompile, MirroredTargetOptionMixin):
+class RscCompile(JvmCompile, MirroredTargetOptionMixin):
   """Compile Scala and Java code to classfiles using Rsc."""
 
   _name = 'mixed' # noqa
@@ -145,6 +149,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         targets and the Zinc products of zinc-only targets.
     """
 
+  class ZincCompileUtils:
+
   @memoized_property
   def _compiler_tags(self):
     return {
@@ -167,6 +173,13 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     register('--extra-rsc-args', type=list, default=[],
              help='Extra arguments to pass to the rsc invocation.')
 
+    # TODO(ity): only valid for zinc-only workflow
+    register('--incremental', advanced=True, type=bool, default=True,
+      help='When set, zinc will use sub-target incremental compilation, which dramatically '
+           'improves compile performance while changing large targets. When unset, '
+           'changed targets will be compiled with an empty output directory, as if after '
+           'running clean-all.')
+
     cls.register_jvm_tool(
       register,
       'rsc',
@@ -182,6 +195,41 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       ]
     )
 
+  def log_zinc_file(self, analysis_file):
+    self.context.log.debug('Calling zinc on: {} ({})'
+      .format(analysis_file,
+      hash_file(analysis_file).upper()
+      if os.path.exists(analysis_file)
+      else 'nonexistent'))
+
+  @classmethod
+  def _javac_plugin_args(cls, javac_plugin_map):
+    ret = []
+    for plugin, args in javac_plugin_map.items():
+      for arg in args:
+        if ' ' in arg:
+          # Note: Args are separated by spaces, and there is no way to escape embedded spaces, as
+          # javac's Main does a simple split on these strings.
+          raise TaskError('javac plugin args must not contain spaces '
+                          '(arg {} for plugin {})'.format(arg, plugin))
+      ret.append('-C-Xplugin:{} {}'.format(plugin, ' '.join(args)))
+    return ret
+
+  def _scalac_plugin_args(self, scalac_plugin_map, classpath):
+    if not scalac_plugin_map:
+      return []
+
+    plugin_jar_map = self._find_scalac_plugins(list(scalac_plugin_map.keys()), classpath)
+    ret = []
+    for name, cp_entries in plugin_jar_map.items():
+      # Note that the first element in cp_entries is the one containing the plugin's metadata,
+      # meaning that this is the plugin that will be loaded, even if there happen to be other
+      # plugins in the list of entries (e.g., because this plugin depends on another plugin).
+      ret.append('-S-Xplugin:{}'.format(':'.join(cp_entries)))
+      for arg in scalac_plugin_map[name]:
+        ret.append('-S-P:{}:{}'.format(name, arg))
+    return ret
+
   @memoized_property
   def _rsc(self):
     return Rsc.global_instance()
@@ -189,6 +237,20 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   @memoized_property
   def _rsc_classpath(self):
     return self.tool_classpath('rsc')
+
+  @memoized_property
+  def _zinc(self):
+    return Zinc.Factory.global_instance().create(self.context.products, self.execution_strategy)
+
+  def _get_zinc_compiler_classpath(self):
+    """Get the classpath for the zinc compiler JVM tool.
+
+    This will just be the zinc compiler tool classpath normally, but tasks which invoke zinc along
+    with other JVM tools with nailgun (such as RscCompile) require zinc to be invoked with this
+    method to ensure a single classpath is used for all the tools they need to invoke so that the
+    nailgun instance (which is keyed by classpath and JVM options) isn't invalidated.
+    """
+    return [self._zinc.zinc]
 
   # TODO: allow @memoized_method to convert lists into tuples so they can be hashed!
   @memoized_property
@@ -201,22 +263,50 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     cp = []
     cp.extend(self._rsc_classpath)
     # Add zinc's classpath so that it can be invoked from the same nailgun instance.
-    cp.extend(super().get_zinc_compiler_classpath())
+    cp.extend(self._get_zinc_compiler_classpath())
     return cp
 
   # Overrides the normal zinc compiler classpath, which only contains zinc.
   def get_zinc_compiler_classpath(self):
     return self.execution_strategy_enum.resolve_for_enum_variant({
       # NB: We must use the verbose version of super() here, possibly because of the lambda.
-      self.HERMETIC: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
-      self.SUBPROCESS: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
+      self.HERMETIC: lambda: self._get_zinc_compiler_classpath(),
+      self.SUBPROCESS: lambda: self._get_zinc_compiler_classpath(),
       self.NAILGUN: lambda: self._nailgunnable_combined_classpath,
     })()
 
-  # NB: Override of ZincCompile/JvmCompile method!
+  def _get_zinc_arguments(self, settings):
+    distribution = self._get_jvm_distribution()
+    return self._format_zinc_arguments(settings, distribution)
+
+  @staticmethod
+  def _format_zinc_arguments(settings, distribution):
+    """Extracts and formats the zinc arguments given in the jvm platform settings.
+
+    This is responsible for the symbol substitution which replaces $JAVA_HOME with the path to an
+    appropriate jvm distribution.
+
+    :param settings: The jvm platform settings from which to extract the arguments.
+    :type settings: :class:`JvmPlatformSettings`
+    """
+    zinc_args = [
+      '-C-source', '-C{}'.format(settings.source_level),
+      '-C-target', '-C{}'.format(settings.target_level),
+    ]
+    if settings.args:
+      settings_args = settings.args
+      if any('$JAVA_HOME' in a for a in settings.args):
+        logger.debug('Substituting "$JAVA_HOME" with "{}" in jvm-platform args.'
+          .format(distribution.home))
+        settings_args = (a.replace('$JAVA_HOME', distribution.home) for a in settings.args)
+      zinc_args.extend(settings_args)
+    return zinc_args
+
+  # NB: Override of JvmCompile method!
   def register_extra_products_from_contexts(self, targets, compile_contexts):
     super().register_extra_products_from_contexts(targets, compile_contexts)
 
+    self.register_zinc_products(targets, compile_contexts)
     def confify(entries):
       return [(conf, e) for e in entries for conf in self._confs]
 
@@ -235,9 +325,27 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
           target,
           cp_entries)
 
+  def register_zinc_products(self, targets, compile_contexts):
+    compile_contexts = [self.select_runtime_context(compile_contexts[t]) for t in targets]
+    zinc_analysis = self.context.products.get_data('zinc_analysis')
+    zinc_args = self.context.products.get_data('zinc_args')
+
+    if zinc_analysis is not None:
+      for compile_context in compile_contexts:
+        zinc_analysis[compile_context.target] = (compile_context.classes_dir.path,
+        compile_context.jar_file.path,
+        compile_context.analysis_file)
+
+    if zinc_args is not None:
+      for compile_context in compile_contexts:
+        with open(compile_context.args_file, 'r') as fp:
+          args = fp.read().split()
+        zinc_args[compile_context.target] = args
+
   def create_empty_extra_products(self):
     super().create_empty_extra_products()
 
+    self.create_empty_extra_zinc_products()
     compile_classpath = self.context.products.get_data('compile_classpath')
     runtime_classpath = self.context.products.get_data('runtime_classpath')
     classpath_product = self.context.products.get_data('rsc_mixed_compile_classpath')
@@ -247,6 +355,13 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     else:
       classpath_product.update(compile_classpath)
     classpath_product.update(runtime_classpath)
+
+  def create_empty_extra_zinc_products(self):
+    if self.context.products.is_required_data('zinc_analysis'):
+      self.context.products.safe_create_data('zinc_analysis', dict)
+
+    if self.context.products.is_required_data('zinc_args'):
+      self.context.products.safe_create_data('zinc_args', lambda: defaultdict(list))
 
   def select(self, target):
     if not isinstance(target, JvmTarget):
@@ -675,6 +790,264 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
   _JDK_LIB_NAMES = ['rt.jar', 'dt.jar', 'jce.jar', 'tools.jar']
 
+  def _verify_zinc_classpath(self, classpath, allow_dist=True):
+    def is_outside(path, putative_parent):
+      return os.path.relpath(path, putative_parent).startswith(os.pardir)
+
+    dist = self._zinc.dist
+    for path in classpath:
+      if not os.path.isabs(path):
+        raise TaskError('Classpath entries provided to zinc should be absolute. '
+                        '{} is not.'.format(path))
+
+      if is_outside(path, self.get_options().pants_workdir) and (not allow_dist or is_outside(path, dist.home)):
+        raise TaskError('Classpath entries provided to zinc should be in working directory or '
+                        'part of the JDK. {} is not.'.format(path))
+      if path != os.path.normpath(path):
+        raise TaskError('Classpath entries provided to zinc should be normalized '
+                        '(i.e. without ".." and "."). {} is not.'.format(path))
+
+  def javac_classpath(self):
+    # Note that if this classpath is empty then Zinc will automatically use the javac from
+    # the JDK it was invoked with.
+    return Java.global_javac_classpath(self.context.products)
+
+  def scalac_classpath_entries(self):
+    """Returns classpath entries for the scalac classpath."""
+    return ScalaPlatform.global_instance().compiler_classpath_entries(
+      self.context.products, self.context._scheduler)
+
+  def compile(self, ctx, args, dependency_classpath, upstream_analysis,
+    settings, compiler_option_sets, zinc_file_manager,
+    javac_plugin_map, scalac_plugin_map):
+    absolute_classpath = (ctx.classes_dir.path,) + tuple(ce.path for ce in dependency_classpath)
+
+    if self.get_options().capture_classpath:
+      self._record_compile_classpath(absolute_classpath, ctx.target, ctx.classes_dir.path)
+
+    self._verify_zinc_classpath(absolute_classpath, allow_dist=(self.execution_strategy != self.HERMETIC))
+    # TODO: Investigate upstream_analysis for hermetic compiles
+    self._verify_zinc_classpath(upstream_analysis.keys())
+
+    def relative_to_exec_root(path):
+      # TODO: Support workdirs not nested under buildroot by path-rewriting.
+      return fast_relpath(path, get_buildroot())
+
+    analysis_cache = relative_to_exec_root(ctx.analysis_file)
+    classes_dir = relative_to_exec_root(ctx.classes_dir.path)
+    jar_file = relative_to_exec_root(ctx.jar_file.path)
+    # TODO: Have these produced correctly, rather than having to relativize them here
+    relative_classpath = tuple(relative_to_exec_root(c) for c in absolute_classpath)
+
+    # list of classpath entries
+    scalac_classpath_entries = self.scalac_classpath_entries()
+    scala_path = [relative_to_exec_root(classpath_entry.path) for classpath_entry in scalac_classpath_entries]
+
+    zinc_args = []
+    zinc_args.extend([
+      '-log-level', self.get_options().level,
+      '-analysis-cache', analysis_cache,
+      '-classpath', ':'.join(relative_classpath),
+      '-d', classes_dir,
+      '-jar', jar_file,
+    ])
+    if not self.get_options().colors:
+      zinc_args.append('-no-color')
+
+    if self.post_compile_extra_resources(ctx):
+      post_compile_merge_dir = relative_to_exec_root(ctx.post_compile_merge_dir)
+      zinc_args.extend(['--post-compile-merge-dir', post_compile_merge_dir])
+
+    compiler_bridge_classpath_entry = self._zinc.compile_compiler_bridge(self.context)
+    zinc_args.extend(['-compiled-bridge-jar', relative_to_exec_root(compiler_bridge_classpath_entry.path)])
+    zinc_args.extend(['-scala-path', ':'.join(scala_path)])
+
+    zinc_args.extend(self._javac_plugin_args(javac_plugin_map))
+    # Search for scalac plugins on the classpath.
+    # Note that:
+    # - We also search in the extra scalac plugin dependencies, if specified.
+    # - In scala 2.11 and up, the plugin's classpath element can be a dir, but for 2.10 it must be
+    #   a jar.  So in-repo plugins will only work with 2.10 if --use-classpath-jars is true.
+    # - We exclude our own classes_dir/jar_file, because if we're a plugin ourselves, then our
+    #   classes_dir doesn't have scalac-plugin.xml yet, and we don't want that fact to get
+    #   memoized (which in practice will only happen if this plugin uses some other plugin, thus
+    #   triggering the plugin search mechanism, which does the memoizing).
+    scalac_plugin_search_classpath = (
+      (set(absolute_classpath) | set(self.scalac_plugin_classpath_elements())) -
+      {ctx.classes_dir.path, ctx.jar_file.path}
+    )
+    zinc_args.extend(self._scalac_plugin_args(scalac_plugin_map, scalac_plugin_search_classpath))
+    if upstream_analysis:
+      zinc_args.extend(['-analysis-map',
+        ','.join('{}:{}'.format(
+          relative_to_exec_root(k),
+          relative_to_exec_root(v)
+        ) for k, v in upstream_analysis.items())])
+
+    zinc_args.extend(args)
+    zinc_args.extend(self._get_zinc_arguments(settings))
+    zinc_args.append('-transactional')
+
+    compiler_option_sets_args = self.get_merged_args_for_compiler_option_sets(compiler_option_sets)
+    zinc_args.extend(compiler_option_sets_args)
+
+    if not self._clear_invalid_analysis:
+      zinc_args.append('-no-clear-invalid-analysis')
+
+    if not zinc_file_manager:
+      zinc_args.append('-no-zinc-file-manager')
+
+    jvm_options = []
+
+    if self.javac_classpath():
+      # Make the custom javac classpath the first thing on the bootclasspath, to ensure that
+      # it's the one javax.tools.ToolProvider.getSystemJavaCompiler() loads.
+      # It will probably be loaded even on the regular classpath: If not found on the bootclasspath,
+      # getSystemJavaCompiler() constructs a classloader that loads from the JDK's tools.jar.
+      # That classloader will first delegate to its parent classloader, which will search the
+      # regular classpath.  However it's harder to guarantee that our javac will preceed any others
+      # on the classpath, so it's safer to prefix it to the bootclasspath.
+      jvm_options.extend(['-Xbootclasspath/p:{}'.format(':'.join(self.javac_classpath()))])
+
+    jvm_options.extend(self._jvm_options)
+
+    zinc_args.extend(ctx.sources)
+
+    self.log_zinc_file(ctx.analysis_file)
+    self.write_argsfile(ctx, zinc_args)
+
+    return self.execution_strategy_enum.resolve_for_enum_variant({
+      self.HERMETIC: lambda: self._compile_hermetic(
+        jvm_options, ctx, classes_dir, jar_file, compiler_bridge_classpath_entry,
+        dependency_classpath, scalac_classpath_entries),
+      self.SUBPROCESS: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir),
+      self.NAILGUN: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir),
+    })()
+
+  class ZincCompileError(TaskError):
+    """An exception type specifically to signal a failed zinc execution."""
+
+  def _compile_nonhermetic(self, jvm_options, ctx, classes_directory):
+    # Populate the resources to merge post compile onto disk for the nonhermetic case,
+    # where `--post-compile-merge-dir` was added is the relevant part.
+    self.context._scheduler.materialize_directories((
+      DirectoryToMaterialize(get_buildroot(), self.post_compile_extra_resources_digest(ctx)),
+    ))
+
+    exit_code = self.runjava(classpath=self.get_zinc_compiler_classpath(),
+      main=Zinc.ZINC_COMPILE_MAIN,
+      jvm_options=jvm_options,
+      args=['@{}'.format(ctx.args_file)],
+      workunit_name=self.name(),
+      workunit_labels=[WorkUnitLabel.COMPILER],
+      dist=self._zinc.dist)
+    if exit_code != 0:
+      raise self.ZincCompileError('Zinc compile failed.', exit_code=exit_code)
+
+  def _compile_hermetic(self, jvm_options, ctx, classes_dir, jar_file,
+    compiler_bridge_classpath_entry, dependency_classpath,
+    scalac_classpath_entries):
+    zinc_relpath = fast_relpath(self._zinc.zinc, get_buildroot())
+
+    snapshots = [
+      self._zinc.snapshot(self.context._scheduler),
+      ctx.target.sources_snapshot(self.context._scheduler),
+    ]
+
+    # scala_library() targets with java_sources have circular dependencies on those java source
+    # files, and we provide them to the same zinc command line that compiles the scala, so we need
+    # to make sure those source files are available in the hermetic execution sandbox.
+    java_sources_targets = getattr(ctx.target, 'java_sources', [])
+    java_sources_snapshots = [
+      tgt.sources_snapshot(self.context._scheduler)
+      for tgt in java_sources_targets
+    ]
+    snapshots.extend(java_sources_snapshots)
+
+    # Ensure the dependencies and compiler bridge jars are available in the execution sandbox.
+    relevant_classpath_entries = dependency_classpath + [compiler_bridge_classpath_entry]
+    directory_digests = tuple(
+      entry.directory_digest for entry in relevant_classpath_entries if entry.directory_digest
+    )
+    if len(directory_digests) != len(relevant_classpath_entries):
+      for dep in relevant_classpath_entries:
+        if dep.directory_digest is None:
+          logger.warning(
+            "ClasspathEntry {} didn't have a Digest, so won't be present for hermetic "
+            "execution of zinc".format(dep)
+          )
+    snapshots.extend(
+      classpath_entry.directory_digest for classpath_entry in scalac_classpath_entries
+    )
+
+    if self._zinc.use_native_image:
+      if jvm_options:
+        raise ValueError(
+          "`{}` got non-empty jvm_options when running with a graal native-image, but this is "
+          "unsupported. jvm_options received: {}".format(self.options_scope, safe_shlex_join(jvm_options))
+        )
+      native_image_path, native_image_snapshot = self._zinc.native_image(self.context)
+      native_image_snapshots = (native_image_snapshot.directory_digest,)
+      scala_boot_classpath = [
+                               classpath_entry.path for classpath_entry in scalac_classpath_entries
+                             ] + [
+                               # We include rt.jar on the scala boot classpath because the compiler usually gets its
+                               # contents from the VM it is executing in, but not in the case of a native image. This
+                               # resolves a `object java.lang.Object in compiler mirror not found.` error.
+                               '.jdk/jre/lib/rt.jar',
+                               # The same goes for the jce.jar, which provides javax.crypto.
+                               '.jdk/jre/lib/jce.jar',
+                             ]
+      image_specific_argv =  [
+        native_image_path,
+        '-java-home', '.jdk',
+        '-Dscala.boot.class.path={}'.format(os.pathsep.join(scala_boot_classpath)),
+        '-Dscala.usejavacp=true',
+      ]
+    else:
+      # TODO: Extract something common from Executor._create_command to make the command line
+      # TODO: Lean on distribution for the bin/java appending here
+      native_image_snapshots = ()
+      image_specific_argv =  ['.jdk/bin/java'] + jvm_options + [
+        '-cp', zinc_relpath,
+        Zinc.ZINC_COMPILE_MAIN
+      ]
+
+    argfile_snapshot, = self.context._scheduler.capture_snapshots([
+      PathGlobsAndRoot(
+        PathGlobs([fast_relpath(ctx.args_file, get_buildroot())]),
+        get_buildroot(),
+      ),
+    ])
+
+    argv = image_specific_argv + ['@{}'.format(argfile_snapshot.files[0])]
+
+    merged_input_digest = self.context._scheduler.merge_directories(
+      tuple(s.directory_digest for s in snapshots) +
+      directory_digests +
+      native_image_snapshots +
+      (self.post_compile_extra_resources_digest(ctx), argfile_snapshot.directory_digest)
+    )
+
+    req = ExecuteProcessRequest(
+      argv=tuple(argv),
+      input_files=merged_input_digest,
+      output_files=(jar_file,) if self.get_options().use_classpath_jars else (),
+      output_directories=() if self.get_options().use_classpath_jars else (classes_dir,),
+      description="zinc compile for {}".format(ctx.target.address.spec),
+      jdk_home=self._zinc.underlying_dist.home,
+    )
+    res = self.context.execute_process_synchronously_or_raise(
+      req, self.name(), [WorkUnitLabel.COMPILER])
+
+    # TODO: Materialize as a batch in do_compile or somewhere
+    self.context._scheduler.materialize_directories((
+      DirectoryToMaterialize(get_buildroot(), res.output_directory_digest),
+    ))
+
+    # TODO: This should probably return a ClasspathEntry rather than a Digest
+    return res.output_directory_digest
+
   @memoized_method
   def _jdk_libs_paths_and_digest(self, hermetic_dist):
     jdk_libs_rel, jdk_libs_globs = hermetic_dist.find_libs_path_globs(self._JDK_LIB_NAMES)
@@ -704,3 +1077,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       'zinc-only': dep_has_rsc_compile,
       'rsc-and-zinc': lambda: False
     })()
+
+  def select_source(self, source_file_path):
+    return source_file_path.endswith('.java') or source_file_path.endswith('.scala')

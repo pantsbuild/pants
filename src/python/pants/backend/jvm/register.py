@@ -159,6 +159,7 @@ def register_goals():
 
   # Compile
   task(name='rsc', action=RscCompile).install('compile')
+  # Remove this task registration in 1.19.0 to correspond with removal_version in #7824
   task(name='zinc', action=ZincCompile).install('compile')
   task(name='javac', action=JavacCompile).install('compile')
 
