@@ -897,8 +897,8 @@ mod tests {
     cleanup: bool,
   ) -> Result<FallibleExecuteProcessResult, String> {
     let store_dir = TempDir::new().unwrap();
-    let store = Store::local_only(store_dir.path()).unwrap();
     let executor = logging::Executor::new();
+    let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
     let runner = super::CommandRunner {
       store: store,
       executor: executor.clone(),

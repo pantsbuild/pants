@@ -123,7 +123,7 @@ enum Node {
 }
 
 struct BuildResultFS {
-  runtime: tokio::runtime::Runtime,
+  runtime: logging::Executor,
   store: Store,
   inode_digest_cache: HashMap<Inode, InodeDetails>,
   digest_inode_cache: HashMap<Digest, (Inode, Inode)>,
@@ -132,7 +132,7 @@ struct BuildResultFS {
 }
 
 impl BuildResultFS {
-  pub fn new(runtime: tokio::runtime::Runtime, store: Store) -> BuildResultFS {
+  pub fn new(runtime: logging::Executor, store: Store) -> BuildResultFS {
     BuildResultFS {
       runtime: runtime,
       store: store,
@@ -597,7 +597,7 @@ impl fuse::Filesystem for BuildResultFS {
 pub fn mount<'a, P: AsRef<Path>>(
   mount_path: P,
   store: Store,
-  runtime: tokio::runtime::Runtime,
+  runtime: logging::Executor,
 ) -> std::io::Result<fuse::BackgroundSession<'a>> {
   // TODO: Work out how to disable caching in the filesystem
   let options = ["-o", "ro", "-o", "fsname=brfs", "-o", "noapplexattr"]
@@ -683,9 +683,11 @@ fn main() {
   } else {
     None
   };
+  let runtime = logging::Executor::new();
 
   let store = match args.value_of("server-address") {
     Some(address) => Store::with_remote(
+      runtime.clone(),
       &store_path,
       &[address.to_owned()],
       args.value_of("remote-instance-name").map(str::to_owned),
@@ -703,11 +705,10 @@ fn main() {
       .expect("Error making BackoffConfig"),
       1,
     ),
-    None => Store::local_only(&store_path),
+    None => Store::local_only(runtime.clone(), &store_path),
   }
   .expect("Error making store");
 
-  let runtime = tokio::runtime::Runtime::new().expect("Making runtime");
   let _fs = mount(mount_path, store, runtime).expect("Error mounting");
   loop {
     std::thread::sleep(std::time::Duration::from_secs(1));
@@ -747,9 +748,10 @@ mod test {
   fn missing_digest() {
     let (store_dir, mount_dir) = make_dirs();
 
-    let store = Store::local_only(store_dir.path()).expect("Error creating local store");
+    let runtime = logging::Executor::new();
 
-    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let store =
+      Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
 
     let _fs = mount(mount_dir.path(), store, runtime).expect("Mounting");
     assert!(!&mount_dir
@@ -762,9 +764,10 @@ mod test {
   #[test]
   fn read_file_by_digest() {
     let (store_dir, mount_dir) = make_dirs();
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    let runtime = logging::Executor::new();
 
-    let store = Store::local_only(store_dir.path()).expect("Error creating local store");
+    let store =
+      Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
 
     let test_bytes = TestData::roland();
 
@@ -784,9 +787,10 @@ mod test {
   #[test]
   fn list_directory() {
     let (store_dir, mount_dir) = make_dirs();
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    let runtime = logging::Executor::new();
 
-    let store = Store::local_only(store_dir.path()).expect("Error creating local store");
+    let store =
+      Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
 
     let test_bytes = TestData::roland();
     let test_directory = TestDirectory::containing_roland();
@@ -809,9 +813,10 @@ mod test {
   #[test]
   fn read_file_from_directory() {
     let (store_dir, mount_dir) = make_dirs();
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    let runtime = logging::Executor::new();
 
-    let store = Store::local_only(store_dir.path()).expect("Error creating local store");
+    let store =
+      Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
 
     let test_bytes = TestData::roland();
     let test_directory = TestDirectory::containing_roland();
@@ -836,9 +841,10 @@ mod test {
   #[test]
   fn list_recursive_directory() {
     let (store_dir, mount_dir) = make_dirs();
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    let runtime = logging::Executor::new();
 
-    let store = Store::local_only(store_dir.path()).expect("Error creating local store");
+    let store =
+      Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
 
     let test_bytes = TestData::roland();
     let treat_bytes = TestData::catnip();
@@ -870,9 +876,10 @@ mod test {
   #[test]
   fn read_file_from_recursive_directory() {
     let (store_dir, mount_dir) = make_dirs();
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    let runtime = logging::Executor::new();
 
-    let store = Store::local_only(store_dir.path()).expect("Error creating local store");
+    let store =
+      Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
 
     let test_bytes = TestData::roland();
     let treat_bytes = TestData::catnip();
@@ -909,9 +916,10 @@ mod test {
   #[test]
   fn files_are_correctly_executable() {
     let (store_dir, mount_dir) = make_dirs();
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    let runtime = logging::Executor::new();
 
-    let store = Store::local_only(store_dir.path()).expect("Error creating local store");
+    let store =
+      Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
 
     let treat_bytes = TestData::catnip();
     let directory = TestDirectory::with_mixed_executable_files();
@@ -960,9 +968,10 @@ mod syscall_tests {
   #[test]
   fn read_file_by_digest_exact_bytes() {
     let (store_dir, mount_dir) = make_dirs();
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    let runtime = logging::Executor::new();
 
-    let store = Store::local_only(store_dir.path()).expect("Error creating local store");
+    let store =
+      Store::local_only(runtime.clone(), store_dir.path()).expect("Error creating local store");
 
     let test_bytes = TestData::roland();
 

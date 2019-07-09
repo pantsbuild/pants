@@ -288,6 +288,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
 
         (
           Store::with_remote(
+            runtime.clone(),
             &store_dir,
             &cas_addresses,
             top_match
@@ -317,7 +318,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           true,
         )
       }
-      None => (Store::local_only(&store_dir), false),
+      None => (Store::local_only(runtime.clone(), &store_dir), false),
     };
     let store = store_result.map_err(|e| {
       format!(

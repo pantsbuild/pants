@@ -50,6 +50,7 @@ pub struct ShardedLmdb {
   lmdbs: HashMap<u8, (Arc<Environment>, Database, Database)>,
   root_path: PathBuf,
   max_size: usize,
+  executor: logging::Executor,
 }
 
 impl ShardedLmdb {
@@ -58,7 +59,11 @@ impl ShardedLmdb {
   // for the mmap; in theory it should be possible not to bound this, but in practice we see travis
   // occasionally fail tests because it's unable to allocate virtual memory if we set this too high,
   // and we have too many tests running concurrently or close together.
-  pub fn new(root_path: PathBuf, max_size: usize) -> Result<ShardedLmdb, String> {
+  pub fn new(
+    root_path: PathBuf,
+    max_size: usize,
+    executor: logging::Executor,
+  ) -> Result<ShardedLmdb, String> {
     trace!("Initializing ShardedLmdb at root {:?}", root_path);
     let mut lmdbs = HashMap::new();
 
@@ -93,6 +98,7 @@ impl ShardedLmdb {
       lmdbs,
       root_path,
       max_size,
+      executor,
     })
   }
 
@@ -171,8 +177,9 @@ impl ShardedLmdb {
     initial_lease: bool,
   ) -> impl Future<Item = (), Error = String> {
     let store = self.clone();
-    futures::future::poll_fn(move || {
-      tokio_threadpool::blocking(|| {
+    self
+      .executor
+      .spawn_on_io_pool(futures::future::lazy(move || {
         let (env, db, lease_database) = store.get(&key);
         let put_res = env.begin_rw_txn().and_then(|mut txn| {
           txn.put(db, &key, &bytes, WriteFlags::NO_OVERWRITE)?;
@@ -192,15 +199,7 @@ impl ShardedLmdb {
           Err(lmdb::Error::KeyExist) => Ok(()),
           Err(err) => Err(format!("Error storing key {:?}: {}", key.to_hex(), err)),
         }
-      })
-    })
-    .then(|blocking_result| match blocking_result {
-      Ok(v) => v,
-      Err(blocking_err) => Err(format!(
-        "Unable to run blocking task to store_bytes in sharded_lmdb on tokio runtime: {}",
-        blocking_err
-      )),
-    })
+      }))
   }
 
   fn lease(
@@ -234,8 +233,9 @@ impl ShardedLmdb {
     f: F,
   ) -> impl Future<Item = Option<T>, Error = String> {
     let store = self.clone();
-    futures::future::poll_fn(move || {
-      tokio_threadpool::blocking(|| {
+    self
+      .executor
+      .spawn_on_io_pool(futures::future::lazy(move || {
         let (env, db, _) = store.get(&fingerprint);
         let ro_txn = env
           .begin_ro_txn()
@@ -249,15 +249,7 @@ impl ShardedLmdb {
             err,
           )),
         })
-      })
-    })
-    .then(|blocking_result| match blocking_result {
-      Ok(v) => v,
-      Err(blocking_err) => Err(format!(
-        "Unable to run blocking task to load_bytes in local ByteStore on tokio runtime: {}",
-        blocking_err
-      )),
-    })
+      }))
   }
 
   #[allow(clippy::identity_conversion)] // False positive: https://github.com/rust-lang/rust-clippy/issues/3913

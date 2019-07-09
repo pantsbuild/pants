@@ -595,10 +595,12 @@ mod tests {
     tempfile::TempDir,
     Arc<PosixFS>,
     OneOffStoreFileByDigest,
-    tokio::runtime::Runtime,
+    logging::Executor,
   ) {
+    let executor = logging::Executor::new();
     // TODO: Pass a remote CAS address through.
     let store = Store::local_only(
+      executor.clone(),
       tempfile::Builder::new()
         .prefix("lmdb_store")
         .tempdir()
@@ -608,18 +610,17 @@ mod tests {
     let dir = tempfile::Builder::new().prefix("root").tempdir().unwrap();
     let posix_fs = Arc::new(PosixFS::new(dir.path(), &[], logging::Executor::new()).unwrap());
     let file_saver = OneOffStoreFileByDigest::new(store.clone(), posix_fs.clone());
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    (store, dir, posix_fs, file_saver, runtime)
+    (store, dir, posix_fs, file_saver, executor)
   }
 
   #[test]
   fn snapshot_one_file() {
-    let (store, dir, posix_fs, digester, mut runtime) = setup();
+    let (store, dir, posix_fs, digester, runtime) = setup();
 
     let file_name = PathBuf::from("roland");
     make_file(&dir.path().join(&file_name), STR.as_bytes(), 0o600);
 
-    let path_stats = expand_all_sorted(posix_fs, &mut runtime);
+    let path_stats = expand_all_sorted(posix_fs, &runtime);
     let snapshot = runtime
       .block_on(Snapshot::from_path_stats(
         store,
@@ -644,14 +645,14 @@ mod tests {
 
   #[test]
   fn snapshot_recursive_directories() {
-    let (store, dir, posix_fs, digester, mut runtime) = setup();
+    let (store, dir, posix_fs, digester, runtime) = setup();
 
     let cats = PathBuf::from("cats");
     let roland = cats.join("roland");
     std::fs::create_dir_all(&dir.path().join(cats)).unwrap();
     make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
-    let path_stats = expand_all_sorted(posix_fs, &mut runtime);
+    let path_stats = expand_all_sorted(posix_fs, &runtime);
     let snapshot = runtime
       .block_on(Snapshot::from_path_stats(
         store,
@@ -676,14 +677,14 @@ mod tests {
 
   #[test]
   fn snapshot_from_digest() {
-    let (store, dir, posix_fs, digester, mut runtime) = setup();
+    let (store, dir, posix_fs, digester, runtime) = setup();
 
     let cats = PathBuf::from("cats");
     let roland = cats.join("roland");
     std::fs::create_dir_all(&dir.path().join(cats)).unwrap();
     make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
-    let path_stats = expand_all_sorted(posix_fs, &mut runtime);
+    let path_stats = expand_all_sorted(posix_fs, &runtime);
     let expected_snapshot = runtime
       .block_on(Snapshot::from_path_stats(
         store.clone(),
@@ -701,7 +702,7 @@ mod tests {
 
   #[test]
   fn snapshot_recursive_directories_including_empty() {
-    let (store, dir, posix_fs, digester, mut runtime) = setup();
+    let (store, dir, posix_fs, digester, runtime) = setup();
 
     let cats = PathBuf::from("cats");
     let roland = cats.join("roland");
@@ -712,7 +713,7 @@ mod tests {
     std::fs::create_dir_all(&dir.path().join(&llamas)).unwrap();
     make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
-    let sorted_path_stats = expand_all_sorted(posix_fs, &mut runtime);
+    let sorted_path_stats = expand_all_sorted(posix_fs, &runtime);
     let mut unsorted_path_stats = sorted_path_stats.clone();
     unsorted_path_stats.reverse();
     assert_eq!(
@@ -738,7 +739,7 @@ mod tests {
 
   #[test]
   fn merge_directories_two_files() {
-    let (store, _, _, _, mut runtime) = setup();
+    let (store, _, _, _, runtime) = setup();
 
     let containing_roland = TestDirectory::containing_roland();
     let containing_treats = TestDirectory::containing_treats();
@@ -763,7 +764,7 @@ mod tests {
 
   #[test]
   fn merge_directories_clashing_files() {
-    let (store, _, _, _, mut runtime) = setup();
+    let (store, _, _, _, runtime) = setup();
 
     let containing_roland = TestDirectory::containing_roland();
     let containing_wrong_roland = TestDirectory::containing_wrong_roland();
@@ -791,7 +792,7 @@ mod tests {
 
   #[test]
   fn merge_directories_same_files() {
-    let (store, _, _, _, mut runtime) = setup();
+    let (store, _, _, _, runtime) = setup();
 
     let containing_roland = TestDirectory::containing_roland();
     let containing_roland_and_treats = TestDirectory::containing_roland_and_treats();
@@ -819,7 +820,7 @@ mod tests {
 
   #[test]
   fn snapshot_merge_two_files() {
-    let (store, tempdir, _, digester, mut runtime) = setup();
+    let (store, tempdir, _, digester, runtime) = setup();
 
     let common_dir_name = "tower";
     let common_dir = PathBuf::from(common_dir_name);
@@ -889,7 +890,7 @@ mod tests {
 
   #[test]
   fn snapshot_merge_colliding() {
-    let (store, tempdir, _, digester, mut runtime) = setup();
+    let (store, tempdir, _, digester, runtime) = setup();
 
     let file = make_file_stat(
       tempdir.path(),
@@ -927,7 +928,7 @@ mod tests {
 
   #[test]
   fn strip_empty_prefix() {
-    let (store, _, _, _, mut runtime) = setup();
+    let (store, _, _, _, runtime) = setup();
 
     let dir = TestDirectory::nested();
     runtime
@@ -944,7 +945,7 @@ mod tests {
 
   #[test]
   fn strip_non_empty_prefix() {
-    let (store, _, _, _, mut runtime) = setup();
+    let (store, _, _, _, runtime) = setup();
 
     let dir = TestDirectory::nested();
     runtime
@@ -964,7 +965,7 @@ mod tests {
 
   #[test]
   fn strip_prefix_empty_subdir() {
-    let (store, _, _, _, mut runtime) = setup();
+    let (store, _, _, _, runtime) = setup();
 
     let dir = TestDirectory::containing_falcons_dir();
     runtime
@@ -981,7 +982,7 @@ mod tests {
 
   #[test]
   fn strip_dir_not_in_store() {
-    let (store, _, _, _, mut runtime) = setup();
+    let (store, _, _, _, runtime) = setup();
     let digest = TestDirectory::nested().digest();
     let result = runtime.block_on(super::Snapshot::strip_prefix(
       store,
@@ -993,7 +994,7 @@ mod tests {
 
   #[test]
   fn strip_subdir_not_in_store() {
-    let (store, _, _, _, mut runtime) = setup();
+    let (store, _, _, _, runtime) = setup();
     let dir = TestDirectory::nested();
     runtime
       .block_on(store.record_directory(&dir.directory(), false))
@@ -1014,7 +1015,7 @@ mod tests {
 
   #[test]
   fn strip_prefix_non_matching_file() {
-    let (store, _, _, _, mut runtime) = setup();
+    let (store, _, _, _, runtime) = setup();
     let dir = TestDirectory::recursive();
     let child_dir = TestDirectory::containing_roland();
     runtime
@@ -1034,7 +1035,7 @@ mod tests {
 
   #[test]
   fn strip_prefix_non_matching_dir() {
-    let (store, _, _, _, mut runtime) = setup();
+    let (store, _, _, _, runtime) = setup();
     let dir = TestDirectory::double_nested_dir_and_file();
     let child_dir = TestDirectory::nested_dir_and_file();
     runtime
@@ -1054,7 +1055,7 @@ mod tests {
 
   #[test]
   fn strip_subdir_not_in_dir() {
-    let (store, _, _, _, mut runtime) = setup();
+    let (store, _, _, _, runtime) = setup();
     let dir = TestDirectory::nested();
     runtime
       .block_on(store.record_directory(&dir.directory(), false))
@@ -1090,11 +1091,8 @@ mod tests {
     )
   }
 
-  fn expand_all_sorted(
-    posix_fs: Arc<PosixFS>,
-    runtime: &mut tokio::runtime::Runtime,
-  ) -> Vec<PathStat> {
-    let mut v = runtime
+  fn expand_all_sorted(posix_fs: Arc<PosixFS>, executor: &logging::Executor) -> Vec<PathStat> {
+    let mut v = executor
       .block_on(
         posix_fs.expand(
           // Don't error or warn if there are no paths matched -- that is a valid state.

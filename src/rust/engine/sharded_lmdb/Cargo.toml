@@ -11,5 +11,5 @@ futures = "^0.1.16"
 hashing = { path = "../hashing" }
 lmdb = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "06bdfbfc6348f6804127176e561843f214fc17f8" }
 log = "0.4"
+logging = { path = "../logging" }
 tempfile = "3"
-tokio-threadpool = "0.1.12"

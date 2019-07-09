@@ -224,6 +224,8 @@ fn main() {
     BTreeSet::new()
   };
 
+  let executor = logging::Executor::new();
+
   let store = match (server_arg, args.value_of("cas-server")) {
     (Some(_server), Some(cas_server)) => {
       let chunk_size =
@@ -242,6 +244,7 @@ fn main() {
       };
 
       Store::with_remote(
+        executor.clone(),
         local_store_path,
         &[cas_server.to_owned()],
         remote_instance_arg.clone(),
@@ -255,7 +258,7 @@ fn main() {
         3,
       )
     }
-    (None, None) => Store::local_only(local_store_path),
+    (None, None) => Store::local_only(executor.clone(), local_store_path),
     _ => panic!("Must specify either both --server and --cas-server or neither."),
   }
   .expect("Error making store");
@@ -309,7 +312,7 @@ fn main() {
     }
     None => Box::new(process_execution::local::CommandRunner::new(
       store.clone(),
-      logging::Executor::new(),
+      executor,
       work_dir,
       true,
     )) as Box<dyn process_execution::CommandRunner>,

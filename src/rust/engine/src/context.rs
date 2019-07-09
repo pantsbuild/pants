@@ -102,9 +102,10 @@ impl Core {
       .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))
       .and_then(|()| {
         if !remote_execution || remote_store_servers.is_empty() {
-          Store::local_only(local_store_dir)
+          Store::local_only(executor.clone(), local_store_dir)
         } else {
           Store::with_remote(
+            executor.clone(),
             local_store_dir,
             &remote_store_servers,
             remote_instance_name.clone(),
