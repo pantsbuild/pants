@@ -362,8 +362,8 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
               .parent()
               .ok_or_else(|| format!("File being saved must have parent but {:?} did not", path))?,
           );
-          let file = runtime
-            .block_on(posix_fs.stat(PathBuf::from(path.file_name().unwrap())))
+          let file = posix_fs
+            .stat_sync(PathBuf::from(path.file_name().unwrap()))
             .unwrap();
           match file {
             fs::Stat::File(f) => {
