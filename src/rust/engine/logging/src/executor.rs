@@ -99,6 +99,15 @@ impl Executor {
       .block_on(Self::future_with_correct_logging_context(future))
   }
 
+  ///
+  /// Spawn a Future on a threadpool specifically reserved for I/O tasks which are allowed to be
+  /// long-running.
+  ///
+  /// At some point in the future we may want to migrate to use tokio-threadpool's blocking
+  /// functionality instead of this threadpool, but we've run into teething issues where introducing
+  /// it has caused significant performance regressions, so for how we continue to use our legacy
+  /// I/O CpuPool. Hopefully we can delete this method at some point.
+  ///
   pub fn spawn_on_io_pool<
     Item: Send + 'static,
     Error: Send + 'static,
