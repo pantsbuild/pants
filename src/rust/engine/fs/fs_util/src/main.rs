@@ -257,7 +257,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
     .value_of("local-store-path")
     .map(PathBuf::from)
     .unwrap_or_else(Store::default_path);
-  let mut runtime = tokio::runtime::Runtime::new().unwrap();
+  let runtime = logging::Executor::new();
   let (store, store_has_remote) = {
     let (store_result, store_has_remote) = match top_match.values_of("server-address") {
       Some(cas_address) => {
@@ -355,6 +355,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           let path = PathBuf::from(args.value_of("path").unwrap());
           // Canonicalize path to guarantee that a relative path has a parent.
           let posix_fs = make_posix_fs(
+            runtime.clone(),
             path
               .canonicalize()
               .map_err(|e| format!("Error canonicalizing path {:?}: {:?}", path, e))?
@@ -416,7 +417,10 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           })
       }
       ("save", Some(args)) => {
-        let posix_fs = Arc::new(make_posix_fs(args.value_of("root").unwrap()));
+        let posix_fs = Arc::new(make_posix_fs(
+          runtime.clone(),
+          args.value_of("root").unwrap(),
+        ));
         let store_copy = store.clone();
         let digest = runtime.block_on(
           posix_fs
@@ -605,8 +609,8 @@ fn expand_files_helper(
     .to_boxed()
 }
 
-fn make_posix_fs<P: AsRef<Path>>(root: P) -> fs::PosixFS {
-  fs::PosixFS::new(&root, &[]).unwrap()
+fn make_posix_fs<P: AsRef<Path>>(executor: logging::Executor, root: P) -> fs::PosixFS {
+  fs::PosixFS::new(&root, &[], executor).unwrap()
 }
 
 fn ensure_uploaded_to_remote(

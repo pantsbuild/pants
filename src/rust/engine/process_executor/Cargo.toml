@@ -9,6 +9,7 @@ publish = false
 clap = "2"
 env_logger = "0.5.4"
 hashing = { path = "../hashing" }
+logging = { path = "../logging" }
 process_execution = { path = "../process_execution" }
 store = { path = "../fs/store" }
 tokio = "0.1"

@@ -13,6 +13,7 @@ glob = "0.2.11"
 ignore = "0.4.4"
 lazy_static = "1"
 log = "0.4"
+logging = { path = "../logging" }
 parking_lot = "0.6"
 tempfile = "3"
 tokio-fs = "0.1.6"

@@ -309,6 +309,7 @@ fn main() {
     }
     None => Box::new(process_execution::local::CommandRunner::new(
       store.clone(),
+      logging::Executor::new(),
       work_dir,
       true,
     )) as Box<dyn process_execution::CommandRunner>,

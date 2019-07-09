@@ -753,6 +753,7 @@ pub extern "C" fn capture_snapshots(
             let core = core.clone();
             store::Snapshot::capture_snapshot_from_arbitrary_root(
               core.store(),
+              core.executor.clone(),
               root,
               path_globs,
               digest_hint,

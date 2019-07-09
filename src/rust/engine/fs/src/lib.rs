@@ -32,7 +32,7 @@ pub use crate::glob_matching::GlobMatching;
 use ::ignore::gitignore::{Gitignore, GitignoreBuilder};
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
-use futures::{future, Future, Stream};
+use futures::{future, Future};
 use glob::{MatchOptions, Pattern};
 use lazy_static::lazy_static;
 use std::cmp::min;
@@ -547,10 +547,15 @@ pub struct GlobWithSource {
 pub struct PosixFS {
   root: Dir,
   ignore: Arc<GitignoreStyleExcludes>,
+  executor: logging::Executor,
 }
 
 impl PosixFS {
-  pub fn new<P: AsRef<Path>>(root: P, ignore_patterns: &[String]) -> Result<PosixFS, String> {
+  pub fn new<P: AsRef<Path>>(
+    root: P,
+    ignore_patterns: &[String],
+    executor: logging::Executor,
+  ) -> Result<PosixFS, String> {
     let root: &Path = root.as_ref();
     let canonical_root = root
       .canonicalize()
@@ -577,6 +582,7 @@ impl PosixFS {
     Ok(PosixFS {
       root: canonical_root,
       ignore: ignore,
+      executor: executor,
     })
   }
 
@@ -584,23 +590,39 @@ impl PosixFS {
     &self,
     dir_relative_to_root: Dir,
   ) -> impl Future<Item = DirectoryListing, Error = io::Error> {
+    let vfs = self.clone();
+    self
+      .executor
+      .spawn_on_io_pool(futures::future::lazy(move || {
+        vfs.scandir_sync(&dir_relative_to_root)
+      }))
+  }
+
+  fn scandir_sync(&self, dir_relative_to_root: &Dir) -> Result<DirectoryListing, io::Error> {
     let dir_abs = self.root.0.join(&dir_relative_to_root.0);
-    let posix_fs = self.clone();
-    let ignore = self.ignore.clone();
-    tokio_fs::read_dir(dir_abs.clone())
-      .and_then(move |readdir| {
-        readdir
-          .and_then(move |dir_entry| {
-            let dir_relative_to_root = dir_relative_to_root.clone();
-            posix_fs.stat(dir_relative_to_root.0.join(dir_entry.file_name()))
-          })
-          .filter(move |s| !ignore.is_ignored(s))
-          .collect()
+    let root = self.root.0.clone();
+    let mut stats: Vec<Stat> = dir_abs
+      .read_dir()?
+      .map(|readdir| {
+        let dir_entry = readdir?;
+        PosixFS::stat_internal(
+          dir_relative_to_root.0.join(dir_entry.file_name()),
+          &root,
+          &std::fs::symlink_metadata(dir_abs.join(dir_entry.file_name()))?,
+        )
       })
-      .map(|mut stats| {
-        stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
-        DirectoryListing(stats)
+      .filter(|s| match s {
+        Ok(ref s) =>
+        // It would be nice to be able to ignore paths before stat'ing them, but in order to apply
+        // git-style ignore patterns, we need to know whether a path represents a directory.
+        {
+          !self.ignore.is_ignored(s)
+        }
+        Err(_) => true,
       })
+      .collect::<Result<Vec<_>, io::Error>>()?;
+    stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
+    Ok(DirectoryListing(stats))
   }
 
   pub fn is_ignored(&self, stat: &Stat) -> bool {
@@ -1168,7 +1190,7 @@ mod posixfs_test {
   }
 
   fn new_posixfs<P: AsRef<Path>>(dir: P) -> PosixFS {
-    PosixFS::new(dir.as_ref(), &[]).unwrap()
+    PosixFS::new(dir.as_ref(), &[], logging::Executor::new()).unwrap()
   }
 
   ///
