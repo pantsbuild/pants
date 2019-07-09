@@ -361,8 +361,7 @@ class RunTracker(Subsystem):
     """
     def error(msg):
       # Report aleady closed, so just print error.
-      print('WARNING: Failed to upload stats to {}. due to {}'.format(stats_url, msg),
-            file=sys.stderr)
+      print(f'WARNING: Failed to upload stats to {stats_url} due to {msg}', file=sys.stderr)
       return False
 
     # TODO(benjy): The upload protocol currently requires separate top-level params, with JSON
@@ -381,22 +380,22 @@ class RunTracker(Subsystem):
     def do_post(url, num_redirects_allowed):
       if num_redirects_allowed < 0:
         return error('too many redirects.')
-      r = requests.post(url, data=params, timeout=timeout,
+      res = requests.post(url, data=params, timeout=timeout,
                         cookies=cookies.get_cookie_jar(), allow_redirects=False)
-      if r.status_code in {307, 308}:
-        return do_post(r.headers['location'], num_redirects_allowed - 1)
-      elif r.status_code != 200:
-        error('HTTP error code: {}. Reason: {}.'.format(r.status_code, r.reason))
-        if 300 <= r.status_code < 400 or r.status_code == 401:
-          print('Use `path/to/pants login --to={}` to authenticate against the stats '
-                'upload service.'.format(auth_provider), file=sys.stderr)
+      if res.status_code in {307, 308}:
+        return do_post(res.headers['location'], num_redirects_allowed - 1)
+      elif res.status_code != 200:
+        error(f'HTTP error code: {res.status_code}. Reason: {res.reason}.')
+        if 300 <= res.status_code < 400 or res.status_code == 401:
+          print(f'Use `path/to/pants login --to={auth_provider}` to authenticate '
+                'against the stats upload service.', file=sys.stderr)
         return False
       return True
 
     try:
       return do_post(stats_url, num_redirects_allowed=6)
     except Exception as e:  # Broad catch - we don't want to fail the build over upload errors.
-      return error('Error: {}'.format(e))
+      return error(f'Error: {e}')
 
   @classmethod
   def _json_dump_options(cls, stats):
