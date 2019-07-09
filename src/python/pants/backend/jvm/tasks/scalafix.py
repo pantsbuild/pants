@@ -33,7 +33,7 @@ class ScalaFix(RewriteBase, JvmTask):
     cls.register_jvm_tool(register,
                           'scalafix',
                           classpath=[
-                            JarDependency(org='ch.epfl.scala', name='scalafix-cli_2.11.12', rev='0.6.0-M16'),
+                            JarDependency(org='ch.epfl.scala', name='scalafix-cli_2.12.8', rev='0.9.4'),
                           ])
     cls.register_jvm_tool(register, 'scalafix-tool-classpath', classpath=[])
 
@@ -52,9 +52,6 @@ class ScalaFix(RewriteBase, JvmTask):
     if options.semantic:
       round_manager.require_data('runtime_classpath')
 
-  def _compute_full_classpath(self, targets):
-    return self.classpath(targets)
-
   def invoke_tool(self, absolute_root, target_sources):
     args = []
     tool_classpath = self.tool_classpath('scalafix-tool-classpath')
@@ -62,7 +59,7 @@ class ScalaFix(RewriteBase, JvmTask):
       args.append('--tool-classpath={}'.format(os.pathsep.join(tool_classpath)))
     if self.get_options().semantic:
       # If semantic checks are enabled, we need the full classpath for these targets.
-      classpath = self._compute_full_classpath({target for target, _ in target_sources})
+      classpath = self.classpath({target for target, _ in target_sources})
       args.append('--sourceroot={}'.format(absolute_root))
       args.append('--classpath={}'.format(os.pathsep.join(classpath)))
     if self.get_options().configuration:
