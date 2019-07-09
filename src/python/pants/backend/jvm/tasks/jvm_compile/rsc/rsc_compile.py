@@ -107,6 +107,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   _name = 'mixed' # noqa
   compiler_name = 'rsc'
 
+  deprecated_options_scope = 'compile.zinc'
+  deprecated_options_scope_removal_version = '1.19.0.dev0'
+
   @classmethod
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (

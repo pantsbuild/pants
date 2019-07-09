@@ -8,7 +8,7 @@ from functools import reduce
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatformSettings
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
-from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
+from pants.backend.jvm.tasks.jvm_compile.rsc.rsc_compile import RscCompile
 from pants.base.revision import Revision
 from pants.java.distribution.distribution import DistributionLocator
 from pants.subsystem.subsystem import Subsystem
@@ -23,7 +23,7 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
 
   @classmethod
   def task_type(cls):
-    return ZincCompile
+    return RscCompile
 
   def _java(self, name, platform=None, deps=None):
     return self.make_target(spec='java:{}'.format(name),
@@ -67,6 +67,19 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
       '\n    {}: [{}]'.format(key, ', '.join(sorted(t.address.spec for t in value)))
       for key, value in sorted(partition.items())
     ))
+
+  @staticmethod
+  def _format_zinc_arguments(settings, distribution):
+    zinc_args = [
+      '-C-source', '-C{}'.format(settings.source_level),
+      '-C-target', '-C{}'.format(settings.target_level),
+    ]
+    if settings.args:
+      settings_args = settings.args
+      if any('$JAVA_HOME' in a for a in settings.args):
+        settings_args = (a.replace('$JAVA_HOME', distribution.home) for a in settings.args)
+      zinc_args.extend(settings_args)
+    return zinc_args
 
   def assert_partitions_equal(self, expected, received):
     # Convert to normal dicts and remove empty values.
@@ -165,7 +178,7 @@ class JavaCompileSettingsPartitioningTest(NailgunTaskTestBase):
 
   def _get_zinc_arguments(self, settings):
     distribution = JvmCompile._local_jvm_distribution(settings=settings)
-    return ZincCompile._format_zinc_arguments(settings, distribution)
+    return self._format_zinc_arguments(settings, distribution)
 
   def test_java_home_extraction(self):
     init_subsystem(DistributionLocator)
