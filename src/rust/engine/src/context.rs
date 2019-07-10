@@ -148,7 +148,8 @@ impl Core {
           )),
           process_execution_remote_parallelism,
         )),
-        command_runner
+        command_runner,
+        1000 // default speculation timeout.
       ))
     }
 
