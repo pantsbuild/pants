@@ -44,6 +44,7 @@ members = [
   "serverset",
   "sharded_lmdb",
   "tar_api",
+  "task_executor",
   "testutil",
   "testutil/mock",
   "testutil/local_cas",
@@ -75,6 +76,7 @@ default-members = [
   "serverset",
   "sharded_lmdb",
   "tar_api",
+  "task_executor",
   "testutil",
   "testutil/mock",
   "testutil/local_cas",
@@ -102,11 +104,11 @@ reqwest = { version = "0.9.10", default_features = false, features = ["rustls-tl
 rule_graph = { path = "rule_graph" }
 smallvec = "0.6"
 store = { path = "fs/store" }
-tokio = "0.1"
 tempfile = "3"
 ui = { path = "ui" }
 url = "1.7.1"
 tar_api = { path = "tar_api" }
+task_executor = { path = "task_executor" }
 workunit_store = { path = "workunit_store" }
 
 [patch.crates-io]

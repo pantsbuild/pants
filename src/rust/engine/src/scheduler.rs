@@ -266,7 +266,7 @@ impl Scheduler {
 
     // If the join failed (due to `Invalidated`, since that is the only error we propagate), retry
     // the entire set of roots.
-    core.spawn(roots_res.then(move |res| {
+    core.executor.spawn_and_ignore(roots_res.then(move |res| {
       if let Ok(res) = res {
         sender.send(res).map_err(|_| ())
       } else {
@@ -403,6 +403,6 @@ impl NodeContext for RootContext {
   where
     F: Future<Item = (), Error = ()> + Send + 'static,
   {
-    self.core.spawn(future);
+    self.core.executor.spawn_and_ignore(future);
   }
 }
