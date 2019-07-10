@@ -304,6 +304,9 @@ def safe_rmtree(directory):
 
   :API: public
   """
+  if directory.endswith(get_repo_root() + '/.pants.d'):
+    # explicitly remove everything in /tmp/.pants.d
+    shutil.rmtree('/tmp/.pants.d', ignore_errors=True)
   if os.path.islink(directory):
     safe_delete(directory)
   else:
