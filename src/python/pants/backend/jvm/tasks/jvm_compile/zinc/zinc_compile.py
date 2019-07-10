@@ -471,11 +471,7 @@ class BaseZincCompile(JvmCompile):
     env = {}
     agent_lib_dir = self.get_options().native_image_agent_library_dir
     if agent_lib_dir:
-      lib_path_env_var = Platform.current.resolve_for_enum_variant({
-        'darwin': 'DYLD_LIBRARY_PATH',
-        'linux': 'LD_LIBRARY_PATH',
-      })
-      env[lib_path_env_var] = agent_lib_dir
+      env[Platform.current.runtime_lib_path_env_var] = agent_lib_dir
 
     req = ExecuteProcessRequest(
       argv=tuple(argv),

@@ -5,7 +5,7 @@ import os
 from abc import ABC, abstractmethod
 
 from pants.engine.rules import rule
-from pants.util.memo import memoized_classproperty
+from pants.util.memo import memoized_classproperty, memoized_property
 from pants.util.objects import datatype, enum
 from pants.util.osutil import all_normalized_os_names, get_normalized_os_name
 from pants.util.strutil import create_path_env_var
@@ -17,6 +17,13 @@ class Platform(enum(all_normalized_os_names())):
   @memoized_classproperty
   def current(cls):
     return cls(get_normalized_os_name())
+
+  @memoized_property
+  def runtime_lib_path_env_var(self):
+    return self.resolve_for_enum_variant({
+      'darwin': 'DYLD_LIBRARY_PATH',
+      'linux': 'LD_LIBRARY_PATH',
+    })
 
 
 class _list_field(property):
@@ -163,13 +170,9 @@ class _Executable(_ExtensibleAlgebraic):
 
     :rtype: dict of string -> string
     """
-    lib_env_var = self._platform.resolve_for_enum_variant({
-      'darwin': 'DYLD_LIBRARY_PATH',
-      'linux': 'LD_LIBRARY_PATH',
-    })
     return {
       'PATH': create_path_env_var(self.path_entries),
-      lib_env_var: create_path_env_var(self.runtime_library_dirs),
+      self._platform.runtime_lib_path_env_var: create_path_env_var(self.runtime_library_dirs),
     }
 
 
