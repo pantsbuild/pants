@@ -727,7 +727,9 @@ matrix:
         - *py36_linux_test_config_env
         - CACHE_NAME=unit_tests.v2.py36
       script:
-        - travis_wait 50 ./build-support/bin/ci.py --python-tests-v2
+        - travis_wait 50 ./build-support/bin/ci.py
+          --python-tests-v2
+          --remote-execution-oauth-token-path <(./pants.pex --quiet run build-support/bin:get_rbe_token)
 
     - <<: *py37_linux_test_config
       name: "Unit tests - V2 test runner (Py3.7 PEX)"
@@ -735,7 +737,10 @@ matrix:
         - *py37_linux_test_config_env
         - CACHE_NAME=unit_tests.v2.py37
       script:
-       - travis_wait 50 ./build-support/bin/ci.py --python-tests-v2 --python-version 3.7
+       - travis_wait 50 ./build-support/bin/ci.py
+         --python-tests-v2
+         --remote-execution-oauth-token-path <(./pants.pex --quiet run build-support/bin:get_rbe_token)
+         --python-version 3.7
 
     - <<: *py36_linux_test_config
       name: "Unit tests - V1 test runner (Py3.6 PEX)"
