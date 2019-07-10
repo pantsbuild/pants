@@ -67,9 +67,9 @@ function _build_native_code() {
     # should be using.
     cd "${REPO_ROOT}"
     "${REPO_ROOT}/build-support/bin/native/cargo" build ${MODE_FLAG} \
-      --manifest-path "${NATIVE_ROOT}/Cargo.toml" -p engine
+      --manifest-path "${NATIVE_ROOT}/Cargo.toml" -p engine_cffi
   ) || die
-  echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
+  echo "${NATIVE_ROOT}/target/${MODE}/libengine_cffi.${LIB_EXTENSION}"
 }
 
 function bootstrap_native_code() {
