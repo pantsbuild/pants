@@ -2892,19 +2892,6 @@ mod tests {
     )
   }
 
-  fn echo_foo_request() -> ExecuteProcessRequest {
-    ExecuteProcessRequest {
-      argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
-      env: BTreeMap::new(),
-      input_files: EMPTY_DIGEST,
-      output_files: BTreeSet::new(),
-      output_directories: BTreeSet::new(),
-      timeout: Duration::from_millis(5000),
-      description: "echo a foo".to_string(),
-      jdk_home: None,
-    }
-  }
-
   fn cat_roland_request() -> ExecuteProcessRequest {
     ExecuteProcessRequest {
       argv: owned_string_vec(&["/bin/cat", "roland"]),

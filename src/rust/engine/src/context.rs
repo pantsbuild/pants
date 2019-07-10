@@ -19,7 +19,6 @@ use boxfuture::{BoxFuture, Boxable};
 use core::clone::Clone;
 use fs::{safe_create_dir_all_ioerror, PosixFS};
 use graph::{EntryId, Graph, NodeContext};
-use parking_lot::RwLock;
 use process_execution::{self, BoundedCommandRunner, speculate::SpeculatingCommandRunner};
 use rand::seq::SliceRandom;
 use reqwest;
@@ -134,24 +133,27 @@ impl Core {
         process_execution_local_parallelism,
       ));
 
-    if let Some(address) = &remote_execution_server && remote_execution {
-      command_runner = Box::new(SpeculatingCommandRunner::new(
-        Box::new(BoundedCommandRunner::new(
-          Box::new(process_execution::remote::CommandRunner::new(
-            address,
-            remote_execution_process_cache_namespace.clone(),
-            remote_instance_name.clone(),
-            root_ca_certs.clone(),
-            oauth_bearer_token.clone(),
-            remote_execution_extra_platform_properties.clone(),
-            store.clone(),
+    command_runner = match &remote_execution_server {
+      Some(address) if remote_execution => {
+        Box::new(SpeculatingCommandRunner::new(
+          Box::new(BoundedCommandRunner::new(
+            Box::new(process_execution::remote::CommandRunner::new(
+              address,
+              remote_execution_process_cache_namespace.clone(),
+              remote_instance_name.clone(),
+              root_ca_certs.clone(),
+              oauth_bearer_token.clone(),
+              remote_execution_extra_platform_properties.clone(),
+              store.clone(),
+            )),
+            process_execution_remote_parallelism,
           )),
-          process_execution_remote_parallelism,
-        )),
-        command_runner,
-        1000 // default speculation timeout.
-      ))
-    }
+          command_runner,
+          1000 // default speculation timeout.
+        ))
+      },
+      _ => command_runner,
+    };
 
     let http_client = reqwest::r#async::Client::new();
     let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);

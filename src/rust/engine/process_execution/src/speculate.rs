@@ -3,6 +3,7 @@ use std::sync::Arc;
 use tokio_timer::Delay;
 use futures::future::{Either, Future, result};
 use boxfuture::{BoxFuture, Boxable};
+use workunit_store::WorkUnitStore;
 use super::{
   CommandRunner,
   ExecuteProcessRequest,
@@ -29,18 +30,21 @@ impl SpeculatingCommandRunner {
 }
 
 impl CommandRunner for SpeculatingCommandRunner {
-  fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String> {
+  fn run(
+    &self, req: ExecuteProcessRequest, workunit_store: WorkUnitStore
+  ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let command_runner = self.clone();
+    let workunit_store_clone = workunit_store.clone();
     let req_2 = req.clone();
     let delay = Delay::new(Instant::now() + Duration::from_millis(self.speculation_timeout_ms));
-    self.primary.run(req).select2(delay).then(
+    self.primary.run(req, workunit_store).select2(delay).then(
       move |raced_result| {
         match raced_result {
           // first request finished before delay, so pass it on
           Ok(Either::A((successful_first_req, _delay))) => result::<FallibleExecuteProcessResult, String>(Ok(successful_first_req)).to_boxed(),
           // delay finished before our first call, make a second, which returns either the first or second.
           Ok(Either::B((_delay_exceeded, outstanding_first_req))) => {
-            command_runner.secondary.run(req_2).select(outstanding_first_req).map(
+            command_runner.secondary.run(req_2, workunit_store_clone).select(outstanding_first_req).map(
               // TODO(hrfuller) Need to impl Drop on something so that when the BoxFuture goes out of scope
               // we cancel a potential RPC, or locally, kill a subprocess. So we need to distinguish local vs. remote
               // requests and save enough state to BoxFuture or another abstraction around our execution results
@@ -72,6 +76,7 @@ mod tests {
   use tokio;
   use testutil::owned_string_vec;
   use std::collections::{BTreeMap, BTreeSet};
+  use workunit_store::WorkUnitStore;
 
   use super::{
     SpeculatingCommandRunner,
@@ -128,12 +133,13 @@ mod tests {
     let execute_request = echo_foo_request();
     let msg1: String = "m1".into();
     let msg2: String = "m2".into();
+    let workunit_store = WorkUnitStore::new();
     let runner = SpeculatingCommandRunner::new(
       Box::new(make_delayed_command_runner(msg1.clone(), r1_latency_ms, r1_is_err)),
       Box::new(make_delayed_command_runner(msg2.clone(), r2_latency_ms, r2_is_err)),
       speculation_delay_ms,
     );
-    runtime.block_on(runner.run(execute_request))
+    runtime.block_on(runner.run(execute_request, workunit_store))
   }
 
   fn make_delayed_command_runner(msg: String, delay: u64, is_err: bool) -> DelayedCommandRunner {
@@ -182,7 +188,7 @@ mod tests {
   }
 
   impl CommandRunner for DelayedCommandRunner {
-    fn run(&self, _req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String> {
+    fn run(&self, _req: ExecuteProcessRequest, _workunit_store: WorkUnitStore) -> BoxFuture<FallibleExecuteProcessResult, String> {
       let delay = Delay::new(Instant::now() + Duration::from_millis(self.delay_ms));
       let exec_result = self.result.clone();
       let exec_error = self.error.clone();
