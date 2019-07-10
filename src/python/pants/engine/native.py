@@ -842,8 +842,8 @@ class Native(Singleton):
         execution_options.process_execution_remote_parallelism,
         execution_options.process_execution_cleanup_local_dirs,
         execution_options.process_execution_speculation_delay,
-
         self.context.utf8_buf(execution_options.process_execution_speculation_strategy),
+        execution_options.process_execution_use_local_cache,
       )
     return self.gc(scheduler, self.lib.scheduler_destroy)
 

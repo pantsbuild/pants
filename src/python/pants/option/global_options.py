@@ -38,6 +38,7 @@ class ExecutionOptions(datatype([
   'process_execution_cleanup_local_dirs',
   'process_execution_speculation_delay',
   'process_execution_speculation_strategy',
+  'process_execution_use_local_cache',
   'remote_execution_process_cache_namespace',
   'remote_instance_name',
   'remote_ca_certs_path',
@@ -65,6 +66,7 @@ class ExecutionOptions(datatype([
       process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
       process_execution_speculation_delay=bootstrap_options.process_execution_speculation_delay,
       process_execution_speculation_strategy=bootstrap_options.process_execution_speculation_strategy,
+      process_execution_use_local_cache=bootstrap_options.process_execution_use_local_cache,
       remote_execution_process_cache_namespace=bootstrap_options.remote_execution_process_cache_namespace,
       remote_instance_name=bootstrap_options.remote_instance_name,
       remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
@@ -86,6 +88,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_cleanup_local_dirs=True,
     process_execution_speculation_delay=.1,
     process_execution_speculation_strategy='local_first',
+    process_execution_use_local_cache=True,
     remote_execution_process_cache_namespace=None,
     remote_instance_name=None,
     remote_ca_certs_path=None,
@@ -435,6 +438,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'and fall back to the local host if remote calls take longer than the speculation timeout.\n'
                   '`none`: Do not speculate about long running processes.',
              advanced=True)
+    register('--process-execution-use-local-cache', type=bool, default=True, advanced=True,
+             help='Whether to keep process executions in a local cache persisted to disk.')
 
   @classmethod
   def register_options(cls, register):
