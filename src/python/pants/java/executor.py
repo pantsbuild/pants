@@ -193,7 +193,7 @@ class SubprocessExecutor(Executor):
     for env_var in cls._SCRUBBED_ENV:
       value = os.getenv(env_var)
       if value:
-        logger.warn('Scrubbing {env_var}={value}'.format(env_var=env_var, value=value))
+        logger.warning('Scrubbing {env_var}={value}'.format(env_var=env_var, value=value))
     with environment_as(**cls._SCRUBBED_ENV):
       yield
 

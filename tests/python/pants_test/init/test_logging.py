@@ -36,7 +36,7 @@ class LoggingTest(TestBase):
 
   def test_file_logging(self):
     with self.logger('INFO') as (file_logger, logging_setup_result):
-      file_logger.warn('this is a warning')
+      file_logger.warning('this is a warning')
       file_logger.info('this is some info')
       file_logger.debug('this is some debug info')
       logging_setup_result.log_handler.flush()
