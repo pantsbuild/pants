@@ -37,6 +37,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use store::UploadSummary;
+use workunit_store::WorkUnitStore;
 
 use async_semaphore::AsyncSemaphore;
 
@@ -133,7 +134,11 @@ impl AddAssign<UploadSummary> for ExecutionStats {
 }
 
 pub trait CommandRunner: Send + Sync {
-  fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String>;
+  fn run(
+    &self,
+    req: ExecuteProcessRequest,
+    workunit_store: WorkUnitStore,
+  ) -> BoxFuture<FallibleExecuteProcessResult, String>;
 }
 
 ///
@@ -153,9 +158,16 @@ impl BoundedCommandRunner {
 }
 
 impl CommandRunner for BoundedCommandRunner {
-  fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String> {
+  fn run(
+    &self,
+    req: ExecuteProcessRequest,
+    workunit_store: WorkUnitStore,
+  ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let inner = self.inner.clone();
-    self.inner.1.with_acquired(move || inner.0.run(req))
+    self
+      .inner
+      .1
+      .with_acquired(move || inner.0.run(req, workunit_store))
   }
 }
 

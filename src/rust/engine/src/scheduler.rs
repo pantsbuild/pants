@@ -18,7 +18,7 @@ use indexmap::IndexMap;
 use log::{debug, info, warn};
 use parking_lot::Mutex;
 use ui::EngineDisplay;
-use workunit_store::{WorkUnit, WorkUnitStore};
+use workunit_store::WorkUnitStore;
 
 ///
 /// A Session represents a related series of requests (generally: one run of the pants CLI) on an
@@ -37,25 +37,11 @@ struct InnerSession {
   // If enabled, Zipkin spans for v2 engine will be collected.
   should_record_zipkin_spans: bool,
   // A place to store info about workunits in rust part
-  workunits: Mutex<Vec<WorkUnit>>,
+  workunit_store: WorkUnitStore,
 }
 
 #[derive(Clone)]
 pub struct Session(Arc<InnerSession>);
-
-impl WorkUnitStore for Session {
-  fn should_record_zipkin_spans(&self) -> bool {
-    self.0.should_record_zipkin_spans
-  }
-
-  fn get_workunits(&self) -> &Mutex<Vec<WorkUnit>> {
-    &self.0.workunits
-  }
-
-  fn add_workunit(&self, workunit: WorkUnit) {
-    self.0.workunits.lock().push(workunit);
-  }
-}
 
 impl Session {
   pub fn new(
@@ -69,7 +55,7 @@ impl Session {
       roots: Mutex::new(HashSet::new()),
       display: EngineDisplay::create(ui_worker_count, should_render_ui).map(Mutex::new),
       should_record_zipkin_spans: should_record_zipkin_spans,
-      workunits: Mutex::new(Vec::new()),
+      workunit_store: WorkUnitStore::new(),
     };
     Session(Arc::new(inner_session))
   }
@@ -90,6 +76,14 @@ impl Session {
 
   pub fn display(&self) -> &Option<Mutex<EngineDisplay>> {
     &self.0.display
+  }
+
+  pub fn should_record_zipkin_spans(&self) -> bool {
+    self.0.should_record_zipkin_spans
+  }
+
+  pub fn workunit_store(&self) -> WorkUnitStore {
+    self.0.workunit_store.clone()
   }
 }
 

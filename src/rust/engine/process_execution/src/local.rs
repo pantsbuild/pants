@@ -21,6 +21,7 @@ use tokio_process::CommandExt;
 use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
 
 use bytes::{Bytes, BytesMut};
+use workunit_store::WorkUnitStore;
 
 pub struct CommandRunner {
   store: Store,
@@ -212,7 +213,13 @@ impl super::CommandRunner for CommandRunner {
   ///
   /// Runs a command on this machine in the passed working directory.
   ///
-  fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String> {
+  /// TODO: start to create workunits for local process execution
+  ///
+  fn run(
+    &self,
+    req: ExecuteProcessRequest,
+    _workunit_store: WorkUnitStore,
+  ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let workdir = try_future!(tempfile::Builder::new()
       .prefix("process-execution")
       .tempdir_in(&self.work_dir)
@@ -348,6 +355,7 @@ mod tests {
   use testutil::data::{TestData, TestDirectory};
   use testutil::path::find_bash;
   use testutil::{as_bytes, owned_string_vec};
+  use workunit_store::WorkUnitStore;
 
   #[test]
   #[cfg(unix)]
@@ -905,6 +913,6 @@ mod tests {
       work_dir: dir,
       cleanup_local_dirs: cleanup,
     };
-    executor.block_on(runner.run(req))
+    executor.block_on(runner.run(req, WorkUnitStore::new()))
   }
 }

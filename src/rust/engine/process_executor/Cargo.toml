@@ -13,3 +13,4 @@ process_execution = { path = "../process_execution" }
 store = { path = "../fs/store" }
 task_executor = { path = "../task_executor" }
 tokio = "0.1"
+workunit_store = { path = "../workunit_store"}
