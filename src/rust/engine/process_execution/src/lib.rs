@@ -90,6 +90,18 @@ pub struct ExecuteProcessRequest {
 }
 
 ///
+/// Metadata surrounding an ExecuteProcessRequest which factors into its cache key when cached
+/// externally from the engine graph (e.g. when using remote execution or an external process
+/// cache).
+///
+#[derive(Clone, Debug)]
+pub struct ExecuteProcessRequestMetadata {
+  pub instance_name: Option<String>,
+  pub cache_key_gen_version: Option<String>,
+  pub platform_properties: BTreeMap<String, String>,
+}
+
+///
 /// The result of running a process.
 ///
 #[derive(Clone, Debug, Eq, PartialEq)]
