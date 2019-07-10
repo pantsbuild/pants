@@ -312,13 +312,11 @@ class SimpleCodegenTask(Task):
     :param sources: A FilesetWithSpec to inject for the target.
     """
     target = vt.target
-
     # NB: For stability, the injected target exposes the stable-symlinked `vt.results_dir`,
     # rather than the hash-named `vt.current_results_dir`.
     synthetic_target_dir = self.synthetic_target_dir(target, vt.results_dir)
     synthetic_target_type = self.synthetic_target_type(target)
     synthetic_extra_dependencies = self.synthetic_target_extra_dependencies(target, synthetic_target_dir)
-
     copied_attributes = {}
     for attribute in self._copy_target_attributes:
       copied_attributes[attribute] = getattr(target, attribute)

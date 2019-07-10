@@ -62,7 +62,6 @@ class ApacheThriftGenBase(SimpleCodegenTask):
     return self._deps
 
   def execute_codegen(self, target, target_workdir):
-    # import pdb; pdb.set_trace()
     target_cmd = self._thrift_cmd[:]
 
     bases = OrderedSet(tgt.target_base for tgt in target.closure() if self.is_gentarget(tgt))

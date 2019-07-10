@@ -5,4 +5,4 @@ class NodeThriftLibrary(NodeModule):
   """
   A Node library generated from Thrift IDL Files
   """
-
+  

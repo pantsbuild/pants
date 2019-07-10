@@ -22,7 +22,7 @@ class ApacheThriftNodeGen(ApacheThriftGenBase):
 
   @property
   def _copy_target_attributes(self):
-    return ['tags', 'scope']
+    return ['tags', 'node_scope', 'package_manager', 'build_script', 'output_dir', 'dev_dependency', 'style_ignore_path', 'bin_executables']
   
 
   # def _codegen(self, target, target_workdir, extra_sources=[]):

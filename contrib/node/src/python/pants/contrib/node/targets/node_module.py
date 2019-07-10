@@ -99,3 +99,24 @@ class NodeModule(NodePackage):
       return { self.package_name: self.payload.bin_executables }
 
     return self.payload.bin_executables
+
+  @property
+  def package_manager(self):
+    return self.payload.package_manager
+
+  @property
+  def build_script(self):
+    return self.payload.build_script
+
+  @property
+  def output_dir(self):
+    return self.payload.output_dir
+
+  @property
+  def dev_dependency(self):
+    return self.payload.dev_dependency
+
+  @property
+  def node_scope(self):
+    return self.payload.node_scope
+  
