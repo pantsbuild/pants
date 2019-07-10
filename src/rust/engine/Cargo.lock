@@ -606,10 +606,7 @@ name = "engine"
 version = "0.0.1"
 dependencies = [
  "boxfuture 0.0.1",
- "build_utils 0.0.1",
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "cbindgen 0.8.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "cc 1.0.37 (registry+https://github.com/rust-lang/crates.io-index)",
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "fs 0.0.1",
  "futures 0.1.28 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -627,11 +624,28 @@ dependencies = [
  "rule_graph 0.0.1",
  "smallvec 0.6.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "store 0.1.0",
- "tar_api 0.0.1",
  "task_executor 0.0.1",
  "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ui 0.0.1",
  "url 1.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "workunit_store 0.0.1",
+]
+
+[[package]]
+name = "engine_cffi"
+version = "0.0.1"
+dependencies = [
+ "build_utils 0.0.1",
+ "cbindgen 0.8.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cc 1.0.37 (registry+https://github.com/rust-lang/crates.io-index)",
+ "engine 0.0.1",
+ "futures 0.1.28 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hashing 0.0.1",
+ "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "logging 0.0.1",
+ "rule_graph 0.0.1",
+ "store 0.1.0",
+ "tar_api 0.0.1",
  "walkdir 2.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "workunit_store 0.0.1",
 ]
