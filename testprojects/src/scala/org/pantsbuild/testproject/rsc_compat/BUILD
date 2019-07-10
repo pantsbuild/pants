@@ -5,7 +5,7 @@ scala_library()
 
 jar_library(
     name="rsc-compat",
-    jars=[jar(org='com.twitter', name='rsc-rules_2.12', rev = "0.0.0-780-e57a1c9c")]
+    jars=[scala_jar(org='com.twitter', name='rsc-rules', rev = "0.0.0-780-e57a1c9c")]
 )
 
 SEMANTICDB_REV='4.1.1'

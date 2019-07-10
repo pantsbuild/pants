@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants.java.jar.jar_dependency import JarDependency
+
 from pants.util.dirutil import read_file
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 TEST_DIR = 'testprojects/src/scala/org/pantsbuild/testproject'
@@ -42,10 +42,8 @@ class ScalaFixIntegrationTest(PantsRunIntegrationTest):
     # take a snapshot of the file which we can write out
     # after the test finishes executing.
     test_file_name = f'{TEST_DIR}/procedure_syntax/ProcedureSyntax.scala'
-    
-    contents = read_file(test_file_name)
 
-    try:
+    with self.with_overwritten_file_content(test_file_name):
       # format an incorrectly formatted file.
       target = f'{TEST_DIR}/procedure_syntax'
       fmt_result = self.run_pants(['fmt', target], options)
@@ -54,11 +52,6 @@ class ScalaFixIntegrationTest(PantsRunIntegrationTest):
       # verify that the lint check passes.
       test_fix = self.run_pants(['lint', target], options)
       self.assert_success(test_fix)
-    finally:
-      # restore the file to its original state.
-      f = open(test_file_name, 'w')
-      f.write(contents)
-      f.close()
 
   def test_rsccompat_fmt(self):
     options =  {
@@ -79,9 +72,7 @@ class ScalaFixIntegrationTest(PantsRunIntegrationTest):
     test_file_name = f'{TEST_DIR}/rsc_compat/RscCompat.scala'
     fixed_file_name = f'{TEST_DIR}/rsc_compat/RscCompatFixed.scala'
 
-    contents = read_file(test_file_name)
-
-    try:
+    with self.with_overwritten_file_content(test_file_name):
       # format an incorrectly formatted file.
       target = f'{TEST_DIR}/rsc_compat'
       fmt_result = self.run_pants(['fmt', target], options)
@@ -90,9 +81,4 @@ class ScalaFixIntegrationTest(PantsRunIntegrationTest):
       result = read_file(test_file_name)
       result = re.sub(re.escape('object RscCompat {'), 'object RscCompatFixed {', result)
       expected = read_file(fixed_file_name)
-      assert(result == expected)
-    finally:
-      # restore the file to its original state.
-      f = open(test_file_name, 'w')
-      f.write(contents)
-      f.close()
+      self.assertEqual(result, expected)
