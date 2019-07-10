@@ -621,21 +621,14 @@ impl PosixFS {
     let link_parent = link.0.parent().map(Path::to_owned);
     let link_abs = self.root.0.join(link.0.as_path()).to_owned();
     tokio_fs::read_link(link_abs.clone()).and_then(move |path_buf| {
-      if path_buf.is_absolute() {
-        Err(io::Error::new(
-          io::ErrorKind::InvalidData,
-          format!("Absolute symlink: {:?}", link_abs),
-        ))
-      } else {
-        link_parent
-          .map(|parent| parent.join(path_buf))
-          .ok_or_else(|| {
-            io::Error::new(
-              io::ErrorKind::InvalidData,
-              format!("Symlink without a parent?: {:?}", link_abs),
-            )
-          })
-      }
+      link_parent
+        .map(|parent| parent.join(path_buf))
+        .ok_or_else(|| {
+          io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("Symlink without a parent?: {:?}", link_abs),
+          )
+        })
     })
   }
 
