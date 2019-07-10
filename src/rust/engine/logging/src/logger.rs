@@ -8,12 +8,16 @@ use log::{log, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
 use parking_lot::Mutex;
 use simplelog::Config;
 use simplelog::WriteLogger;
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{stderr, Stderr, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use ui::EngineDisplay;
+use uuid::Uuid;
 
 lazy_static! {
   pub static ref LOGGER: Logger = Logger::new();
@@ -23,6 +27,7 @@ pub struct Logger {
   pantsd_log: Mutex<MaybeWriteLogger<File>>,
   stderr_log: Mutex<MaybeWriteLogger<Stderr>>,
   show_rust_3rdparty_logs: AtomicBool,
+  engine_display_handles: Mutex<HashMap<Uuid, Arc<Mutex<EngineDisplay>>>>,
 }
 
 impl Logger {
@@ -31,6 +36,7 @@ impl Logger {
       pantsd_log: Mutex::new(MaybeWriteLogger::empty()),
       stderr_log: Mutex::new(MaybeWriteLogger::empty()),
       show_rust_3rdparty_logs: AtomicBool::new(true),
+      engine_display_handles: Mutex::new(HashMap::new()),
     }
   }
 
@@ -110,6 +116,18 @@ impl Logger {
       log!(target: target, level.into(), "{}", message);
     })
   }
+
+  pub fn register_engine_display(&self, engine_display: Arc<Mutex<EngineDisplay>>) -> Uuid {
+    let mut handle = self.engine_display_handles.lock();
+    let unique_id = Uuid::new_v4();
+    handle.insert(unique_id, engine_display);
+    unique_id
+  }
+
+  pub fn deregister_engine_display(&self, unique_id: Uuid) {
+    let mut handle = self.engine_display_handles.lock();
+    handle.remove(&unique_id);
+  }
 }
 
 impl Log for Logger {
@@ -123,7 +141,15 @@ impl Log for Logger {
   fn log(&self, record: &Record) {
     let destination = get_destination();
     match destination {
-      Destination::Stderr => self.stderr_log.lock().log(record),
+      Destination::Stderr => {
+        let mut handles_map = self.engine_display_handles.lock();
+        for handle in handles_map.values_mut() {
+          let log_string: String = format!("{}", record.args());
+          let mut display_engine = handle.lock();
+          display_engine.log(log_string);
+        }
+        self.stderr_log.lock().log(record)
+      }
       Destination::Pantsd => self.pantsd_log.lock().log(record),
     }
   }
@@ -246,7 +272,6 @@ pub fn set_destination(destination: Destination) {
 }
 
 pub fn get_destination() -> Destination {
-
   fn get_task_destination() -> Option<Destination> {
     TASK_DESTINATION.with(|destination| *destination.lock())
   }
@@ -261,5 +286,3 @@ pub fn get_destination() -> Destination {
     get_thread_destination()
   }
 }
-
-
