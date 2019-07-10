@@ -653,21 +653,14 @@ impl PosixFS {
       .executor
       .spawn_on_io_pool(futures::future::lazy(move || {
         link_abs.read_link().and_then(|path_buf| {
-          if path_buf.is_absolute() {
-            Err(io::Error::new(
-              io::ErrorKind::InvalidData,
-              format!("Absolute symlink: {:?}", link_abs),
-            ))
-          } else {
-            link_parent
-              .map(|parent| parent.join(path_buf))
-              .ok_or_else(|| {
-                io::Error::new(
-                  io::ErrorKind::InvalidData,
-                  format!("Symlink without a parent?: {:?}", link_abs),
-                )
-              })
-          }
+          link_parent
+            .map(|parent| parent.join(path_buf))
+            .ok_or_else(|| {
+              io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Symlink without a parent?: {:?}", link_abs),
+              )
+            })
         })
       }))
   }
