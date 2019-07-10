@@ -27,7 +27,8 @@ parse_deps = true
 # very long time.
 #
 # Feel free to add more crates here if you need; basically any type that gets exposed over a C
-# interface needs to be listed here.
+# interface needs to be listed here. Please make sure to update build.rs to mark any crates which
+# are added here for change detection.
 #
 # We need to parse the engine crate to codegen PyResult (because externs are both something we use
 # from Python in engine, and something we expose to python in engine_cffi).

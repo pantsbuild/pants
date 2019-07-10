@@ -96,6 +96,8 @@ fn main() -> Result<(), CffiBuildError> {
   // Ideally we could just point at the engine crate here, but it's the workspace that contains all
   // code, and we don't want to re-run on _any_ code changes (even though we'll probably re-run for
   // them anyway), so we explicitly mark ../src and ../Cargo.toml for change-detection.
+  //
+  // This list should be kept in sync with the equivalent list of included crates in cbindgen.toml
   mark_for_change_detection(Path::new("../src"));
   mark_for_change_detection(Path::new("../Cargo.toml"));
   mark_for_change_detection(Path::new("../logging"));
