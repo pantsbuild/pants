@@ -41,6 +41,7 @@ use workunit_store::WorkUnitStore;
 
 use async_semaphore::AsyncSemaphore;
 
+pub mod cache;
 pub mod local;
 pub mod remote;
 pub mod speculate;
@@ -88,6 +89,18 @@ pub struct ExecuteProcessRequest {
   /// see https://github.com/pantsbuild/pants/issues/6416.
   ///
   pub jdk_home: Option<PathBuf>,
+}
+
+///
+/// Metadata surrounding an ExecuteProcessRequest which factors into its cache key when cached
+/// externally from the engine graph (e.g. when using remote execution or an external process
+/// cache).
+///
+#[derive(Clone, Debug)]
+pub struct ExecuteProcessRequestMetadata {
+  pub instance_name: Option<String>,
+  pub cache_key_gen_version: Option<String>,
+  pub platform_properties: BTreeMap<String, String>,
 }
 
 ///

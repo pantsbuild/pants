@@ -19,6 +19,7 @@ hashing = { path = "../hashing" }
 log = "0.4"
 protobuf = { version = "2.0.6", features = ["with-bytes"] }
 sha2 = "0.8"
+sharded_lmdb = {  path = "../sharded_lmdb" }
 store = { path = "../fs/store" }
 task_executor = { path = "../task_executor" }
 tempfile = "3"
