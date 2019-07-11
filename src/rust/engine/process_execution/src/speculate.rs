@@ -58,9 +58,8 @@ mod tests {
   use std::time::{Duration, Instant};
   use tokio_timer::Delay;
   use tokio;
-  use testutil::owned_string_vec;
-  use std::collections::{BTreeMap, BTreeSet};
   use workunit_store::WorkUnitStore;
+  use crate::remote::tests::echo_foo_request;
 
   use super::{
     SpeculatingCommandRunner,
@@ -68,7 +67,6 @@ mod tests {
     ExecuteProcessRequest,
     FallibleExecuteProcessResult,
   };
-
 
   #[test]
   fn test_no_speculation() {
@@ -140,19 +138,6 @@ mod tests {
       })
     }
     DelayedCommandRunner::new(Duration::from_millis(delay), result)
-  }
-
-  fn echo_foo_request() -> ExecuteProcessRequest {
-    ExecuteProcessRequest {
-      argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
-      env: BTreeMap::new(),
-      input_files: EMPTY_DIGEST,
-      output_files: BTreeSet::new(),
-      output_directories: BTreeSet::new(),
-      timeout: Duration::from_millis(5000),
-      description: "echo a foo".to_string(),
-      jdk_home: None,
-    }
   }
 
   struct DelayedCommandRunner {
