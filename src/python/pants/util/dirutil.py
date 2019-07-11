@@ -78,20 +78,27 @@ def safe_mkdir(directory, clean=False):
 
 def make_pants_workdir(workdir, workdir_symlink):
   try:
-    # delete <workdir> if it's a file
-    if os.path.isfile(workdir):
+    # delete <workdir> if it's a file or a symlink
+    if os.path.isfile(workdir) or os.path.islink(workdir):
       safe_delete(workdir)
     # make sure the base directory for .pants.d(symlink) exists
     if not os.path.isdir(workdir):
       os.makedirs(workdir)
 
-    # delete <workdir_symlink>, either it's a file or a dir
-    if os.path.isfile(workdir_symlink):
-      safe_delete(workdir_symlink)
-    elif os.path.isdir(workdir_symlink):
-      safe_rmtree(workdir_symlink)
-    # create a symlink for .pants.d if it doesn't exist
-    absolute_symlink(workdir, workdir_symlink)
+    # if <workdir_symlink> exists
+    if os.path.exists(workdir_symlink):
+      # but its base directory is not <workdir>
+      if not os.path.realpath(workdir_symlink).endswith(workdir):
+        if os.path.isdir(workdir_symlink):
+          # or a physical directory
+          safe_rmtree(workdir_symlink)
+        else:
+          safe_delete(workdir_symlink)
+        # re-create a symlink
+        absolute_symlink(workdir, workdir_symlink)
+    else:
+      # create a symlink
+      absolute_symlink(workdir, workdir_symlink)
   except OSError as e:
     if e.errno != errno.EEXIST:
       raise
