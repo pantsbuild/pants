@@ -41,6 +41,7 @@ use workunit_store::WorkUnitStore;
 
 use async_semaphore::AsyncSemaphore;
 
+pub mod cache;
 pub mod local;
 pub mod remote;
 
