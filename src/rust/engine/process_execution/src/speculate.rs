@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 use std::sync::Arc;
 use tokio_timer::Delay;
-use futures::future::{Either, Future, result};
+use futures::future::{Future, ok, err};
 use boxfuture::{BoxFuture, Boxable};
 use workunit_store::WorkUnitStore;
 use super::{
@@ -15,16 +15,15 @@ use super::{
 pub struct SpeculatingCommandRunner {
   primary: Arc<dyn CommandRunner>,
   secondary: Arc<dyn CommandRunner>,
-  speculation_timeout_ms: u64,
+  speculation_timeout: Duration,
 }
 
 impl SpeculatingCommandRunner {
-
-  pub fn new(primary: Box<dyn CommandRunner>, secondary: Box<dyn CommandRunner>, speculation_timeout_ms: u64) -> SpeculatingCommandRunner {
+  pub fn new(primary: Box<dyn CommandRunner>, secondary: Box<dyn CommandRunner>, speculation_timeout: Duration) -> SpeculatingCommandRunner {
     SpeculatingCommandRunner {
       primary: primary.into(),
       secondary: secondary.into(),
-      speculation_timeout_ms: speculation_timeout_ms
+      speculation_timeout: speculation_timeout
     }
   }
 }
@@ -36,34 +35,19 @@ impl CommandRunner for SpeculatingCommandRunner {
     let command_runner = self.clone();
     let workunit_store_clone = workunit_store.clone();
     let req_2 = req.clone();
-    let delay = Delay::new(Instant::now() + Duration::from_millis(self.speculation_timeout_ms));
-    self.primary.run(req, workunit_store).select2(delay).then(
-      move |raced_result| {
+    let delay = Delay::new(Instant::now() + self.speculation_timeout);
+    self.primary.run(req, workunit_store).select(
+      delay.then(move |_| command_runner.secondary.run(req_2, workunit_store_clone))
+    ).then(
+      |raced_result| {
         match raced_result {
-          // first request finished before delay, so pass it on
-          Ok(Either::A((successful_first_req, _delay))) => result::<FallibleExecuteProcessResult, String>(Ok(successful_first_req)).to_boxed(),
-          // delay finished before our first call, make a second, which returns either the first or second.
-          Ok(Either::B((_delay_exceeded, outstanding_first_req))) => {
-            command_runner.secondary.run(req_2, workunit_store_clone).select(outstanding_first_req).map(
-              // TODO(hrfuller) Need to impl Drop on something so that when the BoxFuture goes out of scope
-              // we cancel a potential RPC, or locally, kill a subprocess. So we need to distinguish local vs. remote
-              // requests and save enough state to BoxFuture or another abstraction around our execution results
-              |(successful_res, _droppable_req)| { successful_res }
-            ).map_err(
-              // one of the requests failed. We fail fast and return here but we could potentially wait for the second request to finish.
-              |(failed_res, _droppable_req)| { failed_res }
-            ).to_boxed()
-          },
-          // NOTE(hrfuller), if the first request was remote and fails fast, we *could* launch a secondary local here.
-          Err(Either::A((failed_first_res, _delay))) => result::<FallibleExecuteProcessResult, String>(Err(failed_first_res)).to_boxed(),
-          // NOTE(hrfuller) timer failure seem unlikely but if it happens we could speculate here anyway.
-          Err(Either::B((_failed_timer_res, outstanding_res))) => outstanding_res.to_boxed(),
+          Ok((successful_res, _outstanding_req)) => ok::<FallibleExecuteProcessResult, String>(successful_res).to_boxed(),
+          Err((failed_res, _outstanding_req)) => err::<FallibleExecuteProcessResult, String>(failed_res).to_boxed(),
         }
       }
     ).to_boxed()
   }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -137,17 +121,17 @@ mod tests {
     let runner = SpeculatingCommandRunner::new(
       Box::new(make_delayed_command_runner(msg1.clone(), r1_latency_ms, r1_is_err)),
       Box::new(make_delayed_command_runner(msg2.clone(), r2_latency_ms, r2_is_err)),
-      speculation_delay_ms,
+      Duration::from_millis(speculation_delay_ms),
     );
     runtime.block_on(runner.run(execute_request, workunit_store))
   }
 
   fn make_delayed_command_runner(msg: String, delay: u64, is_err: bool) -> DelayedCommandRunner {
-    let (mut result, mut error) = (None, None);
+    let mut result;
     if is_err {
-      error = Some(msg.into());
+      result = Err(msg.into());
     } else {
-      result = Some(FallibleExecuteProcessResult {
+      result = Ok(FallibleExecuteProcessResult {
         stdout: msg.into(),
         stderr: "".into(),
         exit_code: 0,
@@ -155,7 +139,7 @@ mod tests {
         execution_attempts: vec![],
       })
     }
-    DelayedCommandRunner::new(delay, result, error)
+    DelayedCommandRunner::new(Duration::from_millis(delay), result)
   }
 
   fn echo_foo_request() -> ExecuteProcessRequest {
@@ -172,41 +156,27 @@ mod tests {
   }
 
   struct DelayedCommandRunner {
-    delay_ms: u64,
-    result: Option<FallibleExecuteProcessResult>,
-    error: Option<String>,
+    delay: Duration,
+    result: Result<FallibleExecuteProcessResult, String>,
   }
 
   impl DelayedCommandRunner {
-    pub fn new(delay_ms: u64, result: Option<FallibleExecuteProcessResult>, error: Option<String>) -> DelayedCommandRunner {
+    pub fn new(delay: Duration, result: Result<FallibleExecuteProcessResult, String>) -> DelayedCommandRunner {
       DelayedCommandRunner {
-        delay_ms: delay_ms,
+        delay: delay,
         result: result,
-        error: error,
       }
     }
   }
 
   impl CommandRunner for DelayedCommandRunner {
     fn run(&self, _req: ExecuteProcessRequest, _workunit_store: WorkUnitStore) -> BoxFuture<FallibleExecuteProcessResult, String> {
-      let delay = Delay::new(Instant::now() + Duration::from_millis(self.delay_ms));
+      let delay = Delay::new(Instant::now() + self.delay);
       let exec_result = self.result.clone();
-      let exec_error = self.error.clone();
       delay.then(move |delay_res| {
         match delay_res {
-          Ok(_) => {
-            if exec_result.is_some() {
-              Ok(exec_result.unwrap())
-            } else if exec_error.is_some() {
-              Err(exec_error.unwrap())
-            } else {
-              Err(String::from("Generic command runner error!"))
-            }
-          },
-          Err(e) => {
-            println!["error is {:?}", e];
-            Err(String::from("Timer failed during testing"))
-          }
+          Ok(_) => exec_result,
+          Err(_) => Err(String::from("Timer failed during testing"))
         }
       }).to_boxed()
     }

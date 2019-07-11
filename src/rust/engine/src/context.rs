@@ -149,7 +149,7 @@ impl Core {
             process_execution_remote_parallelism,
           )),
           command_runner,
-          1000 // default speculation timeout.
+          Duration::from_millis(1000) // default speculation timeout.
         ))
       },
       _ => command_runner,

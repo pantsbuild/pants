@@ -34,6 +34,3 @@ maplit = "1.0.1"
 mock = { path = "../testutil/mock" }
 tempfile = "3"
 testutil = { path = "../testutil" }
-workunit_store = { path = "../workunit_store" }
-tokio = "0.1"
-tokio-timer = "0.2"
