@@ -409,8 +409,8 @@ class BaseZincCompile(JvmCompile):
     )
     if len(directory_digests) != len(relevant_classpath_entries):
       for dep in relevant_classpath_entries:
-        if dep.directory_digest is None:
-          logger.warning(
+        if not dep.directory_digest:
+          raise AssertionError(
             "ClasspathEntry {} didn't have a Digest, so won't be present for hermetic "
             "execution of zinc".format(dep)
           )

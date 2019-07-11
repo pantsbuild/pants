@@ -347,13 +347,12 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         classpath_entries = classpath_product.get_classpath_entries_for_targets(dependencies_for_target)
         for _conf, classpath_entry in classpath_entries:
           classpath_paths.append(fast_relpath(classpath_entry.path, get_buildroot()))
-          if classpath_entry.directory_digest:
-            classpath_directory_digests.append(classpath_entry.directory_digest)
-          else:
-            logger.warning(
+          if self.HERMETIC == self.execution_strategy_enum.value and not classpath_entry.directory_digest:
+            raise AssertionError(
               "ClasspathEntry {} didn't have a Digest, so won't be present for hermetic "
               "execution of rsc".format(classpath_entry)
             )
+          classpath_directory_digests.append(classpath_entry.directory_digest)
 
         ctx.ensure_output_dirs_exist()
 
