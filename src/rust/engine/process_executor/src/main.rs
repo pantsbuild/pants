@@ -33,6 +33,7 @@ use process_execution;
 
 use clap::{value_t, App, AppSettings, Arg};
 use hashing::{Digest, Fingerprint};
+use process_execution::ExecuteProcessRequestMetadata;
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter::Iterator;
 use std::path::PathBuf;
@@ -303,11 +304,13 @@ fn main() {
 
       Box::new(process_execution::remote::CommandRunner::new(
         address,
-        args.value_of("cache-key-gen-version").map(str::to_owned),
-        remote_instance_arg,
+        ExecuteProcessRequestMetadata {
+          instance_name: remote_instance_arg,
+          cache_key_gen_version: args.value_of("cache-key-gen-version").map(str::to_owned),
+          platform_properties,
+        },
         root_ca_certs,
         oauth_bearer_token,
-        platform_properties,
         store.clone(),
       )) as Box<dyn process_execution::CommandRunner>
     }

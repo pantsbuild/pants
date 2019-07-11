@@ -19,7 +19,7 @@ use boxfuture::{BoxFuture, Boxable};
 use core::clone::Clone;
 use fs::{safe_create_dir_all_ioerror, PosixFS};
 use graph::{EntryId, Graph, NodeContext};
-use process_execution::{self, BoundedCommandRunner};
+use process_execution::{self, BoundedCommandRunner, ExecuteProcessRequestMetadata};
 use rand::seq::SliceRandom;
 use reqwest;
 use rule_graph::RuleGraph;
@@ -127,11 +127,13 @@ impl Core {
       Some(ref address) if remote_execution => BoundedCommandRunner::new(
         Box::new(process_execution::remote::CommandRunner::new(
           address,
-          remote_execution_process_cache_namespace.clone(),
-          remote_instance_name.clone(),
+          ExecuteProcessRequestMetadata {
+            instance_name: remote_instance_name.clone(),
+            cache_key_gen_version: remote_execution_process_cache_namespace.clone(),
+            platform_properties: remote_execution_extra_platform_properties.clone(),
+          },
           root_ca_certs.clone(),
           oauth_bearer_token.clone(),
-          remote_execution_extra_platform_properties.clone(),
           store.clone(),
         )),
         process_execution_remote_parallelism,

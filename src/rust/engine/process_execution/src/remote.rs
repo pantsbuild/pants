@@ -20,10 +20,12 @@ use time;
 use time::Timespec;
 use tokio_timer::Delay;
 
-use super::{ExecuteProcessRequest, ExecutionStats, FallibleExecuteProcessResult};
+use super::{
+  ExecuteProcessRequest, ExecuteProcessRequestMetadata, ExecutionStats,
+  FallibleExecuteProcessResult,
+};
 use std;
 use std::cmp::min;
-use std::collections::btree_map::BTreeMap;
 use workunit_store::{generate_random_64bit_string, get_parent_id, WorkUnit, WorkUnitStore};
 
 // Environment variable which is exclusively used for cache key invalidation.
@@ -39,10 +41,8 @@ enum OperationOrStatus {
 
 #[derive(Clone)]
 pub struct CommandRunner {
-  cache_key_gen_version: Option<String>,
-  instance_name: Option<String>,
+  metadata: ExecuteProcessRequestMetadata,
   authorization_header: Option<String>,
-  platform_properties: BTreeMap<String, String>,
   channel: grpcio::Channel,
   env: Arc<grpcio::Environment>,
   execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
@@ -136,12 +136,7 @@ impl super::CommandRunner for CommandRunner {
     let operations_client = self.operations_client.clone();
 
     let store = self.store.clone();
-    let execute_request_result = make_execute_request(
-      &req,
-      &self.instance_name,
-      &self.cache_key_gen_version,
-      self.platform_properties.clone(),
-    );
+    let execute_request_result = make_execute_request(&req, self.metadata.clone());
 
     let ExecuteProcessRequest {
       description,
@@ -313,11 +308,9 @@ impl CommandRunner {
 
   pub fn new(
     address: &str,
-    cache_key_gen_version: Option<String>,
-    instance_name: Option<String>,
+    metadata: ExecuteProcessRequestMetadata,
     root_ca_certs: Option<Vec<u8>>,
     oauth_bearer_token: Option<String>,
-    platform_properties: BTreeMap<String, String>,
     store: Store,
   ) -> CommandRunner {
     let env = Arc::new(grpcio::EnvBuilder::new().build());
@@ -340,10 +333,8 @@ impl CommandRunner {
     ));
 
     CommandRunner {
-      cache_key_gen_version,
-      instance_name,
+      metadata,
       authorization_header: oauth_bearer_token.map(|t| format!("Bearer {}", t)),
-      platform_properties,
       channel,
       env,
       execution_client,
@@ -807,9 +798,7 @@ fn maybe_add_workunit(
 
 fn make_execute_request(
   req: &ExecuteProcessRequest,
-  instance_name: &Option<String>,
-  cache_key_gen_version: &Option<String>,
-  mut platform_properties: BTreeMap<String, String>,
+  metadata: ExecuteProcessRequestMetadata,
 ) -> Result<
   (
     bazel_protos::remote_execution::Action,
@@ -832,10 +821,17 @@ fn make_execute_request(
     env.set_value(value.to_string());
     command.mut_environment_variables().push(env);
   }
+
+  let ExecuteProcessRequestMetadata {
+    instance_name,
+    cache_key_gen_version,
+    mut platform_properties,
+  } = metadata;
+
   if let Some(cache_key_gen_version) = cache_key_gen_version {
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
     env.set_name(CACHE_KEY_GEN_VERSION_ENV_VAR_NAME.to_string());
-    env.set_value(cache_key_gen_version.to_string());
+    env.set_value(cache_key_gen_version);
     command.mut_environment_variables().push(env);
   }
   let mut output_files = req
@@ -887,7 +883,7 @@ fn make_execute_request(
 
   let mut execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
   if let Some(instance_name) = instance_name {
-    execute_request.set_instance_name(instance_name.clone());
+    execute_request.set_instance_name(instance_name);
   }
   execute_request.set_action_digest((&digest(&action)?).into());
 
@@ -992,8 +988,8 @@ mod tests {
 
   use super::super::CommandRunner as CommandRunnerTrait;
   use super::{
-    CommandRunner, ExecuteProcessRequest, ExecutionError, ExecutionHistory,
-    FallibleExecuteProcessResult,
+    CommandRunner, ExecuteProcessRequest, ExecuteProcessRequestMetadata, ExecutionError,
+    ExecutionHistory, FallibleExecuteProcessResult,
   };
   use maplit::hashset;
   use mock::execution_server::MockOperation;
@@ -1086,7 +1082,7 @@ mod tests {
     );
 
     assert_eq!(
-      super::make_execute_request(&req, &None, &None, BTreeMap::new()),
+      super::make_execute_request(&req, empty_request_metadata()),
       Ok((want_action, want_command, want_execute_request))
     );
   }
@@ -1160,7 +1156,14 @@ mod tests {
     );
 
     assert_eq!(
-      super::make_execute_request(&req, &Some("dark-tower".to_owned()), &None, BTreeMap::new()),
+      super::make_execute_request(
+        &req,
+        ExecuteProcessRequestMetadata {
+          instance_name: Some("dark-tower".to_owned()),
+          cache_key_gen_version: None,
+          platform_properties: BTreeMap::new(),
+        }
+      ),
       Ok((want_action, want_command, want_execute_request))
     );
   }
@@ -1239,7 +1242,14 @@ mod tests {
     );
 
     assert_eq!(
-      super::make_execute_request(&req, &None, &Some("meep".to_owned()), BTreeMap::new()),
+      super::make_execute_request(
+        &req,
+        ExecuteProcessRequestMetadata {
+          instance_name: None,
+          cache_key_gen_version: Some("meep".to_owned()),
+          platform_properties: BTreeMap::new(),
+        }
+      ),
       Ok((want_action, want_command, want_execute_request))
     );
   }
@@ -1294,7 +1304,7 @@ mod tests {
     );
 
     assert_eq!(
-      super::make_execute_request(&req, &None, &None, BTreeMap::new()),
+      super::make_execute_request(&req, empty_request_metadata()),
       Ok((want_action, want_command, want_execute_request))
     );
   }
@@ -1363,14 +1373,16 @@ mod tests {
     assert_eq!(
       super::make_execute_request(
         &req,
-        &None,
-        &None,
-        vec![
-          ("FIRST".to_owned(), "foo".to_owned()),
-          ("last".to_owned(), "bar".to_owned())
-        ]
-        .into_iter()
-        .collect()
+        ExecuteProcessRequestMetadata {
+          instance_name: None,
+          cache_key_gen_version: None,
+          platform_properties: vec![
+            ("FIRST".to_owned(), "foo".to_owned()),
+            ("last".to_owned(), "bar".to_owned())
+          ]
+          .into_iter()
+          .collect()
+        },
       ),
       Ok((want_action, want_command, want_execute_request))
     );
@@ -1394,9 +1406,7 @@ mod tests {
             description: "wrong command".to_string(),
             jdk_home: None,
           },
-          &None,
-          &None,
-          BTreeMap::new(),
+          empty_request_metadata(),
         )
         .unwrap()
         .2,
@@ -1420,7 +1430,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
+        super::make_execute_request(&execute_request, empty_request_metadata())
           .unwrap()
           .2,
         vec![
@@ -1519,7 +1529,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&echo_roland_request(), &None, &None, BTreeMap::new())
+        super::make_execute_request(&echo_roland_request(), empty_request_metadata())
           .unwrap()
           .2,
         vec![make_successful_operation(
@@ -1552,11 +1562,9 @@ mod tests {
 
     let cmd_runner = CommandRunner::new(
       &mock_server.address(),
+      empty_request_metadata(),
       None,
       None,
-      None,
-      None,
-      BTreeMap::new(),
       store,
     );
     let result = runtime
@@ -1604,7 +1612,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
+        super::make_execute_request(&execute_request, empty_request_metadata())
           .unwrap()
           .2,
         Vec::from_iter(
@@ -1655,7 +1663,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
+        super::make_execute_request(&execute_request, empty_request_metadata())
           .unwrap()
           .2,
         vec![
@@ -1680,7 +1688,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
+        super::make_execute_request(&execute_request, empty_request_metadata())
           .unwrap()
           .2,
         vec![
@@ -1719,7 +1727,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
+        super::make_execute_request(&execute_request, empty_request_metadata())
           .unwrap()
           .2,
         vec![
@@ -1757,7 +1765,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
+        super::make_execute_request(&execute_request, empty_request_metadata())
           .unwrap()
           .2,
         vec![MockOperation::new({
@@ -1789,7 +1797,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
+        super::make_execute_request(&execute_request, empty_request_metadata())
           .unwrap()
           .2,
         vec![
@@ -1824,7 +1832,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
+        super::make_execute_request(&execute_request, empty_request_metadata())
           .unwrap()
           .2,
         vec![MockOperation::new({
@@ -1850,7 +1858,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
+        super::make_execute_request(&execute_request, empty_request_metadata())
           .unwrap()
           .2,
         vec![
@@ -1881,7 +1889,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&cat_roland_request(), &None, &None, BTreeMap::new())
+        super::make_execute_request(&cat_roland_request(), empty_request_metadata())
           .unwrap()
           .2,
         vec![
@@ -1925,11 +1933,9 @@ mod tests {
       .expect("Saving directory bytes to store");
     let command_runner = CommandRunner::new(
       &mock_server.address(),
+      empty_request_metadata(),
       None,
       None,
-      None,
-      None,
-      BTreeMap::new(),
       store,
     );
 
@@ -1975,7 +1981,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&cat_roland_request(), &None, &None, BTreeMap::new())
+        super::make_execute_request(&cat_roland_request(), empty_request_metadata())
           .unwrap()
           .2,
         vec![
@@ -2019,11 +2025,9 @@ mod tests {
 
     let result = CommandRunner::new(
       &mock_server.address(),
+      empty_request_metadata(),
       None,
       None,
-      None,
-      None,
-      BTreeMap::new(),
       store,
     )
     .run(cat_roland_request(), WorkUnitStore::new())
@@ -2053,7 +2057,7 @@ mod tests {
 
       mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
         op_name.clone(),
-        super::make_execute_request(&cat_roland_request(), &None, &None, BTreeMap::new())
+        super::make_execute_request(&cat_roland_request(), empty_request_metadata())
           .unwrap()
           .2,
         // We won't get as far as trying to run the operation, so don't expect any requests whose
@@ -2085,11 +2089,9 @@ mod tests {
 
     let runner = CommandRunner::new(
       &mock_server.address(),
+      empty_request_metadata(),
       None,
       None,
-      None,
-      None,
-      BTreeMap::new(),
       store,
     );
 
@@ -2310,7 +2312,7 @@ mod tests {
         let op_name = "gimme-foo".to_string();
         mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
+          super::make_execute_request(&execute_request, empty_request_metadata())
             .unwrap()
             .2,
           vec![
@@ -2348,7 +2350,7 @@ mod tests {
         let op_name = "gimme-foo".to_string();
         mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, &None, &None, BTreeMap::new())
+          super::make_execute_request(&execute_request, empty_request_metadata())
             .unwrap()
             .2,
           vec![
@@ -2828,7 +2830,7 @@ mod tests {
     )
     .expect("Failed to make store");
 
-    CommandRunner::new(&address, None, None, None, None, BTreeMap::new(), store)
+    CommandRunner::new(&address, empty_request_metadata(), None, None, store)
   }
 
   fn extract_execute_response(
@@ -2915,6 +2917,14 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "unleash a roaring meow".to_string(),
       jdk_home: None,
+    }
+  }
+
+  fn empty_request_metadata() -> ExecuteProcessRequestMetadata {
+    ExecuteProcessRequestMetadata {
+      instance_name: None,
+      cache_key_gen_version: None,
+      platform_properties: BTreeMap::new(),
     }
   }
 }
