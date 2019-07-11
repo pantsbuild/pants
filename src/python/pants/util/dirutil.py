@@ -67,15 +67,31 @@ def safe_mkdir(directory, clean=False):
   if clean:
     safe_rmtree(directory)
   try:
-    if directory.endswith(get_repo_root() + '/.pants.d'):
-      # make sure the base directory for .pants.d(symlink) exists
-      if not os.path.isdir('/tmp/.pants.d'):
-        os.makedirs('/tmp/.pants.d')
-      # create a symlink for .pants.d if it doesn't exist
-      if not os.path.isdir(directory):
-        absolute_symlink('/tmp/.pants.d', directory)
+    if directory.rstrip('/').endswith(get_workdir_symlink()):
+      make_pants_workdir(get_workdir(), get_workdir_symlink())
     else:
       os.makedirs(directory)
+  except OSError as e:
+    if e.errno != errno.EEXIST:
+      raise
+
+
+def make_pants_workdir(workdir, workdir_symlink):
+  try:
+    # delete <workdir> if it's a file
+    if os.path.isfile(workdir):
+      safe_delete(workdir)
+    # make sure the base directory for .pants.d(symlink) exists
+    if not os.path.isdir(workdir):
+      os.makedirs(workdir)
+
+    # delete <workdir_symlink>, either it's a file or a dir
+    if os.path.isfile(workdir_symlink):
+      safe_delete(workdir_symlink)
+    elif os.path.isdir(workdir_symlink):
+      safe_rmtree(workdir_symlink)
+    # create a symlink for .pants.d if it doesn't exist
+    absolute_symlink(workdir, workdir_symlink)
   except OSError as e:
     if e.errno != errno.EEXIST:
       raise
@@ -304,9 +320,6 @@ def safe_rmtree(directory):
 
   :API: public
   """
-  if directory.endswith(get_repo_root() + '/.pants.d'):
-    # explicitly remove everything in /tmp/.pants.d
-    shutil.rmtree('/tmp/.pants.d', ignore_errors=True)
   if os.path.islink(directory):
     safe_delete(directory)
   else:
@@ -340,10 +353,10 @@ def safe_concurrent_rename(src, dst):
   # attempted this write. This ensures that at least one process writes the new content.
 
   # For .pants.d directory, since it is a symlink, use the base dir('/tmp/.pants.d') instead
-  if src.endswith(get_repo_root() + '/.pants.d'):
-    src = '/tmp/.pants.d'
-  if dst.endswith(get_repo_root() + '/.pants.d'):
-    dst = '/tmp/.pants.d'
+  if src.rstrip('/').endswith(get_workdir_symlink()):
+    src = get_workdir()
+  if dst.rstrip('/').endswith(get_workdir_symlink()):
+    dst = get_workdir()
 
   if os.path.isdir(src):  # Note that dst may not exist, so we test for the type of src.
     safe_rmtree(dst)
@@ -599,3 +612,11 @@ def is_writable_dir(path):
 def get_repo_root():
   """Return the absolute path to the root directory of the Pants git repo."""
   return subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).strip().decode()
+
+
+def get_workdir():
+  return '/tmp/.pants.d'
+
+
+def get_workdir_symlink():
+  return get_repo_root() + '/.pants.d'
