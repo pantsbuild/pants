@@ -19,7 +19,7 @@ use boxfuture::{BoxFuture, Boxable};
 use core::clone::Clone;
 use fs::{safe_create_dir_all_ioerror, PosixFS};
 use graph::{EntryId, Graph, NodeContext};
-use process_execution::{self, BoundedCommandRunner, speculate::SpeculatingCommandRunner};
+use process_execution::{self, BoundedCommandRunner, ExecuteProcessRequestMetadata};
 use rand::seq::SliceRandom;
 use reqwest;
 use rule_graph::RuleGraph;
@@ -41,7 +41,7 @@ pub struct Core {
   pub types: Types,
   pub executor: task_executor::Executor,
   store: Store,
-  pub command_runner: Box<dyn process_execution::CommandRunner>,
+  pub command_runner: BoundedCommandRunner,
   pub http_client: reqwest::r#async::Client,
   pub vfs: PosixFS,
   pub build_root: PathBuf,
@@ -123,7 +123,22 @@ impl Core {
       })
       .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
 
-      let mut command_runner: Box<dyn process_execution::CommandRunner> = Box::new(BoundedCommandRunner::new(
+    let command_runner = match &remote_execution_server {
+      Some(ref address) if remote_execution => BoundedCommandRunner::new(
+        Box::new(process_execution::remote::CommandRunner::new(
+          address,
+          ExecuteProcessRequestMetadata {
+            instance_name: remote_instance_name.clone(),
+            cache_key_gen_version: remote_execution_process_cache_namespace.clone(),
+            platform_properties: remote_execution_extra_platform_properties.clone(),
+          },
+          root_ca_certs.clone(),
+          oauth_bearer_token.clone(),
+          store.clone(),
+        )),
+        process_execution_remote_parallelism,
+      ),
+      _ => BoundedCommandRunner::new(
         Box::new(process_execution::local::CommandRunner::new(
           store.clone(),
           executor.clone(),
@@ -131,28 +146,7 @@ impl Core {
           process_execution_cleanup_local_dirs,
         )),
         process_execution_local_parallelism,
-      ));
-
-    command_runner = match &remote_execution_server {
-      Some(address) if remote_execution => {
-        Box::new(SpeculatingCommandRunner::new(
-          Box::new(BoundedCommandRunner::new(
-            Box::new(process_execution::remote::CommandRunner::new(
-              address,
-              remote_execution_process_cache_namespace.clone(),
-              remote_instance_name.clone(),
-              root_ca_certs.clone(),
-              oauth_bearer_token.clone(),
-              remote_execution_extra_platform_properties.clone(),
-              store.clone(),
-            )),
-            process_execution_remote_parallelism,
-          )),
-          command_runner,
-          Duration::from_millis(1000) // default speculation timeout.
-        ))
-      },
-      _ => command_runner,
+      ),
     };
 
     let http_client = reqwest::r#async::Client::new();
