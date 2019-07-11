@@ -20,6 +20,7 @@ from pants.backend.jvm.tasks.jvm_compile.execution_graph import Job
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.mirrored_target_option_mixin import MirroredTargetOptionMixin
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryToMaterialize, PathGlobs,
@@ -111,6 +112,67 @@ class RscCompile(JvmCompile, MirroredTargetOptionMixin):
   _name = 'mixed' # noqa
   compiler_name = 'rsc'
 
+  class ZincCompileUtils:
+
+    def log_zinc_file(self, log, analysis_file):
+      log.debug('Calling zinc on: {} ({})'
+        .format(analysis_file,
+        hash_file(analysis_file).upper()
+        if os.path.exists(analysis_file)
+        else 'nonexistent'))
+
+    def _javac_plugin_args(cls, javac_plugin_map):
+      ret = []
+      for plugin, args in javac_plugin_map.items():
+        for arg in args:
+          if ' ' in arg:
+            # Note: Args are separated by spaces, and there is no way to escape embedded spaces, as
+            # javac's Main does a simple split on these strings.
+            raise TaskError('javac plugin args must not contain spaces '
+                            '(arg {} for plugin {})'.format(arg, plugin))
+        ret.append('-C-Xplugin:{} {}'.format(plugin, ' '.join(args)))
+      return ret
+
+    def _scalac_plugin_args(self, scalac_plugin_map, classpath):
+      if not scalac_plugin_map:
+        return []
+      plugin_jar_map = self._find_scalac_plugins(list(scalac_plugin_map.keys()), classpath)
+      ret = []
+      for name, cp_entries in plugin_jar_map.items():
+        # Note that the first element in cp_entries is the one containing the plugin's metadata,
+        # meaning that this is the plugin that will be loaded, even if there happen to be other
+        # plugins in the list of entries (e.g., because this plugin depends on another plugin).
+        ret.append('-S-Xplugin:{}'.format(':'.join(cp_entries)))
+        for arg in scalac_plugin_map[name]:
+          ret.append('-S-P:{}:{}'.format(name, arg))
+      return ret
+
+    def _get_zinc_arguments(self, settings, distribution):
+      return self._format_zinc_arguments(settings, distribution)
+
+    @staticmethod
+    def _format_zinc_arguments(settings, distribution):
+      """Extracts and formats the zinc arguments given in the jvm platform settings.
+
+      This is responsible for the symbol substitution which replaces $JAVA_HOME with the path to an
+      appropriate jvm distribution.
+
+      :param settings: The jvm platform settings from which to extract the arguments.
+      :type settings: :class:`JvmPlatformSettings`
+      """
+      zinc_args = [
+        '-C-source', '-C{}'.format(settings.source_level),
+        '-C-target', '-C{}'.format(settings.target_level),
+      ]
+      if settings.args:
+        settings_args = settings.args
+        if any('$JAVA_HOME' in a for a in settings.args):
+          logger.debug('Substituting "$JAVA_HOME" with "{}" in jvm-platform args.'
+            .format(distribution.home))
+          settings_args = (a.replace('$JAVA_HOME', distribution.home) for a in settings.args)
+        zinc_args.extend(settings_args)
+      return zinc_args
+
   @classmethod
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (
@@ -126,6 +188,10 @@ class RscCompile(JvmCompile, MirroredTargetOptionMixin):
   @classmethod
   def implementation_version(cls):
     return super().implementation_version() + [('RscCompile', 173)]
+
+  @memoized_property
+  def _zinc(self):
+    return Zinc.Factory.global_instance().create(self.context.products, self.execution_strategy)
 
   class JvmCompileWorkflowType(enum(['zinc-only', 'zinc-java', 'rsc-and-zinc'])):
     """Target classifications used to correctly schedule Zinc and Rsc jobs.
@@ -148,8 +214,6 @@ class RscCompile(JvmCompile, MirroredTargetOptionMixin):
         Rsc products of their dependencies. The Rsc compile uses the Rsc products of Rsc compatible
         targets and the Zinc products of zinc-only targets.
     """
-
-  class ZincCompileUtils:
 
   @memoized_property
   def _compiler_tags(self):
@@ -195,41 +259,6 @@ class RscCompile(JvmCompile, MirroredTargetOptionMixin):
       ]
     )
 
-  def log_zinc_file(self, analysis_file):
-    self.context.log.debug('Calling zinc on: {} ({})'
-      .format(analysis_file,
-      hash_file(analysis_file).upper()
-      if os.path.exists(analysis_file)
-      else 'nonexistent'))
-
-  @classmethod
-  def _javac_plugin_args(cls, javac_plugin_map):
-    ret = []
-    for plugin, args in javac_plugin_map.items():
-      for arg in args:
-        if ' ' in arg:
-          # Note: Args are separated by spaces, and there is no way to escape embedded spaces, as
-          # javac's Main does a simple split on these strings.
-          raise TaskError('javac plugin args must not contain spaces '
-                          '(arg {} for plugin {})'.format(arg, plugin))
-      ret.append('-C-Xplugin:{} {}'.format(plugin, ' '.join(args)))
-    return ret
-
-  def _scalac_plugin_args(self, scalac_plugin_map, classpath):
-    if not scalac_plugin_map:
-      return []
-
-    plugin_jar_map = self._find_scalac_plugins(list(scalac_plugin_map.keys()), classpath)
-    ret = []
-    for name, cp_entries in plugin_jar_map.items():
-      # Note that the first element in cp_entries is the one containing the plugin's metadata,
-      # meaning that this is the plugin that will be loaded, even if there happen to be other
-      # plugins in the list of entries (e.g., because this plugin depends on another plugin).
-      ret.append('-S-Xplugin:{}'.format(':'.join(cp_entries)))
-      for arg in scalac_plugin_map[name]:
-        ret.append('-S-P:{}:{}'.format(name, arg))
-    return ret
-
   @memoized_property
   def _rsc(self):
     return Rsc.global_instance()
@@ -239,9 +268,10 @@ class RscCompile(JvmCompile, MirroredTargetOptionMixin):
     return self.tool_classpath('rsc')
 
   @memoized_property
-  def _zinc(self):
-    return Zinc.Factory.global_instance().create(self.context.products, self.execution_strategy)
+  def _zinc_compile(self):
+    return self.ZincCompileUtils()
 
+  # TODO(ity): rename this
   def _get_zinc_compiler_classpath(self):
     """Get the classpath for the zinc compiler JVM tool.
 
@@ -274,33 +304,6 @@ class RscCompile(JvmCompile, MirroredTargetOptionMixin):
       self.SUBPROCESS: lambda: self._get_zinc_compiler_classpath(),
       self.NAILGUN: lambda: self._nailgunnable_combined_classpath,
     })()
-
-  def _get_zinc_arguments(self, settings):
-    distribution = self._get_jvm_distribution()
-    return self._format_zinc_arguments(settings, distribution)
-
-  @staticmethod
-  def _format_zinc_arguments(settings, distribution):
-    """Extracts and formats the zinc arguments given in the jvm platform settings.
-
-    This is responsible for the symbol substitution which replaces $JAVA_HOME with the path to an
-    appropriate jvm distribution.
-
-    :param settings: The jvm platform settings from which to extract the arguments.
-    :type settings: :class:`JvmPlatformSettings`
-    """
-    zinc_args = [
-      '-C-source', '-C{}'.format(settings.source_level),
-      '-C-target', '-C{}'.format(settings.target_level),
-    ]
-    if settings.args:
-      settings_args = settings.args
-      if any('$JAVA_HOME' in a for a in settings.args):
-        logger.debug('Substituting "$JAVA_HOME" with "{}" in jvm-platform args.'
-          .format(distribution.home))
-        settings_args = (a.replace('$JAVA_HOME', distribution.home) for a in settings.args)
-      zinc_args.extend(settings_args)
-    return zinc_args
 
   # NB: Override of JvmCompile method!
   def register_extra_products_from_contexts(self, targets, compile_contexts):
@@ -862,7 +865,7 @@ class RscCompile(JvmCompile, MirroredTargetOptionMixin):
     zinc_args.extend(['-compiled-bridge-jar', relative_to_exec_root(compiler_bridge_classpath_entry.path)])
     zinc_args.extend(['-scala-path', ':'.join(scala_path)])
 
-    zinc_args.extend(self._javac_plugin_args(javac_plugin_map))
+    zinc_args.extend(self._zinc_compile._javac_plugin_args(javac_plugin_map))
     # Search for scalac plugins on the classpath.
     # Note that:
     # - We also search in the extra scalac plugin dependencies, if specified.
@@ -876,7 +879,7 @@ class RscCompile(JvmCompile, MirroredTargetOptionMixin):
       (set(absolute_classpath) | set(self.scalac_plugin_classpath_elements())) -
       {ctx.classes_dir.path, ctx.jar_file.path}
     )
-    zinc_args.extend(self._scalac_plugin_args(scalac_plugin_map, scalac_plugin_search_classpath))
+    zinc_args.extend(self._zinc_compile._scalac_plugin_args(scalac_plugin_map, scalac_plugin_search_classpath))
     if upstream_analysis:
       zinc_args.extend(['-analysis-map',
         ','.join('{}:{}'.format(
@@ -885,7 +888,7 @@ class RscCompile(JvmCompile, MirroredTargetOptionMixin):
         ) for k, v in upstream_analysis.items())])
 
     zinc_args.extend(args)
-    zinc_args.extend(self._get_zinc_arguments(settings))
+    zinc_args.extend(self._zinc_compile._get_zinc_arguments(settings, self._get_jvm_distribution()))
     zinc_args.append('-transactional')
 
     compiler_option_sets_args = self.get_merged_args_for_compiler_option_sets(compiler_option_sets)
@@ -913,7 +916,7 @@ class RscCompile(JvmCompile, MirroredTargetOptionMixin):
 
     zinc_args.extend(ctx.sources)
 
-    self.log_zinc_file(ctx.analysis_file)
+    self._zinc_compile.log_zinc_file(self.context.log, ctx.analysis_file)
     self.write_argsfile(ctx, zinc_args)
 
     return self.execution_strategy_enum.resolve_for_enum_variant({
@@ -934,7 +937,8 @@ class RscCompile(JvmCompile, MirroredTargetOptionMixin):
       DirectoryToMaterialize(get_buildroot(), self.post_compile_extra_resources_digest(ctx)),
     ))
 
-    exit_code = self.runjava(classpath=self.get_zinc_compiler_classpath(),
+    exit_code = self.runjava(
+      classpath=self.get_zinc_compiler_classpath(),
       main=Zinc.ZINC_COMPILE_MAIN,
       jvm_options=jvm_options,
       args=['@{}'.format(ctx.args_file)],
