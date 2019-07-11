@@ -26,7 +26,7 @@ use fs::{
   PathGlobs, PathStat, StrictGlobMatching, VFS,
 };
 use hashing;
-use process_execution;
+use process_execution::{self, CommandRunner};
 use rule_graph;
 
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
