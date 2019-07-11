@@ -1,6 +1,8 @@
 native-image `META-INF/`
 ===========================
 
+**NOTE: currently, these instructions will only work when used from the script at https://github.com/cosmicexplorer/graal/tree/graal-make-zinc-again/build-zinc-rsc-native-images.bash! Image building in general is currently blocked on https://github.com/oracle/graal/issues/1448.*
+
 *This directory contains special configuration files recognized by the `native-image` tool when embedded in a jar. This embedded configuration allows any user with some version of the Graal VM to fetch the `org.pantsbuild:zinc-compiler` jar and run `native-image -jar` to produce a native executable of the pants zinc wrapper without any additional arguments.*
 
 The Graal VM's `native-image` tool[^1] converts JVM bytecode to a native compiled executable[^2] executing via the Substrate VM. The `native-image` tool is not yet immediately compatible with all JVM code[^3], but the tool is stable and featureful enough to successfully build many codebases with a mixture of (mostly) automated and (some) manual configuration.
