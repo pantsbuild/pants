@@ -910,13 +910,13 @@ mod local {
           // by python, but they're not, so...
           file_dbs: ShardedLmdb::new(
             files_root.clone(),
-            1024 * 1024 * 1024 * 1024,
+            1024 * 1024 * 1024 * 1024 * 1024,
             executor.clone(),
           )
           .map(Arc::new),
           directory_dbs: ShardedLmdb::new(
             directories_root.clone(),
-            5 * 1024 * 1024 * 1024,
+            1024 * 1024 * 1024 * 1024,
             executor.clone(),
           )
           .map(Arc::new),
