@@ -715,6 +715,20 @@ matrix:
       stage: *bootstrap_cron
     - <<: *py37_osx_build_engine
 
+    # NB: We move this test here, above the other unit tests, to ensure that the shard is #5. The
+    # RBE token server will only give tokens to job number #5, so we must do this for the cron job
+    # to work with remoting.
+    - <<: *py37_linux_test_config
+      name: "Unit tests - V2 test runner (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=unit_tests.v2.py37
+      script:
+        - travis_wait 50 ./build-support/bin/ci.py
+          --python-tests-v2
+          --remote-execution-oauth-token-path <(./pants.pex --quiet run build-support/bin:get_rbe_token)
+          --python-version 3.7
+
     - <<: *py36_lint
     - <<: *py37_lint
 
@@ -731,17 +745,6 @@ matrix:
           --python-tests-v2
           --remote-execution-oauth-token-path <(./pants.pex --quiet run build-support/bin:get_rbe_token)
 
-    - <<: *py37_linux_test_config
-      name: "Unit tests - V2 test runner (Py3.7 PEX)"
-      env:
-        - *py37_linux_test_config_env
-        - CACHE_NAME=unit_tests.v2.py37
-      script:
-       - travis_wait 50 ./build-support/bin/ci.py
-         --python-tests-v2
-         --remote-execution-oauth-token-path <(./pants.pex --quiet run build-support/bin:get_rbe_token)
-         --python-version 3.7
-
     - <<: *py36_linux_test_config
       name: "Unit tests - V1 test runner (Py3.6 PEX)"
       env:
@@ -757,8 +760,8 @@ matrix:
         - *py37_linux_test_config_env
         - CACHE_NAME=unit_tests.v1.py37
       script:
-       - ./build-support/bin/ci.py --plugin-tests --python-version 3.7
-       - ./build-support/bin/ci.py --python-tests-v1 --python-version 3.7
+        - ./build-support/bin/ci.py --plugin-tests --python-version 3.7
+        - ./build-support/bin/ci.py --python-tests-v1 --python-version 3.7
 
     - <<: *py36_linux_build_wheels
     - <<: *py36_osx_build_wheels
