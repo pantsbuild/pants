@@ -44,6 +44,7 @@ use async_semaphore::AsyncSemaphore;
 pub mod cache;
 pub mod local;
 pub mod remote;
+pub mod speculate;
 
 ///
 /// A process to be executed.

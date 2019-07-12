@@ -108,6 +108,9 @@ impl CommandRunner {
   }
 }
 
+// TODO(pantsbuild/pants#8039) Need to impl Drop on command runner  so that when the BoxFuture goes out of scope
+// we cancel a potential RPC. So we need to distinguish local vs. remote
+// requests and save enough state to BoxFuture or another abstraction around our execution results
 impl super::CommandRunner for CommandRunner {
   ///
   /// Runs a command via a gRPC service implementing the Bazel Remote Execution API
@@ -970,7 +973,7 @@ fn timespec_from(timestamp: &protobuf::well_known_types::Timestamp) -> time::Tim
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
   use bazel_protos;
   use bazel_protos::operations::Operation;
   use bazel_protos::remote_execution::ExecutedActionMetadata;
@@ -2636,7 +2639,7 @@ mod tests {
     assert_eq!(got_workunits, want_workunits);
   }
 
-  fn echo_foo_request() -> ExecuteProcessRequest {
+  pub fn echo_foo_request() -> ExecuteProcessRequest {
     ExecuteProcessRequest {
       argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
       env: BTreeMap::new(),
