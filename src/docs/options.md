@@ -22,7 +22,7 @@ each configurable component is qualified by a _scope_.
   not `./pants list.list`.
 + Options for the global instance of subsystem `subsystem` belong to the `subsystem` scope. E.g., `jvm` or `cache`.
 + Options for the instance of subsystem `subsystem` belonging to some other task or subsystem with scope `scope`
-  belong to the `subsystem.scope` scope. E.g., `cache.compile.zinc`.
+  belong to the `subsystem.scope` scope. E.g., `cache.compile.rsc`.
 
 The scope names are used to qualify the option names when setting their values, as explained in
 the remainder of this document.

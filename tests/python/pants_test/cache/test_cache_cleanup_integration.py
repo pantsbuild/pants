@@ -45,7 +45,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
     """Ensure that max-old of 1 removes all but one files"""
 
     with temporary_dir() as cache_dir:
-      config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
+      config = {'cache.compile.rsc': {'write_to': [cache_dir]}}
 
       java_6_args = self._create_platform_args(6) + [
         'compile.zinc',
@@ -88,7 +88,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
     """
 
     with temporary_dir() as cache_dir:
-      config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
+      config = {'cache.compile.rsc': {'write_to': [cache_dir]}}
 
       java_6_args = self._create_platform_args(6) + [
         'compile.zinc',

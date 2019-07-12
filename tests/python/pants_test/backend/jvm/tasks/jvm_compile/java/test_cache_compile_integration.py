@@ -38,7 +38,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       temporary_dir(root_dir=get_buildroot()) as src_dir:
 
       config = {
-        'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
+        'cache.compile.rsc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
         'compile.zinc': {'incremental_caching': True},
         'java': {'strict_deps': False},
       }
@@ -107,7 +107,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         temporary_dir(root_dir=get_buildroot()) as src_dir:
 
       config = {
-        'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
+        'cache.compile.rsc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
         'compile.zinc': {'incremental_caching': True },
       }
 
@@ -172,7 +172,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
     with temporary_dir() as cache_dir, temporary_dir(root_dir=get_buildroot()) as src_dir, \
       temporary_dir(root_dir=get_buildroot(), suffix='.pants.d') as workdir:
       config = {
-        'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
+        'cache.compile.rsc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
       }
 
       dep_src_file = os.path.join(src_dir, 'org', 'pantsbuild', 'dep', 'A.scala')
@@ -261,7 +261,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       def complete_config(config):
         # Clone the input config and add cache settings.
         cache_settings = {'write_to': [cache_dir], 'read_from': [cache_dir]}
-        return dict(list(config.items()) + [('cache.compile.zinc', cache_settings)])
+        return dict(list(config.items()) + [('cache.compile.rsc', cache_settings)])
 
       buildfile = os.path.join(src_dir, 'BUILD')
       spec = os.path.join(src_dir, ':cachetest')

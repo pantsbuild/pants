@@ -279,7 +279,7 @@ class BaseZincCompileIntegrationTest:
       temporary_dir(root_dir=get_buildroot()) as src_dir:
 
       config = {
-        'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
+        'cache.compile.rsc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
       }
 
       srcfile = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.scala')
@@ -341,7 +341,7 @@ class BaseZincCompileIntegrationTest:
       temporary_dir(root_dir=get_buildroot()) as src_dir:
 
       config = {
-        'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
+        'cache.compile.rsc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
         'compile.zinc': {'incremental_caching': True },
       }
 

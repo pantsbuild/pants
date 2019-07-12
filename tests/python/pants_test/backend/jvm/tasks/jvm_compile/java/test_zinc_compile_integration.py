@@ -51,7 +51,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         pants_run = self.run_test_compile(
           workdir, cachedir, target,
           extra_args=[
-            '--cache-compile-zinc-write-to=["{}/dummy_artifact_cache_dir"]'.format(cachedir),
+            '--cache-compile-rsc-write-to=["{}/dummy_artifact_cache_dir"]'.format(cachedir),
           ],
           clean_all=True,
         )
@@ -143,7 +143,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
   def test_failed_hermetic_incremental_compile(self):
     with temporary_dir() as cache_dir:
       config = {
-        'cache.compile.zinc': {'write_to': [cache_dir]},
+        'cache.compile.rsc': {'write_to': [cache_dir]},
         'compile.zinc': {
           'execution_strategy': 'hermetic',
           'use_classpath_jars': False,
@@ -167,7 +167,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
   def test_failed_compile_with_hermetic(self):
     with temporary_dir() as cache_dir:
       config = {
-        'cache.compile.zinc': {'write_to': [cache_dir]},
+        'cache.compile.rsc': {'write_to': [cache_dir]},
         'compile.zinc': {
           'execution_strategy': 'hermetic',
           'use_classpath_jars': False,
@@ -195,7 +195,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
   def test_failed_compile_with_subprocess(self):
     with temporary_dir() as cache_dir:
       config = {
-        'cache.compile.zinc': {'write_to': [cache_dir]},
+        'cache.compile.rsc': {'write_to': [cache_dir]},
         'compile.zinc': {
           'execution_strategy': 'subprocess',
           'use_classpath_jars': False,
@@ -224,7 +224,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
   def test_hermetic_binary_with_dependencies(self):
     with temporary_dir() as cache_dir:
       config = {
-        'cache.compile.zinc': {'write_to': [cache_dir]},
+        'cache.compile.rsc': {'write_to': [cache_dir]},
         'compile.zinc': {
           'execution_strategy': 'hermetic',
           'use_classpath_jars': False,
@@ -263,7 +263,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
 
     with temporary_dir() as cache_dir:
       config = {
-        'cache.compile.zinc': {'write_to': [cache_dir]},
+        'cache.compile.rsc': {'write_to': [cache_dir]},
         'compile.zinc': {
           'execution_strategy': 'hermetic',
           'use_classpath_jars': False,
