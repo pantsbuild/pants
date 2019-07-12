@@ -65,35 +65,6 @@ class NativeToolchain(Subsystem):
 class LibcObjects(datatype(['crti_object_paths'])): pass
 
 
-class LinkerWrapperMixin:
-
-  def for_compiler(self, compiler, platform):
-    """Return a Linker object which is intended to be compatible with the given `compiler`."""
-    return (self.linker
-            # TODO(#6143): describe why the compiler needs to be first on the PATH!
-            .sequence(compiler, exclude_list_fields=['extra_args', 'path_entries'])
-            .prepend_field('path_entries', compiler.path_entries)
-            .copy(exe_filename=compiler.exe_filename))
-
-
-class GCCLinker(datatype([('linker', Linker)]), LinkerWrapperMixin): pass
-
-
-class LLVMLinker(datatype([('linker', Linker)]), LinkerWrapperMixin): pass
-
-
-class GCCCToolchain(datatype([('c_toolchain', CToolchain)])): pass
-
-
-class GCCCppToolchain(datatype([('cpp_toolchain', CppToolchain)])): pass
-
-
-class LLVMCToolchain(datatype([('c_toolchain', CToolchain)])): pass
-
-
-class LLVMCppToolchain(datatype([('cpp_toolchain', CppToolchain)])): pass
-
-
 @rule(LibcObjects, [NativeToolchain], given=[Platform.darwin])
 def select_libc_objects_darwin(native_toolchain):
   """???/libc search will fail on osx/not supported"""
@@ -128,29 +99,31 @@ class BaseLinker(datatype([('linker', Linker)])):
   usable by a specific compiler."""
 
 
-@rule(BaseLinker, [Platform, NativeToolchain])
-def select_base_linker(platform, native_toolchain):
-  if platform == Platform.darwin:
-    # TODO(#5663): turn this into LLVM when lld works.
-    linker = yield Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools)
-  else:
-    linker = yield Get(Linker, Binutils, native_toolchain._binutils)
-  base_linker = BaseLinker(linker=linker)
-  yield base_linker
+@rule(BaseLinker, [NativeToolchain], given=[Platform.darwin])
+def select_base_linker_darwin(native_toolchain):
+  # TODO(#5663): turn this into LLVM when lld works.
+  linker = yield Get(Linker, XCodeCLITools, native_toolchain._xcode_cli_tools)
+  yield BaseLinker(linker)
 
 
-@rule(GCCLinker, [NativeToolchain])
+@rule(BaseLinker, [NativeToolchain], given=[Platform.linux])
+def select_base_linker_linux(native_toolchain):
+  linker = yield Get(Linker, Binutils, native_toolchain._binutils)
+  yield BaseLinker(linker)
+
+
+@rule(Linker, [NativeToolchain], given=[ToolchainVariant.gnu])
 def select_gcc_linker(native_toolchain):
   base_linker = yield Get(BaseLinker, NativeToolchain, native_toolchain)
   linker = base_linker.linker
   libc_objects = yield Get(LibcObjects, NativeToolchain, native_toolchain)
   linker_with_libc = linker.append_field('extra_object_files', libc_objects.crti_object_paths)
-  yield GCCLinker(linker_with_libc)
+  yield linker_with_libc
 
 
-@rule(LLVMLinker, [BaseLinker])
+@rule(Linker, [BaseLinker], given=[ToolchainVariant.llvm])
 def select_llvm_linker(base_linker):
-  return LLVMLinker(base_linker.linker)
+  return base_linker.linker
 
 
 class GCCInstallLocationForLLVM(datatype(['toolchain_dir'])):
@@ -171,7 +144,7 @@ def select_gcc_install_location(gcc):
   return GCCInstallLocationForLLVM(gcc.select())
 
 
-@rule(LLVMCToolchain, [Platform, NativeToolchain])
+@rule(CToolchain, [Platform, NativeToolchain], given=[ToolchainVariant.llvm])
 def select_llvm_c_toolchain(platform, native_toolchain):
   provided_clang = yield Get(CCompiler, LLVM, native_toolchain._llvm)
 
@@ -191,13 +164,13 @@ def select_llvm_c_toolchain(platform, native_toolchain):
     '-x', 'c', '-std=c11',
   ])
 
-  llvm_linker_wrapper = yield Get(LLVMLinker, NativeToolchain, native_toolchain)
-  working_linker = llvm_linker_wrapper.for_compiler(working_c_compiler, platform)
+  llvm_linker = yield Get(Linker, NativeToolchain, native_toolchain)
+  working_linker = llvm_linker.prepare_for_compiler(working_c_compiler, platform)
 
-  yield LLVMCToolchain(CToolchain(working_c_compiler, working_linker))
+  yield CToolchain(working_c_compiler, working_linker)
 
 
-@rule(LLVMCppToolchain, [Platform, NativeToolchain])
+@rule(CppToolchain, [Platform, NativeToolchain], given=[ToolchainVariant.llvm])
 def select_llvm_cpp_toolchain(platform, native_toolchain):
   provided_clangpp = yield Get(CppCompiler, LLVM, native_toolchain._llvm)
 
@@ -232,16 +205,16 @@ def select_llvm_cpp_toolchain(platform, native_toolchain):
     '-nostdinc++',
   ])
 
-  llvm_linker_wrapper = yield Get(LLVMLinker, NativeToolchain, native_toolchain)
-  working_linker = (llvm_linker_wrapper
-                    .for_compiler(working_cpp_compiler, platform)
+  llvm_linker = yield Get(Linker, NativeToolchain, native_toolchain)
+  working_linker = (llvm_linker
+                    .prepare_for_compiler(working_cpp_compiler, platform)
                     .append_field('linking_library_dirs', extra_llvm_linking_library_dirs)
                     .prepend_field('extra_args', linker_extra_args))
 
-  yield LLVMCppToolchain(CppToolchain(working_cpp_compiler, working_linker))
+  yield CppToolchain(working_cpp_compiler, working_linker)
 
 
-@rule(GCCCToolchain, [Platform, NativeToolchain])
+@rule(CToolchain, [Platform, NativeToolchain], given=[ToolchainVariant.gnu])
 def select_gcc_c_toolchain(platform, native_toolchain):
   provided_gcc = yield Get(CCompiler, GCC, native_toolchain._gcc)
 
@@ -260,13 +233,13 @@ def select_gcc_c_toolchain(platform, native_toolchain):
     '-x', 'c', '-std=c11',
   ])
 
-  gcc_linker_wrapper = yield Get(GCCLinker, NativeToolchain, native_toolchain)
-  working_linker = gcc_linker_wrapper.for_compiler(working_c_compiler, platform)
+  gcc_linker = yield Get(Linker, NativeToolchain, native_toolchain)
+  working_linker = gcc_linker.prepare_for_compiler(working_c_compiler, platform)
 
-  yield GCCCToolchain(CToolchain(working_c_compiler, working_linker))
+  yield CToolchain(working_c_compiler, working_linker)
 
 
-@rule(GCCCppToolchain, [Platform, NativeToolchain])
+@rule(CppToolchain, [Platform, NativeToolchain], given=[ToolchainVariant.gnu])
 def select_gcc_cpp_toolchain(platform, native_toolchain):
   provided_gpp = yield Get(CppCompiler, GCC, native_toolchain._gcc)
 
@@ -292,34 +265,10 @@ def select_gcc_cpp_toolchain(platform, native_toolchain):
     '-nostdinc++',
   ])
 
-  gcc_linker_wrapper = yield Get(GCCLinker, NativeToolchain, native_toolchain)
-  working_linker = gcc_linker_wrapper.for_compiler(working_cpp_compiler, platform)
+  gcc_linker = yield Get(Linker, NativeToolchain, native_toolchain)
+  working_linker = gcc_linker.prepare_for_compiler(working_cpp_compiler, platform)
 
-  yield GCCCppToolchain(CppToolchain(working_cpp_compiler, working_linker))
-
-
-@rule(CToolchain, [NativeToolchain], given=[ToolchainVariant.gnu])
-def select_c_toolchain_gnu(native_toolchain):
-  toolchain_resolved = yield Get(GCCCToolchain, NativeToolchain, native_toolchain)
-  yield toolchain_resolved.c_toolchain
-
-
-@rule(CToolchain, [NativeToolchain], given=[ToolchainVariant.llvm])
-def select_c_toolchain_llvm(native_toolchain):
-  toolchain_resolved = yield Get(LLVMCToolchain, NativeToolchain, native_toolchain)
-  yield toolchain_resolved.c_toolchain
-
-
-@rule(CppToolchain, [NativeToolchain], given=[ToolchainVariant.gnu])
-def select_cpp_toolchain_gnu(native_toolchain):
-  toolchain_resolved = yield Get(GCCCppToolchain, NativeToolchain, native_toolchain)
-  yield toolchain_resolved.cpp_toolchain
-
-
-@rule(CppToolchain, [NativeToolchain], given=[ToolchainVariant.llvm])
-def select_cpp_toolchain_llvm(native_toolchain):
-  toolchain_resolved = yield Get(LLVMCppToolchain, NativeToolchain, native_toolchain)
-  yield toolchain_resolved.cpp_toolchain
+  yield CppToolchain(working_cpp_compiler, working_linker)
 
 
 def create_native_toolchain_rules():
@@ -328,7 +277,8 @@ def create_native_toolchain_rules():
     select_libc_objects_linux,
     select_assembler_darwin,
     select_assembler_linux,
-    select_base_linker,
+    select_base_linker_darwin,
+    select_base_linker_linux,
     select_gcc_linker,
     select_llvm_linker,
     select_gcc_install_location,
@@ -336,9 +286,5 @@ def create_native_toolchain_rules():
     select_llvm_cpp_toolchain,
     select_gcc_c_toolchain,
     select_gcc_cpp_toolchain,
-    select_c_toolchain_gnu,
-    select_c_toolchain_llvm,
-    select_cpp_toolchain_gnu,
-    select_cpp_toolchain_llvm,
     RootRule(NativeToolchain),
   ]

@@ -224,7 +224,17 @@ class Linker(datatype([
     'linking_library_dirs',
     'extra_args',
     'extra_object_files',
-])): pass
+])):
+
+  # TODO: encode the "readiness" to be used by a compiler in the type somehow (perhaps by using a
+  # BaseLinker and a PreparedLinker?)!
+  def prepare_for_compiler(self, compiler, platform):
+    """Return a Linker object which is intended to be compatible with the given `compiler`."""
+    return (self
+            # TODO(#6143): describe why the compiler needs to be first on the PATH!
+            .sequence(compiler, exclude_list_fields=['extra_args', 'path_entries'])
+            .prepend_field('path_entries', compiler.path_entries)
+            .copy(exe_filename=compiler.exe_filename))
 
 
 class _CompilerMixin(_Executable):
