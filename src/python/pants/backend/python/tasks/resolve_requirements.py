@@ -19,6 +19,7 @@ class ResolveRequirements(ResolveRequirementsTaskBase):
 
   @classmethod
   def prepare(cls, options, round_manager):
+    super().prepare(options, round_manager)
     round_manager.require_data(PythonInterpreter)
 
   def execute(self):
