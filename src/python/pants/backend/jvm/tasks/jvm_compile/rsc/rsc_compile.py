@@ -223,7 +223,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       self.NAILGUN: lambda: self._nailgunnable_combined_classpath,
     })()
 
-  # NB: Override of ZincCompile/JvmCompile method!
   def register_extra_products_from_contexts(self, targets, compile_contexts):
     super().register_extra_products_from_contexts(targets, compile_contexts)
 
