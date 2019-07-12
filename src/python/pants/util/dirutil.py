@@ -6,7 +6,6 @@ import errno
 import os
 import shutil
 import stat
-import subprocess
 import tempfile
 import threading
 import uuid
