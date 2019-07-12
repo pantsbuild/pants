@@ -415,6 +415,18 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--process-execution-cleanup-local-dirs', type=bool, default=True, advanced=True,
              help='Whether or not to cleanup directories used for local process execution '
                   '(primarily useful for e.g. debugging).')
+    register('--process-execution-speculation-timeout-ms', type=int, default=100, advanced=True,
+             help='Number of milliseconds to wait before speculating a second request for a slow process. '
+                  ' see `--process-execution-speculation`')
+    register('--process-execution-speculation', choices=['remote_first', 'local_first', 'none'], default='local_first',
+             help="Speculate a second request for an underlying process if the first one does not complete within "
+                  '`--speculation-timeout-ms` milliseconds.\n'
+                  '`local_first` (default): Try to run the process locally first, '
+                  'and fall back to remote execution if available.\n'
+                  '`remote_first`: Run the process on the remote execution backend if available, '
+                  'and fall back to the local host if remote calls take longer than the speculation timeout.\n'
+                  '`none`: Do not speculate about long running processes.',
+             advanced=True)
 
   @classmethod
   def register_options(cls, register):
