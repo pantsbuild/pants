@@ -164,7 +164,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       help='Always compile targets marked with this tag with rsc, unless the workflow is '
            'specified on the cli.')
     register('--workflow', type=cls.JvmCompileWorkflowType,
-      default=cls.JvmCompileWorkflowType.rsc_and_zinc, metavar='<workflow>',
+      default=cls.JvmCompileWorkflowType.zinc_only, metavar='<workflow>',
       help='The workflow to use to compile JVM targets.')
 
     register('--extra-rsc-args', type=list, default=[],
