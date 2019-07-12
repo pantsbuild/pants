@@ -49,25 +49,25 @@ pub struct ShardedLmdb {
   // First Database is content, second is leases.
   lmdbs: HashMap<u8, (Arc<Environment>, Database, Database)>,
   root_path: PathBuf,
-  max_size_bytes: usize,
+  max_size: usize,
   executor: task_executor::Executor,
 }
 
 impl ShardedLmdb {
-  // max_size is the maximum size the databases together will be allowed to grow to in bytes.
+  // max_size is the maximum size the databases together will be allowed to grow to.
   // When calling this function, we will attempt to allocate that much virtual (not resident) memory
   // for the mmap; in theory it should be possible not to bound this, but in practice we see travis
   // occasionally fail tests because it's unable to allocate virtual memory if we set this too high,
   // and we have too many tests running concurrently or close together.
   pub fn new(
     root_path: PathBuf,
-    max_size_bytes: usize,
+    max_size: usize,
     executor: task_executor::Executor,
   ) -> Result<ShardedLmdb, String> {
     trace!("Initializing ShardedLmdb at root {:?}", root_path);
     let mut lmdbs = HashMap::new();
 
-    for (env, dir, fingerprint_prefix) in ShardedLmdb::envs(&root_path, max_size_bytes)? {
+    for (env, dir, fingerprint_prefix) in ShardedLmdb::envs(&root_path, max_size)? {
       trace!("Making ShardedLmdb content database for {:?}", dir);
       let content_database = env
         .create_db(Some("content"), DatabaseFlags::empty())
@@ -97,15 +97,12 @@ impl ShardedLmdb {
     Ok(ShardedLmdb {
       lmdbs,
       root_path,
-      max_size_bytes,
+      max_size,
       executor,
     })
   }
 
-  fn envs(
-    root_path: &Path,
-    max_size_bytes: usize,
-  ) -> Result<Vec<(Environment, PathBuf, u8)>, String> {
+  fn envs(root_path: &Path, max_size: usize) -> Result<Vec<(Environment, PathBuf, u8)>, String> {
     let mut envs = Vec::with_capacity(0x10);
     for b in 0x00..0x10 {
       let fingerprint_prefix = b << 4;
@@ -116,7 +113,7 @@ impl ShardedLmdb {
       fs::safe_create_dir_all(&dir)
         .map_err(|err| format!("Error making directory for store at {:?}: {:?}", dir, err))?;
       envs.push((
-        ShardedLmdb::make_env(&dir, max_size_bytes)?,
+        ShardedLmdb::make_env(&dir, max_size)?,
         dir,
         fingerprint_prefix,
       ));
@@ -124,7 +121,7 @@ impl ShardedLmdb {
     Ok(envs)
   }
 
-  fn make_env(dir: &Path, max_size_bytes: usize) -> Result<Environment, String> {
+  fn make_env(dir: &Path, max_size: usize) -> Result<Environment, String> {
     Environment::new()
       // NO_SYNC
       // =======
@@ -159,7 +156,7 @@ impl ShardedLmdb {
       .set_flags(EnvironmentFlags::NO_SYNC | EnvironmentFlags::NO_TLS)
       // 2 DBs; one for file contents, one for leases.
       .set_max_dbs(2)
-      .set_map_size(max_size_bytes / page_size::get())
+      .set_map_size(max_size)
       .open(dir)
       .map_err(|e| format!("Error making env for store at {:?}: {}", dir, e))
   }
@@ -257,7 +254,7 @@ impl ShardedLmdb {
 
   #[allow(clippy::identity_conversion)] // False positive: https://github.com/rust-lang/rust-clippy/issues/3913
   pub fn compact(&self) -> Result<(), String> {
-    for (env, old_dir, _) in ShardedLmdb::envs(&self.root_path, self.max_size_bytes)? {
+    for (env, old_dir, _) in ShardedLmdb::envs(&self.root_path, self.max_size)? {
       let new_dir = TempDir::new_in(old_dir.parent().unwrap()).expect("TODO");
       env
         .copy(new_dir.path(), EnvironmentCopyFlags::COMPACT)

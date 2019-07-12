@@ -2,6 +2,45 @@
 ======================
 This document describes releases leading up to the ``1.18.x`` ``stable`` series.
 
+1.18.0rc1 (7/10/2019)
+---------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add utf-8 encoding to thrift-generated python files (#8022)
+  `PR #8022 <https://github.com/pantsbuild/pants/pull/8022>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix performance regression introduced by #7898 (#8006)
+  `PR #8006 <https://github.com/pantsbuild/pants/pull/8006>`_
+
+* Revert "Make precomputing fail more usefully (#7994)" (#8024)
+  `PR #8024 <https://github.com/pantsbuild/pants/pull/8024>`_
+
+* Fix plugin resolution to respect interpreter ABI. (#8005)
+  `PR #8005 <https://github.com/pantsbuild/pants/pull/8005>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Extract cbindgen'd interface into its own crate (#8013)
+  `PR #8013 <https://github.com/pantsbuild/pants/pull/8013>`_
+
+* Fix pdb conflict in run_tracker stats request (#8025)
+  `PR #8025 <https://github.com/pantsbuild/pants/pull/8025>`_
+
+* Make union error messages better (#7999)
+  `PR #7999 <https://github.com/pantsbuild/pants/pull/7999>`_
+
+Version updates
+~~~~~~~~~~~~~~~
+
+* Update rust dependencies (#8016)
+  `PR #8016 <https://github.com/pantsbuild/pants/pull/8016>`_
+
 1.18.0rc0 (7/5/2019)
 --------------------
 
