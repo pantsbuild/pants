@@ -13,6 +13,7 @@ import uuid
 from collections import defaultdict
 from contextlib import contextmanager
 
+from pants.base.build_environment import get_buildroot
 from pants.util.strutil import ensure_text
 
 
@@ -616,14 +617,9 @@ def is_writable_dir(path):
   return is_readable_dir(path) and os.access(path, os.W_OK)
 
 
-def get_repo_root():
-  """Return the absolute path to the root directory of the Pants git repo."""
-  return subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).strip().decode()
-
-
 def get_workdir():
   return '/tmp/.pants.d'
 
 
 def get_workdir_symlink():
-  return get_repo_root() + '/.pants.d'
+  return get_buildroot() + '/.pants.d'
