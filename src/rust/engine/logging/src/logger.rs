@@ -246,23 +246,20 @@ pub fn set_destination(destination: Destination) {
 }
 
 pub fn get_destination() -> Destination {
-  let ret = {
-    if futures::task::is_in_task() {
-      TASK_DESTINATION.with(|destination| {
-        let destination = destination.lock();
-        if let Some(destination) = destination.as_ref() {
-          Some(*destination)
-        } else {
-          None
-        }
-      })
-    } else {
-      None
-    }
-  };
-  if let Some(ret) = ret {
-    ret
-  } else {
+
+  fn get_task_destination() -> Option<Destination> {
+    TASK_DESTINATION.with(|destination| *destination.lock())
+  }
+
+  fn get_thread_destination() -> Destination {
     THREAD_DESTINATION.with(|destination| *destination.lock())
   }
+
+  if futures::task::is_in_task() {
+    get_task_destination().unwrap_or_else(get_thread_destination)
+  } else {
+    get_thread_destination()
+  }
 }
+
+
