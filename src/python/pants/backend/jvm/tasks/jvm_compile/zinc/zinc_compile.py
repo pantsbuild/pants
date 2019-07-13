@@ -467,11 +467,17 @@ class BaseZincCompile(JvmCompile):
       (self.post_compile_extra_resources_digest(ctx), argfile_snapshot.directory_digest)
     )
 
+    # NB: We always capture the output jar, but if classpath jars are not used, we additionally
+    # capture loose classes from the workspace. This is because we need to both:
+    #   1) allow loose classes as an input to dependent compiles
+    #   2) allow jars to be materialized at the end of the run.
+    output_directories = () if self.get_options().use_classpath_jars else (classes_dir,)
+
     req = ExecuteProcessRequest(
       argv=tuple(argv),
       input_files=merged_input_digest,
-      output_files=(jar_file,) if self.get_options().use_classpath_jars else (),
-      output_directories=() if self.get_options().use_classpath_jars else (classes_dir,),
+      output_files=(jar_file,),
+      output_directories=output_directories,
       description="zinc compile for {}".format(ctx.target.address.spec),
       jdk_home=self._zinc.underlying_dist.home,
     )
