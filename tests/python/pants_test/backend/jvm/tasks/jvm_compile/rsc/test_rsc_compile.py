@@ -110,8 +110,7 @@ class RscCompileTest(NailgunTaskTestBase):
       print(dependee_graph)
       self.assertEqual(dedent("""
                      zinc[zinc-java](java/classpath:java_lib) <- {}
-                     rsc(scala/classpath:scala_lib) <- {}
-                     zinc[rsc-and-zinc](scala/classpath:scala_lib) <- {}""").strip(),
+                     zinc[zinc-only](scala/classpath:scala_lib) <- {}""").strip(),
         dependee_graph)
 
   def test_default_workflow_of_zinc_only_zincs_scala(self):

@@ -26,12 +26,14 @@ from pants.backend.jvm.tasks.jvm_compile.missing_dependency_finder import (Compi
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnitLabel
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, PathGlobsAndRoot
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
+from pants.option.ranked_value import RankedValue
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import Timer, temporary_dir
 from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_file_dump, safe_mkdir,
@@ -387,10 +389,17 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                           sources=self._compute_sources_for_target(target))
 
   def execute(self):
-    if JvmPlatform.global_instance().get_options().compiler != self.compiler_name:
+    requested_compiler = JvmPlatform.global_instance().get_options().compiler
+    deprecated_conditional(
+      lambda:  requested_compiler != self.compiler_name,
+      removal_version='1.19.0.dev0',
+      entity_description='Requested a deprecated/unsupported compiler: [{}].'.format(requested_compiler),
+      hint_message='Compiler will be defaulted to [{}].'.format(self.compiler_name))
+
+    if requested_compiler != self.compiler_name:
       # If the requested compiler is not the one supported by this task,
-      # bail early.
-      return
+      # issue a deprecation warning and set the compiler to this task's
+      JvmPlatform.global_instance().get_options().compiler = RankedValue(0, self.compiler_name)
 
     # In case we have no relevant targets and return early, create the requested product maps.
     self.create_empty_extra_products()

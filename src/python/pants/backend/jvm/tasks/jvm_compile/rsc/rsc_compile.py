@@ -165,7 +165,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
            'specified on the cli.')
     register('--workflow', type=cls.JvmCompileWorkflowType,
       default=cls.JvmCompileWorkflowType.zinc_only, metavar='<workflow>',
-      help='The workflow to use to compile JVM targets.')
+      help='The workflow to use to compile JVM targets.', fingerprint=True)
 
     register('--extra-rsc-args', type=list, default=[],
              help='Extra arguments to pass to the rsc invocation.')
@@ -211,8 +211,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   def get_zinc_compiler_classpath(self):
     return self.execution_strategy_enum.resolve_for_enum_variant({
       # NB: We must use the verbose version of super() here, possibly because of the lambda.
-      self.HERMETIC: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
-      self.SUBPROCESS: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
+      self.HERMETIC: lambda: super().get_zinc_compiler_classpath(),
+      self.SUBPROCESS: lambda: super().get_zinc_compiler_classpath(),
       self.NAILGUN: lambda: self._nailgunnable_combined_classpath,
     })()
 
