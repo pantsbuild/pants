@@ -123,7 +123,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
   def test_config_buildroot_does_not_invalidate_targets(self, cache_args):
     previous_names = set()
     for buildroot in self._temporary_buildroots(['examples']):
-      with self.temporary_workdir() as workdir:
+      with temporary_dir(root_dir=buildroot, prefix='.pants.d', suffix='.pants.d') as workdir:
         tmp = os.path.join(buildroot, 'tmp')
         os.mkdir(tmp)
         config = dedent("""
