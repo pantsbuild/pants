@@ -247,8 +247,7 @@ class BaseZincCompile(JvmCompile):
 
   def scalac_classpath_entries(self):
     """Returns classpath entries for the scalac classpath."""
-    return ScalaPlatform.global_instance().compiler_classpath_entries(
-      self.context.products, self.context._scheduler)
+    return ScalaPlatform.global_instance().compiler_classpath_entries(self.context.products)
 
   def compile(self, ctx, args, dependency_classpath, upstream_analysis,
               settings, compiler_option_sets, zinc_file_manager,
@@ -385,10 +384,9 @@ class BaseZincCompile(JvmCompile):
   def _compile_hermetic(self, jvm_options, ctx, classes_dir, jar_file,
                         compiler_bridge_classpath_entry, dependency_classpath,
                         scalac_classpath_entries):
-    zinc_relpath = fast_relpath(self._zinc.zinc, get_buildroot())
+    zinc_relpath = fast_relpath(self._zinc.zinc.path, get_buildroot())
 
     snapshots = [
-      self._zinc.snapshot(self.context._scheduler),
       ctx.target.sources_snapshot(self.context._scheduler),
     ]
 
@@ -404,9 +402,9 @@ class BaseZincCompile(JvmCompile):
 
     # Ensure the dependencies and compiler bridge jars are available in the execution sandbox.
     relevant_classpath_entries = dependency_classpath + [compiler_bridge_classpath_entry]
-    directory_digests = tuple(
+    directory_digests = [
       entry.directory_digest for entry in relevant_classpath_entries if entry.directory_digest
-    )
+    ]
     if len(directory_digests) != len(relevant_classpath_entries):
       for dep in relevant_classpath_entries:
         if not dep.directory_digest:
@@ -414,7 +412,7 @@ class BaseZincCompile(JvmCompile):
             "ClasspathEntry {} didn't have a Digest, so won't be present for hermetic "
             "execution of zinc".format(dep)
           )
-    snapshots.extend(
+    directory_digests.extend(
       classpath_entry.directory_digest for classpath_entry in scalac_classpath_entries
     )
 
@@ -425,7 +423,7 @@ class BaseZincCompile(JvmCompile):
           "unsupported. jvm_options received: {}".format(self.options_scope, safe_shlex_join(jvm_options))
         )
       native_image_path, native_image_snapshot = self._zinc.native_image(self.context)
-      native_image_snapshots = (native_image_snapshot.directory_digest,)
+      native_image_snapshots = [native_image_snapshot.directory_digest,]
       scala_boot_classpath = [
           classpath_entry.path for classpath_entry in scalac_classpath_entries
         ] + [
@@ -443,7 +441,7 @@ class BaseZincCompile(JvmCompile):
         '-Dscala.usejavacp=true',
       ]
     else:
-      native_image_snapshots = ()
+      native_image_snapshots = []
       # TODO: Lean on distribution for the bin/java appending here
       image_specific_argv =  ['.jdk/bin/java'] + jvm_options + [
         '-cp', zinc_relpath,
@@ -461,10 +459,11 @@ class BaseZincCompile(JvmCompile):
     argv = image_specific_argv + ['@{}'.format(argfile_snapshot.files[0])]
 
     merged_input_digest = self.context._scheduler.merge_directories(
-      tuple(s.directory_digest for s in snapshots) +
+      [self._zinc.zinc.directory_digest] +
+      [s.directory_digest for s in snapshots] +
       directory_digests +
       native_image_snapshots +
-      (self.post_compile_extra_resources_digest(ctx), argfile_snapshot.directory_digest)
+      [self.post_compile_extra_resources_digest(ctx), argfile_snapshot.directory_digest]
     )
 
     # NB: We always capture the output jar, but if classpath jars are not used, we additionally
@@ -500,7 +499,7 @@ class BaseZincCompile(JvmCompile):
     method to ensure a single classpath is used for all the tools they need to invoke so that the
     nailgun instance (which is keyed by classpath and JVM options) isn't invalidated.
     """
-    return [self._zinc.zinc]
+    return [self._zinc.zinc.path]
 
   def _verify_zinc_classpath(self, classpath, allow_dist=True):
     def is_outside(path, putative_parent):
