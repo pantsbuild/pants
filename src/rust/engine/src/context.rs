@@ -73,8 +73,8 @@ impl Core {
     process_execution_local_parallelism: usize,
     process_execution_remote_parallelism: usize,
     process_execution_cleanup_local_dirs: bool,
-    process_execution_speculation_timeout: Duration,
-    process_execution_speculation: String,
+    process_execution_speculation_delay: Duration,
+    process_execution_speculation_strategy: String,
   ) -> Core {
     // Randomize CAS address order to avoid thundering herds from common config.
     let mut remote_store_servers = remote_store_servers;
@@ -155,20 +155,19 @@ impl Core {
         )),
         process_execution_remote_parallelism,
       ));
-      command_runner = match process_execution_speculation.as_ref() {
+      command_runner = match process_execution_speculation_strategy.as_ref() {
         "local_first" => Box::new(SpeculatingCommandRunner::new(
           command_runner,
           remote_command_runner,
-          process_execution_speculation_timeout,
+          process_execution_speculation_delay,
         )),
         "remote_first" => Box::new(SpeculatingCommandRunner::new(
           remote_command_runner,
           command_runner,
-          process_execution_speculation_timeout,
+          process_execution_speculation_delay,
         )),
         "none" => remote_command_runner,
-        // not possible to get this branch, but when matching a reference we need a catch all.
-        _ => command_runner,
+        _ => unreachable!(),
       };
     }
 
