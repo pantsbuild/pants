@@ -39,7 +39,7 @@ class ZipkinReporter(Reporter):
     Reporter that implements Zipkin tracing.
   """
 
-  def __init__(self, run_tracker, settings, endpoint, trace_id, parent_id, sample_rate):
+  def __init__(self, run_tracker, settings, endpoint, trace_id, parent_id, sample_rate, service_name_prefix):
     """
     When trace_id and parent_id are set a Zipkin trace will be created with given trace_id
     and parent_id. If trace_id and parent_id are set to None, a trace_id will be randomly
@@ -61,6 +61,7 @@ class ZipkinReporter(Reporter):
     self.endpoint = endpoint
     self.tracer = get_default_tracer()
     self.run_tracker = run_tracker
+    self.service_name_prefix = service_name_prefix
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
@@ -104,7 +105,7 @@ class ZipkinReporter(Reporter):
         self.parent_id = zipkin_attrs.span_id
 
       span = local_tracer.zipkin_span(
-        service_name="pants/corp/{}/local".format(service_name),
+        service_name=self.service_name_prefix.format(service_name),
         span_name=workunit.name,
         transport_handler=self.handler,
         encoding=Encoding.V1_THRIFT,
@@ -118,7 +119,7 @@ class ZipkinReporter(Reporter):
         local_tracer.push_zipkin_attrs(parent_attrs)
         local_tracer.set_transport_configured(configured=True)
       span = local_tracer.zipkin_span(
-        service_name="pants/corp/{}/local".format(service_name),
+        service_name=self.service_name_prefix.format(service_name),
         span_name=workunit.name,
       )
     # For all spans except the first span zipkin_attrs for span are created at this point
@@ -160,7 +161,7 @@ class ZipkinReporter(Reporter):
       local_tracer = get_default_tracer()
 
       span = local_tracer.zipkin_span(
-        service_name="pants/corp/rule/local",
+        service_name=self.service_name_prefix.format("rule"),
         span_name=workunit['name'],
         duration=duration,
       )
