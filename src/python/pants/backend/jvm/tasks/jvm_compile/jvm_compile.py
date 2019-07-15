@@ -1,6 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import enum
 import functools
 import os
 from multiprocessing import cpu_count
@@ -57,6 +58,11 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
   """
 
   size_estimators = create_size_estimators()
+
+  class Compiler(enum.Enum):
+    ZINC = 'zinc'
+    RSC = 'rsc'
+    JAVAC = 'javac'
 
   @classmethod
   def size_estimator_by_name(cls, estimation_strategy_name):
@@ -390,16 +396,21 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   def execute(self):
     requested_compiler = JvmPlatform.global_instance().get_options().compiler
+    if requested_compiler != self.compiler_name:
+      return
     deprecated_conditional(
-      lambda:  requested_compiler != self.compiler_name,
+      lambda:  requested_compiler == self.Compiler.ZINC,
       removal_version='1.19.0.dev0',
-      entity_description='Requested a deprecated/unsupported compiler: [{}].'.format(requested_compiler),
+      entity_description='Requested a deprecated compiler: [{}].'.format(requested_compiler),
       hint_message='Compiler will be defaulted to [{}].'.format(self.compiler_name))
 
-    if requested_compiler != self.compiler_name:
-      # If the requested compiler is not the one supported by this task,
-      # issue a deprecation warning and set the compiler to this task's
+    if requested_compiler == self.Compiler.ZINC and self.compiler_name == self.Compiler.RSC:
+      # Issue a deprecation warning (above) and rewrite zinc to rsc, as zinc is being deprecated.
       JvmPlatform.global_instance().get_options().compiler = RankedValue(0, self.compiler_name)
+    elif requested_compiler != self.compiler_name:
+      # If the requested compiler is not the one supported by this task, log and abort
+      self.context.log.debug('Requested an unsupported compiler [{}], aborting'.format(requested_compiler))
+      return
 
     # In case we have no relevant targets and return early, create the requested product maps.
     self.create_empty_extra_products()

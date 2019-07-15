@@ -265,13 +265,13 @@ class BaseZincCompileIntegrationTest:
       first_run = self.run_test_compile(workdir, cachedir,
                             'testprojects/src/scala/org/pantsbuild/testproject/javasources')
 
-      self.assertIn('isolation-zinc-pool-bootstrap', first_run.stdout_data)
+      self.assertIn('isolation-mixed-pool-bootstrap', first_run.stdout_data)
 
       # Run valid compile.
       second_run = self.run_test_compile(workdir, cachedir,
                             'testprojects/src/scala/org/pantsbuild/testproject/javasources')
 
-      self.assertNotIn('isolation-zinc-pool-bootstrap', second_run.stdout_data)
+      self.assertNotIn('isolation-mixed-pool-bootstrap', second_run.stdout_data)
 
   def test_source_compat_binary_incompat_scala_change(self):
     with temporary_dir() as cache_dir, \

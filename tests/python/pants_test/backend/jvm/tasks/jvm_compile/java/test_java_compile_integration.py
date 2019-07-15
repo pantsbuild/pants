@@ -223,6 +223,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
         # Build again to hit the cache.
         second_run = self.run_pants_with_workdir(['clean-all', 'test', target], workdir, config)
         self.assert_success(second_run)
+        print(second_run.stdout_data)
         self.assertFalse("Compiling" in second_run.stdout_data)
 
         # Corrupt the remote artifact.

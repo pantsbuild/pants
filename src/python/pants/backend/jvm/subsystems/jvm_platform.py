@@ -24,7 +24,7 @@ class JvmPlatform(Subsystem):
   # strictly (eg, if Java 10 != 1.10, simply leave it out).
   SUPPORTED_CONVERSION_VERSIONS = (6, 7, 8,)
 
-  _COMPILER_CHOICES = ['zinc', 'javac', 'rsc']
+  _COMPILER_CHOICES = ['javac', 'rsc']
 
   class IllegalDefaultPlatform(TaskError):
     """The --default-platform option was set, but isn't defined in --platforms."""

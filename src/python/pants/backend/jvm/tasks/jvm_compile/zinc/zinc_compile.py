@@ -633,7 +633,7 @@ class ZincCompile(BaseZincCompile):
     removal_version='1.19.0.dev0',
     hint_message="compile.zinc task is being phased out. Use compile.rsc:zinc-only option instead."
   )
-  compiler_name = 'rsc'
+  compiler_name = 'zinc'
 
   @classmethod
   def product_types(cls):

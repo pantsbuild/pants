@@ -654,7 +654,7 @@ Interrupted by user over pailgun client!
     # This pair of JVM options causes the JVM to always crash, so the command will fail if the env
     # isn't stripped.
     with self.pantsd_successful_run_context(
-      extra_config={'compile.zinc': {'jvm_options': ['-Xmx1g']}},
+      extra_config={'compile.rsc': {'jvm_options': ['-Xmx1g']}},
       extra_env={'_JAVA_OPTIONS': '-Xms2g'},
     ) as (pantsd_run, checker, workdir, _):
       pantsd_run(['help'])
