@@ -662,9 +662,11 @@ matrix:
       stage: *bootstrap_cron
     - <<: *py37_osx_build_engine
 
-    # NB: We move this test here, above the other unit tests, to ensure that the shard is #5. The
-    # RBE token server will only give tokens to job number #5, so we must do this for the cron job
-    # to work with remoting.
+    # NB: We move this test here, above the other unit tests, to ensure that the shard is #5. Per
+    # the token generator design
+    # https://docs.google.com/document/d/1gL3D1f-AzL_LzRxWLskCpVQ2ZlB_26GTETgXkXsrpDY/edit#heading=h.akhkfdtqfpw,
+    # the RBE token server will only give tokens to job number #5, so we must do this for the cron
+    # job to work with remoting.
     - <<: *py37_linux_test_config
       name: "Unit tests - V2 test runner (Py3.7 PEX)"
       env:
