@@ -10,6 +10,6 @@ if [ "${COMMIT_MSG_SRC}" != "commit" ] && [ "${NUM_NON_MD_FILES}" -eq 0 ]; then
 cat <<EOF >> "${COMMIT_MSG_FILEPATH}"
 
 # Delete this line to force a full CI run for documentation-only changes.
-SKIP_FULL_CI  # Documentation-only change.
+[ci skip]  # Documentation-only change.
 EOF
 fi
