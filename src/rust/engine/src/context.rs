@@ -19,7 +19,9 @@ use boxfuture::{BoxFuture, Boxable};
 use core::clone::Clone;
 use fs::{safe_create_dir_all_ioerror, PosixFS};
 use graph::{EntryId, Graph, NodeContext};
-use process_execution::{self, BoundedCommandRunner, ExecuteProcessRequestMetadata};
+use process_execution::{
+  self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, ExecuteProcessRequestMetadata,
+};
 use rand::seq::SliceRandom;
 use reqwest;
 use rule_graph::RuleGraph;
@@ -41,7 +43,7 @@ pub struct Core {
   pub types: Types,
   pub executor: task_executor::Executor,
   store: Store,
-  pub command_runner: BoundedCommandRunner,
+  pub command_runner: Box<dyn process_execution::CommandRunner>,
   pub http_client: reqwest::r#async::Client,
   pub vfs: PosixFS,
   pub build_root: PathBuf,
@@ -71,6 +73,8 @@ impl Core {
     process_execution_local_parallelism: usize,
     process_execution_remote_parallelism: usize,
     process_execution_cleanup_local_dirs: bool,
+    process_execution_speculation_timeout: Duration,
+    process_execution_speculation: String,
   ) -> Core {
     // Randomize CAS address order to avoid thundering herds from common config.
     let mut remote_store_servers = remote_store_servers;
@@ -123,10 +127,23 @@ impl Core {
       })
       .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
 
-    let command_runner = match &remote_execution_server {
-      Some(ref address) if remote_execution => BoundedCommandRunner::new(
+    let mut command_runner: Box<dyn process_execution::CommandRunner> =
+      Box::new(BoundedCommandRunner::new(
+        Box::new(process_execution::local::CommandRunner::new(
+          store.clone(),
+          executor.clone(),
+          work_dir.clone(),
+          process_execution_cleanup_local_dirs,
+        )),
+        process_execution_local_parallelism,
+      ));
+
+    if remote_execution {
+      let remote_command_runner = Box::new(BoundedCommandRunner::new(
         Box::new(process_execution::remote::CommandRunner::new(
-          address,
+          // No problem unwrapping here because the global options validation
+          // requires the remote_execution_server be present when remote_execution is set.
+          &remote_execution_server.unwrap(),
           ExecuteProcessRequestMetadata {
             instance_name: remote_instance_name.clone(),
             cache_key_gen_version: remote_execution_process_cache_namespace.clone(),
@@ -137,17 +154,23 @@ impl Core {
           store.clone(),
         )),
         process_execution_remote_parallelism,
-      ),
-      _ => BoundedCommandRunner::new(
-        Box::new(process_execution::local::CommandRunner::new(
-          store.clone(),
-          executor.clone(),
-          work_dir.clone(),
-          process_execution_cleanup_local_dirs,
+      ));
+      command_runner = match process_execution_speculation.as_ref() {
+        "local_first" => Box::new(SpeculatingCommandRunner::new(
+          command_runner,
+          remote_command_runner,
+          process_execution_speculation_timeout,
         )),
-        process_execution_local_parallelism,
-      ),
-    };
+        "remote_first" => Box::new(SpeculatingCommandRunner::new(
+          remote_command_runner,
+          command_runner,
+          process_execution_speculation_timeout,
+        )),
+        "none" => remote_command_runner,
+        // not possible to get this branch, but when matching a reference we need a catch all.
+        _ => command_runner,
+      };
+    }
 
     let http_client = reqwest::r#async::Client::new();
     let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);

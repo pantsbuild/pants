@@ -202,6 +202,8 @@ pub extern "C" fn scheduler_create(
   process_execution_local_parallelism: u64,
   process_execution_remote_parallelism: u64,
   process_execution_cleanup_local_dirs: bool,
+  process_execution_speculation_timeout_ms: u64,
+  process_execution_speculation_mode_buf: Buffer,
 ) -> *const Scheduler {
   let root_type_ids = root_type_ids.to_vec();
   let ignore_patterns = ignore_patterns_buf
@@ -275,6 +277,10 @@ pub extern "C" fn scheduler_create(
     }
   };
 
+  let process_execution_speculation = process_execution_speculation_mode_buf
+    .to_string()
+    .expect("process_execution_speculation was not valid UTF8");
+
   Box::into_raw(Box::new(Scheduler::new(Core::new(
     root_type_ids.clone(),
     tasks,
@@ -310,6 +316,8 @@ pub extern "C" fn scheduler_create(
     process_execution_local_parallelism as usize,
     process_execution_remote_parallelism as usize,
     process_execution_cleanup_local_dirs,
+    Duration::from_millis(process_execution_speculation_timeout_ms),
+    process_execution_speculation,
   ))))
 }
 

@@ -36,6 +36,8 @@ class ExecutionOptions(datatype([
   'process_execution_local_parallelism',
   'process_execution_remote_parallelism',
   'process_execution_cleanup_local_dirs',
+  'process_execution_speculation_timeout_ms',
+  'process_execution_speculation',
   'remote_execution_process_cache_namespace',
   'remote_instance_name',
   'remote_ca_certs_path',
@@ -61,6 +63,8 @@ class ExecutionOptions(datatype([
       process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
       process_execution_remote_parallelism=bootstrap_options.process_execution_remote_parallelism,
       process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
+      process_execution_speculation_timeout_ms=bootstrap_options.process_execution_speculation_timeout_ms,
+      process_execution_speculation=bootstrap_options.process_execution_speculation,
       remote_execution_process_cache_namespace=bootstrap_options.remote_execution_process_cache_namespace,
       remote_instance_name=bootstrap_options.remote_instance_name,
       remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
@@ -80,6 +84,8 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_local_parallelism=multiprocessing.cpu_count()*2,
     process_execution_remote_parallelism=128,
     process_execution_cleanup_local_dirs=True,
+    process_execution_speculation_timeout_ms=100,
+    process_execution_speculation='local_first',
     remote_execution_process_cache_namespace=None,
     remote_instance_name=None,
     remote_ca_certs_path=None,
@@ -415,10 +421,12 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--process-execution-cleanup-local-dirs', type=bool, default=True, advanced=True,
              help='Whether or not to cleanup directories used for local process execution '
                   '(primarily useful for e.g. debugging).')
-    register('--process-execution-speculation-timeout-ms', type=int, default=100, advanced=True,
+    register('--process-execution-speculation-timeout-ms', type=int,
+             default=DEFAULT_EXECUTION_OPTIONS.process_execution_speculation_timeout_ms, advanced=True,
              help='Number of milliseconds to wait before speculating a second request for a slow process. '
                   ' see `--process-execution-speculation`')
-    register('--process-execution-speculation', choices=['remote_first', 'local_first', 'none'], default='local_first',
+    register('--process-execution-speculation', choices=['remote_first', 'local_first', 'none'],
+             default=DEFAULT_EXECUTION_OPTIONS.process_execution_speculation,
              help="Speculate a second request for an underlying process if the first one does not complete within "
                   '`--speculation-timeout-ms` milliseconds.\n'
                   '`local_first` (default): Try to run the process locally first, '
