@@ -65,11 +65,11 @@ class ZipkinReporter(Reporter):
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
     if workunit.has_label(WorkUnitLabel.GOAL):
-      service_name = "pants goal"
+      service_name = "goal"
     elif workunit.has_label(WorkUnitLabel.TASK):
-      service_name = "pants task"
+      service_name = "task"
     else:
-      service_name = "pants workunit"
+      service_name = "workunit"
 
     # Set local_tracer. Tracer stores spans and span's zipkin_attrs.
     # If start_workunit is called from the root thread then local_tracer is the same as self.tracer.
@@ -104,7 +104,7 @@ class ZipkinReporter(Reporter):
         self.parent_id = zipkin_attrs.span_id
 
       span = local_tracer.zipkin_span(
-        service_name=service_name,
+        service_name="pants/corp/{}/local".format(service_name),
         span_name=workunit.name,
         transport_handler=self.handler,
         encoding=Encoding.V1_THRIFT,
@@ -118,7 +118,7 @@ class ZipkinReporter(Reporter):
         local_tracer.push_zipkin_attrs(parent_attrs)
         local_tracer.set_transport_configured(configured=True)
       span = local_tracer.zipkin_span(
-        service_name=service_name,
+        service_name="pants/corp/{}/local".format(service_name),
         span_name=workunit.name,
       )
     # For all spans except the first span zipkin_attrs for span are created at this point
@@ -160,7 +160,7 @@ class ZipkinReporter(Reporter):
       local_tracer = get_default_tracer()
 
       span = local_tracer.zipkin_span(
-        service_name="pants",
+        service_name="pants/corp/rule/local",
         span_name=workunit['name'],
         duration=duration,
       )
