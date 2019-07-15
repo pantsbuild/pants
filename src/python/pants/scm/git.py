@@ -47,7 +47,7 @@ class Git(Scm):
     try:
       if subdir:
         with pushd(subdir):
-          process, out = cls._invoke(cmd, stderr=subproces.DEVNULL)
+          process, out = cls._invoke(cmd, stderr=subprocess.DEVNULL)
       else:
         process, out = cls._invoke(cmd, stderr=subprocess.DEVNULL)
       cls._check_result(cmd, process.returncode, raise_type=Scm.ScmException)
