@@ -301,7 +301,7 @@ impl Scheduler {
     // Keys are positions in the display (display workers) and the values are the actual jobs to print.
     let mut tasks_to_display = IndexMap::new();
 
-    let results = match session.maybe_display() {
+    match session.maybe_display() {
       Some(display) => {
         {
           let mut display = display.lock();
@@ -321,11 +321,11 @@ impl Scheduler {
             );
           }
         };
+        LOGGER.deregister_engine_display(unique_handle);
         {
           let mut display = display.lock();
           display.finish();
         }
-        LOGGER.deregister_engine_display(unique_handle);
         results
       }
       None => loop {
@@ -333,8 +333,7 @@ impl Scheduler {
           break res;
         }
       },
-    };
-    results
+    }
   }
 
   fn display_ongoing_tasks(
