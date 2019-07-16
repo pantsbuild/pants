@@ -365,16 +365,12 @@ impl PathGlob {
       // The resulting symbolic path will continue to contain a literal `..`.
       let mut canonical_dir_parent = canonical_dir;
       let mut symbolic_path_parent = symbolic_path;
-      if !canonical_dir_parent.0.pop() {
-        let mut symbolic_path = symbolic_path_parent;
-        symbolic_path.extend(parts.iter().map(Pattern::as_str));
-        return Err(format!(
-          "Globs may not traverse outside of the buildroot: {:?}",
-          symbolic_path,
-        ));
+      if canonical_dir_parent.0.pop() {
+        symbolic_path_parent.push(Path::new(*PARENT_DIR));
+        PathGlob::parse_globs(canonical_dir_parent, symbolic_path_parent, &parts[1..])
+      } else {
+        Ok(vec![])
       }
-      symbolic_path_parent.push(Path::new(*PARENT_DIR));
-      PathGlob::parse_globs(canonical_dir_parent, symbolic_path_parent, &parts[1..])
     } else if parts.len() == 1 {
       // This is the path basename.
       Ok(vec![PathGlob::wildcard(

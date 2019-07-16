@@ -267,10 +267,12 @@ impl Snapshot {
             .iter_mut()
             .map(|directory| directory.take_files().into_iter()),
         )
-        .sorted_by(|a, b| a.name.cmp(&b.name));
+        .sorted_by(|a, b| a.name.cmp(&b.name))
+        .into_iter()
+        .unique_by(|v| v.name.clone());
 
         out_dir.set_files(protobuf::RepeatedField::from_vec(
-          file_nodes.into_iter().dedup().collect(),
+          file_nodes.dedup().collect(),
         ));
         let unique_count = out_dir
           .get_files()
@@ -565,6 +567,7 @@ impl StoreFileByDigest<String> for OneOffStoreFileByDigest {
       .read_file(&file)
       .map_err(move |err| format!("Error reading file {:?}: {:?}", file, err))
       .and_then(move |content| store.store_file_bytes(content.content, true))
+      .or_else(|_e| Ok(EMPTY_DIGEST))
       .to_boxed()
   }
 }

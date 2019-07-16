@@ -307,6 +307,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
           })
           .unwrap_or_else(|| vec![])
       })
+      .or_else(|_e| future::ok(vec![]))
       .and_then(move |link_globs| {
         future::result(PathGlobs::from_globs(link_globs))
           .map_err(|e| Self::mk_error(e.as_str()))
