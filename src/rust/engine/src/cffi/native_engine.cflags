@@ -1,0 +1,1 @@
+-Wno-unused-result -Wsign-compare -Wunreachable-code -DNDEBUG -g -fwrapv -O3 -Wall -Wstrict-prototypes -I/Users/dmcclanahan/tools/pants-v3/build-support/pants_dev_deps.py36.venv/include/python3.6m

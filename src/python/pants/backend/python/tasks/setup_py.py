@@ -407,6 +407,7 @@ class SetupPy(Task):
   @classmethod
   def prepare(cls, options, round_manager):
     round_manager.require_data(PythonInterpreter)
+    round_manager.optional_data('python')  # For codegen.
 
   @classmethod
   def register_options(cls, register):
