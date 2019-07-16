@@ -374,14 +374,12 @@ impl Scheduler {
       let d = display.lock();
       d.worker_count()
     };
+
+    let mut d = display.lock();
     for i in tasks_to_display.len()..worker_count {
-      let mut d = display.lock();
       d.update(i.to_string(), "".to_string());
     }
-    {
-      let mut d = display.lock();
-      d.render();
-    }
+    d.render();
   }
 }
 
