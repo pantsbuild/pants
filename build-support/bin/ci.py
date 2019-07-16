@@ -10,7 +10,7 @@ import tempfile
 from contextlib import contextmanager
 from enum import Enum
 from pathlib import Path
-from typing import Iterator, List, Optional
+from typing import Iterator, List, Optional, Set
 
 from common import banner, die, green, travis_section
 
@@ -350,43 +350,61 @@ def run_python_tests_v1() -> None:
 
 
 def run_python_tests_v2(*, remote_execution_enabled: bool) -> None:
-  known_v2_failures_file = "build-support/unit_test_v2_blacklist.txt"
-  with open(known_v2_failures_file, "r") as f:
-    blacklisted_targets = {line.strip() for line in f.readlines()}
-  with travis_section("PythonTestsV2", "Running Python unit tests with V2 test runner"):
-    check_pants_pex_exists()
-    try:
-      all_targets = subprocess.run([
-        "./pants.pex",
-        "--tag=-integration",
-        "--filter-type=python_tests",
-        "filter",
-        "src/python::",
-        "tests/python::",
-      ], stdout=subprocess.PIPE, encoding="utf-8", check=True).stdout.strip().split("\n")
-      v2_targets = set(all_targets) - blacklisted_targets
-      if not remote_execution_enabled:
-        subprocess.run(
-          ["./pants.pex", "--no-v1", "--v2", "test.pytest"] + sorted(v2_targets) + PYTEST_PASSTHRU_ARGS,
-          check=True
-        )
-      else:
-        with get_remote_execution_oauth_token_path() as oauth_token_path:
-          subprocess.run(
-            [
-              "./pants.pex",
-              "--no-v1",
-              "--v2",
-              "--pants-config-files=pants.remote.ini",
-              f"--remote-oauth-bearer-token-path={oauth_token_path}",
-              "test.pytest"
-            ] + sorted(v2_targets) + PYTEST_PASSTHRU_ARGS,
-            check=True
-          )
-    except subprocess.CalledProcessError:
-      die("Python unit tests failure (V2 test runner)")
+
+  def get_blacklisted_targets(path: str) -> Set[str]:
+    return {line.strip() for line in Path(path).read_text().splitlines()}
+
+  blacklisted_v2_targets = get_blacklisted_targets("build-support/unit_test_v2_blacklist.txt")
+  blacklisted_remote_targets = get_blacklisted_targets("build-support/unit_test_remote_blacklist.txt")
+
+  with travis_section("PythonTestsV2Setup", "Setting up Python unit tests with V2 test runner"):
+    all_targets = subprocess.run([
+      "./pants.pex",
+      "--tag=-integration",
+      "--filter-type=python_tests",
+      "filter",
+      "src/python::",
+      "tests/python::",
+    ], stdout=subprocess.PIPE, encoding="utf-8", check=True).stdout.strip().split("\n")
+    v2_targets = set(all_targets) - blacklisted_v2_targets
+    if remote_execution_enabled:
+      remote_execution_targets = v2_targets - blacklisted_remote_targets
+      local_execution_targets = blacklisted_v2_targets
     else:
-      green("V2 unit tests passed.")
+      remote_execution_targets = set()
+      local_execution_targets = v2_targets
+    check_pants_pex_exists()
+
+  def run_v2_tests(*, targets: Set[str], execution_strategy: str, oauth_token_path: Optional[str] = None) -> None:
+    try:
+      command = (
+        ["./pants.pex", "--no-v1", "--v2", "test.pytest"] + sorted(targets) + PYTEST_PASSTHRU_ARGS
+      )
+      if oauth_token_path is not None:
+        command = (
+          command[:3]
+          + ["--pants-config-files=pants.remote.ini", f"--remote-oauth-bearer-token-path={oauth_token_path}"]
+          + command[3:]
+        )
+      subprocess.run(command, check=True)
+    except subprocess.CalledProcessError:
+      die(f"V2 unit tests failure ({execution_strategy} build execution).")
+    else:
+      green(f"V2 unit tests passed ({execution_strategy} build execution).")
+
+  if remote_execution_enabled:
+    with travis_section(
+      "PythonTestsV2Remote", "Running Python unit tests with V2 test runner and remote build execution"
+    ), get_remote_execution_oauth_token_path() as oauth_token_path:
+      run_v2_tests(
+        targets=remote_execution_targets,
+        execution_strategy="remote",
+        oauth_token_path=oauth_token_path
+      )
+  with travis_section(
+    "PythonTestsV2Local", "Running Python unit tests with V2 test runner and local build execution"
+  ):
+    run_v2_tests(targets=local_execution_targets, execution_strategy="local")
 
 
 def run_rust_tests() -> None:
