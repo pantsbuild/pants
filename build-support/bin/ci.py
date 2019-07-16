@@ -6,9 +6,11 @@ import argparse
 import os
 import platform
 import subprocess
+import tempfile
+from contextlib import contextmanager
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional
+from typing import Iterator, List, Optional
 
 from common import banner, die, green, travis_section
 
@@ -38,7 +40,7 @@ def main() -> None:
   if args.python_tests_v1:
     run_python_tests_v1()
   if args.python_tests_v2:
-    run_python_tests_v2(remote_execution_oauth_token_path=args.remote_execution_oauth_token_path)
+    run_python_tests_v2(remote_execution_enabled=args.remote_execution_enabled)
   if args.rust_tests:
     run_rust_tests()
   if args.jvm_tests:
@@ -76,10 +78,11 @@ def create_parser() -> argparse.ArgumentParser:
     help="Run Pants with this version (defaults to 3.6)."
   )
   parser.add_argument(
-    "--remote-execution-oauth-token-path", default=None,
-    help="Provide the Oauth2 authentication for remote execution. When running locally, log in to "
-         "the GCloud CLI and provide via `<(gcloud auth application-default print-access-token | "
-         "perl -p -e 'chomp if eof)'. If this is left off, then remoting will not be used."
+    "--remote-execution-enabled", action="store_true",
+    help="Pants will use remote build execution remote where possible (for now, the V2 unit tests). "
+         "If running locally, you must be logged in via the `gcloud` CLI to an account with remote "
+         "build execution permissions. If running in CI, the script will ping the secure token "
+         "generator at https://github.com/pantsbuild/rbe-token-server."
   )
   parser.add_argument(
     "--bootstrap", action="store_true", help="Bootstrap a pants.pex from local sources."
@@ -159,6 +162,24 @@ def set_run_from_pex() -> None:
   # In this file we invoke ./pants.pex directly anyway, but some of those invocations will run
   # integration tests that shell out to `./pants`, so we set this env var for those cases.
   os.environ["RUN_PANTS_FROM_PEX"] = "1"
+
+
+@contextmanager
+def get_remote_execution_oauth_token_path() -> Iterator[str]:
+  command = (
+    ["./pants.pex", "--quiet", "run", "build-support/bin:get_rbe_token"]
+    if os.getenv("CI")
+    else ["gcloud", "auth", "application-default", "print-access-token"]
+  )
+  token: str = subprocess.run(
+    command, encoding="utf-8", stdout=subprocess.PIPE, check=True
+  ).stdout
+  if not os.getenv("CI"):
+    token = token.splitlines()[0]
+  with tempfile.NamedTemporaryFile(mode="w+") as tf:
+    tf.write(token)
+    tf.seek(0)
+    yield tf.name
 
 # -------------------------------------------------------------------------
 # Bootstrap pants.pex
@@ -328,7 +349,7 @@ def run_python_tests_v1() -> None:
       green("Contrib unit tests passed.")
 
 
-def run_python_tests_v2(*, remote_execution_oauth_token_path: Optional[str] = None) -> None:
+def run_python_tests_v2(*, remote_execution_enabled: bool) -> None:
   known_v2_failures_file = "build-support/unit_test_v2_blacklist.txt"
   with open(known_v2_failures_file, "r") as f:
     blacklisted_targets = {line.strip() for line in f.readlines()}
@@ -344,16 +365,24 @@ def run_python_tests_v2(*, remote_execution_oauth_token_path: Optional[str] = No
         "tests/python::",
       ], stdout=subprocess.PIPE, encoding="utf-8", check=True).stdout.strip().split("\n")
       v2_targets = set(all_targets) - blacklisted_targets
-      v2_flags = ["--no-v1", "--v2"]
-      if remote_execution_oauth_token_path is not None:
-        v2_flags.extend([
-          "--pants-config-files=pants.remote.ini",
-          f"--remote-oauth-bearer-token-path={remote_execution_oauth_token_path}"
-        ])
-      subprocess.run(
-        ["./pants.pex"] + v2_flags + ["test.pytest"] + sorted(v2_targets) + PYTEST_PASSTHRU_ARGS,
-        check=True
-      )
+      if not remote_execution_enabled:
+        subprocess.run(
+          ["./pants.pex", "--no-v1", "--v2", "test.pytest"] + sorted(v2_targets) + PYTEST_PASSTHRU_ARGS,
+          check=True
+        )
+      else:
+        with get_remote_execution_oauth_token_path() as oauth_token_path:
+          subprocess.run(
+            [
+              "./pants.pex",
+              "--no-v1",
+              "--v2",
+              "--pants-config-files=pants.remote.ini",
+              f"--remote-oauth-bearer-token-path={oauth_token_path}",
+              "test.pytest"
+            ] + sorted(v2_targets) + PYTEST_PASSTHRU_ARGS,
+            check=True
+          )
     except subprocess.CalledProcessError:
       die("Python unit tests failure (V2 test runner)")
     else:
