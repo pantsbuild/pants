@@ -381,11 +381,10 @@ def run_python_tests_v2(*, remote_execution_enabled: bool) -> None:
         ["./pants.pex", "--no-v1", "--v2", "test.pytest"] + sorted(targets) + PYTEST_PASSTHRU_ARGS
       )
       if oauth_token_path is not None:
-        command = (
-          command[:3]
-          + ["--pants-config-files=pants.remote.ini", f"--remote-oauth-bearer-token-path={oauth_token_path}"]
-          + command[3:]
-        )
+        command[3:3] = [
+          "--pants-config-files=pants.remote.ini",
+          f"--remote-oauth-bearer-token-path={oauth_token_path}"
+        ]
       subprocess.run(command, check=True)
     except subprocess.CalledProcessError:
       die(f"V2 unit tests failure ({execution_strategy} build execution).")
