@@ -8,14 +8,6 @@ from pants.base.project_tree import Dir, File, Link, ProjectTree
 from pants.util.dirutil import fast_relpath, safe_walk
 
 
-# Use the built-in version of scandir/walk if possible, otherwise
-# use the scandir module version
-try:
-  from os import scandir
-except ImportError:
-  from scandir import scandir
-
-
 class FileSystemProjectTree(ProjectTree):
   def _join(self, relpath):
     if relpath.startswith(os.sep):
@@ -33,7 +25,7 @@ class FileSystemProjectTree(ProjectTree):
       raise ValueError('scandir for non-canonical path "{}" not supported in {}.'.format(
         relpath, self))
 
-    for entry in scandir(abspath):
+    for entry in os.scandir(abspath):
       # NB: We don't use `DirEntry.stat`, as the scandir docs indicate that that always requires
       # an additional syscall on Unixes.
       entry_path = os.path.normpath(os.path.join(relpath, entry.name))
