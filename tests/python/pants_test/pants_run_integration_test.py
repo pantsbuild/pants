@@ -21,8 +21,9 @@ from pants.base.build_file import BuildFile
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.fs.archive import ZIP
 from pants.subsystem.subsystem import Subsystem
-from pants.util.contextutil import environment_as, pushd, temporary_dir
-from pants.util.dirutil import fast_relpath, safe_mkdir, safe_mkdir_for, safe_open
+from pants.util.contextutil import (environment_as, pushd, temporary_dir, temporary_file,
+                                    temporary_file_path)
+from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_mkdir_for, safe_rmtree
 from pants.util.objects import datatype
 from pants.util.osutil import Pid
 from pants.util.process_handler import SubprocessProcessHandler
@@ -219,6 +220,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     # Some integration tests rely on clean subsystem state (e.g., to set up a DistributionLocator).
     Subsystem.reset()
 
+  @contextmanager
   def temporary_workdir(self, cleanup=True):
     # We can hard-code '.pants.d' here because we know that will always be its value
     # in the pantsbuild/pants repo (e.g., that's what we .gitignore in that repo).
@@ -226,7 +228,17 @@ class PantsRunIntegrationTest(unittest.TestCase):
     # which we don't have a reference to here.
     root = os.path.join(get_buildroot(), '.pants.d', 'tmp')
     safe_mkdir(root)
-    return temporary_dir(root_dir=root, cleanup=cleanup, suffix='.pants.d')
+    # Create a temporary file, and then remove it before yielding. This allows the copy of pants
+    # that will work in the workdir to create it. Finally, if a symlink was created (as with the
+    # pants_physical_workdir_base option), delete the destination in addition to the link.
+    with temporary_file_path(root_dir=root, cleanup=cleanup, suffix='.pants.d') as path:
+      safe_delete(path)
+      yield path
+      if cleanup:
+        if os.path.islink(path):
+          safe_rmtree(os.readlink(path))
+        else:
+          safe_rmtree(path)
 
   def temporary_cachedir(self):
     return temporary_dir(suffix='__CACHEDIR')
@@ -321,10 +333,9 @@ class PantsRunIntegrationTest(unittest.TestCase):
         ini.add_section(section)
         for key, value in section_config.items():
           ini.set(section, key, value)
-      ini_file_name = os.path.join(workdir, 'pants.ini')
-      with safe_open(ini_file_name, mode='w') as fp:
-        ini.write(fp)
-      args.append('--pants-config-files=' + ini_file_name)
+      with temporary_file(cleanup=False, suffix='.pants.ini', binary_mode=False) as ini_file:
+        args.append('--pants-config-files=' + ini_file.name)
+        ini.write(ini_file)
 
     pants_script = os.path.join(build_root or get_buildroot(), self.PANTS_SCRIPT_NAME)
 

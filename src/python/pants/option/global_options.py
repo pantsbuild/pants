@@ -182,6 +182,11 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--pants-workdir', advanced=True, metavar='<dir>',
              default=os.path.join(buildroot, '.pants.d'),
              help='Write intermediate output files to this dir.')
+    register('--pants-physical-workdir-base', advanced=True, metavar='<dir>',
+             default=None,
+             help='When set, a base directory in which to store `--pants-workdir` contents. '
+                  'If this option is a set, the workdir will be created as symlink into a '
+                  'per-workspace subdirectory.')
     register('--pants-supportdir', advanced=True, metavar='<dir>',
              default=os.path.join(buildroot, 'build-support'),
              help='Use support files from this dir.')

@@ -9,6 +9,7 @@ import warnings
 from pants.base.exception_sink import ExceptionSink
 from pants.bin.remote_pants_runner import RemotePantsRunner
 from pants.init.logging import init_rust_logger, setup_logging_to_stderr
+from pants.init.util import init_workdir
 from pants.option.options_bootstrapper import OptionsBootstrapper
 
 
@@ -50,6 +51,9 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     options_bootstrapper = OptionsBootstrapper.create(env=self._env, args=self._args)
     bootstrap_options = options_bootstrapper.bootstrap_options
     global_bootstrap_options = bootstrap_options.for_global_scope()
+
+    # Initialize the workdir early enough to ensure that logging has a destination.
+    init_workdir(global_bootstrap_options)
 
     # We enable Rust logging here,
     # and everything before it will be routed through regular Python logging.

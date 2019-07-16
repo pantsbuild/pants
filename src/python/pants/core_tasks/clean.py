@@ -26,6 +26,9 @@ class Clean(Task):
 
   def execute(self):
     pants_wd = self.get_options().pants_workdir
+    if self.get_options().pants_physical_workdir_base:
+      # If a physical workdir is in use, operate on it rather than on the symlink that points to it.
+      pants_wd = os.readlink(pants_wd)
     pants_trash = os.path.join(pants_wd, "trash")
 
     # Creates, and eventually deletes, trash dir created in .pants_cleanall.
