@@ -301,12 +301,12 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
       trace = assert_single_element(ZipkinHandler.traces.values())
 
-      zinc_task_span = self.find_spans_by_name_and_service_name(trace, 'zinc', 'pants task')
+      zinc_task_span = self.find_spans_by_name_and_service_name(trace, 'zinc', 'pants/task')
       self.assertEqual(len(zinc_task_span), 1)
       zinc_task_span_id = zinc_task_span[0]['id']
 
       compile_workunit_spans = self.find_spans_by_name_and_service_name(
-        trace, 'compile', 'pants workunit'
+        trace, 'compile', 'pants/workunit'
       )
       self.assertEqual(len(compile_workunit_spans), 3)
       self.assertTrue(all(span['parentId'] == zinc_task_span_id for span in compile_workunit_spans))
