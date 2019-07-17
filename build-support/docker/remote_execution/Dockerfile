@@ -1,6 +1,17 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+# To deploy changes to this image, you will need to be logged in the gcloud CLI locally and
+# follow this guide https://cloud.google.com/container-registry/docs/quickstart, which boils down to:
+#
+#   1. Install Docker and the gcloud CLI.
+#   2. $ gcloud auth configure-docker
+#   3. Ensure you have permissions to upload to Google Container Registry for pants-remoting-beta.
+#   4. $ docker build --tag rbe-remote-execution build-support/docker/remote_execution
+#   5. $ docker tag rbe-remote-execution gcr.io/pants-remoting-beta/rbe-remote-execution
+#   6. $ docker push gcr.io/pants-remoting-beta/rbe-remote-execution
+#   7. Update `pants.remote.ini` to use the new SHA printed to the console.
+
 FROM gcr.io/cloud-marketplace/google/rbe-ubuntu16-04@sha256:da0f21c71abce3bbb92c3a0c44c3737f007a82b60f8bd2930abc55fe64fc2729
 
 RUN apt-get update
