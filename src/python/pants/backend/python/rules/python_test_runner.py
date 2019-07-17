@@ -18,7 +18,6 @@ from pants.source.source_root import SourceRootConfig
 from pants.util.strutil import create_path_env_var
 
 
-# TODO: Support resources
 # TODO(7697): Use a dedicated rule for removing the source root prefix, so that this rule
 # does not have to depend on SourceRootConfig.
 @rule(TestResult, [PythonTestsAdaptor, PyTest, PythonSetup, SourceRootConfig, SubprocessEncodingEnvironment])
@@ -63,17 +62,23 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
 
   source_roots = source_root_config.get_source_roots()
 
-  # Gather sources and adjust for the source root.
+  # Gather sources and, for all Python targets, adjust for the source root to ensure Python imports
+  # work properly.
   # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of raising to
   # simplify the hasattr() checks here!
   # TODO(7714): restore the full source name for the stdout of the Pytest run.
-  sources_snapshots_and_source_roots = []
+  non_python_sources = []
+  python_sources_snapshots_and_source_roots = []
   for maybe_source_target in all_targets:
-    if hasattr(maybe_source_target, 'sources'):
-      tgt_snapshot = maybe_source_target.sources.snapshot
+    if not hasattr(maybe_source_target, "sources"):
+      continue
+    tgt_snapshot = maybe_source_target.sources.snapshot
+    if "python" in maybe_source_target.type_alias:
       tgt_source_root = source_roots.find_by_path(maybe_source_target.address.spec_path)
-      sources_snapshots_and_source_roots.append((tgt_snapshot, tgt_source_root))
-  all_sources_digests = yield [
+      python_sources_snapshots_and_source_roots.append((tgt_snapshot, tgt_source_root))
+    else:
+      non_python_sources.append(tgt_snapshot)
+  python_relativized_sources_digests = yield [
     Get(
       Digest,
       DirectoryWithPrefixToStrip(
@@ -82,11 +87,16 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
       )
     )
     for snapshot, source_root
-    in sources_snapshots_and_source_roots
+    in python_sources_snapshots_and_source_roots
   ]
 
   sources_digest = yield Get(
-    Digest, DirectoriesToMerge(directories=tuple(all_sources_digests)),
+    Digest, DirectoriesToMerge(
+      directories=(
+        tuple(python_relativized_sources_digests)
+        + tuple(snapshot.directory_digest for snapshot in non_python_sources)
+      )
+    ),
   )
 
   inits_digest = yield Get(InjectedInitDigest, Digest, sources_digest)
