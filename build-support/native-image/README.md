@@ -53,11 +53,18 @@ The native-image can then be tested out with:
 $ PANTS_COMPILE_ZINC_JVM_OPTIONS='[]' ./pants --zinc-native-image --zinc-version=0.0.15 compile.zinc --execution-strategy=hermetic --no-incremental --cache-ignore test ::
 ```
 
+*Note:* if the native-image build fails, and you see the following in the output:
+``` bash
+Caused by: java.lang.VerifyError: class scala.tools.nsc.Global overrides final method isDeveloper.()Z
+```
+
+Please re-run the script at most two more times. This can occur nondeterministically for some reason right now.
+
 ## Updating the zinc native-image
 
 This is a developing story. Currently, the script will idempotently create or update a directory in the pwd named `generated-reflect-config/` with the results of the reflection tracing. This directory will contain 5 files -- 4 json config files, and one `BUILD` file. This directory can be checked in and updated over time -- subsequent runs of the script will never remove information from previous runs.
 
-[^1]: https://github.com/pantsbuild/pants/tree/master/build-support/native-image/generate-native-image-for-pants-targets.bash
+[^1]: ./generate-native-image-for-pants-targets.bash
 
 [^2]: https://github.com/oracle/graal/tree/master/substratevm
 

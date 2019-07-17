@@ -1,9 +1,9 @@
-# ???
+# Functions to simplify the multiple complex bootstrapping techniques currently necessary to build a
+# zinc native-image.
+# TODO: This will be made automatic in pants via https://github.com/pantsbuild/pants/pull/6893.
 
 # TODO: build off of a more recent graal sha (more recent ones fail to build scalac and more): see
 # https://github.com/oracle/graal/issues/1448.
-
-set -euxo pipefail
 
 # shellcheck source=build-support/native-image/utils.bash
 source "${SCRIPT_DIR}/utils.bash"
@@ -48,8 +48,8 @@ function clone_mx {
   do_within_cache_dir clone_repo_somewhat_idempotently \
                       mx/ \
                       https://github.com/graalvm/mx \
-    && with_pushd "${NATIVE_IMAGE_BUILD_CACHE_DIR}/mx" \
-                  ./mx update
+    && >&2 with_pushd "${NATIVE_IMAGE_BUILD_CACHE_DIR}/mx" \
+           ./mx update
 }
 
 function extract_openjdk_jvmci {
@@ -84,7 +84,16 @@ function fetch_scala_compiler_jars {
 }
 
 function fetch_pants_zinc_wrapper_jars {
-  "$(get_coursier)" fetch org.pantsbuild:zinc-compiler_2.12:0.0.15 \
+  pants_zinc_compiler_version='0.0.15'
+  pants_underlying_zinc_dependency_version='1.1.7'
+  # NB: `native-image` emits a warning on later protobuf versions, which the pantsbuild
+  # `zinc-compiler` artifact will pull in unless we exclude them here and also explicitly add a
+  # protobuf artifact.
+  "$(get_coursier)" fetch \
+                    "org.pantsbuild:zinc-compiler_2.12:${pants_zinc_compiler_version}" \
+                    "org.scala-sbt:compiler-bridge_2.12:${pants_underlying_zinc_dependency_version}" \
+                    --exclude com.google.protobuf:protobuf-java \
+                    com.google.protobuf:protobuf-java:2.5.0 \
     | merge_jars
 }
 
@@ -99,7 +108,7 @@ function create_zinc_image {
        -cp "${scala_compiler_jars}:${pants_zinc_wrapper_jars}" \
        org.pantsbuild.zinc.compiler.Main \
        -H:Name="$expected_output" \
-       -J-Xmx7g -O0 \
+       -J-Xmx7g -O9 \
        --verbose -H:+ReportExceptionStackTraces \
        --no-fallback \
        -Djava.io.tmpdir=/tmp \

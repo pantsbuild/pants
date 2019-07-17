@@ -1,4 +1,5 @@
-# ???
+# Functions used in building zinc native-images.
+# TODO: This will be made automatic in pants via https://github.com/pantsbuild/pants/pull/6893.
 
 export NATIVE_IMAGE_BUILD_CACHE_DIR="${HOME}/.cache/pants/native-image-build-script-cache"
 

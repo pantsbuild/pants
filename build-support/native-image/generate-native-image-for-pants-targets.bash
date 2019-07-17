@@ -1,10 +1,28 @@
 #!/usr/bin/env bash
-# ???
+# Script to generate a platform-specific native-image of the pantsbuild zinc wrapper which works to
+# compile macros, from a pants project.
+
+# Requires `jq` and `go`. `jq` can be downloaded from https://stedolan.github.io/jq/!
+# Works on OSX and Linux -- see the README.md in this directory for more usage info.
+
+# TODO: This will be made automatic in pants via https://github.com/pantsbuild/pants/pull/6893.
 
 set -euxo pipefail
 
-# Requires jq.
+# TODO: Right now, NATIVE_IMAGE_EXTRA_ARGS='-H:IncludeResourceBundles=org.scalactic.ScalacticBundle'
+# is necessary to build any zinc native-image which compiles any code using scalatest. This
+# information should be inferred by the native-image agent, but isn't yet.
 
+# TODO: build off of a more recent graal sha (more recent ones fail to build scalac and more): see
+# https://github.com/oracle/graal/issues/1448.
+
+
+# ARGUMENTS
+
+# $@: Forwarded to a `./pants compile` invocation which runs with reflection tracing enabled.
+# $NATIVE_IMAGE_EXTRA_ARGS: Forwarded to a `native-image` invocation.
+
+
 # CONSTANTS
 
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
@@ -12,13 +30,11 @@ SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 # shellcheck source=build-support/native-image/build-zinc-native-image.bash
 source "${SCRIPT_DIR}/build-zinc-native-image.bash"
 
-GENERATED_CONFIG_DIR="$(pwd)/generated-reflect-config"
+GENERATED_CONFIG_DIR="$(normalize_path "${GENERATED_CONFIG_DIR:-generated-reflect-config}")"
 GENERATED_CONFIG_JSON_FILE="${GENERATED_CONFIG_DIR}/reflect-config.json"
 GENERATED_BUILD_FILE="${GENERATED_CONFIG_DIR}/BUILD"
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../.. && pwd -P)"
-DOWNLOAD_BINARY_SCRIPT="${REPO_ROOT}/build-support/bin/download_binary.sh"
-
+
 # FUNCTIONS
 
 function download_buildozer {
@@ -53,7 +69,10 @@ function run_zinc_compile_with_tracing {
   if [[ ! -f "$GENERATED_CONFIG_JSON_FILE" ]]; then
     rm -rfv "$GENERATED_CONFIG_DIR"
     mkdir -v "$GENERATED_CONFIG_DIR"
+    # TODO: jvm options are ignored from the command line, this is a bug and should be fixed.
     export PANTS_COMPILE_ZINC_JVM_OPTIONS="+['-agentlib:native-image-agent=config-merge-dir=${GENERATED_CONFIG_DIR}']"
+    # NB: --worker-count=1 is because the `config-merge-dir` option to the native-image agent will
+    # clobber symbols from concurrent compiles.
     MODE=debug ./pants -ldebug \
             --no-zinc-native-image \
             --resolve-coursier-capture-snapshots \
@@ -86,7 +105,7 @@ function trim_reflection_config_to_just_macros {
 }
 
 function extract_macro_target_names_from_pants {
-  ./pants classmap "$@" >.tmp-classmap
+  ./pants classmap "$@" >.tmp-classmap || return "$?"
 
   # Get the class names of all the macro usages, then filter down the above `./pants classmap` to
   # find the targets which provide those classes.
@@ -107,7 +126,6 @@ jvm_binary(
   name='generated-native-image-binary',
   main='org.pantsbuild.zinc.compiler.Main',
   dependencies=[
-    "//:zinc",
     $(sed -Ee 's#^(.*)$#"\1",#g')
   ],
 )
@@ -126,9 +144,11 @@ EOF
 function generate_macro_deps_jar {
   extract_macro_target_names_from_pants "$@" \
     | if [[ -f "$GENERATED_BUILD_FILE" ]]; then
+    # If the generated BUILD file exists already, pull down buildozer to idempotently add the
+    # new deps!
     _buildozer="$(download_buildozer)"
     (xargs -t -P1 -L200 printf "//%s "; echo) | while read -r buildozer_deps_flattened; do
-      "$_buildozer" "add deps ${buildozer_deps_flattened}" \
+      "$_buildozer" "add dependencies ${buildozer_deps_flattened}" \
                     //generated-reflect-config:generated-native-image-binary
       rc="$?"
       # Buildozer will return with 3 if no changes were made and everything exited successfully!
@@ -136,9 +156,10 @@ function generate_macro_deps_jar {
         return "$rc"
       fi
     done
-    else
-      template_BUILD_file >"$GENERATED_BUILD_FILE" || return "$?"
-    fi >&2
+  else
+    # Otherwise, generate a BUILD file next to the generated native-image json config.
+    template_BUILD_file >"$GENERATED_BUILD_FILE" || return "$?"
+  fi >&2
   # NB: This "gracefully" handles the case of having no macros to add by having pants succeed
   # without outputting any jar. This is passed to the native-image build classpath, which accepts
   # entries that don't exist.
@@ -150,7 +171,8 @@ function generate_macro_deps_jar {
 
 # actually build the zinc image!!!
 
-### EXE!
+
+### EXECUTING!
 # NB: It's not clear whether it's possible to set the locale in some ubuntu containers, so we
 # simply ignore it here.
 export PANTS_IGNORE_UNRECOGNIZED_ENCODING=1
@@ -169,9 +191,15 @@ readonly MACRO_DEPS_JAR="$(generate_macro_deps_jar "$@")"
 create_zinc_image \
   -H:ConfigurationFileDirectories="$GENERATED_CONFIG_DIR" \
   -cp "$MACRO_DEPS_JAR" \
+  ${NATIVE_IMAGE_EXTRA_ARGS:-} \
   | while read -r image_location; do
   "$image_location" --help
   echo
 done
 
-# Caused by: java.lang.VerifyError: class scala.tools.nsc.Global overrides final method isDeveloper.()Z
+# NB: if the native-image build fails, and you see the following in the output:
+#
+#     Caused by: java.lang.VerifyError: class scala.tools.nsc.Global overrides final method isDeveloper.()Z
+#
+# Please re-run the script at most two more times. This can occur nondeterministically for some
+# reason right now.
