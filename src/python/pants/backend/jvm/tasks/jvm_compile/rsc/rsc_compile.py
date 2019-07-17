@@ -9,6 +9,7 @@ import re
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext  # noqa
 from pants.backend.jvm.subsystems.rsc import Rsc
 from pants.backend.jvm.subsystems.shader import Shader
+from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
@@ -18,6 +19,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.mirrored_target_option_mixin import MirroredTargetOptionMixin
+from pants.cache.cache_setup import CacheSetup
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryToMaterialize, PathGlobs,
                              PathGlobsAndRoot)
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
@@ -112,8 +114,13 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
   @classmethod
   def subsystem_dependencies(cls):
+    dep = CacheSetup.scoped(
+      Zinc.Factory,
+      removal_version='1.19.0.dev0',
+      removal_hint='Cache options for `zinc` should move to `rsc`.'
+    )
     return super().subsystem_dependencies() + (
-      Rsc,
+      Rsc, dep.optionable_cls
     )
 
   @memoized_property
