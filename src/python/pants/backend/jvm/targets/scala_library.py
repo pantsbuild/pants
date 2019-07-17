@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
+from pants.backend.jvm.subsystems.scala_coverage_platform import ScalaCoveragePlatform
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.base.exceptions import TargetDefinitionException
@@ -27,7 +28,7 @@ class ScalaLibrary(ExportableJvmLibrary):
 
   @classmethod
   def subsystems(cls):
-    return super().subsystems() + (ScalaPlatform, )
+    return super().subsystems() + (ScalaPlatform, ScalaCoveragePlatform, )
 
   def __init__(self, java_sources=None, payload=None, **kwargs):
     """
@@ -47,6 +48,8 @@ class ScalaLibrary(ExportableJvmLibrary):
     })
     super().__init__(payload=payload, **kwargs)
 
+    self._scoverage = ScalaCoveragePlatform.global_instance().get_options().enable_scoverage
+
   @classmethod
   def compute_injectable_specs(cls, kwargs=None, payload=None):
     for spec in super().compute_injectable_specs(kwargs, payload):
@@ -65,6 +68,10 @@ class ScalaLibrary(ExportableJvmLibrary):
     for spec in ScalaPlatform.global_instance().injectables_specs_for_key('scala-library'):
       yield spec
 
+    if ScalaCoveragePlatform.global_instance().get_options().enable_scoverage:
+      for spec in ScalaCoveragePlatform.global_instance().injectables_specs_for_key('scoverage'):
+        yield spec
+
   def get_jar_dependencies(self):
     for jar in super().get_jar_dependencies():
       yield jar
@@ -82,3 +89,37 @@ class ScalaLibrary(ExportableJvmLibrary):
         raise TargetDefinitionException(self, 'No such java target: {}'.format(spec))
       targets.append(target)
     return targets
+
+  @property
+  def scalac_plugins(self):
+    """The names of compiler plugins to use when compiling this target with scalac.
+    :return: See constructor.
+    :rtype: list of strings.
+    """
+    if self._scoverage:
+      return ScalaCoveragePlatform.global_instance().get_scalac_plugins(self)
+
+    return self.payload.scalac_plugins
+
+  @property
+  def scalac_plugin_args(self):
+    """Map from scalac plugin name to list of args for that plugin.
+    :return: See constructor.
+    :rtype: map from string to list of strings.
+    """
+    if self._scoverage:
+      return ScalaCoveragePlatform.global_instance().get_scalac_plugin_args(self)
+
+    return self.payload.scalac_plugin_args
+
+  @property
+  def compiler_option_sets(self):
+    """For every element in this list, enable the corresponding flags on compilation
+    of targets.
+    :return: See constructor.
+    :rtype: list
+    """
+    if self._scoverage:
+      return ScalaCoveragePlatform.global_instance().get_compiler_option_sets(self)
+
+    return self.payload.compiler_option_sets
