@@ -366,13 +366,13 @@ def run_python_tests_v2(*, remote_execution_enabled: bool) -> None:
       "src/python::",
       "tests/python::",
     ], stdout=subprocess.PIPE, encoding="utf-8", check=True).stdout.strip().split("\n")
-    v2_targets = set(all_targets) - blacklisted_v2_targets
+    v2_compatible_targets = set(all_targets) - blacklisted_v2_targets
     if remote_execution_enabled:
-      remote_execution_targets = v2_targets - blacklisted_remote_targets
-      local_execution_targets = blacklisted_v2_targets
+      remote_execution_targets = v2_compatible_targets - blacklisted_remote_targets
+      local_execution_targets = blacklisted_remote_targets
     else:
       remote_execution_targets = set()
-      local_execution_targets = v2_targets
+      local_execution_targets = v2_compatible_targets
     check_pants_pex_exists()
 
   def run_v2_tests(*, targets: Set[str], execution_strategy: str, oauth_token_path: Optional[str] = None) -> None:
