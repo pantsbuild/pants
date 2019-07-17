@@ -25,7 +25,6 @@ PyYAML==5.1
 py_zipkin==0.18.3
 requests[security]>=2.20.1
 responses==0.10.4
-scandir==1.2
 setproctitle==1.1.10
 setuptools==40.6.3
 wheel==0.31.1
