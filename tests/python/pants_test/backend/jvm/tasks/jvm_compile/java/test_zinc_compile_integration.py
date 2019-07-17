@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import re
 from unittest import skipIf
 
 from pants.base.build_environment import get_buildroot
@@ -187,10 +188,12 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         )
         self.assert_failure(pants_run)
         self.assertIn('package System2 does not exist', pants_run.stderr_data)
-        self.assertIn(
-          'Failed jobs: compile(testprojects/src/java/org/pantsbuild/testproject/dummies:'
-          'compilation_failure_target)',
-          pants_run.stdout_data)
+        self.assertTrue(
+          re.search(
+            'Compilation failure.*testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target',
+            pants_run.stdout_data
+          )
+        )
 
   def test_failed_compile_with_subprocess(self):
     with temporary_dir() as cache_dir:

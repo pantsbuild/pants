@@ -75,7 +75,7 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
   _PACKAGE_PATH_PREFIX = os.sep + os.path.join('classes', 'org', 'pantsbuild')
 
   def find_classfile(self, workdir, filename):
-    for root, dirs, files in os.walk(os.path.join(workdir, 'compile', 'zinc')):
+    for root, dirs, files in os.walk(os.path.join(workdir, 'compile', 'rsc')):
       for f in files:
         candidate = os.path.join(root, f)
         if candidate.endswith(os.path.join(self._PACKAGE_PATH_PREFIX, filename)):

@@ -31,6 +31,7 @@ class RscCompileIntegration(BaseCompileIT, AbstractTestGenerator):
               'cache.compile.rsc': {'write_to': [cache_dir]},
               'jvm-platform': {'compiler': 'rsc'},
               'compile.rsc': {
+                'workflow': 'rsc-and-zinc',
                 'execution_strategy': execution_strategy.value,
                 'worker_count': worker_count,
               },

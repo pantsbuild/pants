@@ -207,7 +207,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         run_two = self.run_compile(con_spec, config, new_workdir)
         self.assertTrue(
             re.search(
-              "\[zinc\][^[]*\[cache\][^[]*Using cached artifacts for 2 targets.",
+              "Using cached artifacts for 2 targets.",
               run_two.stdout_data),
             run_two.stdout_data)
 
@@ -223,7 +223,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         run_three = self.run_compile(con_spec, config, new_workdir)
         self.assertTrue(
             re.search(
-              r"/org/pantsbuild/consumer:consumer\)[^[]*\[compile\][^[]*\[zinc\]\W*\[info\] Compile success",
+              r"consumer[\s\S]*Compile success",
               run_three.stdout_data),
             run_three.stdout_data)
 

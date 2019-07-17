@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import re
 import shutil
 
 from pants.base.build_environment import get_buildroot
@@ -56,9 +57,12 @@ class DepExportsIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(['compile', '--lint-scalafmt-skip',
                                 'testprojects/tests/scala/org/pantsbuild/testproject/non_exports:C'])
     self.assert_failure(pants_run)
-    self.assertIn('FAILURE: Compilation failure: Failed jobs: '
-                  'compile(testprojects/tests/scala/org/pantsbuild/testproject/non_exports:C)',
-                  pants_run.stdout_data)
+    self.assertTrue(
+      re.search(
+        'Compilation failure.*testprojects/tests/scala/org/pantsbuild/testproject/non_exports:C',
+        pants_run.stdout_data
+      )
+    )
 
 
 class DepExportsThriftTargets(PantsRunIntegrationTest):

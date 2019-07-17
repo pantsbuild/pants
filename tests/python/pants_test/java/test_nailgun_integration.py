@@ -33,7 +33,7 @@ class TestNailgunIntegration(PantsRunIntegrationTest):
               'compile.zinc': {'nailgun_timeout_seconds': '0.00002'}}
     )
     self.assert_failure(pants_run)
-    self.assertRegex(pants_run.stdout_data, """\
-compile\\(examples/src/java/org/pantsbuild/example/hello/greet:greet\\) failed: \
-Problem launching via <no nailgun connection> command org\\.pantsbuild\\.zinc\\.compiler\\.Main .*: \
-Failed to read nailgun output after 2e\-05 seconds!""")
+    self.assertRegex(
+      pants_run.stdout_data,
+      """\<no nailgun connection>.* Failed to read nailgun output"""
+    )
