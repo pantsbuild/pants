@@ -59,7 +59,6 @@ impl Core {
     types: Types,
     build_root: PathBuf,
     ignore_patterns: &[String],
-    work_dir: PathBuf,
     local_store_dir: PathBuf,
     remote_execution: bool,
     remote_store_servers: Vec<String>,

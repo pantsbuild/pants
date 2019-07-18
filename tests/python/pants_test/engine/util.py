@@ -92,7 +92,6 @@ def create_scheduler(rules, union_rules=None, validate=True, native=None):
     native,
     FileSystemProjectTree(os.getcwd()),
     './.pants.d',
-    safe_mkdtemp(),
     rules,
     union_rules,
     execution_options=DEFAULT_EXECUTION_OPTIONS,
