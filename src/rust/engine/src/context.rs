@@ -142,7 +142,7 @@ impl Core {
         Box::new(process_execution::local::CommandRunner::new(
           store.clone(),
           executor.clone(),
-          work_dir.clone(),
+          std::env::temp_dir(),
           process_execution_cleanup_local_dirs,
         )),
         process_execution_local_parallelism,
