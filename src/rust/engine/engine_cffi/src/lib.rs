@@ -806,6 +806,7 @@ pub extern "C" fn merge_directories(
 #[no_mangle]
 pub extern "C" fn materialize_directories(
   scheduler_ptr: *mut Scheduler,
+  session_ptr: *mut Session,
   directories_paths_and_digests_value: Handle,
 ) -> PyResult {
   let values = externs::project_multi(&directories_paths_and_digests_value.into(), "dependencies");
@@ -826,13 +827,18 @@ pub extern "C" fn materialize_directories(
       return e.into();
     }
   };
-
+  let workunit_store = with_session(session_ptr, |session| session.workunit_store());
   with_scheduler(scheduler_ptr, |scheduler| {
     scheduler.core.executor.block_on(
       futures::future::join_all(
         dir_and_digests
           .into_iter()
-          .map(|(dir, digest)| scheduler.core.store().materialize_directory(dir, digest))
+          .map(|(dir, digest)| {
+            scheduler
+              .core
+              .store()
+              .materialize_directory(dir, digest, workunit_store.clone())
+          })
           .collect::<Vec<_>>(),
       )
       .map(|_| ()),

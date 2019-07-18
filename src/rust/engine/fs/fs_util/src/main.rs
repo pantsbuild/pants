@@ -410,7 +410,11 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           .expect("size_bytes must be a non-negative number");
         let digest = Digest(fingerprint, size_bytes);
         runtime
-          .block_on(store.materialize_directory(destination, digest))
+          .block_on(store.materialize_directory(
+            destination,
+            digest,
+            workunit_store::WorkUnitStore::new(),
+          ))
           .map(|metadata| {
             eprintln!("{}", serde_json::to_string_pretty(&metadata).unwrap());
           })

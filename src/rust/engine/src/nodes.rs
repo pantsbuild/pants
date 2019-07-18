@@ -1129,7 +1129,7 @@ impl Node for NodeKey {
           start_timestamp,
           end_timestamp,
           span_id,
-          //          TODO: set parent_id with the proper value, issue #7969
+          // TODO: set parent_id with the proper value, issue #7969
           parent_id: None,
         };
         context2.session.workunit_store().add_workunit(workunit)

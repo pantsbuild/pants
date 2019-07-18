@@ -330,7 +330,7 @@ fn main() {
 
   if let Some(output) = args.value_of("materialize-output-to").map(PathBuf::from) {
     runtime
-      .block_on(store.materialize_directory(output, result.output_directory))
+      .block_on(store.materialize_directory(output, result.output_directory, WorkUnitStore::new()))
       .unwrap();
   }
 

@@ -22,3 +22,4 @@ serde_derive = "1.0"
 store = { path = "../store" }
 task_executor = { path = "../../task_executor" }
 tokio = "0.1"
+workunit_store = { path = "../../workunit_store" }

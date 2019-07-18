@@ -29,6 +29,8 @@ task_executor = { path = "../../task_executor" }
 tempfile = "3"
 tokio-threadpool = "0.1.12"
 uuid = { version = "0.7.1", features = ["v4"] }
+workunit_store = {path = "../../workunit_store" }
+time = "0.1.42"
 
 [dev-dependencies]
 maplit = "*"

@@ -46,6 +46,8 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
+use time::Timespec;
+use workunit_store::{WorkUnit, WorkUnitStore};
 
 use parking_lot::Mutex;
 
@@ -99,6 +101,20 @@ impl TimeSpan {
       start,
       duration: now - start,
     }
+  }
+
+  fn timespec_from_f64_secs(seconds: f64) -> Timespec {
+    let secs = seconds as i64;
+    let subsec_nanos = ((seconds - secs as f64) * Self::NANOSECS_IN_SEC) as i32;
+    Timespec::new(secs, subsec_nanos)
+  }
+
+  pub fn start_timestamp(self) -> Timespec {
+    Self::timespec_from_f64_secs(self.start)
+  }
+
+  pub fn end_timestamp(self) -> Timespec {
+    Self::timespec_from_f64_secs(self.start + self.duration)
   }
 }
 
@@ -614,6 +630,7 @@ impl Store {
     &self,
     destination: PathBuf,
     digest: Digest,
+    workunit_store: WorkUnitStore,
   ) -> BoxFuture<DirectoryMaterializeMetadata, String> {
     let root = Arc::new(Mutex::new(None));
     self
@@ -621,6 +638,7 @@ impl Store {
         destination,
         RootOrParentMetadataBuilder::Root(root.clone()),
         digest,
+        workunit_store,
       )
       .map(|()| Arc::try_unwrap(root).unwrap().into_inner().unwrap().build())
       .to_boxed()
@@ -631,6 +649,7 @@ impl Store {
     destination: PathBuf,
     root_or_parent_metadata: RootOrParentMetadataBuilder,
     digest: Digest,
+    workunit_store: WorkUnitStore,
   ) -> BoxFuture<(), String> {
     if let RootOrParentMetadataBuilder::Root(..) = root_or_parent_metadata {
       try_future!(fs::safe_create_dir_all(&destination));
@@ -677,7 +696,12 @@ impl Store {
             let child_files = child_files.clone();
             let name = file_node.get_name().to_owned();
             store
-              .materialize_file(path, digest, file_node.is_executable)
+              .materialize_file(
+                path,
+                digest,
+                file_node.is_executable,
+                workunit_store.clone(),
+              )
               .map(move |metadata| child_files.lock().insert(name, metadata))
               .to_boxed()
           })
@@ -696,7 +720,7 @@ impl Store {
               child_files.clone(),
             ));
 
-            store.materialize_directory_helper(path, builder, digest)
+            store.materialize_directory_helper(path, builder, digest, workunit_store.clone())
           })
           .collect::<Vec<_>>();
         future::join_all(file_futures)
@@ -711,7 +735,13 @@ impl Store {
     destination: PathBuf,
     digest: Digest,
     is_executable: bool,
+    workunit_store: WorkUnitStore,
   ) -> BoxFuture<LoadMetadata, String> {
+    let workunit_name = format!(
+      "materialize_file({:?}, {:?})",
+      destination.as_path(),
+      digest
+    );
     self
       .load_file_bytes_with(digest, move |bytes| {
         OpenOptions::new()
@@ -732,6 +762,18 @@ impl Store {
         Some((Ok(()), metadata)) => Ok(metadata),
         Some((Err(e), _metadata)) => Err(e),
         None => Err(format!("File with digest {:?} not found", digest)),
+      })
+      .inspect(move |metadata: &LoadMetadata| {
+        if let LoadMetadata::Remote(time_span) = metadata {
+          let workunit = WorkUnit {
+            name: workunit_name,
+            start_timestamp: time_span.start_timestamp(),
+            end_timestamp: time_span.end_timestamp(),
+            span_id: workunit_store::generate_random_64bit_string(),
+            parent_id: workunit_store::get_parent_id(),
+          };
+          workunit_store.add_workunit(workunit)
+        }
       })
       .to_boxed()
   }
@@ -2421,6 +2463,8 @@ mod tests {
   use std::time::Duration;
   use tempfile::TempDir;
   use testutil::data::{TestData, TestDirectory};
+  use workunit_store::WorkUnitStore;
+
   impl LoadMetadata {
     fn is_remote(&self) -> bool {
       match self {
@@ -3301,8 +3345,13 @@ mod tests {
 
     let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
-    block_on(store.materialize_file(file.clone(), TestData::roland().digest(), false))
-      .expect_err("Want unknown digest error");
+    block_on(store.materialize_file(
+      file.clone(),
+      TestData::roland().digest(),
+      false,
+      WorkUnitStore::new(),
+    ))
+    .expect_err("Want unknown digest error");
   }
 
   #[test]
@@ -3315,7 +3364,7 @@ mod tests {
     let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
     block_on(store.store_file_bytes(testdata.bytes(), false)).expect("Error saving bytes");
-    block_on(store.materialize_file(file.clone(), testdata.digest(), false))
+    block_on(store.materialize_file(file.clone(), testdata.digest(), false, WorkUnitStore::new()))
       .expect("Error materializing file");
     assert_eq!(file_contents(&file), testdata.bytes());
     assert!(!is_executable(&file));
@@ -3331,7 +3380,7 @@ mod tests {
     let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
     block_on(store.store_file_bytes(testdata.bytes(), false)).expect("Error saving bytes");
-    block_on(store.materialize_file(file.clone(), testdata.digest(), true))
+    block_on(store.materialize_file(file.clone(), testdata.digest(), true, WorkUnitStore::new()))
       .expect("Error materializing file");
     assert_eq!(file_contents(&file), testdata.bytes());
     assert!(is_executable(&file));
@@ -3346,6 +3395,7 @@ mod tests {
     block_on(store.materialize_directory(
       materialize_dir.path().to_owned(),
       TestDirectory::recursive().digest(),
+      WorkUnitStore::new(),
     ))
     .expect_err("Want unknown digest error");
   }
@@ -3371,6 +3421,7 @@ mod tests {
     block_on(store.materialize_directory(
       materialize_dir.path().to_owned(),
       recursive_testdir.digest(),
+      WorkUnitStore::new(),
     ))
     .expect("Error materializing");
 
@@ -3402,8 +3453,12 @@ mod tests {
     block_on(store.store_file_bytes(catnip.bytes(), false))
       .expect("Error saving catnip file bytes");
 
-    block_on(store.materialize_directory(materialize_dir.path().to_owned(), testdir.digest()))
-      .expect("Error materializing");
+    block_on(store.materialize_directory(
+      materialize_dir.path().to_owned(),
+      testdir.digest(),
+      WorkUnitStore::new(),
+    ))
+    .expect("Error materializing");
 
     assert_eq!(list_dir(materialize_dir.path()), vec!["feed", "food"]);
     assert_eq!(
@@ -3664,7 +3719,11 @@ mod tests {
 
     let mat_dir = tempfile::tempdir().unwrap();
     let metadata = runtime
-      .block_on(store.materialize_directory(mat_dir.path().to_owned(), outer_dir.digest()))
+      .block_on(store.materialize_directory(
+        mat_dir.path().to_owned(),
+        outer_dir.digest(),
+        WorkUnitStore::new(),
+      ))
       .unwrap();
 
     let local = LoadMetadata::Local;
@@ -3716,7 +3775,11 @@ mod tests {
 
     let mat_dir = tempfile::tempdir().unwrap();
     let metadata = runtime
-      .block_on(store.materialize_directory(mat_dir.path().to_owned(), outer_dir.digest()))
+      .block_on(store.materialize_directory(
+        mat_dir.path().to_owned(),
+        outer_dir.digest(),
+        WorkUnitStore::new(),
+      ))
       .unwrap();
 
     assert!(metadata
