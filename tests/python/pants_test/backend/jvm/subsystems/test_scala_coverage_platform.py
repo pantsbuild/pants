@@ -1,6 +1,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
   unicode_literals, with_statement)
 
+import os
 from pants_test.test_base import TestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
 from pants.backend.jvm.subsystems.scala_coverage_platform import ScalaCoveragePlatform
@@ -15,6 +16,7 @@ from textwrap import dedent
 
 class ScalaCoveragePlatformTest(TestBase):
   scoverage_path = '//:scoverage'
+  blacklist_file_path = 'my/file/new_blacklist_scoverage_test'
 
   def setup_scala_coverage_platform(self):
     options = {
@@ -56,10 +58,6 @@ class ScalaCoveragePlatformTest(TestBase):
       JarLibrary,
       jars=[JarDependency('org.scala-lang', 'scala-library', '2.10.5')])
 
-    self.make_target('//:scoverage',
-      JarLibrary,
-      jars=[JarDependency('com.twitter.scoverage', 'scalac-scoverage-plugin', '1.0.1-twitter'),
-        JarDependency('com.twitter.scoverage', 'scalac-scoverage-runtime', '1.0.1-twitter')])
 
 
   # ==========> TESTS <=============
@@ -141,8 +139,13 @@ class ScalaCoveragePlatformTest(TestBase):
     self.setup_scala_coverage_platform()
     ScalaCoveragePlatform.global_instance().get_options().enable_scoverage = True
 
-    blacklist_file = open("new_blacklist_scoverage", "a+")
-    blacklist_file.write("a/scala:blacked")
+    tmp = self.create_file(
+      relpath=self.blacklist_file_path,
+      contents=dedent("""
+      a/scala:blacked
+      """)
+    )
+    ScalaCoveragePlatform.global_instance().get_options().blacklist_file = tmp
 
     self.create_file(
       relpath='a/scala/pass.scala',
@@ -158,4 +161,5 @@ class ScalaCoveragePlatformTest(TestBase):
     scala_target = self.make_target('a/scala:blacked', ScalaLibrary, sources=['pass.scala'])
 
     self.assertNotIn('scoverage', scala_target.scalac_plugins)
+
 

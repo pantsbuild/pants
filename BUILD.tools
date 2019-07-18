@@ -27,12 +27,6 @@ jar_library(name = 'scrooge-linter',
               jar(org='com.twitter', name='scrooge-linter_2.11', rev=SCROOGE_REV)
             ])
 
-jar_library(name = 'scoverage',
-  jars = [
-    scala_jar(org = 'com.twitter.scoverage', name = 'scalac-scoverage-plugin', rev = '1.0.1-twitter' ),
-    scala_jar(org = 'com.twitter.scoverage', name = 'scalac-scoverage-runtime', rev = '1.0.1-twitter' ),
-  ])
-
 
 # Google doesn't publish Kythe jars (yet?).  So we publish them to a custom repo
 # (https://github.com/toolchainlabs/binhost) for now.  See build-support/ivy/ivysettings.xml
