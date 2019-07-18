@@ -35,6 +35,7 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/ivy',
     'src/python/pants/java/jar',
+    'src/python/pants/util:dirutil',
   ]
 )
 
