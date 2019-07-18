@@ -115,9 +115,10 @@ class DaemonPantsRunner:
     try:
       # N.B. This will redirect stdio in the daemon's context to the nailgun session.
       with cls.nailgunned_stdio(maybe_shutdown_socket, env, handle_stdin=False) as finalizer:
+        print('123')
         options, _, options_bootstrapper = LocalPantsRunner.parse_options(args, env)
         subprocess_dir = options.for_global_scope().pants_subprocessdir
-        graph_helper, target_roots, exit_code = scheduler_service.prefork(options, options_bootstrapper)
+        graph_helper, target_roots, exit_code = scheduler_service.prepare_graph(options, options_bootstrapper)
         finalizer()
     except Exception:
       graph_helper = None
@@ -126,7 +127,7 @@ class DaemonPantsRunner:
       # TODO: this should no longer be necessary, remove the creation of subprocess_dir
       subprocess_dir = os.path.join(get_buildroot(), '.pids')
       exit_code = 1
-      # TODO This used to raise the _GracefulTerminationException, and maybe it should again, or notify in some way that the prefork has failed.
+      # TODO This used to raise the _GracefulTerminationException, and maybe it should again, or notify in some way that the prepare_graph has failed.
 
     return cls(
       maybe_shutdown_socket,
