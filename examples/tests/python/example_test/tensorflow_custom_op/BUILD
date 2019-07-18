@@ -7,3 +7,11 @@ python_tests(
     'examples/src/python/example/tensorflow_custom_op',
   ],
 )
+
+python_tests(
+  name='gpu',
+  dependencies=[
+    'examples/3rdparty/python:tensorflow-gpu',
+    'examples/src/python/example/tensorflow_custom_op_gpu',
+  ],
+)

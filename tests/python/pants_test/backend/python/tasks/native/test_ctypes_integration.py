@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 from functools import wraps
+from textwrap import dedent
 from unittest import skipIf
 from zipfile import ZipFile
 
@@ -58,6 +59,8 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
   _binary_target_with_compiler_option_sets = (
     'testprojects/src/python/python_distribution/ctypes_with_extra_compiler_flags:bin'
   )
+  _tensorflow_cpu_target = 'examples/src/python/example/tensorflow_custom_op:zero-out-custom-op-hello-world'
+  _tensorflow_gpu_target = 'examples/src/python/example/tensorflow_custom_op:zero-out-custom-op-hello-world-gpu'
 
   @skipIf(_IS_OSX and _PYTHON_MAJOR_MINOR == (2, 7),
           reason='Broken as described in https://github.com/pantsbuild/pants/issues/7763.')
@@ -267,3 +270,55 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     })
     self.assert_success(pants_run)
     self.assertIn('x=3, f(x)=12600000', pants_run.stdout_data)
+
+  _zero_out_module_contents = dedent("""\
+    op lib: ['LIB_HANDLE', 'OP_LIST', '_InitOpDefLibrary', '__builtins__', '__doc__', '__loader__', '__name__', '__package__', '__spec__', '_collections', '_common_shapes', '_context', '_core', '_dispatch', '_dtypes', '_errors', '_execute', '_op_def_lib', '_op_def_library', '_op_def_pb2', '_op_def_registry', '_ops', '_pywrap_tensorflow', '_six', '_tensor_shape', 'deprecated_endpoints', 'tf_export', 'zero_out', 'zero_out_eager_fallback']
+    """)
+
+  def _assert_tensorflow_binary_creation(self, target):
+    with temporary_dir() as tmp_dir:
+      self.do_command(
+        'binary',
+        target,
+        config={
+          'native-build-step': {
+            'toolchain_variant': 'llvm',
+          },
+          GLOBAL_SCOPE_CONFIG_SECTION: {
+            'pants_distdir': tmp_dir,
+          },
+        })
+      output_file = os.path.join(tmp_dir, 'zero-out-custom-op-hello-world.pex')
+      return output_file
+
+  def _assert_tensorflow_run(self, target):
+    stdout = self.do_command(
+      '-q',
+      'run',
+      target,
+      config={
+        'native-build-step': {
+          'toolchain_variant': 'llvm',
+        },
+      }).stdout_data
+    self.assertEqual(stdout.decode('utf-8'), self._zero_out_module_contents)
+
+  def test_tensorflow_cpu_binary_and_run(self):
+    pex_file = self._assert_tensorflow_binary_creation(self._tensorflow_cpu_target)
+    self.assertEqual(
+        subprocess.run([pex_file], check=True, capture_output=True).stdout,
+        self._zero_out_module_contents)
+
+    self._assert_tensorflow_run(self._tensorflow_cpu_target)
+
+  def test_tensorflow_gpu_python_binary(self):
+    # tensorflow-gpu is not released for OSX, and this should fail.
+    if Platform.current == Platform.darwin:
+      return
+
+    pex_file = self._assert_tensorflow_binary_creation(self._tensorflow_gpu_target)
+    self.assertEqual(
+      subprocess.run([pex_file], check=True, capture_output=True).stdout,
+      self._zero_out_module_contents)
+
+    self._assert_tensorflow_run(self._tensorflow_gpu_target)

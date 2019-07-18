@@ -15,3 +15,7 @@ Note that due to a current limitation (see [#6848](https://github.com/pantsbuild
 ```
 
 or by setting the toolchain variant [option in `pants.ini`](https://www.pantsbuild.org/options.html).
+
+# GPU support
+
+The targets in this directory have `-gpu` versions, depending on `tensorflow-gpu` instead. Note that `tensorflow-gpu` is only released for Linux and those targets will fail on OSX.

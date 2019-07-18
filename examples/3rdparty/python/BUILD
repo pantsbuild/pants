@@ -25,3 +25,25 @@ unpacked_whls(
   ],
   within_data_subdir='purelib/tensorflow',
 )
+
+remote_sources(
+  name='tensorflow-framework-gpu',
+  dest=packaged_native_library,
+  sources_target=':tensorflow-native-libs-gpu',
+  args=dict(
+    include_relpath='include',
+    lib_relpath='',
+    native_lib_names=['tensorflow_framework'],
+  ),
+)
+
+unpacked_whls(
+  name='tensorflow-native-libs-gpu',
+  libraries=[':tensorflow-gpu'],
+  module_name='tensorflow',
+  include_patterns=[
+    'include/**/*',
+    './*.so',
+  ],
+  within_data_subdir='purelib/tensorflow',
+)
