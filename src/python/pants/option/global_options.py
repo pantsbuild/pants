@@ -191,10 +191,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              default=os.path.join(buildroot, 'build-support'),
              help='Use support files from this dir.')
     register('--pants-distdir', advanced=True, metavar='<dir>',
-             default=default_distdir,
-             help='Write end-product artifacts to this dir. If you modify this path, you '
-                  'should also update --build-ignore and --pants-ignore to include the '
-                  'custom dist dir path as well.')
+             default=os.path.join(buildroot, 'dist'),
+             help='Write end-product artifacts to this dir.')
     register('--pants-subprocessdir', advanced=True, default=os.path.join(buildroot, '.pids'),
              help='The directory to use for tracking subprocess metadata, if any. This should '
                   'live outside of the dir used by `--pants-workdir` to allow for tracking '
@@ -218,16 +216,17 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Verify that all config file values correspond to known options.')
 
     register('--build-ignore', advanced=True, type=list,
-             default=['.*/', default_rel_distdir, 'bower_components/',
+             default=['.*/', 'bower_components/',
                       'node_modules/', '*.egg-info/'],
              help='Paths to ignore when identifying BUILD files. '
                   'This does not affect any other filesystem operations. '
                   'Patterns use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')
     register('--pants-ignore', advanced=True, type=list,
-             default=['.*/', default_rel_distdir],
+             default=['.*/'],
              help='Paths to ignore for all filesystem operations performed by pants '
                   '(e.g. BUILD file scanning, glob matching, etc). '
-                  'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore).')
+                  'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). '
+                  'The `--pants-distdir` and `--pants-workdir` locations are inherently ignored.')
     register('--glob-expansion-failure', advanced=True,
              default=GlobMatchErrorBehavior.warn, type=GlobMatchErrorBehavior,
              help="Raise an exception if any targets declaring source files "
@@ -318,7 +317,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--pantsd-log-dir', advanced=True, default=None,
              help='The directory to log pantsd output to.')
     register('--pantsd-invalidation-globs', advanced=True, type=list, default=[],
-             help='Filesystem events matching any of these globs will trigger a daemon restart.')
+             help='Filesystem events matching any of these globs will trigger a daemon restart. '
+                  'The `--pythonpath` and `--pants-config-files` are inherently invalidated.')
 
     # Watchman options.
     register('--watchman-version', advanced=True, default='4.9.0-pants1', help='Watchman version.')

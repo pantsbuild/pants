@@ -34,7 +34,7 @@ from pants.engine.parser import SymbolTable
 from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import Scheduler
 from pants.engine.selectors import Params
-from pants.init.options_initializer import BuildConfigInitializer
+from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.global_options import (DEFAULT_EXECUTION_OPTIONS, ExecutionOptions,
                                          GlobMatchErrorBehavior)
 from pants.util.objects import datatype
@@ -238,13 +238,15 @@ class EngineInitializer:
   @staticmethod
   def setup_legacy_graph(native, options_bootstrapper, build_configuration):
     """Construct and return the components necessary for LegacyBuildGraph construction."""
+    build_root = get_buildroot()
     bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
     return EngineInitializer.setup_legacy_graph_extended(
-      bootstrap_options.pants_ignore,
+      OptionsInitializer.compute_pants_ignore(build_root, bootstrap_options),
       bootstrap_options.local_store_dir,
       bootstrap_options.build_file_imports,
       options_bootstrapper,
       build_configuration,
+      build_root=build_root,
       native=native,
       glob_match_error_behavior=bootstrap_options.glob_expansion_failure,
       build_ignore_patterns=bootstrap_options.build_ignore,
