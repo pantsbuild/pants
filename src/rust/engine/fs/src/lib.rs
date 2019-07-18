@@ -541,13 +541,19 @@ pub struct GlobWithSource {
 }
 
 ///
-/// All Stats consumed or return by this type are relative to the root.
+/// All Stats consumed or returned by this type are relative to the root.
+///
+/// If `symlink_aware` is true (as it is by default), `scandir` will produce `Link` entries so that
+/// a consumer can explicitly track their expansion. Otherwise, it will allow the operating system
+/// to expand the link to its underlying type without regard to the links traversed, and `scandir`
+/// will produce only `Dir` and `File` entries.
 ///
 #[derive(Clone)]
 pub struct PosixFS {
   root: Dir,
   ignore: Arc<GitignoreStyleExcludes>,
   executor: task_executor::Executor,
+  symlink_aware: bool,
 }
 
 impl PosixFS {
@@ -555,6 +561,15 @@ impl PosixFS {
     root: P,
     ignore_patterns: &[String],
     executor: task_executor::Executor,
+  ) -> Result<PosixFS, String> {
+    Self::new_symlink_aware(root, ignore_patterns, executor, true)
+  }
+
+  pub fn new_symlink_aware<P: AsRef<Path>>(
+    root: P,
+    ignore_patterns: &[String],
+    executor: task_executor::Executor,
+    symlink_aware: bool,
   ) -> Result<PosixFS, String> {
     let root: &Path = root.as_ref();
     let canonical_root = root
@@ -583,6 +598,7 @@ impl PosixFS {
       root: canonical_root,
       ignore: ignore,
       executor: executor,
+      symlink_aware: symlink_aware,
     })
   }
 
@@ -605,10 +621,17 @@ impl PosixFS {
       .read_dir()?
       .map(|readdir| {
         let dir_entry = readdir?;
+        let metadata = if self.symlink_aware {
+          // Use the dir_entry metadata, which is symlink aware.
+          dir_entry.metadata()?
+        } else {
+          // Use an independent stat call to get metadata, which is symlink oblivious.
+          std::fs::metadata(dir_abs.join(dir_entry.file_name()))?
+        };
         PosixFS::stat_internal(
           dir_relative_to_root.0.join(dir_entry.file_name()),
           &root,
-          &std::fs::symlink_metadata(dir_abs.join(dir_entry.file_name()))?,
+          &metadata,
         )
       })
       .filter(|s| match s {
