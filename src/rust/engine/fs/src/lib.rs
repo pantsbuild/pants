@@ -621,17 +621,20 @@ impl PosixFS {
       .read_dir()?
       .map(|readdir| {
         let dir_entry = readdir?;
-        let metadata = if self.symlink_aware {
-          // Use the dir_entry metadata, which is symlink aware.
-          dir_entry.metadata()?
-        } else {
-          // Use an independent stat call to get metadata, which is symlink oblivious.
-          std::fs::metadata(dir_abs.join(dir_entry.file_name()))?
-        };
+        let (file_type, compute_metadata): (_, Box<FnOnce() -> Result<_, _>>) =
+          if self.symlink_aware {
+            // Use the dir_entry metadata, which is symlink aware.
+            (dir_entry.file_type()?, Box::new(|| dir_entry.metadata()))
+          } else {
+            // Use an independent stat call to get metadata, which is symlink oblivious.
+            let metadata = std::fs::metadata(dir_abs.join(dir_entry.file_name()))?;
+            (metadata.file_type(), Box::new(|| Ok(metadata)))
+          };
         PosixFS::stat_internal(
-          dir_relative_to_root.0.join(dir_entry.file_name()),
           &root,
-          &metadata,
+          dir_relative_to_root.0.join(dir_entry.file_name()),
+          file_type,
+          compute_metadata,
         )
       })
       .filter(|s| match s {
@@ -698,11 +701,20 @@ impl PosixFS {
   ///
   /// Makes a Stat for path_for_stat relative to absolute_path_to_root.
   ///
-  fn stat_internal(
-    path_for_stat: PathBuf,
+  /// This method takes both a `FileType` and a getter for `Metadata` because on Unixes,
+  /// directory walks cheaply return the `FileType` without extra syscalls, but other
+  /// metadata requires additional syscall(s) to compute. We can avoid those calls for
+  /// Dirs and Links.
+  ///
+  fn stat_internal<F>(
     absolute_path_to_root: &Path,
-    metadata: &std::fs::Metadata,
-  ) -> Result<Stat, io::Error> {
+    path_for_stat: PathBuf,
+    file_type: std::fs::FileType,
+    compute_metadata: F,
+  ) -> Result<Stat, io::Error>
+  where
+    F: FnOnce() -> Result<std::fs::Metadata, io::Error>,
+  {
     if !path_for_stat.is_relative() {
       return Err(io::Error::new(
         io::ErrorKind::InvalidInput,
@@ -722,11 +734,10 @@ impl PosixFS {
         ),
       ));
     }
-    let file_type = metadata.file_type();
     if file_type.is_symlink() {
       Ok(Stat::Link(Link(path_for_stat)))
     } else if file_type.is_file() {
-      let is_executable = metadata.permissions().mode() & 0o100 == 0o100;
+      let is_executable = compute_metadata()?.permissions().mode() & 0o100 == 0o100;
       Ok(Stat::File(File {
         path: path_for_stat,
         is_executable: is_executable,
@@ -745,12 +756,15 @@ impl PosixFS {
   }
 
   pub fn stat_sync(&self, relative_path: PathBuf) -> Result<Stat, io::Error> {
-    PosixFS::stat_path_sync(relative_path, &self.root.0)
-  }
-
-  fn stat_path_sync(relative_path: PathBuf, root: &Path) -> Result<Stat, io::Error> {
-    let metadata = fs::symlink_metadata(root.join(&relative_path))?;
-    PosixFS::stat_internal(relative_path, root, &metadata)
+    let abs_path = self.root.0.join(&relative_path);
+    let metadata = if self.symlink_aware {
+      fs::symlink_metadata(abs_path)?
+    } else {
+      fs::metadata(abs_path)?
+    };
+    PosixFS::stat_internal(&self.root.0, relative_path, metadata.file_type(), || {
+      Ok(metadata)
+    })
   }
 }
 
@@ -782,13 +796,11 @@ impl PathStatGetter<io::Error> for Arc<PosixFS> {
       paths
         .into_iter()
         .map(|path| {
-          let root = self.root.0.clone();
           let fs = self.clone();
+          let fs2 = self.clone();
           self
             .executor
-            .spawn_on_io_pool(futures::future::lazy(move || {
-              PosixFS::stat_path_sync(path, &root)
-            }))
+            .spawn_on_io_pool(futures::future::lazy(move || fs2.stat_sync(path)))
             .then(|stat_result| match stat_result {
               Ok(v) => Ok(Some(v)),
               Err(err) => match err.kind() {
