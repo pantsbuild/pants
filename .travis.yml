@@ -208,6 +208,9 @@ base_osx_config: &base_osx_config
     brew:
       packages:
       - openssl
+  before_script:
+    - ulimit -c unlimited
+    - ulimit -n 8192
 
 py36_osx_config: &py36_osx_config
   <<: *base_osx_config
