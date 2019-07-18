@@ -20,7 +20,7 @@ class ScalaCoveragePlatform(InjectablesMixin, Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    super(ScalaCoveragePlatform, cls).register_options(register)
+    super().register_options(register)
     register('--enable-scoverage',
       default=False,
       type=bool,
