@@ -1,7 +1,3 @@
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-  unicode_literals, with_statement)
-
-import os
 from pants_test.test_base import TestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
 from pants.backend.jvm.subsystems.scala_coverage_platform import ScalaCoveragePlatform
