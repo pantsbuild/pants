@@ -622,6 +622,7 @@ dependencies = [
  "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "reqwest 0.9.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "rule_graph 0.0.1",
+ "sharded_lmdb 0.0.1",
  "smallvec 0.6.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "store 0.1.0",
  "task_executor 0.0.1",
