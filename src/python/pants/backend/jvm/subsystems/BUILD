@@ -112,8 +112,8 @@ python_library(
 )
 
 python_library(
-  name = 'scala_coverage_platform',
-  sources = ['scala_coverage_platform.py'],
+  name = 'scoverage_platform',
+  sources = ['scoverage_platform.py'],
   dependencies = [
     'src/python/pants/option',
     'src/python/pants/subsystem',

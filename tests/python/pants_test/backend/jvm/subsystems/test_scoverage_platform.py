@@ -1,6 +1,9 @@
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from pants_test.test_base import TestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
-from pants.backend.jvm.subsystems.scala_coverage_platform import ScalaCoveragePlatform
+from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -10,11 +13,11 @@ from pants.java.jar.jar_dependency import JarDependency
 from textwrap import dedent
 
 
-class ScalaCoveragePlatformTest(TestBase):
+class ScoveragePlatformTest(TestBase):
   scoverage_path = '//:scoverage'
   blacklist_file_path = 'my/file/new_blacklist_scoverage_test'
 
-  def setup_scala_coverage_platform(self):
+  def setup_scoverage_platform(self):
     options = {
       ScalaPlatform.options_scope: {
         'version': 'custom',
@@ -23,13 +26,13 @@ class ScalaCoveragePlatformTest(TestBase):
     }
 
     options2 = {
-      ScalaCoveragePlatform.options_scope: {
+      ScoveragePlatform.options_scope: {
         'enable_scoverage' : 'False'
       }
     }
 
     init_subsystem(ScalaPlatform, options)
-    init_subsystem(ScalaCoveragePlatform, options2)
+    init_subsystem(ScoveragePlatform, options2)
 
     self.make_target('//:scalastyle',
       JarLibrary,
@@ -59,26 +62,26 @@ class ScalaCoveragePlatformTest(TestBase):
   # ==========> TESTS <=============
   # ================================
   def test_subsystem_defaults(self):
-    init_subsystem(ScalaCoveragePlatform)
+    init_subsystem(ScoveragePlatform)
 
-    subsystem = ScalaCoveragePlatform.global_instance()
+    subsystem = ScoveragePlatform.global_instance()
 
     self.assertEqual(False, subsystem.get_options().enable_scoverage)
     self.assertEqual(self.scoverage_path, subsystem.get_options().scoverage_target_path)
 
   def test_subsystem_option_sets(self):
-    init_subsystem(ScalaCoveragePlatform)
-    ScalaCoveragePlatform.global_instance().get_options().enable_scoverage = True
+    init_subsystem(ScoveragePlatform)
+    ScoveragePlatform.global_instance().get_options().enable_scoverage = True
 
-    subsystem = ScalaCoveragePlatform.global_instance()
+    subsystem = ScoveragePlatform.global_instance()
 
     self.assertEqual(True, subsystem.get_options().enable_scoverage)
     self.assertEqual(self.scoverage_path, subsystem.get_options().scoverage_target_path)
 
 
   def test_library_scoverage_enabled(self):
-    self.setup_scala_coverage_platform()
-    ScalaCoveragePlatform.global_instance().get_options().enable_scoverage = True
+    self.setup_scoverage_platform()
+    ScoveragePlatform.global_instance().get_options().enable_scoverage = True
 
     self.create_file(
       relpath='a/scala/pass.scala',
@@ -100,8 +103,8 @@ class ScalaCoveragePlatformTest(TestBase):
 
 
   def test_library_scoverage_disabled(self):
-    self.setup_scala_coverage_platform()
-    ScalaCoveragePlatform.global_instance().get_options().enable_scoverage = False
+    self.setup_scoverage_platform()
+    ScoveragePlatform.global_instance().get_options().enable_scoverage = False
 
     self.create_file(
       relpath='a/scala/pass.scala',
@@ -132,8 +135,8 @@ class ScalaCoveragePlatformTest(TestBase):
     instrumented as long as `scalac_plugins` do not contain `scoverage`.
     :return:
     """
-    self.setup_scala_coverage_platform()
-    ScalaCoveragePlatform.global_instance().get_options().enable_scoverage = True
+    self.setup_scoverage_platform()
+    ScoveragePlatform.global_instance().get_options().enable_scoverage = True
 
     tmp = self.create_file(
       relpath=self.blacklist_file_path,
@@ -141,7 +144,7 @@ class ScalaCoveragePlatformTest(TestBase):
       a/scala:blacked
       """)
     )
-    ScalaCoveragePlatform.global_instance().get_options().blacklist_file = tmp
+    ScoveragePlatform.global_instance().get_options().blacklist_file = tmp
 
     self.create_file(
       relpath='a/scala/pass.scala',

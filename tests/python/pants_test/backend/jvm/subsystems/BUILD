@@ -19,7 +19,7 @@ python_tests(
   sources=['test_custom_scala.py'],
   dependencies=[
     'src/python/pants/backend/jvm/subsystems:scala_platform',
-    'src/python/pants/backend/jvm/subsystems:scala_coverage_platform',
+    'src/python/pants/backend/jvm/subsystems:scoverage_platform',
     'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
@@ -32,11 +32,11 @@ python_tests(
 
 
 python_tests(
-  name='test_scala_coverage_platform',
-  sources=['test_scala_coverage_platform.py'],
+  name='test_scoverage_platform',
+  sources=['test_scoverage_platform.py'],
   dependencies=[
     'src/python/pants/backend/jvm/subsystems:scala_platform',
-    'src/python/pants/backend/jvm/subsystems:scala_coverage_platform',
+    'src/python/pants/backend/jvm/subsystems:scoverage_platform',
     'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',

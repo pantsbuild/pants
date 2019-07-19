@@ -9,14 +9,15 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.address import Address
 from typing import Any, Dict, List, Optional, Union
 
+
 SCOVERAGE = "scoverage"
 blacklist_file = 'new_blacklist_scoverage'
 
 
-class ScalaCoveragePlatform(InjectablesMixin, Subsystem):
+class ScoveragePlatform(InjectablesMixin, Subsystem):
   """The scala coverage platform."""
 
-  options_scope = 'scala-coverage'
+  options_scope = 'scoverage'
 
   @classmethod
   def register_options(cls, register):
@@ -38,13 +39,14 @@ class ScalaCoveragePlatform(InjectablesMixin, Subsystem):
       help='Path to the scoverage dependency.')
 
   def scoverage_jar(self):
-    return [JarDependency(org='com.twitter.scoverage', name='scalac-scoverage-plugin_2.12', rev='1.0.1-twitter'),
-      JarDependency(org='com.twitter.scoverage', name='scalac-scoverage-runtime_2.12', rev='1.0.1-twitter')]
+    return [JarDependency(org='com.twitter.scoverage', name='scalac-scoverage-plugin_2.12',
+      rev='1.0.1-twitter'),
+      JarDependency(org='com.twitter.scoverage', name='scalac-scoverage-runtime_2.12',
+        rev='1.0.1-twitter')]
 
-
-  def injectables(self,build_graph):
+  def injectables(self, build_graph):
     specs_to_create = [
-      ('scoverage',self.scoverage_jar),
+      ('scoverage', self.scoverage_jar),
     ]
 
     for spec_key, create_jardep_func in specs_to_create:
@@ -59,7 +61,6 @@ class ScalaCoveragePlatform(InjectablesMixin, Subsystem):
           scope='forced')
       elif not build_graph.get_target(target_address).is_synthetic:
         raise build_graph.ManualSyntheticTargetError(target_address)
-
 
   @property
   def injectables_spec_mapping(self):

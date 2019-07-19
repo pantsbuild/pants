@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
-from pants.backend.jvm.subsystems.scala_coverage_platform import ScalaCoveragePlatform
+from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.base.exceptions import TargetDefinitionException
@@ -28,7 +28,7 @@ class ScalaLibrary(ExportableJvmLibrary):
 
   @classmethod
   def subsystems(cls):
-    return super().subsystems() + (ScalaPlatform, ScalaCoveragePlatform, )
+    return super().subsystems() + (ScalaPlatform, ScoveragePlatform,)
 
   def __init__(self, java_sources=None, payload=None, **kwargs):
     """
@@ -48,7 +48,7 @@ class ScalaLibrary(ExportableJvmLibrary):
     })
     super().__init__(payload=payload, **kwargs)
 
-    self._scoverage = ScalaCoveragePlatform.global_instance().get_options().enable_scoverage
+    self._scoverage = ScoveragePlatform.global_instance().get_options().enable_scoverage
 
   @classmethod
   def compute_injectable_specs(cls, kwargs=None, payload=None):
@@ -68,8 +68,8 @@ class ScalaLibrary(ExportableJvmLibrary):
     for spec in ScalaPlatform.global_instance().injectables_specs_for_key('scala-library'):
       yield spec
 
-    if ScalaCoveragePlatform.global_instance().get_options().enable_scoverage:
-      for spec in ScalaCoveragePlatform.global_instance().injectables_specs_for_key('scoverage'):
+    if ScoveragePlatform.global_instance().get_options().enable_scoverage:
+      for spec in ScoveragePlatform.global_instance().injectables_specs_for_key('scoverage'):
         yield spec
 
   def get_jar_dependencies(self):
@@ -97,7 +97,7 @@ class ScalaLibrary(ExportableJvmLibrary):
     :rtype: list of strings.
     """
     if self._scoverage:
-      return ScalaCoveragePlatform.global_instance().get_scalac_plugins(self)
+      return ScoveragePlatform.global_instance().get_scalac_plugins(self)
 
     return self.payload.scalac_plugins
 
@@ -108,7 +108,7 @@ class ScalaLibrary(ExportableJvmLibrary):
     :rtype: map from string to list of strings.
     """
     if self._scoverage:
-      return ScalaCoveragePlatform.global_instance().get_scalac_plugin_args(self)
+      return ScoveragePlatform.global_instance().get_scalac_plugin_args(self)
 
     return self.payload.scalac_plugin_args
 
@@ -120,6 +120,6 @@ class ScalaLibrary(ExportableJvmLibrary):
     :rtype: list
     """
     if self._scoverage:
-      return ScalaCoveragePlatform.global_instance().get_compiler_option_sets(self)
+      return ScoveragePlatform.global_instance().get_compiler_option_sets(self)
 
     return self.payload.compiler_option_sets
