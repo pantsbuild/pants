@@ -59,7 +59,10 @@ class Reporting(Subsystem):
     register('--zipkin-trace-v2', advanced=True, type=bool, default=False,
               help='If enabled, the zipkin spans are tracked for v2 engine execution progress.')
     register('--zipkin-service-name-prefix', advanced=True, default='pants',
-      help='The prefix for service name for Zipkin spans.')
+              help='The prefix for service name for Zipkin spans.')
+    register('--zipkin-max-span-batch-size', advanced=True, default=100,
+              help='Spans in a Zipkin trace are sent in batches.' 
+                   'zipkin-max-span-batch-size sets the max size of one batch.')
 
   def initialize(self, run_tracker, all_options, start_time=None):
     """Initialize with the given RunTracker.
@@ -104,6 +107,7 @@ class Reporting(Subsystem):
     service_name_prefix = self.get_options().zipkin_service_name_prefix
     if "{}" not in service_name_prefix:
       service_name_prefix = service_name_prefix + "/{}"
+    max_span_batch_size = self.get_options().zipkin_max_span_batch_size
 
     if zipkin_endpoint is None and trace_id is not None and parent_id is not None:
       raise ValueError(
@@ -132,7 +136,8 @@ class Reporting(Subsystem):
     if zipkin_endpoint is not None:
       zipkin_reporter_settings = ZipkinReporter.Settings(log_level=Report.INFO)
       zipkin_reporter = ZipkinReporter(
-        run_tracker, zipkin_reporter_settings, zipkin_endpoint, trace_id, parent_id, sample_rate, service_name_prefix
+        run_tracker, zipkin_reporter_settings, zipkin_endpoint, trace_id, parent_id, sample_rate,
+        service_name_prefix, max_span_batch_size
       )
       report.add_reporter('zipkin', zipkin_reporter)
 
