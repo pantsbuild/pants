@@ -68,6 +68,6 @@ class Buildozer(Task):
       subprocess.check_call(buildozer_command, cwd=get_buildroot())
     except subprocess.CalledProcessError as err:
       if err.returncode == 3:
-        logger.warn('{} ... no changes were made'.format(buildozer_command))
+        logger.warning('{} ... no changes were made'.format(buildozer_command))
       else:
         raise TaskError('{} ... exited non-zero ({}).'.format(buildozer_command, err.returncode))

@@ -126,7 +126,7 @@ class BuildFileManipulator:
           if isinstance(keyword.value, ast.Str):
             return keyword.value.s
           else:
-            logger.warn('Saw a non-string-literal name argument to a target while '
+            logger.warning('Saw a non-string-literal name argument to a target while '
                         'looking through {build_file}.  Target type was {target_type}.'
                         'name value was {name_value}'
                         .format(build_file=build_file,
@@ -348,7 +348,7 @@ class BuildFileManipulator:
     """Add a dependency to this target.  This will deduplicate existing dependencies."""
     if address in self._dependencies_by_address:
       if self._dependencies_by_address[address].has_comment():
-        logger.warn('BuildFileManipulator would have added {address} as a dependency of '
+        logger.warning('BuildFileManipulator would have added {address} as a dependency of '
                     '{target_address}, but that dependency was already forced with a comment.'
                     .format(address=address.spec, target_address=self.target_address.spec))
         return

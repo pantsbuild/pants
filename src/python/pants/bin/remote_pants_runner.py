@@ -118,7 +118,7 @@ class RemotePantsRunner:
           raise self.Fallback(e)
 
         self._backoff(attempt)
-        logger.warn(
+        logger.warning(
           'pantsd was unresponsive on port {}, retrying ({}/{})'
           .format(pantsd_handle.port, attempt, retries)
         )
