@@ -646,7 +646,13 @@ impl PosixFS {
         }
         Err(_) => true,
       })
-      .collect::<Result<Vec<_>, io::Error>>()?;
+      .collect::<Result<Vec<_>, io::Error>>()
+      .map_err(|e| {
+        io::Error::new(
+          e.kind(),
+          format!("Failed to scan directory {:?}: {}", dir_abs, e),
+        )
+      })?;
     stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
     Ok(DirectoryListing(stats))
   }
@@ -661,40 +667,55 @@ impl PosixFS {
     self
       .executor
       .spawn_on_io_pool(futures::future::lazy(move || {
-        std::fs::File::open(&path_abs).and_then(|mut f| {
-          let mut content = Vec::new();
-          f.read_to_end(&mut content)?;
-          Ok(FileContent {
-            path: path,
-            content: Bytes::from(content),
+        std::fs::File::open(&path_abs)
+          .and_then(|mut f| {
+            let mut content = Vec::new();
+            f.read_to_end(&mut content)?;
+            Ok(FileContent {
+              path: path,
+              content: Bytes::from(content),
+            })
           })
-        })
+          .map_err(|e| {
+            io::Error::new(
+              e.kind(),
+              format!("Failed to read file {:?}: {}", path_abs, e),
+            )
+          })
       }))
   }
 
   pub fn read_link(&self, link: &Link) -> impl Future<Item = PathBuf, Error = io::Error> {
     let link_parent = link.0.parent().map(Path::to_owned);
-    let link_abs = self.root.0.join(link.0.as_path()).to_owned();
+    let link_abs = self.root.0.join(link.0.as_path());
     self
       .executor
       .spawn_on_io_pool(futures::future::lazy(move || {
-        link_abs.read_link().and_then(|path_buf| {
-          if path_buf.is_absolute() {
-            Err(io::Error::new(
-              io::ErrorKind::InvalidData,
-              format!("Absolute symlink: {:?}", link_abs),
-            ))
-          } else {
-            link_parent
-              .map(|parent| parent.join(path_buf))
-              .ok_or_else(|| {
-                io::Error::new(
-                  io::ErrorKind::InvalidData,
-                  format!("Symlink without a parent?: {:?}", link_abs),
-                )
-              })
-          }
-        })
+        link_abs
+          .read_link()
+          .and_then(|path_buf| {
+            if path_buf.is_absolute() {
+              Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Absolute symlink: {:?}", link_abs),
+              ))
+            } else {
+              link_parent
+                .map(|parent| parent.join(path_buf))
+                .ok_or_else(|| {
+                  io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Symlink without a parent?: {:?}", link_abs),
+                  )
+                })
+            }
+          })
+          .map_err(|e| {
+            io::Error::new(
+              e.kind(),
+              format!("Failed to read link {:?}: {}", link_abs, e),
+            )
+          })
       }))
   }
 

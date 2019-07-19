@@ -488,7 +488,7 @@ impl Snapshot {
 
         posix_fs
           .expand(path_globs)
-          .map_err(|err| format!("Error expanding globs: {:?}", err))
+          .map_err(|err| format!("Error expanding globs: {}", err))
           .and_then(|path_stats| {
             Snapshot::from_path_stats(
               store2.clone(),
