@@ -24,8 +24,17 @@ function get_coursier {
 }
 
 function bootstrap_environment {
-  # Install necessary tools for the ubuntu:latest container on docker hub.
-  if ! is_osx; then
+  if is_osx; then
+    # Install `realpath`.
+    if ! hash realpath 2>/dev/null; then
+      ensure_has_executable \
+        'brew' \
+        "homebrew must be installed to obtain the 'coreutils' package, which contains 'realpath'." \
+        "Please see https://brew.sh/."
+      brew install coreutils
+    fi
+  else
+    # Install necessary tools for the ubuntu:latest container on docker hub.
     apt-get update
     apt-get -y install \
             g{cc,++} git curl aptitude zlib1g-dev make python{,3} git python3-pip \

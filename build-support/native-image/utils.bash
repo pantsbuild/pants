@@ -1,10 +1,18 @@
 # Functions used in building zinc native-images.
 # TODO: This will be made automatic in pants via https://github.com/pantsbuild/pants/pull/6893.
 
-export NATIVE_IMAGE_BUILD_CACHE_DIR="${HOME}/.cache/pants/native-image-build-script-cache"
+export NATIVE_IMAGE_BUILD_CACHE_DIR="${NATIVE_IMAGE_BUILD_CACHE_DIR:-${HOME}/.cache/pants/native-image-build-script-cache}"
 
 function is_osx {
   [[ "$(uname)" == 'Darwin' ]]
+}
+
+function ensure_has_executable {
+  local cmd="$1"
+  if ! hash "$cmd"; then
+    echo >&2 "${cmd} was not found." "${@:2}"
+    exit 1
+  fi
 }
 
 function with_pushd {
