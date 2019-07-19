@@ -14,15 +14,13 @@ set -euxo pipefail
 # information should be inferred by the native-image agent, but isn't yet.
 
 # TODO: build off of a more recent graal sha (more recent ones fail to build scalac and more): see
-# https://github.com/oracle/graal/issues/1448.
+# https://github.com/oracle/graal/issues/1448, as well as #7955!
 
-
 # ARGUMENTS
 
 # $@: Forwarded to a `./pants compile` invocation which runs with reflection tracing enabled.
 # $NATIVE_IMAGE_EXTRA_ARGS: Forwarded to a `native-image` invocation.
 
-
 # CONSTANTS
 
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
@@ -34,7 +32,6 @@ GENERATED_CONFIG_DIR="$(normalize_path "${GENERATED_CONFIG_DIR:-generated-reflec
 GENERATED_CONFIG_JSON_FILE="${GENERATED_CONFIG_DIR}/reflect-config.json"
 GENERATED_BUILD_FILE="${GENERATED_CONFIG_DIR}/BUILD"
 
-
 # FUNCTIONS
 
 function download_buildozer {
@@ -70,18 +67,16 @@ function run_zinc_compile_with_tracing {
     rm -rfv "$GENERATED_CONFIG_DIR"
     mkdir -v "$GENERATED_CONFIG_DIR"
     # TODO: jvm options are ignored from the command line, this is a bug and should be fixed.
-    export PANTS_COMPILE_ZINC_JVM_OPTIONS="+['-agentlib:native-image-agent=config-merge-dir=${GENERATED_CONFIG_DIR}']"
+    export PANTS_COMPILE_ZINC_JVM_OPTIONS="+['-agentpath:${agent_lib_path}=config-merge-dir=${GENERATED_CONFIG_DIR}']"
     # NB: --worker-count=1 is because the `config-merge-dir` option to the native-image agent will
     # clobber symbols from concurrent compiles.
-    MODE=debug ./pants -ldebug \
+    ./pants -ldebug \
             --no-zinc-native-image \
-            --resolve-coursier-capture-snapshots \
             compile.zinc \
             --execution-strategy=hermetic \
             --worker-count=1 \
             --no-incremental \
             --no-use-classpath-jars \
-            --native-image-agent-library-dir="$(dirname "$agent_lib_path")" \
             --cache-ignore \
             "$@"
     unset PANTS_COMPILE_ZINC_JVM_OPTIONS
@@ -171,7 +166,6 @@ function generate_macro_deps_jar {
 
 # actually build the zinc image!!!
 
-
 ### EXECUTING!
 # NB: It's not clear whether it's possible to set the locale in some ubuntu containers, so we
 # simply ignore it here.
@@ -179,7 +173,6 @@ export PANTS_IGNORE_UNRECOGNIZED_ENCODING=1
 
 bootstrap_environment >&2
 
-# export MODE=debug
 export JAVA_HOME="$(extract_openjdk_jvmci)"
 PATH="$(clone_mx):${PATH}"
 
