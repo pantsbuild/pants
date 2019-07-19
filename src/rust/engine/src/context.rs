@@ -29,6 +29,8 @@ use sharded_lmdb::ShardedLmdb;
 use std::collections::btree_map::BTreeMap;
 use store::Store;
 
+const GIGABYTES: usize = 1024 * 1024 * 1024;
+
 ///
 /// The core context shared (via Arc) between the Scheduler and the Context objects of
 /// all running Nodes.
@@ -178,7 +180,7 @@ impl Core {
     if process_execution_use_local_cache {
       let process_execution_store = ShardedLmdb::new(
         local_store_dir2.join("processes"),
-        5 * 1024 * 1024 * 1024,
+        5 * GIGABYTES,
         executor.clone(),
       )
       .expect("Could not initialize store for process cache: {:?}");
