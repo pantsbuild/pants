@@ -49,9 +49,12 @@ use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
 
+const MEGABYTES: usize = 1024 * 1024;
+const GIGABYTES: usize = 1024 * MEGABYTES;
+
 // This is the target number of bytes which should be present in all combined LMDB store files
 // after garbage collection. We almost certainly want to make this configurable.
-pub const DEFAULT_LOCAL_STORE_GC_TARGET_BYTES: usize = 4 * 1024 * 1024 * 1024;
+pub const DEFAULT_LOCAL_STORE_GC_TARGET_BYTES: usize = 4 * GIGABYTES;
 
 // Summary of the files and directories uploaded with an operation
 // ingested_file_{count, bytes}: Number and combined size of processed files
@@ -858,7 +861,7 @@ pub enum EntryType {
 }
 
 mod local {
-  use super::{EntryType, ShrinkBehavior};
+  use super::{EntryType, ShrinkBehavior, GIGABYTES};
 
   use boxfuture::{try_future, BoxFuture, Boxable};
   use bytes::Bytes;
@@ -908,15 +911,11 @@ mod local {
           // travis fail because they can't allocate virtual memory, if there are multiple Stores
           // in memory at the same time. We don't know why they're not efficiently garbage collected
           // by python, but they're not, so...
-          file_dbs: ShardedLmdb::new(
-            files_root.clone(),
-            1024 * 1024 * 1024 * 1024 / 10,
-            executor.clone(),
-          )
-          .map(Arc::new),
+          file_dbs: ShardedLmdb::new(files_root.clone(), 100 * GIGABYTES, executor.clone())
+            .map(Arc::new),
           directory_dbs: ShardedLmdb::new(
             directories_root.clone(),
-            5 * 1024 * 1024 * 1024,
+            5 * GIGABYTES,
             executor.clone(),
           )
           .map(Arc::new),
@@ -2002,7 +2001,7 @@ mod remote {
 
   #[cfg(test)]
   mod tests {
-    use super::super::EntryType;
+    use super::super::{EntryType, MEGABYTES};
     use super::ByteStore;
     use bytes::Bytes;
     use hashing::Digest;
@@ -2333,7 +2332,7 @@ mod remote {
         &None,
         None,
         1,
-        10 * 1024 * 1024,
+        10 * MEGABYTES,
         Duration::from_secs(1),
         BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
         1,
@@ -2366,7 +2365,7 @@ mod remote {
 mod tests {
   use super::{
     local, DirectoryMaterializeMetadata, EntryType, FileContent, LoadMetadata, Source, Store,
-    UploadSummary,
+    UploadSummary, MEGABYTES,
   };
 
   use bazel_protos;
@@ -2461,7 +2460,7 @@ mod tests {
       &None,
       None,
       1,
-      10 * 1024 * 1024,
+      10 * MEGABYTES,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
@@ -3142,7 +3141,7 @@ mod tests {
       &None,
       None,
       1,
-      10 * 1024 * 1024,
+      10 * MEGABYTES,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
@@ -3169,7 +3168,7 @@ mod tests {
       &None,
       None,
       1,
-      10 * 1024 * 1024,
+      10 * MEGABYTES,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
@@ -3210,7 +3209,7 @@ mod tests {
       &None,
       Some("Armory.Key".to_owned()),
       1,
-      10 * 1024 * 1024,
+      10 * MEGABYTES,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
@@ -3237,7 +3236,7 @@ mod tests {
       &None,
       Some("Armory.Key".to_owned()),
       1,
-      10 * 1024 * 1024,
+      10 * MEGABYTES,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
