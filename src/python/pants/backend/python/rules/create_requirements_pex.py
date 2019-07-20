@@ -12,7 +12,7 @@ from pants.util.objects import datatype, hashable_string_list, string_optional, 
 from pants.util.strutil import create_path_env_var
 
 
-class ResolveRequirementsRequest(datatype([
+class RequirementsPexRequest(datatype([
   ('output_filename', string_type),
   ('requirements', hashable_string_list),
   ('interpreter_constraints', hashable_string_list),
@@ -21,14 +21,14 @@ class ResolveRequirementsRequest(datatype([
   pass
 
 
-class ResolvedRequirementsPex(datatype([('directory_digest', Digest)])):
+class RequirementsPex(datatype([('directory_digest', Digest)])):
   pass
 
 
 # TODO: This is non-hermetic because the requirements will be resolved on the fly by
 # pex, where it should be hermetically provided in some way.
-@rule(ResolvedRequirementsPex, [ResolveRequirementsRequest, DownloadedPexBin, PythonSetup, PexBuildEnvironment])
-def resolve_requirements(request, pex_bin, python_setup, pex_build_environment):
+@rule(RequirementsPex, [RequirementsPexRequest, DownloadedPexBin, PythonSetup, PexBuildEnvironment])
+def create_requirements_pex(request, pex_bin, python_setup, pex_build_environment):
   """Returns a PEX with the given requirements, optional entry point, and optional
   interpreter constraints."""
 
@@ -60,14 +60,12 @@ def resolve_requirements(request, pex_bin, python_setup, pex_build_environment):
   )
 
   result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, request)
-  yield ResolvedRequirementsPex(
-    directory_digest=result.output_directory_digest,
-  )
+  yield RequirementsPex(directory_digest=result.output_directory_digest)
 
 
 def rules():
   return [
-    resolve_requirements,
+    create_requirements_pex,
     optionable_rule(PythonSetup),
     optionable_rule(PythonNativeCode),
   ]

@@ -5,8 +5,8 @@ from pants.backend.python.pants_requirement import PantsRequirement
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_requirements import PythonRequirements
-from pants.backend.python.rules import (download_pex_bin, inject_init, python_test_runner,
-                                        resolve_requirements)
+from pants.backend.python.rules import (create_requirements_pex, download_pex_bin, inject_init,
+                                        python_test_runner)
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
 from pants.backend.python.subsystems.python_native_code import rules as python_native_code_rules
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
@@ -93,6 +93,6 @@ def rules():
     inject_init.rules() +
     python_test_runner.rules() +
     python_native_code_rules() +
-    resolve_requirements.rules() +
+    create_requirements_pex.rules() +
     subprocess_environment_rules()
   )

@@ -5,10 +5,10 @@ import json
 import os.path
 import zipfile
 
+from pants.backend.python.rules.create_requirements_pex import (RequirementsPex,
+                                                                RequirementsPexRequest,
+                                                                create_requirements_pex)
 from pants.backend.python.rules.download_pex_bin import download_pex_bin
-from pants.backend.python.rules.resolve_requirements import (ResolvedRequirementsPex,
-                                                             ResolveRequirementsRequest,
-                                                             resolve_requirements)
 from pants.backend.python.subsystems.python_native_code import (PythonNativeCode,
                                                                 create_pex_native_build_environment)
 from pants.backend.python.subsystems.python_setup import PythonSetup
@@ -26,10 +26,10 @@ class TestResolveRequirements(TestBase):
   @classmethod
   def rules(cls):
     return super().rules() + [
-      resolve_requirements,
-      download_pex_bin,
+      create_requirements_pex,
       create_pex_native_build_environment,
-      RootRule(ResolveRequirementsRequest),
+      download_pex_bin,
+      RootRule(RequirementsPexRequest),
       RootRule(PythonSetup),
       RootRule(PythonNativeCode),
     ]
@@ -44,14 +44,14 @@ class TestResolveRequirements(TestBase):
     def hashify_optional_collection(iterable):
       return tuple(sorted(iterable)) if iterable is not None else tuple()
 
-    request = ResolveRequirementsRequest(
+    request = RequirementsPexRequest(
       output_filename="test.pex",
       requirements=hashify_optional_collection(requirements),
       interpreter_constraints=hashify_optional_collection(interpreter_constraints),
       entry_point=entry_point,
     )
     requirements_pex = assert_single_element(
-      self.scheduler.product_request(ResolvedRequirementsPex, [Params(
+      self.scheduler.product_request(RequirementsPex, [Params(
         request,
         PythonSetup.global_instance(),
         PythonNativeCode.global_instance()

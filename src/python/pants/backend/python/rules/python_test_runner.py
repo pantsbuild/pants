@@ -1,9 +1,9 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from pants.backend.python.rules.create_requirements_pex import (RequirementsPex,
+                                                                RequirementsPexRequest)
 from pants.backend.python.rules.inject_init import InjectedInitDigest
-from pants.backend.python.rules.resolve_requirements import (ResolvedRequirementsPex,
-                                                             ResolveRequirementsRequest)
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
@@ -53,7 +53,7 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
         all_target_requirements.append(str(py_req.requirement))
   all_requirements = all_target_requirements + list(pytest.get_requirement_strings())
   resolved_requirements_pex = yield Get(
-    ResolvedRequirementsPex, ResolveRequirementsRequest(
+    RequirementsPex, RequirementsPexRequest(
       output_filename=output_pytest_requirements_pex_filename,
       requirements=tuple(sorted(all_requirements)),
       interpreter_constraints=tuple(sorted(interpreter_constraints)),
