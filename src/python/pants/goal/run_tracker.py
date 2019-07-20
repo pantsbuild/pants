@@ -12,6 +12,7 @@ import time
 import uuid
 from collections import OrderedDict
 from contextlib import contextmanager
+from typing import Dict
 
 import requests
 
@@ -29,6 +30,7 @@ from pants.reporting.json_reporter import JsonReporter
 from pants.reporting.report import Report
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import relative_symlink, safe_file_dump
+from pants.version import VERSION
 
 
 class RunTrackerOptionEncoder(CoercingOptionEncoder):
@@ -351,6 +353,10 @@ class RunTracker(Subsystem):
     self.report.log(self._threadlocal.current_workunit, level, *msg_elements)
 
   @classmethod
+  def _get_headers(cls) -> Dict[str, str]:
+    return {'User-Agent': f"pants/v{VERSION}"}
+
+  @classmethod
   def post_stats(cls, stats_url, stats, timeout=2, auth_provider=None):
     """POST stats to the given url.
 
@@ -366,6 +372,7 @@ class RunTracker(Subsystem):
     # But this will first require changing the upload receiver at every shop that uses this.
     params = {k: cls._json_dump_options(v) for (k, v) in stats.items()}
     cookies = Cookies.global_instance()
+    headers = cls._get_headers()
     auth_provider = auth_provider or '<provider>'
 
     # We can't simply let requests handle redirects, as we only allow them for specific codes:
@@ -378,6 +385,7 @@ class RunTracker(Subsystem):
       if num_redirects_allowed < 0:
         return error('too many redirects.')
       res = requests.post(url, data=params, timeout=timeout,
+                          headers=headers,
                         cookies=cookies.get_cookie_jar(), allow_redirects=False)
       if res.status_code in {307, 308}:
         return do_post(res.headers['location'], num_redirects_allowed - 1)

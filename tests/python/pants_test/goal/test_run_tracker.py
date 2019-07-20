@@ -9,6 +9,7 @@ from urllib.parse import parse_qs
 from pants.auth.cookies import Cookies
 from pants.goal.run_tracker import RunTracker
 from pants.util.contextutil import temporary_file_path
+from pants.version import VERSION
 from pants_test.test_base import TestBase
 
 
@@ -31,6 +32,7 @@ class RunTrackerTest(TestBase):
             post_data = parse_qs(handler.rfile.read(length).decode())
             decoded_post_data = {k: json.loads(v[0]) for k, v in post_data.items()}
             self.assertEqual(stats, decoded_post_data)
+            self.assertEqual(handler.headers['User-Agent'], f"pants/v{VERSION}")
             handler.send_response(200)
             handler.end_headers()
         except Exception:
