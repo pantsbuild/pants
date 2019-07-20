@@ -7,7 +7,7 @@ import sbt.internal.util.ConsoleLogger
 import scoverage.{Coverage, IOUtils, Serializer}
 import scoverage.report.{ScoverageHtmlWriter, ScoverageXmlWriter}
 
-object ScoverageRep {
+object ScoverageReport {
   val Scoverage = "scoverage"
 
   // Copying the logger from org.pantsbuild.zinc.bootstrap

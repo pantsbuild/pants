@@ -9,7 +9,7 @@ scala_library(
 jvm_binary(
   name = "gen2",
   basename = "gen2",
-  main = "org.pantsbuild.scoverage.report.ScoverageRep",
+  main = "org.pantsbuild.scoverage.report.ScoverageReport",
    dependencies=[
       ":report",
     ]
