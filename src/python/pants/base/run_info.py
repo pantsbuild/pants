@@ -8,9 +8,9 @@ import socket
 import time
 from collections import OrderedDict
 
-from pants import version
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.util.dirutil import safe_mkdir_for
+from pants.version import VERSION
 
 
 class RunInfo:
@@ -81,7 +81,7 @@ class RunInfo:
     # TODO: Get rid of the redundant 'path' key once everyone is off it.
     self.add_infos(('id', run_id), ('timestamp', timestamp), ('datetime', datetime),
                    ('user', user), ('machine', machine), ('path', buildroot),
-                   ('buildroot', buildroot), ('version', version.VERSION))
+                   ('buildroot', buildroot), ('version', VERSION))
 
   def add_scm_info(self):
     """Adds SCM-related info."""
