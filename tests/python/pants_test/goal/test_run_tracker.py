@@ -42,7 +42,7 @@ class RunTrackerTest(TestBase):
     host, port = server.server_address
 
     def mk_url(path):
-      return 'http://{}:{}{}'.format(host, port, path)
+      return f'http://{host}:{port}{path}'
 
     server_thread = threading.Thread(target=server.serve_forever)
     server_thread.daemon = True
