@@ -51,7 +51,7 @@ class Config(ABC):
       with io.BytesIO(file_content.content) as fh:
         yield fh
 
-    return cls._meta_load(opener, file_contents, seed_values)
+    return cls._meta_load(opener, file_contents, seed_values=seed_values)
 
   @classmethod
   def load(cls, config_paths, seed_values=None):
@@ -72,16 +72,16 @@ class Config(ABC):
       with open(f, 'rb') as fh:
         yield fh
 
-    return cls._meta_load(opener, config_paths, seed_values)
+    return cls._meta_load(opener, config_paths, seed_values=seed_values)
 
   @classmethod
-  def _meta_load(cls, open_ctx, config_items, seed_values=None):
+  def _meta_load(cls, open_ctx, config_items, *, seed_values=None):
     if not config_items:
       return _EmptyConfig()
 
     single_file_configs = []
     for config_item in config_items:
-      parser = cls._create_parser(seed_values)
+      parser = cls._create_parser(seed_values=seed_values)
       with open_ctx(config_item) as ini:
         content = ini.read()
         content_digest = sha1(content).hexdigest()
@@ -92,7 +92,7 @@ class Config(ABC):
     return _ChainedConfig(tuple(reversed(single_file_configs)))
 
   @classmethod
-  def _create_parser(cls, seed_values=None):
+  def _create_parser(cls, *, seed_values=None):
     """Creates a config parser that supports %([key-name])s value substitution.
 
     A handful of seed values will be set to act as if specified in the loaded config file's DEFAULT
@@ -103,7 +103,9 @@ class Config(ABC):
                         pants_supportdir and pants_distdir.
     """
     seed_values = seed_values or {}
-    buildroot = seed_values.get('buildroot', get_buildroot())
+    buildroot = seed_values.get('buildroot')
+    if buildroot is None:
+      buildroot = get_buildroot()
 
     all_seed_values = {
       'buildroot': buildroot,
