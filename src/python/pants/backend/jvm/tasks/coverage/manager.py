@@ -4,7 +4,9 @@
 import os
 import shutil
 
+from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
 from pants.backend.jvm.tasks.coverage.cobertura import Cobertura
+from pants.backend.jvm.tasks.coverage.scoverage import Scoverage
 from pants.backend.jvm.tasks.coverage.engine import NoCoverage
 from pants.backend.jvm.tasks.coverage.jacoco import Jacoco
 from pants.subsystem.subsystem import Subsystem
@@ -57,14 +59,14 @@ class CodeCoverage(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super().subsystem_dependencies() + (Cobertura.Factory, Jacoco.Factory)
+    return super().subsystem_dependencies() + (Cobertura.Factory, Jacoco.Factory, Scoverage.Factory)
 
   # TODO(jtrobec): move these to subsystem scope after deprecating
   @staticmethod
   def register_junit_options(register, register_jvm_tool):
     register('--coverage', type=bool, fingerprint=True, help='Collect code coverage data.')
     register('--coverage-processor', advanced=True, fingerprint=True,
-             choices=['cobertura', 'jacoco'], default=None,
+             choices=['cobertura', 'jacoco', 'scoverage'], default=None,
              help="Which coverage processor to use if --coverage is enabled. If this option is "
                   "unset but coverage is enabled implicitly or explicitly, defaults to 'cobertura'."
                   "If this option is explicitly set, implies --coverage.")
@@ -83,18 +85,25 @@ class CodeCoverage(Subsystem):
     # register options for coverage engines
     # TODO(jtrobec): get rid of these calls when engines are dependent subsystems
     Cobertura.register_junit_options(register, register_jvm_tool)
+    Scoverage.register_junit_options(register, register_jvm_tool)
 
   class InvalidCoverageEngine(Exception):
     """Indicates an invalid coverage engine type was selected."""
 
   def get_coverage_engine(self, task, output_dir, all_targets, execute_java):
     options = task.get_options()
-    if options.coverage or options.coverage_processor or options.is_flagged('coverage_open'):
+    processor = options.coverage_processor
+    if ScoveragePlatform.global_instance().get_options().enable_scoverage:
+      processor = 'scoverage'
+
+    if options.coverage or processor or options.is_flagged('coverage_open'):
       settings = CodeCoverageSettings.from_task(task, workdir=output_dir)
-      if options.coverage_processor in ('cobertura', None):
+      if processor in ('cobertura', None):
         return Cobertura.Factory.global_instance().create(settings, all_targets, execute_java)
-      elif options.coverage_processor == 'jacoco':
+      elif processor == 'jacoco':
         return Jacoco.Factory.global_instance().create(settings, all_targets, execute_java)
+      elif processor == 'scoverage':
+        return Scoverage.Factory.global_instance().create(settings, all_targets, execute_java)
       else:
         # NB: We should never get here since the `--coverage-processor` is restricted by `choices`,
         # but for clarity.
