@@ -16,7 +16,7 @@ from pants.engine.legacy.structs import PythonTestsAdaptor
 from pants.engine.rules import UnionRule, optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.core_test_model import Status, TestResult, TestTarget
-from pants.source.source_root import SourceRoot, SourceRootConfig
+from pants.source.source_root import SourceRootConfig
 from pants.util.strutil import create_path_env_var
 
 
@@ -67,12 +67,14 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
   # simplify the hasattr() checks here!
   source_roots = source_root_config.get_source_roots()
   sources_digest_list: List[Digest] = []
-  source_roots_set: Set[SourceRoot] = set()
+  source_root_paths: Set[str] = set()
   for maybe_source_target in all_targets:
     if not hasattr(maybe_source_target, 'sources'):
       continue
     sources_digest_list.append(maybe_source_target.sources.snapshot.directory_digest)
-    source_roots_set.add(source_roots.find_by_path(maybe_source_target.address.spec_path))
+    source_root = source_roots.find_by_path(maybe_source_target.address.spec_path)
+    if source_root is not None:
+      source_root_paths.add(source_root.path)
 
   sources_digest = yield Get(
     Digest, DirectoriesToMerge(directories=tuple(sources_digest_list)),
@@ -96,7 +98,7 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
     'PATH': interpreter_search_paths,
     # This adds support for absolute imports of source roots, e.g.
     # `src/python/pants` -> `import pants`.
-    'PYTHONPATH': create_path_env_var([source_root.path for source_root in source_roots_set]),
+    'PYTHONPATH': create_path_env_var(sorted(source_root_paths)),
     **subprocess_encoding_environment.invocation_environment_dict
   }
 
