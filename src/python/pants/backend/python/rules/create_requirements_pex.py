@@ -46,20 +46,20 @@ def create_requirements_pex(request, pex_bin, python_setup, pex_build_environmen
   # necessarily the interpreter that PEX will use to execute the generated .pex file.
   # TODO(#7735): Set --python-setup-interpreter-search-paths differently for the host and target
   # platforms, when we introduce platforms in https://github.com/pantsbuild/pants/issues/7735.
-  argv = ["python", f"./{pex_bin.executable}", "-o", request.output_filename]
+  argv = ["python", f"./{pex_bin.executable}", "--output-file", request.output_filename]
   if request.entry_point is not None:
-    argv.extend(["-e", request.entry_point])
+    argv.extend(["--entry-point", request.entry_point])
   argv.extend(interpreter_constraint_args + list(request.requirements))
 
-  request = ExecuteProcessRequest(
+  execute_process_request = ExecuteProcessRequest(
     argv=tuple(argv),
     env=env,
     input_files=pex_bin.directory_digest,
-    description=f"Resolve requirements: {', '.join(request.requirements)}",
+    description=f"Create a requirements PEX: {', '.join(request.requirements)}",
     output_files=(request.output_filename,),
   )
 
-  result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, request)
+  result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, execute_process_request)
   yield RequirementsPex(directory_digest=result.output_directory_digest)
 
 
