@@ -12,6 +12,7 @@ from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
+from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.junit_tests import JUnitTests
@@ -54,7 +55,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
         'version': 'custom'
       }
     }
-    init_subsystems([JUnit, ScalaPlatform], scala_options)
+    init_subsystems([JUnit, ScalaPlatform, ScoveragePlatform], scala_options)
 
     self.make_target(
       ':scala-library',
