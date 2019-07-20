@@ -375,7 +375,9 @@ def run_python_tests_v2(*, remote_execution_enabled: bool) -> None:
       local_execution_targets = v2_compatible_targets
     check_pants_pex_exists()
 
-  def run_v2_tests(*, targets: Set[str], execution_strategy: str, oauth_token_path: Optional[str] = None) -> None:
+  def run_v2_tests(
+    *, targets: Set[str], execution_strategy: str, oauth_token_path: Optional[str] = None
+  ) -> None:
     try:
       command = (
         ["./pants.pex", "--no-v1", "--v2", "test.pytest"] + sorted(targets) + PYTEST_PASSTHRU_ARGS
@@ -383,6 +385,9 @@ def run_python_tests_v2(*, remote_execution_enabled: bool) -> None:
       if oauth_token_path is not None:
         command[3:3] = [
           "--pants-config-files=pants.remote.ini",
+          # We turn off speculation to reduce the risk of flakiness, where a test passes locally but
+          # fails remoting and we have a race condition for which environment executes first.
+          "--process-execution-speculation-strategy=none",
           f"--remote-oauth-bearer-token-path={oauth_token_path}"
         ]
       subprocess.run(command, check=True)
