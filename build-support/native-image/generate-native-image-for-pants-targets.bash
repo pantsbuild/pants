@@ -47,19 +47,17 @@ function download_buildozer {
 function build_agent_dylib {
   pushd "$(get_substratevm_dir)" >&2
   if is_osx; then
-    desired_agent_dylib_path="$(pwd)/libnative-image-agent.dylib"
+    dylib_extension='.dylib'
   else
-    desired_agent_dylib_path="$(pwd)/libnative-image-agent.so"
+    dylib_extension='.so'
   fi
+  desired_agent_dylib_path="$(pwd)/libnative-image-agent${dylib_extension}"
   if [[ ! -f "$desired_agent_dylib_path" ]]; then
-    mx build >&2 || return "$?"
-    mx native-image --tool:native-image-agent --verbose >&2 || return "$?"
-    if is_osx; then
-      cp -v {,lib}native-image-agent.dylib || return "$?"
-    else
-      cp -v {,lib}native-image-agent.so || return "$?"
-    fi >&2 || return "$?"
-  fi
+    mx build \
+      && mx native-image --tool:native-image-agent --verbose \
+      && cp -v {,lib}native-image-agent"$dylib_extension" \
+        || return "$?"
+  fi >&2
   echo "$desired_agent_dylib_path"
   popd >&2
 }
@@ -212,7 +210,7 @@ create_zinc_image \
   ${NATIVE_IMAGE_EXTRA_ARGS:-} \
   | while read -r image_location; do
   "$image_location" --help
-  echo
+  echo >&2 "native image generated at ${image_location}"
 done
 
 # NB: if the native-image build fails, and you see the following in the output:
