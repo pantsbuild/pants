@@ -5,9 +5,10 @@ import json
 import os.path
 import zipfile
 
-from pants.backend.python.rules.resolve_requirements import (ResolvedRequirementsPex,
-                                                             ResolveRequirementsRequest,
-                                                             resolve_requirements)
+from pants.backend.python.rules.create_requirements_pex import (RequirementsPex,
+                                                                RequirementsPexRequest,
+                                                                create_requirements_pex)
+from pants.backend.python.rules.download_pex_bin import download_pex_bin
 from pants.backend.python.subsystems.python_native_code import (PythonNativeCode,
                                                                 create_pex_native_build_environment)
 from pants.backend.python.subsystems.python_setup import PythonSetup
@@ -25,11 +26,12 @@ class TestResolveRequirements(TestBase):
   @classmethod
   def rules(cls):
     return super().rules() + [
-      resolve_requirements,
-      RootRule(ResolveRequirementsRequest),
+      create_requirements_pex,
+      create_pex_native_build_environment,
+      download_pex_bin,
+      RootRule(RequirementsPexRequest),
       RootRule(PythonSetup),
       RootRule(PythonNativeCode),
-      create_pex_native_build_environment,
     ]
 
   def setUp(self):
@@ -37,19 +39,19 @@ class TestResolveRequirements(TestBase):
     init_subsystems([PythonSetup, PythonNativeCode])
 
   def create_pex_and_get_pex_info(
-    self, requirements=None, entry_point=None, interpreter_constraints=None
+    self, *, requirements=None, entry_point=None, interpreter_constraints=None
   ):
     def hashify_optional_collection(iterable):
       return tuple(sorted(iterable)) if iterable is not None else tuple()
 
-    request = ResolveRequirementsRequest(
+    request = RequirementsPexRequest(
       output_filename="test.pex",
       requirements=hashify_optional_collection(requirements),
       interpreter_constraints=hashify_optional_collection(interpreter_constraints),
       entry_point=entry_point,
     )
     requirements_pex = assert_single_element(
-      self.scheduler.product_request(ResolvedRequirementsPex, [Params(
+      self.scheduler.product_request(RequirementsPex, [Params(
         request,
         PythonSetup.global_instance(),
         PythonNativeCode.global_instance()
@@ -64,19 +66,19 @@ class TestResolveRequirements(TestBase):
           pex_info_content = pex_info.readline().decode()
     return json.loads(pex_info_content)
 
-  def test_resolves_dependencies(self):
+  def test_resolves_dependencies(self) -> None:
     requirements = {"six==1.12.0", "jsonschema==2.6.0", "requests==2.22.0"}
     pex_info = self.create_pex_and_get_pex_info(requirements=requirements)
     # NB: We do not check for transitive dependencies, which PEX-INFO will include. We only check
     # that at least the dependencies we requested are included.
     self.assertTrue(requirements.issubset(pex_info["requirements"]))
 
-  def test_entry_point(self):
+  def test_entry_point(self) -> None:
     entry_point = "pydoc"
     pex_info = self.create_pex_and_get_pex_info(entry_point=entry_point)
     self.assertEqual(pex_info["entry_point"], entry_point)
 
-  def test_interpreter_constraints(self):
+  def test_interpreter_constraints(self) -> None:
     constraints = {"CPython>=2.7,<3", "CPython>=3.6,<4"}
     pex_info = self.create_pex_and_get_pex_info(interpreter_constraints=constraints)
     self.assertEqual(set(pex_info["interpreter_constraints"]), constraints)
