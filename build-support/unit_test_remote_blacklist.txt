@@ -65,8 +65,8 @@ tests/python/pants_test/backend/project_info/tasks:dependencies
 tests/python/pants_test/backend/project_info/tasks:depmap
 tests/python/pants_test/backend/project_info/tasks:export
 tests/python/pants_test/backend/project_info/tasks:filedeps
+tests/python/pants_test/backend/python/rules:create_requirements_pex
 tests/python/pants_test/backend/python/rules:inject_init
-tests/python/pants_test/backend/python/rules:resolve_requirements
 tests/python/pants_test/backend/python/targets:targets
 tests/python/pants_test/backend/python/tasks/native:native
 tests/python/pants_test/backend/python/tasks:build_local_python_distributions
