@@ -204,11 +204,8 @@ class RunTracker(Subsystem):
     millis = int((self._run_timestamp * 1000) % 1000)
     # run_uuid is used as a part of run_id and also as a trace_id for Zipkin tracing
     run_uuid = uuid.uuid4().hex
-    run_id = 'pants_run_{}_{}_{}'.format(
-      time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self._run_timestamp)),
-      millis,
-      run_uuid
-    )
+    str_time = time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self._run_timestamp))
+    run_id = f'pants_run_{str_time}_{millis}_{run_uuid}'
 
     info_dir = os.path.join(self.get_options().pants_workdir, self.options_scope)
     self.run_info_dir = os.path.join(info_dir, run_id)
@@ -272,7 +269,7 @@ class RunTracker(Subsystem):
     # Log reporting details.
     url = self.run_info.get_info('report_url')
     if url:
-      self.log(Report.INFO, 'See a report at: {}'.format(url))
+      self.log(Report.INFO, f'See a report at: {url}')
     else:
       self.log(Report.INFO, '(To run a reporting server: ./pants server)')
 
@@ -408,7 +405,7 @@ class RunTracker(Subsystem):
     try:
       safe_file_dump(file_name, params, mode='w')
     except Exception as e: # Broad catch - we don't want to fail in stats related failure.
-      print('WARNING: Failed to write stats to {} due to Error: {}'.format(file_name, e),
+      print(f'WARNING: Failed to write stats to {file_name} due to Error: {e}',
             file=sys.stderr)
 
   def run_information(self):
@@ -544,7 +541,7 @@ class RunTracker(Subsystem):
       critical_path_timings.add_timing(tracking_label, raw_timings.get(timing_label, 0.0))
 
     def get_label(dep):
-      return "{}:{}".format(RunTracker.DEFAULT_ROOT_NAME, dep)
+      return f"{RunTracker.DEFAULT_ROOT_NAME}:{dep}"
 
     # Add setup workunit to critical_path_timings manually, as its unaccounted for, otherwise.
     add_to_timings(setup_workunit, setup_workunit)
@@ -602,11 +599,8 @@ class RunTracker(Subsystem):
       else:
         return value[option]
     except (Config.ConfigValidationError, AttributeError) as e:
-      raise ValueError("Couldn't find option scope {}{} for recording ({})".format(
-        scope,
-        "" if option is None else " option {}".format(option),
-        e
-      ))
+      option_str = "" if option is None else f" option {option}"
+      raise ValueError(f"Couldn't find option scope {scope}{option_str} for recording ({e})")
 
   @classmethod
   def _create_dict_with_nested_keys_and_val(cls, keys, value):

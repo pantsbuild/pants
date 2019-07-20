@@ -55,13 +55,13 @@ class RunInfo:
       key = key.strip()
       val = str(val).strip()
       if ':' in key:
-        raise ValueError('info key "{}" must not contain a colon.'.format(key))
+        raise ValueError(f'info key "{key}" must not contain a colon.')
       kv_pairs.append((key, val))
 
     for k, v in kv_pairs:
       if k in self._info:
-        raise ValueError('info key "{}" already exists with value {}. '
-                         'Cannot add it again with value {}.'.format(k, self._info[k], v))
+        raise ValueError(f'info key "{k}" already exists with value {self._info[k]}. '
+                         'Cannot add it again with value {v}.')
       self._info[k] = v
 
     try:
