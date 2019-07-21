@@ -3,30 +3,34 @@
 
 import datetime
 import os
+import shutil
 import subprocess
 import unittest
 from contextlib import contextmanager
+from pathlib import Path
 from textwrap import dedent
+from typing import Optional, Sequence
 
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_file_dump, touch
-from pants_test.testutils.git_util import get_repo_root, initialize_repo
+from pants.util.dirutil import safe_file_dump, safe_mkdir_for
+from pants_test.testutils.git_util import initialize_repo
 
 
 class PreCommitHookTest(unittest.TestCase):
 
-  def setUp(self):
-    self.pants_repo_root = get_repo_root()
-
   @contextmanager
-  def _create_tiny_git_repo(self):
+  def _create_tiny_git_repo(self, *, copy_files: Optional[Sequence[Path]] = None):
     with temporary_dir() as gitdir,\
          temporary_dir() as worktree:
       # A tiny little fake git repo we will set up. initialize_repo() requires at least one file.
-      readme_file = os.path.join(worktree, 'README')
-      touch(readme_file)
+      (Path(worktree) / 'README').touch()
       # The contextmanager interface is only necessary if an explicit gitdir is not provided.
       with initialize_repo(worktree, gitdir=gitdir) as git:
+        if copy_files is not None:
+          for fp in copy_files:
+            new_fp = Path(worktree) / fp
+            safe_mkdir_for(str(new_fp))
+            shutil.copy(fp, new_fp)
         yield git, worktree, gitdir
 
   def _assert_subprocess_error(self, worktree, cmd, expected_excerpt):
@@ -50,8 +54,8 @@ class PreCommitHookTest(unittest.TestCase):
     self.assertEqual(full_expected_output, stdout)
 
   def test_check_packages(self):
-    package_check_script = os.path.join(self.pants_repo_root, 'build-support/bin/check_packages.sh')
-    with self._create_tiny_git_repo() as (_, worktree, _):
+    package_check_script = 'build-support/bin/check_packages.sh'
+    with self._create_tiny_git_repo(copy_files=[Path(package_check_script)]) as (_, worktree, _):
       init_py_path = os.path.join(worktree, 'subdir/__init__.py')
 
       # Check that an invalid __init__.py errors.
@@ -76,9 +80,8 @@ subdir/__init__.py
   # more testing git functionality, but since it's not clear how this is measured, it could be
   # useful if correctly detecting copies and moves ever becomes a concern.
   def test_added_files_correctly_detected(self):
-    get_added_files_script = os.path.join(self.pants_repo_root,
-                                          'build-support/bin/get_added_files.sh')
-    with self._create_tiny_git_repo() as (git, worktree, _):
+    get_added_files_script = 'build-support/bin/get_added_files.sh'
+    with self._create_tiny_git_repo(copy_files=[Path(get_added_files_script)]) as (git, worktree, _):
       # Create a new file.
       new_file = os.path.join(worktree, 'wow.txt')
       safe_file_dump(new_file, '')
@@ -91,12 +94,12 @@ subdir/__init__.py
         full_expected_output=f"{rel_new_file}\n")
 
   def test_check_headers(self):
-    header_check_script = os.path.join(
-      self.pants_repo_root, 'build-support/bin/check_header.py'
-    )
+    header_check_script = 'build-support/bin/check_header.py'
     cur_year_num = datetime.datetime.now().year
     cur_year = str(cur_year_num)
-    with self._create_tiny_git_repo() as (_, worktree, _):
+    with self._create_tiny_git_repo(
+      copy_files=[Path(header_check_script), "build-support/bin/common.py"]
+    ) as (_, worktree, _):
       new_py_path = os.path.join(worktree, 'subdir/file.py')
 
       def assert_header_check(added_files, expected_excerpt):
