@@ -30,25 +30,24 @@ class PreCommitHookTest(unittest.TestCase):
         yield git, worktree, gitdir
 
   def _assert_subprocess_error(self, worktree, cmd, expected_excerpt):
-    proc = subprocess.Popen(
+    result = subprocess.run(
       cmd,
       cwd=worktree,
       stdout=subprocess.PIPE,
       stderr=subprocess.PIPE,
+      encoding="utf-8",
     )
-    (stdout_data, stderr_data) = proc.communicate()
-    stdout_data = stdout_data.decode()
-    stderr_data = stderr_data.decode()
-    self.assertNotEqual(0, proc.returncode)
-    all_output = '{}\n{}'.format(stdout_data, stderr_data)
-    self.assertIn(expected_excerpt, all_output)
+    self.assertNotEqual(0, result.returncode)
+    self.assertIn(expected_excerpt, f'{result.stdout}\n{result.stderr}')
 
   def _assert_subprocess_success(self, worktree, cmd, **kwargs):
     self.assertEqual(0, subprocess.check_call(cmd, cwd=worktree, **kwargs))
 
   def _assert_subprocess_success_with_output(self, worktree, cmd, full_expected_output):
-    output = subprocess.check_output(cmd, cwd=worktree)
-    self.assertEqual(full_expected_output, output.decode())
+    stdout = subprocess.run(
+      cmd, cwd=worktree, check=True, stdout=subprocess.PIPE, encoding="utf-8"
+    ).stdout
+    self.assertEqual(full_expected_output, stdout)
 
   def test_check_packages(self):
     package_check_script = os.path.join(self.pants_repo_root, 'build-support/bin/check_packages.sh')
@@ -89,7 +88,7 @@ subdir/__init__.py
       self._assert_subprocess_success_with_output(
         worktree, [get_added_files_script],
         # This should be the only entry in the index, and it is a newly added file.
-        full_expected_output="{}\n".format(rel_new_file))
+        full_expected_output=f"{rel_new_file}\n")
 
   def test_check_headers(self):
     header_check_script = os.path.join(
@@ -122,12 +121,11 @@ subdir/__init__.py
       )
 
       # Check that a file with a typo in the header fails
-      safe_file_dump(new_py_path, dedent("""\
-        # Copyright {} Pants project contributors (see CONTRIBUTORS.md).
+      safe_file_dump(new_py_path, dedent(f"""\
+        # Copyright {cur_year} Pants project contributors (see CONTRIBUTORS.md).
         # Licensed under the MIT License, Version 3.3 (see LICENSE).
 
-        """.format(cur_year))
-      )
+        """))
       assert_header_check(
         added_files=[],
         expected_excerpt="subdir/file.py: header does not match the expected header"
@@ -144,22 +142,22 @@ subdir/__init__.py
         added_files=[],
         expected_excerpt=(
           r"subdir/file.py: copyright year must match '20\d\d' (was YYYY): "
-          "current year is {}".format(cur_year)
+          f"current year is {cur_year}"
         )
       )
 
       # Check that a newly added file must have the current year.
       last_year = str(cur_year_num - 1)
-      safe_file_dump(new_py_path, dedent("""\
-        # Copyright {} Pants project contributors (see CONTRIBUTORS.md).
+      safe_file_dump(new_py_path, dedent(f"""\
+        # Copyright {last_year} Pants project contributors (see CONTRIBUTORS.md).
         # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-        """.format(last_year))
+        """)
       )
       rel_new_py_path = os.path.relpath(new_py_path, worktree)
       assert_header_check(
         added_files=[rel_new_py_path],
-        expected_excerpt="subdir/file.py: copyright year must be {} (was {})".format(cur_year, last_year)
+        expected_excerpt=f"subdir/file.py: copyright year must be {cur_year} (was {last_year})"
       )
 
       # Check that a file isn't checked against the current year if it is not passed as an
