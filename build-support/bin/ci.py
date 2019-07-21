@@ -324,7 +324,6 @@ def run_python_tests_v1() -> None:
         "./pants.pex",
         f"--target-spec-file={known_v2_failures_file}",
         "test.pytest",
-        "--chroot",
       ] + PYTEST_PASSTHRU_ARGS, check=True)
     except subprocess.CalledProcessError:
       die("Python unit test failure (V1 test runner")
