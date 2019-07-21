@@ -19,3 +19,9 @@ files(
   name = 'pants_script',
   source = 'pants',
 )
+
+# Usually this must be accompanied with `pants_script` to be discovered properly.
+files(
+  name = 'pants_ini',
+  source = 'pants.ini'
+)
