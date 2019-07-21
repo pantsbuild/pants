@@ -194,9 +194,10 @@ encountered it too. After you've done that, you can ask in slack for someone to 
 That will cause the shard to re-run its tests.
 
 #### Advanced: Remote execution of tests
-Pants is in the early stages of running its tests through remote build execution (RBE), meaning
-that each test class is run with a distinct remote worker through Google Cloud, rather than
-running locally. This allows for highly parallel runs of our large CI suite.
+Pants is in the early stages of running its tests through Google's Remote Build Execution service
+(RBE), meaning that each step of the testing process (e.g. resolving requirements or running Pytest)
+may be run with a distinct remote worker through Google Cloud, rather than running locally. This
+allows for highly parallel runs of our large CI suite.
 
 To use this feature locally, you must download the Google Cloud SDK and log in through the CLI to
 your Google account via `gcloud auth login` and `gcloud auth application-default login`. Then, if
