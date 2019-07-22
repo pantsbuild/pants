@@ -96,12 +96,16 @@ class NodeModule(NodePackage):
     """
     if isinstance(self.payload.bin_executables, string_types):
       # In this case, the package_name is the bin name
-      return { self.package_name: self.payload.bin_executables }
+      return {self.package_name: self.payload.bin_executables}
 
     return self.payload.bin_executables
 
   @property
   def package_manager(self):
+    """
+
+    :rtype: string
+    """
     return self.payload.package_manager
 
   @property

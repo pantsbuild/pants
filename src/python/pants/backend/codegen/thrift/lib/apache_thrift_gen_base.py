@@ -22,10 +22,10 @@ class ApacheThriftGenBase(SimpleCodegenTask):
   # The name of the thrift generator to use. Subclasses must set.
   # E.g., java, py (see `thrift -help` for all available generators).
   thrift_generator = None
-  # The name of the 
+  # The name of the
   @classproperty
-  def gen_directory(cls):
-    return thrift_generator
+  def gen_directory(self, cls=None):
+    return self.thrift_generator
 
   # Subclasses may set their own default generator options.
   default_gen_options_map = None
