@@ -33,6 +33,7 @@ class RunTrackerTest(TestBase):
             decoded_post_data = {k: json.loads(v[0]) for k, v in post_data.items()}
             self.assertEqual(stats, decoded_post_data)
             self.assertEqual(handler.headers['User-Agent'], f"pants/v{VERSION}")
+            self.assertEqual(handler.headers['X-Pants-Stats-Version'], "1")
             handler.send_response(200)
             handler.end_headers()
         except Exception:

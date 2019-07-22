@@ -253,7 +253,7 @@ class RunTracker(Subsystem):
     self.report = report
 
     # Set up the JsonReporter for V2 stats.
-    if self.get_options().stats_version == 2:
+    if self._stats_version == 2:
       json_reporter_settings = JsonReporter.Settings(log_level=Report.INFO)
       self.json_reporter = JsonReporter(self, json_reporter_settings)
       report.add_reporter('json', self.json_reporter)
@@ -348,13 +348,19 @@ class RunTracker(Subsystem):
       workunit.set_outcome(outcome)
       self.end_workunit(workunit)
 
+  @property
+  def _stats_version(self) -> int:
+    return self.get_options().stats_version
+
   def log(self, level, *msg_elements):
     """Log a message against the current workunit."""
     self.report.log(self._threadlocal.current_workunit, level, *msg_elements)
 
   @classmethod
   def _get_headers(cls) -> Dict[str, str]:
-    return {'User-Agent': f"pants/v{VERSION}"}
+    return {'User-Agent': f"pants/v{VERSION}",
+            'X-Pants-Stats-Version': str(self._stats_version),
+            }
 
   @classmethod
   def post_stats(cls, stats_url, stats, timeout=2, auth_provider=None):
@@ -425,7 +431,7 @@ class RunTracker(Subsystem):
     return run_information
 
   def _stats(self):
-    if self.get_options().stats_version == 2:
+    if self._stats_version == 2:
       return {
         'run_info': self.run_information(),
         'artifact_cache_stats': self.artifact_cache_stats.get_all(),
