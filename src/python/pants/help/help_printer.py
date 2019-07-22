@@ -52,7 +52,8 @@ class HelpPrinter:
     for scope_info in self._options.known_scope_to_info.values():
       if scope_info.category not in (ScopeInfo.GOAL, ScopeInfo.GOAL_V1):
         continue
-      goal_descriptions[scope_info.scope] = scope_info.description
+      description = scope_info.description or "<no description>"
+      goal_descriptions[scope_info.scope] = description
     goal_descriptions.update({goal.name: goal.description_first_line
                               for goal in Goal.all()
                               if goal.description})
