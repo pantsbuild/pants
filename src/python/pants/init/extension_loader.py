@@ -131,6 +131,7 @@ def load_backend(build_configuration, backend_package):
                                     .format(backend=backend_module, error=e))
 
   def invoke_entrypoint(name):
+    #print(f"INVOKE ENTRYPOINT NAME {name} MODULE {module}")
     entrypoint = getattr(module, name, lambda: None)
     try:
       return entrypoint()

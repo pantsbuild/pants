@@ -145,6 +145,8 @@ class BuildConfiguration:
     :type rules: :class:`collections.Iterable` containing
                  :class:`pants.engine.rules.Rule` instances.
     """
+
+    print(f"Rules: {rules}")
     if not isinstance(rules, Iterable):
       raise TypeError('The rules must be an iterable, given {!r}'.format(rules))
 
