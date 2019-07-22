@@ -162,13 +162,15 @@ with whatever relevant flags reproduce the failure (`./build-support/bin/ci.py -
 available flags). The relevant flags are in the log for the shard on a line that looks something
 like `./build-support/bin/ci.py --python-tests --python-version 3.7`.
 
-To run just Pants' *unit* tests (skipping the can-be-slow integration tests), filter out
-the python tests tagged with 'integration':
+To run tests for a specific target, run the below, substituting the target(s) with what you'd like to test:
 
     :::bash
-    $ ./pants test tests/python/pants_test:: --tag=-integration
+    $ ./pants test tests/python/pants_test/util:strutil
 
-For convenience, this is wrapped up in a script `build-support/bin/unit-test.sh`.
+You may filter out the often-slow integration tests like this;
+
+    :::bash
+    $ ./pants --tag=-integration test tests/python/pants_test/goal::
 
 If you only want to run tests for changed targets, then you can use the
 `test-changed` goal:
