@@ -73,6 +73,7 @@ class RunTracker(Subsystem):
 
   # The name of the tracking root for the background worker threads.
   BACKGROUND_ROOT_NAME = 'background'
+  SUPPORTED_STATS_VERSIONS = [1, 2]
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -87,7 +88,7 @@ class RunTracker(Subsystem):
                   'auth provider name is only used to provide a more helpful error message.')
     register('--stats-upload-timeout', advanced=True, type=int, default=2,
              help='Wait at most this many seconds for the stats upload to complete.')
-    register('--stats-version', advanced=True, type=int, default=1, choices=[1, 2],
+    register('--stats-version', advanced=True, type=int, default=1, choices=cls.SUPPORTED_STATS_VERSIONS,
              help='Format of stats JSON for uploads and local json file.')
     register('--num-foreground-workers', advanced=True, type=int,
              default=multiprocessing.cpu_count(),
@@ -253,7 +254,7 @@ class RunTracker(Subsystem):
     self.report = report
 
     # Set up the JsonReporter for V2 stats.
-    if self.get_options().stats_version == 2:
+    if self._stats_version == 2:
       json_reporter_settings = JsonReporter.Settings(log_level=Report.INFO)
       self.json_reporter = JsonReporter(self, json_reporter_settings)
       report.add_reporter('json', self.json_reporter)
@@ -348,16 +349,22 @@ class RunTracker(Subsystem):
       workunit.set_outcome(outcome)
       self.end_workunit(workunit)
 
+  @property
+  def _stats_version(self) -> int:
+    return self.get_options().stats_version
+
   def log(self, level, *msg_elements):
     """Log a message against the current workunit."""
     self.report.log(self._threadlocal.current_workunit, level, *msg_elements)
 
   @classmethod
-  def _get_headers(cls) -> Dict[str, str]:
-    return {'User-Agent': f"pants/v{VERSION}"}
+  def _get_headers(cls, stats_version: int) -> Dict[str, str]:
+    return {'User-Agent': f"pants/v{VERSION}",
+            'X-Pants-Stats-Version': str(stats_version),
+            }
 
   @classmethod
-  def post_stats(cls, stats_url, stats, timeout=2, auth_provider=None):
+  def post_stats(cls, stats_url, stats, timeout=2, auth_provider=None, stats_version=1):
     """POST stats to the given url.
 
     :return: True if upload was successful, False otherwise.
@@ -367,12 +374,14 @@ class RunTracker(Subsystem):
       print(f'WARNING: Failed to upload stats to {stats_url} due to {msg}', file=sys.stderr)
       return False
 
+    if stats_version not in cls.SUPPORTED_STATS_VERSIONS:
+      raise ValueError("Invalid stats version")
     # TODO(benjy): The upload protocol currently requires separate top-level params, with JSON
     # values.  Probably better for there to be one top-level JSON value, namely json.dumps(stats).
     # But this will first require changing the upload receiver at every shop that uses this.
     params = {k: cls._json_dump_options(v) for (k, v) in stats.items()}
     cookies = Cookies.global_instance()
-    headers = cls._get_headers()
+    headers = cls._get_headers(stats_version=stats_version)
     auth_provider = auth_provider or '<provider>'
 
     # We can't simply let requests handle redirects, as we only allow them for specific codes:
@@ -425,7 +434,7 @@ class RunTracker(Subsystem):
     return run_information
 
   def _stats(self):
-    if self.get_options().stats_version == 2:
+    if self._stats_version == 2:
       return {
         'run_info': self.run_information(),
         'artifact_cache_stats': self.artifact_cache_stats.get_all(),
@@ -457,7 +466,7 @@ class RunTracker(Subsystem):
     stats_upload_urls = copy.copy(self.get_options().stats_upload_urls)
     timeout = self.get_options().stats_upload_timeout
     for stats_url, auth_provider in stats_upload_urls.items():
-      self.post_stats(stats_url, stats, timeout=timeout, auth_provider=auth_provider)
+      self.post_stats(stats_url, stats, timeout=timeout, auth_provider=auth_provider, stats_version=self._stats_version)
 
   _log_levels = [Report.ERROR, Report.ERROR, Report.WARN, Report.INFO, Report.INFO]
 
