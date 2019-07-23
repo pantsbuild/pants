@@ -67,7 +67,7 @@ class SchedulerService(PantsService):
     """Service setup."""
     super().setup(services)
     # Register filesystem event handlers on an FSEventService instance.
-    self._fs_event_service.register_all_files_handler(self._enqueue_fs_event)
+    self._fs_event_service.register_all_files_handler(self._enqueue_fs_event, self._fs_event_service.PANTS_ALL_FILES_SUBSCRIPTION_NAME)
 
     # N.B. We compute the invalidating fileset eagerly at launch with an assumption that files
     # that exist at startup are the only ones that can affect the running daemon.
