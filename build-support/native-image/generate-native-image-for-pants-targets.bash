@@ -28,13 +28,13 @@ SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 source "${SCRIPT_DIR}/build-zinc-native-image.bash"
 
 GENERATED_CONFIG_DIRNAME="${GENERATED_CONFIG_DIRNAME:-generated-reflect-config}"
-GENERATED_CONFIG_DIR="$(normalize_path "$GENERATED_CONFIG_DIRNAME")"
+GENERATED_CONFIG_DIR="$(normalize_path_no_validation "$GENERATED_CONFIG_DIRNAME")"
 GENERATED_CONFIG_JSON_FILE="${GENERATED_CONFIG_DIR}/reflect-config.json"
 GENERATED_BUILD_FILE="${GENERATED_CONFIG_DIR}/BUILD"
 
 # NB: Using $REPO_ROOT as calculated in other scripts in this repo seems to make this script fail
 # when run from outside the pants repo!
-DOWNLOAD_BINARY_SCRIPT="$(normalize_path "${SCRIPT_DIR}/../bin/download_binary.sh")"
+DOWNLOAD_BINARY_SCRIPT="$(normalize_path_check_file "${SCRIPT_DIR}/../bin/download_binary.sh")"
 
 # FUNCTIONS
 
@@ -84,7 +84,7 @@ function run_zinc_compile_with_tracing {
             "$@"
     unset PANTS_COMPILE_ZINC_JVM_OPTIONS
   fi >&2
-  normalize_path "$GENERATED_CONFIG_DIR"
+  normalize_path_check_dir "$GENERATED_CONFIG_DIR"
 }
 
 # analyze tracing -- trim reflection down to just macros, then find those macros' targets with
@@ -125,7 +125,6 @@ function template_BUILD_file {
 
 jvm_binary(
   name='generated-native-image-binary',
-  main='org.pantsbuild.zinc.compiler.Main',
   dependencies=[
     $(sed -Ee 's#^(.*)$#"//\1",#g')
   ],
@@ -159,25 +158,61 @@ function generate_template_macro_deps_target {
 }
 
 function add_macro_deps_to_generated_target {
+  # NB: dump dependencies to a file, then run `./pants list` to normalize them!
+  cat >.tmp-deps
+  ./pants --target-spec-file=.tmp-deps list | sort -u >.tmp-normalized-deps || return "$?"
   if [[ -f "$GENERATED_BUILD_FILE" ]]; then
     # If the generated BUILD file exists already, pull down buildozer to idempotently add the new
     # deps!
-    add_buildozer_macro_deps
+    add_buildozer_macro_deps <.tmp-normalized-deps
   else
     # Otherwise, generate a BUILD file next to the generated native-image json config.
-    generate_template_macro_deps_target
-  fi
+    generate_template_macro_deps_target <.tmp-normalized-deps
+  fi >&2
 }
 
 function generate_macro_deps_jar {
   # NB: This "gracefully" handles the case of having no macros to add by having pants succeed
   # without outputting any jar. This is passed to the native-image build classpath, which accepts
   # entries that don't exist.
-  (extract_macro_target_names_from_pants "$@" \
-     | add_macro_deps_to_generated_target \
-     && ./pants -ldebug binary "//${GENERATED_CONFIG_DIRNAME}:generated-native-image-binary") \
-    >&2 \
-    && normalize_path dist/generated-native-image-binary.jar
+  >&2 extract_macro_target_names_from_pants "$@" \
+    | add_macro_deps_to_generated_target \
+    || return "$?"
+
+  >&2 ./pants -ldebug binary "//${GENERATED_CONFIG_DIRNAME}:generated-native-image-binary" \
+    || return "$?"
+
+  normalize_path_check_file dist/generated-native-image-binary.jar
+}
+
+function exercise_native_image_for_compilation {
+  # Test that the just-built native-image can be executed successfully, including running a test
+  # compile!
+  local image_location="$1"
+  local -a other_args=( "${@:2}" )
+
+  "$image_location" --help || return "$?"
+  echo >&2 "native image generated at ${image_location}. running test compile..."
+  sleep 1
+
+  # Put the native-image in the correct cache location for zinc 0.0.15, overwriting the current one
+  # if necessary!
+  if is_osx; then
+    zinc_image_pants_cached="${HOME}/.cache/pants/bin/zinc-pants-native-image/mac/10.13/0.0.15-from-image-script"
+  else
+    zinc_image_pants_cached="${HOME}/.cache/pants/bin/zinc-pants-native-image/linux/x86_64/0.0.15-from-image-script"
+  fi
+  mkdir -pv "$zinc_image_pants_cached" || return "$?"
+
+  cp -v "$image_location" "${zinc_image_pants_cached}/zinc-pants-native-image"
+
+  export PANTS_COMPILE_ZINC_JVM_OPTIONS='[]'
+  ./pants \
+    --zinc-native-image --zinc-version=0.0.15-from-image-script \
+    compile.zinc --execution-strategy=hermetic --no-incremental --cache-ignore \
+    test \
+    "${other_args[@]}" || return "$?"
+  unset PANTS_COMPILE_ZINC_JVM_OPTIONS
 }
 
 # actually build the zinc image!!!
@@ -186,9 +221,24 @@ function generate_macro_deps_jar {
 # NB: It's not clear whether it's possible to set the locale in some ubuntu containers, so we
 # simply ignore it here.
 export PANTS_IGNORE_UNRECOGNIZED_ENCODING=1
+# NB: This is necessary to make download_binary.sh work!
 export PY="$(which python3)"
 
+# NB: We support having empty extra args, so this check for the 'xxx' sentinel will only capture
+# when the $NATIVE_IMAGE_EXTRA_ARGS variable is truly unset.
+if [[ "${NATIVE_IMAGE_EXTRA_ARGS:-xxx}" == 'xxx' ]]; then
+  export NATIVE_IMAGE_EXTRA_ARGS='-H:IncludeResourceBundles=org.scalactic.ScalacticBundle'
+  cat >&2 <<EOF
+Including the scalactic resource bundle via the default NATIVE_IMAGE_EXTRA_ARGS='${NATIVE_IMAGE_EXTRA_ARGS}'.
+This is necessary for any repo using scalatest, but if it breaks yours, you may try setting:
+NATIVE_IMAGE_EXTRA_ARGS=' '
+EOF
+  sleep 5
+fi
+
 bootstrap_environment >&2
+
+trap 'find . -maxdepth 1 -type f -name ".tmp-*" -exec rm {} "+"' EXIT
 
 ensure_has_executable \
   'jq' \
@@ -209,8 +259,14 @@ create_zinc_image \
   -cp "$MACRO_DEPS_JAR" \
   ${NATIVE_IMAGE_EXTRA_ARGS:-} \
   | while read -r image_location; do
-  "$image_location" --help
-  echo >&2 "native image generated at ${image_location}"
+  # NB: `create_zinc_image` echoes the compiled zinc native-image location to stdout, so we read
+  # that single line of output with `while read -r`.
+  exercise_native_image_for_compilation "$image_location" "$@" \
+                                        >&2
+  # NB: We also echo the image location to stdout, while piping everything else to stderr. This
+  # means that the script can be invoked from another script to get a single line of stdout
+  # containing the path to the just-built native-image.
+  echo "$image_location"
 done
 
 # NB: if the native-image build fails, and you see the following in the output:

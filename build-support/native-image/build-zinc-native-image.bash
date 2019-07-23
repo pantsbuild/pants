@@ -16,7 +16,7 @@ function _get_coursier_impl {
     chmod +x coursier
     ./coursier --help >&2 || return "$?"
   fi >&2
-  normalize_path coursier
+  normalize_path_check_file coursier
 }
 
 function get_coursier {
@@ -47,18 +47,26 @@ function bootstrap_environment {
 }
 
 function get_base_native_image_build_script_graal_checkout {
+  # From https://github.com/cosmicexplorer/graal/tree/graal-make-zinc-again!
   do_within_cache_dir clone_repo_somewhat_idempotently \
                       graal/ \
                       https://github.com/cosmicexplorer/graal \
-                      graal-make-zinc-again
+                      ac6f6dd4783cece28f1696b413f02c3776753890
 }
 
 function clone_mx {
+  # From https://github.com/graalvm/mx/tree/master!
   do_within_cache_dir clone_repo_somewhat_idempotently \
                       mx/ \
                       https://github.com/graalvm/mx \
-    && >&2 with_pushd "${NATIVE_IMAGE_BUILD_CACHE_DIR}/mx" \
-           ./mx update
+                      c01eef6e31cd5655b1f0682c445f4ed50aa5c05e \
+    | while read -r mx_repo_dir; do
+    # Reading the mx clone dir from `do_within_cache_dir`, we make sure to call `./mx update` from
+    # within the mx repo, and then echo the same dir to stdout.
+    >&2 with_pushd "$mx_repo_dir" \
+        ./mx update
+    echo "$mx_repo_dir"
+  done
 }
 
 function extract_openjdk_jvmci {
@@ -80,7 +88,8 @@ function get_substratevm_dir {
 
 function build_native_image_tool {
   >&2 with_pushd "$(get_substratevm_dir)" \
-             mx build || return "$?"
+      mx build \
+    || return "$?"
   get_substratevm_dir
 }
 
@@ -88,8 +97,7 @@ function fetch_scala_compiler_jars {
   # TODO: the scala version used to build the pants zinc wrapper must also be changed if this is!
   version='2.12.8'
   "$(get_coursier)" fetch \
-                    org.scala-lang:scala-{compiler,library,reflect}:"$version" \
-    | merge_jars
+                    org.scala-lang:scala-{compiler,library,reflect}:"$version"
 }
 
 function fetch_pants_zinc_wrapper_jars {
@@ -102,18 +110,17 @@ function fetch_pants_zinc_wrapper_jars {
                     "org.pantsbuild:zinc-compiler_2.12:${pants_zinc_compiler_version}" \
                     "org.scala-sbt:compiler-bridge_2.12:${pants_underlying_zinc_dependency_version}" \
                     --exclude com.google.protobuf:protobuf-java \
-                    com.google.protobuf:protobuf-java:2.5.0 \
-    | merge_jars
+                    com.google.protobuf:protobuf-java:2.5.0
 }
 
 function create_zinc_image {
-  scala_compiler_jars="$(fetch_scala_compiler_jars)"
-  native_image_suite="$(do_within_cache_dir build_native_image_tool)"
-  pants_zinc_wrapper_jars="$(fetch_pants_zinc_wrapper_jars)"
+  local scala_compiler_jars="$(fetch_scala_compiler_jars | merge_jars)"
+  local native_image_suite="$(do_within_cache_dir build_native_image_tool)"
+  local pants_zinc_wrapper_jars="$(fetch_pants_zinc_wrapper_jars | merge_jars)"
 
-  expected_output="zinc-pants-native-$(uname)"
+  local expected_output="zinc-pants-native-$(uname)"
 
-  time mx -p "$native_image_suite" native-image \
+  >&2 time mx -p "$native_image_suite" native-image \
        -cp "${scala_compiler_jars}:${pants_zinc_wrapper_jars}" \
        org.pantsbuild.zinc.compiler.Main \
        -H:Name="$expected_output" \
@@ -122,8 +129,8 @@ function create_zinc_image {
        --no-fallback \
        -Djava.io.tmpdir=/tmp \
        "$@" \
-       >&2
+    || return "$?"
 
-  normalize_path "$expected_output" \
-    && [[ -f "$(pwd)/${expected_output}" ]]
+  normalize_path_check_file "$expected_output" \
+                            'pants zinc native-image failed to generate!'
 }

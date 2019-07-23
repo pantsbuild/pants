@@ -7,11 +7,15 @@ function is_osx {
   [[ "$(uname)" == 'Darwin' ]]
 }
 
+function die {
+  echo >&2 "$@"
+  exit 1
+}
+
 function ensure_has_executable {
   local cmd="$1"
   if ! hash "$cmd"; then
-    echo >&2 "${cmd} was not found." "${@:2}"
-    exit 1
+    die "${cmd} was not found." "${@:2}"
   fi
 }
 
@@ -26,9 +30,32 @@ function do_within_cache_dir {
   with_pushd "$NATIVE_IMAGE_BUILD_CACHE_DIR" "$@"
 }
 
-function normalize_path {
-  realpath "$@" \
-    || readlink -f "$@"
+function normalize_path_no_validation {
+  if hash realpath 2>/dev/null; then
+    realpath "$@"
+  else
+    readlink -f "$@"
+  fi
+}
+
+function normalize_path_check_file {
+  local path="$1"
+  local result="$(normalize_path_no_validation "$path")"
+  if [[ -f "$result" ]]; then
+    echo "$result"
+  else
+    die "file was expected: $path" "${@:2}"
+  fi
+}
+
+function normalize_path_check_dir {
+  local path="$1"
+  local result="$(normalize_path_no_validation "$path")"
+  if [[ -d "$result" ]]; then
+    echo "$result"
+  else
+    die "directory was expected: $path" "${@:2}"
+  fi
 }
 
 function clone_repo_somewhat_idempotently {
@@ -45,7 +72,7 @@ function clone_repo_somewhat_idempotently {
     fi
   fi >&2
 
-  normalize_path "$outdir"
+  normalize_path_check_dir "$outdir"
 }
 
 function extract_tgz {
@@ -57,7 +84,7 @@ function extract_tgz {
       | tar zxvf -
   fi >&2
 
-  normalize_path "$outdir"
+  normalize_path_check_dir "$outdir"
 }
 
 function merge_jars {
