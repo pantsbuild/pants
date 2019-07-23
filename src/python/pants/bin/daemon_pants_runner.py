@@ -112,22 +112,6 @@ class DaemonPantsRunner:
   def create(cls, sock, args, env, services, scheduler_service):
     maybe_shutdown_socket = MaybeShutdownSocket(sock)
 
-    try:
-      # N.B. This will redirect stdio in the daemon's context to the nailgun session.
-      with cls.nailgunned_stdio(maybe_shutdown_socket, env, handle_stdin=False) as finalizer:
-        print('123')
-        options, _, options_bootstrapper = LocalPantsRunner.parse_options(args, env)
-        subprocess_dir = options.for_global_scope().pants_subprocessdir
-        graph_helper, target_roots, exit_code = scheduler_service.prepare_graph(options, options_bootstrapper)
-        finalizer()
-    except Exception:
-      graph_helper = None
-      target_roots = None
-      options_bootstrapper = None
-      # TODO: this should no longer be necessary, remove the creation of subprocess_dir
-      subprocess_dir = os.path.join(get_buildroot(), '.pids')
-      exit_code = 1
-      # TODO This used to raise the _GracefulTerminationException, and maybe it should again, or notify in some way that the prepare_graph has failed.
 
     return cls(
       maybe_shutdown_socket,
@@ -262,6 +246,15 @@ class DaemonPantsRunner:
     return None if client_start_time is None else float(client_start_time)
 
   def run(self):
+
+    try:
+      # N.B. This will redirect stdio in the daemon's context to the nailgun session.
+      with cls.nailgunned_stdio(maybe_shutdown_socket, env, handle_stdin=False) as finalizer:
+
+    except Exception:
+
+
+
     # Ensure anything referencing sys.argv inherits the Pailgun'd args.
     sys.argv = self._args
 
@@ -276,6 +269,13 @@ class DaemonPantsRunner:
       hermetic_environment_as(**self._env), \
       encapsulated_global_logger():
       try:
+
+        options, _, options_bootstrapper = LocalPantsRunner.parse_options(args, env)
+        subprocess_dir = options.for_global_scope().pants_subprocessdir
+        graph_helper, target_roots, exit_code = scheduler_service.prepare_graph(options, options_bootstrapper)
+        finalizer()
+
+
         # Clean global state.
         clean_global_runtime_state(reset_subsystem=True)
 
@@ -306,5 +306,8 @@ class DaemonPantsRunner:
         # happening here, so something is probably overriding the excepthook. By catching Exception
         # and calling this method, we emulate the normal, expected sys.excepthook override.
         ExceptionSink._log_unhandled_exception_and_exit(exc=e)
+
+
+
       else:
         self._exiter.exit(self.exit_code if self.exit_code else PANTS_SUCCEEDED_EXIT_CODE)
