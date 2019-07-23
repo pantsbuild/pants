@@ -98,12 +98,13 @@ class Goal:
     return goal_name if goal_name == task_name else '{0}.{1}'.format(goal_name, task_name)
 
   @staticmethod
-  def all():
+  def all(include_v1_goals: bool = True, include_v2_goals: bool = True):
     """Returns all active registered goals, sorted alphabetically by name.
 
     :API: public
     """
-    return [goal for _, goal in sorted(Goal._goal_by_name.items()) if goal.active]
+    should_include = lambda goal: goal.active and ((include_v1_goals and goal._v1_engine) or (include_v2_goals and goal._v2_engine))
+    return [goal for _, goal in sorted(Goal._goal_by_name.items()) if should_include(goal)]
 
   @classmethod
   def get_optionables(cls):
@@ -138,6 +139,8 @@ class _Goal(object):
     self.serialize = False
     self._task_type_by_name = {}  # name -> Task subclass.
     self._ordered_task_names = []  # The task names, in the order imposed by registration.
+    self._v1_engine = True
+    self._v2_engine = False
 
   @property
   def description(self):
