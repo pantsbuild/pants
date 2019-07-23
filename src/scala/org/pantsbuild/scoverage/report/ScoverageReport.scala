@@ -3,7 +3,6 @@ package org.pantsbuild.scoverage.report
 import java.io.File
 import sbt.internal.util.ConsoleLogger
 import org.apache.commons.io.FileUtils
-import scopt.OParser
 
 import scoverage.{ Coverage, IOUtils, Serializer }
 import scoverage.report.{ ScoverageHtmlWriter, ScoverageXmlWriter }
@@ -223,7 +222,7 @@ object ScoverageReport {
   }
 
   def main(args: Array[String]): Unit = {
-    OParser.parse(Settings.parser1, args, Settings()) match {
+    Settings.parser1.parse(args, Settings()) match {
       case Some(settings) =>
         val reportOptions = ReportOptions(settings)
 
