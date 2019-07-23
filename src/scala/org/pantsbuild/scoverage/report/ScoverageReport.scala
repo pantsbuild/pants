@@ -1,11 +1,12 @@
 package org.pantsbuild.scoverage.report
 
 import java.io.File
-import org.pantsbuild.zinc.options.Parsed
-import org.apache.commons.io.FileUtils
 import sbt.internal.util.ConsoleLogger
-import scoverage.{Coverage, IOUtils, Serializer}
-import scoverage.report.{ScoverageHtmlWriter, ScoverageXmlWriter}
+import org.apache.commons.io.FileUtils
+import scopt.OParser
+
+import scoverage.{ Coverage, IOUtils, Serializer }
+import scoverage.report.{ ScoverageHtmlWriter, ScoverageXmlWriter }
 
 object ScoverageReport {
   val Scoverage = "scoverage"
@@ -15,7 +16,8 @@ object ScoverageReport {
   // so we can run zinc without $PATH (as needed in remoting).
   System.setProperty("sbt.log.format", "true")
 
-  val cl = ConsoleLogger.apply()
+  // Setting the logger
+  val logger = ConsoleLogger.apply()
 
   case class ReportOptions(
     loadDataDir: Boolean,
@@ -27,14 +29,13 @@ object ScoverageReport {
     writeXml: Boolean,
     writeXmlDebug: Boolean,
     cleanOld: Boolean,
-    targetFilters: Seq[String]
-  ) {
+    targetFilters: Seq[String]) {
     val writeReports: Boolean = {
       val write = writeHtml || writeXml
       if (!write) {
         // we could end here, but we will still attempt to load the coverage and dump stats as info
         // to the log, so maybe somebody would want to run this w/o generating reports?
-        cl.warn("No report output format specified, so no reports will be written.")
+        logger.warn("No report output format specified, so no reports will be written.")
       }
       write
     }
@@ -52,11 +53,9 @@ object ScoverageReport {
         writeXml = settings.writeXmlReport,
         writeXmlDebug = settings.writeXmlDebug,
         cleanOld = settings.cleanOldReports,
-        targetFilters = settings.targetFilters
-      )
+        targetFilters = settings.targetFilters)
     }
   }
-
   /**
    *
    * @param dataDirs list of measurement directories for which coverage
@@ -90,7 +89,7 @@ object ScoverageReport {
    * @return         Coverage object wrapped in Option
    */
   private def aggregate(dataDirs: Seq[File]): Option[Coverage] = {
-    cl.success(s"Found ${dataDirs.size} subproject scoverage data directories [${dataDirs.mkString(",")}]")
+    logger.info(s"Found ${dataDirs.size} subproject scoverage data directories [${dataDirs.mkString(",")}]")
     if (dataDirs.nonEmpty) {
       Some(aggregatedCoverage(dataDirs))
     } else {
@@ -99,21 +98,36 @@ object ScoverageReport {
   }
 
   /**
+   *
+   * @param dataDir root directory to search under
+   * @return        all the directories and subdirs containing scoverage files beginning at [dataDir]
+   */
+  def getAllCoverageDirs(dataDir: File, acc: Seq[File]): Seq[File] = {
+    if (dataDir.listFiles.filter(_.isFile).toSeq.exists(_.getName contains "scoverage.coverage")) {
+      dataDir.listFiles.filter(_.isDirectory).toSeq
+        .foldRight(acc :+ dataDir) { (e, a) => getAllCoverageDirs(e, a) }
+    } else {
+      dataDir.listFiles.filter(_.isDirectory).toSeq
+        .foldRight(acc) { (e, a) => getAllCoverageDirs(e, a) }
+    }
+  }
+  /**
    * Select the appropriate directories for which the scoverage report has
    * to be generated. If [targetFiles] is empty, report is generated for all
    * measurements directories inside in [dataDir].
    */
-  private def filterFiles(dataDir: File, options: ReportOptions): Seq[File] = {
+  def filterFiles(dataDir: File, options: ReportOptions): Seq[File] = {
     val targetFiles = options.targetFilters
 
-    if(targetFiles.nonEmpty) {
-      cl.info(s"Looking for targets: $targetFiles")
-      dataDir.listFiles.filter(_.isDirectory).toSeq.filter {
-        file => targetFiles.contains(file.getName())
+    val coverareDirs = getAllCoverageDirs(dataDir, Seq())
+
+    if (targetFiles.nonEmpty) {
+      logger.info(s"Looking for targets: $targetFiles")
+      coverareDirs.filter {
+        file => targetFiles.exists(file.toString contains _)
       }
-    }
-    else {
-      dataDir.listFiles.filter(_.isDirectory).toSeq
+    } else {
+      coverareDirs
     }
   }
 
@@ -122,14 +136,13 @@ object ScoverageReport {
    */
   private def loadAggregatedCoverage(dataPath: String, options: ReportOptions): Option[Coverage] = {
     val dataDir: File = new File(dataPath)
-    cl.info(s"Attempting to open scoverage data dir: [$dataDir]")
-    if(dataDir.exists){
-      cl.info(s"Aggregating coverage.")
+    logger.info(s"Attempting to open scoverage data dir: [$dataDir]")
+    if (dataDir.exists) {
+      logger.info(s"Aggregating coverage.")
       val dataDirs: Seq[File] = filterFiles(dataDir, options)
       aggregate(dataDirs)
-    }
-    else {
-      cl.error("Coverage directory does not exists.")
+    } else {
+      logger.error("Coverage directory does not exists.")
       None
     }
   }
@@ -139,16 +152,16 @@ object ScoverageReport {
    */
   private def loadCoverage(dataPath: String): Option[Coverage] = {
     val dataDir: File = new File(dataPath)
-    cl.info(s"Attempting to open scoverage data dir [$dataDir]")
+    logger.info(s"Attempting to open scoverage data dir [$dataDir]")
 
     if (dataDir.exists) {
       val coverageFile = Serializer.coverageFile(dataDir)
-      cl.info(s"Reading scoverage instrumentation [$coverageFile]")
+      logger.info(s"Reading scoverage instrumentation [$coverageFile]")
 
       coverageFile.exists match {
         case true =>
           val coverage = Serializer.deserialize(coverageFile)
-          cl.info(s"Reading scoverage measurements...")
+          logger.info(s"Reading scoverage measurements...")
 
           val measurementFiles = IOUtils.findMeasurementFiles(dataDir)
           val measurements = IOUtils.invoked(measurementFiles)
@@ -156,12 +169,12 @@ object ScoverageReport {
           Some(coverage)
 
         case false =>
-          cl.error("Coverage file did not exist")
+          logger.error("Coverage file did not exist")
           None
 
       }
     } else {
-      cl.error("Data dir did not exist!")
+      logger.error("Data dir did not exist!")
       None
     }
 
@@ -178,75 +191,65 @@ object ScoverageReport {
 
     if (sourceDir.exists) {
       if (options.cleanOld && reportDir.exists) {
-        cl.info(s"Nuking old report directory [$reportDir].")
+        logger.info(s"Nuking old report directory [$reportDir].")
         FileUtils.deleteDirectory(reportDir)
       }
 
       if (!reportDir.exists) {
-        cl.info(s"Creating HTML report directory [$reportDirHtml]")
+        logger.info(s"Creating HTML report directory [$reportDirHtml]")
         reportDirHtml.mkdirs
-        cl.info(s"Creating XML report directory [$reportDirXml]")
+        logger.info(s"Creating XML report directory [$reportDirXml]")
         reportDirXml.mkdirs
       }
 
       if (options.writeHtml) {
-        cl.info(s"Writing HTML scoverage reports to [$reportDirHtml]")
+        logger.info(s"Writing HTML scoverage reports to [$reportDirHtml]")
         new ScoverageHtmlWriter(Seq(sourceDir), reportDirHtml, None).write(coverage)
       }
 
       if (options.writeXml) {
-        cl.info(s"Writing XML scoverage reports to [$reportDirXml]")
+        logger.info(s"Writing XML scoverage reports to [$reportDirXml]")
         new ScoverageXmlWriter(Seq(sourceDir), reportDirXml, false).write(coverage)
         if (options.writeXmlDebug) {
           new ScoverageXmlWriter(Seq(sourceDir), reportDirXml, true).write(coverage)
         }
       }
     } else {
-      cl.error(s"Source dir [$sourceDir] does not exist")
+      logger.error(s"Source dir [$sourceDir] does not exist")
     }
 
-    cl.success(s"Statement coverage: ${coverage.statementCoverageFormatted}%")
-    cl.success(s"Branch coverage:    ${coverage.branchCoverageFormatted}%")
+    logger.success(s"Statement coverage: ${coverage.statementCoverageFormatted}%")
+    logger.success(s"Branch coverage:    ${coverage.branchCoverageFormatted}%")
   }
 
-
   def main(args: Array[String]): Unit = {
-    val Parsed(settings, residual, errors) = Settings.parse(args)
-    val reportOptions = ReportOptions(settings)
+    OParser.parse(Settings.parser1, args, Settings()) match {
+      case Some(settings) =>
+        val reportOptions = ReportOptions(settings)
 
-    // bail out on any command-line option errors
-    if (errors.nonEmpty) {
-      for (error <- errors) System.err.println(error)
-      System.err.println("See %s -help for information about options" format Scoverage)
-      sys.exit(1)
-    }
+        reportOptions.loadDataDir match {
+          case false =>
+            loadAggregatedCoverage(reportOptions.measurementsPath, reportOptions) match {
+              case Some(cov) =>
+                logger.success("Coverage loaded successfully.")
+                if (reportOptions.writeReports) {
+                  writeReports(cov, reportOptions)
+                }
 
-    if (settings.help) {
-      Settings.printUsage(Scoverage)
-      return
-    }
-
-    settings.loadDataDir match {
-      case false =>
-        loadAggregatedCoverage(reportOptions.measurementsPath, reportOptions) match {
-          case Some(cov) =>
-            cl.success("Coverage loaded successfully.\n")
-            if (reportOptions.writeReports) {
-              writeReports(cov, reportOptions)
+              case None => logger.error("Failed to load coverage.")
             }
-
-          case None => cl.error("Failed to load coverage.")
-        }
-      case true =>
-        loadCoverage(reportOptions.dataPath) match {
-          case Some(cov) =>
-            cl.success("Coverage loaded successfully!")
-            if (reportOptions.writeReports) {
-              writeReports(cov, reportOptions)
+          case true =>
+            loadCoverage(reportOptions.dataPath) match {
+              case Some(cov) =>
+                logger.success("Coverage loaded successfully!")
+                if (reportOptions.writeReports) {
+                  writeReports(cov, reportOptions)
+                }
+              case _ => logger.error("Failed to load coverage")
             }
-          case _ => cl.error("Failed to load coverage")
         }
-    }
 
+      case None => logger.error("Incorrect options supplied")
+    }
   }
 }
