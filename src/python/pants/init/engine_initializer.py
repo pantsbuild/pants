@@ -21,8 +21,7 @@ from pants.engine.fs import create_fs_rules
 from pants.engine.goal import Goal
 from pants.engine.isolated_process import create_process_rules
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.engine.legacy.graph import (LegacyBuildGraph, TransitiveHydratedTargets,
-                                       create_legacy_graph_tasks)
+from pants.engine.legacy.graph import (LegacyBuildGraph, create_legacy_graph_tasks)
 from pants.engine.legacy.options_parsing import create_options_parsing_rules
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (JvmAppAdaptor, JvmBinaryAdaptor, PageAdaptor,
