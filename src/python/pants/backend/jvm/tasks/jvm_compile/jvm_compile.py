@@ -400,7 +400,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       return
     deprecated_conditional(
       lambda:  requested_compiler == self.Compiler.ZINC,
-      removal_version='1.19.0.dev0',
+      removal_version='1.20.0.dev0',
       entity_description='Requested a deprecated compiler: [{}].'.format(requested_compiler),
       hint_message='Compiler will be defaulted to [{}].'.format(self.compiler_name))
 

@@ -68,7 +68,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       self.assertTrue(os.path.exists(output), msg='Missing report file {}'.format(output))
 
   INFO_LEVEL_COMPILE_MSG='Compiling 1 mixed source in 1 target (examples/src/java/org/pantsbuild/example/hello/simple:simple).'
-  DEBUG_LEVEL_COMPILE_MSG='compile(examples/src/java/org/pantsbuild/example/hello/simple:simple) finished with status Successful'
+  DEBUG_LEVEL_COMPILE_MSG='examples/src/java/org/pantsbuild/example/hello/simple:simple) finished with status Successful'
 
   def test_output_level_warn(self):
     command = ['compile',

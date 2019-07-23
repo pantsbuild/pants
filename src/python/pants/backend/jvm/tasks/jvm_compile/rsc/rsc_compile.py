@@ -110,13 +110,13 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   compiler_name = 'rsc'
 
   deprecated_options_scope = 'compile.zinc'
-  deprecated_options_scope_removal_version = '1.19.0.dev0'
+  deprecated_options_scope_removal_version = '1.20.0.dev0'
 
   @classmethod
   def subsystem_dependencies(cls):
     dep = CacheSetup.scoped(
       Zinc.Factory,
-      removal_version='1.19.0.dev0',
+      removal_version='1.20.0.dev0',
       removal_hint='Cache options for `zinc` should move to `rsc`.'
     )
     return super().subsystem_dependencies() + (
@@ -237,8 +237,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       zinc_cc = merged_cc.zinc_cc
       if rsc_cc.workflow is not None:
         cp_entries = rsc_cc.workflow.resolve_for_enum_variant({
-          'zinc-only': lambda: confify([zinc_cc.jar_file]),
-          'zinc-java': lambda: confify([zinc_cc.jar_file]),
+          'zinc-only': lambda: confify([self._classpath_for_context(zinc_cc)]),
+          'zinc-java': lambda: confify([self._classpath_for_context(zinc_cc)]),
           'rsc-and-zinc': lambda: confify([rsc_cc.rsc_jar_file]),
         })()
         self.context.products.get_data('rsc_mixed_compile_classpath').add_for_target(

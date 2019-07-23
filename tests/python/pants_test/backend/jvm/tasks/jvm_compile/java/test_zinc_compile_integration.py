@@ -253,7 +253,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
           pants_run.stdout_data,
         )
 
-        compile_dir = os.path.join(workdir, 'compile', 'zinc', 'current')
+        compile_dir = os.path.join(workdir, 'compile', 'rsc', 'current')
 
         for path_suffix in [
           'examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/zinc/classes/org/pantsbuild/example/hello/exe/Exe.class',
@@ -268,7 +268,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
 
     with temporary_dir() as cache_dir:
       config = {
-        'cache.compile.rsc': {'write_to': [cache_dir]},
+        'cache.compile.rsc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
         'compile.zinc': {
           'execution_strategy': 'hermetic',
           'use_classpath_jars': False,
@@ -305,8 +305,8 @@ class ZincCompileIntegrationTest(BaseCompileIT):
           new_temp_test = '''package org.pantsbuild.example.hello.exe
                               
                               import java.io.{BufferedReader, InputStreamReader}
-                              
                               import org.pantsbuild.example.hello
+                              import org.pantsbuild.example.hello.welcome
                               
                               // A simple jvm binary to illustrate Scala BUILD targets
                               

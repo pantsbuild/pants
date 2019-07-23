@@ -341,10 +341,13 @@ class BaseZincCompile(JvmCompile):
       # That classloader will first delegate to its parent classloader, which will search the
       # regular classpath.  However it's harder to guarantee that our javac will preceed any others
       # on the classpath, so it's safer to prefix it to the bootclasspath.
-      jvm_options.extend(['-Xbootclasspath/p:{}'.format(':'.join(self.javac_classpath()))])
+      # list of classpath entries
+      javac_classpath_entries = self.javac_classpath()
+      java_path = [relative_to_exec_root(classpath_entry.path) for classpath_entry in javac_classpath_entries]
+
+      jvm_options.extend(['-Xbootclasspath/p:{}'.format(':'.join(java_path))])
 
     jvm_options.extend(self._jvm_options)
-
     zinc_args.extend(ctx.sources)
 
     self.log_zinc_file(ctx.analysis_file)
@@ -630,7 +633,7 @@ class ZincCompile(BaseZincCompile):
   """Compile Scala and Java code to classfiles using Zinc."""
 
   deprecated_module(
-    removal_version='1.19.0.dev0',
+    removal_version='1.20.0.dev0',
     hint_message="compile.zinc task is being phased out. Use compile.rsc:zinc-only option instead."
   )
   compiler_name = 'zinc'
