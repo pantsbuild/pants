@@ -247,14 +247,6 @@ class DaemonPantsRunner:
 
   def run(self):
 
-    try:
-      # N.B. This will redirect stdio in the daemon's context to the nailgun session.
-      with cls.nailgunned_stdio(maybe_shutdown_socket, env, handle_stdin=False) as finalizer:
-
-    except Exception:
-
-
-
     # Ensure anything referencing sys.argv inherits the Pailgun'd args.
     sys.argv = self._args
 
