@@ -26,7 +26,8 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
       default=False,
       type=bool,
       help='Specifies whether to generate scoverage reports for scala test targets.'
-           'Default value is False')
+           'Default value is False.If True,'
+           'implies --test-junit-coverage-processor=scoverage.')
 
     register('--blacklist-file',
       default=blacklist_file,

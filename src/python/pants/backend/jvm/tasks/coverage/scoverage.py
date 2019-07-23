@@ -46,11 +46,24 @@ class Scoverage(CoverageEngine):
       return JarDependency(org='com.twitter.scoverage', name='scalac-scoverage-runtime_2.12',
         rev='1.0.1-twitter', **kwargs)
 
+    def scoverage_report_jar(**kwargs):
+      return [JarDependency(org='org.scoverage', name='scoverage-report_2.12',
+        rev='3.4.9-SNAPSHOT', url='file:/Users/sameera/.m2/repository/org/scoverage/scoverage-report_2.12/3.4.9-SNAPSHOT/scoverage-report_2.12-3.4.9-SNAPSHOT.jar', **kwargs),
+              JarDependency(org='org.apache.directory.studio', name='org.apache.commons.io', rev='2.4'),
+              JarDependency(org='com.github.scopt', name='scopt_2.12', rev='4.0.0-RC2'),
+              JarDependency(org='com.twitter.scoverage', name='scalac-scoverage-plugin_2.12', rev='1.0.1-twitter')]
+
     register_jvm_tool(register,
       'scalac-scoverage-runtime',
       classpath=[
         scoverage_runtime_jar()
       ])
+
+    register_jvm_tool(register,
+      'scoverage-report',
+      classpath=
+        scoverage_report_jar()
+      )
 
   def __init__(self, settings, targets, execute_java_for_targets):
     """
@@ -100,23 +113,13 @@ class Scoverage(CoverageEngine):
 
 
   def report(self, output_dir, execution_failed_exception=None):
-    if execution_failed_exception:
-      self._settings.log.warn('Test failed: {}'.format(execution_failed_exception))
-      return
+    cobertura_cp = self._settings.tool_classpath('scoverage-report')
+    result = self._execute_java(classpath=cobertura_cp,
+                                main='scoverageReport.ScoverageReport',
+                                jvm_options=self._settings.coverage_jvm_options,
+                                args=["--measurementsDirPath",f"{output_dir}/scoverage/measurements", "--reportDirPath",f"{output_dir}/ScoverageReports"],
+                               )
 
-    for md in self._iter_datadirs(output_dir):
-      parent_dir = os.path.dirname(md)
-      base_report_dir = os.path.join(parent_dir, 'reports')
-      safe_mkdir(base_report_dir, clean=True)
-
-      # TODO(sameera): add target filtering for scoverage
-      filtered_targets = self.filter_scoverage_targets(md)
-      self._execute_scoverage_report_gen(measurements_dir=md, report_dir=base_report_dir,
-        target_filter=filtered_targets)
-
-    # Opening the last generated report in case `--no-test-junit-fast` is specified.
-    if self._settings.coverage_open:
-      return os.path.join(base_report_dir, 'html', 'index.html')
 
   def _execute_scoverage_report_gen(self, measurements_dir, report_dir, target_filter):
     cmd = [

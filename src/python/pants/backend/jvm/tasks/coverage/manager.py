@@ -1,6 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 import os
 import shutil
 
@@ -13,6 +14,7 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir
 from pants.util.strutil import safe_shlex_split
 
+logger = logging.getLogger(__name__)
 
 class CodeCoverageSettings:
   """A class containing settings for code coverage tasks."""
@@ -68,12 +70,15 @@ class CodeCoverage(Subsystem):
     register('--coverage-processor', advanced=True, fingerprint=True,
              choices=['cobertura', 'jacoco', 'scoverage'], default=None,
              help="Which coverage processor to use if --coverage is enabled. If this option is "
-                  "unset but coverage is enabled implicitly or explicitly, defaults to 'cobertura'."
-                  "If this option is explicitly set, implies --coverage.")
+                  "unset but coverage is enabled implicitly or explicitly, defaults to 'cobertura'. "
+                  "If this option is explicitly set, implies --coverage. If this option is set to "
+                  "scoverage, then first scoverage MUST be enabled by passing option "
+                  "--scoverage-enable-scoverage.")
     # We need to fingerprint this even though it nominally UI-only affecting option since the
     # presence of this option alone can implicitly flag on `--coverage`.
     register('--coverage-open', type=bool, fingerprint=True,
-             help='Open the generated HTML coverage report in a browser. Implies --coverage.')
+             help='Open the generated HTML coverage report in a browser. Implies --coverage '
+                  'with cobertura as the engine.')
 
     register('--coverage-jvm-options', advanced=True, type=list, fingerprint=True,
              help='JVM flags to be added when running the coverage processor. For example: '
@@ -92,8 +97,19 @@ class CodeCoverage(Subsystem):
 
   def get_coverage_engine(self, task, output_dir, all_targets, execute_java):
     options = task.get_options()
+    enable_scoverage = ScoveragePlatform.global_instance().get_options().enable_scoverage
     processor = options.coverage_processor
-    if ScoveragePlatform.global_instance().get_options().enable_scoverage:
+
+    if (processor == 'scoverage' and not enable_scoverage):
+      raise self.InvalidCoverageEngine("Cannot set processor to scoverage without first enabling "
+                                       "scoverage (by passing --scoverage-enable-scoverage option)")
+
+    if enable_scoverage:
+      if processor is None:
+        logger.info("Scoverage is enabled. Setting coverage engine to scoverage.")
+      elif processor != 'scoverage':
+        logger.warning(f"Scoverage is enabled. Cannot use {processor} as the engine. Setting "
+                       f"coverage engine to scoverage.")
       processor = 'scoverage'
 
     if options.coverage or processor or options.is_flagged('coverage_open'):
