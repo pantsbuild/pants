@@ -253,7 +253,6 @@ class DaemonPantsRunner:
         options, _, options_bootstrapper = LocalPantsRunner.parse_options(self._args, self._env)
         graph_helper, target_roots, exit_code = self._scheduler_service.prepare_graph(options, options_bootstrapper)
         self.exit_code = exit_code
-        finalizer()
 
         # Clean global state.
         clean_global_runtime_state(reset_subsystem=True)
