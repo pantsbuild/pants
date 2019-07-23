@@ -214,9 +214,6 @@ class SchedulerService(PantsService):
 
     v1_goals, ambiguous_goals, v2_goals = options.goals_by_version
 
-    # if v1_goals or (ambiguous_goals and global_options.v1):
-    #   session.warm_product_graph(target_roots)
-
     if v2_goals or (ambiguous_goals and global_options.v2):
       goals = v2_goals + (ambiguous_goals if global_options.v2 else tuple())
 

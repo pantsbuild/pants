@@ -110,18 +110,11 @@ class DaemonPantsRunner:
 
   @classmethod
   def create(cls, sock, args, env, services, scheduler_service):
-    maybe_shutdown_socket = MaybeShutdownSocket(sock)
-
-
     return cls(
-      maybe_shutdown_socket=maybe_shutdown_socket,
+      maybe_shutdown_socket=MaybeShutdownSocket(sock),
       args=args,
       env=env,
-      # graph_helper,
-      # target_roots,
       services=services,
-      # subprocess_dir,
-      # options_bootstrapper,
       exit_code=0,
       scheduler_service=scheduler_service
     )
@@ -140,17 +133,14 @@ class DaemonPantsRunner:
     :param OptionsBootstrapper options_bootstrapper: An OptionsBootstrapper to reuse.
     """
     self._name = self._make_identity()
-    # self._metadata_base_dir = metadata_base_dir
     self._maybe_shutdown_socket = maybe_shutdown_socket
     self._args = args
     self._env = env
-    # self._graph_helper = graph_helper
-    # self._target_roots = target_roots
     self._services = services
-    # self._options_bootstrapper = options_bootstrapper
-    self.exit_code = exit_code
     self._exiter = DaemonExiter(maybe_shutdown_socket)
     self._scheduler_service = scheduler_service
+
+    self.exit_code = exit_code
 
   # TODO: this should probably no longer be necesary, remove.
   def _make_identity(self):
@@ -264,10 +254,8 @@ class DaemonPantsRunner:
       try:
 
         options, _, options_bootstrapper = LocalPantsRunner.parse_options(self._args, self._env)
-        # subprocess_dir = options.for_global_scope().pants_subprocessdir
         graph_helper, target_roots, exit_code = self._scheduler_service.prepare_graph(options, options_bootstrapper)
         finalizer()
-
 
         # Clean global state.
         clean_global_runtime_state(reset_subsystem=True)

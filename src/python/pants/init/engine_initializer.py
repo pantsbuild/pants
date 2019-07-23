@@ -168,19 +168,6 @@ class LegacyGraphSession(datatype(['scheduler_session', 'build_file_aliases', 'g
       )
       self.invalid_goals = invalid_goals
 
-  def warm_product_graph(self, target_roots):
-    """Warm the scheduler's `ProductGraph` with `TransitiveHydratedTargets` products.
-
-    This method raises only fatal errors, and does not consider failed roots in the execution
-    graph: in the v1 codepath, failed roots are accounted for post-fork.
-
-    :param TargetRoots target_roots: The targets root of the request.
-    """
-    logger.debug('warming target_roots for: %r', target_roots)
-    subjects = [target_roots.specs]
-    request = self.scheduler_session.execution_request([TransitiveHydratedTargets], subjects)
-    self.scheduler_session.execute(request)
-
   def run_console_rules(self, options_bootstrapper, goals, target_roots):
     """Runs @console_rules sequentially and interactively by requesting their implicit Goal products.
 
