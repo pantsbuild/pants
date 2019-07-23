@@ -30,6 +30,23 @@ function do_within_cache_dir {
   with_pushd "$NATIVE_IMAGE_BUILD_CACHE_DIR" "$@"
 }
 
+function pushd_into_command_line {
+  while read -r into_dir; do
+    with_pushd "$into_dir" "$@" || return "$?"
+  done
+}
+
+function command_line_with_side_effect {
+  while read -r arg; do
+    >&2 "$1" "$arg" "${@:2}" || return "$?"
+    echo "$arg"
+  done
+}
+
+function pushd_into_command_line_with_side_effect {
+  command_line_with_side_effect with_pushd "$@"
+}
+
 function normalize_path_no_validation {
   if hash realpath 2>/dev/null; then
     realpath "$@"

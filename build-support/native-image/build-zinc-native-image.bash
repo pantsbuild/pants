@@ -14,7 +14,7 @@ function _get_coursier_impl {
   if [[ ! -f ./coursier ]]; then
     curl -Lo coursier https://git.io/coursier-cli || return "$?"
     chmod +x coursier
-    ./coursier --help >&2 || return "$?"
+    ./coursier --help || return "$?"
   fi >&2
   normalize_path_check_file coursier
 }
@@ -47,6 +47,9 @@ function bootstrap_environment {
 }
 
 function get_base_native_image_build_script_graal_checkout {
+  # TODO(#7955): See https://github.com/oracle/graal/issues/1448 and
+  # https://github.com/pantsbuild/pants/issues/7955 to cover using a released graal instead of a
+  # fork!
   # From https://github.com/cosmicexplorer/graal/tree/graal-make-zinc-again!
   do_within_cache_dir clone_repo_somewhat_idempotently \
                       graal/ \
@@ -59,14 +62,7 @@ function clone_mx {
   do_within_cache_dir clone_repo_somewhat_idempotently \
                       mx/ \
                       https://github.com/graalvm/mx \
-                      c01eef6e31cd5655b1f0682c445f4ed50aa5c05e \
-    | while read -r mx_repo_dir; do
-    # Reading the mx clone dir from `do_within_cache_dir`, we make sure to call `./mx update` from
-    # within the mx repo, and then echo the same dir to stdout.
-    >&2 with_pushd "$mx_repo_dir" \
-        ./mx update
-    echo "$mx_repo_dir"
-  done
+                      c01eef6e31cd5655b1f0682c445f4ed50aa5c05e
 }
 
 function extract_openjdk_jvmci {
@@ -87,10 +83,9 @@ function get_substratevm_dir {
 }
 
 function build_native_image_tool {
-  >&2 with_pushd "$(get_substratevm_dir)" \
-      mx build \
-    || return "$?"
-  get_substratevm_dir
+  get_substratevm_dir \
+    | pushd_into_command_line_with_side_effect \
+        mx build
 }
 
 function fetch_scala_compiler_jars {
@@ -103,9 +98,10 @@ function fetch_scala_compiler_jars {
 function fetch_pants_zinc_wrapper_jars {
   pants_zinc_compiler_version='0.0.15'
   pants_underlying_zinc_dependency_version='1.1.7'
-  # NB: `native-image` emits a warning on later protobuf versions, which the pantsbuild
+  # TODO: `native-image` emits a warning on later protobuf versions, which the pantsbuild
   # `zinc-compiler` artifact will pull in unless we exclude them here and also explicitly add a
-  # protobuf artifact.
+  # protobuf artifact. We should fix this by making the change to the org.pantsbuild:zinc-compiler
+  # artifact!
   "$(get_coursier)" fetch \
                     "org.pantsbuild:zinc-compiler_2.12:${pants_zinc_compiler_version}" \
                     "org.scala-sbt:compiler-bridge_2.12:${pants_underlying_zinc_dependency_version}" \

@@ -38,7 +38,8 @@ After a long bootstrap process, the arguments are forwarded to a pants invocatio
 Caused by: java.lang.VerifyError: class scala.tools.nsc.Global overrides final method isDeveloper.()Z
 ```
 
-Please re-run the script at most two more times. This can occur nondeterministically for some reason right now.
+Please re-run the script at most two more times. This can occur nondeterministically for some reason right now. https://github.com/pantsbuild/pants/issues/7955 is intended to cover solving this issue, along with others.
+
 
 ## Updating the zinc native-image
 

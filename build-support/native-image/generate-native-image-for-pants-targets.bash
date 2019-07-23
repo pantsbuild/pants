@@ -13,14 +13,17 @@ set -euxo pipefail
 # information should be inferred by the native-image agent, but isn't yet.
 
 # TODO: build off of a more recent graal sha (more recent ones fail to build scalac and more): see
-# https://github.com/oracle/graal/issues/1448, as well as #7955!
+# https://github.com/oracle/graal/issues/1448, as well as
+# https://github.com/pantsbuild/pants/issues/7955!
 
-# ARGUMENTS
+### ARGUMENTS
 
 # $@: Forwarded to a `./pants compile` invocation which runs with reflection tracing enabled.
 # $NATIVE_IMAGE_EXTRA_ARGS: Forwarded to a `native-image` invocation.
+# $ZINC_IMAGE_VERSION: Used in the compile test that runs to validate the native-image. Determines
+#                      where the image is written to in the pants cachedir.
 
-# CONSTANTS
+### CONSTANTS
 
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 
@@ -32,11 +35,13 @@ GENERATED_CONFIG_DIR="$(normalize_path_no_validation "$GENERATED_CONFIG_DIRNAME"
 GENERATED_CONFIG_JSON_FILE="${GENERATED_CONFIG_DIR}/reflect-config.json"
 GENERATED_BUILD_FILE="${GENERATED_CONFIG_DIR}/BUILD"
 
+ZINC_IMAGE_VERSION="${ZINC_IMAGE_VERSION:-0.0.15-from-image-script}"
+
 # NB: Using $REPO_ROOT as calculated in other scripts in this repo seems to make this script fail
 # when run from outside the pants repo!
 DOWNLOAD_BINARY_SCRIPT="$(normalize_path_check_file "${SCRIPT_DIR}/../bin/download_binary.sh")"
 
-# FUNCTIONS
+### FUNCTIONS
 
 function download_buildozer {
   "$DOWNLOAD_BINARY_SCRIPT" \
@@ -45,27 +50,25 @@ function download_buildozer {
 }
 
 function build_agent_dylib {
-  pushd "$(get_substratevm_dir)" >&2
   if is_osx; then
-    dylib_extension='.dylib'
+    local dylib_extension='.dylib'
   else
-    dylib_extension='.so'
+    local dylib_extension='.so'
   fi
-  desired_agent_dylib_path="$(pwd)/libnative-image-agent${dylib_extension}"
+  local desired_agent_dylib_path="libnative-image-agent${dylib_extension}"
   if [[ ! -f "$desired_agent_dylib_path" ]]; then
     mx build \
       && mx native-image --tool:native-image-agent --verbose \
       && cp -v {,lib}native-image-agent"$dylib_extension" \
         || return "$?"
   fi >&2
-  echo "$desired_agent_dylib_path"
-  popd >&2
+  normalize_path_check_file "$desired_agent_dylib_path"
 }
 
 # run with tracing on
 
 function run_zinc_compile_with_tracing {
-  agent_lib_path="$(build_agent_dylib)"
+  local agent_lib_path="$(get_substratevm_dir | pushd_into_command_line build_agent_dylib)"
   if [[ ! -f "$GENERATED_CONFIG_JSON_FILE" ]]; then
     rm -rfv "$GENERATED_CONFIG_DIR"
     mkdir -v "$GENERATED_CONFIG_DIR"
@@ -81,7 +84,8 @@ function run_zinc_compile_with_tracing {
             --no-incremental \
             --no-use-classpath-jars \
             --cache-ignore \
-            "$@"
+            "$@" \
+      || return "$?"
     unset PANTS_COMPILE_ZINC_JVM_OPTIONS
   fi >&2
   normalize_path_check_dir "$GENERATED_CONFIG_DIR"
@@ -193,31 +197,38 @@ function exercise_native_image_for_compilation {
 
   "$image_location" --help || return "$?"
   echo >&2 "native image generated at ${image_location}. running test compile..."
-  sleep 1
+  sleep 5
 
   # Put the native-image in the correct cache location for zinc 0.0.15, overwriting the current one
   # if necessary!
   if is_osx; then
-    zinc_image_pants_cached="${HOME}/.cache/pants/bin/zinc-pants-native-image/mac/10.13/0.0.15-from-image-script"
+    local zinc_image_base_pants_cachedir="${HOME}/.cache/pants/bin/zinc-pants-native-image/mac/10.13"
   else
-    zinc_image_pants_cached="${HOME}/.cache/pants/bin/zinc-pants-native-image/linux/x86_64/0.0.15-from-image-script"
+    local zinc_image_base_pants_cachedir="${HOME}/.cache/pants/bin/zinc-pants-native-image/linux/x86_64"
   fi
+  local zinc_image_pants_cached="${zinc_image_base_pants_cachedir}/${ZINC_IMAGE_VERSION}"
   mkdir -pv "$zinc_image_pants_cached" || return "$?"
 
   cp -v "$image_location" "${zinc_image_pants_cached}/zinc-pants-native-image"
 
   export PANTS_COMPILE_ZINC_JVM_OPTIONS='[]'
-  ./pants \
-    --zinc-native-image --zinc-version=0.0.15-from-image-script \
-    compile.zinc --execution-strategy=hermetic --no-incremental --cache-ignore \
-    test \
-    "${other_args[@]}" || return "$?"
+  ./pants --zinc-native-image --zinc-version="$ZINC_IMAGE_VERSION" \
+          compile.zinc --execution-strategy=hermetic --no-incremental --cache-ignore \
+          test \
+          "${other_args[@]}" \
+    || return "$?"
   unset PANTS_COMPILE_ZINC_JVM_OPTIONS
 }
 
 # actually build the zinc image!!!
 
 ### EXECUTING!
+# NB: We create files named `.tmp-*` in many methods in this script. These files aren't used for
+# caching, just as temporary outputs for parts of the script since we can't yet do this in Pants
+# directly (see https://github.com/pantsbuild/pants/pull/6893). This will remove all of those files.
+_orig_pwd="$(pwd)"
+trap 'find "$_orig_pwd" -maxdepth 1 -type f -name ".tmp-*" -exec rm {} "+"' EXIT
+
 # NB: It's not clear whether it's possible to set the locale in some ubuntu containers, so we
 # simply ignore it here.
 export PANTS_IGNORE_UNRECOGNIZED_ENCODING=1
@@ -238,8 +249,6 @@ fi
 
 bootstrap_environment >&2
 
-trap 'find . -maxdepth 1 -type f -name ".tmp-*" -exec rm {} "+"' EXIT
-
 ensure_has_executable \
   'jq' \
   "jq must be installed to be able to manipulate the native-image json config." \
@@ -249,29 +258,25 @@ ensure_has_executable \
 export JAVA_HOME="$(extract_openjdk_jvmci)"
 PATH="$(clone_mx):${PATH}"
 
-readonly ZINC_GENERATED_CONFIG_DIR="$(run_zinc_compile_with_tracing "$@")"
-with_pushd "$ZINC_GENERATED_CONFIG_DIR" \
-           trim_reflection_config_to_just_macros
+run_zinc_compile_with_tracing "$@" \
+  | >&2 pushd_into_command_line \
+        trim_reflection_config_to_just_macros
 readonly MACRO_DEPS_JAR="$(generate_macro_deps_jar "$@")"
 
+# NB: We also echo the image location to stdout, while piping everything else to stderr. This
+# means that the script can be invoked from another script to get a single line of stdout
+# containing the path to the just-built native-image.
 create_zinc_image \
   -H:ConfigurationFileDirectories="$GENERATED_CONFIG_DIR" \
   -cp "$MACRO_DEPS_JAR" \
   ${NATIVE_IMAGE_EXTRA_ARGS:-} \
-  | while read -r image_location; do
-  # NB: `create_zinc_image` echoes the compiled zinc native-image location to stdout, so we read
-  # that single line of output with `while read -r`.
-  exercise_native_image_for_compilation "$image_location" "$@" \
-                                        >&2
-  # NB: We also echo the image location to stdout, while piping everything else to stderr. This
-  # means that the script can be invoked from another script to get a single line of stdout
-  # containing the path to the just-built native-image.
-  echo "$image_location"
-done
+  | command_line_with_side_effect \
+      exercise_native_image_for_compilation "$@"
 
-# NB: if the native-image build fails, and you see the following in the output:
+# TODO(#7955): if the native-image build fails, and you see the following in the output:
 #
 #     Caused by: java.lang.VerifyError: class scala.tools.nsc.Global overrides final method isDeveloper.()Z
 #
 # Please re-run the script at most two more times. This can occur nondeterministically for some
-# reason right now.
+# reason right now. https://github.com/pantsbuild/pants/issues/7955 is intended to cover solving
+# this issue, along with others.
