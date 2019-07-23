@@ -1,2 +1,0 @@
-"""Module containing user contributions
-"""
