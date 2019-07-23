@@ -28,30 +28,10 @@ The script in [^1] will run on OSX or Linux (the `ubuntu:latest` container on do
 
 ``` bash
 $ cd /your/pants/codebase
-$ NATIVE_IMAGE_EXTRA_ARGS='-H:IncludeResourceBundles=org.scalactic.ScalacticBundle' /path/to/your/pants/checkout/build-support/native-image/generate-native-image-for-pants-targets.bash ::
+$ /path/to/your/pants/checkout/build-support/native-image/generate-native-image-for-pants-targets.bash ::
 ```
 
-After a long bootstrap process, the arguments are forwarded to a pants invocation which runs with reflection tracing. The `NATIVE_IMAGE_EXTRA_ARGS` environment variable can be used to add any necessary arguments to the `native-image` invocation (the scalactic resource bundle is necessary for any repo using scalatest). The above will build an image suitable for all targets in the repo (`::`) for the current platform. The script will generate a different output file depending upon whether it is run on OSX or Linux.
-
-On OSX:
-
-``` bash
-$ mkdir -pv ~/.cache/pants/bin/zinc-pants-native-image/mac/10.13/0.0.15
-$ cp -v zinc-pants-native-Darwin ~/.cache/pants/bin/zinc-pants-native-image/mac/10.13/0.0.15/zinc-pants-native-image
-```
-
-On Linux:
-
-``` bash
-$ mkdir -pv ~/.cache/pants/bin/zinc-pants-native-image/linux/x86_64/0.0.15
-$ cp -v zinc-pants-native-Linux ~/.cache/pants/bin/zinc-pants-native-image/linux/x86_64/0.0.15/zinc-pants-native-image
-```
-
-The native-image can then be tested out with:
-
-``` bash
-$ PANTS_COMPILE_ZINC_JVM_OPTIONS='[]' ./pants --zinc-native-image --zinc-version=0.0.15 compile.zinc --execution-strategy=hermetic --no-incremental --cache-ignore test ::
-```
+After a long bootstrap process, the arguments are forwarded to a pants invocation which runs with reflection tracing. The `NATIVE_IMAGE_EXTRA_ARGS` environment variable can be used to add any necessary arguments to the `native-image` invocation (the scalactic resource bundle is necessary for any repo using scalatest). The above will build an image suitable for all targets in the repo (`::`) for the current platform. The script will generate a different output file `zinc-pants-native-{Darwin,Linux}` depending upon whether it is run on OSX or Linux.
 
 *Note:* if the native-image build fails, and you see the following in the output:
 ``` bash
@@ -63,6 +43,10 @@ Please re-run the script at most two more times. This can occur nondeterministic
 ## Updating the zinc native-image
 
 This is a developing story. Currently, the script will idempotently create or update a directory in the pwd named `generated-reflect-config/` with the results of the reflection tracing. This directory will contain 5 files -- 4 json config files, and one `BUILD` file. This directory can be checked in and updated over time -- subsequent runs of the script will never remove information from previous runs.
+
+*Note:* the script does *not* need to be run over the whole repo (`::`) at once! Since the compile run with reflection tracing has parallelism set to 1, this initial run can take a long time. Initially, it's possible to run the script over batched sections of your repo (e.g. using `./pants list` and `--target-spec-file`), until all targets are covered.
+
+The image may begin failing to build -- this can happen e.g. if you used to use a macro in your repo, but no longer do, the build will fail when scanning reflect config entries. If this happens, you can always `rm -rfv generated-reflect-config/` and run the script again (although you will have to rebuild it for your whole repo again in this case).
 
 [^1]: ./generate-native-image-for-pants-targets.bash
 
