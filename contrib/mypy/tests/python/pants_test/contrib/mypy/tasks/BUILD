@@ -10,3 +10,12 @@ python_tests(
   ],
   tags={'integration'},
 )
+
+python_tests(
+  name='mypy_tests',
+  source = 'test_mypy.py',
+  dependencies=[
+    'tests/python/pants_test:task_test_base',
+    'contrib/mypy/src/python/pants/contrib/mypy/tasks',
+  ],
+)

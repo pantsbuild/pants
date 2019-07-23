@@ -6,7 +6,7 @@ import subprocess
 
 
 def main() -> None:
-  subprocess.run(["./pants", "--tag=+type_checked", "mypy", "::"], check=True)
+  subprocess.run(["./pants", "--tag=+type_checked", "--lint-skip", "--no-lint-mypy-skip", "lint", "::"], check=True)
 
 
 if __name__ == '__main__':

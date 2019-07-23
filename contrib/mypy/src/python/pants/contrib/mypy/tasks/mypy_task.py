@@ -5,6 +5,7 @@ import os
 import subprocess
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
+from pants.build_graph.target import Target
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
@@ -18,10 +19,22 @@ from pants.util.memo import memoized_property
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_info import PexInfo
+from pants.task.lint_task_mixin import LintTaskMixin
 
 
-class MypyTask(ResolveRequirementsTaskBase):
-  """Invoke the mypy static type analyzer for Python."""
+class MypyTaskError(TaskError):
+  """Indicates a TaskError from a failing MyPy run"""
+
+class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
+  """Invoke the mypy static type analyzer for Python.
+
+  Mypy lint task filters out target_roots that are not properly tagged according to
+  --whitelisted-tag-name, and executes my py on targets in context from whitelisted target
+  roots. Next, if any transitive targets from the filtered roots are not whitelisted, a Mypy
+  TaskError will be thrown.
+
+  'In context' meaning in the sub-graph where a whitelisted target is the root
+  """
 
   _MYPY_COMPATIBLE_INTERPETER_CONSTRAINT = '>=3.5'
   _PYTHON_SOURCE_EXTENSION = '.py'
@@ -36,6 +49,8 @@ class MypyTask(ResolveRequirementsTaskBase):
     register('--mypy-version', default='0.710', help='The version of mypy to use.')
     register('--config-file', default=None,
              help='Path mypy configuration file, relative to buildroot.')
+    register('--whitelisted-tag-name', default='type_checked',
+             help='Tag name to identify python targets to execute MyPy')
 
   @classmethod
   def supports_passthru_args(cls):
@@ -60,9 +75,22 @@ class MypyTask(ResolveRequirementsTaskBase):
   def is_python_target(target):
     return isinstance(target, PythonTarget)
 
+  def _is_tagged_target(self, target):
+    return self.get_options().whitelisted_tag_name in target.tags
+
+  def _is_tagged_non_synthetic_python_target(self, target):
+    return (self.is_non_synthetic_python_target(target) and
+            self._is_tagged_target(target))
+
+  def _all_targets_in_context_are_whitelisted(self, targets, targets_in_context):
+    return len(targets) == 0 or len(targets) == len(targets_in_context)
+
   def _calculate_python_sources(self, targets):
-    """Generate a set of source files from the given targets."""
-    python_eval_targets = filter(self.is_non_synthetic_python_target, targets)
+    """Filter targets to generate a set of source files from the given targets."""
+    whitelisted_targets = Target.closure_for_targets(list(filter(self._is_tagged_target, targets)))
+    python_eval_targets = list(filter(self._is_tagged_non_synthetic_python_target, list(whitelisted_targets)))
+    if not self._all_targets_in_context_are_whitelisted(python_eval_targets, whitelisted_targets):
+      raise MypyTaskError("All targets in context need to be whitelisted for mypy to run")
     sources = set()
     for target in python_eval_targets:
       sources.update(
@@ -121,7 +149,6 @@ class MypyTask(ResolveRequirementsTaskBase):
       with open(sources_list_path, 'w') as f:
         for source in sources:
           f.write('{}\n'.format(source))
-
       # Construct the mypy command line.
       cmd = ['--python-version={}'.format(interpreter_for_targets.identity.python)]
       if self.get_options().config_file:
@@ -135,7 +162,6 @@ class MypyTask(ResolveRequirementsTaskBase):
       source_roots = self._collect_source_roots()
 
       mypy_path = os.pathsep.join([os.path.join(get_buildroot(), root) for root in source_roots])
-
       # Execute mypy.
       with self.context.new_workunit(
         name='check',
@@ -146,4 +172,4 @@ class MypyTask(ResolveRequirementsTaskBase):
         returncode = self._run_mypy(mypy_interpreter, cmd,
           env={'MYPYPATH': mypy_path}, stdout=workunit.output('stdout'), stderr=subprocess.STDOUT)
         if returncode != 0:
-          raise TaskError('mypy failed: code={}'.format(returncode))
+          raise MypyTaskError('mypy failed: code={}'.format(returncode))

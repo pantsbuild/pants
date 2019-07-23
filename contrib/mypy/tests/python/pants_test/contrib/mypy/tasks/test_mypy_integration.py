@@ -8,7 +8,9 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class MypyIntegrationTest(PantsRunIntegrationTest):
   def test_mypy(self):
     cmd = [
-      'mypy',
+      '--lint-skip',
+      '--no-lint-mypy-skip',
+      'lint',
       'contrib/mypy/tests/python/pants_test/contrib/mypy::',
       '--',
       '--follow-imports=silent'
