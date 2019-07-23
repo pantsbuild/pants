@@ -16,18 +16,12 @@ class ApacheThriftNodeGen(ApacheThriftGenBase):
 
   sources_globs = ('**/*',)
 
-
   def synthetic_target_type(self, target):
     return NodeModule
 
   @property
   def _copy_target_attributes(self):
     return ['tags', 'node_scope', 'package_manager', 'build_script', 'output_dir', 'dev_dependency', 'style_ignore_path', 'bin_executables']
-  
-
-  # def _codegen(self, target, target_workdir, extra_sources=[]):
-
-  #     super().execute_codegen(target, target_workdir)
 
   def execute_codegen(selt, target, target_workdir):
     """
@@ -41,7 +35,7 @@ class ApacheThriftNodeGen(ApacheThriftGenBase):
     sources_list = target.sources_relative_to_target_base()
     if 'yarn.lock' not in sources_list.files:
       safe_file_dump(os.path.join(target_workdir, 'yarn.lock'))
-    
+
     if 'package.json' not in sources_list.files:
         dependency_list = target.dependencies
         package_dict = {}
@@ -51,7 +45,7 @@ class ApacheThriftNodeGen(ApacheThriftGenBase):
         for dep in dependency_list:
             if isinstance(dep, NodeModule):
                 dep_spec = dep.address.spec_path
-                relative_path = os.path.relpath(deo_spec, target_workdir)
+                relative_path = os.path.relpath(dep_spec, target_workdir)
                 relative_path = "file:" + relative_path
                 dep_dict[dep.name] = relative_path
 

@@ -27,3 +27,12 @@ python_tests(
     'tests/python/pants_test:test_base'
   ]
 )
+
+python_tests(
+  name='node_thrift_library',
+  sources=['test_node_thrift_library.py'],
+  dependencies=[
+    'contrib/node/src/python/pants/contrib/node/targets:node_thrift_library',
+    'tests/python/pants_test:test_base'
+  ]
+)

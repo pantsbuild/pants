@@ -15,6 +15,14 @@ python_tests(
 )
 
 python_tests(
+  name='apache_thrift_node_gen_integration',
+  sources=['test_apache_thrift_node_gen_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ],
+)
+
+python_tests(
   name='node_build',
   sources=['test_node_build.py'],
   dependencies=[
