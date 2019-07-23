@@ -851,6 +851,10 @@ impl Store {
       })
       .to_boxed()
   }
+
+  pub fn all_local_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {
+    self.local.all_digests(entry_type)
+  }
 }
 
 // Only public for testing.
@@ -1179,6 +1183,26 @@ mod local {
           Err(format!("Got hash collision reading from store - digest {:?} was requested, but retrieved bytes with that fingerprint had length {}. Congratulations, you may have broken sha256! Underlying bytes: {:?}", digest, bytes.len(), bytes))
         }
       }).to_boxed()
+    }
+
+    pub fn all_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {
+      let database = match entry_type {
+        EntryType::File => self.inner.file_dbs.clone(),
+        EntryType::Directory => self.inner.directory_dbs.clone(),
+      };
+      let mut digests = vec![];
+      for &(ref env, ref database, ref _lease_database) in &database?.all_lmdbs() {
+        let txn = env
+          .begin_ro_txn()
+          .map_err(|err| format!("Error beginning transaction to garbage collect: {}", err))?;
+        let mut cursor = txn
+          .open_ro_cursor(*database)
+          .map_err(|err| format!("Failed to open lmdb read cursor: {}", err))?;
+        for (key, bytes) in cursor.iter() {
+          digests.push(Digest(Fingerprint::from_bytes_unsafe(key), bytes.len()));
+        }
+      }
+      Ok(digests)
     }
   }
 
@@ -1622,6 +1646,14 @@ mod local {
         block_on(store.load_bytes_with(EntryType::Directory, empty_dir.digest(), |b| b)),
         Ok(Some(empty_dir.bytes())),
       )
+    }
+
+    #[test]
+    pub fn all_digests() {
+      let dir = TempDir::new().unwrap();
+      let store = new_store(dir.path());
+      let digest = prime_store_with_file_bytes(&store, TestData::roland().bytes());
+      assert_eq!(Ok(vec![digest]), store.all_digests(EntryType::File));
     }
 
     pub fn new_store<P: AsRef<Path>>(dir: P) -> ByteStore {
