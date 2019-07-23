@@ -4,8 +4,6 @@
 import os
 import unittest
 
-from future.utils import text_type
-
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, FileContent, FilesContent, PathGlobs,
                              Snapshot)
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
@@ -18,13 +16,13 @@ from pants.util.objects import TypeCheckError, datatype
 from pants_test.test_base import TestBase
 
 
-class Concatted(datatype([('value', text_type)])): pass
+class Concatted(datatype([('value', str)])): pass
 
 
-class BinaryLocation(datatype([('bin_path', text_type)])):
+class BinaryLocation(datatype([('bin_path', str)])):
 
   def __new__(cls, bin_path):
-    this_object = super().__new__(cls, text_type(bin_path))
+    this_object = super().__new__(cls, bin_path)
 
     bin_path = this_object.bin_path
 
@@ -75,7 +73,7 @@ def cat_files_process_result_concatted(cat_exe_req):
     description='cat some files',
   )
   cat_process_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, process_request)
-  yield Concatted(cat_process_result.stdout.decode('utf-8'))
+  yield Concatted(cat_process_result.stdout.decode())
 
 
 def create_cat_stdout_rules():
@@ -97,7 +95,7 @@ class JavacVersionExecutionRequest(datatype([('binary_location', BinaryLocation)
     return (self.bin_path, '-version',)
 
 
-class JavacVersionOutput(datatype([('value', text_type)])): pass
+class JavacVersionOutput(datatype([('value', str)])): pass
 
 
 @rule(JavacVersionOutput, [JavacVersionExecutionRequest])
@@ -110,7 +108,7 @@ def get_javac_version_output(javac_version_command):
   javac_version_proc_result = yield Get(
     ExecuteProcessResult, ExecuteProcessRequest, javac_version_proc_req)
 
-  yield JavacVersionOutput(text_type(javac_version_proc_result.stderr))
+  yield JavacVersionOutput(javac_version_proc_result.stderr.decode())
 
 
 class JavacSources(datatype([('java_files', tuple)])):
@@ -138,8 +136,8 @@ class JavacCompileRequest(datatype([
 
 
 class JavacCompileResult(datatype([
-  ('stdout', text_type),
-  ('stderr', text_type),
+  ('stdout', str),
+  ('stderr', str),
   ('directory_digest', Digest),
 ])): pass
 
@@ -166,12 +164,9 @@ def javac_compile_process_result(javac_compile_req):
   )
   javac_proc_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, process_request)
 
-  stdout = javac_proc_result.stdout
-  stderr = javac_proc_result.stderr
-
   yield JavacCompileResult(
-    text_type(stdout),
-    text_type(stderr),
+    javac_proc_result.stdout.decode(),
+    javac_proc_result.stderr.decode(),
     javac_proc_result.output_directory_digest,
   )
 
@@ -301,7 +296,7 @@ class IsolatedProcessTest(TestBase, unittest.TestCase):
     self.assertEqual(
       execute_process_result.output_directory_digest,
       Digest(
-        fingerprint=text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        fingerprint="63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
         serialized_bytes_length=80,
       )
     )

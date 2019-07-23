@@ -7,8 +7,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use tokio::runtime::Runtime;
-
 use futures::Future;
 
 use crate::core::{Failure, TypeId};
@@ -21,13 +19,17 @@ use boxfuture::{BoxFuture, Boxable};
 use core::clone::Clone;
 use fs::{safe_create_dir_all_ioerror, PosixFS};
 use graph::{EntryId, Graph, NodeContext};
-use parking_lot::RwLock;
-use process_execution::{self, BoundedCommandRunner, CommandRunner};
+use process_execution::{
+  self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, ExecuteProcessRequestMetadata,
+};
 use rand::seq::SliceRandom;
 use reqwest;
 use rule_graph::RuleGraph;
+use sharded_lmdb::ShardedLmdb;
 use std::collections::btree_map::BTreeMap;
 use store::Store;
+
+const GIGABYTES: usize = 1024 * 1024 * 1024;
 
 ///
 /// The core context shared (via Arc) between the Scheduler and the Context objects of
@@ -42,9 +44,9 @@ pub struct Core {
   pub tasks: Tasks,
   pub rule_graph: RuleGraph<Rule>,
   pub types: Types,
-  runtime: Arc<RwLock<Runtime>>,
+  pub executor: task_executor::Executor,
   store: Store,
-  pub command_runner: BoundedCommandRunner,
+  pub command_runner: Box<dyn process_execution::CommandRunner>,
   pub http_client: reqwest::r#async::Client,
   pub vfs: PosixFS,
   pub build_root: PathBuf,
@@ -59,6 +61,7 @@ impl Core {
     ignore_patterns: &[String],
     work_dir: PathBuf,
     local_store_dir: PathBuf,
+    remote_execution: bool,
     remote_store_servers: Vec<String>,
     remote_execution_server: Option<String>,
     remote_execution_process_cache_namespace: Option<String>,
@@ -70,17 +73,18 @@ impl Core {
     remote_store_chunk_upload_timeout: Duration,
     remote_store_rpc_retries: usize,
     remote_execution_extra_platform_properties: BTreeMap<String, String>,
-    process_execution_parallelism: usize,
+    process_execution_local_parallelism: usize,
+    process_execution_remote_parallelism: usize,
     process_execution_cleanup_local_dirs: bool,
+    process_execution_speculation_delay: Duration,
+    process_execution_speculation_strategy: String,
+    process_execution_use_local_cache: bool,
   ) -> Core {
     // Randomize CAS address order to avoid thundering herds from common config.
     let mut remote_store_servers = remote_store_servers;
     remote_store_servers.shuffle(&mut rand::thread_rng());
 
-    let runtime =
-      Arc::new(RwLock::new(Runtime::new().unwrap_or_else(|e| {
-        panic!("Could not initialize Runtime: {:?}", e)
-      })));
+    let executor = task_executor::Executor::new();
     // We re-use these certs for both the execution and store service; they're generally tied together.
     let root_ca_certs = if let Some(path) = remote_root_ca_certs_path {
       Some(
@@ -92,23 +96,24 @@ impl Core {
     };
 
     // We re-use this token for both the execution and store service; they're generally tied together.
-    let oauth_bearer_token = if let Some(path) = remote_oauth_bearer_token_path {
-      Some(
-        std::fs::read_to_string(&path)
-          .unwrap_or_else(|err| panic!("Error reading root CA certs file {:?}: {}", path, err)),
-      )
-    } else {
-      None
-    };
+    let oauth_bearer_token =
+      if let Some(path) = remote_oauth_bearer_token_path {
+        Some(std::fs::read_to_string(&path).unwrap_or_else(|err| {
+          panic!("Error reading OAuth bearer token file {:?}: {}", path, err)
+        }))
+      } else {
+        None
+      };
 
-    let local_store_dir = local_store_dir.clone();
+    let local_store_dir2 = local_store_dir.clone();
     let store = safe_create_dir_all_ioerror(&local_store_dir)
       .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))
       .and_then(|()| {
-        if remote_store_servers.is_empty() {
-          Store::local_only(local_store_dir)
+        if !remote_execution || remote_store_servers.is_empty() {
+          Store::local_only(executor.clone(), local_store_dir)
         } else {
           Store::with_remote(
+            executor.clone(),
             local_store_dir,
             &remote_store_servers,
             remote_instance_name.clone(),
@@ -126,27 +131,66 @@ impl Core {
       })
       .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
 
-    let underlying_command_runner: Box<dyn CommandRunner> = match &remote_execution_server {
-      Some(ref address) => Box::new(process_execution::remote::CommandRunner::new(
-        address,
-        remote_execution_process_cache_namespace.clone(),
-        remote_instance_name.clone(),
-        root_ca_certs.clone(),
-        oauth_bearer_token.clone(),
-        remote_execution_extra_platform_properties.clone(),
-        // Allow for some overhead for bookkeeping threads (if any).
-        process_execution_parallelism + 2,
-        store.clone(),
-      )),
-      None => Box::new(process_execution::local::CommandRunner::new(
-        store.clone(),
-        work_dir.clone(),
-        process_execution_cleanup_local_dirs,
-      )),
+    let process_execution_metadata = ExecuteProcessRequestMetadata {
+      instance_name: remote_instance_name.clone(),
+      cache_key_gen_version: remote_execution_process_cache_namespace.clone(),
+      platform_properties: remote_execution_extra_platform_properties.clone(),
     };
 
-    let command_runner =
-      BoundedCommandRunner::new(underlying_command_runner, process_execution_parallelism);
+    let mut command_runner: Box<dyn process_execution::CommandRunner> =
+      Box::new(BoundedCommandRunner::new(
+        Box::new(process_execution::local::CommandRunner::new(
+          store.clone(),
+          executor.clone(),
+          work_dir.clone(),
+          process_execution_cleanup_local_dirs,
+        )),
+        process_execution_local_parallelism,
+      ));
+
+    if remote_execution {
+      let remote_command_runner = Box::new(BoundedCommandRunner::new(
+        Box::new(process_execution::remote::CommandRunner::new(
+          // No problem unwrapping here because the global options validation
+          // requires the remote_execution_server be present when remote_execution is set.
+          &remote_execution_server.unwrap(),
+          process_execution_metadata.clone(),
+          root_ca_certs.clone(),
+          oauth_bearer_token.clone(),
+          store.clone(),
+        )),
+        process_execution_remote_parallelism,
+      ));
+      command_runner = match process_execution_speculation_strategy.as_ref() {
+        "local_first" => Box::new(SpeculatingCommandRunner::new(
+          command_runner,
+          remote_command_runner,
+          process_execution_speculation_delay,
+        )),
+        "remote_first" => Box::new(SpeculatingCommandRunner::new(
+          remote_command_runner,
+          command_runner,
+          process_execution_speculation_delay,
+        )),
+        "none" => remote_command_runner,
+        _ => unreachable!(),
+      };
+    }
+
+    if process_execution_use_local_cache {
+      let process_execution_store = ShardedLmdb::new(
+        local_store_dir2.join("processes"),
+        5 * GIGABYTES,
+        executor.clone(),
+      )
+      .expect("Could not initialize store for process cache: {:?}");
+      command_runner = Box::new(process_execution::cache::CommandRunner {
+        underlying: command_runner.into(),
+        process_execution_store,
+        file_store: store.clone(),
+        metadata: process_execution_metadata,
+      })
+    }
 
     let http_client = reqwest::r#async::Client::new();
     let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);
@@ -156,13 +200,13 @@ impl Core {
       tasks: tasks,
       rule_graph: rule_graph,
       types: types,
-      runtime: runtime,
+      executor: executor.clone(),
       store,
       command_runner,
       http_client,
       // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
-      vfs: PosixFS::new(&build_root, &ignore_patterns).unwrap_or_else(|e| {
+      vfs: PosixFS::new(&build_root, &ignore_patterns, executor).unwrap_or_else(|e| {
         panic!("Could not initialize VFS: {:?}", e);
       }),
       build_root: build_root,
@@ -171,51 +215,6 @@ impl Core {
 
   pub fn store(&self) -> Store {
     self.store.clone()
-  }
-
-  ///
-  /// Start running a Future on a tokio Runtime.
-  ///
-  pub fn spawn<F: Future<Item = (), Error = ()> + Send + 'static>(&self, future: F) {
-    // Make sure to copy our (thread-local) logging destination into the task.
-    // When a daemon thread kicks off a future, it should log like a daemon thread (and similarly
-    // for a user-facing thread).
-    let logging_destination = logging::get_destination();
-    self
-      .runtime
-      .read()
-      .executor()
-      .spawn(futures::future::ok(()).and_then(move |()| {
-        logging::set_destination(logging_destination);
-        future
-      }))
-  }
-
-  ///
-  /// Run a Future and return its resolved Result.
-  ///
-  /// This should never be called from in a Future context, or any context where anyone may want to
-  /// spawn something on the runtime using Core::spawn.
-  ///
-  pub fn block_on<
-    Item: Send + 'static,
-    Error: Send + 'static,
-    F: Future<Item = Item, Error = Error> + Send + 'static,
-  >(
-    &self,
-    future: F,
-  ) -> Result<Item, Error> {
-    // Make sure to copy our (thread-local) logging destination into the task.
-    // When a daemon thread kicks off a future, it should log like a daemon thread (and similarly
-    // for a user-facing thread).
-    let logging_destination = logging::get_destination();
-    self
-      .runtime
-      .write()
-      .block_on(futures::future::ok(()).and_then(move |()| {
-        logging::set_destination(logging_destination);
-        future
-      }))
   }
 }
 
@@ -277,6 +276,6 @@ impl NodeContext for Context {
   where
     F: Future<Item = (), Error = ()> + Send + 'static,
   {
-    self.core.runtime.read().executor().spawn(future);
+    self.core.executor.spawn_and_ignore(future);
   }
 }

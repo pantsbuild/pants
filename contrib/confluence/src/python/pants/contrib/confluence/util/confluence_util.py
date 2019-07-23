@@ -5,11 +5,10 @@ import getpass
 import logging
 import mimetypes
 from os.path import basename
+from urllib.parse import quote_plus
 from xmlrpc.client import Binary
 from xmlrpc.client import Error as XMLRPCError
 from xmlrpc.client import ServerProxy
-
-from future.moves.urllib.parse import quote_plus
 
 
 log = logging.getLogger(__name__)

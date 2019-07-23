@@ -3,8 +3,6 @@
 
 import os
 
-from future.utils import binary_type, text_type
-
 from pants.engine.objects import Collection
 from pants.engine.rules import RootRule
 from pants.option.custom_types import GlobExpansionConjunction
@@ -13,7 +11,7 @@ from pants.util.dirutil import maybe_read_file, safe_delete, safe_file_dump
 from pants.util.objects import Exactly, datatype
 
 
-class FileContent(datatype([('path', text_type), ('content', binary_type)])):
+class FileContent(datatype([('path', str), ('content', bytes)])):
   """The content of a file."""
 
   def __repr__(self):
@@ -56,7 +54,7 @@ class PathGlobs(datatype([
       conjunction=(conjunction or GlobExpansionConjunction.any_match))
 
 
-class Digest(datatype([('fingerprint', text_type), ('serialized_bytes_length', int)])):
+class Digest(datatype([('fingerprint', str), ('serialized_bytes_length', int)])):
   """A Digest is a content-digest fingerprint, and a length of underlying content.
 
   These are used both to reference digests of strings/bytes/content, and as an opaque handle to a
@@ -113,7 +111,7 @@ class Digest(datatype([('fingerprint', text_type), ('serialized_bytes_length', i
 
 class PathGlobsAndRoot(datatype([
     ('path_globs', PathGlobs),
-    ('root', text_type),
+    ('root', str),
     ('digest_hint', Exactly(Digest, type(None))),
 ])):
   """A set of PathGlobs to capture relative to some root (which may exist outside of the buildroot).
@@ -145,16 +143,16 @@ class DirectoriesToMerge(datatype([('directories', tuple)])):
   pass
 
 
-class DirectoryWithPrefixToStrip(datatype([('directory_digest', Digest), ('prefix', text_type)])):
+class DirectoryWithPrefixToStrip(datatype([('directory_digest', Digest), ('prefix', str)])):
   pass
 
 
-class DirectoryToMaterialize(datatype([('path', text_type), ('directory_digest', Digest)])):
+class DirectoryToMaterialize(datatype([('path', str), ('directory_digest', Digest)])):
   """A request to materialize the contents of a directory digest at the provided path."""
   pass
 
 
-class UrlToFetch(datatype([('url', text_type), ('digest', Digest)])):
+class UrlToFetch(datatype([('url', str), ('digest', Digest)])):
   pass
 
 
@@ -166,7 +164,7 @@ _EMPTY_FINGERPRINT = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b78
 
 
 EMPTY_DIRECTORY_DIGEST = Digest(
-  fingerprint=text_type(_EMPTY_FINGERPRINT),
+  fingerprint=_EMPTY_FINGERPRINT,
   serialized_bytes_length=0
 )
 

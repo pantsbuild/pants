@@ -63,7 +63,6 @@ python_tests(
     'src/python/pants/util:osutil',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:task_test_base',
-    'tests/python/pants_test/backend/python/tasks:interpreter_cache_test_mixin',
   ]
 )
 
@@ -78,7 +77,6 @@ python_tests(
     'src/python/pants/ivy',
     'src/python/pants/java/distribution',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:int-test',
   ],

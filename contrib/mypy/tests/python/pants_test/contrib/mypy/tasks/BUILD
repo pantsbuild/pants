@@ -5,8 +5,8 @@ python_tests(
   name='mypy_integration',
   sources=['test_mypy_integration.py'],
   dependencies=[
-    'tests/python/pants_test/backend/python:interpreter_selection_utils',
     'tests/python/pants_test:int-test',
+    'tests/python/pants_test:interpreter_selection_utils',
   ],
   tags={'integration'},
 )

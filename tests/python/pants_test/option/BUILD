@@ -5,7 +5,6 @@ python_tests(
   name='testing',
   sources=globs('*.py', exclude=[globs('*_integration.py')]),
   dependencies=[
-    '3rdparty/python:mock',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
     'src/python/pants/option',

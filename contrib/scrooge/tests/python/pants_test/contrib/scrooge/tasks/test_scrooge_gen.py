@@ -3,8 +3,8 @@
 
 import os
 from textwrap import dedent
+from unittest.mock import MagicMock
 
-from mock import MagicMock
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary

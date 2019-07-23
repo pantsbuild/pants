@@ -9,7 +9,6 @@ from pex import pep425tags
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.build_graph.address import Address
-from pants_test.backend.python.tasks.interpreter_cache_test_mixin import InterpreterCacheTestMixin
 from pants_test.subsystem import subsystem_util
 from pants_test.task_test_base import TaskTestBase
 
@@ -35,7 +34,7 @@ def normalized_current_platform():
   return normalize_platform_tag(pep425tags.get_platform())
 
 
-class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
+class PythonTaskTestBase(TaskTestBase):
   """
   :API: public
   """

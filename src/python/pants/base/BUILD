@@ -5,7 +5,6 @@ python_library(
   name = 'build_environment',
   sources = ['build_environment.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':build_root',
     'src/python/pants/scm',
     'src/python/pants/scm:git',
@@ -18,8 +17,6 @@ python_library(
   sources = ['file_system_project_tree.py', 'project_tree.py', 'project_tree_factory.py'],
   dependencies = [
     '3rdparty/python:pathspec',
-    '3rdparty/python:scandir',
-    '3rdparty/python:six',
     ':build_environment',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
@@ -47,7 +44,6 @@ python_library(
   name = 'build_root',
   sources = ['build_root.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/util:meta',
   ],
 )
@@ -56,7 +52,6 @@ python_library(
   name = 'deprecated',
   sources = ['deprecated.py'],
   dependencies = [
-    '3rdparty/python:six',
     ':revision',
     'src/python/pants:version',
     'src/python/pants/util:memo',
@@ -67,7 +62,6 @@ python_library(
   name = 'exception_sink',
   sources = ['exception_sink.py'],
   dependencies = [
-    '3rdparty/python:faulthandler',
     '3rdparty/python:setproctitle',
     'src/python/pants/util:dirutil',
     ':build_environment',
@@ -104,7 +98,6 @@ python_library(
   name = 'hash_utils',
   sources = ['hash_utils.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':deprecated',
     'src/python/pants/util:objects',
   ]
@@ -115,30 +108,23 @@ python_library(
   sources = ['mustache.py'],
   dependencies = [
     '3rdparty/python:pystache',
-    '3rdparty/python:six',
   ]
 )
 
 python_library(
   name = 'parse_context',
   sources = ['parse_context.py'],
-  dependencies = [
-  ]
 )
 
 python_library(
   name = 'payload',
   sources = ['payload.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
 )
 
 python_library(
   name = 'payload_field',
   sources = ['payload_field.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':deprecated',
     ':hash_utils',
@@ -158,8 +144,6 @@ python_library(
 python_library(
   name = 'revision',
   sources = ['revision.py'],
-  dependencies = [
-  ]
 )
 
 python_library(
@@ -195,7 +179,6 @@ python_library(
   name = 'worker_pool',
   sources = ['worker_pool.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':workunit',
     'src/python/pants/reporting:report', # TODO(pl): Bust this out
   ],
@@ -217,7 +200,6 @@ python_library(
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
-    '3rdparty/python:six',
   ],
 )
 
@@ -225,7 +207,6 @@ python_library(
   name='exiter',
   sources=['exiter.py'],
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/util:fileutil',
     'src/python/pants/util:strutil',
   ]

@@ -6,8 +6,6 @@ import os
 import sys
 from collections import defaultdict, namedtuple
 
-from future.utils import PY3
-
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.base.build_environment import get_buildroot
@@ -169,8 +167,7 @@ class JvmDependencyUsage(Task):
       transitive_deps = set(transitive_deps_by_target.get(target))
       node = self.create_dep_usage_node(target, targets_by_file, transitive_deps)
       vt = target_to_vts[target]
-      mode = 'w' if PY3 else 'wb'
-      with open(self.nodes_json(vt.results_dir), mode=mode) as fp:
+      with open(self.nodes_json(vt.results_dir), mode='w') as fp:
         json.dump(node.to_cacheable_dict(), fp, indent=2, sort_keys=True)
       vt.update()
       return node

@@ -1,9 +1,10 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import subprocess
+
 from pants.base.exceptions import TaskError
 from pants.task.task import Task
-from pants.util.process_handler import subprocess
 
 from pants.contrib.cpp.targets.cpp_binary import CppBinary
 from pants.contrib.cpp.targets.cpp_library import CppLibrary

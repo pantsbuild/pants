@@ -2,9 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from collections import defaultdict, namedtuple
-
-from future.moves.itertools import zip_longest
-from six import string_types
+from itertools import zip_longest
 
 from pants.reporting.reporter import Reporter
 
@@ -98,7 +96,7 @@ class JsonReporter(Reporter):
 
   def _render_messages(self, *msg_elements):
     def _message_details(element):
-      if isinstance(element, string_types):
+      if isinstance(element, str):
         element = [element]
 
       text, detail = (x or y for x, y in zip_longest(element, ('', None)))

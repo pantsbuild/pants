@@ -130,7 +130,7 @@ class LineOriented:
           'Expected Options for `{}`, got: {}'.format(cls.__name__, line_oriented_options))
 
     output_file = line_oriented_options.values.output_file
-    sep = line_oriented_options.values.sep.encode('utf-8').decode('unicode_escape')
+    sep = line_oriented_options.values.sep.encode().decode('unicode_escape')
 
     if output_file:
       stdout_file = open(output_file, 'w')

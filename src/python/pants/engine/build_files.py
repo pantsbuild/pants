@@ -5,8 +5,6 @@ import logging
 from collections.abc import MutableMapping, MutableSequence
 from os.path import dirname, join
 
-import six
-from future.utils import raise_from
 from twitter.common.collections import OrderedSet
 
 from pants.base.project_tree import Dir
@@ -67,7 +65,7 @@ def _raise_did_you_mean(address_family, name, source=None):
                                .format(name, address_family.namespace, possibilities))
 
   if source:
-    raise_from(resolve_error, source)
+    raise resolve_error from source
   else:
     raise resolve_error
 
@@ -92,7 +90,7 @@ def hydrate_struct(address_mapper, address):
 
   inline_dependencies = []
   def maybe_append(outer_key, value):
-    if isinstance(value, six.string_types):
+    if isinstance(value, str):
       if outer_key != 'dependencies':
         inline_dependencies.append(Address.parse(value,
                                           relative_to=address.spec_path,
@@ -121,7 +119,7 @@ def hydrate_struct(address_mapper, address):
   dependencies = [d.value for d in hydrated_inline_dependencies]
 
   def maybe_consume(outer_key, value):
-    if isinstance(value, six.string_types):
+    if isinstance(value, str):
       if outer_key == 'dependencies':
         # Don't recurse into the dependencies field of a Struct, since those will be explicitly
         # requested by tasks. But do ensure that their addresses are absolute, since we're
@@ -204,12 +202,12 @@ def addresses_from_address_families(address_mapper, specs):
     try:
       addr_families_for_spec = spec.matching_address_families(address_family_by_directory)
     except Spec.AddressFamilyResolutionError as e:
-      raise raise_from(ResolveError(e), e)
+      raise ResolveError(e) from e
 
     try:
       all_addr_tgt_pairs = spec.address_target_pairs_from_address_families(addr_families_for_spec)
     except Spec.AddressResolutionError as e:
-      raise raise_from(AddressLookupError(e), e)
+      raise AddressLookupError(e) from e
     except SingleAddress._SingleAddressResolutionError as e:
       _raise_did_you_mean(e.single_address_family, e.name, source=e)
 

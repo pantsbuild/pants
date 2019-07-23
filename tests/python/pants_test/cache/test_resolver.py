@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import unittest
+from unittest.mock import Mock, patch
 
 import requests
-from mock import Mock, patch
 
 from pants.cache.resolver import Resolver, ResponseParser, RESTfulResolver
 

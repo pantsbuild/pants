@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import subprocess
 import textwrap
 import unittest
 from contextlib import contextmanager
@@ -10,7 +11,6 @@ from pants.java.distribution.distribution import Distribution
 from pants.java.executor import Executor, SubprocessExecutor
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_open
-from pants.util.process_handler import subprocess
 
 
 class SubprocessExecutorTest(unittest.TestCase):
@@ -38,7 +38,7 @@ class SubprocessExecutorTest(unittest.TestCase):
                                  stderr=subprocess.PIPE)
         _, stderr = process.communicate()
         self.assertEqual(0, process.returncode)
-        self.assertEqual('' if scrubbed else env_value, stderr.decode('utf-8').strip())
+        self.assertEqual('' if scrubbed else env_value, stderr.decode().strip())
 
   def test_not_scrubbed(self):
     self.do_test_jre_env_var('FRED', 'frog', scrubbed=False)

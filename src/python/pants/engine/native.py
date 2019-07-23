@@ -12,7 +12,6 @@ from contextlib import closing
 
 import cffi
 import pkg_resources
-from future.utils import PY2, binary_type, text_type
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.engine.selectors import Get
@@ -134,8 +133,6 @@ def bootstrap_c_source(scheduler_bindings_path, output_dir, module_name=NATIVE_E
     temp_output_prefix = os.path.join(tempdir, module_name)
     real_output_prefix = os.path.join(output_dir, module_name)
     temp_c_file = '{}.c'.format(temp_output_prefix)
-    if PY2:
-      temp_c_file = temp_c_file.encode('utf-8')
     c_file = '{}.c'.format(real_output_prefix)
     env_script = '{}.cflags'.format(real_output_prefix)
 
@@ -264,7 +261,7 @@ class _FFISpecification(object):
       self._ffi.def_extern(onerror=exc_handler)(bound_method)
 
   def to_py_str(self, msg_ptr, msg_len):
-    return bytes(self._ffi.buffer(msg_ptr, msg_len)).decode('utf-8')
+    return bytes(self._ffi.buffer(msg_ptr, msg_len)).decode()
 
   @classmethod
   def call(cls, c, func, args):
@@ -285,6 +282,19 @@ class _FFISpecification(object):
     obj = self._ffi.from_handle(val[0])
     type_id = c.to_id(type(obj))
     return TypeId(type_id)
+
+  @_extern_decl('Handle', ['ExternContext*', 'TypeId'])
+  def extern_get_handle_from_type_id(self, context_handle, ty):
+    c = self._ffi.from_handle(context_handle)
+    obj = c.from_id(ty.tup_0)
+    return c.to_value(obj)
+
+  @_extern_decl('bool', ['ExternContext*', 'TypeId'])
+  def extern_is_union(self, context_handle, type_id):
+    """Return whether or not a type is a member of a union"""
+    c = self._ffi.from_handle(context_handle)
+    input_type = c.from_id(type_id.tup_0)
+    return bool(getattr(input_type, '_is_union', None))
 
   @_extern_decl('Ident', ['ExternContext*', 'Handle*'])
   def extern_identify(self, context_handle, val):
@@ -321,7 +331,7 @@ class _FFISpecification(object):
   def extern_type_to_str(self, context_handle, type_id):
     """Given a TypeId, write type.__name__ and return it."""
     c = self._ffi.from_handle(context_handle)
-    return c.utf8_buf(text_type(c.from_id(type_id.tup_0).__name__))
+    return c.utf8_buf(str(c.from_id(type_id.tup_0).__name__))
 
   @_extern_decl('Buffer', ['ExternContext*', 'Handle*'])
   def extern_val_to_str(self, context_handle, val):
@@ -329,7 +339,7 @@ class _FFISpecification(object):
     c = self._ffi.from_handle(context_handle)
     v = c.from_value(val[0])
     # Consistently use the empty string to indicate None.
-    v_str = '' if v is None else text_type(v)
+    v_str = '' if v is None else str(v)
     return c.utf8_buf(v_str)
 
   @_extern_decl('Handle', ['ExternContext*', 'Handle**', 'uint64_t'])
@@ -363,13 +373,13 @@ class _FFISpecification(object):
   def extern_store_bytes(self, context_handle, bytes_ptr, bytes_len):
     """Given a context and raw bytes, return a new Handle to represent the content."""
     c = self._ffi.from_handle(context_handle)
-    return c.to_value(binary_type(self._ffi.buffer(bytes_ptr, bytes_len)))
+    return c.to_value(bytes(self._ffi.buffer(bytes_ptr, bytes_len)))
 
   @_extern_decl('Handle', ['ExternContext*', 'uint8_t*', 'uint64_t'])
   def extern_store_utf8(self, context_handle, utf8_ptr, utf8_len):
     """Given a context and UTF8 bytes, return a new Handle to represent the content."""
     c = self._ffi.from_handle(context_handle)
-    return c.to_value(self._ffi.string(utf8_ptr, utf8_len).decode('utf-8'))
+    return c.to_value(self._ffi.string(utf8_ptr, utf8_len).decode())
 
   @_extern_decl('Handle', ['ExternContext*', 'int64_t'])
   def extern_store_i64(self, context_handle, i64):
@@ -429,6 +439,7 @@ class _FFISpecification(object):
             TypeId(c.to_id(res.product)),
             c.to_value(res.subject),
             c.identify(res.subject),
+            TypeId(c.to_id(res.subject_declared_type)),
           )
       elif type(res) in (tuple, list):
         # GetMulti.
@@ -505,7 +516,7 @@ class ExternContext:
     return (buf, len(bytestring), self.to_value(buf))
 
   def utf8_buf(self, string):
-    return self.buf(string.encode('utf-8'))
+    return self.buf(string.encode())
 
   def utf8_buf_buf(self, strings):
     bufs = [self.utf8_buf(string) for string in strings]
@@ -610,8 +621,8 @@ class Native(Singleton):
       with closing(pkg_resources.resource_stream(__name__, lib_name)) as input_fp:
         # NB: The header stripping code here must be coordinated with header insertion code in
         #     build-support/bin/native/bootstrap_code.sh
-        engine_version = input_fp.readline().decode('utf-8').strip()
-        repo_version = input_fp.readline().decode('utf-8').strip()
+        engine_version = input_fp.readline().decode().strip()
+        repo_version = input_fp.readline().decode().strip()
         logger.debug('using {} built at {}'.format(engine_version, repo_version))
         with open(lib_path, 'wb') as output_fp:
           output_fp.write(input_fp.read())
@@ -659,6 +670,8 @@ class Native(Singleton):
                            self.ffi_lib.extern_call,
                            self.ffi_lib.extern_generator_send,
                            self.ffi_lib.extern_get_type_for,
+                           self.ffi_lib.extern_get_handle_from_type_id,
+                           self.ffi_lib.extern_is_union,
                            self.ffi_lib.extern_identify,
                            self.ffi_lib.extern_equals,
                            self.ffi_lib.extern_clone_val,
@@ -708,7 +721,7 @@ class Native(Singleton):
     return self.lib.init_logging(level, log_show_rust_3rdparty)
 
   def setup_pantsd_logger(self, log_file_path, level):
-    log_file_path = log_file_path.encode("utf-8")
+    log_file_path = log_file_path.encode()
     result = self.lib.setup_pantsd_logger(log_file_path, level)
     return self.context.raise_or_return(result)
 
@@ -716,8 +729,8 @@ class Native(Singleton):
     return self.lib.setup_stderr_logger(level)
 
   def write_log(self, msg, level, target):
-    msg = msg.encode("utf-8")
-    target = target.encode("utf-8")
+    msg = msg.encode()
+    target = target.encode()
     return self.lib.write_log(msg, level, target)
 
   def flush_log(self):
@@ -803,8 +816,8 @@ class Native(Singleton):
         ti(type_process_result),
         ti(type_generator),
         ti(type_url_to_fetch),
-        ti(text_type),
-        ti(binary_type),
+        ti(str),
+        ti(bytes),
         # Project tree.
         self.context.utf8_buf(build_root),
         self.context.utf8_buf(work_dir),
@@ -812,6 +825,7 @@ class Native(Singleton):
         self.context.utf8_buf_buf(ignore_patterns),
         self.to_ids_buf(root_subject_types),
         # Remote execution config.
+        execution_options.remote_execution,
         self.context.utf8_buf_buf(execution_options.remote_store_server),
         # We can't currently pass Options to the rust side, so we pass empty strings for None.
         self.context.utf8_buf(execution_options.remote_execution_server or ""),
@@ -824,8 +838,12 @@ class Native(Singleton):
         execution_options.remote_store_chunk_upload_timeout_seconds,
         execution_options.remote_store_rpc_retries,
         self.context.utf8_buf_buf(execution_options.remote_execution_extra_platform_properties),
-        execution_options.process_execution_parallelism,
+        execution_options.process_execution_local_parallelism,
+        execution_options.process_execution_remote_parallelism,
         execution_options.process_execution_cleanup_local_dirs,
+        execution_options.process_execution_speculation_delay,
+        self.context.utf8_buf(execution_options.process_execution_speculation_strategy),
+        execution_options.process_execution_use_local_cache,
       )
     return self.gc(scheduler, self.lib.scheduler_destroy)
 

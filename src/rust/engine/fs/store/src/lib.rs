@@ -49,9 +49,12 @@ use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
 
+const MEGABYTES: usize = 1024 * 1024;
+const GIGABYTES: usize = 1024 * MEGABYTES;
+
 // This is the target number of bytes which should be present in all combined LMDB store files
 // after garbage collection. We almost certainly want to make this configurable.
-pub const DEFAULT_LOCAL_STORE_GC_TARGET_BYTES: usize = 4 * 1024 * 1024 * 1024;
+pub const DEFAULT_LOCAL_STORE_GC_TARGET_BYTES: usize = 4 * GIGABYTES;
 
 // Summary of the files and directories uploaded with an operation
 // ingested_file_{count, bytes}: Number and combined size of processed files
@@ -177,9 +180,12 @@ impl Store {
   ///
   /// Make a store which only uses its local storage.
   ///
-  pub fn local_only<P: AsRef<Path>>(path: P) -> Result<Store, String> {
+  pub fn local_only<P: AsRef<Path>>(
+    executor: task_executor::Executor,
+    path: P,
+  ) -> Result<Store, String> {
     Ok(Store {
-      local: local::ByteStore::new(path)?,
+      local: local::ByteStore::new(executor, path)?,
       remote: None,
     })
   }
@@ -189,6 +195,7 @@ impl Store {
   /// will attempt to back-fill its local storage from a remote CAS.
   ///
   pub fn with_remote<P: AsRef<Path>>(
+    executor: task_executor::Executor,
     path: P,
     cas_addresses: &[String],
     instance_name: Option<String>,
@@ -201,7 +208,7 @@ impl Store {
     rpc_retries: usize,
   ) -> Result<Store, String> {
     Ok(Store {
-      local: local::ByteStore::new(path)?,
+      local: local::ByteStore::new(executor, path)?,
       remote: Some(remote::ByteStore::new(
         cas_addresses,
         instance_name,
@@ -854,7 +861,7 @@ pub enum EntryType {
 }
 
 mod local {
-  use super::{EntryType, ShrinkBehavior};
+  use super::{EntryType, ShrinkBehavior, GIGABYTES};
 
   use boxfuture::{try_future, BoxFuture, Boxable};
   use bytes::Bytes;
@@ -882,10 +889,14 @@ mod local {
     //  2. It's nice to know whether we should be able to parse something as a proto.
     file_dbs: Result<Arc<ShardedLmdb>, String>,
     directory_dbs: Result<Arc<ShardedLmdb>, String>,
+    executor: task_executor::Executor,
   }
 
   impl ByteStore {
-    pub fn new<P: AsRef<Path>>(path: P) -> Result<ByteStore, String> {
+    pub fn new<P: AsRef<Path>>(
+      executor: task_executor::Executor,
+      path: P,
+    ) -> Result<ByteStore, String> {
       let root = path.as_ref();
       let files_root = root.join("files");
       let directories_root = root.join("directories");
@@ -900,10 +911,15 @@ mod local {
           // travis fail because they can't allocate virtual memory, if there are multiple Stores
           // in memory at the same time. We don't know why they're not efficiently garbage collected
           // by python, but they're not, so...
-          file_dbs: ShardedLmdb::new(files_root.clone(), 1024 * 1024 * 1024 * 1024 / 10)
+          file_dbs: ShardedLmdb::new(files_root.clone(), 100 * GIGABYTES, executor.clone())
             .map(Arc::new),
-          directory_dbs: ShardedLmdb::new(directories_root.clone(), 5 * 1024 * 1024 * 1024)
-            .map(Arc::new),
+          directory_dbs: ShardedLmdb::new(
+            directories_root.clone(),
+            5 * GIGABYTES,
+            executor.clone(),
+          )
+          .map(Arc::new),
+          executor: executor,
         }),
       })
     }
@@ -1114,22 +1130,28 @@ mod local {
       entry_type: EntryType,
       bytes: Bytes,
       initial_lease: bool,
-    ) -> BoxFuture<Digest, String> {
+    ) -> impl Future<Item = Digest, Error = String> {
       let dbs = match entry_type {
         EntryType::Directory => self.inner.directory_dbs.clone(),
         EntryType::File => self.inner.file_dbs.clone(),
       };
-
-      let fingerprint = {
-        let mut hasher = Sha256::default();
-        hasher.input(&bytes);
-        Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
-      };
-      let digest = Digest(fingerprint, bytes.len());
-      try_future!(dbs)
-        .store_bytes(digest.0, bytes, initial_lease)
-        .map(move |()| digest)
-        .to_boxed()
+      let bytes2 = bytes.clone();
+      self
+        .inner
+        .executor
+        .spawn_on_io_pool(futures::future::lazy(move || {
+          let fingerprint = {
+            let mut hasher = Sha256::default();
+            hasher.input(&bytes);
+            Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
+          };
+          Ok(Digest(fingerprint, bytes.len()))
+        }))
+        .and_then(move |digest| {
+          future::done(dbs)
+            .and_then(move |db| db.store_bytes(digest.0, bytes2, initial_lease))
+            .map(move |()| digest)
+        })
     }
 
     pub fn load_bytes_with<T: Send + 'static, F: Fn(Bytes) -> T + Send + Sync + 'static>(
@@ -1603,7 +1625,7 @@ mod local {
     }
 
     pub fn new_store<P: AsRef<Path>>(dir: P) -> ByteStore {
-      ByteStore::new(dir).unwrap()
+      ByteStore::new(task_executor::Executor::new(), dir).unwrap()
     }
 
     pub fn load_file_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
@@ -1979,7 +2001,7 @@ mod remote {
 
   #[cfg(test)]
   mod tests {
-    use super::super::EntryType;
+    use super::super::{EntryType, MEGABYTES};
     use super::ByteStore;
     use bytes::Bytes;
     use hashing::Digest;
@@ -2310,7 +2332,7 @@ mod remote {
         &None,
         None,
         1,
-        10 * 1024 * 1024,
+        10 * MEGABYTES,
         Duration::from_secs(1),
         BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
         1,
@@ -2343,7 +2365,7 @@ mod remote {
 mod tests {
   use super::{
     local, DirectoryMaterializeMetadata, EntryType, FileContent, LoadMetadata, Source, Store,
-    UploadSummary,
+    UploadSummary, MEGABYTES,
   };
 
   use bazel_protos;
@@ -2423,7 +2445,7 @@ mod tests {
   /// Create a new local store with whatever was already serialized in dir.
   ///
   fn new_local_store<P: AsRef<Path>>(dir: P) -> Store {
-    Store::local_only(dir).expect("Error creating local store")
+    Store::local_only(task_executor::Executor::new(), dir).expect("Error creating local store")
   }
 
   ///
@@ -2431,13 +2453,14 @@ mod tests {
   ///
   fn new_store<P: AsRef<Path>>(dir: P, cas_address: String) -> Store {
     Store::with_remote(
+      task_executor::Executor::new(),
       dir,
       &[cas_address],
       None,
       &None,
       None,
       1,
-      10 * 1024 * 1024,
+      10 * MEGABYTES,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
@@ -3111,13 +3134,14 @@ mod tests {
       .expect("Error storing catnip locally");
 
     let store_with_remote = Store::with_remote(
+      task_executor::Executor::new(),
       dir.path(),
       &[cas.address()],
       Some("dark-tower".to_owned()),
       &None,
       None,
       1,
-      10 * 1024 * 1024,
+      10 * MEGABYTES,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
@@ -3137,13 +3161,14 @@ mod tests {
       .build();
 
     let store_with_remote = Store::with_remote(
+      task_executor::Executor::new(),
       dir.path(),
       &[cas.address()],
       Some("dark-tower".to_owned()),
       &None,
       None,
       1,
-      10 * 1024 * 1024,
+      10 * MEGABYTES,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
@@ -3177,13 +3202,14 @@ mod tests {
       .expect("Error storing catnip locally");
 
     let store_with_remote = Store::with_remote(
+      task_executor::Executor::new(),
       dir.path(),
       &[cas.address()],
       None,
       &None,
       Some("Armory.Key".to_owned()),
       1,
-      10 * 1024 * 1024,
+      10 * MEGABYTES,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
@@ -3203,13 +3229,14 @@ mod tests {
       .build();
 
     let store_with_remote = Store::with_remote(
+      task_executor::Executor::new(),
       dir.path(),
       &[cas.address()],
       None,
       &None,
       Some("Armory.Key".to_owned()),
       1,
-      10 * 1024 * 1024,
+      10 * MEGABYTES,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,

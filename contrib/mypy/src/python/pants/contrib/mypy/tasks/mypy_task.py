@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import subprocess
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -14,7 +15,6 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.contextutil import temporary_file_path
 from pants.util.memo import memoized_property
-from pants.util.process_handler import subprocess
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_info import PexInfo

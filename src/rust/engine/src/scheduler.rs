@@ -16,9 +16,10 @@ use crate::nodes::{NodeKey, Select, Tracer, Visualizer};
 use graph::{EntryId, Graph, InvalidationResult, NodeContext};
 use indexmap::IndexMap;
 use log::{debug, info, warn};
+use logging::logger::LOGGER;
 use parking_lot::Mutex;
 use ui::EngineDisplay;
-use workunit_store::{WorkUnit, WorkUnitStore};
+use workunit_store::WorkUnitStore;
 
 ///
 /// A Session represents a related series of requests (generally: one run of the pants CLI) on an
@@ -33,29 +34,15 @@ struct InnerSession {
   // The set of roots that have been requested within this session.
   roots: Mutex<HashSet<Root>>,
   // If enabled, the display that will render the progress of the V2 engine.
-  display: Option<Mutex<EngineDisplay>>,
+  display: Option<Arc<Mutex<EngineDisplay>>>,
   // If enabled, Zipkin spans for v2 engine will be collected.
   should_record_zipkin_spans: bool,
   // A place to store info about workunits in rust part
-  workunits: Mutex<Vec<WorkUnit>>,
+  workunit_store: WorkUnitStore,
 }
 
 #[derive(Clone)]
 pub struct Session(Arc<InnerSession>);
-
-impl WorkUnitStore for Session {
-  fn should_record_zipkin_spans(&self) -> bool {
-    self.0.should_record_zipkin_spans
-  }
-
-  fn get_workunits(&self) -> &Mutex<Vec<WorkUnit>> {
-    &self.0.workunits
-  }
-
-  fn add_workunit(&self, workunit: WorkUnit) {
-    self.0.workunits.lock().push(workunit);
-  }
-}
 
 impl Session {
   pub fn new(
@@ -67,9 +54,10 @@ impl Session {
     let inner_session = InnerSession {
       preceding_graph_size: scheduler.core.graph.len(),
       roots: Mutex::new(HashSet::new()),
-      display: EngineDisplay::create(ui_worker_count, should_render_ui).map(Mutex::new),
+      display: EngineDisplay::create(ui_worker_count, should_render_ui)
+        .map(|x| Arc::new(Mutex::new(x))),
       should_record_zipkin_spans: should_record_zipkin_spans,
-      workunits: Mutex::new(Vec::new()),
+      workunit_store: WorkUnitStore::new(),
     };
     Session(Arc::new(inner_session))
   }
@@ -88,8 +76,16 @@ impl Session {
     self.0.preceding_graph_size
   }
 
-  pub fn display(&self) -> &Option<Mutex<EngineDisplay>> {
-    &self.0.display
+  fn maybe_display(&self) -> Option<&Arc<Mutex<EngineDisplay>>> {
+    self.0.display.as_ref()
+  }
+
+  pub fn should_record_zipkin_spans(&self) -> bool {
+    self.0.should_record_zipkin_spans
+  }
+
+  pub fn workunit_store(&self) -> WorkUnitStore {
+    self.0.workunit_store.clone()
   }
 }
 
@@ -266,7 +262,7 @@ impl Scheduler {
 
     // If the join failed (due to `Invalidated`, since that is the only error we propagate), retry
     // the entire set of roots.
-    core.spawn(roots_res.then(move |res| {
+    core.executor.spawn_and_ignore(roots_res.then(move |res| {
       if let Ok(res) = res {
         sender.send(res).map_err(|_| ())
       } else {
@@ -301,64 +297,89 @@ impl Scheduler {
       .map(NodeKey::from)
       .collect();
 
-    // Lock the display for the remainder of the execution, and grab a reference to it.
-    let mut maybe_display = match &session.display() {
-      &Some(ref d) => Some(d.lock()),
-      &None => None,
-    };
-
     // This map keeps the k most relevant jobs in assigned possitions.
     // Keys are positions in the display (display workers) and the values are the actual jobs to print.
     let mut tasks_to_display = IndexMap::new();
 
-    if let Some(ref mut display) = maybe_display {
-      display.start();
-    };
+    match session.maybe_display() {
+      Some(display) => {
+        {
+          let mut display = display.lock();
+          display.start();
+        }
+        let unique_handle = LOGGER.register_engine_display(display.clone());
 
-    let results = loop {
-      if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
-        break res;
-      } else if let Some(ref mut display) = maybe_display {
-        Scheduler::display_ongoing_tasks(&self.core.graph, &roots, display, &mut tasks_to_display);
+        let results = loop {
+          if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
+            break res;
+          } else {
+            Scheduler::display_ongoing_tasks(
+              &self.core.graph,
+              &roots,
+              display,
+              &mut tasks_to_display,
+            );
+          }
+        };
+        LOGGER.deregister_engine_display(unique_handle);
+        {
+          let mut display = display.lock();
+          display.finish();
+        }
+        results
       }
-    };
-    if let Some(ref mut display) = maybe_display {
-      display.finish();
-    };
-
-    results
+      None => loop {
+        if let Ok(res) = receiver.recv_timeout(Duration::from_millis(100)) {
+          break res;
+        }
+      },
+    }
   }
 
   fn display_ongoing_tasks(
     graph: &Graph<NodeKey>,
     roots: &[NodeKey],
-    display: &mut EngineDisplay,
+    display: &Mutex<EngineDisplay>,
     tasks_to_display: &mut IndexMap<String, Duration>,
   ) {
     // Update the graph. To do that, we iterate over heavy hitters.
-    let heavy_hitters = graph.heavy_hitters(&roots, display.worker_count());
+
+    let worker_count = {
+      let d = display.lock();
+      d.worker_count()
+    };
+    let heavy_hitters = graph.heavy_hitters(&roots, worker_count);
+
     // Insert every one in the set of tasks to display.
     // For tasks already here, the durations are overwritten.
     tasks_to_display.extend(heavy_hitters.clone().into_iter());
+
     // And remove the tasks that no longer should be there.
     for (task, _) in tasks_to_display.clone().into_iter() {
       if !heavy_hitters.contains_key(&task) {
         tasks_to_display.swap_remove(&task);
       }
     }
-    let display_worker_count = display.worker_count();
-    let ongoing_tasks = tasks_to_display;
-    for (i, id) in ongoing_tasks.iter().enumerate() {
+
+    for (i, id) in tasks_to_display.iter().enumerate() {
       // TODO Maybe we want to print something else besides the ID here.
-      display.update(i.to_string(), format!("{:?}", id));
+      let mut d = display.lock();
+      d.update(i.to_string(), format!("{:?}", id));
     }
+
     // If the number of ongoing tasks is less than the number of workers,
     // fill the rest of the workers with empty string.
     // TODO(yic): further improve the UI. https://github.com/pantsbuild/pants/issues/6666
-    for i in ongoing_tasks.len()..display_worker_count {
-      display.update(i.to_string(), "".to_string());
+    let worker_count = {
+      let d = display.lock();
+      d.worker_count()
+    };
+
+    let mut d = display.lock();
+    for i in tasks_to_display.len()..worker_count {
+      d.update(i.to_string(), "".to_string());
     }
-    display.render();
+    d.render();
   }
 }
 
@@ -403,6 +424,6 @@ impl NodeContext for RootContext {
   where
     F: Future<Item = (), Error = ()> + Send + 'static,
   {
-    self.core.spawn(future);
+    self.core.executor.spawn_and_ignore(future);
   }
 }

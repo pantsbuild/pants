@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import subprocess
 from textwrap import dedent
 
 from pants.backend.python.tasks.gather_sources import GatherSources
@@ -9,7 +10,6 @@ from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.base.run_info import RunInfo
 from pants.build_graph.register import build_file_aliases as register_core
-from pants.util.process_handler import subprocess
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 
@@ -53,7 +53,7 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
     self.assertTrue(os.path.isfile(pex_copy))
 
     # Check that the pex runs.
-    output = subprocess.check_output(pex_copy).decode('utf-8')
+    output = subprocess.check_output(pex_copy).decode()
     if expected_output:
       self.assertEqual(expected_output, output)
 

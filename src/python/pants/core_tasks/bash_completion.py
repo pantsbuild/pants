@@ -86,7 +86,7 @@ class BashCompletion(ConsoleTask):
 
     generator = Generator(
       resource_string(__name__,
-                      os.path.join('templates', 'bash_completion', 'autocomplete.sh.mustache')).decode('utf-8'),
+                      os.path.join('templates', 'bash_completion', 'autocomplete.sh.mustache')).decode(),
       scopes_text=' '.join(sorted(list(cmd_line_scopes))),
       options_text=options_text
     )

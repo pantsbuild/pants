@@ -135,9 +135,9 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
       executable_file_content = self._get_executable_file_content(exec_pex_parent, modules)
 
       hasher = hashlib.sha1()
-      hasher.update(reqs_pex.path().encode('utf-8'))
-      hasher.update(srcs_pex.path().encode('utf-8'))
-      hasher.update(executable_file_content.encode('utf-8'))
+      hasher.update(reqs_pex.path().encode())
+      hasher.update(srcs_pex.path().encode())
+      hasher.update(executable_file_content.encode())
       exec_file_hash = hasher.hexdigest()
       exec_pex_path = os.path.realpath(os.path.join(exec_pex_parent, exec_file_hash))
       if not os.path.isdir(exec_pex_path):
@@ -199,7 +199,7 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
     return modules
 
   def _get_executable_file_content(self, exec_pex_parent, modules):
-    generator = Generator(pkgutil.get_data(__name__, self._EVAL_TEMPLATE_PATH).decode('utf-8'),
+    generator = Generator(pkgutil.get_data(__name__, self._EVAL_TEMPLATE_PATH).decode(),
                           chroot_parent=exec_pex_parent, modules=modules)
     return generator.render()
 

@@ -40,7 +40,7 @@ python_tests(
   sources = ['test_execution_graph.py'],
   dependencies = [
     'src/python/pants/backend/jvm/tasks/jvm_compile:execution_graph',
-    ]
+  ]
 )
 
 python_tests(
@@ -48,7 +48,6 @@ python_tests(
   sources = ['test_clean_all_integration.py'],
   dependencies = [
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},

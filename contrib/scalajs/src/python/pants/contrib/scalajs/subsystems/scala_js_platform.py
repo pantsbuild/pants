@@ -5,7 +5,6 @@ import json
 import os
 import shutil
 
-from future.utils import PY3
 from pants.build_graph.injectables_mixin import InjectablesMixin
 from pants.option.custom_types import target_option
 from pants.subsystem.subsystem import Subsystem
@@ -50,8 +49,7 @@ class ScalaJSPlatform(InjectablesMixin, Subsystem, NodeResolverBase):
       'version': '0.0.0',
       'main': main,
     }
-    mode = 'w' if PY3 else 'wb'
-    with open(os.path.join(results_dir, 'package.json'), mode) as fp:
+    with open(os.path.join(results_dir, 'package.json'), 'w') as fp:
       json.dump(package, fp, indent=2)
 
   @property

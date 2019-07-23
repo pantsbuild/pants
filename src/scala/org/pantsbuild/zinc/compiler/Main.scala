@@ -9,9 +9,9 @@ import java.nio.file.Paths
 import scala.collection.JavaConverters._
 
 import sbt.internal.inc.IncrementalCompilerImpl
-import sbt.internal.util.{ ConsoleLogger, ConsoleOut }
+import sbt.internal.util.{ BasicLogger, ConsoleLogger, ConsoleOut, StackTrace }
 import sbt.io.IO
-import sbt.util.Level
+import sbt.util.{ ControlEvent, Level, LogEvent, Logger }
 import xsbti.CompileFailed
 
 import com.martiansoftware.nailgun.NGContext
@@ -20,6 +20,52 @@ import com.google.common.io.Files
 
 import org.pantsbuild.zinc.analysis.AnalysisMap
 import org.pantsbuild.zinc.util.Util
+
+// TODO: why does the default logger take so long? Is it scanning the filesystem or doing something
+// else pathological?
+// The normal sbt logger takes 5 seconds to start up in a native image. This is intended to be
+// equivalent, while allowing the native image to run immediately.
+case class BareBonesLogger(thisLevel: Level.Value) extends BasicLogger {
+  import scala.Console.{ CYAN, GREEN, RED, YELLOW, RESET }
+
+  val out = System.err
+
+  override def trace(t: => Throwable): Unit = out.println(StackTrace.trimmed(t, getTrace))
+
+  override def success(message: => String): Unit = {
+    val colored = s"$GREEN[success!] $message$RESET"
+    out.println(colored)
+  }
+
+  def printError(message: => String): Unit = {
+    val colored = s"$RED[error] $message$RESET"
+    out.println(colored)
+  }
+
+  override def log(
+    level: Level.Value,
+    message: => String
+  ): Unit = {
+    if (level >= thisLevel) {
+      val (colorStart, prefix) = level match {
+        case Level.Debug => (CYAN, "[debug]")
+        case Level.Info => (GREEN, "[info]")
+        case Level.Warn => (YELLOW, "[warn]")
+        case Level.Error => (RED, "[error]")
+      }
+      val colored = s"$colorStart$prefix $message$RESET"
+      out.println(colored)
+    }
+  }
+
+  override def logAll(events: Seq[LogEvent]): Unit = events.foreach(log)
+
+  // TODO: Figure out what messages get routed to this method!
+  override def control(event: ControlEvent.Value, message: => String): Unit = {
+    val colored = s"$GREEN[control: $event] $message$RESET"
+    out.println(colored)
+  }
+}
 
 /**
  * Command-line main class.
@@ -51,7 +97,7 @@ object Main {
     else published
   }
 
-  def mkLogger(settings: Settings): ConsoleLogger = {
+  def mkLogger(settings: Settings) = {
     // If someone has not explicitly enabled log4j2 JMX, disable it.
     if (!Util.isSetProperty("log4j2.disable.jmx")) {
       Util.setProperty("log4j2.disable.jmx", "true")
@@ -61,13 +107,7 @@ object Main {
     // so we can run zinc without $PATH (as needed in remoting).
     System.setProperty("sbt.log.format", "true")
 
-    val cl =
-      ConsoleLogger(
-        out = ConsoleOut.systemOut,
-        ansiCodesSupported = settings.consoleLog.color
-      )
-    cl.setLevel(settings.consoleLog.logLevel)
-    cl
+    BareBonesLogger(settings.consoleLog.logLevel)
   }
 
   def preprocessArgs(rawArgs: Array[String]): Array[String] = {
@@ -137,8 +177,7 @@ object Main {
   }
 
   def mainImpl(settings: Settings, startTime: Long): Unit = {
-    val log = mkLogger(settings)
-
+    val log = BareBonesLogger(settings.consoleLog.logLevel)
     val isDebug = settings.consoleLog.logLevel <= Level.Debug
 
     // if there are no sources provided, print outputs based on current analysis if requested,

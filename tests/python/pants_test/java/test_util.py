@@ -4,8 +4,7 @@
 import os
 import unittest
 from contextlib import contextmanager
-
-from mock import Mock, patch
+from unittest.mock import Mock, patch
 
 from pants.java.executor import Executor
 from pants.java.jar.manifest import Manifest
@@ -127,5 +126,5 @@ class SafeClasspathTest(unittest.TestCase):
       # manifest should contain the relative path of both jar and resource directory
       expected = ('{}: ../{}/{} ../{}/{}/\n'
                   .format(Manifest.CLASS_PATH, LIB_DIR, JAR_FILE, LIB_DIR, RESOURCES)
-                  .encode('utf-8'))
+                  .encode())
       self.assertEqual(expected, synthetic_jar.read(Manifest.PATH).replace(b'\n ', b''))

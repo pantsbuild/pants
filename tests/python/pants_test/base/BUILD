@@ -26,7 +26,6 @@ python_tests(
   name = 'exclude_target_regexp_integration',
   sources = [ 'test_exclude_target_regexp_integration.py' ],
   dependencies = [
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
@@ -61,7 +60,6 @@ python_tests(
   name = 'deprecated',
   sources = ['test_deprecated.py'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/base:deprecated',
     'src/python/pants/util:collections',
     'src/python/pants:version',
@@ -74,7 +72,6 @@ python_tests(
   sources = ['test_filesystem_build_file.py'],
   dependencies = [
     '3rdparty/python:pathspec',
-    '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_file',
     'src/python/pants/util:dirutil',
@@ -103,7 +100,6 @@ python_tests(
   name = 'hash_utils',
   sources = ['test_hash_utils.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:hash_utils',
     'src/python/pants/util:contextutil',
@@ -197,7 +193,6 @@ python_tests(
   name = 'exception_sink',
   sources = ['test_exception_sink.py'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/base:exception_sink',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
@@ -212,8 +207,6 @@ python_tests(
   name = 'exception_sink_integration',
   sources = ['test_exception_sink_integration.py'],
   dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python:mock',
     'src/python/pants/base:exception_sink',
     'src/python/pants/util:osutil',
     'tests/python/pants_test:int-test',

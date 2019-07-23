@@ -3,13 +3,13 @@
 
 import datetime
 import os
+import subprocess
 import unittest
 from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump, touch
-from pants.util.process_handler import subprocess
 from pants_test.testutils.git_util import get_repo_root, initialize_repo
 
 
@@ -37,8 +37,8 @@ class PreCommitHookTest(unittest.TestCase):
       stderr=subprocess.PIPE,
     )
     (stdout_data, stderr_data) = proc.communicate()
-    stdout_data = stdout_data.decode('utf-8')
-    stderr_data = stderr_data.decode('utf-8')
+    stdout_data = stdout_data.decode()
+    stderr_data = stderr_data.decode()
     self.assertNotEqual(0, proc.returncode)
     all_output = '{}\n{}'.format(stdout_data, stderr_data)
     self.assertIn(expected_excerpt, all_output)
@@ -48,7 +48,7 @@ class PreCommitHookTest(unittest.TestCase):
 
   def _assert_subprocess_success_with_output(self, worktree, cmd, full_expected_output):
     output = subprocess.check_output(cmd, cwd=worktree)
-    self.assertEqual(full_expected_output, output.decode('utf-8'))
+    self.assertEqual(full_expected_output, output.decode())
 
   def test_check_packages(self):
     package_check_script = os.path.join(self.pants_repo_root, 'build-support/bin/check_packages.sh')

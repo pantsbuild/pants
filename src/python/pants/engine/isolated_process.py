@@ -3,8 +3,6 @@
 
 import logging
 
-from future.utils import binary_type
-
 from pants.engine.fs import Digest
 from pants.engine.rules import RootRule, rule
 from pants.util.objects import Exactly, datatype, hashable_string_list, string_optional, string_type
@@ -62,8 +60,8 @@ class ExecuteProcessRequest(datatype([
     )
 
 
-class ExecuteProcessResult(datatype([('stdout', binary_type),
-                                     ('stderr', binary_type),
+class ExecuteProcessResult(datatype([('stdout', bytes),
+                                     ('stderr', bytes),
                                      ('output_directory_digest', Digest)
                                      ])):
   """Result of successfully executing a process.
@@ -71,8 +69,8 @@ class ExecuteProcessResult(datatype([('stdout', binary_type),
   Requesting one of these will raise an exception if the exit code is non-zero."""
 
 
-class FallibleExecuteProcessResult(datatype([('stdout', binary_type),
-                                             ('stderr', binary_type),
+class FallibleExecuteProcessResult(datatype([('stdout', bytes),
+                                             ('stderr', bytes),
                                              ('exit_code', int),
                                              ('output_directory_digest', Digest)
                                              ])):
@@ -103,8 +101,8 @@ stderr:
     msg = self.MSG_FMT.format(
       desc=process_description,
       code=exit_code,
-      stdout=stdout.decode('utf-8'),
-      stderr=stderr.decode('utf-8')
+      stdout=stdout.decode(),
+      stderr=stderr.decode()
     )
 
     super().__init__(msg)

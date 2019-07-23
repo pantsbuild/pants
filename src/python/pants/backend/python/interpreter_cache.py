@@ -195,7 +195,7 @@ class PythonInterpreterCache(Subsystem):
                   .format(interpreter_dir))
       shutil.rmtree(interpreter_dir, ignore_errors=True)
     except Exception as e:
-      logger.warn(
+      logger.warning(
         'Caught exception {!r} during interpreter purge. Please run `./pants clean-all`!'
         .format(e)
       )

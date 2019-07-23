@@ -9,7 +9,6 @@ python_tests(
     'src/python/pants/java/distribution',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ],
   timeout = 15,

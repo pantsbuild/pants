@@ -3,7 +3,6 @@
 
 from collections import namedtuple
 
-import six
 from colors import cyan, green, red, yellow
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -123,7 +122,7 @@ class PlainTextReporter(PlainTextReporterBase):
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
-    if not self.is_under_main_root(workunit):
+    if self.is_under_background_root(workunit):
       return
 
     label_format = self._get_label_format(workunit)
@@ -144,7 +143,7 @@ class PlainTextReporter(PlainTextReporterBase):
 
   def end_workunit(self, workunit):
     """Implementation of Reporter callback."""
-    if not self.is_under_main_root(workunit):
+    if self.is_under_background_root(workunit):
       return
 
     if workunit.outcome() != WorkUnit.SUCCESS and not self._show_output(workunit):
@@ -153,17 +152,17 @@ class PlainTextReporter(PlainTextReporterBase):
         self._emit_indented_workunit_label(workunit)
       for name, outbuf in workunit.outputs().items():
         self.emit(self._prefix(workunit, '\n==== {} ====\n'.format(name)))
-        self.emit(self._prefix(workunit, outbuf.read_from(0).decode('utf-8')))
+        self.emit(self._prefix(workunit, outbuf.read_from(0).decode()))
         self.flush()
 
   def do_handle_log(self, workunit, level, *msg_elements):
     """Implementation of Reporter callback."""
-    if not self.is_under_main_root(workunit):
+    if self.is_under_background_root(workunit):
       return
 
     # If the element is a (msg, detail) pair, we ignore the detail. There's no
     # useful way to display it on the console.
-    elements = [e if isinstance(e, six.string_types) else e[0] for e in msg_elements]
+    elements = [e if isinstance(e, str) else e[0] for e in msg_elements]
     msg = '\n' + ''.join(elements)
     if self.use_color_for_workunit(workunit, self.settings.color):
       msg = self._COLOR_BY_LEVEL.get(level, lambda x: x)(msg)
@@ -173,7 +172,7 @@ class PlainTextReporter(PlainTextReporterBase):
 
   def handle_output(self, workunit, label, s):
     """Implementation of Reporter callback."""
-    if not self.is_under_main_root(workunit):
+    if self.is_under_background_root(workunit):
       return
     tool_output_format = self._get_tool_output_format(workunit)
     if tool_output_format == ToolOutputFormat.INDENT:

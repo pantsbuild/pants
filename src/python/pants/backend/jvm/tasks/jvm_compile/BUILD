@@ -36,7 +36,6 @@ python_library(
 python_library(
   sources = ['jvm_compile.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':compile_context',
     ':execution_graph',
     ':missing_dependency_finder',

@@ -4,8 +4,11 @@
 import os
 from abc import abstractmethod
 
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.rewrite_base import RewriteBase
 from pants.base.exceptions import TaskError
+from pants.build_graph.build_graph import BuildGraph
+from pants.build_graph.target_scopes import Scopes
 from pants.java.jar.jar_dependency import JarDependency
 from pants.option.custom_types import file_option
 from pants.task.fmt_task_mixin import FmtTaskMixin
@@ -32,7 +35,7 @@ class ScalaFix(RewriteBase):
     cls.register_jvm_tool(register,
                           'scalafix',
                           classpath=[
-                            JarDependency(org='ch.epfl.scala', name='scalafix-cli_2.11.12', rev='0.6.0-M16'),
+                            JarDependency(org='ch.epfl.scala', name='scalafix-cli_2.12.8', rev='0.9.4'),
                           ])
     cls.register_jvm_tool(register, 'scalafix-tool-classpath', classpath=[])
 
@@ -51,9 +54,13 @@ class ScalaFix(RewriteBase):
     if options.semantic:
       round_manager.require_data('runtime_classpath')
 
-  def _compute_classpath(self, targets):
-    classpaths = self.context.products.get_data('runtime_classpath')
-    return [entry for _, entry in classpaths.get_for_targets(targets)]
+  @staticmethod
+  def _compute_classpath(runtime_classpath, targets):
+    closure = BuildGraph.closure(targets, bfs=True,
+                                 include_scopes=Scopes.JVM_RUNTIME_SCOPES, respect_intransitive=True)
+    classpath_for_targets = ClasspathUtil.classpath(closure, runtime_classpath)
+
+    return classpath_for_targets
 
   def invoke_tool(self, absolute_root, target_sources):
     args = []
@@ -61,9 +68,9 @@ class ScalaFix(RewriteBase):
     if tool_classpath:
       args.append('--tool-classpath={}'.format(os.pathsep.join(tool_classpath)))
     if self.get_options().semantic:
-      # If semantic checks are enabled, pass the relevant classpath entries for these
-      # targets.
-      classpath = self._compute_classpath({target for target, _ in target_sources})
+      # If semantic checks are enabled, we need the full classpath for these targets.
+      runtime_classpath = self.context.products.get_data('runtime_classpath')
+      classpath = ScalaFix._compute_classpath(runtime_classpath, {target for target, _ in target_sources})
       args.append('--sourceroot={}'.format(absolute_root))
       args.append('--classpath={}'.format(os.pathsep.join(classpath)))
     if self.get_options().configuration:

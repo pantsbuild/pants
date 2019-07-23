@@ -6,12 +6,10 @@ import logging
 import os
 import pkgutil
 import plistlib
+import subprocess
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from contextlib import contextmanager
-
-from future.utils import PY3, text_type
-from six import string_types
 
 from pants.base.revision import Revision
 from pants.java.util import execute_java, execute_java_async
@@ -19,7 +17,6 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.osutil import OS_ALIASES, normalize_os_name
-from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)
@@ -34,7 +31,7 @@ def _parse_java_version(name, version):
   # We also accommodate specification versions, which just have major and minor
   # components; eg: `1.8`.  These are useful when specifying constraints a distribution must
   # satisfy; eg: to pick any 1.8 java distribution: '1.8' <= version <= '1.8.99'
-  if isinstance(version, string_types):
+  if isinstance(version, str):
     version = Revision.lenient(version)
   if version and not isinstance(version, Revision):
     raise ValueError('{} must be a string or a Revision object, given: {}'.format(name, version))
@@ -149,7 +146,7 @@ class Distribution:
         if self._is_executable(os.path.join(jdk_dir, 'bin', 'javac')):
           home = jdk_dir
       self._home = home
-    return text_type(self._home)
+    return self._home
 
   @property
   def real_home(self):
@@ -237,10 +234,10 @@ class Distribution:
         stdout, stderr = process.communicate()
         if process.returncode != 0:
           raise self.Error('Failed to determine java system properties for {} with {} - exit code'
-                           ' {}: {}'.format(java, ' '.join(cmd), process.returncode, stderr.decode('utf-8')))
+                           ' {}: {}'.format(java, ' '.join(cmd), process.returncode, stderr.decode()))
 
       props = {}
-      for line in stdout.decode('utf-8').split(os.linesep):
+      for line in stdout.decode().split(os.linesep):
         key, _, val = line.partition('=')
         props[key] = val
       self._system_properties = props
@@ -366,8 +363,7 @@ class _OSXEnvironment(_DistributionEnvironment):
     if os.path.exists(self._osx_java_home_exe):
       try:
         plist = subprocess.check_output([self._osx_java_home_exe, '--failfast', '--xml'])
-        plist_results = plistlib.loads(plist) if PY3 else plistlib.readPlistFromString(plist)
-        for distribution in plist_results:
+        for distribution in plistlib.loads(plist):
           home = distribution['JVMHomePath']
           yield self.Location.from_home(home)
       except subprocess.CalledProcessError:

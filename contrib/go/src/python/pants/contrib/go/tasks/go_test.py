@@ -3,7 +3,6 @@
 
 from contextlib import contextmanager
 
-from future.utils import text_type
 from pants.base.build_environment import get_buildroot
 from pants.base.workunit import WorkUnitLabel
 from pants.task.testrunner_task_mixin import PartitionedTestRunnerTaskMixin, TestResult
@@ -52,8 +51,8 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
     self.ensure_workspace(target)
 
   class _GoTestTargetInfo(datatype([
-      ('import_path', text_type),
-      ('gopath', text_type),
+      ('import_path', str),
+      ('gopath', str),
   ])): pass
 
   def _generate_args_for_targets(self, targets):
@@ -62,8 +61,7 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
     reconstructed for spawning test commands regardless of how the targets are partitioned.
     """
     return {
-      t: self._GoTestTargetInfo(import_path=text_type(t.import_path),
-                                gopath=text_type(self.get_gopath(t)))
+      t: self._GoTestTargetInfo(import_path=t.import_path, gopath=self.get_gopath(t))
       for t in targets
     }
 

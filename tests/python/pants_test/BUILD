@@ -4,7 +4,6 @@
 python_library(
   name='test_infra',
   dependencies=[
-    '3rdparty/python:future',
     'tests/python/pants_test:int-test-for-export',
     'tests/python/pants_test:test_base',
     'tests/python/pants_test/jvm:jar_task_test_base',
@@ -60,7 +59,6 @@ python_library(
   name = 'test_base',
   sources = ['test_base.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/base:build_root',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/base:exceptions',
@@ -97,7 +95,6 @@ python_library(
     'src/python/pants/ivy',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test:test_base',
   ]
 )
@@ -112,4 +109,9 @@ python_tests(
     'src/python/pants/source',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
+)
+
+python_library(
+  name='interpreter_selection_utils',
+  sources=['interpreter_selection_utils.py'],
 )

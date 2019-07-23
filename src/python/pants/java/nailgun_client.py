@@ -10,7 +10,6 @@ import sys
 import time
 
 import psutil
-from future.utils import PY3
 
 from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, MaybeShutdownSocket, NailgunProtocol
@@ -245,8 +244,8 @@ class NailgunClient:
     self._address = (self._host, self._port)
     self._address_string = ':'.join(str(i) for i in self._address)
     self._stdin = ins
-    self._stdout = out or (sys.stdout.buffer if PY3 else sys.stdout)
-    self._stderr = err or (sys.stderr.buffer if PY3 else sys.stderr)
+    self._stdout = out or sys.stdout.buffer
+    self._stderr = err or sys.stderr.buffer
     self._exit_on_broken_pipe = exit_on_broken_pipe
     self._metadata_base_dir = metadata_base_dir
     # Mutable session state.
@@ -314,6 +313,9 @@ class NailgunClient:
     """Send the signal `signum` send if the PID and/or PGRP chunks have been received.
 
     No error is raised if the pid or pgrp are None or point to an already-dead process.
+
+    :param signum: The signal number to send to the remote process.
+    :param include_pgrp: If True, it will try to kill the pgrp as well
     """
     remote_pid = self._maybe_last_pid()
     if remote_pid is not None:

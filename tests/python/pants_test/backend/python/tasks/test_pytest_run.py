@@ -116,7 +116,7 @@ class PytestTestConftest(PytestTestBase):
     def pytest_configure(config):
       INDEX.update((app, len(app)) for app in APPS)
     """))
-    self.add_to_build_file('src/python/base', target='python_library()\n')
+    self.add_to_build_file('src/python/base', target='python_library(sources=globs("*.py"))\n')
 
     self.create_file('src/python/base/app/__init__.py')
     self.create_file('src/python/base/app/conftest.py', contents=dedent("""

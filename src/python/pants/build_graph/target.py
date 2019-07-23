@@ -6,7 +6,6 @@ import os
 import weakref
 from hashlib import sha1
 
-from six import string_types
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
@@ -371,7 +370,7 @@ class Target(AbstractTarget):
     """
     return self._tags
 
-  def assert_list(self, putative_list, expected_type=string_types, key_arg=None):
+  def assert_list(self, putative_list, expected_type=str, key_arg=None):
     """
     :API: public
     """
@@ -462,7 +461,7 @@ class Target(AbstractTarget):
 
       dep_hashes = sorted(list(dep_hash_iter()))
       for dep_hash in dep_hashes:
-        hasher.update(dep_hash.encode('utf-8'))
+        hasher.update(dep_hash.encode())
       target_hash = self.invalidation_hash(fingerprint_strategy)
       if target_hash is None and not dep_hashes:
         return None

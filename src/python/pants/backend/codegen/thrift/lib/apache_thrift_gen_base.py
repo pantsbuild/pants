@@ -15,7 +15,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.option.custom_types import target_option
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.memo import memoized_property
-from pants.util.meta import classproperty
+
 
 
 class ApacheThriftGenBase(SimpleCodegenTask):

@@ -2,11 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import subprocess
 from unittest import skipIf
-
-from future.utils import PY2
-
-from pants.util.process_handler import subprocess
 
 
 PY_2 = '2'
@@ -14,6 +11,7 @@ PY_3 = '3'
 
 PY_27 = '2.7'
 PY_36 = '3.6'
+PY_37 = '3.7'
 
 
 def has_python_version(version):
@@ -33,11 +31,9 @@ def python_interpreter_path(version):
   :returns: the normalized path to the interpreter binary if found; otherwise `None`
   :rtype: string
   """
-  if PY2:
-    FileNotFoundError = IOError
   try:
     command = ['python{}'.format(version), '-c', 'import sys; print(sys.executable)']
-    py_path = subprocess.check_output(command).decode('utf-8').strip()
+    py_path = subprocess.check_output(command).decode().strip()
     return os.path.realpath(py_path)
   except (subprocess.CalledProcessError, FileNotFoundError):
     return None
@@ -82,3 +78,8 @@ def skip_unless_python27_and_python3_present(func):
 def skip_unless_python27_and_python36_present(func):
   """A test skip decorator that only runs a test method if python2.7 and python3.6 are present."""
   return skip_unless_all_pythons_present(PY_27, PY_36)(func)
+
+
+def skip_unless_python36_and_python37_present(func):
+  """A test skip decorator that only runs a test method if python3.6 and python3.7 are present."""
+  return skip_unless_all_pythons_present(PY_36, PY_37)(func)

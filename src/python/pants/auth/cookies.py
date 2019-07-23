@@ -2,8 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-
-from future.moves.http.cookiejar import LWPCookieJar
+from http.cookiejar import LWPCookieJar
 
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.subsystem.subsystem import Subsystem

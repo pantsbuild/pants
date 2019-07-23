@@ -11,8 +11,6 @@ from abc import ABC, abstractmethod
 from contextlib import closing, contextmanager
 
 import requests
-import six
-from future.utils import PY3
 
 from pants.util.dirutil import safe_open
 from pants.util.strutil import strip_prefix
@@ -39,7 +37,7 @@ class Fetcher:
 
     def __init__(self, value=None, response_code=None):
       super(Fetcher.PermanentError, self).__init__(value)
-      if response_code and not isinstance(response_code, six.integer_types):
+      if response_code and not isinstance(response_code, int):
         raise ValueError('response_code must be an integer, got {}'.format(response_code))
       self._response_code = response_code
 
@@ -153,10 +151,10 @@ class Fetcher:
       :type stream: :class:`io.RawIOBase`
       """
       self._width = width or 50
-      if not isinstance(self._width, six.integer_types):
+      if not isinstance(self._width, int):
         raise ValueError('The width must be an integer, given {}'.format(self._width))
       self._chunk_size_bytes = chunk_size_bytes or 10 * 1024
-      self._stream = stream or (sys.stderr.buffer if PY3 else sys.stderr)
+      self._stream = stream or sys.stderr.buffer
       self._start = time.time()
 
     def status(self, code, content_length=None):
@@ -178,19 +176,19 @@ class Fetcher:
         self.chunks = chunk_count
         if self.size:
           self._stream.write(b'\r')
-          self._stream.write('{:3}% '.format(int(self.read * 1.0 / self.size * 100)).encode('utf-8'))
+          self._stream.write(f'{int(self.read * 1.0 / self.size * 100):3}% '.encode())
         self._stream.write(b'.' * self.chunks)
         if self.size:
           size_width = len(str(self.download_size))
           downloaded = int(self.read / 1024)
-          self._stream.write('{} {} KB'.format(' ' * (self._width - self.chunks),
-                                               str(downloaded).rjust(size_width))
-                             .encode('utf-8'))
+          self._stream.write(
+            f"{' ' * (self._width - self.chunks)} {str(downloaded).rjust(size_width)} KB".encode()
+          )
         self._stream.flush()
 
     def finished(self):
       if self.chunks > 0:
-        self._stream.write(' {:.3f}s\n'.format(time.time() - self._start).encode('utf-8'))
+        self._stream.write(f' {time.time() - self._start:.3f}s\n'.encode())
         self._stream.flush()
 
   def __init__(self, root_dir, requests_api=None):
@@ -367,7 +365,7 @@ class Fetcher:
     """
     @contextmanager
     def download_fp(_path_or_fd):
-      if _path_or_fd and not isinstance(_path_or_fd, six.string_types):
+      if _path_or_fd and not isinstance(_path_or_fd, str):
         yield _path_or_fd, _path_or_fd.name
       else:
         if not _path_or_fd:

@@ -139,7 +139,7 @@ class Report:
       # in Python 2. It is not clear why the dictionary size is changing, and this may
       # be a potential source of issues.
       for label, output in list(workunit.outputs().items()):
-        s = output.read().decode('utf-8')
+        s = output.read().decode()
         if len(s) > 0:
           for reporter in self._reporters.values():
             reporter.handle_output(workunit, label, s)

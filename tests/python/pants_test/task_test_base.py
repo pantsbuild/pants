@@ -3,11 +3,10 @@
 
 import glob
 import os
+import subprocess
 from abc import abstractmethod
 from contextlib import closing, contextmanager
 from io import BytesIO
-
-from future.utils import PY2
 
 from pants.goal.goal import Goal
 from pants.ivy.bootstrapper import Bootstrapper
@@ -17,7 +16,6 @@ from pants.util.contextutil import temporary_dir
 from pants.util.memo import memoized_method
 from pants.util.meta import classproperty
 from pants.util.objects import SubclassesOf, TypedCollection, datatype
-from pants.util.process_handler import subprocess
 from pants_test.test_base import TestBase
 
 
@@ -108,8 +106,6 @@ class TaskTestBase(TestBase):
     :return: A pair (type, options_scope)
     """
     subclass_name = 'test_{0}_{1}'.format(task_type.__name__, options_scope)
-    if PY2:
-      subclass_name = subclass_name.encode('utf-8')
     return type(subclass_name, (task_type,), {'_stable_name': task_type._compute_stable_name(),
                                               'options_scope': options_scope})
 
@@ -200,7 +196,7 @@ class ConsoleTaskTestBase(TaskTestBase):
       context = self.context(target_roots=targets, console_outstream=output)
       task = self.create_task(context)
       task.execute()
-      return output.getvalue().decode('utf-8')
+      return output.getvalue().decode()
 
   def execute_console_task(self, targets=None, extra_targets=None, options=None,
                            passthru_args=None, workspace=None, scheduler=None):

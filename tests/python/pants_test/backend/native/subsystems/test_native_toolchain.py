@@ -3,6 +3,7 @@
 
 import os
 import re
+import subprocess
 from contextlib import contextmanager
 
 from pants.backend.native.config.environment import Platform
@@ -15,7 +16,6 @@ from pants.backend.native.subsystems.native_toolchain import (GCCCppToolchain, G
                                                               NativeToolchain)
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import is_executable, safe_open
-from pants.util.process_handler import subprocess
 from pants.util.strutil import safe_shlex_join
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.subsystem.subsystem_util import global_subsystem_instance, init_subsystems
@@ -133,7 +133,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
     env = env or {}
     try:
       with environment_as(**env):
-        return subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode('utf-8')
+        return subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode()
     except subprocess.CalledProcessError as e:
       raise Exception(
         "Command failed while invoking the native toolchain "

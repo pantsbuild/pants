@@ -5,8 +5,6 @@ import os
 import shutil
 from hashlib import sha1
 
-from future.utils import raise_from
-
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.target import Target
 from pants.invalidation.build_invalidator import CacheKey
@@ -342,7 +340,7 @@ class InvalidationCacheManager:
     return os.path.join(
       self._results_dir_prefix,
       key.id,
-      self._STABLE_DIR_NAME if stable else sha1(key.hash.encode('utf-8')).hexdigest()[:12]
+      self._STABLE_DIR_NAME if stable else sha1(key.hash.encode()).hexdigest()[:12]
     )
 
   def wrap_targets(self, targets, topological_order=False):
@@ -386,4 +384,4 @@ class InvalidationCacheManager:
       # TODO(Eric Ayers): If you see this exception, add a fix to catch the problem earlier.
       new_exception = self.CacheValidationError("Problem validating target {} in {}: {}"
                                                 .format(target.id, target.address.spec_path, e))
-      raise_from(self.CacheValidationError(new_exception), e)
+      raise self.CacheValidationError(new_exception) from e

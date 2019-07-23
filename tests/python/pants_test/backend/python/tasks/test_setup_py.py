@@ -5,8 +5,8 @@ import os
 from collections import OrderedDict
 from contextlib import contextmanager
 from textwrap import dedent
+from unittest.mock import Mock
 
-from mock import Mock
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 
@@ -21,8 +21,8 @@ from pants.build_graph.target import Target
 from pants.fs.archive import TGZ
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
-from pants_test.backend.python.interpreter_selection_utils import skip_unless_python36_present
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
+from pants_test.interpreter_selection_utils import skip_unless_python36_present
 from pants_test.subsystem.subsystem_util import init_subsystem
 
 

@@ -3,8 +3,7 @@
 
 import logging
 import os
-
-from future.utils import text_type
+import subprocess
 
 from pants.backend.jvm import argfile
 from pants.backend.jvm.subsystems.java import Java
@@ -18,7 +17,6 @@ from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.dirutil import fast_relpath, safe_walk
 from pants.util.meta import classproperty
-from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)
@@ -172,7 +170,9 @@ class JavacCompile(JvmCompile):
           if return_code:
             raise TaskError('javac exited with return code {rc}'.format(rc=return_code))
         self.context._scheduler.materialize_directories((
-          DirectoryToMaterialize(text_type(ctx.classes_dir.path), self.extra_resources_digest(ctx)),
+          DirectoryToMaterialize(
+            ctx.classes_dir.path,
+            self.post_compile_extra_resources_digest(ctx, prepend_post_merge_relative_path=False)),
         ))
 
     self._create_context_jar(ctx)
@@ -213,12 +213,8 @@ class JavacCompile(JvmCompile):
       for f in input_snapshot.files if f.endswith('.java')
     )
 
-    # TODO(#6071): Our ExecuteProcessRequest expects a specific string type for arguments,
-    # which py2 doesn't default to. This can be removed when we drop python 2.
-    argv = [text_type(arg) for arg in cmd]
-
     exec_process_request = ExecuteProcessRequest(
-      argv=tuple(argv),
+      argv=tuple(cmd),
       input_files=input_snapshot.directory_digest,
       output_files=output_files,
       description='Compiling {} with javac'.format(ctx.target.address.spec),
@@ -232,9 +228,9 @@ class JavacCompile(JvmCompile):
     # Dump the output to the .pants.d directory where it's expected by downstream tasks.
     merged_directories = self.context._scheduler.merge_directories([
         exec_result.output_directory_digest,
-        self.extra_resources_digest(ctx),
+        self.post_compile_extra_resources_digest(ctx, prepend_post_merge_relative_path=False),
       ])
     classes_directory = ctx.classes_dir.path
     self.context._scheduler.materialize_directories((
-      DirectoryToMaterialize(text_type(classes_directory), merged_directories),
+      DirectoryToMaterialize(classes_directory, merged_directories),
     ))

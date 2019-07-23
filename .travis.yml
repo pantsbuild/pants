@@ -10,8 +10,6 @@
 # Conditions are documented here: https://docs.travis-ci.com/user/conditions-v1
 conditions: v1
 
-if: commit_message !~ SKIP_FULL_CI
-
 # -------------------------------------------------------------------------
 # Global setup
 # -------------------------------------------------------------------------
@@ -39,6 +37,7 @@ env:
     # Travis converts it back into its original decrypted value when ran in CI, per
     # https://docs.travis-ci.com/user/environment-variables#defining-encrypted-variables-in-travisyml.
     - secure: hFVAQGLVkexzTd3f9NF+JoG1dE+CPICKqOcdvQYv8+YB2rwwqu0/J6MnqKUZSmec4AM4ZvyPUBIHnSw8aMJysYs+GZ6iG/8ZRRmdbmo2WBPbSZ+ThRZxx/F6AjmovUmf8Zt366ZAZXpc9NHKREkTUGl6UL7FFe9+ouVnb90asdw=
+    - RUST_BACKTRACE='all'
 
 # Stages are documented here: https://docs.travis-ci.com/user/build-stages
 stages:
@@ -106,6 +105,9 @@ pants_run_cache_config: &pants_run_cache_config
     directories:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
+      # We include the lmdb_store to include a local process cache, so that hopefully we don't need to re-run processes (particularly tests) which have already run.
+      # TODO(#8041): Prune this directory before storing the cache.
+      - ${HOME}/.cache/pants/lmdb_store
       - ${HOME}/.cache/pants/tools
       - ${HOME}/.cache/pants/zinc
       - ${HOME}/.ivy2/pants
@@ -190,14 +192,19 @@ py36_linux_test_config: &py36_linux_test_config
   env:
     - &py36_linux_test_config_env >
       BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
+      PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
 
 py37_linux_test_config: &py37_linux_test_config
   <<: *py37_linux_config
   <<: *base_linux_test_config
   stage: *test_cron
   env:
-    # TODO(https://github.com/tensorflow/tensorflow/issues/27078): tensorflow==1.13.1 on python 3.7.2 for Linux uses the new C++ ABI, which may be an error.
-    - &py37_linux_test_config_env BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
+    # TODO(https://github.com/tensorflow/tensorflow/issues/27078): tensorflow==1.13.1 on python
+    # 3.7.2 for Linux uses the new C++ ABI, which may be an error.
+    - &py37_linux_test_config_env >
+      BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
+      PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
+      PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
 
 base_osx_config: &base_osx_config
   os: osx
@@ -206,6 +213,9 @@ base_osx_config: &base_osx_config
     brew:
       packages:
       - openssl
+  before_script:
+    - ulimit -c unlimited
+    - ulimit -n 8192
 
 py36_osx_config: &py36_osx_config
   <<: *base_osx_config
@@ -602,7 +612,7 @@ py36_osx_platform_tests: &py36_osx_platform_tests
     - *py36_osx_test_config_env
     - CACHE_NAME=macosplatformtests.py36
   script:
-    - travis_wait 50 ./build-support/bin/ci.py --platform-specific-tests
+    - ./build-support/bin/ci.py --platform-specific-tests
 
 py37_osx_platform_tests: &py37_osx_platform_tests
   <<: *py37_osx_test_config
@@ -611,7 +621,7 @@ py37_osx_platform_tests: &py37_osx_platform_tests
     - *py37_osx_test_config_env
     - CACHE_NAME=macosplatformtests.py37
   script:
-    - travis_wait 50 ./build-support/bin/ci.py --platform-specific-tests --python-version 3.7
+    - ./build-support/bin/ci.py --platform-specific-tests --python-version 3.7
 
 # -------------------------------------------------------------------------
 # JVM tests
@@ -710,6 +720,19 @@ matrix:
       stage: *bootstrap_cron
     - <<: *py37_osx_build_engine
 
+    # NB: We move this test here, above the other unit tests, to ensure that the shard is #5. Per
+    # the token generator design
+    # https://docs.google.com/document/d/1gL3D1f-AzL_LzRxWLskCpVQ2ZlB_26GTETgXkXsrpDY/edit#heading=h.akhkfdtqfpw,
+    # the RBE token server will only give tokens to job number #5, so we must do this for the cron
+    # job to work with remoting.
+    - <<: *py37_linux_test_config
+      name: "Unit tests - V2 test runner (Py3.7 PEX)"
+      env:
+        - *py37_linux_test_config_env
+        - CACHE_NAME=unit_tests.v2.py37
+      script:
+        - travis_wait 50 ./build-support/bin/ci.py --python-tests-v2 --remote-execution-enabled --python-version 3.7
+
     - <<: *py36_lint
     - <<: *py37_lint
 
@@ -722,15 +745,7 @@ matrix:
         - *py36_linux_test_config_env
         - CACHE_NAME=unit_tests.v2.py36
       script:
-        - travis_wait 50 ./build-support/bin/ci.py --python-tests-v2
-
-    - <<: *py37_linux_test_config
-      name: "Unit tests - V2 test runner (Py3.7 PEX)"
-      env:
-        - *py37_linux_test_config_env
-        - CACHE_NAME=unit_tests.v2.py37
-      script:
-       - travis_wait 50 ./build-support/bin/ci.py --python-tests-v2 --python-version 3.7
+        - travis_wait 50 ./build-support/bin/ci.py --python-tests-v2 --remote-execution-enabled
 
     - <<: *py36_linux_test_config
       name: "Unit tests - V1 test runner (Py3.6 PEX)"
@@ -747,8 +762,8 @@ matrix:
         - *py37_linux_test_config_env
         - CACHE_NAME=unit_tests.v1.py37
       script:
-       - ./build-support/bin/ci.py --plugin-tests --python-version 3.7
-       - ./build-support/bin/ci.py --python-tests-v1 --python-version 3.7
+        - ./build-support/bin/ci.py --plugin-tests --python-version 3.7
+        - ./build-support/bin/ci.py --python-tests-v1 --python-version 3.7
 
     - <<: *py36_linux_build_wheels
     - <<: *py36_osx_build_wheels

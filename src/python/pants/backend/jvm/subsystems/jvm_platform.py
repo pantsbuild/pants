@@ -95,7 +95,7 @@ class JvmPlatform(Subsystem):
 
   @property
   def _fallback_platform(self):
-    logger.warn('No default jvm platform is defined.')
+    logger.warning('No default jvm platform is defined.')
     source_level = JvmPlatform.parse_java_version(DistributionLocator.cached().version)
     target_level = source_level
     platform_name = '(DistributionLocator.cached().version {})'.format(source_level)

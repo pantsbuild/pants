@@ -5,6 +5,7 @@ import contextlib
 import multiprocessing
 import os
 import re
+import subprocess
 from collections import namedtuple
 from multiprocessing.pool import ThreadPool
 
@@ -16,7 +17,6 @@ from pants.task.target_restriction_mixins import (HasSkipAndTransitiveOptionsMix
 from pants.util import desktop
 from pants.util.dirutil import safe_mkdir, safe_walk
 from pants.util.memo import memoized_property
-from pants.util.process_handler import subprocess
 
 
 Jvmdoc = namedtuple('Jvmdoc', ['tool_name', 'product_type'])

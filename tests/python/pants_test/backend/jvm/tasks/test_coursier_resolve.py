@@ -4,9 +4,8 @@
 import os
 import re
 from contextlib import contextmanager
+from unittest.mock import MagicMock
 
-from future.utils import PY3
-from mock import MagicMock
 from psutil.tests import safe_rmpath
 
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
@@ -133,8 +132,8 @@ class CoursierResolveTest(NailgunTaskTestBase):
       self.resolve([lib])
     self.assertEqual(
       "Undefined revs for jars unsupported by Coursier. "
-      "\"jar(org={unicode_literal}'com.google.guava', name={unicode_literal}'guava', "
-      "rev=None, classifier=None, ext={unicode_literal}'jar')\"".format(unicode_literal='' if PY3 else 'u'),
+      "\"jar(org='com.google.guava', name='guava', "
+      "rev=None, classifier=None, ext='jar')\"",
       str(cm.exception))
 
   def test_resolve_multiple_artifacts(self):

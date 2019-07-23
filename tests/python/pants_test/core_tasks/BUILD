@@ -6,7 +6,6 @@ python_tests(
   sources=['test_bash_completion.py'],
   coverage=['pants.core_tasks.bash_completion'],
   dependencies=[
-    '3rdparty/python:mock',
     'src/python/pants/core_tasks',
     'tests/python/pants_test:task_test_base',
   ]

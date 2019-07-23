@@ -6,6 +6,7 @@ import glob
 import os
 import re
 import shutil
+import subprocess
 import unittest
 from contextlib import contextmanager
 from operator import eq, ne
@@ -21,8 +22,8 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import fast_relpath, safe_mkdir, safe_mkdir_for, safe_open
 from pants.util.objects import Exactly, datatype, string_type
-from pants.util.osutil import IntegerForPid
-from pants.util.process_handler import SubprocessProcessHandler, subprocess
+from pants.util.osutil import Pid
+from pants.util.process_handler import SubprocessProcessHandler
 from pants.util.strutil import ensure_binary
 from pants_test.testutils.file_test_util import check_symlinks, contains_exact_files
 
@@ -34,7 +35,7 @@ class PantsResult(datatype([
     ('stdout_data', string_type),
     ('stderr_data', string_type),
     ('workdir', string_type),
-    ('pid', Exactly(*IntegerForPid)),
+    ('pid', Exactly(Pid)),
 ])):
   pass
 
@@ -62,8 +63,8 @@ class PantsJoinHandle(datatype([
     return PantsResult(
       self.command,
       self.process.returncode,
-      stdout_data.decode("utf-8"),
-      stderr_data.decode("utf-8"),
+      stdout_data.decode(),
+      stderr_data.decode(),
       self.workdir,
       self.process.pid)
 
@@ -473,7 +474,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
         stdout, _ = java_run.communicate()
       java_returncode = java_run.returncode
       self.assertEqual(java_returncode, 0)
-      return stdout.decode('utf-8')
+      return stdout.decode()
 
   def assert_success(self, pants_run, msg=None):
     self.assert_result(pants_run, PANTS_SUCCEEDED_EXIT_CODE, expected=True, msg=msg)
