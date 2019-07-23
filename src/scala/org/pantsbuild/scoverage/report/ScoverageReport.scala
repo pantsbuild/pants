@@ -2,6 +2,7 @@ package org.pantsbuild.scoverage.report
 
 import java.io.File
 import org.apache.commons.io.FileUtils
+import java.util.concurrent.atomic.AtomicInteger
 
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -22,7 +23,7 @@ object ScoverageReport {
    * @return         [Coverage] object for the [dataDirs]
    */
   private def aggregatedCoverage(dataDirs: Seq[File]): Coverage = {
-    var id = 0
+    var id = new AtomicInteger(0)
     val coverage = Coverage()
     dataDirs foreach { dataDir =>
       val coverageFile: File = Serializer.coverageFile(dataDir)
@@ -33,8 +34,7 @@ object ScoverageReport {
         subcoverage.apply(measurements)
         subcoverage.statements foreach { stmt =>
           // need to ensure all the ids are unique otherwise the coverage object will have stmt collisions
-          id = id + 1
-          coverage add stmt.copy(id = id)
+          coverage add stmt.copy(id = id.incrementAndGet())
         }
       }
     }
@@ -45,7 +45,7 @@ object ScoverageReport {
    *
    * @param dataDirs list of measurement directories for which coverage
    *                 report has to be generated
-   * @return         Coverage object wrapped in Option
+   * @return         Coverage object
    */
   private def aggregate(dataDirs: Seq[File]): Coverage = {
     logger.info(s"Found ${dataDirs.size} subproject scoverage data directories [${dataDirs.mkString(",")}]")

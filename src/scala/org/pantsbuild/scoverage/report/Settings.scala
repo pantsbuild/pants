@@ -62,6 +62,7 @@ object Settings {
 
     opt[Seq[String]]("targetFilters")
       .action((f: Seq[String], s: Settings) => s.copy(targetFilters = f))
-      .text("Directory names for which report has to be generated.")
+      .text("If not specified, reports are generated for directories with coverage instrument files." +
+        "Else, report is generated only for the directories specified in the list.")
   }
 }
