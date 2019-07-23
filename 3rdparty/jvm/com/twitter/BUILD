@@ -15,8 +15,4 @@ jar_library(name='scrooge-core',
   ],
 )
 
-jar_library(name='scalac-scoverage-plugin',
-  jars=[
-    scala_jar(org='com.twitter.scoverage', name='scalac-scoverage-plugin', rev='1.0.1-twitter'),
-    ],
-  )
+
