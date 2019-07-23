@@ -297,7 +297,6 @@ class PailgunServer(ThreadingMixIn, TCPServer):
 
     try:
       with self.ensure_request_is_exclusive(environment, request):
-        self.logger.info(request)
         # Attempt to handle a request with the handler.
         handler.handle_request()
         self.request_complete_callback()

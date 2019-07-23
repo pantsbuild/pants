@@ -237,7 +237,6 @@ class DaemonPantsRunner:
     return None if client_start_time is None else float(client_start_time)
 
   def run(self):
-
     # Ensure anything referencing sys.argv inherits the Pailgun'd args.
     sys.argv = self._args
 
@@ -287,8 +286,5 @@ class DaemonPantsRunner:
         # happening here, so something is probably overriding the excepthook. By catching Exception
         # and calling this method, we emulate the normal, expected sys.excepthook override.
         ExceptionSink._log_unhandled_exception_and_exit(exc=e)
-
-
-
       else:
         self._exiter.exit(self.exit_code if self.exit_code else PANTS_SUCCEEDED_EXIT_CODE)
