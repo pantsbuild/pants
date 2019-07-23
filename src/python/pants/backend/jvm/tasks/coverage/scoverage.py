@@ -47,12 +47,13 @@ class Scoverage(CoverageEngine):
         rev='1.0.1-twitter', **kwargs)
 
     def scoverage_report_jar(**kwargs):
-      return [JarDependency(org='org.pantsbuild', name='scoverageReport_2.12',
-        rev='0.0.1-SNAPSHOT', url='file:/Users/sameera/.m2/repository/org/pantsbuild/scoverageReport_2.12/0.0.1-SNAPSHOT/scoverageReport_2.12-0.0.1-SNAPSHOT.jar', **kwargs),
+      return [JarDependency(org='org.pantsbuild', name='scoverage-report-generator_2.12',
+        rev='0.0.1-SNAPSHOT', url='file:/Users/sameera/.m2/repository/org/pantsbuild/scoverage-report-generator_2.12/0.0.1-SNAPSHOT/scoverage-report-generator_2.12-0.0.1-SNAPSHOT.jar', **kwargs),
               JarDependency(org='org.apache.directory.studio', name='org.apache.commons.io', rev='2.4'),
               JarDependency(org='com.github.scopt', name='scopt_2.12', rev='3.7.0'),
-              JarDependency(org='org.scala-sbt', name='util-logging_2.12', rev='1.3.0-M8'),
-              JarDependency(org='com.twitter.scoverage', name='scalac-scoverage-plugin_2.12', rev='1.0.1-twitter')]
+              JarDependency(org='com.twitter.scoverage', name='scalac-scoverage-plugin_2.12', rev='1.0.1-twitter'),
+        JarDependency(org='org.slf4j', name='slf4j-simple', rev='1.7.26'),
+        JarDependency(org='org.slf4j', name='slf4j-api', rev='1.7.26')]
 
     register_jvm_tool(register,
       'scalac-scoverage-runtime',
