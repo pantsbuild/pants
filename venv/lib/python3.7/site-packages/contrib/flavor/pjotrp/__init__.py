@@ -1,1 +1,0 @@
-"""Pjotr's flavors"""
