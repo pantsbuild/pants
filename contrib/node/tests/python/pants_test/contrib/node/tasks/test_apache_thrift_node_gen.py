@@ -63,3 +63,25 @@ class ApacheThriftNodeGenTest(TaskTestBase):
                       'test1_types.js',
                       'test2_types.js'},
                      set(synthetic_target.sources_relative_to_source_root()))
+
+  def test_namespace_effective(self):
+    self.create_file('src/thrift/com/foo/test1.thrift', contents=dedent("""
+    namespace js foo.bar
+
+    struct Test1 {}
+    """))
+    self.create_file('src/thrift/com/foo/test2.thrift', contents=dedent("""
+    namespace js foo.bar
+
+    struct Test2 {}
+    """))
+    test1 = self.make_target(spec='src/thrift/com/foo:test1',
+                             target_type=NodeThriftLibrary,
+                             sources=['test1.thrift'])
+    test2 = self.make_target(spec='src/thrift/com/foo:test2',
+                             target_type=NodeThriftLibrary,
+                             sources=['test2.thrift'])
+    synthetic_target1 = self.generate_single_thrift_target(test1)
+    synthetic_target2 = self.generate_single_thrift_target(test2)
+
+    self.assertNotEqual(synthetic_target1, synthetic_target2)
