@@ -6,6 +6,7 @@ import io
 import itertools
 import os
 import shutil
+import subprocess
 import textwrap
 from abc import ABC, abstractmethod
 from collections import OrderedDict, defaultdict
@@ -34,7 +35,6 @@ from pants.task.task import Task
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_concurrent_creation, safe_rmtree, safe_walk
 from pants.util.memo import memoized_property
-from pants.util.process_handler import subprocess
 from pants.util.strutil import ensure_binary, ensure_text, safe_shlex_split
 
 
@@ -53,7 +53,10 @@ setup(**{setup_dict})
 # but that embeds u's in the string itself during conversion. For that reason we roll out own
 # literal pretty-printer here.
 #
-# For more information, see http://bugs.python.org/issue13943
+# Note that we must still keep this code, even though Pants only runs with Python 3, because
+# the created product may still be run by Python 2.
+#
+# For more information, see http://bugs.python.org/issue13943.
 def distutils_repr(obj):
   output = io.StringIO()
   linesep = os.linesep

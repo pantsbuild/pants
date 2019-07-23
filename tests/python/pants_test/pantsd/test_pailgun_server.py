@@ -4,11 +4,10 @@
 import socket
 import threading
 import unittest
+import unittest.mock
 from contextlib import contextmanager
 from queue import Queue
 from socketserver import TCPServer
-
-import mock
 
 from pants.java.nailgun_protocol import ChunkType, MaybeShutdownSocket, NailgunProtocol
 from pants.pantsd.pailgun_server import PailgunHandler, PailgunServer
@@ -19,13 +18,13 @@ PATCH_OPTS = dict(autospec=True, spec_set=True)
 
 class TestPailgunServer(unittest.TestCase):
   def setUp(self):
-    self.mock_handler_inst = mock.Mock()
+    self.mock_handler_inst = unittest.mock.Mock()
      # Add a fake environment for this to not timeout.
     self.fake_environment = {"PANTSD_REQUEST_TIMEOUT_LIMIT": "-1"}
     self.mock_handler_inst.parsed_request.return_value = (None, None, [], self.fake_environment)
 
-    self.mock_runner_factory = mock.Mock(side_effect=Exception('this should never be called'))
-    self.mock_handler_class = mock.Mock(return_value=self.mock_handler_inst)
+    self.mock_runner_factory = unittest.mock.Mock(side_effect=Exception('this should never be called'))
+    self.mock_handler_class = unittest.mock.Mock(return_value=self.mock_handler_inst)
     self.lock = threading.RLock()
 
     @contextmanager
@@ -38,8 +37,8 @@ class TestPailgunServer(unittest.TestCase):
     def after_request_callback():
       self.after_request_callback_calls += 1
 
-    with mock.patch.object(PailgunServer, 'server_bind'), \
-         mock.patch.object(PailgunServer, 'server_activate'):
+    with unittest.mock.patch.object(PailgunServer, 'server_bind'), \
+         unittest.mock.patch.object(PailgunServer, 'server_activate'):
       self.server = PailgunServer(
         server_address=('0.0.0.0', 0),
         runner_factory=self.mock_runner_factory,
@@ -48,32 +47,32 @@ class TestPailgunServer(unittest.TestCase):
         request_complete_callback=after_request_callback,
       )
 
-  @mock.patch.object(TCPServer, 'server_bind', **PATCH_OPTS)
+  @unittest.mock.patch.object(TCPServer, 'server_bind', **PATCH_OPTS)
   def test_server_bind(self, mock_tcpserver_bind):
-    mock_sock = mock.Mock()
+    mock_sock = unittest.mock.Mock()
     mock_sock.getsockname.return_value = ('0.0.0.0', 31337)
     self.server.socket = mock_sock
     self.server.server_bind()
     self.assertEqual(self.server.server_port, 31337)
     self.assertIs(mock_tcpserver_bind.called, True)
 
-  @mock.patch.object(PailgunServer, 'close_request', **PATCH_OPTS)
+  @unittest.mock.patch.object(PailgunServer, 'close_request', **PATCH_OPTS)
   def test_process_request_thread(self, mock_close_request):
-    mock_request = mock.Mock()
+    mock_request = unittest.mock.Mock()
     self.server.process_request_thread(mock_request, ('1.2.3.4', 31338))
     self.assertIs(self.mock_handler_inst.handle_request.called, True)
     mock_close_request.assert_called_once_with(self.server, mock_request)
 
-  @mock.patch.object(PailgunServer, 'close_request', **PATCH_OPTS)
+  @unittest.mock.patch.object(PailgunServer, 'close_request', **PATCH_OPTS)
   def test_process_request_calls_callback(self, mock_close_request):
-    mock_request = mock.Mock()
+    mock_request = unittest.mock.Mock()
     self.server.process_request_thread(mock_request, ('1.2.3.4', 31338))
     self.assertIs(self.mock_handler_inst.handle_request.called, True)
     assert(self.after_request_callback_calls == 1)
 
-  @mock.patch.object(PailgunServer, 'shutdown_request', **PATCH_OPTS)
+  @unittest.mock.patch.object(PailgunServer, 'shutdown_request', **PATCH_OPTS)
   def test_process_request_thread_error(self, mock_shutdown_request):
-    mock_request = mock.Mock()
+    mock_request = unittest.mock.Mock()
     self.mock_handler_inst.handle_request.side_effect = AttributeError('oops')
     self.server.process_request_thread(mock_request, ('1.2.3.4', 31338))
     self.assertIs(self.mock_handler_inst.handle_request.called, True)
@@ -168,7 +167,7 @@ class TestPailgunServer(unittest.TestCase):
     self.server.ensure_request_is_exclusive = mock_ensure_request_is_exclusive(self.server.ensure_request_is_exclusive)
 
     # Create as many mock threads as needed. Lauch all of them, and wait for all of them to finish.
-    mock_request = mock.Mock()
+    mock_request = unittest.mock.Mock()
     def create_request_thread(port):
       return threading.Thread(target = self.server.process_request_thread,
                               args = (mock_request, ('1.2.3.4', port)),
@@ -188,8 +187,8 @@ class TestPailgunServer(unittest.TestCase):
 class TestPailgunHandler(unittest.TestCase):
   def setUp(self):
     self.client_sock, self.server_sock = socket.socketpair()
-    self.mock_socket = mock.Mock()
-    self.mock_server = mock.create_autospec(PailgunServer, spec_set=True)
+    self.mock_socket = unittest.mock.Mock()
+    self.mock_server = unittest.mock.create_autospec(PailgunServer, spec_set=True)
     self.handler = PailgunHandler(
       self.server_sock,
       self.client_sock.getsockname()[:2],
@@ -203,7 +202,7 @@ class TestPailgunHandler(unittest.TestCase):
     self.assertEqual(last_chunk_type, ChunkType.EXIT)
     self.assertEqual(last_payload, '1')
 
-  @mock.patch.object(PailgunHandler, '_run_pants', **PATCH_OPTS)
+  @unittest.mock.patch.object(PailgunHandler, '_run_pants', **PATCH_OPTS)
   def test_handle_request(self, mock_run_pants):
     NailgunProtocol.send_request(self.client_sock, '/test', './pants', 'help-advanced')
     self.handler.handle_request()

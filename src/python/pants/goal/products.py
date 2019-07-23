@@ -4,7 +4,6 @@
 import os
 from collections import defaultdict
 
-import six
 from twitter.common.collections import OrderedSet
 
 from pants.util.collections import factory_dict
@@ -182,8 +181,6 @@ class RootedProducts:
   def __bool__(self):
     return self._rel_paths
 
-  __nonzero__ = __bool__
-
 
 class MultipleRootedProducts:
   """A product consisting of multiple roots, with associated file products.
@@ -232,8 +229,6 @@ class MultipleRootedProducts:
       if products:
         return True
     return False
-
-  __nonzero__ = __bool__
 
   def __str__(self):
     return "MultipleRootedProducts({})".format(self._rooted_products_by_root)
@@ -333,7 +328,7 @@ class Products:
 
         :API: public
       """
-      return six.iteritems(self.by_target)
+      return self.by_target.items()
 
     def keys_for(self, basedir, product):
       """Returns the set of keys the given mapped product is registered under.
@@ -356,8 +351,6 @@ class Products:
 
     def __bool__(self):
       return not self.empty()
-
-    __nonzero__ = __bool__
 
   def __init__(self):
     # TODO(John Sirois): Kill products and simply have users register ProductMapping subtypes

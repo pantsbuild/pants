@@ -2,10 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import subprocess
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
-from pants.util.process_handler import subprocess
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -81,7 +81,7 @@ class ExcludeTargetRegexpIntegrationTest(PantsRunIntegrationTest):
                                       stdout=subprocess.PIPE,
                                       cwd=path)
           java_retcode = java_run.wait()
-          java_out = java_run.stdout.read().decode('utf-8')
+          java_out = java_run.stdout.read().decode()
           self.assertEqual(java_retcode, 0)
           self.assertTrue(expected in java_out, "Expected '{output}' from {jar}, not '{stdout}'."
                                                 .format(output=expected, jar=jar, stdout=java_out))

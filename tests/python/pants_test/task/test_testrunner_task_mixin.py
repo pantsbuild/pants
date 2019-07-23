@@ -3,18 +3,18 @@
 
 import collections
 import os
+import subprocess
 from contextlib import contextmanager
 from unittest import TestCase
+from unittest.mock import Mock, patch
 from xml.etree.ElementTree import ParseError
-
-from mock import Mock, patch
 
 from pants.base.exceptions import ErrorWhileTesting
 from pants.task.task import TaskBase
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
-from pants.util.process_handler import ProcessHandler, subprocess
+from pants.util.process_handler import ProcessHandler
 from pants_test.task_test_base import TaskTestBase
 
 

@@ -10,6 +10,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Andrew Hamilton
 + Andy Reitz
 + Antoine Tollenaere
++ Asher Foa
 + Bardur Arantsson
 + Benjy Weinberger
 + Bill Farner
@@ -29,6 +30,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Christopher Livingston
 + Cody Gibb
 + Craig Schertz
++ Damon Revoe
 + Dan Davydov
 + Dan Fabulich
 + Dan Harrison
@@ -66,6 +68,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Greg Shuflin
 + Guy Marom
 + Harley Cooper
++ Henry Fuller
 + Hwasung Lee
 + Ian Tabolt
 + Igor Morozov
@@ -188,6 +191,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Ugo Di Girolamo
 + Wei An
 + Wilhelmina Drengwitz
++ Win Wang
 + Wolfram Arnold
 + Xaelias
 + Yi Cheng

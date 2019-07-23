@@ -10,18 +10,8 @@ from common import die
 
 
 def main() -> None:
-  python_files = find_files(
-      "src", "tests", "pants-plugins", "examples", "contrib", extension=".py"
-  )
   rust_files = find_files("src/rust/engine", extension=".rs")
 
-  python2_compatible_files = filter_files(python_files, snippet_regex=r"^from __future__ import")
-
-  check_banned_import(
-    python2_compatible_files,
-    bad_import_regex=r"^import subprocess$",
-    correct_import_message="`from pants.util.process_handler import subprocess`"
-  )
   check_banned_import(
     rust_files,
     bad_import_regex=r"^use std::sync::.*(Mutex|RwLock)",

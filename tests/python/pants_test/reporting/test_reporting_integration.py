@@ -8,7 +8,6 @@ import unittest
 from collections import defaultdict
 from http.server import BaseHTTPRequestHandler
 
-from future.utils import PY3
 from parameterized import parameterized
 from py_zipkin import Encoding
 from py_zipkin.encoding import convert_spans
@@ -137,6 +136,16 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       self.assertNotIn('Compile success at ', line)
       # zinc's label should be suppressed
       self.assertNotIn('[zinc]', line)
+
+  def test_suppress_background_workunits_output(self):
+    command = ['compile',
+      'examples/src/java/org/pantsbuild/example/hello::']
+    pants_run = self.run_pants(command)
+    self.assert_success(pants_run)
+    # background workunit label should be suppressed
+    self.assertNotIn('[background]', pants_run.stdout_data)
+    # labels of children of the background workunit should be suppressed
+    self.assertNotIn('[workdir_build_cleanup]', pants_run.stdout_data)
 
   def test_invalid_config(self):
     command = ['compile',
@@ -292,12 +301,12 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
       trace = assert_single_element(ZipkinHandler.traces.values())
 
-      zinc_task_span = self.find_spans_by_name_and_service_name(trace, 'zinc', 'pants task')
+      zinc_task_span = self.find_spans_by_name_and_service_name(trace, 'zinc', 'pants/task')
       self.assertEqual(len(zinc_task_span), 1)
       zinc_task_span_id = zinc_task_span[0]['id']
 
       compile_workunit_spans = self.find_spans_by_name_and_service_name(
-        trace, 'compile', 'pants workunit'
+        trace, 'compile', 'pants/workunit'
       )
       self.assertEqual(len(compile_workunit_spans), 3)
       self.assertTrue(all(span['parentId'] == zinc_task_span_id for span in compile_workunit_spans))
@@ -322,7 +331,7 @@ def zipkin_handler():
     traces = defaultdict(list)
 
     def do_POST(self):
-      content_length = self.headers.get('content-length') if PY3 else self.headers.getheader('content-length')
+      content_length = self.headers.get('content-length')
       thrift_trace = self.rfile.read(int(content_length))
       json_trace = convert_spans(thrift_trace, Encoding.V1_JSON, Encoding.V1_THRIFT)
       trace = json.loads(json_trace)

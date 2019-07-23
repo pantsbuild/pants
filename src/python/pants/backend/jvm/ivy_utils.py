@@ -11,8 +11,6 @@ from abc import abstractmethod
 from collections import OrderedDict, defaultdict, namedtuple
 from functools import total_ordering
 
-import six
-from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
@@ -366,8 +364,7 @@ class FrozenResolution:
       ])
 
     with safe_concurrent_creation(filename) as tmp_filename:
-      mode = 'w' if PY3 else 'wb'
-      with open(tmp_filename, mode) as f:
+      with open(tmp_filename, 'w') as f:
         json.dump(res, f)
 
 
@@ -850,7 +847,7 @@ class IvyUtils:
         hardlink_map[path] = path
 
     # Create hardlinks for paths in the ivy cache dir.
-    for path, hardlink in six.iteritems(hardlink_map):
+    for path, hardlink in hardlink_map.items():
       if path == hardlink:
         # Skip paths that aren't going to be hardlinked.
         continue
@@ -1013,7 +1010,7 @@ class IvyUtils:
 
   @classmethod
   def _write_ivy_xml_file(cls, ivyxml, template_data, template_relpath):
-    template_text = pkgutil.get_data(__name__, template_relpath).decode('utf-8')
+    template_text = pkgutil.get_data(__name__, template_relpath).decode()
     generator = Generator(template_text, lib=template_data)
     with safe_open(ivyxml, 'w') as output:
       generator.write(output)

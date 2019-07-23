@@ -23,7 +23,6 @@ python_library(
   name = 'engine_test_base',
   sources = ['base_engine_test.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
     'tests/python/pants_test:test_base',
@@ -66,7 +65,6 @@ python_tests(
   sources=['test_fs.py'],
   dependencies=[
     ':scheduler_test_base',
-    '3rdparty/python:future',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:nodes',
     'tests/python/pants_test:test_base',
@@ -78,7 +76,6 @@ python_tests(
   name='isolated_process',
   sources=['test_isolated_process.py'],
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:isolated_process',
     'src/python/pants/engine:rules',
@@ -111,7 +108,6 @@ python_tests(
 python_tests(
   sources=['test_engine.py'],
   dependencies=[
-    '3rdparty/python:mock',
     ':scheduler_test_base',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/build_graph',
@@ -127,7 +123,6 @@ python_tests(
   name='build_files',
   sources=['test_build_files.py'],
   dependencies=[
-    '3rdparty/python:future',
     ':scheduler_test_base',
     'src/python/pants/build_graph',
     'src/python/pants/engine:build_files',
@@ -192,7 +187,6 @@ python_tests(
   sources=['test_scheduler.py'],
   coverage=['pants.engine.nodes', 'pants.engine.scheduler'],
   dependencies=[
-    '3rdparty/python:mock',
     ':util',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/build_graph',

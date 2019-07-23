@@ -101,7 +101,6 @@ python_library(
   name = 'bootstrap_jvm_tools',
   sources = ['bootstrap_jvm_tools.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':ivy_task_mixin',
     ':jar_task',
     'src/python/pants/backend/jvm/subsystems:jvm_tool_mixin',
@@ -242,7 +241,6 @@ python_library(
   name = 'ivy_task_mixin',
   sources = ['ivy_task_mixin.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:classpath_products',
@@ -276,7 +274,6 @@ python_library(
   name = 'coursier_resolve',
   sources = ['coursier_resolve.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':classpath_products',
     ':nailgun_task',
     'src/python/pants/backend/jvm/tasks/coursier',
@@ -314,7 +311,6 @@ python_library(
   name = 'jar_publish',
   sources = ['jar_publish.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':jar_publish_resources',
     ':jar_task',
@@ -345,9 +341,7 @@ python_library(
   name = 'jar_task',
   sources = ['jar_task.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:six',
     ':classpath_util',
     ':nailgun_task',
     'src/python/pants/backend/jvm:argfile',
@@ -404,7 +398,6 @@ python_library(
     'src/python/pants/util:desktop',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
-    'src/python/pants/util:process_handler',
     'src/python/pants/util:strutil',
   ],
 )
@@ -465,7 +458,6 @@ python_library(
   name = 'jvm_dependency_usage',
   sources = ['jvm_dependency_usage.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':jvm_dependency_analyzer',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
@@ -481,7 +473,6 @@ python_library(
   name = 'jvm_platform_analysis',
   sources = ['jvm_platform_analysis.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:ansicolors',
     'src/python/pants/base:exceptions',
     'src/python/pants/backend/jvm/targets:jvm',
@@ -538,7 +529,6 @@ python_library(
     'src/python/pants/task',
     'src/python/pants/util:desktop',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:process_handler',
   ],
 )
 
@@ -587,9 +577,6 @@ python_library(
 python_library(
   name = 'properties',
   sources = ['properties.py'],
-  dependencies = [
-    '3rdparty/python:six',
-  ],
 )
 
 python_library(
@@ -720,7 +707,6 @@ python_library(
   name = 'unpack_jars',
   sources = ['unpack_jars.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jar_import_products',

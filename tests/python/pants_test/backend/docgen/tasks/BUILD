@@ -7,7 +7,6 @@ python_tests(
   sources = ['test_markdown_to_html.py'],
   dependencies = [
     '3rdparty/python:beautifulsoup4',
-    '3rdparty/python:mock',
     'src/python/pants/backend/docgen/targets',
     'src/python/pants/backend/docgen/tasks',
     'src/python/pants/base:exceptions',

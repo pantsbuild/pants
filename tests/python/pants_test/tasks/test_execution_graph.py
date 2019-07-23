@@ -5,8 +5,6 @@ import re
 import unittest
 from collections import defaultdict
 
-from future.utils import PY3
-
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job, JobExistsError,
                                                                  NoRootJobError, UnknownJobError)
@@ -199,7 +197,7 @@ class ExecutionGraphTest(unittest.TestCase):
       ExecutionGraph([self.job("A", passing_fn, []),
                       self.job("B", passing_fn, ["Z"])], False)
 
-    self.assertEqual("Unexecutable graph: Undefined dependencies " + ("'Z'" if PY3 else "u'Z'"),
+    self.assertEqual("Unexecutable graph: Undefined dependencies 'Z'",
                      str(cm.exception))
 
   def test_on_success_callback_raises_error(self):
@@ -223,7 +221,7 @@ class ExecutionGraphTest(unittest.TestCase):
       ExecutionGraph([self.job("Same", passing_fn, []),
                       self.job("Same", passing_fn, [])], False)
 
-    self.assertEqual("Unexecutable graph: Job already scheduled " + ("'Same'" if PY3 else "u'Same'"),
+    self.assertEqual("Unexecutable graph: Job already scheduled 'Same'",
                      str(cm.exception))
 
   def test_priorities_for_chain_of_jobs(self):

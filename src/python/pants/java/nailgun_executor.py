@@ -5,11 +5,11 @@ import hashlib
 import logging
 import os
 import re
+import selectors
 import threading
 import time
 from contextlib import closing
 
-from future.utils import PY3, string_types
 from twitter.common.collections import maybe_list
 
 from pants.base.build_environment import get_buildroot
@@ -18,12 +18,6 @@ from pants.java.nailgun_client import NailgunClient
 from pants.pantsd.process_manager import FingerprintedProcessManager, ProcessGroup
 from pants.util.dirutil import read_file, safe_file_dump, safe_open
 from pants.util.memo import memoized_classproperty
-
-
-if PY3:
-  import selectors
-else:
-  import select
 
 
 logger = logging.getLogger(__name__)
@@ -92,7 +86,7 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
                                          process_name=self._PROCESS_NAME,
                                          metadata_base_dir=metadata_base_dir)
 
-    if not isinstance(workdir, string_types):
+    if not isinstance(workdir, str):
       raise ValueError('Workdir must be a path string, not: {workdir}'.format(workdir=workdir))
 
     self._identity = identity
@@ -126,12 +120,12 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
     """
     digest = hashlib.sha1()
     # TODO(John Sirois): hash classpath contents?
-    encoded_jvm_options = [option.encode('utf-8') for option in sorted(jvm_options)]
-    encoded_classpath = [cp.encode('utf-8') for cp in sorted(classpath)]
-    encoded_java_version = repr(java_version).encode('utf-8')
+    encoded_jvm_options = [option.encode() for option in sorted(jvm_options)]
+    encoded_classpath = [cp.encode() for cp in sorted(classpath)]
+    encoded_java_version = repr(java_version).encode()
     for item in (encoded_jvm_options, encoded_classpath, encoded_java_version):
-      digest.update(str(item).encode('utf-8'))
-    return digest.hexdigest() if PY3 else digest.hexdigest().decode('utf-8')
+      digest.update(str(item).encode())
+    return digest.hexdigest()
 
   def _runner(self, classpath, main, jvm_options, args):
     """Runner factory. Called via Executor.execute()."""
@@ -220,37 +214,23 @@ Stderr:
           stderr=stderr,
         )
 
-    if PY3:
-      # NB: We use PollSelector, rather than the more efficient DefaultSelector, because
-      # DefaultSelector results in using the epoll() syscall on Linux, which does not work with
-      # regular text files like ng_stdout. See https://stackoverflow.com/a/8645770.
-      with selectors.PollSelector() as selector, \
-        safe_open(self._ng_stdout, 'r') as ng_stdout:
-        selector.register(ng_stdout, selectors.EVENT_READ)
-        while 1:
-          remaining_time = calculate_remaining_time()
-          possibly_raise_timeout(remaining_time)
-          events = selector.select(timeout=-1 * remaining_time)
-          if events:
-            line = ng_stdout.readline()  # TODO: address deadlock risk here.
-            try:
-              return self._NG_PORT_REGEX.match(line).group(1)
-            except AttributeError:
-              pass
-            accumulated_stdout += line
-    else:
-      with safe_open(self._ng_stdout, 'r') as ng_stdout:
-        while 1:
-          remaining_time = calculate_remaining_time()
-          possibly_raise_timeout(remaining_time)
-          readable, _, _ = select.select([ng_stdout], [], [], (-1 * remaining_time))
-          if readable:
-            line = ng_stdout.readline()  # TODO: address deadlock risk here.
-            try:
-              return self._NG_PORT_REGEX.match(line).group(1)
-            except AttributeError:
-              pass
-            accumulated_stdout += line
+    # NB: We use PollSelector, rather than the more efficient DefaultSelector, because
+    # DefaultSelector results in using the epoll() syscall on Linux, which does not work with
+    # regular text files like ng_stdout. See https://stackoverflow.com/a/8645770.
+    with selectors.PollSelector() as selector, \
+      safe_open(self._ng_stdout, 'r') as ng_stdout:
+      selector.register(ng_stdout, selectors.EVENT_READ)
+      while 1:
+        remaining_time = calculate_remaining_time()
+        possibly_raise_timeout(remaining_time)
+        events = selector.select(timeout=-1 * remaining_time)
+        if events:
+          line = ng_stdout.readline()  # TODO: address deadlock risk here.
+          try:
+            return self._NG_PORT_REGEX.match(line).group(1)
+          except AttributeError:
+            pass
+          accumulated_stdout += line
 
   def _create_ngclient(self, port, stdout, stderr, stdin):
     return NailgunClient(port=port, ins=stdin, out=stdout, err=stderr)

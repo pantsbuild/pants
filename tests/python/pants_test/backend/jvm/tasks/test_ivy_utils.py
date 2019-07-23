@@ -7,7 +7,6 @@ import xml.etree.ElementTree as ET
 from collections import namedtuple
 from textwrap import dedent
 
-from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.ivy_utils import (FrozenResolution, IvyFetchStep, IvyInfo, IvyModule,
@@ -636,8 +635,7 @@ class IvyUtilsResolveStepsTest(TestBase):
 class IvyFrozenResolutionTest(TestBase):
 
   def test_spec_without_a_real_target(self):
-    binary_mode = False if PY3 else True
-    with temporary_file(binary_mode=binary_mode) as resolve_file:
+    with temporary_file(binary_mode=False) as resolve_file:
 
       json.dump(
         {"default":{"coord_to_attrs":{}, "target_to_coords":{"non-existent-target":[]}}},

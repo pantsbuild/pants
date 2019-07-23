@@ -6,8 +6,7 @@ import os
 import random
 import stat
 import unittest
-
-from mock import mock
+import unittest.mock
 
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
 from pants.util.fileutil import (atomic_copy, create_size_estimators, safe_hardlink_or_copy,
@@ -17,7 +16,7 @@ from pants.util.fileutil import (atomic_copy, create_size_estimators, safe_hardl
 class FileutilTest(unittest.TestCase):
   def test_atomic_copy(self):
     with temporary_file() as src:
-      src.write(src.name.encode('utf-8'))
+      src.write(src.name.encode())
       src.flush()
       with temporary_file() as dst:
         atomic_copy(src.name, dst.name)
@@ -70,7 +69,7 @@ class FileutilTest(unittest.TestCase):
     content = b'hello'
 
     # Mock os.link to throw an CROSS-DEVICE error
-    with mock.patch('os.link') as os_mock:
+    with unittest.mock.patch('os.link') as os_mock:
       err = OSError()
       err.errno = errno.EXDEV
       os_mock.side_effect = err

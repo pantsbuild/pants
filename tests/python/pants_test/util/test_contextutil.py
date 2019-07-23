@@ -5,19 +5,17 @@ import os
 import pstats
 import shutil
 import signal
+import subprocess
 import sys
 import unittest
+import unittest.mock
 import uuid
 import zipfile
 from contextlib import contextmanager
 
-import mock
-from future.utils import PY3
-
 from pants.util.contextutil import (InvalidZipPath, Timer, environment_as, exception_logging,
                                     hermetic_environment_as, maybe_profiled, open_zip, pushd,
                                     signal_handler_as, stdio_as, temporary_dir, temporary_file)
-from pants.util.process_handler import subprocess
 
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)
@@ -75,7 +73,7 @@ class ContextutilTest(unittest.TestCase):
   def test_hermetic_environment_subprocesses(self):
     with self.ensure_user_defined_in_environment():
       with hermetic_environment_as(AAA='333'):
-        output = subprocess.check_output('env', shell=True).decode('utf-8')
+        output = subprocess.check_output('env', shell=True).decode()
         self.assertNotIn('USER=', output)
         self.assertIn('AAA', os.environ)
         self.assertEqual(os.environ['AAA'], '333')
@@ -83,15 +81,12 @@ class ContextutilTest(unittest.TestCase):
       self.assertNotIn('AAA', os.environ)
 
   def test_hermetic_environment_unicode(self):
-    UNICODE_CHAR = '¡'
-    ENCODED_CHAR = UNICODE_CHAR.encode('utf-8')
-    expected_output = UNICODE_CHAR if PY3 else ENCODED_CHAR
-    with environment_as(XXX=UNICODE_CHAR):
-      self.assertEqual(os.environ['XXX'], expected_output)
-      with hermetic_environment_as(AAA=UNICODE_CHAR):
+    with environment_as(XXX='¡'):
+      self.assertEqual(os.environ['XXX'], '¡')
+      with hermetic_environment_as(AAA='¡'):
         self.assertIn('AAA', os.environ)
-        self.assertEqual(os.environ['AAA'], expected_output)
-      self.assertEqual(os.environ['XXX'], expected_output)
+        self.assertEqual(os.environ['AAA'], '¡')
+      self.assertEqual(os.environ['XXX'], '¡')
 
   def test_simple_pushd(self):
     pre_cwd = os.getcwd()
@@ -290,7 +285,7 @@ class ContextutilTest(unittest.TestCase):
   def test_signal_handler_as(self):
     mock_initial_handler = 1
     mock_new_handler = 2
-    with mock.patch('signal.signal', **PATCH_OPTS) as mock_signal:
+    with unittest.mock.patch('signal.signal', **PATCH_OPTS) as mock_signal:
       mock_signal.return_value = mock_initial_handler
       try:
         with signal_handler_as(signal.SIGUSR2, mock_new_handler):
@@ -299,8 +294,8 @@ class ContextutilTest(unittest.TestCase):
         pass
     self.assertEqual(mock_signal.call_count, 2)
     mock_signal.assert_has_calls([
-      mock.call(signal.SIGUSR2, mock_new_handler),
-      mock.call(signal.SIGUSR2, mock_initial_handler)
+      unittest.mock.call(signal.SIGUSR2, mock_new_handler),
+      unittest.mock.call(signal.SIGUSR2, mock_initial_handler)
     ])
 
   def test_permissions(self):
@@ -311,7 +306,7 @@ class ContextutilTest(unittest.TestCase):
       self.assertEqual(0o644, os.stat(path)[0] & 0o777)
 
   def test_exception_logging(self):
-    fake_logger = mock.Mock()
+    fake_logger = unittest.mock.Mock()
 
     with self.assertRaises(AssertionError):
       with exception_logging(fake_logger, 'error!'):

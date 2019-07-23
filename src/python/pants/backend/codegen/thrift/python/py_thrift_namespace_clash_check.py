@@ -73,7 +73,7 @@ class PyThriftNamespaceClashCheck(Task):
         try:
           py_namespaces_by_target[t].append(
             # File content is provided as a binary string, so we have to decode it.
-            (path, self._extract_py_namespace_from_content(t, path, content.decode('utf-8'))))
+            (path, self._extract_py_namespace_from_content(t, path, content.decode())))
         except self.NamespaceParseFailure:
           failing_py_thrift_by_target[t].append(path)
 

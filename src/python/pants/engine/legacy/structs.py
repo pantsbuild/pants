@@ -6,8 +6,6 @@ import os.path
 from abc import ABCMeta, abstractmethod
 from collections.abc import MutableSequence, MutableSet
 
-from six import string_types
-
 from pants.build_graph.target import Target
 from pants.engine.addressable import addressable_list
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
@@ -48,11 +46,11 @@ class TargetAdaptor(StructWithDeps):
       )
 
     if source is not None:
-      if not isinstance(source, string_types):
+      if not isinstance(source, str):
         raise Target.IllegalArgument(
           self.address.spec,
-          'source must be a string containing a path relative to the target, but got {} of type {}'
-            .format(source, type(source))
+          f"source must be a str containing a path relative to the target, but got {source} of "
+          f"type {type(source)}"
         )
       sources = [source]
 
@@ -253,7 +251,7 @@ class RemoteSourcesAdaptor(TargetAdaptor):
     """
     :param dest: A target constructor.
     """
-    if not isinstance(dest, string_types):
+    if not isinstance(dest, str):
       dest = dest._type_alias
     super().__init__(dest=dest, **kwargs)
 
@@ -308,17 +306,17 @@ class BaseGlobs(Locatable, metaclass=ABCMeta):
       return Files(spec_path=spec_path)
     elif isinstance(sources, BaseGlobs):
       return sources
-    elif isinstance(sources, string_types):
+    elif isinstance(sources, str):
       return Files(sources, spec_path=spec_path)
     elif isinstance(sources, (MutableSet, MutableSequence, tuple)) and \
-         all(isinstance(s, string_types) for s in sources):
+         all(isinstance(s, str) for s in sources):
       return Files(*sources, spec_path=spec_path)
     else:
       raise ValueError('Expected either a glob or list of literal sources: got: {}'.format(sources))
 
   @staticmethod
   def _filespec_for_exclude(raw_exclude, spec_path):
-    if isinstance(raw_exclude, string_types):
+    if isinstance(raw_exclude, str):
       raise ValueError('Excludes of type `{}` are not supported: got "{}"'
                        .format(type(raw_exclude).__name__, raw_exclude))
 

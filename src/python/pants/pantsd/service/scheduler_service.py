@@ -7,8 +7,6 @@ import queue
 import sys
 import threading
 
-from future.utils import PY3
-
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.init.target_roots_calculator import TargetRootsCalculator
@@ -137,9 +135,9 @@ class SchedulerService(PantsService):
     try:
       subscription, is_initial_event, files = (event['subscription'],
                                                event['is_fresh_instance'],
-                                               event['files'] if PY3 else [f.decode('utf-8') for f in event['files']])
+                                               event['files'])
     except (KeyError, UnicodeDecodeError) as e:
-      self._logger.warn('%r raised by invalid watchman event: %s', e, event)
+      self._logger.warning('%r raised by invalid watchman event: %s', e, event)
       return
 
     self._logger.debug('processing {} files for subscription {} (first_event={})'

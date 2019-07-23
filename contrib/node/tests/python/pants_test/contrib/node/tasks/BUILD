@@ -2,6 +2,27 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
+  name='apache_thrift_node_gen',
+  sources=['test_apache_thrift_node_gen.py'],
+  dependencies=[
+    'src/python/pants/backend/codegen/thrift/lib',
+    'contrib/node/src/python/pants/contrib/node/targets:node_module',
+    'contrib/node/src/python/pants/contrib/node/targets:node_thrift_library',
+    'contrib/node/src/python/pants/contrib/node/tasks:apache_thrift_node_gen',
+    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:task_test_base',
+  ]
+)
+
+python_tests(
+  name='apache_thrift_node_gen_integration',
+  sources=['test_apache_thrift_node_gen_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ],
+)
+
+python_tests(
   name='node_build',
   sources=['test_node_build.py'],
   dependencies=[
@@ -83,7 +104,6 @@ python_tests(
   name='node_task',
   sources=['test_node_task.py'],
   dependencies=[
-    '3rdparty/python:future',
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
     'contrib/node/src/python/pants/contrib/node/targets:node_remote_module',
     'contrib/node/src/python/pants/contrib/node/targets:node_test',
@@ -99,7 +119,6 @@ python_tests(
   name='node_resolve',
   sources=['test_node_resolve.py'],
   dependencies=[
-    '3rdparty/python:mock',
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
     'contrib/node/src/python/pants/contrib/node/targets:node_preinstalled_module',
     'contrib/node/src/python/pants/contrib/node/targets:node_remote_module',
@@ -137,8 +156,6 @@ python_tests(
   name='node_resolve_src_deps',
   sources=['test_node_resolve_src_deps.py'],
   dependencies=[
-    '3rdparty/python:future',
-    '3rdparty/python:mock',
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
     'contrib/node/src/python/pants/contrib/node/targets:node_preinstalled_module',
     'contrib/node/src/python/pants/contrib/node/targets:node_remote_module',

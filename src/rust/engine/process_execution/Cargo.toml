@@ -19,15 +19,19 @@ hashing = { path = "../hashing" }
 log = "0.4"
 protobuf = { version = "2.0.6", features = ["with-bytes"] }
 sha2 = "0.8"
+sharded_lmdb = {  path = "../sharded_lmdb" }
 store = { path = "../fs/store" }
+task_executor = { path = "../task_executor" }
 tempfile = "3"
 time = "0.1.40"
 tokio-codec = "0.1"
 tokio-process = "0.2.1"
 tokio-timer = "0.2"
+workunit_store = { path = "../workunit_store" }
+tokio = "0.1"
 
 [dev-dependencies]
+maplit = "1.0.1"
 mock = { path = "../testutil/mock" }
 tempfile = "3"
 testutil = { path = "../testutil" }
-tokio = "0.1"

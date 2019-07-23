@@ -10,7 +10,6 @@ from abc import ABC
 from contextlib import contextmanager
 from hashlib import sha1
 
-import six
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
@@ -86,7 +85,7 @@ class Config(ABC):
       with open_ctx(config_item) as ini:
         content = ini.read()
         content_digest = sha1(content).hexdigest()
-        parser.read_string(content.decode('utf-8'))
+        parser.read_string(content.decode())
       config_path = config_item.path if hasattr(config_item, 'path') else config_item
       single_file_configs.append(_SingleFileConfig(config_path, content_digest, parser))
 
@@ -123,7 +122,7 @@ class Config(ABC):
 
     return configparser.ConfigParser(all_seed_values)
 
-  def get(self, section, option, type_=six.string_types, default=None):
+  def get(self, section, option, type_=str, default=None):
     """Retrieves option from the specified section (or 'DEFAULT') and attempts to parse it as type.
 
     If the specified section does not exist or is missing a definition for the option, the value is
@@ -137,10 +136,7 @@ class Config(ABC):
       return default
 
     raw_value = self.get_value(section, option)
-    # We jump through some hoops here to deal with the fact that `six.string_types` is a tuple of
-    # types.
-    if (type_ == six.string_types or
-        (isinstance(type_, type) and issubclass(type_, six.string_types))):
+    if type_ == str or issubclass(type_, str):
       return raw_value
 
     key = '{}.{}'.format(section, option)

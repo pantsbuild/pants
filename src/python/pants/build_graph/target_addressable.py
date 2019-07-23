@@ -3,8 +3,6 @@
 
 import logging
 
-from six import string_types
-
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.addressable import Addressable
 
@@ -57,7 +55,7 @@ class TargetAddressable(Addressable):
       raise TargetDefinitionException(target=self, msg=msg)
 
     for dep_spec in self.dependency_specs:
-      if not isinstance(dep_spec, string_types):
+      if not isinstance(dep_spec, str):
         msg = ('dependencies passed to Target constructors must be strings.  {dep_spec} is not'
                ' a string.  Target type was: {target_type}.'
                .format(target_type=self.addressed_type, dep_spec=dep_spec))
@@ -85,7 +83,7 @@ class TargetAddressable(Addressable):
                                                         address=address,
                                                         **self._kwargs)
     if not type_alias:
-      self.logger.warn('%s has no BUILD alias, suggesting a broken macro that does not assign one.',
+      self.logger.warning('%s has no BUILD alias, suggesting a broken macro that does not assign one.',
                        target)
     return target
 

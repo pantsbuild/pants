@@ -24,30 +24,32 @@ Bad
 
     #Not This
 
-
 ## Indentation, Line lengths
 
-* Pants uses a code line width of 100 characters.
-* Pants code uses 2 spaces for indentation.
+* Use a code line width of 100 characters.
+* Use 2 spaces for indentation.
 
-## String Interpolation and formatting
+## String Interpolation
 
-* Prefer `.format` for formatting strings over using `%`.
+Use f-strings over `.format()` and `%`.
+
+    # Good
+    f"Hello {name}!"
+
+    # Bad
+    "Hello {}".format(name)
+    "Hello %s" % name
 
 ## Collection Literals
 
-Where possible, use the literals for the various collection types.
+Use the literals for the various collection types.
 
-### Sets
-
+    # Good
     a_set = {a}
-    # Instead of
-    a_set = set([a])
-
-### Tuples
-
     a_tuple = (a, b)
     another_tuple = (a,)
-    # Instead of
+
+    # Bad
+    a_set = set([a])
     a_tuple = tuple([a, b])
     another_tuple = tuple([a])

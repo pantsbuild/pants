@@ -3,8 +3,6 @@
 
 from hashlib import sha1
 
-from future.utils import PY3
-
 from pants.base.payload_field import PayloadField
 from pants.util.objects import datatype
 
@@ -27,5 +25,5 @@ class NativeArtifact(datatype(['lib_name']), PayloadField):
   def _compute_fingerprint(self):
     # TODO: This fingerprint computation boilerplate is error-prone and could probably be
     # streamlined, for simple payload fields.
-    hasher = sha1(self.lib_name.encode('utf-8'))
-    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+    hasher = sha1(self.lib_name.encode())
+    return hasher.hexdigest()

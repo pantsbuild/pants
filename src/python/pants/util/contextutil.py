@@ -12,20 +12,13 @@ import time
 import uuid
 import zipfile
 from contextlib import closing, contextmanager
+from queue import Queue
+from socketserver import TCPServer
 
 from colors import green
-from future.utils import PY2, PY3, string_types
 
 from pants.util.dirutil import safe_delete
 from pants.util.tarutil import TarFile
-
-
-if PY2:
-  from Queue import Queue
-  from SocketServer import TCPServer
-else:
-  from queue import Queue
-  from socketserver import TCPServer
 
 
 class InvalidZipPath(ValueError):
@@ -55,7 +48,7 @@ def environment_as(**kwargs):
 
   def setenv(key, val):
     if val is not None:
-      os.environ[key] = val if PY3 else _os_encode(val)
+      os.environ[key] = val
     else:
       if key in os.environ:
         del os.environ[key]
@@ -70,15 +63,11 @@ def environment_as(**kwargs):
       setenv(key, val)
 
 
-def _copy_and_decode_env(env):
-  return {k: _os_decode(v) for k, v in env.items()}
-
-
 def _purge_env():
-  # N.B. Without the use of `del` here (which calls `os.unsetenv` under the hood), subprocess32
+  # N.B. Without the use of `del` here (which calls `os.unsetenv` under the hood), subprocess
   # invokes or other things that may access the environment at the C level may not see the
   # correct env vars (i.e. we can't just replace os.environ with an empty dict).
-  # See https://docs.python.org/2/library/os.html#os.unsetenv for more info.
+  # See https://docs.python.org/3/library/os.html#os.unsetenv for more info.
   #
   # Wraps iterable in list() to make a copy and avoid issues with deleting while iterating.
   for k in list(os.environ.keys()):
@@ -87,13 +76,13 @@ def _purge_env():
 
 def _restore_env(env):
   for k, v in env.items():
-    os.environ[k] = v if PY3 else _os_encode(v)
+    os.environ[k] = v
 
 
 @contextmanager
 def hermetic_environment_as(**kwargs):
   """Set the environment to the supplied values from an empty state."""
-  old_environment = os.environ.copy() if PY3 else _copy_and_decode_env(os.environ)
+  old_environment = os.environ.copy()
   _purge_env()
   try:
     with environment_as(**kwargs):
@@ -141,7 +130,7 @@ def stdio_as(stdout_fd, stderr_fd, stdin_fd):
   impossible for this method to locate all python objects which refer to those fds, so it's up
   to the caller to guarantee that `0, 1, 2` are safe to replace.
 
-  In Python3, the streams expect unicode. To write and read bytes, access their buffer, e.g. `stdin.buffer.read()`.
+  The streams expect unicode. To write and read bytes, access their buffer, e.g. `stdin.buffer.read()`.
   """
   with _stdio_stream_as(stdin_fd,  0, 'stdin',  'r'),\
        _stdio_stream_as(stdout_fd, 1, 'stdout', 'w'),\
@@ -301,9 +290,7 @@ def open_tar(path_or_file, *args, **kwargs):
 
     If path_or_file is a file, caller must close it separately.
   """
-  (path, fileobj) = ((path_or_file, None) if isinstance(path_or_file, string_types)
-                     else (None, path_or_file))  # TODO(#6071): stop using six.string_types
-                                                 # This should only accept python3 `str`, not byte strings.
+  (path, fileobj) = (path_or_file, None) if isinstance(path_or_file, str) else (None, path_or_file)
   with closing(TarFile.open(path, *args, fileobj=fileobj, **kwargs)) as tar:
     yield tar
 

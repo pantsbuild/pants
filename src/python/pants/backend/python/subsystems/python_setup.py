@@ -3,13 +3,13 @@
 
 import logging
 import os
+import subprocess
 
 from pex.variables import Variables
 
 from pants.option.custom_types import UnsetBool
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
-from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)
@@ -22,21 +22,14 @@ class PythonSetup(Subsystem):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--interpreter-constraints', advanced=True, default=['CPython>=2.7,<3', 'CPython>=3.6,<4'], type=list,
-             metavar='<requirement>', fingerprint=True,
+    register('--interpreter-constraints', advanced=True, fingerprint=True, type=list,
+             default=['CPython>=2.7,<3', 'CPython>=3.6,<4'],
+             metavar='<requirement>',
              help="Constrain the selected Python interpreter.  Specify with requirement syntax, "
                   "e.g. 'CPython>=2.7,<3' (A CPython interpreter with version >=2.7 AND version <3)"
                   "or 'PyPy' (A pypy interpreter of any version). Multiple constraint strings will "
                   "be ORed together. These constraints are applied in addition to any "
                   "compatibilities required by the relevant targets.")
-    register('--setuptools-version', advanced=True, default='40.4.3',
-             help='The setuptools version for this python environment.',
-             removal_version='1.17.0.dev2',
-             removal_hint='This option is now unused and can be removed from pants configuration.')
-    register('--wheel-version', advanced=True, default='0.31.1',
-             help='The wheel version for this python environment.',
-             removal_version='1.17.0.dev2',
-             removal_hint='This option is now unused and can be removed from pants configuration.')
     register('--platforms', advanced=True, type=list, metavar='<platform>', default=['current'],
              fingerprint=True,
              help='A list of platforms to be supported by this python environment. Each platform'
@@ -198,7 +191,7 @@ class PythonSetup(Subsystem):
 
 def get_pyenv_root():
   try:
-    return subprocess.check_output(['pyenv', 'root']).decode('utf-8').strip()
+    return subprocess.check_output(['pyenv', 'root']).decode().strip()
   except (OSError, subprocess.CalledProcessError):
     logger.info('No pyenv binary found. Will not use pyenv interpreters.')
   return None

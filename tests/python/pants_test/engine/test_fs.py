@@ -10,8 +10,6 @@ from abc import ABCMeta
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler
 
-from future.utils import text_type
-
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, DirectoriesToMerge,
                              DirectoryToMaterialize, DirectoryWithPrefixToStrip, FilesContent,
                              PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch, create_fs_rules)
@@ -226,9 +224,9 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         f.write("European Burmese")
       scheduler = self.mk_scheduler(rules=create_fs_rules())
       globs = PathGlobs(("*",), ())
-      snapshot = scheduler.capture_snapshots((PathGlobsAndRoot(globs, text_type(temp_dir)),))[0]
+      snapshot = scheduler.capture_snapshots((PathGlobsAndRoot(globs, temp_dir),))[0]
       self.assert_snapshot_equals(snapshot, ["roland"], Digest(
-        text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
         80
       ))
 
@@ -240,17 +238,17 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         f.write("I don't know")
       scheduler = self.mk_scheduler(rules=create_fs_rules())
       snapshots = scheduler.capture_snapshots((
-        PathGlobsAndRoot(PathGlobs(("roland",), ()), text_type(temp_dir)),
-        PathGlobsAndRoot(PathGlobs(("susannah",), ()), text_type(temp_dir)),
-        PathGlobsAndRoot(PathGlobs(("doesnotexist",), ()), text_type(temp_dir)),
+        PathGlobsAndRoot(PathGlobs(("roland",), ()), temp_dir),
+        PathGlobsAndRoot(PathGlobs(("susannah",), ()), temp_dir),
+        PathGlobsAndRoot(PathGlobs(("doesnotexist",), ()), temp_dir),
       ))
       self.assertEqual(3, len(snapshots))
       self.assert_snapshot_equals(snapshots[0], ["roland"], Digest(
-        text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
         80
       ))
       self.assert_snapshot_equals(snapshots[1], ["susannah"], Digest(
-        text_type("d3539cfc21eb4bab328ca9173144a8e932c515b1b9e26695454eeedbc5a95f6f"),
+        "d3539cfc21eb4bab328ca9173144a8e932c515b1b9e26695454eeedbc5a95f6f",
         82
       ))
       self.assert_snapshot_equals(snapshots[2], [], EMPTY_DIRECTORY_DIGEST)
@@ -260,7 +258,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       scheduler = self.mk_scheduler(rules=create_fs_rules())
       globs = PathGlobs(("*",), ())
       with self.assertRaises(Exception) as cm:
-        scheduler.capture_snapshots((PathGlobsAndRoot(globs, text_type(os.path.join(temp_dir, "doesnotexist"))),))
+        scheduler.capture_snapshots((PathGlobsAndRoot(globs, os.path.join(temp_dir, "doesnotexist")),))
       self.assertIn("doesnotexist", str(cm.exception))
 
   def assert_snapshot_equals(self, snapshot, files, directory_digest):
@@ -280,10 +278,10 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         f.write("Not sure actually")
       (empty_snapshot, roland_snapshot, susannah_snapshot, both_snapshot) = (
         self.scheduler.capture_snapshots((
-          PathGlobsAndRoot(PathGlobs(("doesnotmatch",), ()), text_type(temp_dir)),
-          PathGlobsAndRoot(PathGlobs(("roland",), ()), text_type(temp_dir)),
-          PathGlobsAndRoot(PathGlobs(("susannah",), ()), text_type(temp_dir)),
-          PathGlobsAndRoot(PathGlobs(("*",), ()), text_type(temp_dir)),
+          PathGlobsAndRoot(PathGlobs(("doesnotmatch",), ()), temp_dir),
+          PathGlobsAndRoot(PathGlobs(("roland",), ()), temp_dir),
+          PathGlobsAndRoot(PathGlobs(("susannah",), ()), temp_dir),
+          PathGlobsAndRoot(PathGlobs(("*",), ()), temp_dir),
         ))
       )
 
@@ -317,10 +315,10 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         f.write("Not sure actually")
       (empty_snapshot, roland_snapshot, susannah_snapshot, both_snapshot) = (
         self.scheduler.capture_snapshots((
-          PathGlobsAndRoot(PathGlobs(("doesnotmatch",), ()), text_type(temp_dir)),
-          PathGlobsAndRoot(PathGlobs(("roland",), ()), text_type(temp_dir)),
-          PathGlobsAndRoot(PathGlobs(("susannah",), ()), text_type(temp_dir)),
-          PathGlobsAndRoot(PathGlobs(("*",), ()), text_type(temp_dir)),
+          PathGlobsAndRoot(PathGlobs(("doesnotmatch",), ()), temp_dir),
+          PathGlobsAndRoot(PathGlobs(("roland",), ()), temp_dir),
+          PathGlobsAndRoot(PathGlobs(("susannah",), ()), temp_dir),
+          PathGlobsAndRoot(PathGlobs(("*",), ()), temp_dir),
         ))
       )
 
@@ -354,10 +352,10 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
     with temporary_dir() as temp_dir:
       dir_path = os.path.join(temp_dir, "containing_roland")
       digest = Digest(
-        text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"),
+        "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
         80
       )
-      self.scheduler.materialize_directories((DirectoryToMaterialize(text_type(dir_path), digest),))
+      self.scheduler.materialize_directories((DirectoryToMaterialize(dir_path, digest),))
 
       created_file = os.path.join(dir_path, "roland")
       with open(created_file, 'r') as f:
@@ -397,8 +395,8 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       )
 
       snapshot, snapshot_with_extra_files = self.scheduler.capture_snapshots((
-        PathGlobsAndRoot(PathGlobs(("characters/dark_tower/*",)), text_type(temp_dir)),
-        PathGlobsAndRoot(PathGlobs(("**",)), text_type(temp_dir)),
+        PathGlobsAndRoot(PathGlobs(("characters/dark_tower/*",)), temp_dir),
+        PathGlobsAndRoot(PathGlobs(("**",)), temp_dir),
       ))
       # Check that we got the full snapshots that we expect
       self.assertEquals(snapshot.files, relevant_files)
@@ -407,14 +405,14 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       # Strip empty prefix:
       zero_prefix_stripped_digest = assert_single_element(self.scheduler.product_request(
         Digest,
-        [DirectoryWithPrefixToStrip(snapshot.directory_digest, text_type(""))],
+        [DirectoryWithPrefixToStrip(snapshot.directory_digest, "")],
       ))
       self.assertEquals(snapshot.directory_digest, zero_prefix_stripped_digest)
 
       # Strip a non-empty prefix shared by all files:
       stripped_digest = assert_single_element(self.scheduler.product_request(
         Digest,
-        [DirectoryWithPrefixToStrip(snapshot.directory_digest, text_type("characters/dark_tower"))],
+        [DirectoryWithPrefixToStrip(snapshot.directory_digest, "characters/dark_tower")],
       ))
       self.assertEquals(
         stripped_digest,
@@ -424,7 +422,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         )
       )
       expected_snapshot = assert_single_element(self.scheduler.capture_snapshots((
-        PathGlobsAndRoot(PathGlobs(("*",)), text_type(tower_dir)),
+        PathGlobsAndRoot(PathGlobs(("*",)), tower_dir),
       )))
       self.assertEquals(expected_snapshot.files, ('roland', 'susannah'))
       self.assertEquals(stripped_digest, expected_snapshot.directory_digest)
@@ -433,7 +431,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       with self.assertRaisesWithMessageContaining(Exception, "Cannot strip prefix characters/dark_tower from root directory Digest(Fingerprint<28c47f77867f0c8d577d2ada2f06b03fc8e5ef2d780e8942713b26c5e3f434b8>, 243) - root directory contained non-matching directory named: books and file named: index"):
         self.scheduler.product_request(
           Digest,
-          [DirectoryWithPrefixToStrip(snapshot_with_extra_files.directory_digest, text_type("characters/dark_tower"))]
+          [DirectoryWithPrefixToStrip(snapshot_with_extra_files.directory_digest, "characters/dark_tower")]
         )
 
   def test_lift_directory_digest_to_snapshot(self):
@@ -450,7 +448,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
     text = b"European Burmese"
     hasher = hashlib.sha256()
     hasher.update(text)
-    digest = Digest(fingerprint=text_type(hasher.hexdigest()), serialized_bytes_length=len(text))
+    digest = Digest(fingerprint=hasher.hexdigest(), serialized_bytes_length=len(text))
 
     with self.assertRaisesWithMessageContaining(ExecutionError, "unknown directory"):
       self.scheduler.product_request(Snapshot, [digest])
@@ -505,9 +503,9 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       with open(os.path.join(temp_dir, "roland"), "w") as f:
         f.write("European Burmese")
       globs = PathGlobs(("*",), ())
-      snapshot = self.scheduler.capture_snapshots((PathGlobsAndRoot(globs, text_type(temp_dir)),))[0]
+      snapshot = self.scheduler.capture_snapshots((PathGlobsAndRoot(globs, temp_dir),))[0]
 
-      expected_digest = Digest(text_type("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"), 80)
+      expected_digest = Digest("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16", 80)
       self.assert_snapshot_equals(snapshot, ["roland"], expected_digest)
     return expected_digest
 
@@ -519,7 +517,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         url = UrlToFetch("http://localhost:{}/CNAME".format(port), self.pantsbuild_digest)
         snapshot, = self.scheduler.product_request(Snapshot, subjects=[url])
         self.assert_snapshot_equals(snapshot, ["CNAME"], Digest(
-          text_type("16ba2118adbe5b53270008790e245bbf7088033389461b08640a4092f7f647cf"),
+          "16ba2118adbe5b53270008790e245bbf7088033389461b08640a4092f7f647cf",
           81
         ))
 
@@ -554,7 +552,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       ))
       snapshot, = self.scheduler.product_request(Snapshot, subjects=[url])
       self.assert_snapshot_equals(snapshot, ["CNAME"], Digest(
-        text_type("16ba2118adbe5b53270008790e245bbf7088033389461b08640a4092f7f647cf"),
+        "16ba2118adbe5b53270008790e245bbf7088033389461b08640a4092f7f647cf",
         81
       ))
 
@@ -572,7 +570,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         )
         snapshot, = self.scheduler.product_request(Snapshot, subjects=[url])
         self.assert_snapshot_equals(snapshot, ["roland"], Digest(
-          text_type("9341f76bef74170bedffe51e4f2e233f61786b7752d21c2339f8ee6070eba819"),
+          "9341f76bef74170bedffe51e4f2e233f61786b7752d21c2339f8ee6070eba819",
           82
         ))
 

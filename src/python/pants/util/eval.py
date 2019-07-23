@@ -3,8 +3,6 @@
 
 from textwrap import dedent
 
-from future.utils import string_types
-
 
 def parse_expression(val, acceptable_types, name=None, raise_type=ValueError):
   """Attempts to parse the given `val` as a python expression of the specified `acceptable_types`.
@@ -22,9 +20,8 @@ def parse_expression(val, acceptable_types, name=None, raise_type=ValueError):
   def format_type(typ):
     return typ.__name__
 
-  if not isinstance(val, string_types):
-    raise raise_type('The raw `val` is not a string.  Given {} of type {}.'
-                     .format(val, format_type(type(val))))
+  if not isinstance(val, str):
+    raise raise_type(f"The raw `val` is not a str.  Given {val} of type {format_type(type(val))}.")
 
   def get_name():
     return repr(name) if name else 'value'

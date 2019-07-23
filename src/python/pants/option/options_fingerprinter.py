@@ -51,7 +51,7 @@ class OptionsFingerprinter:
         # before the commit which added it. I suspect that using the empty string would be
         # reasonable too, but haven't done any archaeology to check.
         fingerprint = 'None'
-      hasher.update(fingerprint.encode('utf-8'))
+      hasher.update(fingerprint.encode())
     return hasher.hexdigest()
 
   def __init__(self, build_graph=None):
@@ -96,7 +96,7 @@ class OptionsFingerprinter:
         # Not all targets have hashes; in particular, `Dependencies` targets don't.
         h = target.compute_invalidation_hash()
         if h:
-          hasher.update(h.encode('utf-8'))
+          hasher.update(h.encode())
     return hasher.hexdigest()
 
   def _assert_in_buildroot(self, filepath):
@@ -145,7 +145,7 @@ class OptionsFingerprinter:
     # Note that we don't sort the filepaths, as their order may have meaning.
     for filepath in filepaths:
       filepath = self._assert_in_buildroot(filepath)
-      hasher.update(os.path.relpath(filepath, get_buildroot()).encode('utf-8'))
+      hasher.update(os.path.relpath(filepath, get_buildroot()).encode())
       with open(filepath, 'rb') as f:
         hasher.update(f.read())
     return hasher.hexdigest()

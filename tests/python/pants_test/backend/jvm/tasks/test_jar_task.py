@@ -171,7 +171,7 @@ class JarTaskTest(BaseJarTaskTest):
       return ('Manifest-Version: 1.0\r\n' +
               'Class-Path: {}\r\n' +
               'Created-By: org.pantsbuild.tools.jar.JarBuilder\r\n\r\n').format(
-                ' '.join(maybe_list(classpath))).encode('utf-8')
+                ' '.join(maybe_list(classpath))).encode()
 
     def assert_classpath(classpath):
       with self.jarfile() as existing_jarfile:
@@ -265,7 +265,7 @@ class JarBuilderTest(BaseJarTaskTest):
         self.assert_listing(jar, 'FakeAgent.class')
         self.assertEqual(b'0xCAFEBABE', jar.read('FakeAgent.class'))
 
-        manifest = jar.read('META-INF/MANIFEST.MF').decode('utf-8').strip()
+        manifest = jar.read('META-INF/MANIFEST.MF').decode().strip()
         all_entries = dict(tuple(re.split(r'\s*:\s*', line, 1)) for line in manifest.splitlines())
         expected_entries = {
             'Agent-Class': 'fred',
@@ -300,7 +300,7 @@ class JarBuilderTest(BaseJarTaskTest):
           jar_builder.add_target(binary_target)
 
       with open_zip(existing_jarfile) as jar:
-        manifest = jar.read('META-INF/MANIFEST.MF').decode('utf-8').strip()
+        manifest = jar.read('META-INF/MANIFEST.MF').decode().strip()
         all_entries = dict(tuple(re.split(r'\s*:\s*', line, 1)) for line in manifest.splitlines())
         expected_entries = {
           'Foo': 'foo-value',

@@ -3,6 +3,7 @@
 
 import logging
 import os
+import subprocess
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
@@ -10,7 +11,6 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.java.distribution.distribution import DistributionLocator
 from pants.task.simple_codegen_task import SimpleCodegenTask
-from pants.util.process_handler import subprocess
 
 from pants.contrib.jax_ws.targets.jax_ws_library import JaxWsLibrary
 

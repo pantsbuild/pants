@@ -17,7 +17,6 @@ python_tests(
   dependencies=[
     'contrib/go/src/python/pants/contrib/go/subsystems',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )

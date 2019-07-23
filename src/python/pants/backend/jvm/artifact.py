@@ -1,8 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from six import string_types
-
 from pants.backend.jvm.repository import Repository
 from pants.base.hash_utils import stable_json_sha1
 from pants.base.payload_field import PayloadField
@@ -27,10 +25,10 @@ class Artifact(PayloadField):
     :param repo: The ``repo`` this artifact is published to.
     :param publication_metadata: Optional extra publication metadata required by the ``repo``.
     """
-    if not isinstance(org, string_types):
-      raise ValueError("org must be {} but was {}".format(string_types, org))
-    if not isinstance(name, string_types):
-      raise ValueError("name must be {} but was {}".format(string_types, name))
+    if not isinstance(org, str):
+      raise ValueError(f"org must be `str` but was {org} with type {type(org)}")
+    if not isinstance(name, str):
+      raise ValueError(f"name must be str but was {name} with type {type(name)}")
     if not isinstance(repo, Repository):
       raise ValueError("repo must be an instance of Repository")
 

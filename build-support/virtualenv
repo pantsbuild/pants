@@ -3,7 +3,7 @@
 
 set -e
 
-VIRTUALENV_VERSION=15.2.0
+VIRTUALENV_VERSION=16.6.2
 VIRTUALENV_PACKAGE_LOCATION=${VIRTUALENV_PACKAGE_LOCATION:-https://pypi.io/packages/source/v/virtualenv}
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && git rev-parse --show-toplevel)

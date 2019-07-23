@@ -4,13 +4,13 @@
 import logging
 import os
 import re
+import subprocess
 
 from twitter.common.collections import OrderedSet
 
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import is_readable_dir
 from pants.util.memo import memoized_classproperty
-from pants.util.process_handler import subprocess
 from pants.util.strutil import safe_shlex_join
 
 
@@ -37,7 +37,7 @@ class ParseSearchDirs(Subsystem):
   def _invoke_compiler_exe(self, cmd, env):
     try:
       # Get stderr interspersed in the error message too -- this should not affect output parsing.
-      compiler_output = subprocess.check_output(cmd, env=env, stderr=subprocess.STDOUT).decode('utf-8')
+      compiler_output = subprocess.check_output(cmd, env=env, stderr=subprocess.STDOUT).decode()
     except OSError as e:
       # We use `safe_shlex_join` here to pretty-print the command.
       raise self.ParseSearchDirsError(

@@ -2,8 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-
-from mock import Mock
+from unittest.mock import Mock
 
 from pants.cache.cache_setup import (CacheFactory, CacheSetup, CacheSpec, CacheSpecFormatError,
                                      EmptyCacheSpecError, InvalidCacheSpecError,

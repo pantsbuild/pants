@@ -9,6 +9,7 @@ from pants.contrib.node.subsystems.resolvers.node_preinstalled_module_resolver i
 from pants.contrib.node.subsystems.resolvers.npm_resolver import NpmResolver
 from pants.contrib.node.targets.node_bundle import NodeBundle
 from pants.contrib.node.targets.node_module import NodeModule
+from pants.contrib.node.targets.node_thrift_library import NodeThriftLibrary  
 from pants.contrib.node.targets.node_preinstalled_module import NodePreinstalledModule
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
 from pants.contrib.node.targets.node_test import NodeTest as NodeTestTarget
@@ -20,6 +21,7 @@ from pants.contrib.node.tasks.node_repl import NodeRepl
 from pants.contrib.node.tasks.node_resolve import NodeResolve
 from pants.contrib.node.tasks.node_run import NodeRun
 from pants.contrib.node.tasks.node_test import NodeTest as NodeTestTask
+from pants.contrib.node.tasks.apache_thrift_node_gen import ApacheThriftNodeGen
 
 
 def build_file_aliases():
@@ -30,6 +32,7 @@ def build_file_aliases():
       'node_preinstalled_module': NodePreinstalledModule,
       'node_remote_module': NodeRemoteModule,
       'node_test': NodeTestTarget,
+      'node_thrift_library' : NodeThriftLibrary,
     },
   )
 
@@ -43,6 +46,7 @@ def register_goals():
   task(name='node', action=NodeTestTask).install('test')
   task(name='node', action=NodeBundleTask).install('bundle')
   task(name='node-install', action=NodeInstall).install()
+  task(name='node-thrift', action=ApacheThriftNodeGen).install('gen')
   # Linting
   task(name='javascriptstyle', action=JavascriptStyleLint).install('lint')
   task(name='javascriptstyle', action=JavascriptStyleFmt).install('fmt')

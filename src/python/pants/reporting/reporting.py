@@ -5,8 +5,6 @@ import os
 import sys
 from io import BytesIO
 
-from future.utils import PY3
-
 from pants.base.workunit import WorkUnitLabel
 from pants.reporting.html_reporter import HtmlReporter
 from pants.reporting.invalidation_report import InvalidationReport
@@ -60,6 +58,8 @@ class Reporting(Subsystem):
               help='Rate at which to sample Zipkin traces. Value 0.0 - 100.0.')
     register('--zipkin-trace-v2', advanced=True, type=bool, default=False,
               help='If enabled, the zipkin spans are tracked for v2 engine execution progress.')
+    register('--zipkin-service-name-prefix', advanced=True, default='pants',
+      help='The prefix for service name for Zipkin spans.')
 
   def initialize(self, run_tracker, all_options, start_time=None):
     """Initialize with the given RunTracker.
@@ -101,6 +101,9 @@ class Reporting(Subsystem):
     trace_id = self.get_options().zipkin_trace_id
     parent_id = self.get_options().zipkin_parent_id
     sample_rate = self.get_options().zipkin_sample_rate
+    service_name_prefix = self.get_options().zipkin_service_name_prefix
+    if "{}" not in service_name_prefix:
+      service_name_prefix = service_name_prefix + "/{}"
 
     if zipkin_endpoint is None and trace_id is not None and parent_id is not None:
       raise ValueError(
@@ -129,7 +132,7 @@ class Reporting(Subsystem):
     if zipkin_endpoint is not None:
       zipkin_reporter_settings = ZipkinReporter.Settings(log_level=Report.INFO)
       zipkin_reporter = ZipkinReporter(
-        run_tracker, zipkin_reporter_settings, zipkin_endpoint, trace_id, parent_id, sample_rate
+        run_tracker, zipkin_reporter_settings, zipkin_endpoint, trace_id, parent_id, sample_rate, service_name_prefix
       )
       report.add_reporter('zipkin', zipkin_reporter)
 
@@ -173,8 +176,8 @@ class Reporting(Subsystem):
                                                               timing=timing, cache_stats=cache_stats))
     else:
       # Set up the new console reporter.
-      stdout = sys.stdout.buffer if PY3 else sys.stdout
-      stderr = sys.stderr.buffer if PY3 else sys.stderr
+      stdout = sys.stdout.buffer
+      stderr = sys.stderr.buffer
       settings = PlainTextReporter.Settings(log_level=log_level, outfile=stdout, errfile=stderr,
                                             color=color, indent=True, timing=timing, cache_stats=cache_stats,
                                             label_format=self.get_options().console_label_format,

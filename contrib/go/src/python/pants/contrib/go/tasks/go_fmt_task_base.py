@@ -2,10 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import subprocess
 from contextlib import contextmanager
 
 from pants.base.exceptions import TaskError
-from pants.util.process_handler import subprocess
 
 from pants.contrib.go.targets.go_local_source import GoLocalSource
 from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
@@ -35,7 +35,7 @@ class GoFmtTaskBase(GoWorkspaceTask):
       if sources:
         args = [os.path.join(self.go_dist.goroot, 'bin', 'gofmt')] + flags + list(sources)
         try:
-          output = subprocess.check_output(args)
+          output = subprocess.check_output(args).decode()
         except subprocess.CalledProcessError as e:
           raise TaskError('{} failed with exit code {}'.format(' '.join(args), e.returncode),
                           exit_code=e.returncode)

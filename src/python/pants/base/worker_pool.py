@@ -5,7 +5,7 @@ import multiprocessing
 import threading
 from multiprocessing.pool import ThreadPool
 
-from future.moves import _thread
+import _thread
 
 from pants.reporting.report import Report
 

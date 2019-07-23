@@ -12,9 +12,9 @@ import re
 from collections import namedtuple
 from datetime import date, datetime
 from textwrap import dedent
+from urllib.parse import parse_qs, urlencode, urlsplit, urlunparse
 
 import pystache
-from future.moves.urllib.parse import parse_qs, urlencode, urlsplit, urlunparse
 
 from pants.base.build_environment import get_buildroot
 from pants.base.mustache import MustacheRenderer
@@ -47,10 +47,8 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
       ('/latestrunid', self._handle_latest_runid),  # Return id of latest pants run.
       ('/favicon.ico', self._handle_favicon)  # Return favicon.
     ]
-    # TODO(#6071): BaseHTTPServer.BaseHTTPRequestHandler is an old-style class, so we must
-    # invoke its __init__ like this.
     # TODO: Replace this entirely with a proper server as part of the pants daemon.
-    http.server.BaseHTTPRequestHandler.__init__(self, request, client_address, server)
+    super().__init__(request=request, client_address=client_address, server=server)
 
   def do_GET(self):
     """GET method implementation for BaseHTTPRequestHandler."""
@@ -69,7 +67,7 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
         self._handle_runs('', {})
         return
 
-      content = 'Invalid GET request {}'.format(self.path).encode('utf-8'),
+      content = f'Invalid GET request {self.path}'.encode(),
       self._send_content(content, 'text/html', code=400)
     except (IOError, ValueError):
       pass  # Printing these errors gets annoying, and there's nothing to do about them anyway.
@@ -80,7 +78,7 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
     runs_by_day = self._partition_runs_by_day()
     args = self._default_template_args('run_list.html')
     args['runs_by_day'] = runs_by_day
-    content = self._renderer.render_name('base.html', args).encode("utf-8")
+    content = self._renderer.render_name('base.html', args).encode()
     self._send_content(content, 'text/html')
 
   _collapsible_fmt_string = dedent("""
@@ -134,7 +132,7 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
       if run_id == 'latest':
         args['is_latest'] = run_info['id']
 
-    content = self._renderer.render_name('base.html', args).encode("utf-8")
+    content = self._renderer.render_name('base.html', args).encode()
     self._send_content(content, 'text/html')
 
   def _handle_browse(self, relpath, params):
@@ -154,7 +152,7 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
       with open(abspath, 'rb') as infile:
         content = infile.read()
     else:
-      content = 'No file found at {}'.format(abspath).encode('utf-8')
+      content = f'No file found at {abspath}'.encode()
     content_type = mimetypes.guess_type(abspath)[0] or 'text/plain'
     if not content_type.startswith('text/') and not content_type == 'application/xml':
       # Binary file. Display it as hex, split into lines.
@@ -174,7 +172,7 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
     linenums = True
     args = {'prettify_extra_langs': prettify_extra_langs, 'content': content,
             'prettify': prettify, 'linenums': linenums}
-    content = self._renderer.render_name('file_content.html', args).encode("utf-8")
+    content = self._renderer.render_name('file_content.html', args).encode()
     self._send_content(content, 'text/html')
 
   def _handle_assets(self, relpath, params):
@@ -207,8 +205,8 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
             if pos:
               infile.seek(pos)
             content = infile.read()
-            ret[_id] = content.decode("utf-8")
-    content = json.dumps(ret).encode("utf-8")
+            ret[_id] = content.decode()
+    content = json.dumps(ret).encode()
     self._send_content(content, 'application/json')
 
   def _handle_latest_runid(self, relpath, params):
@@ -220,7 +218,7 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
     if latest_runinfo is None:
       self._send_content(b'none', 'text/plain')
     else:
-      self._send_content(latest_runinfo['id'].encode("utf-8"), 'text/plain')
+      self._send_content(latest_runinfo['id'].encode(), 'text/plain')
 
   def _handle_favicon(self, relpath, params):
     """Statically serve the favicon out of the assets dir."""
@@ -285,7 +283,7 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
                  'breadcrumbs': breadcrumbs,
                  'entries': entries,
                  'params': params})
-    content = self._renderer.render_name('base.html', args).encode("utf-8")
+    content = self._renderer.render_name('base.html', args).encode()
     self._send_content(content, 'text/html')
 
   def _serve_file(self, abspath, params):
@@ -300,7 +298,7 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
     args.update({'root_parent': os.path.dirname(self._root),
                  'breadcrumbs': breadcrumbs,
                  'link_path': link_path})
-    content = self._renderer.render_name('base.html', args).encode("utf-8")
+    content = self._renderer.render_name('base.html', args).encode()
     self._send_content(content, 'text/html')
 
   def _send_content(self, content, content_type, code=200):
@@ -317,7 +315,7 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
     client_ip = self._client_address[0]
     if not client_ip in self._settings.allowed_clients and \
        not 'ALL' in self._settings.allowed_clients:
-      content = 'Access from host {} forbidden.'.format(client_ip).encode('utf-8')
+      content = f'Access from host {client_ip} forbidden.'.encode()
       self._send_content(content, 'text/html')
       return False
     return True

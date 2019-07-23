@@ -4,12 +4,12 @@
 import http.server
 import json
 import threading
-
-from future.moves.urllib.parse import parse_qs
+from urllib.parse import parse_qs
 
 from pants.auth.cookies import Cookies
 from pants.goal.run_tracker import RunTracker
 from pants.util.contextutil import temporary_file_path
+from pants.version import VERSION
 from pants_test.test_base import TestBase
 
 
@@ -29,9 +29,11 @@ class RunTrackerTest(TestBase):
             self.assertEqual('/upload', handler.path)
             self.assertEqual('application/x-www-form-urlencoded', handler.headers['Content-type'])
             length = int(handler.headers['Content-Length'])
-            post_data = parse_qs(handler.rfile.read(length).decode('utf-8'))
+            post_data = parse_qs(handler.rfile.read(length).decode())
             decoded_post_data = {k: json.loads(v[0]) for k, v in post_data.items()}
             self.assertEqual(stats, decoded_post_data)
+            self.assertEqual(handler.headers['User-Agent'], f"pants/v{VERSION}")
+            self.assertIn(handler.headers['X-Pants-Stats-Version'], {"1", "2"})
             handler.send_response(200)
             handler.end_headers()
         except Exception:
@@ -43,19 +45,34 @@ class RunTrackerTest(TestBase):
     host, port = server.server_address
 
     def mk_url(path):
-      return 'http://{}:{}{}'.format(host, port, path)
+      return f'http://{host}:{port}{path}'
 
     server_thread = threading.Thread(target=server.serve_forever)
     server_thread.daemon = True
     server_thread.start()
 
     self.context(for_subsystems=[Cookies])
-    self.assertTrue(RunTracker.post_stats(mk_url('/upload'), stats))
-    self.assertTrue(RunTracker.post_stats(mk_url('/redirect307'), stats))
-    self.assertFalse(RunTracker.post_stats(mk_url('/redirect302'), stats))
+    self.assertTrue(RunTracker.post_stats(mk_url('/upload'), stats, stats_version=1))
+    self.assertTrue(RunTracker.post_stats(mk_url('/redirect307'), stats, stats_version=1))
+    self.assertFalse(RunTracker.post_stats(mk_url('/redirect302'), stats, stats_version=2))
 
     server.shutdown()
     server.server_close()
+
+  def test_invalid_stats_version(self):
+    stats = {'stats': {'foo': 'bar', 'baz': 42}}
+    url = 'http://example.com/upload/'
+    with self.assertRaises(ValueError):
+      RunTracker.post_stats(url, stats, stats_version=0)
+    
+    with self.assertRaises(ValueError):
+      RunTracker.post_stats(url, stats, stats_version=None)
+
+    with self.assertRaises(ValueError):
+      RunTracker.post_stats(url, stats, stats_version=9)
+
+    with self.assertRaises(ValueError):
+      RunTracker.post_stats(url, stats, stats_version="not a number")
 
   def test_write_stats_to_json_file(self):
     # Set up

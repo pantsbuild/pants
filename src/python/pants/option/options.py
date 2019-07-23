@@ -5,8 +5,6 @@ import copy
 import re
 import sys
 
-from future.utils import text_type
-
 from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
 from pants.option.global_options import GlobalOptionsRegistrar
@@ -368,10 +366,10 @@ class Options:
           )
 
   class _ScopedFlagNameForFuzzyMatching(datatype([
-      ('scope', text_type),
-      ('arg', text_type),
-      ('normalized_arg', text_type),
-      ('scoped_arg', text_type),
+      ('scope', str),
+      ('arg', str),
+      ('normalized_arg', str),
+      ('scoped_arg', str),
   ])):
     """Specify how a registered option would look like on the command line.
 
@@ -415,8 +413,8 @@ class Options:
       known_args = parser.known_args
       for arg in known_args:
         scoped_flag = self._ScopedFlagNameForFuzzyMatching(
-          scope=text_type(scope),
-          arg=text_type(arg),
+          scope=scope,
+          arg=arg,
         )
         all_scoped_flag_names.append(scoped_flag)
     self.walk_parsers(register_all_scoped_names)

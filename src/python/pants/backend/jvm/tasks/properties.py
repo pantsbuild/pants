@@ -4,8 +4,6 @@
 import re
 from collections import OrderedDict
 
-import six
-
 
 class Properties:
   """A Python reader for java.util.Properties formatted data.
@@ -25,17 +23,17 @@ class Properties:
 
     :API: public
 
-    :param (string | open stream) data: An open stream or a string.
+    :param (str | open stream) data: An open stream or a string.
     :returns: A dict of parsed property data.
     :rtype: dict
     """
 
     if hasattr(data, 'read') and callable(data.read):
       contents = data.read()
-    elif isinstance(data, six.string_types):
+    elif isinstance(data, str):
       contents = data
     else:
-      raise TypeError('Can only process data from a string or a readable object, given: %s' % data)
+      raise TypeError(f"Can only process data from a str or a readable object, given: {data}")
 
     return Properties._parse(contents.splitlines())
 
@@ -107,7 +105,7 @@ class Properties:
 
     if hasattr(output, 'write') and callable(output.write):
       write(output)
-    elif isinstance(output, six.string_types):
+    elif isinstance(output, str):
       with open(output, 'w+') as out:
         write(out)
     else:

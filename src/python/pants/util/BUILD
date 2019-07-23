@@ -4,6 +4,7 @@
 python_library(
   name = 'argutil',
   sources = ['argutil.py'],
+  tags = {'type_checked'},
 )
 
 python_library(
@@ -11,7 +12,6 @@ python_library(
   sources = ['contextutil.py'],
   dependencies = [
     '3rdparty/python:ansicolors',
-    '3rdparty/python:future',
     ':dirutil',
     ':tarutil',
   ],
@@ -20,15 +20,11 @@ python_library(
 python_library(
   name = 'collections',
   sources = ['collections.py'],
-  dependencies = [
-  ]
 )
 
 python_library(
   name = 'debug',
   sources = ['debug.py'],
-  dependencies = [
-  ],
 )
 
 python_library(
@@ -36,8 +32,8 @@ python_library(
   sources = ['desktop.py'],
   dependencies = [
     ':osutil',
-    ':process_handler',
   ],
+  tags = {'type_checked'},
 )
 
 python_library(
@@ -45,7 +41,6 @@ python_library(
   sources = ['dirutil.py'],
   dependencies = [
     ':strutil',
-    '3rdparty/python:future',
     'src/python/pants/base:deprecated',
   ],
 )
@@ -53,9 +48,6 @@ python_library(
 python_library(
   name = 'eval',
   sources = ['eval.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
 )
 
 python_library(
@@ -69,9 +61,6 @@ python_library(
 python_library(
   name = 'filtering',
   sources = ['filtering.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
 )
 
 python_library(
@@ -85,15 +74,11 @@ python_library(
 python_library(
   name = 'meta',
   sources = ['meta.py'],
-  dependencies = [
-  ]
 )
 
 python_library(
   name = 'netrc',
   sources = ['netrc.py'],
-  dependencies = [
-  ]
 )
 
 python_library(
@@ -101,7 +86,6 @@ python_library(
   sources = ['objects.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:future',
     ':strutil',
     ':memo',
     ':meta',
@@ -111,33 +95,22 @@ python_library(
 python_library(
   name = 'osutil',
   sources = ['osutil.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
+  tags = {'type_checked'},
 )
 
 python_library(
   name = 'process_handler',
   sources = ['process_handler.py'],
-  dependencies= [
-    '3rdparty/python:future',
-    '3rdparty/python:subprocess32',
-  ]
 )
 
 python_library(
   name = 'retry',
   sources = ['retry.py'],
-  dependencies = [
-  ]
 )
 
 python_library(
   name = 'rwbuf',
   sources = ['rwbuf.py'],
-  dependencies = [
-    '3rdparty/python:six',
-  ]
 )
 
 python_library(
@@ -159,25 +132,17 @@ python_binary(
 python_library(
   name = 'socket',
   sources = ['socket.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ]
 )
 
 python_library(
   name = 'strutil',
   sources = ['strutil.py'],
-  dependencies = [
-    '3rdparty/python:future',
-  ],
+  tags = {'type_checked'},
 )
 
 python_library(
   name = 'tarutil',
   sources = ['tarutil.py'],
-  dependencies = [
-    '3rdparty/python:six',
-  ],
 )
 
 python_library(

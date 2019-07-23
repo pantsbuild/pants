@@ -21,7 +21,6 @@ python_library(
   name='parser',
   sources=['parser.py'],
   dependencies=[
-    '3rdparty/python:future',
     ':structs',
     'src/python/pants/base:build_file_target_factory',
     'src/python/pants/base:parse_context',
@@ -64,7 +63,6 @@ python_library(
   name='graph',
   sources=['graph.py'],
   dependencies=[
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':address_mapper',
     ':structs',

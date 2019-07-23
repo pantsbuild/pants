@@ -4,7 +4,6 @@
 
 python_library(
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:payload',

@@ -39,7 +39,7 @@ class TestEngineOptionsParsing(TestBase):
     self.assertEqual(global_options.options.enable_pantsd, True)
     self.assertEqual(global_options.options.binaries_baseurls, ['https://bins.com'])
 
-    self.assertEqual(python_setup_options.options.wheel_version, '0.31.1')
+    self.assertEqual(python_setup_options.options.platforms, ['current'])
 
   def test_options_parse_memoization(self):
     # Confirm that re-executing with a new-but-identical Options object results in memoization.

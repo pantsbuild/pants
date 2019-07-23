@@ -6,8 +6,7 @@ import socket
 import threading
 import traceback
 from contextlib import contextmanager
-
-from six.moves.socketserver import BaseRequestHandler, BaseServer, TCPServer, ThreadingMixIn
+from socketserver import BaseRequestHandler, BaseServer, TCPServer, ThreadingMixIn
 
 from pants.engine.native import Native
 from pants.java.nailgun_protocol import NailgunProtocol
@@ -103,7 +102,7 @@ class ExclusiveRequestTimeout(Exception):
 
 class PailgunHandleRequestLock:
   """Convenience lock to implement Lock.acquire(timeout), which is not available in Python 2."""
-  # TODO remove and replace for the py3 Lock() when we don't have to support py2 anymore.
+  # TODO(#6071): remove and replace for the py3 Lock() when we don't have to support py2 anymore.
 
   def __init__(self):
     self.cond = threading.Condition()
@@ -235,6 +234,9 @@ class PailgunServer(ThreadingMixIn, TCPServer):
   def _should_keep_polling(self, timeout, time_polled):
     return self._should_poll_forever(timeout) or time_polled < timeout
 
+  def _send_stderr(self, request, message):
+    NailgunProtocol.send_stderr(request, message)
+
   @contextmanager
   def ensure_request_is_exclusive(self, environment, request):
     """
@@ -257,7 +259,7 @@ class PailgunServer(ThreadingMixIn, TCPServer):
         self.logger.debug("released request lock.")
 
     time_polled = 0.0
-    user_notification_interval = 1.0 # Stop polling to notify the user every second.
+    user_notification_interval = 5.0 # Stop polling to notify the user every second.
     self.logger.debug("request {} is trying to aquire the request lock.".format(request))
 
     # NB: Optimistically try to acquire the lock without blocking, in case we are the only request being handled.
@@ -266,14 +268,20 @@ class PailgunServer(ThreadingMixIn, TCPServer):
       with yield_and_release(time_polled):
         yield
     else:
+      self.logger.debug("request {} didn't aquire the lock on the first try, polling...".format(request))
       # We have to wait for another request to finish being handled.
-      NailgunProtocol.send_stderr(request, "Another pants invocation is running. Will wait {} for it to finish before giving up.\n".format(
-        "forever" if self._should_poll_forever(timeout) else "up to {} seconds".format(timeout)
+      self._send_stderr(request, "Another pants invocation is running. "
+                                 "Will wait {} for it to finish before giving up.\n".format(
+        "forever" if self._should_poll_forever(timeout)
+                  else "up to {} seconds".format(timeout)
       ))
+      self._send_stderr(request, "If you don't want to wait for the first run to finish, please "
+                                 "press Ctrl-C and run this command with PANTS_CONCURRENT=True "
+                                 "in the environment.\n")
       while not self.free_to_handle_request_lock.acquire(timeout=user_notification_interval):
         time_polled += user_notification_interval
         if self._should_keep_polling(timeout, time_polled):
-          NailgunProtocol.send_stderr(request, "Waiting for invocation to finish (waited for {}s so far)...\n".format(time_polled))
+          self._send_stderr(request, "Waiting for invocation to finish (waited for {}s so far)...\n".format(time_polled))
         else: # We have timed out.
           raise ExclusiveRequestTimeout("Timed out while waiting for another pants invocation to finish.")
       with yield_and_release(time_polled):
@@ -292,6 +300,9 @@ class PailgunServer(ThreadingMixIn, TCPServer):
         # Attempt to handle a request with the handler.
         handler.handle_request()
         self.request_complete_callback()
+    except BrokenPipeError as e:
+      # The client has closed the connection, most likely from a SIGINT
+      self.logger.error("Request {} abruptly closed with {}, probably because the client crashed or was sent a SIGINT.".format(request, type(e)))
     except Exception as e:
       # If that fails, (synchronously) handle the error with the error handler sans-fork.
       try:

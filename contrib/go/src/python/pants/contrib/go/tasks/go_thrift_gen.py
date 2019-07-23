@@ -3,6 +3,7 @@
 
 import os
 import re
+import subprocess
 
 from pants.backend.codegen.thrift.lib.thrift import Thrift
 from pants.base.build_environment import get_buildroot
@@ -13,7 +14,6 @@ from pants.option.custom_types import target_option
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.process_handler import subprocess
 from twitter.common.collections import OrderedSet
 
 from pants.contrib.go.targets.go_thrift_library import GoThriftGenLibrary, GoThriftLibrary

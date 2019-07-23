@@ -300,8 +300,14 @@ def union(cls):
   """
   # TODO: Check that the union base type is used as a tag and nothing else (e.g. no attributes)!
   assert isinstance(cls, type)
+  if cls.__doc__:
+    union_description = cls.__doc__
+  else:
+    union_description = cls.__name__
+
   return type(cls.__name__, (cls,), {
     '_is_union': True,
+    'union_description': union_description,
   })
 
 

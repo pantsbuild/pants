@@ -5,8 +5,6 @@ import hashlib
 import logging
 import os
 
-from future.utils import PY3
-
 from pants.backend.jvm.ivy_utils import NO_RESOLVE_RUN_RESULT, IvyFetchStep, IvyResolveStep
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -47,16 +45,16 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
       return None
 
     hasher = hashlib.sha1()
-    fingerprint = target.payload.fingerprint().encode('utf-8')
+    fingerprint = target.payload.fingerprint().encode()
     hasher.update(fingerprint)
 
     for conf in self._confs:
-      hasher.update(conf.encode('utf-8'))
+      hasher.update(conf.encode())
 
     for element in hash_elements_for_target:
-      hasher.update(element.encode('utf-8'))
+      hasher.update(element.encode())
 
-    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+    return hasher.hexdigest()
 
   def __hash__(self):
     return hash((type(self), '-'.join(self._confs)))

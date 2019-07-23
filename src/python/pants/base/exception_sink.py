@@ -12,11 +12,10 @@ import traceback
 from contextlib import contextmanager
 
 import setproctitle
-from future.utils import PY3
 
 from pants.base.exiter import Exiter
 from pants.util.dirutil import safe_mkdir, safe_open
-from pants.util.osutil import IntegerForPid
+from pants.util.osutil import Pid
 
 
 logger = logging.getLogger(__name__)
@@ -224,7 +223,7 @@ class ExceptionSink:
     if for_pid is None:
       intermediate_filename_component = ''
     else:
-      assert(isinstance(for_pid, IntegerForPid))
+      assert(isinstance(for_pid, Pid))
       intermediate_filename_component = '.{}'.format(for_pid)
     in_dir = in_dir or cls._log_dir
     return os.path.join(
@@ -487,7 +486,7 @@ ExceptionSink.reset_log_location(os.path.join(os.getcwd(), '.pants.d'))
 # Sets except hook for exceptions at import time.
 ExceptionSink.reset_exiter(Exiter(exiter=sys.exit))
 # Sets a SIGUSR2 handler.
-ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer if PY3 else sys.stderr)
+ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer)
 # Sets a handler that logs nonfatal signals to the exception sink before exiting.
 ExceptionSink.reset_signal_handler(SignalHandler())
 # Set whether to print stacktraces on exceptions or signals during import time.

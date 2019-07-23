@@ -3,8 +3,6 @@
 
 import os
 
-from future.utils import text_type
-
 from pants.backend.graph_info.subsystems.cloc_binary import ClocBinary
 from pants.base.workunit import WorkUnitLabel
 from pants.engine.fs import FilesContent, PathGlobs, PathGlobsAndRoot
@@ -48,7 +46,7 @@ class CountLinesOfCode(ConsoleTask):
       list_file_snapshot = self.context._scheduler.capture_snapshots((
         PathGlobsAndRoot(
           PathGlobs(('input_files_list',)),
-          text_type(tmpdir),
+          tmpdir,
         ),
       ))[0]
 
@@ -83,7 +81,7 @@ class CountLinesOfCode(ConsoleTask):
       [exec_result.output_directory_digest]
     )[0].dependencies
 
-    files_content = {fc.path: fc.content.decode('utf-8') for fc in files_content_tuple}
+    files_content = {fc.path: fc.content.decode() for fc in files_content_tuple}
     for line in files_content['report'].split('\n'):
       yield line
 

@@ -5,6 +5,7 @@ import functools
 import logging
 import os
 import signal
+import subprocess
 import time
 import traceback
 from contextlib import contextmanager
@@ -16,7 +17,6 @@ from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.process.subprocess import Subprocess
 from pants.util.dirutil import read_file, rm_rf, safe_file_dump, safe_mkdir
 from pants.util.memo import memoized_property
-from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)
@@ -317,7 +317,7 @@ class ProcessManager(ProcessMetadataManager):
       kwargs.setdefault('stderr', subprocess.STDOUT)
 
     try:
-      return subprocess.check_output(command, **kwargs).decode('utf-8').strip()
+      return subprocess.check_output(command, **kwargs).decode().strip()
     except (OSError, subprocess.CalledProcessError) as e:
       subprocess_output = getattr(e, 'output', '').strip()
       raise cls.ExecutionError(str(e), subprocess_output)

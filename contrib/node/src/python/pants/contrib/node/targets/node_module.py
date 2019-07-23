@@ -6,7 +6,6 @@ import logging
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
-from six import string_types
 
 from pants.contrib.node.targets.node_package import NodePackage
 
@@ -44,7 +43,7 @@ class NodeModule(NodePackage):
                             and the value will be the local file name per package.json rules.
     :type bin_executables: `dict`, where key is bin name and value is a local file path to an executable
                            E.G. { 'app': './cli.js', 'runner': './scripts/run.sh' }
-                           `string`, file path and package name as  the default bin name
+                           `str`, file path and package name as  the default bin name
                            E.G. './cli.js' would be interpreted as { 'app': './cli.js' }
     :param node_scope: Groups related packages together by adding a scope. The `@`
       symbol is typically used for specifying scope in the package name in `package.json`.
@@ -60,7 +59,7 @@ class NodeModule(NodePackage):
     # of pre-existing package.json files as node_module targets will require this.
 
     bin_executables = bin_executables or {}
-    if not (isinstance(bin_executables, dict) or isinstance(bin_executables, string_types)):
+    if not (isinstance(bin_executables, dict) or isinstance(bin_executables, str)):
       raise TargetDefinitionException(
         self,
         'expected a `dict` or `str` object for bin_executables, instead found a {}'
@@ -94,8 +93,33 @@ class NodeModule(NodePackage):
 
     :rtype: dict
     """
-    if isinstance(self.payload.bin_executables, string_types):
+    if isinstance(self.payload.bin_executables, str):
       # In this case, the package_name is the bin name
-      return { self.package_name: self.payload.bin_executables }
+      return {self.package_name: self.payload.bin_executables}
 
     return self.payload.bin_executables
+
+  @property
+  def package_manager(self):
+    """
+
+    :rtype: string
+    """
+    return self.payload.package_manager
+
+  @property
+  def build_script(self):
+    return self.payload.build_script
+
+  @property
+  def output_dir(self):
+    return self.payload.output_dir
+
+  @property
+  def dev_dependency(self):
+    return self.payload.dev_dependency
+
+  @property
+  def node_scope(self):
+    return self.payload.node_scope
+  

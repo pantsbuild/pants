@@ -19,6 +19,8 @@ from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibr
 from pants.backend.codegen.thrift.python.apache_thrift_py_gen import ApacheThriftPyGen
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
 from pants.backend.codegen.wire.java.java_wire_library import JavaWireLibrary
+from pants.contrib.node.targets.node_thrift_library import NodeThriftLibrary
+from pants.backend.codegen.thrift.node.apache_thrift_node_gen import ApachetThriftNodeGen
 from pants.backend.codegen.wire.java.wire_gen import WireGen
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task

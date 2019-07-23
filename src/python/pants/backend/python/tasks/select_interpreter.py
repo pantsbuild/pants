@@ -4,7 +4,6 @@
 import hashlib
 import os
 
-from future.utils import PY3
 from pex.executor import Executor
 from pex.interpreter import PythonInterpreter
 
@@ -32,8 +31,8 @@ class PythonInterpreterFingerprintStrategy(DefaultFingerprintHashingMixin, Finge
       return None
     hasher = hashlib.sha1()
     for element in hash_elements_for_target:
-      hasher.update(element.encode('utf-8'))
-    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+      hasher.update(element.encode())
+    return hasher.hexdigest()
 
 
 class SelectInterpreter(Task):

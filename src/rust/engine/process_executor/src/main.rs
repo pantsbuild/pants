@@ -33,6 +33,7 @@ use process_execution;
 
 use clap::{value_t, App, AppSettings, Arg};
 use hashing::{Digest, Fingerprint};
+use process_execution::ExecuteProcessRequestMetadata;
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter::Iterator;
 use std::path::PathBuf;
@@ -40,6 +41,7 @@ use std::process::exit;
 use std::time::Duration;
 use store::{BackoffConfig, Store};
 use tokio::runtime::Runtime;
+use workunit_store::WorkUnitStore;
 
 /// A binary which takes args of format:
 ///  process_executor --env=FOO=bar --env=SOME=value --input-digest=abc123 --input-digest-length=80
@@ -224,6 +226,8 @@ fn main() {
     BTreeSet::new()
   };
 
+  let executor = task_executor::Executor::new();
+
   let store = match (server_arg, args.value_of("cas-server")) {
     (Some(_server), Some(cas_server)) => {
       let chunk_size =
@@ -242,6 +246,7 @@ fn main() {
       };
 
       Store::with_remote(
+        executor.clone(),
         local_store_path,
         &[cas_server.to_owned()],
         remote_instance_arg.clone(),
@@ -255,7 +260,7 @@ fn main() {
         3,
       )
     }
-    (None, None) => Store::local_only(local_store_path),
+    (None, None) => Store::local_only(executor.clone(), local_store_path),
     _ => panic!("Must specify either both --server and --cas-server or neither."),
   }
   .expect("Error making store");
@@ -299,17 +304,19 @@ fn main() {
 
       Box::new(process_execution::remote::CommandRunner::new(
         address,
-        args.value_of("cache-key-gen-version").map(str::to_owned),
-        remote_instance_arg,
+        ExecuteProcessRequestMetadata {
+          instance_name: remote_instance_arg,
+          cache_key_gen_version: args.value_of("cache-key-gen-version").map(str::to_owned),
+          platform_properties,
+        },
         root_ca_certs,
         oauth_bearer_token,
-        platform_properties,
-        1,
         store.clone(),
       )) as Box<dyn process_execution::CommandRunner>
     }
     None => Box::new(process_execution::local::CommandRunner::new(
       store.clone(),
+      executor,
       work_dir,
       true,
     )) as Box<dyn process_execution::CommandRunner>,
@@ -318,7 +325,7 @@ fn main() {
   let mut runtime = Runtime::new().unwrap();
 
   let result = runtime
-    .block_on(runner.run(request))
+    .block_on(runner.run(request, WorkUnitStore::new()))
     .expect("Error executing");
 
   if let Some(output) = args.value_of("materialize-output-to").map(PathBuf::from) {

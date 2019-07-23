@@ -4,10 +4,7 @@
 import logging
 import os
 import tokenize
-from io import BytesIO, StringIO
-
-import six
-from future.utils import PY3
+from io import StringIO
 
 from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.base.parse_context import ParseContext
@@ -124,7 +121,7 @@ class LegacyPythonCallbacksParser(Parser):
     return symbols, parse_context
 
   def parse(self, filepath, filecontent):
-    python = filecontent.decode('utf-8') if PY3 else filecontent
+    python = filecontent.decode()
 
     # Mutate the parse context for the new path, then exec, and copy the resulting objects.
     # We execute with a (shallow) clone of the symbols as a defense against accidental
@@ -132,7 +129,7 @@ class LegacyPythonCallbacksParser(Parser):
     # _intentional_ mutation would require a deep clone, which doesn't seem worth the cost at
     # this juncture.
     self._parse_context._storage.clear(os.path.dirname(filepath))
-    six.exec_(python, dict(self._symbols))
+    exec(python, dict(self._symbols))
 
     # Perform this check after successful execution, so we know the python is valid (and should
     # tokenize properly!)
@@ -140,12 +137,12 @@ class LegacyPythonCallbacksParser(Parser):
     # But it's sufficient to tell most users who aren't being actively malicious that they're doing
     # something wrong, and it has a low performance overhead.
     if self._build_file_imports_behavior != 'allow' and 'import' in python:
-      io_wrapped_python = StringIO(python) if PY3 else BytesIO(python)
+      io_wrapped_python = StringIO(python)
       for token in tokenize.generate_tokens(io_wrapped_python.readline):
         if token[1] == 'import':
           line_being_tokenized = token[4]
           if self._build_file_imports_behavior == 'warn':
-            logger.warn('{} tried to import - import statements should be avoided ({})'.format(
+            logger.warning('{} tried to import - import statements should be avoided ({})'.format(
               filepath,
               line_being_tokenized
             ))

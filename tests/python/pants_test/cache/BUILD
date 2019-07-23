@@ -29,7 +29,6 @@ python_tests(
   name = 'cache_setup',
   sources = ['test_cache_setup.py'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/cache',
     'src/python/pants/option',
     'src/python/pants/subsystem',
@@ -78,8 +77,6 @@ python_tests(
   name = 'pinger',
   sources = ['test_pinger.py'],
   dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python:mock',
     '3rdparty/python:responses',
     'src/python/pants/cache',
     'tests/python/pants_test:test_base',
@@ -91,7 +88,6 @@ python_tests(
   name = 'resolver',
   sources = ['test_resolver.py'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/cache',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]

@@ -9,8 +9,6 @@ import threading
 from collections import defaultdict
 from textwrap import dedent
 
-from future.utils import PY3
-
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.subsystems.shader import Shader
@@ -46,16 +44,16 @@ class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
       return None
 
     hasher.update(b'version=2')
-    hasher.update(base_fingerprint.encode('utf-8'))
+    hasher.update(base_fingerprint.encode())
 
     # NB: this series of updates must always cover the same fields that populate `_tuple`'s slots
     # to ensure proper invalidation.
-    hasher.update(self._main.encode('utf-8'))
+    hasher.update(self._main.encode())
     if self._custom_rules:
       for rule in self._custom_rules:
-        hasher.update(rule.render().encode('utf-8'))
+        hasher.update(rule.render().encode())
 
-    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+    return hasher.hexdigest()
 
   def _tuple(self):
     # NB: this tuple's slots - used for `==/hash()` - must be kept in agreement with the hashed

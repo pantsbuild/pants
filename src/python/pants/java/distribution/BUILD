@@ -4,15 +4,12 @@
 python_library(
   sources=[ 'distribution.py' ],
   dependencies=[
-    '3rdparty/python:future',
-    '3rdparty/python:six',
     ':resources',
     'src/python/pants/base:revision',
     'src/python/pants/java:util',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:osutil',
-    'src/python/pants/util:process_handler',
   ],
 )
 

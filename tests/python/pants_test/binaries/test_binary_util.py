@@ -4,9 +4,7 @@
 import glob
 import logging
 import os
-
-import mock
-from future.utils import PY2
+import unittest.mock
 
 from pants.binaries.binary_util import (BinaryRequest, BinaryToolFetcher, BinaryToolUrlGenerator,
                                         BinaryUtil, select)
@@ -95,7 +93,7 @@ class BinaryUtilTest(TestBase):
       return result_file.read()
 
   def test_timeout(self):
-    fetcher = mock.create_autospec(Fetcher, spec_set=True)
+    fetcher = unittest.mock.create_autospec(Fetcher, spec_set=True)
     timeout_value = 42
     binary_util = self._gen_binary_util(baseurls=['http://binaries.example.com'],
                                         timeout_secs=timeout_value,
@@ -105,8 +103,8 @@ class BinaryUtilTest(TestBase):
     fetch_path = binary_util.select_script(supportdir='a-binary', version='v1.2', name='a-binary')
     logger.debug("fetch_path: {}".format(fetch_path))
     fetcher.download.assert_called_once_with('http://binaries.example.com/a-binary/v1.2/a-binary',
-                                             listener=mock.ANY,
-                                             path_or_fd=mock.ANY,
+                                             listener=unittest.mock.ANY,
+                                             path_or_fd=unittest.mock.ANY,
                                              timeout_secs=timeout_value)
 
   def test_no_base_urls_error(self):
@@ -188,7 +186,7 @@ class BinaryUtilTest(TestBase):
         supportdir=supportdir,
         version=version,
         name=name)
-      expected_content = 'SEEN {}'.format(name.upper()).encode('utf-8')
+      expected_content = f'SEEN {name.upper()}'.encode()
       self.assertEqual(expected_content, self._read_file(binary_path_abs))
       unseen.remove(expected_content)
     self.assertEqual(0, len(unseen))  # Make sure we've seen all the SEENs.
@@ -249,9 +247,9 @@ class BinaryUtilTest(TestBase):
       "Error resolving binary request BinaryRequest(supportdir=mysupportdir, version=myversion, "
       "name=myname, platform_dependent=True, external_url_generator=None, archiver=None): "
       "Pants could not resolve binaries for the current host. Update --binaries-path-by-id to "
-      "find binaries for the current host platform ({unicode_literal}\'linux\', "
-      "{unicode_literal}\'quantum_computer\').\\n--binaries-path-by-id was:"
-    ).format(unicode_literal='u' if PY2 else '')
+      "find binaries for the current host platform (\'linux\', "
+      "\'quantum_computer\').\\n--binaries-path-by-id was:"
+    )
     self.assertIn(expected_msg, the_raised_exception_message)
 
   def test_select_script_missing_arch(self):
@@ -270,9 +268,9 @@ class BinaryUtilTest(TestBase):
       # platform_dependent=False when doing select_script()
       "name=myname, platform_dependent=False, external_url_generator=None, archiver=None): Pants "
       "could not resolve binaries for the current host. Update --binaries-path-by-id to find "
-      "binaries for the current host platform ({unicode_literal}\'linux\', "
-      "{unicode_literal}\'quantum_computer\').\\n--binaries-path-by-id was:"
-    ).format(unicode_literal='u' if PY2 else '')
+      "binaries for the current host platform (\'linux\', "
+      "\'quantum_computer\').\\n--binaries-path-by-id was:"
+    )
     self.assertIn(expected_msg, the_raised_exception_message)
 
   def test_select_binary_base_path_override(self):

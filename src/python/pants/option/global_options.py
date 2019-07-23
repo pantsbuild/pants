@@ -4,7 +4,6 @@
 import multiprocessing
 import os
 import sys
-from textwrap import dedent
 
 from pants.base.build_environment import (get_buildroot, get_default_pants_config_file,
                                           get_pants_cachedir, get_pants_configdir, pants_version)
@@ -26,14 +25,19 @@ class GlobMatchErrorBehavior(enum(['ignore', 'warn', 'error'])):
 
 
 class ExecutionOptions(datatype([
+  'remote_execution',
   'remote_store_server',
   'remote_store_thread_count',
   'remote_execution_server',
   'remote_store_chunk_bytes',
   'remote_store_chunk_upload_timeout_seconds',
   'remote_store_rpc_retries',
-  'process_execution_parallelism',
+  'process_execution_local_parallelism',
+  'process_execution_remote_parallelism',
   'process_execution_cleanup_local_dirs',
+  'process_execution_speculation_delay',
+  'process_execution_speculation_strategy',
+  'process_execution_use_local_cache',
   'remote_execution_process_cache_namespace',
   'remote_instance_name',
   'remote_ca_certs_path',
@@ -49,14 +53,19 @@ class ExecutionOptions(datatype([
   @classmethod
   def from_bootstrap_options(cls, bootstrap_options):
     return cls(
+      remote_execution=bootstrap_options.remote_execution,
       remote_store_server=bootstrap_options.remote_store_server,
       remote_execution_server=bootstrap_options.remote_execution_server,
       remote_store_thread_count=bootstrap_options.remote_store_thread_count,
       remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
       remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
       remote_store_rpc_retries=bootstrap_options.remote_store_rpc_retries,
-      process_execution_parallelism=bootstrap_options.process_execution_parallelism,
+      process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
+      process_execution_remote_parallelism=bootstrap_options.process_execution_remote_parallelism,
       process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
+      process_execution_speculation_delay=bootstrap_options.process_execution_speculation_delay,
+      process_execution_speculation_strategy=bootstrap_options.process_execution_speculation_strategy,
+      process_execution_use_local_cache=bootstrap_options.process_execution_use_local_cache,
       remote_execution_process_cache_namespace=bootstrap_options.remote_execution_process_cache_namespace,
       remote_instance_name=bootstrap_options.remote_instance_name,
       remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
@@ -66,14 +75,19 @@ class ExecutionOptions(datatype([
 
 
 DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
+    remote_execution=False,
     remote_store_server=[],
     remote_store_thread_count=1,
     remote_execution_server=None,
     remote_store_chunk_bytes=1024*1024,
     remote_store_chunk_upload_timeout_seconds=60,
     remote_store_rpc_retries=2,
-    process_execution_parallelism=multiprocessing.cpu_count()*2,
+    process_execution_local_parallelism=multiprocessing.cpu_count()*2,
+    process_execution_remote_parallelism=128,
     process_execution_cleanup_local_dirs=True,
+    process_execution_speculation_delay=.1,
+    process_execution_speculation_strategy='local_first',
+    process_execution_use_local_cache=True,
     remote_execution_process_cache_namespace=None,
     remote_instance_name=None,
     remote_ca_certs_path=None,
@@ -137,31 +151,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'etc. For example, the setup script we distribute at https://www.pantsbuild.org/install.html#recommended-installation '
                   'uses this value to determine which Python version to run with. You may find the '
                   'version of the pants instance you are running using -v, -V, or --version.')
-
-    register('--pants-runtime-python-version', advanced=True,
-             removal_version='1.19.0.dev0',
-             deprecation_start_version='1.17.0.dev0',
-             removal_hint=dedent("""
-                  This option was only used to help with Pants' migration to run on Python 3. \
-                  Pants will now correctly default to whichever Python versions are supported for \
-                  the current `pants_version` you are using. Please make sure you are using the \
-                  most up-to-date version of the `./pants` script with:
-
-                    curl -L -O https://pantsbuild.github.io/setup/pants
-
-                  and then unset this option."""),
-             help='Use this Python version to run Pants. The option expects the major and minor '
-                  'version, e.g. 2.7 or 3.6. Note Pants code only uses this to verify that you are '
-                  'using the requested interpreter, as Pants cannot dynamically change the '
-                  'interpreter it is using once the program is already running. This option is '
-                  'useful to set in your pants.ini, however, and then you can grep the value to '
-                  'select which interpreter to use for setup scripts (e.g. `./pants`), runner '
-                  'scripts, IDE plugins, etc. For example, the setup script we distribute at '
-                  'https://www.pantsbuild.org/install.html#recommended-installation uses this '
-                  'value to determine which Python version to run with. Also note this does not mean '
-                  'your own code must use this Python version. See '
-                  'https://www.pantsbuild.org/python_readme.html#configure-the-python-version '
-                  'for how to configure your code\'s compatibility.')
 
     register('--plugins', advanced=True, type=list, help='Load these plugins.')
     register('--plugin-cache-dir', advanced=True,
@@ -266,7 +255,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     # In practice, this means that if this is set, a run will not even try to use pantsd.
     # NB: Eventually, we would like to deprecate this flag in favor of making pantsd runs parallelizable.
     register('--concurrent', advanced=True, type=bool, default=False, daemon=False,
-             help='Enable concurrent runs of pants.')
+             help='Enable concurrent runs of pants. Without this enabled, pants will '
+                  'start up all concurrent invocations (e.g. in other terminals) without pantsd. '
+                  'Enabling this option requires parallel pants invocations to block on the first')
 
     # Shutdown pantsd after the current run.
     # This needs to be accessed at the same time as enable_pantsd,
@@ -350,6 +341,10 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              # This default is also hard-coded into the engine's rust code in
              # fs::Store::default_path
              default=os.path.expanduser('~/.cache/pants/lmdb_store'))
+
+    register('--remote-execution', advanced=True, type=bool,
+             default=DEFAULT_EXECUTION_OPTIONS.remote_execution,
+             help="Enables remote workers for increased parallelism. (Alpha)")
     register('--remote-store-server', advanced=True, type=list, default=[],
              help='host:port of grpc server to use as remote execution file store.')
     register('--remote-store-thread-count', type=int, advanced=True,
@@ -390,12 +385,35 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
 
     # This should eventually deprecate the RunTracker worker count, which is used for legacy cache
     # lookups via CacheSetup in TaskBase.
-    register('--process-execution-parallelism', type=int, default=multiprocessing.cpu_count(),
+    register('--process-execution-parallelism', type=int, dest='local_execution_parallelism',
+             removal_version='1.20.0.dev2', advanced=True,
+             removal_hint='Use --process-execution-local-parallelism, and/or --process-execution-remote-parallelism instead.',
+             help='Number of concurrent processes that may be executed locally.')
+    register('--process-execution-local-parallelism', type=int, default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_parallelism,
              advanced=True,
-             help='Number of concurrent processes that may be executed either locally and remotely.')
+             help='Number of concurrent processes that may be executed locally.')
+    register('--process-execution-remote-parallelism', type=int, default=DEFAULT_EXECUTION_OPTIONS.process_execution_remote_parallelism,
+             advanced=True,
+             help='Number of concurrent processes that may be executed remotely.')
     register('--process-execution-cleanup-local-dirs', type=bool, default=True, advanced=True,
              help='Whether or not to cleanup directories used for local process execution '
                   '(primarily useful for e.g. debugging).')
+    register('--process-execution-speculation-delay', type=float,
+             default=DEFAULT_EXECUTION_OPTIONS.process_execution_speculation_delay, advanced=True,
+             help='Number of seconds to wait before speculating a second request for a slow process. '
+                  ' see `--process-execution-speculation-strategy`')
+    register('--process-execution-speculation-strategy', choices=['remote_first', 'local_first', 'none'],
+             default=DEFAULT_EXECUTION_OPTIONS.process_execution_speculation_strategy,
+             help="Speculate a second request for an underlying process if the first one does not complete within "
+                  '`--process-execution-speculation-delay` seconds.\n'
+                  '`local_first` (default): Try to run the process locally first, '
+                  'and fall back to remote execution if available.\n'
+                  '`remote_first`: Run the process on the remote execution backend if available, '
+                  'and fall back to the local host if remote calls take longer than the speculation timeout.\n'
+                  '`none`: Do not speculate about long running processes.',
+             advanced=True)
+    register('--process-execution-use-local-cache', type=bool, default=True, advanced=True,
+             help='Whether to keep process executions in a local cache persisted to disk.')
 
   @classmethod
   def register_options(cls, register):
@@ -461,10 +479,18 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     Raises pants.option.errors.OptionsError on validation failure.
     """
     if opts.loop and (not opts.v2 or opts.v1):
-      raise OptionsError('The --loop option only works with @console_rules, and thus requires '
+      raise OptionsError('The `--loop` option only works with @console_rules, and thus requires '
                          '`--v2 --no-v1` to function as expected.')
     if opts.loop and not opts.enable_pantsd:
-      raise OptionsError('The --loop option requires `--enable-pantsd`, in order to watch files.')
+      raise OptionsError('The `--loop` option requires `--enable-pantsd`, in order to watch files.')
 
     if opts.v2_ui and not opts.v2:
-      raise OptionsError('The --v2-ui option requires --v2 to be enabled together.')
+      raise OptionsError('The `--v2-ui` option requires `--v2` to be enabled together.')
+
+    if opts.remote_execution and not opts.remote_execution_server:
+      raise OptionsError("The `--remote-execution` option requires also setting "
+                         "`--remote-execution-server` to work properly.")
+
+    if opts.remote_execution_server and not opts.remote_store_server:
+      raise OptionsError("The `--remote-execution-server` option requires also setting "
+                         "`--remote-store-server`. Often these have the same value.")

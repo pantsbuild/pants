@@ -7,6 +7,7 @@ import os
 import pkgutil
 import re
 import shutil
+import subprocess
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.python.targets.python_target import PythonTarget
@@ -17,7 +18,6 @@ from pants.task.console_task import ConsoleTask
 from pants.util import desktop
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
-from pants.util.process_handler import subprocess
 
 
 _TEMPLATE_BASEDIR = 'templates/idea'
@@ -141,7 +141,7 @@ class IdeaPluginGen(ConsoleTask):
 
     def gen_file(template_file_name, **mustache_kwargs):
       return self._generate_to_tempfile(
-        Generator(pkgutil.get_data(__name__, template_file_name).decode('utf-8'), **mustache_kwargs)
+        Generator(pkgutil.get_data(__name__, template_file_name).decode(), **mustache_kwargs)
       )
 
     ipr = gen_file(self.project_template, project=configured_project)

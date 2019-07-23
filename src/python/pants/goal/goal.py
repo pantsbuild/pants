@@ -1,9 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
-from future.utils import PY2
-
 from pants.goal.error import GoalError
 from pants.option.optionable import Optionable
 from pants.util.memo import memoized
@@ -24,8 +21,6 @@ def _create_stable_task_type(superclass, options_scope):
   """
   subclass_name = '{0}_{1}'.format(superclass.__name__,
                                   options_scope.replace('.', '_').replace('-', '_'))
-  if PY2:
-    subclass_name = subclass_name.encode('utf-8')
   return type(subclass_name, (superclass,), {
     '__doc__': superclass.__doc__,
     '__module__': superclass.__module__,

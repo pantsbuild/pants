@@ -5,8 +5,6 @@ import logging
 import sys
 import traceback
 
-from future.utils import PY3
-
 from pants.util.strutil import ensure_binary
 
 
@@ -53,7 +51,7 @@ class Exiter:
     """
     if msg:
       out = out or sys.stderr
-      if PY3 and hasattr(out, 'buffer'):
+      if hasattr(out, 'buffer'):
         out = out.buffer
 
       msg = ensure_binary(msg)

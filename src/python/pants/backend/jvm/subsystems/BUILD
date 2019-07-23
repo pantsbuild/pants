@@ -5,7 +5,6 @@ python_library(
   name = 'dependency_context',
   sources = ['dependency_context.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':java',
     ':scala_platform',
     'src/python/pants/backend/codegen/thrift/java',
@@ -132,7 +131,6 @@ python_library(
   name = 'zinc',
   sources = ['zinc.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':dependency_context',
     ':jvm_tool_mixin',
     ':shader',
@@ -145,7 +143,6 @@ python_library(
   name = 'zinc_language_mixin',
   sources = ['zinc_language_mixin.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/build_graph',
     'src/python/pants/subsystem',
   ]
@@ -163,7 +160,6 @@ python_library(
   name='rsc',
   sources=['rsc.py'],
   dependencies=[
-    '3rdparty/python:future',
     ':jvm_tool_mixin',
     ':shader',
     ':zinc',

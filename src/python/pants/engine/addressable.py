@@ -5,8 +5,6 @@ import inspect
 from collections.abc import MutableMapping, MutableSequence
 from functools import update_wrapper
 
-from future.utils import string_types
-
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.objects import Collection, Resolvable, Serializable
 from pants.util.objects import TypeConstraintError
@@ -150,7 +148,7 @@ class AddressableDescriptor:
     if value is None:
       return None
 
-    if isinstance(value, (string_types, Address, Resolvable)):
+    if isinstance(value, (str, Address, Resolvable)):
       return value
 
     # Support untyped dicts that we deserialize on-demand here into the required type.

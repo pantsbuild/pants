@@ -3,8 +3,8 @@
 
 import os
 import shutil
+import urllib.parse
 
-import six.moves.urllib.parse as urllib_parse
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.fs.archive import archiver_for_path
@@ -33,7 +33,7 @@ class NodePreinstalledModuleResolver(Subsystem, NodeResolverBase):
       self._copy_sources(target, results_dir)
 
     with temporary_dir() as temp_dir:
-      archive_file_name = urllib_parse.urlsplit(target.dependencies_archive_url).path.split('/')[-1]
+      archive_file_name = urllib.parse.urlsplit(target.dependencies_archive_url).path.split('/')[-1]
       if not archive_file_name:
         raise TaskError('Could not determine archive file name for {target} from {url}'
                         .format(target=target.address.reference(),

@@ -5,8 +5,6 @@ import os
 from hashlib import sha1
 from threading import Lock
 
-from future.utils import text_type
-
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
@@ -28,7 +26,7 @@ from pants.util.fileutil import safe_hardlink_or_copy
 from pants.util.memo import memoized_method, memoized_property
 
 
-_ZINC_COMPILER_VERSION = '0.0.13'
+_ZINC_COMPILER_VERSION = '0.0.14'
 
 
 class Zinc:
@@ -300,7 +298,7 @@ class Zinc:
     """
     hasher = sha1()
     for cp_entry in [self.zinc, self.compiler_interface, self.compiler_bridge]:
-      hasher.update(os.path.relpath(cp_entry, self._workdir()).encode('utf-8'))
+      hasher.update(os.path.relpath(cp_entry, self._workdir()).encode())
     key = hasher.hexdigest()[:12]
 
     return os.path.join(self._workdir(), 'zinc', 'compiler-bridge', key)
@@ -323,7 +321,7 @@ class Zinc:
     ]
     input_jar_snapshots = context._scheduler.capture_snapshots((PathGlobsAndRoot(
       PathGlobs(tuple([bootstrapper] + bootstrapper_args[1::2])),
-      text_type(get_buildroot()),
+      get_buildroot(),
     ),))
     argv = tuple(['.jdk/bin/java'] +
                  ['-cp', bootstrapper, Zinc.ZINC_BOOTSTRAPER_MAIN] +
@@ -377,7 +375,7 @@ class Zinc:
     else:
       bridge_jar_snapshot = context._scheduler.capture_snapshots((PathGlobsAndRoot(
         PathGlobs((self._relative_to_buildroot(bridge_jar),)),
-        text_type(get_buildroot())
+        get_buildroot()
       ),))[0]
       bridge_jar_digest = bridge_jar_snapshot.directory_digest
       return ClasspathEntry(bridge_jar, bridge_jar_digest)

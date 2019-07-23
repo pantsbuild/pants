@@ -2,11 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import subprocess
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.task.task import Task
-from pants.util.process_handler import subprocess
 
 from pants.contrib.buildrefactor.buildozer_binary import BuildozerBinary
 
@@ -68,6 +68,6 @@ class Buildozer(Task):
       subprocess.check_call(buildozer_command, cwd=get_buildroot())
     except subprocess.CalledProcessError as err:
       if err.returncode == 3:
-        logger.warn('{} ... no changes were made'.format(buildozer_command))
+        logger.warning('{} ... no changes were made'.format(buildozer_command))
       else:
         raise TaskError('{} ... exited non-zero ({}).'.format(buildozer_command, err.returncode))

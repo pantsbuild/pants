@@ -160,15 +160,17 @@ a pull request, and allow travis to run them. You can reproduce failures by runn
 
 with whatever relevant flags reproduce the failure (`./build-support/bin/ci.py --help` will list the
 available flags). The relevant flags are in the log for the shard on a line that looks something
-like `./build-support/bin/ci.py --python-tests --python-version 3.7`.
+like `./build-support/bin/ci.py --lint --sanity-checks --python-version 3.7`.
 
-To run just Pants' *unit* tests (skipping the can-be-slow integration tests), filter out
-the python tests tagged with 'integration':
+To run tests for a specific target, run the below, substituting the target(s) with what you'd like to test:
 
     :::bash
-    $ ./pants test tests/python/pants_test:: --tag=-integration
+    $ ./pants test tests/python/pants_test/util:strutil
 
-For convenience, this is wrapped up in a script `build-support/bin/unit-test.sh`.
+You may filter out the often-slow integration tests like this;
+
+    :::bash
+    $ ./pants --tag=-integration test tests/python/pants_test/goal::
 
 If you only want to run tests for changed targets, then you can use the
 `test-changed` goal:
@@ -193,6 +195,26 @@ the issue with `flaky-test`. If an issue already exists, add a comment to it not
 encountered it too. After you've done that, you can ask in slack for someone to restart the shard.
 That will cause the shard to re-run its tests.
 
+#### Advanced: Remote execution of tests
+Pants is in the early stages of running its tests through Google's Remote Build Execution service
+(RBE), meaning that each step of the testing process (e.g. resolving requirements or running Pytest)
+may be run with a distinct remote worker through Google Cloud, rather than running locally. This
+allows for highly parallel runs of our large CI suite.
+
+To use this feature locally, you must download the Google Cloud SDK and log in through the CLI to
+your Google account via `gcloud auth login` and `gcloud auth application-default login`. Then, if
+you have the permissions to use Pants's remote resources, you can turn on remoting for tests by
+passing the `--remote-execution-enabled` flag to `ci.py`, such as:
+
+    :::bash
+    $ build-support/bin/ci.py --python-tests-v2 --remote-execution-enabled
+
+To use remote execution for a specific test(s), run this:
+
+    :::bash
+    $ ./pants --pants-config-files=pants.remote.ini \
+      --remote-oauth-bearer-token-path=<(gcloud auth application-default print-access-token | perl -p -e 'chomp if eof') \
+      --no-v1 --v2 test tests/python/pants_test/util:strutil 
 
 Debugging
 ---------
