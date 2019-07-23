@@ -74,7 +74,7 @@ class CountLinesOfCode(ConsoleTask):
       output_files=('ignored', 'report'),
       description='cloc',
     )
-    exec_result = self.context.execute_process_synchronously_without_raising(req, 'cloc', (WorkUnitLabel.TOOL,))
+    exec_result = self.context.execute_process_synchronously_or_raise(req, 'cloc', (WorkUnitLabel.TOOL,))
 
     files_content_tuple = self.context._scheduler.product_request(
       FilesContent,
