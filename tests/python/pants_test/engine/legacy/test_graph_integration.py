@@ -111,7 +111,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
       },
     })
     self.assert_success(pants_run)
-    self.assertNotIn("WARN]", pants_run.stderr_data)
+    self.assertNotIn("Globs", pants_run.stderr_data)
 
   def test_missing_bundles_warnings(self):
     target_full = '{}:missing-bundle-fileset'.format(self._BUNDLE_TARGET_BASE)
@@ -140,7 +140,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
       },
     })
     self.assert_success(pants_run)
-    self.assertNotIn("WARN]", pants_run.stderr_data)
+    self.assertNotIn("Globs", pants_run.stderr_data)
 
   def test_existing_directory_with_no_build_files_fails(self):
     pants_run = self.run_pants(['list', "{}::".format(self._NO_BUILD_FILE_TARGET_BASE)])

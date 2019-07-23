@@ -219,10 +219,12 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         )
         self.assert_failure(pants_run)
         self.assertIn('package System2 does not exist', pants_run.stdout_data)
-        self.assertIn(
-          'Failed jobs: compile(testprojects/src/java/org/pantsbuild/testproject/dummies:'
-          'compilation_failure_target)',
-          pants_run.stdout_data)
+        self.assertTrue(
+          re.search(
+          'Compilation failure.*testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target',
+          pants_run.stdout_data
+          )
+        )
 
   def test_hermetic_binary_with_dependencies(self):
     with temporary_dir() as cache_dir:
@@ -254,8 +256,8 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         compile_dir = os.path.join(workdir, 'compile', 'zinc', 'current')
 
         for path_suffix in [
-          'examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/classes/org/pantsbuild/example/hello/exe/Exe.class',
-          'examples.src.scala.org.pantsbuild.example.hello.welcome.welcome/current/classes/org/pantsbuild/example/hello/welcome/WelcomeEverybody.class',
+          'examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/zinc/classes/org/pantsbuild/example/hello/exe/Exe.class',
+          'examples.src.scala.org.pantsbuild.example.hello.welcome.welcome/current/zinc/classes/org/pantsbuild/example/hello/welcome/WelcomeEverybody.class',
         ]:
           path = os.path.join(compile_dir, path_suffix)
           self.assertTrue(os.path.exists(path), "Want path {} to exist".format(path))
@@ -290,22 +292,21 @@ class ZincCompileIntegrationTest(BaseCompileIT):
           pants_run.stdout_data,
         )
 
-        compile_dir = os.path.join(workdir, 'compile', 'zinc', 'current')
+        compile_dir = os.path.join(workdir, 'compile', 'rsc', 'current')
 
         for path_suffix in [
-          'examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/classes/org/pantsbuild/example/hello/exe/Exe.class',
-          'examples.src.scala.org.pantsbuild.example.hello.welcome.welcome/current/classes/org/pantsbuild/example/hello/welcome/WelcomeEverybody.class',
+          'examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/zinc/classes/org/pantsbuild/example/hello/exe/Exe.class',
+          'examples.src.scala.org.pantsbuild.example.hello.welcome.welcome/current/zinc/classes/org/pantsbuild/example/hello/welcome/WelcomeEverybody.class',
         ]:
           path = os.path.join(compile_dir, path_suffix)
           self.assertTrue(os.path.exists(path), "Want path {} to exist".format(path))
-
         with self.with_overwritten_file_content(file_abs_path):
 
           new_temp_test = '''package org.pantsbuild.example.hello.exe
                               
                               import java.io.{BufferedReader, InputStreamReader}
                               
-                              import org.pantsbuild.example.hello.welcome
+                              import org.pantsbuild.example.hello
                               
                               // A simple jvm binary to illustrate Scala BUILD targets
                               
@@ -352,11 +353,11 @@ class ZincCompileIntegrationTest(BaseCompileIT):
             pants_run.stdout_data,
           )
 
-          compile_dir = os.path.join(workdir, 'compile', 'zinc', 'current')
+          compile_dir = os.path.join(workdir, 'compile', 'rsc', 'current')
 
           for path_suffix in [
-            'examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/classes/org/pantsbuild/example/hello/exe/Exe.class',
-            'examples.src.scala.org.pantsbuild.example.hello.welcome.welcome/current/classes/org/pantsbuild/example/hello/welcome/WelcomeEverybody.class',
+            'examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/zinc/classes/org/pantsbuild/example/hello/exe/Exe.class',
+            'examples.src.scala.org.pantsbuild.example.hello.welcome.welcome/current/zinc/classes/org/pantsbuild/example/hello/welcome/WelcomeEverybody.class',
           ]:
             path = os.path.join(compile_dir, path_suffix)
             self.assertTrue(os.path.exists(path), "Want path {} to exist".format(path))

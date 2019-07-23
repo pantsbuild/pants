@@ -144,7 +144,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       # Should cause NotMain.class to be removed
       self.run_compile(cachetest_spec, config, workdir)
 
-      root = os.path.join(workdir, 'compile', 'zinc')
+      root = os.path.join(workdir, 'compile', 'rsc')
 
       task_versions = [p for p in os.listdir(root) if p != 'current']
       self.assertEqual(len(task_versions), 1, 'Expected 1 task version.')
@@ -159,7 +159,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       self.assertIn('current', target_workdirs)
 
       def classfiles(d):
-        cd = os.path.join(target_workdir_root, d, 'classes', 'org', 'pantsbuild', 'cachetest')
+        cd = os.path.join(target_workdir_root, d, 'zinc', 'classes', 'org', 'pantsbuild', 'cachetest')
         return sorted(os.listdir(cd))
 
       # One workdir should contain NotMain, and the other should contain Main.
