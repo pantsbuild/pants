@@ -143,12 +143,13 @@ class SchedulerService(PantsService):
     self._logger.debug('processing {} files for subscription {} (first_event={})'
                        .format(len(files), subscription, is_initial_event))
 
-    # The first watchman event is a listing of all files - ignore it.
-    if not is_initial_event:
-      if subscription == self._fs_event_service.PANTS_PID_SUBSCRIPTION_NAME:
-        self._maybe_invalidate_scheduler_pidfile()
-      else:
-        self._handle_batch_event(files)
+    # The first watchman event for all_files is a listing of all files - ignore it.
+    if not is_initial_event and subscription == self._fs_event_service.PANTS_ALL_FILES_SUBSCRIPTION_NAME:
+      self._handle_batch_event(files)
+
+    # However, we do want to check for the initial event in the pid file creation.
+    if subscription == self._fs_event_service.PANTS_PID_SUBSCRIPTION_NAME:
+      self._maybe_invalidate_scheduler_pidfile()
 
     if not self._watchman_is_running.is_set():
       self._watchman_is_running.set()
