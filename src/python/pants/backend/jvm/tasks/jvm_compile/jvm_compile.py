@@ -5,7 +5,6 @@ import functools
 import os
 from multiprocessing import cpu_count
 
-from future.utils import PY2, PY3, text_type
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
@@ -39,7 +38,6 @@ from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_file_
                                 safe_rmtree)
 from pants.util.fileutil import create_size_estimators
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.strutil import ensure_text
 
 
 # Well known metadata file to register javac plugins.
@@ -262,7 +260,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     """Classpath entries containing scalac plugins."""
     return []
 
-  def extra_resources(self, compile_context):
+  def post_compile_extra_resources(self, compile_context):
     """Produces a dictionary of any extra, out-of-band resources for a target.
 
     E.g., targets that produce scala compiler plugins or annotation processor files
@@ -273,35 +271,44 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     target = compile_context.target
 
     if isinstance(target, JavacPlugin):
-      result[_JAVAC_PLUGIN_INFO_FILE] = target.classname if PY3 else target.classname.decode('utf-8')
+      result[_JAVAC_PLUGIN_INFO_FILE] = target.classname
     elif isinstance(target, AnnotationProcessor) and target.processors:
       result[_PROCESSOR_INFO_FILE] = '{}\n'.format('\n'.join(p.strip() for p in target.processors))
 
     return result
 
-  def extra_resources_digest(self, compile_context):
-    """Compute a Digest for the extra_resources for the given context."""
+  def post_compile_extra_resources_digest(self, compile_context,
+                                          prepend_post_merge_relative_path=True):
+    """Compute a Digest for the post_compile_extra_resources for the given context."""
     # TODO: Switch to using #7739 once it is available.
-    extra_resources = self.extra_resources(compile_context)
+    extra_resources = self.post_compile_extra_resources(compile_context)
     if not extra_resources:
       return EMPTY_DIRECTORY_DIGEST
-    with temporary_dir() as tmpdir:
-      for filename, filecontent in extra_resources.items():
-        safe_file_dump(os.path.join(tmpdir, filename), filecontent)
-      snapshot, = self.context._scheduler.capture_snapshots([
-          PathGlobsAndRoot(PathGlobs(extra_resources), tmpdir)
+
+    def _snapshot_resources(resources, prefix='.'):
+      with temporary_dir() as root_dir:
+        for filename, filecontent in resources.items():
+          safe_file_dump(os.path.join(os.path.join(root_dir, prefix), filename), filecontent)
+
+        extra_resources_relative_to_rootdir = {os.path.join(prefix, k): v for k, v in
+                                               resources.items()}
+        snapshot, = self.context._scheduler.capture_snapshots([
+          PathGlobsAndRoot(PathGlobs(extra_resources_relative_to_rootdir), root_dir)
         ])
+
       return snapshot.directory_digest
+
+    if prepend_post_merge_relative_path:
+      rel_post_compile_merge_dir = fast_relpath(compile_context.post_compile_merge_dir,
+                                                get_buildroot())
+      return _snapshot_resources(extra_resources, prefix=rel_post_compile_merge_dir)
+    else:
+      return _snapshot_resources(extra_resources)
 
   def write_argsfile(self, ctx, args):
     """Write the argsfile for this context."""
     with open(ctx.args_file, 'w') as fp:
       for arg in args:
-        # NB: in Python 2, options are stored sometimes as bytes and sometimes as unicode in the OptionValueContainer.
-        # This is due to how Python 2 natively stores attributes as a map of `str` (aka `bytes`) to their value. So,
-        # the setattr() and getattr() functions sometimes use bytes.
-        if PY2:
-          arg = ensure_text(arg)
         fp.write(arg)
         fp.write('\n')
 
@@ -328,6 +335,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     super().__init__(*args, **kwargs)
     self._targets_to_compile_settings = None
 
+    # TODO: self._jvm_options doesn't seem to record changes from `--<scope>-jvm-options` on the
+    # command line (but this might work in pants.ini?)!
     # JVM options for running the compiler.
     self._jvm_options = self.get_options().jvm_options
 
@@ -367,13 +376,15 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       self.get_options().class_not_found_error_patterns))
 
   def create_compile_context(self, target, target_workdir):
-    return CompileContext(target,
-                          os.path.join(target_workdir, 'z.analysis'),
-                          ClasspathEntry(os.path.join(target_workdir, 'classes')),
-                          ClasspathEntry(os.path.join(target_workdir, 'z.jar')),
-                          os.path.join(target_workdir, 'logs'),
-                          os.path.join(target_workdir, 'zinc_args'),
-                          self._compute_sources_for_target(target))
+    return CompileContext(target=target,
+                          analysis_file=os.path.join(target_workdir, 'z.analysis'),
+                          classes_dir=ClasspathEntry(os.path.join(target_workdir, 'classes')),
+                          jar_file=ClasspathEntry(os.path.join(target_workdir, 'z.jar')),
+                          log_dir=os.path.join(target_workdir, 'logs'),
+                          args_file=os.path.join(target_workdir, 'zinc_args'),
+                          post_compile_merge_dir=os.path.join(target_workdir,
+                                                              'post_compile_merge_dir'),
+                          sources=self._compute_sources_for_target(target))
 
   def execute(self):
     if JvmPlatform.global_instance().get_options().compiler != self.compiler_name:
@@ -886,7 +897,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       libs_unrooted = [self._unroot_lib_path(l) for l in libs_abs]
       path_globs = PathGlobsAndRoot(
         PathGlobs(tuple(libs_unrooted)),
-        text_type(self._underlying.home))
+        self._underlying.home)
       return (libs_unrooted, path_globs)
 
     @property

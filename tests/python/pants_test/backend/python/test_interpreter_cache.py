@@ -5,14 +5,12 @@ import os
 import sys
 from contextlib import contextmanager
 
-from future.utils import PY3
-
 from pants.backend.python.interpreter_cache import PythonInterpreter, PythonInterpreterCache
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir
-from pants_test.backend.python.interpreter_selection_utils import (
-  PY_27, PY_36, python_interpreter_path, skip_unless_python27_and_python36_present)
+from pants_test.interpreter_selection_utils import (PY_27, PY_36, python_interpreter_path,
+                                                    skip_unless_python27_and_python36_present)
 from pants_test.test_base import TestBase
 from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
@@ -22,9 +20,9 @@ class TestInterpreterCache(TestBase):
   def _make_bad_requirement(requirement):
     """Turns a requirement that passes into one we know will fail.
 
-    E.g. 'CPython==2.7.5' becomes 'CPython==99.7.5'
+    E.g. 'CPython==3.7.2' becomes 'CPython==99.7.2'
     """
-    requirement_major_version = '3' if PY3 else '2'
+    requirement_major_version = '3'
     return str(requirement).replace(
       '=={}'.format(requirement_major_version), '==99'
     )

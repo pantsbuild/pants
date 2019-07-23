@@ -31,7 +31,6 @@ python_library(
     'src/python/pants/util:fileutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:objects',
-    'src/python/pants/util:process_handler',
     'src/python/pants/util:xml_parser',
   ]
 )

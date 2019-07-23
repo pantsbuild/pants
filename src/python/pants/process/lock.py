@@ -51,7 +51,7 @@ class OwnerPrintingInterProcessFileLock(InterProcessLock):
       current_process = psutil.Process()
       message = '{} ({})'.format(current_process.pid, ' '.join(current_process.cmdline()))
       with open(self.message_path, 'wb') as f:
-        f.write(message.encode('utf-8'))
+        f.write(message.encode())
 
     return self.acquired
 

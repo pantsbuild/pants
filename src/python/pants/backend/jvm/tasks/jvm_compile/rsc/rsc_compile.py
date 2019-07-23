@@ -6,8 +6,6 @@ import logging
 import os
 import re
 
-from future.utils import PY3, text_type
-
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext  # noqa
 from pants.backend.jvm.subsystems.rsc import Rsc
 from pants.backend.jvm.subsystems.shader import Shader
@@ -92,9 +90,10 @@ class RscCompileContext(CompileContext):
                jar_file,
                log_dir,
                args_file,
+               post_compile_merge_dir,
                sources,
                workflow):
-    super().__init__(target, analysis_file, classes_dir, jar_file, log_dir, args_file, sources)
+    super().__init__(target, analysis_file, classes_dir, jar_file, log_dir, args_file, post_compile_merge_dir, sources)
     self.workflow = workflow
     self.rsc_jar_file = rsc_jar_file
 
@@ -122,7 +121,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('RscCompile', 172)]
+    return super().implementation_version() + [('RscCompile', 173)]
 
   class JvmCompileWorkflowType(enum(['zinc-only', 'zinc-java', 'rsc-and-zinc'])):
     """Target classifications used to correctly schedule Zinc and Rsc jobs.
@@ -312,7 +311,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       tgt, = vts.targets
 
       if not hit_cache:
-        counter_val = str(counter()).rjust(counter.format_length(), ' ' if PY3 else b' ')
+        counter_val = str(counter()).rjust(counter.format_length(), ' ')
         counter_str = '[{}/{}] '.format(counter_val, counter.size)
         self.context.log.info(
           counter_str,
@@ -538,6 +537,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         args_file=os.path.join(rsc_dir, 'rsc_args'),
         rsc_jar_file=ClasspathEntry(os.path.join(rsc_dir, 'm.jar')),
         log_dir=os.path.join(rsc_dir, 'logs'),
+        post_compile_merge_dir=os.path.join(rsc_dir, 'post_compile_merge_dir'),
         sources=sources,
         workflow=self._classify_target_compile_workflow(target),
       ),
@@ -548,6 +548,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         jar_file=ClasspathEntry(os.path.join(zinc_dir, 'z.jar'), None),
         log_dir=os.path.join(zinc_dir, 'logs'),
         args_file=os.path.join(zinc_dir, 'zinc_args'),
+        post_compile_merge_dir=os.path.join(zinc_dir, 'post_compile_merge_dir'),
         sources=sources,
       ))
 
@@ -568,13 +569,10 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       additional_snapshots = [native_image_snapshot]
       initial_args = [native_image_path]
     else:
-      # TODO(#6071): Our ExecuteProcessRequest expects a specific string type for arguments,
-      # which py2 doesn't default to. This can be removed when we drop python 2.
-      str_jvm_options = [text_type(opt) for opt in self.get_options().jvm_options]
       additional_snapshots = []
       initial_args = [
         distribution.java,
-      ] + str_jvm_options + [
+      ] + self.get_options().jvm_options + [
         '-cp', os.pathsep.join(tool_classpath),
         main,
       ]
@@ -593,7 +591,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     if pathglobs:
       root = PathGlobsAndRoot(
         PathGlobs(tuple(pathglobs)),
-        text_type(get_buildroot()))
+        get_buildroot())
       # dont capture snapshot, if pathglobs is empty
       path_globs_input_digest = self.context._scheduler.capture_snapshots((root,))[0].directory_digest
 
@@ -613,7 +611,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       # TODO: These should always be unicodes
       # Since this is always hermetic, we need to use `underlying.home` because
       # ExecuteProcessRequest requires an existing, local jdk location.
-      jdk_home=text_type(distribution.underlying_home),
+      jdk_home=distribution.underlying_home,
     )
     res = self.context.execute_process_synchronously_without_raising(
       epr,
@@ -632,7 +630,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     self.context._scheduler.materialize_directories((
       DirectoryToMaterialize(
         # NB the first element here is the root to materialize into, not the dir to snapshot
-        text_type(get_buildroot()),
+        get_buildroot(),
         res.output_directory_digest),
     ))
 

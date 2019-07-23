@@ -32,12 +32,12 @@ pub use crate::glob_matching::GlobMatching;
 use ::ignore::gitignore::{Gitignore, GitignoreBuilder};
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
-use futures::{future, Future, Stream};
+use futures::{future, Future};
 use glob::{MatchOptions, Pattern};
 use lazy_static::lazy_static;
 use std::cmp::min;
 use std::ffi::OsStr;
-use std::io;
+use std::io::{self, Read};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
@@ -547,10 +547,15 @@ pub struct GlobWithSource {
 pub struct PosixFS {
   root: Dir,
   ignore: Arc<GitignoreStyleExcludes>,
+  executor: task_executor::Executor,
 }
 
 impl PosixFS {
-  pub fn new<P: AsRef<Path>>(root: P, ignore_patterns: &[String]) -> Result<PosixFS, String> {
+  pub fn new<P: AsRef<Path>>(
+    root: P,
+    ignore_patterns: &[String],
+    executor: task_executor::Executor,
+  ) -> Result<PosixFS, String> {
     let root: &Path = root.as_ref();
     let canonical_root = root
       .canonicalize()
@@ -577,6 +582,7 @@ impl PosixFS {
     Ok(PosixFS {
       root: canonical_root,
       ignore: ignore,
+      executor: executor,
     })
   }
 
@@ -584,23 +590,39 @@ impl PosixFS {
     &self,
     dir_relative_to_root: Dir,
   ) -> impl Future<Item = DirectoryListing, Error = io::Error> {
+    let vfs = self.clone();
+    self
+      .executor
+      .spawn_on_io_pool(futures::future::lazy(move || {
+        vfs.scandir_sync(&dir_relative_to_root)
+      }))
+  }
+
+  fn scandir_sync(&self, dir_relative_to_root: &Dir) -> Result<DirectoryListing, io::Error> {
     let dir_abs = self.root.0.join(&dir_relative_to_root.0);
-    let posix_fs = self.clone();
-    let ignore = self.ignore.clone();
-    tokio_fs::read_dir(dir_abs.clone())
-      .and_then(move |readdir| {
-        readdir
-          .and_then(move |dir_entry| {
-            let dir_relative_to_root = dir_relative_to_root.clone();
-            posix_fs.stat(dir_relative_to_root.0.join(dir_entry.file_name()))
-          })
-          .filter(move |s| !ignore.is_ignored(s))
-          .collect()
+    let root = self.root.0.clone();
+    let mut stats: Vec<Stat> = dir_abs
+      .read_dir()?
+      .map(|readdir| {
+        let dir_entry = readdir?;
+        PosixFS::stat_internal(
+          dir_relative_to_root.0.join(dir_entry.file_name()),
+          &root,
+          &std::fs::symlink_metadata(dir_abs.join(dir_entry.file_name()))?,
+        )
       })
-      .map(|mut stats| {
-        stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
-        DirectoryListing(stats)
+      .filter(|s| match s {
+        Ok(ref s) =>
+        // It would be nice to be able to ignore paths before stat'ing them, but in order to apply
+        // git-style ignore patterns, we need to know whether a path represents a directory.
+        {
+          !self.ignore.is_ignored(s)
+        }
+        Err(_) => true,
       })
+      .collect::<Result<Vec<_>, io::Error>>()?;
+    stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
+    Ok(DirectoryListing(stats))
   }
 
   pub fn is_ignored(&self, stat: &Stat) -> bool {
@@ -610,33 +632,44 @@ impl PosixFS {
   pub fn read_file(&self, file: &File) -> impl Future<Item = FileContent, Error = io::Error> {
     let path = file.path.clone();
     let path_abs = self.root.0.join(&file.path);
-    tokio_fs::File::open(path_abs)
-      .and_then(|file| {
-        tokio_io::io::read_to_end(file, Vec::new()).map(|(_file, bytes)| Bytes::from(bytes))
-      })
-      .map(|content| FileContent { path, content })
+    self
+      .executor
+      .spawn_on_io_pool(futures::future::lazy(move || {
+        std::fs::File::open(&path_abs).and_then(|mut f| {
+          let mut content = Vec::new();
+          f.read_to_end(&mut content)?;
+          Ok(FileContent {
+            path: path,
+            content: Bytes::from(content),
+          })
+        })
+      }))
   }
 
   pub fn read_link(&self, link: &Link) -> impl Future<Item = PathBuf, Error = io::Error> {
     let link_parent = link.0.parent().map(Path::to_owned);
     let link_abs = self.root.0.join(link.0.as_path()).to_owned();
-    tokio_fs::read_link(link_abs.clone()).and_then(move |path_buf| {
-      if path_buf.is_absolute() {
-        Err(io::Error::new(
-          io::ErrorKind::InvalidData,
-          format!("Absolute symlink: {:?}", link_abs),
-        ))
-      } else {
-        link_parent
-          .map(|parent| parent.join(path_buf))
-          .ok_or_else(|| {
-            io::Error::new(
+    self
+      .executor
+      .spawn_on_io_pool(futures::future::lazy(move || {
+        link_abs.read_link().and_then(|path_buf| {
+          if path_buf.is_absolute() {
+            Err(io::Error::new(
               io::ErrorKind::InvalidData,
-              format!("Symlink without a parent?: {:?}", link_abs),
-            )
-          })
-      }
-    })
+              format!("Absolute symlink: {:?}", link_abs),
+            ))
+          } else {
+            link_parent
+              .map(|parent| parent.join(path_buf))
+              .ok_or_else(|| {
+                io::Error::new(
+                  io::ErrorKind::InvalidData,
+                  format!("Symlink without a parent?: {:?}", link_abs),
+                )
+              })
+          }
+        })
+      }))
   }
 
   ///
@@ -688,10 +721,13 @@ impl PosixFS {
     }
   }
 
-  pub fn stat(&self, relative_path: PathBuf) -> impl Future<Item = Stat, Error = io::Error> {
-    let root = self.root.0.clone();
-    tokio_fs::symlink_metadata(self.root.0.join(&relative_path))
-      .and_then(move |metadata| PosixFS::stat_internal(relative_path, &root, &metadata))
+  pub fn stat_sync(&self, relative_path: PathBuf) -> Result<Stat, io::Error> {
+    PosixFS::stat_path_sync(relative_path, &self.root.0)
+  }
+
+  fn stat_path_sync(relative_path: PathBuf, root: &Path) -> Result<Stat, io::Error> {
+    let metadata = fs::symlink_metadata(root.join(&relative_path))?;
+    PosixFS::stat_internal(relative_path, root, &metadata)
   }
 }
 
@@ -723,9 +759,13 @@ impl PathStatGetter<io::Error> for Arc<PosixFS> {
       paths
         .into_iter()
         .map(|path| {
+          let root = self.root.0.clone();
           let fs = self.clone();
           self
-            .stat(path)
+            .executor
+            .spawn_on_io_pool(futures::future::lazy(move || {
+              PosixFS::stat_path_sync(path, &root)
+            }))
             .then(|stat_result| match stat_result {
               Ok(v) => Ok(Some(v)),
               Err(err) => match err.kind() {
@@ -891,9 +931,8 @@ mod posixfs_test {
     let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("photograph_marmosets");
     make_file(&dir.path().join(&path), &[], 0o700);
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
     assert_eq!(
-      runtime.block_on(posix_fs.stat(path.clone())).unwrap(),
+      posix_fs.stat_sync(path.clone()).unwrap(),
       super::Stat::File(File {
         path: path,
         is_executable: true,
@@ -907,9 +946,8 @@ mod posixfs_test {
     let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("marmosets");
     make_file(&dir.path().join(&path), &[], 0o600);
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
     assert_eq!(
-      runtime.block_on(posix_fs.stat(path.clone())).unwrap(),
+      posix_fs.stat_sync(path.clone()).unwrap(),
       super::Stat::File(File {
         path: path,
         is_executable: false,
@@ -923,9 +961,8 @@ mod posixfs_test {
     let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("enclosure");
     std::fs::create_dir(dir.path().join(&path)).unwrap();
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
     assert_eq!(
-      runtime.block_on(posix_fs.stat(path.clone())).unwrap(),
+      posix_fs.stat_sync(path.clone()).unwrap(),
       super::Stat::Dir(Dir(path))
     )
   }
@@ -939,18 +976,16 @@ mod posixfs_test {
 
     let link_path = PathBuf::from("remarkably_similar_marmoset");
     std::os::unix::fs::symlink(&dir.path().join(path), dir.path().join(&link_path)).unwrap();
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
     assert_eq!(
-      runtime.block_on(posix_fs.stat(link_path.clone())).unwrap(),
+      posix_fs.stat_sync(link_path.clone()).unwrap(),
       super::Stat::Link(Link(link_path))
     )
   }
 
   #[test]
   fn stat_other() {
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
-    runtime
-      .block_on(new_posixfs("/dev").stat(PathBuf::from("null")))
+    new_posixfs("/dev")
+      .stat_sync(PathBuf::from("null"))
       .expect_err("Want error");
   }
 
@@ -958,9 +993,8 @@ mod posixfs_test {
   fn stat_missing() {
     let dir = tempfile::TempDir::new().unwrap();
     let posix_fs = new_posixfs(&dir.path());
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
-    runtime
-      .block_on(posix_fs.stat(PathBuf::from("no_marmosets")))
+    posix_fs
+      .stat_sync(PathBuf::from("no_marmosets"))
       .expect_err("Want error");
   }
 
@@ -1168,7 +1202,7 @@ mod posixfs_test {
   }
 
   fn new_posixfs<P: AsRef<Path>>(dir: P) -> PosixFS {
-    PosixFS::new(dir.as_ref(), &[]).unwrap()
+    PosixFS::new(dir.as_ref(), &[], task_executor::Executor::new()).unwrap()
   }
 
   ///

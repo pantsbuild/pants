@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from contextlib import contextmanager
 
 from pants.util.objects import datatype
-from pants.util.osutil import IntegerForPid
+from pants.util.osutil import Pid
 
 
 STDIO_DESCRIPTORS = (0, 1, 2)
@@ -98,7 +98,7 @@ class NailgunProtocol:
   def _decode_unicode_seq(cls, seq):
     for item in seq:
       if isinstance(item, bytes):
-        yield item.decode('utf-8')
+        yield item.decode()
       else:
         yield item
 
@@ -209,7 +209,7 @@ class NailgunProtocol:
     if chunk_type not in ChunkType.VALID_TYPES:
       raise cls.ProtocolError('invalid chunk type: {}'.format(chunk_type))
     if not return_bytes:
-      payload = payload.decode('utf-8')
+      payload = payload.decode()
 
     return chunk_type, payload
 
@@ -320,14 +320,14 @@ class NailgunProtocol:
   @classmethod
   def send_pid(cls, sock, pid):
     """Send the PID chunk over the specified socket."""
-    assert(isinstance(pid, IntegerForPid) and pid > 0)
+    assert(isinstance(pid, Pid) and pid > 0)
     encoded_int = cls.encode_int(pid)
     cls.write_chunk(sock, ChunkType.PID, encoded_int)
 
   @classmethod
   def send_pgrp(cls, sock, pgrp):
     """Send the PGRP chunk over the specified socket."""
-    assert(isinstance(pgrp, IntegerForPid) and pgrp < 0)
+    assert(isinstance(pgrp, Pid) and pgrp < 0)
     encoded_int = cls.encode_int(pgrp)
     cls.write_chunk(sock, ChunkType.PGRP, encoded_int)
 
@@ -352,7 +352,7 @@ class NailgunProtocol:
     The result of this method be used as the value of an environment variable in a subsequent
     NailgunClient execution.
     """
-    return str(obj).encode('utf-8')
+    return str(obj).encode()
 
   @classmethod
   def isatty_to_env(cls, stdin, stdout, stderr):

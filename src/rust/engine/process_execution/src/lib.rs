@@ -37,11 +37,14 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use store::UploadSummary;
+use workunit_store::WorkUnitStore;
 
 use async_semaphore::AsyncSemaphore;
 
+pub mod cache;
 pub mod local;
 pub mod remote;
+pub mod speculate;
 
 ///
 /// A process to be executed.
@@ -89,6 +92,18 @@ pub struct ExecuteProcessRequest {
 }
 
 ///
+/// Metadata surrounding an ExecuteProcessRequest which factors into its cache key when cached
+/// externally from the engine graph (e.g. when using remote execution or an external process
+/// cache).
+///
+#[derive(Clone, Debug)]
+pub struct ExecuteProcessRequestMetadata {
+  pub instance_name: Option<String>,
+  pub cache_key_gen_version: Option<String>,
+  pub platform_properties: BTreeMap<String, String>,
+}
+
+///
 /// The result of running a process.
 ///
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -133,7 +148,11 @@ impl AddAssign<UploadSummary> for ExecutionStats {
 }
 
 pub trait CommandRunner: Send + Sync {
-  fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String>;
+  fn run(
+    &self,
+    req: ExecuteProcessRequest,
+    workunit_store: WorkUnitStore,
+  ) -> BoxFuture<FallibleExecuteProcessResult, String>;
 }
 
 ///
@@ -153,9 +172,16 @@ impl BoundedCommandRunner {
 }
 
 impl CommandRunner for BoundedCommandRunner {
-  fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String> {
+  fn run(
+    &self,
+    req: ExecuteProcessRequest,
+    workunit_store: WorkUnitStore,
+  ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let inner = self.inner.clone();
-    self.inner.1.with_acquired(move || inner.0.run(req))
+    self
+      .inner
+      .1
+      .with_acquired(move || inner.0.run(req, workunit_store))
   }
 }
 

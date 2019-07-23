@@ -4,8 +4,6 @@
 
 from collections.abc import MutableMapping, MutableSequence
 
-from future.utils import binary_type, text_type
-
 from pants.engine.addressable import addressable, addressable_list
 from pants.engine.objects import Serializable, SerializableFactory, Validatable, ValidationError
 from pants.util.objects import SubclassesOf, SuperclassesOf
@@ -13,10 +11,10 @@ from pants.util.objects import SubclassesOf, SuperclassesOf
 
 def _normalize_utf8_keys(kwargs):
   """When kwargs are passed literally in a source file, their keys are ascii: normalize."""
-  if any(type(key) is binary_type for key in kwargs.keys()):
+  if any(type(key) is bytes for key in kwargs.keys()):
     # This is to preserve the original dict type for kwargs.
     dict_type = type(kwargs)
-    return dict_type([(text_type(k), v) for k, v in kwargs.items()])
+    return dict_type([(str(k), v) for k, v in kwargs.items()])
   return kwargs
 
 

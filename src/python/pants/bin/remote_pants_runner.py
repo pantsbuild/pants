@@ -6,8 +6,6 @@ import sys
 import time
 from contextlib import contextmanager
 
-from future.utils import PY3, raise_with_traceback
-
 from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.console.stty_utils import STTYSettings
 from pants.java.nailgun_client import NailgunClient
@@ -29,6 +27,7 @@ class PailgunClientSignalHandler(SignalHandler):
     super().__init__(*args, **kwargs)
 
   def _forward_signal_with_timeout(self, signum, signame):
+    # TODO Consider not accessing the private function _maybe_last_pid here, or making it public.
     logger.info(
       'Sending {} to pantsd with pid {}, waiting up to {} seconds before sending SIGKILL...'
       .format(signame, self._pailgun_client._maybe_last_pid(), self._timeout))
@@ -38,7 +37,12 @@ class PailgunClientSignalHandler(SignalHandler):
     self._pailgun_client.maybe_send_signal(signum)
 
   def handle_sigint(self, signum, _frame):
-    self._forward_signal_with_timeout(signum, 'SIGINT')
+    if self._pailgun_client._maybe_last_pid():
+      self._forward_signal_with_timeout(signum, 'SIGINT')
+    else:
+      # NB: We consider not having received a PID yet as "not having started substantial work".
+      # So in this case, we let the client die gracefully, and the server handle the closed socket.
+      super(PailgunClientSignalHandler, self).handle_sigint(signum, _frame)
 
   def handle_sigquit(self, signum, _frame):
     self._forward_signal_with_timeout(signum, 'SIGQUIT')
@@ -79,8 +83,8 @@ class RemotePantsRunner:
     self._options_bootstrapper = options_bootstrapper
     self._bootstrap_options = options_bootstrapper.bootstrap_options
     self._stdin = stdin or sys.stdin
-    self._stdout = stdout or (sys.stdout.buffer if PY3 else sys.stdout)
-    self._stderr = stderr or (sys.stderr.buffer if PY3 else sys.stderr)
+    self._stdout = stdout or sys.stdout.buffer
+    self._stderr = stderr or sys.stderr.buffer
 
   @contextmanager
   def _trapped_signals(self, client):
@@ -114,7 +118,7 @@ class RemotePantsRunner:
           raise self.Fallback(e)
 
         self._backoff(attempt)
-        logger.warn(
+        logger.warning(
           'pantsd was unresponsive on port {}, retrying ({}/{})'
           .format(pantsd_handle.port, attempt, retries)
         )
@@ -129,7 +133,8 @@ class RemotePantsRunner:
         # Ensure a newline.
         logger.fatal('')
         logger.fatal('lost active connection to pantsd!')
-        raise_with_traceback(self._extract_remote_exception(pantsd_handle.pid, e))
+        traceback = sys.exc_info()[2]
+        raise self._extract_remote_exception(pantsd_handle.pid, e).with_traceback(traceback)
 
   def _connect_and_execute(self, pantsd_handle):
     port = pantsd_handle.port

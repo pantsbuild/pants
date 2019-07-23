@@ -4,9 +4,8 @@
 import logging
 import os
 import sys
+from urllib import parse
 from zipfile import ZIP_STORED
-
-from future.moves.urllib import parse
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.java.executor import Executor, SubprocessExecutor

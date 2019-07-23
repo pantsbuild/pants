@@ -1,9 +1,6 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
-from future.utils import PY2
-
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 
@@ -25,8 +22,6 @@ class GoalOptionsRegistrar(Optionable):
     code from knowing which goal(s) the task is to be registered in.
     """
     type_name = '{}_{}'.format(cls.__name__, goal)
-    if PY2:
-      type_name = type_name.encode('utf-8')
     return type(type_name, (cls, ), {'options_scope': goal})
 
 

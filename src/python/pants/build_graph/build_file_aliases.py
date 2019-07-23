@@ -5,8 +5,6 @@ import inspect
 from abc import abstractmethod
 from collections import defaultdict
 
-import six
-
 from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.build_graph.target import Target
 from pants.util.memo import memoized_property
@@ -107,7 +105,7 @@ class BuildFileAliases:
 
   @classmethod
   def _validate_alias(cls, category, alias, obj):
-    if not isinstance(alias, six.string_types):
+    if not isinstance(alias, str):
       raise TypeError('Aliases must be strings, given {category} entry {alias!r} of type {typ} as '
                       'the alias of {obj}'
                       .format(category=category, alias=alias, typ=type(alias).__name__, obj=obj))

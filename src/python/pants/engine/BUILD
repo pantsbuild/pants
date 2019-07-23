@@ -46,7 +46,6 @@ python_library(
   sources=['fs.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:future',
     ':objects',
     ':rules',
     ':selectors',
@@ -72,8 +71,6 @@ python_library(
   name='build_files',
   sources=['build_files.py'],
   dependencies=[
-    '3rdparty/python:future',
-    '3rdparty/python:six',
     ':addressable',
     ':fs',
     ':mapper',
@@ -129,7 +126,6 @@ python_library(
   name='objects',
   sources=['objects.py'],
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/util:memo',
     'src/python/pants/util:objects',
   ]
@@ -139,7 +135,6 @@ python_library(
   name='parser',
   sources=['parser.py'],
   dependencies=[
-    '3rdparty/python:six',
     ':addressable',
     ':objects',
     'src/python/pants/build_graph',
@@ -152,7 +147,6 @@ python_library(
   sources=['rules.py'],
   dependencies=[
     '3rdparty/python:asttokens',
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':goal',
     ':selectors',
@@ -166,8 +160,6 @@ python_library(
   name='selectors',
   sources=['selectors.py'],
   dependencies=[
-    '3rdparty/python:future',
-    '3rdparty/python:six',
     'src/python/pants/util:objects',
   ]
 )
@@ -195,7 +187,6 @@ python_library(
   name='native',
   sources=['native.py'],
   dependencies=[
-    '3rdparty/python:future',
     ':native_engine_shared_library',
     ':selectors',
     '3rdparty/python:cffi',

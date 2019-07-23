@@ -66,7 +66,7 @@ class ReportTestSuite:
           if error_on_conflict:
             raise cls.MergeError(suites, cases)
           else:
-            logger.warn('Found duplicate test case results in suite {!r} from files: {}, '
+            logger.warning('Found duplicate test case results in suite {!r} from files: {}, '
                         'using first result:\n -> {}'.format(suite_name,
                                                              ', '.join(s.file for s in suites),
                                                              '\n    '.join(map(str, cases))))

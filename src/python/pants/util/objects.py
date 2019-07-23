@@ -6,7 +6,6 @@ from abc import ABC, abstractmethod
 from collections import OrderedDict, namedtuple
 from collections.abc import Iterable
 
-from future.utils import binary_type, text_type
 from twitter.common.collections import OrderedSet
 
 from pants.util.memo import memoized_classproperty
@@ -232,10 +231,7 @@ def datatype(field_decls, superclass_name=None, **kwargs):
 
   # Return a new type with the given name, inheriting from the DataType class
   # just defined, with an empty class body.
-  try:  # Python3
-    return type(superclass_name, (DataType,), {})
-  except TypeError:  # Python2
-    return type(superclass_name.encode('utf-8'), (DataType,), {})
+  return type(superclass_name, (DataType,), {})
 
 
 class EnumVariantSelectionError(TypeCheckError):
@@ -385,7 +381,7 @@ def enum(all_values):
   # Python requires creating an explicit closure to save the value on each loop iteration.
   accessor_generator = lambda case: lambda cls: cls(case)
   for case in all_values_realized:
-    if _string_type_constraint.satisfied_by(case):
+    if SubclassesOf(str).satisfied_by(case):
       accessor = classproperty(accessor_generator(case))
       attr_name = re.sub(r'-', '_', case)
       setattr(ChoiceDatatype, attr_name, accessor)
@@ -537,9 +533,6 @@ class SubclassesOf(TypeOnlyConstraint):
     return issubclass(obj_type, self._types)
 
 
-_string_type_constraint = SubclassesOf(binary_type, text_type)
-
-
 class TypedCollection(TypeConstraint):
   """A `TypeConstraint` which accepts a TypeOnlyConstraint and validates a collection."""
 
@@ -556,12 +549,12 @@ class TypedCollection(TypeConstraint):
   def exclude_iterable_constraint(cls):
     """Define what collection inputs are *not* accepted by this type constraint.
 
-    Strings in Python are considered iterables of substrings, but we only want to allow explicit
-    collection types.
+    Strings (unicode and byte) in Python are considered iterables of substrings, but we only want
+    to allow explicit collection types.
 
     :rtype: TypeConstraint
     """
-    return _string_type_constraint
+    return SubclassesOf(str, bytes)
 
   def __init__(self, constraint):
     """Create a `TypeConstraint` which validates each member of a collection with `constraint`.
@@ -627,9 +620,9 @@ class HashableTypedCollection(TypedCollection):
   iterable_constraint = hashable_collection_constraint
 
 
-string_type = Exactly(text_type)
+string_type = Exactly(str)
 string_list = TypedCollection(string_type)
-string_optional = Exactly(text_type, type(None))
+string_optional = Exactly(str, type(None))
 
 
 hashable_string_list = HashableTypedCollection(string_type)

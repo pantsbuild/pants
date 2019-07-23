@@ -49,7 +49,6 @@ python_tests(
   name = 'build_file_parser',
   sources = ['test_build_file_parser.py'],
   dependencies = [
-    '3rdparty/python:future',
     'src/python/pants/base:build_file',
     'src/python/pants/build_graph',
     'tests/python/pants_test:test_base',
@@ -111,8 +110,6 @@ python_tests(
   name = 'target',
   sources = ['test_target.py'],
   dependencies = [
-    '3rdparty/python:future',
-    '3rdparty/python:mock',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/base:payload',

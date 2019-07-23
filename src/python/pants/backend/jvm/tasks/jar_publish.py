@@ -11,7 +11,6 @@ import sys
 from collections import OrderedDict, defaultdict, namedtuple
 from copy import copy
 
-from future.utils import PY3
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.ossrh_publication_metadata import OSSRHPublicationMetadata
@@ -165,7 +164,7 @@ class PomWriter:
       target_jar = target_jar.extend(dependencies=list(dependencies.values()))
 
     template_relpath = os.path.join(_TEMPLATES_RELPATH, 'pom.xml.mustache')
-    template_text = pkgutil.get_data(__name__, template_relpath).decode('utf-8')
+    template_text = pkgutil.get_data(__name__, template_relpath).decode()
     generator = Generator(template_text, project=target_jar)
     with safe_open(path, 'w') as output:
       generator.write(output)
@@ -746,8 +745,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
                   coordinate(jar.org, jar.name), oldentry.version(), oldentry.sha, changelog)
               # The stdout encoding can be detected as None when running without a tty (common in
               # tests), in which case we want to force encoding with a unicode-supporting codec.
-              # In Py3, sys.stdout is a unicode stream.
-              sys.stdout.write(message) if PY3 else sys.stdout.write(message.encode('utf-8'))
+              sys.stdout.write(message)
           if not self.confirm_push(coordinate(jar.org, jar.name), newentry.version()):
             raise TaskError('User aborted push')
 
@@ -872,25 +870,25 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
 
   def entry_fingerprint(self, target, fingerprint_internal):
     sha = hashlib.sha1()
-    sha.update(target.invalidation_hash().encode('utf-8'))
+    sha.update(target.invalidation_hash().encode())
 
     # TODO(Tejal Desai): pantsbuild/pants/65: Remove java_sources attribute for ScalaLibrary
     if isinstance(target, ScalaLibrary):
       for java_source in sorted(target.java_sources):
-        sha.update(java_source.invalidation_hash().encode('utf-8'))
+        sha.update(java_source.invalidation_hash().encode())
 
     # TODO(John Sirois): handle resources
 
     for jarsig in sorted([jar_coordinate(j) for j in target.jar_dependencies if j.rev]):
-      sha.update(jarsig.encode('utf-8'))
+      sha.update(jarsig.encode())
 
     # TODO(tdesai) Handle resource type in get_db.
     internal_dependencies = sorted(target_internal_dependencies(target), key=lambda t: t.id)
     for internal_target in internal_dependencies:
       fingerprint = fingerprint_internal(internal_target)
-      sha.update(fingerprint.encode('utf-8'))
+      sha.update(fingerprint.encode())
 
-    return sha.hexdigest() if PY3 else sha.hexdigest().decode('utf-8')
+    return sha.hexdigest()
 
   def changelog(self, target, sha):
     # Filter synthetic files.
@@ -909,7 +907,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
 
   def generate_ivysettings(self, ivy, publishedjars, publish_local=None):
     template_relpath = os.path.join(_TEMPLATES_RELPATH, 'ivysettings.xml.mustache')
-    template_text = pkgutil.get_data(__name__, template_relpath).decode('utf-8')
+    template_text = pkgutil.get_data(__name__, template_relpath).decode()
 
     published = [TemplateData(org=jar.org, name=jar.name) for jar in publishedjars]
 
@@ -926,7 +924,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
 
   def generate_ivy(self, jar, version, publications):
     template_relpath = os.path.join(_TEMPLATES_RELPATH, 'ivy.xml.mustache')
-    template_text = pkgutil.get_data(__name__, template_relpath).decode('utf-8')
+    template_text = pkgutil.get_data(__name__, template_relpath).decode()
 
     pubs = [TemplateData(name=None if p.name == jar.name else p.name,
                          classifier=p.classifier,

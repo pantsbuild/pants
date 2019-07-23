@@ -21,7 +21,6 @@ python_tests(
     'test_union_products.py',
   ],
   dependencies=[
-    '3rdparty/python:future',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/auth',
     'src/python/pants/build_graph',

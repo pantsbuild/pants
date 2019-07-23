@@ -5,6 +5,7 @@ import functools
 import os
 import re
 import shutil
+import subprocess
 import xml.etree.ElementTree as ET
 from abc import abstractmethod
 from contextlib import contextmanager
@@ -17,7 +18,6 @@ from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_mkdir_for
 from pants.util.memo import memoized_classproperty, memoized_property
-from pants.util.process_handler import subprocess
 
 
 class TestResult:

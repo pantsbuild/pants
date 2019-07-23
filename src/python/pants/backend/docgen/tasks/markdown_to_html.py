@@ -184,14 +184,14 @@ class MarkdownToHtml(Task):
           style_css = HtmlFormatter(style=self.code_style).get_style_defs('.codehilite')
           template = resource_string(
             __name__, os.path.join(self._templates_dir, 'fragment.mustache')
-          ).decode('utf-8')
+          ).decode()
           generator = Generator(template, style_css=style_css, md_html=md_html)
           generator.write(output)
         else:
           style_link = os.path.relpath(css, os.path.dirname(output_path))
           template = resource_string(
             __name__, os.path.join(self._templates_dir, 'page.mustache')
-          ).decode('utf-8')
+          ).decode()
           generator = Generator(template, style_link=style_link, md_html=md_html)
           generator.write(output)
         return output.name
@@ -210,7 +210,7 @@ class MarkdownToHtml(Task):
 
       template_path = os.path.join(self._templates_dir,
                                    'fragment.mustache' if fragmented else 'page.mustache')
-      template = resource_string(__name__, template_path).decode('utf-8')
+      template = resource_string(__name__, template_path).decode()
       generator = Generator(template, md_html=rst_html)
       safe_mkdir(os.path.dirname(output_path))
       with open(output_path, 'w') as output:

@@ -29,12 +29,11 @@ python_tests(
   name = 'interpreter_cache',
   sources = ['test_interpreter_cache.py'],
   dependencies = [
-    '3rdparty/python:future',
-    ':interpreter_selection_utils',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/testutils:pexrc_util',
+    'tests/python/pants_test:interpreter_selection_utils',
     'tests/python/pants_test:test_base',
   ],
 )
@@ -54,19 +53,9 @@ python_library(
   name='pants_requirement_integration_test_base',
   sources=['pants_requirement_integration_test_base.py'],
   dependencies=[
-    '3rdparty/python:future',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:int-test',
-  ]
-)
-
-python_library(
-  name='interpreter_selection_utils',
-  sources=['interpreter_selection_utils.py'],
-  dependencies=[
-    'src/python/pants/util:process_handler',
-    '3rdparty/python:future',
   ]
 )

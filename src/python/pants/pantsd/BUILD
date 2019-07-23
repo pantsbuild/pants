@@ -9,7 +9,6 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/process',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:process_handler',
   ]
 )
 
@@ -17,7 +16,6 @@ python_library(
   name = 'pailgun_server',
   sources = ['pailgun_server.py'],
   dependencies = [
-    '3rdparty/python:six',
     'src/python/pants/java:nailgun_protocol',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:socket'
@@ -57,7 +55,6 @@ python_library(
   name = 'pants_daemon',
   sources = ['pants_daemon.py'],
   dependencies = [
-    '3rdparty/python:future',
     '3rdparty/python:setproctitle',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exception_sink',

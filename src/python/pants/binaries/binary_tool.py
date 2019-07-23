@@ -5,8 +5,6 @@ import logging
 import os
 import threading
 
-from future.utils import text_type
-
 from pants.binaries.binary_util import BinaryRequest, BinaryUtil
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot
 from pants.fs.archive import XZCompressedTarArchiver, create_archiver
@@ -147,7 +145,7 @@ class BinaryToolBase(Subsystem):
         if old_opts.get(self.replaces_name) and not old_opts.is_default(self.replaces_name):
           return old_opts.get(self.replaces_name)
       else:
-        logger.warn('Cannot resolve version of {} from deprecated option {} in scope {} without a '
+        logger.warning('Cannot resolve version of {} from deprecated option {} in scope {} without a '
                     'context!'.format(self._get_name(), self.replaces_name, self.replaces_scope))
     return self.get_options().version
 
@@ -187,7 +185,7 @@ class BinaryToolBase(Subsystem):
     snapshot = context._scheduler.capture_snapshots((
       PathGlobsAndRoot(
         PathGlobs((relpath,)),
-        text_type(bootstrapdir),
+        bootstrapdir,
       ),
     ))[0]
     return (relpath, snapshot)

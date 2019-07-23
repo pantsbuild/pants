@@ -8,9 +8,6 @@ import threading
 from json.decoder import JSONDecoder
 from json.encoder import JSONEncoder
 
-import six
-from future.utils import PY2
-
 from pants.build_graph.address import Address
 from pants.engine.objects import Resolvable, Serializable
 from pants.engine.parser import ParseError, Parser
@@ -41,7 +38,7 @@ class JsonParser(Parser):
     self.symbol_table = symbol_table
 
   def _as_type(self, type_or_name):
-    return _import(type_or_name) if isinstance(type_or_name, six.string_types) else type_or_name
+    return _import(type_or_name) if isinstance(type_or_name, str) else type_or_name
 
   @staticmethod
   def _object_decoder(obj, symbol_table):
@@ -58,13 +55,7 @@ class JsonParser(Parser):
     symbol_table = self.symbol_table.table
     decoder = functools.partial(self._object_decoder,
                                 symbol_table=symbol_table.__getitem__ if symbol_table else self._as_type)
-    kwargs = {
-      'object_hook': decoder,
-      'strict': True,
-    }
-    if PY2:
-      kwargs['encoding'] = 'UTF-8'
-    return JSONDecoder(**kwargs)
+    return JSONDecoder(object_hook=decoder, strict=True)
 
   def parse(self, filepath, filecontent):
     """Parse the given json encoded string into a list of top-level objects found.
@@ -193,10 +184,7 @@ def encode_json(obj, inline=False, **kwargs):
   :rtype: string
   :raises: :class:`ParseError` if there were any problems encoding the given `obj` in json.
   """
-  kwargs.update({'default': functools.partial(_object_encoder, inline=inline)})
-  if PY2:
-    kwargs.update({'encoding': 'utf-8'})
-  encoder = JSONEncoder(**kwargs)
+  encoder = JSONEncoder(default=functools.partial(_object_encoder, inline=inline), **kwargs)
   return encoder.encode(obj)
 
 
@@ -226,7 +214,7 @@ class PythonAssignmentsParser(Parser):
 
     python = filecontent
     symbols = {}
-    six.exec_(python, parse_globals, symbols)
+    exec(python, parse_globals, symbols)
 
     objects = []
     for name, obj in symbols.items():
@@ -286,5 +274,5 @@ class PythonCallbacksParser(Parser):
     python = filecontent
     with self._lock:
       del objects[:]
-      six.exec_(python, parse_globals, {})
+      exec(python, parse_globals, {})
       return list(objects)

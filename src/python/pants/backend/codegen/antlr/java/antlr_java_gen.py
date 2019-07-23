@@ -67,7 +67,7 @@ class AntlrJavaGen(SimpleCodegenTask, NailgunTask):
 
     if compiler == 'antlr3':
       if target.package is not None:
-        logger.warn("The 'package' attribute is not supported for antlr3 and will be ignored.")
+        logger.warning("The 'package' attribute is not supported for antlr3 and will be ignored.")
       java_main = 'org.antlr.Tool'
     elif compiler == 'antlr4':
       args.append('-visitor')  # Generate Parse Tree Visitor As Well

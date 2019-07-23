@@ -8,8 +8,6 @@ from contextlib import contextmanager
 from hashlib import sha1
 from itertools import repeat
 
-from future.utils import PY3
-
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
 from pants.build_graph.target_filter_subsystem import TargetFilter
@@ -74,7 +72,7 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
   @classmethod
   @memoized_method
   def implementation_version_slug(cls):
-    return sha1(cls.implementation_version_str().encode('utf-8')).hexdigest()[:12]
+    return sha1(cls.implementation_version_str().encode()).hexdigest()[:12]
 
   @classmethod
   def stable_name(cls):
@@ -307,15 +305,15 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
 
   def _options_fingerprint(self, scope):
     options_hasher = sha1()
-    options_hasher.update(scope.encode('utf-8'))
+    options_hasher.update(scope.encode())
     options_fp = OptionsFingerprinter.combined_options_fingerprint_for_scope(
       scope,
       self.context.options,
       build_graph=self.context.build_graph,
       include_passthru=self.supports_passthru_args(),
     )
-    options_hasher.update(options_fp.encode('utf-8'))
-    return options_hasher.hexdigest() if PY3 else options_hasher.hexdigest().decode('utf-8')
+    options_hasher.update(options_fp.encode())
+    return options_hasher.hexdigest()
 
   @memoized_property
   def fingerprint(self):
@@ -328,12 +326,12 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     A task's fingerprint is only valid after the task has been fully initialized.
     """
     hasher = sha1()
-    hasher.update(self.stable_name().encode('utf-8'))
-    hasher.update(self._options_fingerprint(self.options_scope).encode('utf-8'))
-    hasher.update(self.implementation_version_str().encode('utf-8'))
+    hasher.update(self.stable_name().encode())
+    hasher.update(self._options_fingerprint(self.options_scope).encode())
+    hasher.update(self.implementation_version_str().encode())
     for dep in self.subsystem_closure_iter():
-      hasher.update(self._options_fingerprint(dep.options_scope).encode('utf-8'))
-    return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+      hasher.update(self._options_fingerprint(dep.options_scope).encode())
+    return hasher.hexdigest()
 
   def artifact_cache_reads_enabled(self):
     return self._cache_factory.read_cache_available()

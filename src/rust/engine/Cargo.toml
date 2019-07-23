@@ -3,7 +3,6 @@ version = "0.0.1"
 edition = "2018"
 name = "engine"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
-build = "src/cffi_build.rs"
 publish = false
 
 [profile.release]
@@ -12,15 +11,6 @@ publish = false
 debug = true
 # Optimise for the speed of our binary, rather than the speed of compilation.
 codegen-units = 1
-
-[lib]
-crate-type = ["cdylib"]
-
-[build-dependencies]
-build_utils = { path = "build_utils" }
-cbindgen = "0.8.6"
-cc = "1.0"
-walkdir = "2"
 
 [workspace]
 # These are the packages which are built/tested when the --all flag is passed to cargo.
@@ -31,6 +21,7 @@ members = [
   ".",
   "async_semaphore",
   "boxfuture",
+  "engine_cffi",
   "fs",
   "fs/brfs",
   "fs/fs_util",
@@ -44,6 +35,7 @@ members = [
   "serverset",
   "sharded_lmdb",
   "tar_api",
+  "task_executor",
   "testutil",
   "testutil/mock",
   "testutil/local_cas",
@@ -63,6 +55,7 @@ default-members = [
   ".",
   "async_semaphore",
   "boxfuture",
+  "engine_cffi",
   "fs",
   "fs/fs_util",
   "fs/store",
@@ -75,6 +68,7 @@ default-members = [
   "serverset",
   "sharded_lmdb",
   "tar_api",
+  "task_executor",
   "testutil",
   "testutil/mock",
   "testutil/local_cas",
@@ -100,13 +94,15 @@ process_execution = { path = "process_execution" }
 rand = "0.6"
 reqwest = { version = "0.9.10", default_features = false, features = ["rustls-tls"] }
 rule_graph = { path = "rule_graph" }
+sharded_lmdb = { path = "sharded_lmdb" }
 smallvec = "0.6"
 store = { path = "fs/store" }
-tokio = "0.1"
 tempfile = "3"
+time = "0.1.40"
 ui = { path = "ui" }
 url = "1.7.1"
-tar_api = { path = "tar_api" }
+uuid = { version = "0.7", features = ["v4"] }
+task_executor = { path = "task_executor" }
 workunit_store = { path = "workunit_store" }
 
 [patch.crates-io]

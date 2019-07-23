@@ -3,15 +3,13 @@
 
 from abc import ABC, abstractmethod
 
-from future.utils import text_type
-
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
 
 
 class MirroredTargetOptionDeclaration(datatype([
     'options',
-    ('option_name', text_type),
+    ('option_name', str),
     'accessor',
 ])):
   """An interface for operations to perform on an option which may also be set on a target."""

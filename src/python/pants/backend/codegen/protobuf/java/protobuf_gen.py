@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import subprocess
 from collections import OrderedDict
 from hashlib import sha1
 
@@ -16,7 +17,6 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.fs.archive import ZIP
 from pants.task.simple_codegen_task import SimpleCodegenTask
-from pants.util.process_handler import subprocess
 
 
 class ProtobufGen(SimpleCodegenTask):

@@ -2,8 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import unittest
-
-import mock
+import unittest.mock
 
 from pants.pantsd.service.pailgun_service import PailgunService
 
@@ -17,23 +16,23 @@ class FakePailgun:
 
 class TestPailgunService(unittest.TestCase):
   def setUp(self):
-    self.mock_exiter_class = mock.Mock(side_effect=Exception('should not be called'))
-    self.mock_runner_class = mock.Mock(side_effect=Exception('should not be called'))
-    self.mock_scheduler_service = mock.Mock(side_effect=Exception('should not be called'))
-    self.mock_target_roots_calculator = mock.Mock(side_effect=Exception('should not be called'))
+    self.mock_exiter_class = unittest.mock.Mock(side_effect=Exception('should not be called'))
+    self.mock_runner_class = unittest.mock.Mock(side_effect=Exception('should not be called'))
+    self.mock_scheduler_service = unittest.mock.Mock(side_effect=Exception('should not be called'))
+    self.mock_target_roots_calculator = unittest.mock.Mock(side_effect=Exception('should not be called'))
     self.service = PailgunService(bind_addr=(None, None),
                                   runner_class=self.mock_runner_class,
                                   scheduler_service=self.mock_scheduler_service,
                                   shutdown_after_run=False)
 
-  @mock.patch.object(PailgunService, '_setup_pailgun', **PATCH_OPTS)
+  @unittest.mock.patch.object(PailgunService, '_setup_pailgun', **PATCH_OPTS)
   def test_pailgun_property_values(self, mock_setup):
     fake_pailgun = FakePailgun()
     mock_setup.return_value = fake_pailgun
     self.assertIs(self.service.pailgun, fake_pailgun)
     self.assertEqual(self.service.pailgun_port, 33333)
 
-  @mock.patch.object(PailgunService, 'terminate', **PATCH_OPTS)
+  @unittest.mock.patch.object(PailgunService, 'terminate', **PATCH_OPTS)
   def test_pailgun_service_closes_when_callback_is_called(self, mock_setup):
     fake_pailgun = FakePailgun()
     mock_setup.return_value = fake_pailgun

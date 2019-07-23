@@ -21,17 +21,25 @@ use tokio_process::CommandExt;
 use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
 
 use bytes::{Bytes, BytesMut};
+use workunit_store::WorkUnitStore;
 
 pub struct CommandRunner {
   store: Store,
+  executor: task_executor::Executor,
   work_dir: PathBuf,
   cleanup_local_dirs: bool,
 }
 
 impl CommandRunner {
-  pub fn new(store: Store, work_dir: PathBuf, cleanup_local_dirs: bool) -> CommandRunner {
+  pub fn new(
+    store: Store,
+    executor: task_executor::Executor,
+    work_dir: PathBuf,
+    cleanup_local_dirs: bool,
+  ) -> CommandRunner {
     CommandRunner {
       store,
+      executor,
       work_dir,
       cleanup_local_dirs,
     }
@@ -205,7 +213,13 @@ impl super::CommandRunner for CommandRunner {
   ///
   /// Runs a command on this machine in the passed working directory.
   ///
-  fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String> {
+  /// TODO: start to create workunits for local process execution
+  ///
+  fn run(
+    &self,
+    req: ExecuteProcessRequest,
+    _workunit_store: WorkUnitStore,
+  ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let workdir = try_future!(tempfile::Builder::new()
       .prefix("process-execution")
       .tempdir_in(&self.work_dir)
@@ -217,6 +231,7 @@ impl super::CommandRunner for CommandRunner {
     let workdir_path2 = workdir_path.clone();
     let workdir_path3 = workdir_path.clone();
     let store = self.store.clone();
+    let executor = self.executor.clone();
 
     let env = req.env;
     let output_file_paths = req.output_files;
@@ -277,7 +292,7 @@ impl super::CommandRunner for CommandRunner {
           future::ok(store::Snapshot::empty()).to_boxed()
         } else {
           // Use no ignore patterns, because we are looking for explicitly listed paths.
-          future::done(fs::PosixFS::new(workdir_path2, &[]))
+          future::done(fs::PosixFS::new(workdir_path2, &[], executor))
             .map_err(|err| {
               format!(
                 "Error making posix_fs to fetch local process execution output files: {}",
@@ -340,6 +355,7 @@ mod tests {
   use testutil::data::{TestData, TestDirectory};
   use testutil::path::find_bash;
   use testutil::{as_bytes, owned_string_vec};
+  use workunit_store::WorkUnitStore;
 
   #[test]
   #[cfg(unix)]
@@ -889,14 +905,14 @@ mod tests {
     cleanup: bool,
   ) -> Result<FallibleExecuteProcessResult, String> {
     let store_dir = TempDir::new().unwrap();
-    let store = Store::local_only(store_dir.path()).unwrap();
+    let executor = task_executor::Executor::new();
+    let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
     let runner = super::CommandRunner {
       store: store,
+      executor: executor.clone(),
       work_dir: dir,
       cleanup_local_dirs: cleanup,
     };
-    tokio::runtime::Runtime::new()
-      .unwrap()
-      .block_on(runner.run(req))
+    executor.block_on(runner.run(req, WorkUnitStore::new()))
   }
 }

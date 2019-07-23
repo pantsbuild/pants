@@ -4,10 +4,10 @@
 import glob
 import os
 import re
+import subprocess
 
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
-from pants.util.process_handler import subprocess
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -41,7 +41,7 @@ United States
       # Check that the pex was built.
       self.assertTrue(os.path.isfile(pex))
       # Check that the pex runs.
-      output = subprocess.check_output(pex).decode('utf-8')
+      output = subprocess.check_output(pex).decode()
       self._assert_nation_and_greeting(output)
       # Check that we have exactly one wheel output.
       single_wheel_output = assert_single_element(glob.glob(os.path.join(tmp_dir, '*.whl')))

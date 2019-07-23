@@ -3,8 +3,8 @@
 
 import os
 import re
+import subprocess
 
-from future.utils import PY3
 from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
@@ -14,7 +14,6 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir, temporary_file
-from pants.util.process_handler import subprocess
 from pants_test.task_test_base import TaskTestBase
 
 
@@ -46,7 +45,7 @@ class ResolveRequirementsTest(TaskTestBase):
 
     path = stdout_data.strip()
     # Check that the requirement resolved to what we expect.
-    self.assertTrue(path.endswith('/.deps/ansicolors-1.0.2-{}-none-any.whl/colors.py'.format('py3' if PY3 else 'py2')))
+    self.assertTrue(path.endswith('/.deps/ansicolors-1.0.2-py3-none-any.whl/colors.py'))
     # Check that the path is under the test's build root, so we know the pex was created there.
     self.assertTrue(path.startswith(os.path.realpath(get_buildroot())))
 
@@ -84,4 +83,4 @@ class ResolveRequirementsTest(TaskTestBase):
       proc = pex.run(args=[f.name], blocking=False,
                      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
       stdout, stderr = proc.communicate()
-      return (stdout.decode('utf-8'), stderr.decode('utf-8'))
+      return (stdout.decode(), stderr.decode())

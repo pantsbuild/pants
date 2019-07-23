@@ -6,7 +6,6 @@ import os
 from abc import abstractmethod
 from collections import OrderedDict
 
-from future.utils import text_type
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
@@ -286,7 +285,7 @@ class SimpleCodegenTask(Task):
       to_capture.append(
         PathGlobsAndRoot(
           PathGlobs(buildroot_relative_globs, buildroot_relative_excludes),
-          text_type(get_buildroot()),
+          get_buildroot(),
           # The digest is stored adjacent to the hash-versioned `vt.current_results_dir`.
           Digest.load(vt.current_results_dir),
         )
@@ -436,7 +435,7 @@ class SimpleCodegenTask(Task):
       messages.extend(['\t\t{}'.format(source) for source in duped_sources])
     message = '\n'.join(messages)
     if self.get_options().allow_dups:
-      logger.warn(message)
+      logger.warning(message)
     else:
       raise self.DuplicateSourceError(message)
 

@@ -9,6 +9,7 @@ import java.util.function.{ Function => JFunction }
 
 import scala.compat.java8.OptionConverters._
 
+import sbt.internal.inc.ReporterManager
 import sbt.internal.inc.ZincUtil
 import sbt.io.IO
 import sbt.util.Logger
@@ -66,16 +67,8 @@ object InputUtils {
         .withScalacOptions(scalacOptions.toArray)
         .withJavacOptions(javacOptions.toArray)
         .withOrder(compileOrder)
-    val reporter =
-      ReporterUtil.getDefault(
-        ReporterUtil.getDefaultReporterConfig()
-          .withMaximumErrors(Int.MaxValue)
-          .withUseColor(settings.consoleLog.color)
-          .withMsgFilters(settings.consoleLog.msgPredicates.toArray)
-          .withFileFilters(settings.consoleLog.filePredicates.toArray)
-          .withLogLevel(settings.consoleLog.javaLogLevel)
-          .withPositionMapper(positionMapper)
-      )
+    val reporter = ReporterUtil.getReporter(
+      BareBonesLogger(settings.consoleLog.logLevel), ReporterManager.getDefaultReporterConfig)
     val setup =
       Setup.create(
         analysisMap.getPCELookup,

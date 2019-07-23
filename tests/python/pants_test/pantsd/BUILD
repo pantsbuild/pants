@@ -4,7 +4,6 @@
 target(
   name = 'test_deps',
   dependencies = [
-    '3rdparty/python:mock',
     'tests/python/pants_test:test_base'
   ]
 )
@@ -16,7 +15,6 @@ python_tests(
   dependencies = [
     ':test_deps',
     'src/python/pants/pantsd:process_manager',
-    'src/python/pants/util:process_handler',
   ]
 )
 
@@ -45,7 +43,6 @@ python_tests(
   sources = ['test_pailgun_server.py'],
   coverage = ['pants.pantsd.pailgun_server'],
   dependencies = [
-    '3rdparty/python:future',
     ':test_deps',
     'src/python/pants/pantsd:pailgun_server'
   ]

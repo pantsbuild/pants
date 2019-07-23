@@ -4,6 +4,324 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.19.0.dev0 (7/20/2019)
+-----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add support for speculation as a viable command runner. (#8050)
+  `PR #8050 <https://github.com/pantsbuild/pants/pull/8050>`_
+
+Bugfixes
+~~~~~~~~
+
+* Scalafix full classpath fix (#8007)
+  `PR #8007 <https://github.com/pantsbuild/pants/pull/8007>`_
+
+* Fix performance regression introduced by #7898 (#8006)
+  `PR #8006 <https://github.com/pantsbuild/pants/pull/8006>`_
+
+* Fix plugin resolution to respect interpreter ABI. (#8005)
+  `PR #8005 <https://github.com/pantsbuild/pants/pull/8005>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Use `pants` as the user-agent for report server (#8077)
+  `PR #8077 <https://github.com/pantsbuild/pants/pull/8077>`_
+
+* Replace some format() calls with f-strings (#8079)
+  `PR #8079 <https://github.com/pantsbuild/pants/pull/8079>`_
+
+* Use unit-constants for MB/GB (#8072)
+  `PR #8072 <https://github.com/pantsbuild/pants/pull/8072>`_
+
+* Replace deprecated logger.warn calls with logger.warning (#8033)
+  `PR #8033 <https://github.com/pantsbuild/pants/pull/8033>`_
+
+* Local caching CommandRunner has default-on flag (#8040)
+  `PR #8040 <https://github.com/pantsbuild/pants/pull/8040>`_
+
+* Remove unit test runtime dependencies on resources (#8066)
+  `PR #8066 <https://github.com/pantsbuild/pants/pull/8066>`_
+
+* Use our docker image from #8059 for remote execution (#8068)
+  `PR #8068 <https://github.com/pantsbuild/pants/pull/8068>`_
+  `PR #8059 <https://github.com/pantsbuild/pants/pull/8059>`_
+
+* Log messages are rendered in the v2 UI (#8049)
+  `PR #8049 <https://github.com/pantsbuild/pants/pull/8049>`_
+
+* Extend Google RBE Docker image to allow building sdist wheels (#8059)
+  `Issue #8057 <https://github.com/pantsbuild/pants/issues/8057>`_
+  `PR #8059 <https://github.com/pantsbuild/pants/pull/8059>`_
+
+* Bump virtualenv to 16.6.2 for local run script (#8061)
+  `PR #8061 <https://github.com/pantsbuild/pants/pull/8061>`_
+
+* Replace scandir dependency with stdlib version (#8058)
+  `PR #8058 <https://github.com/pantsbuild/pants/pull/8058>`_
+
+* Set RUST_BACKTRACE in CI for more useful Rust debugging (#8054)
+  `PR #8054 <https://github.com/pantsbuild/pants/pull/8054>`_
+
+* Add provides clauses for new zinc deps. (#8055)
+  `PR #8055 <https://github.com/pantsbuild/pants/pull/8055>`_
+
+* Fix test broken by workunit service name changes (#8056)
+  `PR #8056 <https://github.com/pantsbuild/pants/pull/8056>`_
+
+* Suppress git stderr when checking for existence of repo (#7891)
+  `PR #7891 <https://github.com/pantsbuild/pants/pull/7891>`_
+
+* Change service name in Zipkin spans (#8053)
+  `PR #8053 <https://github.com/pantsbuild/pants/pull/8053>`_
+
+* embed a graal native-image configuration inside the zinc wrapper (#7506)
+  `PR #7506 <https://github.com/pantsbuild/pants/pull/7506>`_
+
+* Leverage Travis built-in skip support. (#8001)
+  `PR #8001 <https://github.com/pantsbuild/pants/pull/8001>`_
+
+* Add lmdb_store to travis cache (#8042)
+  `PR #8042 <https://github.com/pantsbuild/pants/pull/8042>`_
+
+* Minimum viable speculating command runner (#7992)
+  `PR #7992 <https://github.com/pantsbuild/pants/pull/7992>`_
+
+* Prep for 1.18.0rc1 (#8034)
+  `PR #8034 <https://github.com/pantsbuild/pants/pull/8034>`_
+
+* Revert "ShardedLmdb takes max size in bytes, not pages (#8038)" (#8044)
+  `PR #8038 <https://github.com/pantsbuild/pants/pull/8038>`_
+  `PR #8044 <https://github.com/pantsbuild/pants/pull/8044>`_
+
+* Add caching CommandRunner wrapper (#7911)
+  `PR #7911 <https://github.com/pantsbuild/pants/pull/7911>`_
+
+* ShardedLmdb takes max size in bytes, not pages (#8038)
+  `PR #8038 <https://github.com/pantsbuild/pants/pull/8038>`_
+
+* Extract ExecuteProcessRequestMetadata (#8035)
+  `PR #8035 <https://github.com/pantsbuild/pants/pull/8035>`_
+
+* Add remote workunits for Zipkin trace (#7897)
+  `PR #7897 <https://github.com/pantsbuild/pants/pull/7897>`_
+
+* Extract cbindgen'd interface into its own crate (#8013)
+  `PR #8013 <https://github.com/pantsbuild/pants/pull/8013>`_
+
+* Revert "Make precomputing fail more usefully (#7994)" (#8024)
+  `PR #7994 <https://github.com/pantsbuild/pants/pull/7994>`_
+  `PR #8024 <https://github.com/pantsbuild/pants/pull/8024>`_
+
+* Update rust dependencies (#8016)
+  `PR #8016 <https://github.com/pantsbuild/pants/pull/8016>`_
+
+* Fix pdb conflict in run_tracker stats request (#8025)
+  `PR #8025 <https://github.com/pantsbuild/pants/pull/8025>`_
+
+* Add utf-8 encoding to thrift-generated python files (#8022)
+  `PR #8022 <https://github.com/pantsbuild/pants/pull/8022>`_
+
+* Make union error messages better (#7999)
+  `PR #7999 <https://github.com/pantsbuild/pants/pull/7999>`_
+
+1.18.0rc0 (7/5/2019)
+--------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Add conftest.py to the python_tests default sources. (#7946)
+  `PR #7946 <https://github.com/pantsbuild/pants/pull/7946>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add `--[no-]remote-execution` flag (#7991)
+  `PR #7991 <https://github.com/pantsbuild/pants/pull/7991>`_
+
+Bugfixes
+~~~~~~~~
+
+* Make precomputing fail more usefully (#7994)
+  `PR #7994 <https://github.com/pantsbuild/pants/pull/7994>`_
+
+* Add __init__.py to directories created by grpcio (#7984)
+  `PR #7984 <https://github.com/pantsbuild/pants/pull/7984>`_
+
+* Don't use remote store when --no-remote-execution specified (#8010)
+  `PR #8010 <https://github.com/pantsbuild/pants/pull/8010>`_
+
+* Fix bug background workunits were printed in UI (#7997)
+  `PR #7997 <https://github.com/pantsbuild/pants/pull/7997>`_
+
+* relativize path for scalac classpath entry (#8011)
+  `PR #8011 <https://github.com/pantsbuild/pants/pull/8011>`_
+
+* Fix bad `with_traceback()` change from #7988 (#8004)
+  `PR #8004 <https://github.com/pantsbuild/pants/pull/8004>`_
+
+* Fix gocheckstyle decoding error (#7978)
+  `PR #7978 <https://github.com/pantsbuild/pants/pull/7978>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Set up pants.remote.ini for remoting Python unit tests (#7990)
+  `PR #7990 <https://github.com/pantsbuild/pants/pull/7990>`_
+
+* Add type checking to several `util` files (#7998)
+  `PR #7998 <https://github.com/pantsbuild/pants/pull/7998>`_
+
+* Kill all uses of t.c.collections.OrderedDict. (#8003)
+  `PR #8003 <https://github.com/pantsbuild/pants/pull/8003>`_
+
+* Use default utf-8 encoding for string `decode()` and `encode()` (#7983)
+  `PR #7983 <https://github.com/pantsbuild/pants/pull/7983>`_
+
+* fix grpc threadpool size (#7974)
+  `PR #7974 <https://github.com/pantsbuild/pants/pull/7974>`_
+
+* Fix most Python 2 issues from #6071 (#7989)
+  `PR #7989 <https://github.com/pantsbuild/pants/pull/7989>`_
+
+* Remove `future` library (#7988)
+  `PR #7988 <https://github.com/pantsbuild/pants/pull/7988>`_
+
+* Remove remaining `if PY{2,3}` snippets (#7986)
+  `PR #7986 <https://github.com/pantsbuild/pants/pull/7986>`_
+
+* Remove `six` library (#7985)
+  `PR #7985 <https://github.com/pantsbuild/pants/pull/7985>`_
+
+* No longer use `string_types` (#7980)
+  `PR #7980 <https://github.com/pantsbuild/pants/pull/7980>`_
+
+* Use dedicated requirements.txt for `contrib.python.checks.checker` (#7982)
+  `PR #7982 <https://github.com/pantsbuild/pants/pull/7982>`_
+
+* Replace `six.exec_()` with `exec()` (#7981)
+  `PR #7981 <https://github.com/pantsbuild/pants/pull/7981>`_
+
+* Remove Python 2 handling of unicode (#7973)
+  `PR #7973 <https://github.com/pantsbuild/pants/pull/7973>`_
+
+* Remove `future.moves` and `six.moves` imports (#7975)
+  `PR #7975 <https://github.com/pantsbuild/pants/pull/7975>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Fix ensure_interpreter_search_path_env docs. (#8000)
+  `PR #8000 <https://github.com/pantsbuild/pants/pull/8000>`_
+
+* Update style guide to use f-strings (#7987)
+  `PR #7987 <https://github.com/pantsbuild/pants/pull/7987>`_
+
+Version updates
+~~~~~~~~~~~~~~~
+
+* Update to rust 1.36.0 (#8014)
+  `PR #8014 <https://github.com/pantsbuild/pants/pull/8014>`_
+
+* Upgrade to pex 1.6.8. (#7962)
+  `PR #7962 <https://github.com/pantsbuild/pants/pull/7962>`_
+
+1.18.0.dev2 (6/28/2019)
+-----------------------
+
+Bugfixes
+~~~~~~~~
+* Fix the wheel count check for pex building. (#7933)
+  `PR #7933 <https://github.com/pantsbuild/pants/pull/7933>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Remove `text_type` and `binary_type` wrappers (#7970)
+  `PR #7970 <https://github.com/pantsbuild/pants/pull/7970>`_
+
+* Fix `cargo.sh` to use Python 3 (#7972)
+  `PR #7972 <https://github.com/pantsbuild/pants/pull/7972>`_
+
+* Remove Python 2 use of `std{out,err}` over `std{out,err}.buffer` (#7968)
+  `PR #7968 <https://github.com/pantsbuild/pants/pull/7968>`_
+
+* Remove Python 2 `hashlib.hexdigest()` decoding (#7965)
+  `PR #7965 <https://github.com/pantsbuild/pants/pull/7965>`_
+
+* Revert "Workaround Travis timeout for OSX platforms test (#7919)" (#7967)
+  `PR #7967 <https://github.com/pantsbuild/pants/pull/7967>`_
+
+* Add Option for remote concurrency. (#7960)
+  `PR #7960 <https://github.com/pantsbuild/pants/pull/7960>`_
+
+* Remove Python 2 select.select() code (#7964)
+  `PR #7964 <https://github.com/pantsbuild/pants/pull/7964>`_
+
+* Simplify tests to no longer check for `u""` character or `unicode` type (#7966)
+  `PR #7966 <https://github.com/pantsbuild/pants/pull/7966>`_
+
+* Remove subprocess, futures, and faulthandler backports (#7950)
+  `PR #7950 <https://github.com/pantsbuild/pants/pull/7950>`_
+
+* Remove unittest.mock backport (#7951)
+  `PR #7951 <https://github.com/pantsbuild/pants/pull/7951>`_
+
+* Hand over post-compile resources to zinc wrapper to keep classes/ and z.jar consistent (#7932)
+  `PR #7932 <https://github.com/pantsbuild/pants/pull/7932>`_
+
+* Add some of the wording from #7913 that wasn't merged in #7924  (#7958)
+  `PR #7958 <https://github.com/pantsbuild/pants/pull/7958>`_
+
+* Crash pailgun client on SIGINT if we haven't received the pid yet (#7924)
+  `PR #7924 <https://github.com/pantsbuild/pants/pull/7924>`_
+
+* Add whitelist of folders that must remain Python 2 compatible (#7941)
+  `PR #7941 <https://github.com/pantsbuild/pants/pull/7941>`_
+
+* Add concurrent flag, which overrides --enable-pantsd (#7944)
+  `PR #7944 <https://github.com/pantsbuild/pants/pull/7944>`_
+
+* Report zipkin spans regardless of goal version. (#7915)
+  `PR #7915 <https://github.com/pantsbuild/pants/pull/7915>`_
+
+* Don't memoize description in process execute memoization (#7916)
+  `PR #7916 <https://github.com/pantsbuild/pants/pull/7916>`_
+
+* Modernize classes to use Python 3 syntax (#7937)
+  `PR #7937 <https://github.com/pantsbuild/pants/pull/7937>`_
+
+* Remove configparser backport (#7939)
+  `PR #7939 <https://github.com/pantsbuild/pants/pull/7939>`_
+
+* Remove `collections.abc` backport (#7940)
+  `PR #7940 <https://github.com/pantsbuild/pants/pull/7940>`_
+
+* Remove `self.assertRegex` backport (#7938)
+  `PR #7938 <https://github.com/pantsbuild/pants/pull/7938>`_
+
+* Add --post-compile-merge-dir option in zinc (#7917)
+  `PR #7917 <https://github.com/pantsbuild/pants/pull/7917>`_
+
+* Remove `builtins` imports (#7934)
+  `PR #7934 <https://github.com/pantsbuild/pants/pull/7934>`_
+
+* Modernize `abc` stdlib usage. (#7928)
+  `PR #7928 <https://github.com/pantsbuild/pants/pull/7928>`_
+
+* Workaround Travis timeout for OSX platforms test (#7919)
+  `PR #7919 <https://github.com/pantsbuild/pants/pull/7919>`_
+
+* Modernize all headers to Python 3 style (#7926)
+  `PR #7926 <https://github.com/pantsbuild/pants/pull/7926>`_
+
+* Kill `AbstractClass` in favor of `abc.ABC{,Meta}`. (#7929)
+  `PR #7929 <https://github.com/pantsbuild/pants/pull/7929>`_
+
+
 1.18.0.dev1 (6/21/2019)
 -----------------------
 

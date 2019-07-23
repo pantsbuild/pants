@@ -3,6 +3,7 @@
 
 import os
 import re
+import subprocess
 
 from pants.backend.codegen.ragel.java.java_ragel_library import JavaRagelLibrary
 from pants.backend.codegen.ragel.subsystems.ragel import Ragel
@@ -12,7 +13,6 @@ from pants.base.exceptions import TaskError
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdir_for
 from pants.util.memo import memoized_property
-from pants.util.process_handler import subprocess
 
 
 class RagelGen(SimpleCodegenTask):

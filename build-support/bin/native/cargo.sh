@@ -4,7 +4,7 @@ set -e
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../../.. && pwd -P)
 
-export PY=${PY:-python}
+export PY=${PY:-python3}
 
 # Exports:
 # + CARGO_HOME: The CARGO_HOME of the Pants-controlled rust toolchain.

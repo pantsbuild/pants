@@ -4,8 +4,7 @@
 import logging
 import os
 import re
-
-import mock
+import unittest.mock
 
 from pants.base.exception_sink import ExceptionSink
 from pants.util.contextutil import temporary_dir
@@ -68,7 +67,7 @@ class TestExceptionSink(TestBase):
       # Check that tmpdir exists, and log an exception into that directory.
       sink.reset_log_location(tmpdir)
 
-      with mock.patch('setproctitle.getproctitle', autospec=True, spec_set=True) \
+      with unittest.mock.patch('setproctitle.getproctitle', autospec=True, spec_set=True) \
            as getproctitle_mock:
         getproctitle_mock.return_value = fake_process_title
         sink.log_exception(msg)
@@ -105,7 +104,7 @@ pid: {pid}
     with self.captured_logging(level=logging.ERROR) as captured:
       with temporary_dir() as tmpdir:
         sink.reset_log_location(tmpdir)
-        with mock.patch.object(sink, '_try_write_with_flush', autospec=sink) as mock_write:
+        with unittest.mock.patch.object(sink, '_try_write_with_flush', autospec=sink) as mock_write:
           mock_write.side_effect = ExceptionSink.ExceptionSinkError('fake write failure')
           sink.log_exception('XXX')
     errors = list(captured.errors())

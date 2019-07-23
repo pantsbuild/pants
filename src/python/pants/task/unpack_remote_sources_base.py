@@ -6,7 +6,6 @@ import os
 import re
 from abc import ABCMeta, abstractmethod
 
-from future.utils import text_type
 from twitter.common.dirutil.fileset import fnmatch_translate_extended
 
 from pants.base.build_environment import get_buildroot
@@ -19,13 +18,10 @@ from pants.util.objects import datatype
 logger = logging.getLogger(__name__)
 
 
-class UnpackedArchives(datatype([('found_files', tuple), ('rel_unpack_dir', text_type)])):
+class UnpackedArchives(datatype([('found_files', tuple), ('rel_unpack_dir', str)])):
 
   def __new__(cls, found_files, rel_unpack_dir):
-    return super().__new__(
-      cls,
-      tuple(found_files),
-      text_type(rel_unpack_dir))
+    return super().__new__(cls, tuple(found_files), rel_unpack_dir)
 
 
 class UnpackRemoteSourcesBase(Task, metaclass=ABCMeta):

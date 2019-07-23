@@ -18,6 +18,5 @@ python_library(
     'src/python/pants/fs',
     'src/python/pants/goal:task_registrar',
     'src/python/pants/task',
-    'src/python/pants/util:process_handler',
   ],
 )

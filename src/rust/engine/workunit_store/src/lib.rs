@@ -26,17 +26,77 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use futures::task_local;
 use parking_lot::Mutex;
+use rand::thread_rng;
+use rand::Rng;
+use std::collections::HashSet;
+use std::sync::Arc;
+use time::Timespec;
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct WorkUnit {
   pub name: String,
-  pub start_timestamp: f64,
-  pub end_timestamp: f64,
+  pub start_timestamp: Timespec,
+  pub end_timestamp: Timespec,
   pub span_id: String,
+  pub parent_id: Option<String>,
 }
 
-pub trait WorkUnitStore {
-  fn should_record_zipkin_spans(&self) -> bool;
-  fn get_workunits(&self) -> &Mutex<Vec<WorkUnit>>;
-  fn add_workunit(&self, workunit: WorkUnit);
+#[derive(Clone)]
+pub struct WorkUnitStore {
+  workunits: Arc<Mutex<HashSet<WorkUnit>>>,
+}
+
+impl WorkUnitStore {
+  pub fn new() -> WorkUnitStore {
+    WorkUnitStore {
+      workunits: Arc::new(Mutex::new(HashSet::new())),
+    }
+  }
+
+  pub fn get_workunits(&self) -> Arc<Mutex<HashSet<WorkUnit>>> {
+    self.workunits.clone()
+  }
+
+  pub fn add_workunit(&self, workunit: WorkUnit) {
+    self.workunits.lock().insert(workunit);
+  }
+}
+
+pub fn generate_random_64bit_string() -> String {
+  let mut rng = thread_rng();
+  let random_u64: u64 = rng.gen();
+  format!("{:16.x}", random_u64)
+}
+
+pub fn workunits_with_constant_span_id(workunit_store: &WorkUnitStore) -> HashSet<WorkUnit> {
+  //  This function is for the test purpose.
+
+  workunit_store
+    .get_workunits()
+    .lock()
+    .iter()
+    .map(|workunit| WorkUnit {
+      span_id: String::from("ignore"),
+      ..workunit.clone()
+    })
+    .collect()
+}
+
+task_local! {
+  static TASK_PARENT_ID: Mutex<Option<String>> = Mutex::new(None)
+}
+
+pub fn set_parent_id(parent_id: String) {
+  TASK_PARENT_ID.with(|task_parent_id| {
+    *task_parent_id.lock() = Some(parent_id);
+  })
+}
+
+pub fn get_parent_id() -> Option<String> {
+  TASK_PARENT_ID.with(|task_parent_id| {
+    let task_parent_id = task_parent_id.lock();
+    (*task_parent_id).clone()
+  })
 }

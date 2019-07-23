@@ -31,7 +31,6 @@ python_library(
   name = 'context',
   sources = ['context.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':products',
     ':workspace',
     'src/python/pants/base:build_environment',
@@ -58,7 +57,6 @@ python_library(
 python_library(
   sources = ['goal.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':error',
     'src/python/pants/option',
     'src/python/pants/util:memo',
@@ -86,7 +84,6 @@ python_library(
   name = 'run_tracker',
   sources = ['run_tracker.py'],
   dependencies = [
-    '3rdparty/python:future',
     ':aggregated_timings',
     ':artifact_cache_stats',
     ':pantsd_stats',

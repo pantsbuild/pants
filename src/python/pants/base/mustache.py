@@ -5,7 +5,6 @@ import os
 import pkgutil
 
 import pystache
-import six
 
 
 class MustacheRenderer:
@@ -37,7 +36,6 @@ class MustacheRenderer:
 
   @staticmethod
   def parse_template(template_text):
-    template_text = six.text_type(template_text)
     template = pystache.parse(template_text)
     return template
 

@@ -107,7 +107,7 @@ before pushing branches to ci:
 You can always run the pre-commit checks manually via:
 
     :::bash
-    $ ./build-support/bin/pre-commit.sh
+    $ ./build-support/githooks/pre-commit
 
 **Pro tip:** If you are certain that you have not accidentally committed anything to
 the `master` branch that you want to keep, and you want to reset to an _exact_ copy of

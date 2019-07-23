@@ -5,12 +5,11 @@ import io
 import json
 import os
 import shlex
+import unittest.mock
 from contextlib import contextmanager
 from textwrap import dedent
 
-import mock
 import yaml
-from future.utils import text_type
 from packaging.version import Version
 
 from pants.base.deprecated import CodeRemovedError
@@ -852,8 +851,8 @@ class OptionsTest(TestBase):
     single_warning = assert_single_element(w)
     self.assertEqual(single_warning.category, DeprecationWarning)
     warning_message = single_warning.message
-    self.assertIn("will be removed in version", text_type(warning_message))
-    self.assertIn(option_string, text_type(warning_message))
+    self.assertIn("will be removed in version", str(warning_message))
+    self.assertIn(option_string, str(warning_message))
 
   def test_deprecated_options_flag(self):
     with self.warnings_catcher() as w:
@@ -923,7 +922,7 @@ class OptionsTest(TestBase):
       self.assertEqual('stale_and_crufty', options.for_scope('stale').crufty)
       self.assertOptionWarning(w, 'crufty')
 
-  @mock.patch('pants.base.deprecated.PANTS_SEMVER', Version(_FAKE_CUR_VERSION))
+  @unittest.mock.patch('pants.base.deprecated.PANTS_SEMVER', Version(_FAKE_CUR_VERSION))
   def test_delayed_deprecated_option(self):
     with self.warnings_catcher() as w:
       delayed_deprecation_option_value = (

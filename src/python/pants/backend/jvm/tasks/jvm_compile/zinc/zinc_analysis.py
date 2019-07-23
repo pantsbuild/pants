@@ -2,8 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-from future.utils import text_type
-
 from pants.backend.jvm.tasks.jvm_compile.analysis import Analysis
 from pants.backend.jvm.zinc.zinc_analysis import ZincAnalysis as UnderlyingAnalysis
 
@@ -43,6 +41,3 @@ class ZincAnalysis(Analysis):
 
   def __str__(self):
     return str(self.underlying_analysis)
-
-  def __unicode__(self):
-    return text_type(self.underlying_analysis)

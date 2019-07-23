@@ -600,6 +600,56 @@ Interrupted by user over pailgun client!
       # NB: Make the timeout very small to ensure the warning message will reliably occur in CI!
       quit_timeout=1e-6)
 
+  def test_sigint_kills_request_waiting_for_lock(self):
+    """
+    Test that, when a pailgun request is blocked waiting for another one to end,
+    sending SIGINT to the blocked run will kill it.
+
+    Regression test for issue: #7920
+    """
+    config = {'GLOBAL': {
+      'pantsd_timeout_when_multiple_invocations': -1,
+      'level': 'debug'
+    }}
+    with self.pantsd_test_context(extra_config=config) as (workdir, config, checker):
+      # Run a repl, so that any other run waiting to acquire the daemon lock waits forever.
+      first_run_handle = self.run_pants_with_workdir_without_waiting(
+        command=['repl', 'examples/src/python/example/hello::'],
+        workdir=workdir,
+        config=config
+      )
+      checker.assert_started()
+      checker.assert_running()
+
+      blocking_run_handle = self.run_pants_with_workdir_without_waiting(
+        command=['goals'],
+        workdir=workdir,
+        config=config
+      )
+
+      # Block until the second request is waiting for the lock.
+      blocked = True
+      while blocked:
+        log = '\n'.join(read_pantsd_log(workdir))
+        if "didn't aquire the lock on the first try, polling." in log:
+          blocked = False
+        # NB: This sleep is totally deterministic, it's just so that we don't spend too many cycles
+        # busy waiting.
+        time.sleep(0.1)
+
+      # Sends SIGINT to the run that is waiting.
+      blocking_run_client_pid = blocking_run_handle.process.pid
+      os.kill(blocking_run_client_pid, signal.SIGINT)
+      blocking_run_handle.join()
+
+      # Check that pantsd is still serving the other request.
+      checker.assert_running()
+
+      # Send exit() to the repl, and exit it.
+      result = first_run_handle.join(stdin_data='exit()')
+      self.assert_success(result)
+      checker.assert_running()
+
   def test_pantsd_environment_scrubbing(self):
     # This pair of JVM options causes the JVM to always crash, so the command will fail if the env
     # isn't stripped.

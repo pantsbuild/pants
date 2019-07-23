@@ -15,7 +15,6 @@ python_tests(
   name='scrooge_gen',
   sources=['test_scrooge_gen.py'],
   dependencies=[
-    '3rdparty/python:mock',
     'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:scrooge_gen',
     'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/backend/jvm/targets:java',
@@ -50,7 +49,6 @@ python_tests(
   name='thrift_linter',
   sources=['test_thrift_linter.py'],
   dependencies=[
-    '3rdparty/python:mock',
     'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:thrift_linter',
     'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:thrift_util',
     'src/python/pants/backend/codegen/thrift/java',

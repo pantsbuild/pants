@@ -4,8 +4,6 @@
 import itertools
 import re
 
-from future.utils import text_type
-
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.engine.console import Console
 from pants.engine.fs import Digest, FilesContent
@@ -83,7 +81,7 @@ class SourceFileValidation(Subsystem):
 
 
 class RegexMatchResult(datatype([
-  ('path', text_type), ('matching', tuple), ('nonmatching', tuple)
+  ('path', str), ('matching', tuple), ('nonmatching', tuple)
 ])):
   """The result of running regex matches on a source file."""
 

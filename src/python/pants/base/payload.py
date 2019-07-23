@@ -3,8 +3,6 @@
 
 from hashlib import sha1
 
-from future.utils import PY3
-
 from pants.util.strutil import ensure_binary
 
 
@@ -121,13 +119,13 @@ class Payload:
           empty_hash = False
           fp = ensure_binary(fp)
           key = ensure_binary(key)
-          key_sha1 = sha1(key).hexdigest().encode('utf-8')
+          key_sha1 = sha1(key).hexdigest().encode()
           hasher.update(key_sha1)
           hasher.update(fp)
     if empty_hash:
       return None
     else:
-      return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+      return hasher.hexdigest()
 
   def mark_dirty(self):
     """Invalidates memoized fingerprints for this payload.

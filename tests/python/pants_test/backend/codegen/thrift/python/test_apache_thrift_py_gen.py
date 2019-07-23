@@ -2,9 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import subprocess
+from pathlib import Path
 from textwrap import dedent
 
-import six
 from pex.resolver import resolve
 
 from pants.backend.codegen.thrift.lib.thrift import Thrift
@@ -14,7 +15,6 @@ from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_environment import get_buildroot
-from pants.util.process_handler import subprocess
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
 from pants_test.task_test_base import TaskTestBase
 
@@ -57,7 +57,7 @@ class ApacheThriftPyGenTest(TaskTestBase):
 
     symbols = {}
     with open(self.init_py_path(target, package_rel_dir), 'rb') as fp:
-      six.exec_(fp.read(), symbols)
+      exec(fp.read(), symbols)
 
     self.assertIn('__all__', symbols)
     self.assertEqual(sorted(('constants', 'ttypes') + services), sorted(symbols['__all__']))
@@ -85,6 +85,30 @@ class ApacheThriftPyGenTest(TaskTestBase):
                      set(synthetic_target.sources_relative_to_source_root()))
     self.assert_ns_package(synthetic_target, 'foo')
     self.assert_leaf_package(synthetic_target, 'foo/bar', 'ThingService')
+
+  def test_inserts_unicode_header(self):
+    """Test that the thrift compiler inserts utf-8 coding header."""
+    self.create_file('src/thrift/com/foo/one.thrift', contents=dedent("""
+    namespace py foo.bar
+    /**
+     * This comment has a unicode string:	🐈
+     * That is a cat, and it's used for testing purposes.
+     * When this is compiled, the thrift compiler should include the "coding=UTF-8".
+     * at the beginning of the python file.
+     **/
+    struct Foo {
+      1: i64 id,
+    }(persisted='true')
+    """))
+    one = self.make_target(spec='src/thrift/com/foo:one',
+      target_type=PythonThriftLibrary,
+      sources=['one.thrift'])
+
+    _, synthetic_target = self.generate_single_thrift_target(one)
+    for filepath in synthetic_target.sources_relative_to_buildroot():
+      if '__init__' not in filepath:
+        first_line = (Path(get_buildroot()) / filepath).read_text().splitlines()[0]
+        self.assertEqual(first_line, "# -*- coding: utf-8 -*-")
 
   def test_nested_namespaces(self):
     self.create_file('src/thrift/com/foo/one.thrift', contents=dedent("""

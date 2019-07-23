@@ -6,7 +6,6 @@ from collections import defaultdict, deque
 from contextlib import contextmanager
 from os.path import dirname
 
-from future.utils import iteritems
 from twitter.common.collections import OrderedSet
 
 from pants.base.exceptions import TargetDefinitionException
@@ -290,7 +289,7 @@ class _DependentGraph(object):
 
   def _validate(self, all_valid_addresses):
     """Validate that all of the dependencies in the graph exist in the given addresses set."""
-    for dependency, dependents in iteritems(self._dependent_address_map):
+    for dependency, dependents in self._dependent_address_map.items():
       if dependency not in all_valid_addresses:
         raise AddressLookupError(
             'Dependent graph construction failed: {} did not exist. Was depended on by:\n  {}'.format(

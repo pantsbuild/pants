@@ -16,7 +16,6 @@ import sbt.internal.inc.{
   CompanionsStore,
   Locate
 }
-import sbt.util.Logger
 import xsbti.api.Companions
 import xsbti.compile.{
   AnalysisContents,

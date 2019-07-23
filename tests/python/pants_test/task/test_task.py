@@ -3,8 +3,6 @@
 
 import os
 
-from future.utils import PY2
-
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -228,8 +226,6 @@ files(
     if scope is None:
       scope = cls.options_scope
     subclass_name = 'test_{0}_{1}_{2}'.format(cls.__name__, scope, name)
-    if PY2:
-      subclass_name = subclass_name.encode('utf-8')
     kwargs['options_scope'] = scope
     return type(subclass_name, (cls,), kwargs)
 

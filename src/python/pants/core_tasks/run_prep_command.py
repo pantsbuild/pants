@@ -2,13 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import subprocess
 from collections import namedtuple
 
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.prep_command import PrepCommand
 from pants.task.task import Task
-from pants.util.process_handler import subprocess
 
 
 class RunPrepCommandBase(Task):
@@ -80,7 +80,7 @@ class RunPrepCommandBase(Task):
 
           if environ:
             if not process.returncode:
-              environment_vars = stdout.decode('utf-8').split('\0')
+              environment_vars = stdout.decode().split('\0')
               for kvpair in environment_vars:
                 var, value = kvpair.split('=', 1)
                 os.environ[var] = value

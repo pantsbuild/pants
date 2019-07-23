@@ -3,8 +3,6 @@
 
 from abc import ABCMeta, abstractmethod
 
-from future.utils import string_types
-
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.target import Target
 from pants.util.memo import memoized_property
@@ -70,7 +68,7 @@ class ImportRemoteSourcesMixin(Target, metaclass=ABCMeta):
 
     specs = []
     for item in target_representation.get(field, ()):
-      if not isinstance(item, string_types):
+      if not isinstance(item, str):
         raise cls.ExpectedAddressError(
           'expected imports to contain string addresses, got {obj} (type: {found_class}) instead.'
           .format(obj=item, found_class=type(item).__name__)

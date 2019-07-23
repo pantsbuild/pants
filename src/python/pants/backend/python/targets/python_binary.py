@@ -3,7 +3,6 @@
 
 import os
 
-from future.utils import string_types
 from pex.pex_info import PexInfo
 from twitter.common.collections import maybe_list
 
@@ -111,8 +110,8 @@ class PythonBinary(PythonTarget):
       raise TargetDefinitionException(self,
           'A python binary target must specify either a single source or entry_point.')
 
-    if not isinstance(platforms, (list, tuple)) and not isinstance(platforms, string_types):
-      raise TargetDefinitionException(self, 'platforms must be a list, tuple or string.')
+    if not isinstance(platforms, (list, tuple)) and not isinstance(platforms, str):
+      raise TargetDefinitionException(self, 'platforms must be a list, tuple or str.')
 
     if sources and sources.files and entry_point:
       entry_point_module = entry_point.split(':', 1)[0]

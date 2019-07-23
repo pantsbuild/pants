@@ -1,12 +1,9 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
-from future.utils import text_type
-
+from pants.backend.python.rules.create_requirements_pex import (RequirementsPex,
+                                                                RequirementsPexRequest)
 from pants.backend.python.rules.inject_init import InjectedInitDigest
-from pants.backend.python.rules.resolve_requirements import (ResolvedRequirementsPex,
-                                                             ResolveRequirementsRequest)
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
@@ -56,11 +53,10 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
         all_target_requirements.append(str(py_req.requirement))
   all_requirements = all_target_requirements + list(pytest.get_requirement_strings())
   resolved_requirements_pex = yield Get(
-    ResolvedRequirementsPex, ResolveRequirementsRequest(
+    RequirementsPex, RequirementsPexRequest(
       output_filename=output_pytest_requirements_pex_filename,
-      # TODO(#7061): This text_type() wrapping can be removed after we drop py2!
-      requirements=tuple(sorted(text_type(requirement) for requirement in all_requirements)),
-      interpreter_constraints=tuple(sorted(text_type(constraint) for constraint in interpreter_constraints)),
+      requirements=tuple(sorted(all_requirements)),
+      interpreter_constraints=tuple(sorted(interpreter_constraints)),
       entry_point="pytest:main",
     )
   )
@@ -106,23 +102,22 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
     DirectoriesToMerge(directories=tuple(all_input_digests)),
   )
 
-  interpreter_search_paths = text_type(create_path_env_var(python_setup.interpreter_search_paths))
-  pex_exe_env = {'PATH': interpreter_search_paths}
-  # TODO(#6071): merge the two dicts via ** unpacking once we drop Py2.
-  pex_exe_env.update(subprocess_encoding_environment.invocation_environment_dict)
+  interpreter_search_paths = create_path_env_var(python_setup.interpreter_search_paths)
+  pex_exe_env = {
+    'PATH': interpreter_search_paths,
+    **subprocess_encoding_environment.invocation_environment_dict
+  }
 
   # NB: we use the hardcoded and generic bin name `python`, rather than something dynamic like
   # `sys.executable`, to ensure that the interpreter may be discovered both locally and in remote
   # execution (so long as `env` is populated with a `PATH` env var and `python` is discoverable
   # somewhere on that PATH). This is only used to run the downloaded PEX tool; it is not
   # necessarily the interpreter that PEX will use to execute the generated .pex file.
-  # TODO(#7735): Set --python-setup-interpreter-search-paths differently for the host and target
-  # platforms, when we introduce platforms in https://github.com/pantsbuild/pants/issues/7735.
   request = ExecuteProcessRequest(
-    argv=("python", './{}'.format(output_pytest_requirements_pex_filename)),
+    argv=("python", f'./{output_pytest_requirements_pex_filename}'),
     env=pex_exe_env,
     input_files=merged_input_files,
-    description='Run pytest for {}'.format(test_target.address.reference()),
+    description=f'Run Pytest for {test_target.address.reference()}',
   )
 
   result = yield Get(FallibleExecuteProcessResult, ExecuteProcessRequest, request)
@@ -130,8 +125,8 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
 
   yield TestResult(
     status=status,
-    stdout=result.stdout.decode('utf-8'),
-    stderr=result.stderr.decode('utf-8'),
+    stdout=result.stdout.decode(),
+    stderr=result.stderr.decode(),
   )
 
 

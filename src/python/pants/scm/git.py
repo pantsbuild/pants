@@ -5,13 +5,13 @@ import binascii
 import io
 import logging
 import os
+import subprocess
 import traceback
 from contextlib import contextmanager
 
 from pants.scm.scm import Scm
 from pants.util.contextutil import pushd
 from pants.util.memo import memoized_method
-from pants.util.process_handler import subprocess
 from pants.util.strutil import ensure_binary, ensure_text
 
 
@@ -47,9 +47,9 @@ class Git(Scm):
     try:
       if subdir:
         with pushd(subdir):
-          process, out = cls._invoke(cmd)
+          process, out = cls._invoke(cmd, stderr=subprocess.DEVNULL)
       else:
-        process, out = cls._invoke(cmd)
+        process, out = cls._invoke(cmd, stderr=subprocess.DEVNULL)
       cls._check_result(cmd, process.returncode, raise_type=Scm.ScmException)
     except Scm.ScmException:
       return None
@@ -69,18 +69,21 @@ class Git(Scm):
     return cls(binary=binary, worktree=dest)
 
   @classmethod
-  def _invoke(cls, cmd):
+  def _invoke(cls, cmd, stderr=None):
     """Invoke the given command, and return a tuple of process and raw binary output.
 
-    stderr flows to wherever its currently mapped for the parent process - generally to
-    the terminal where the user can see the error.
+    If stderr is defined as None, it will flow to wherever it is currently mapped
+    for the parent process, generally to the terminal where the user can see the error
+    (cf. https://docs.python.org/3.7/library/subprocess.html#subprocess.Popen ). In
+    some cases we want to treat it specially, which is why it is exposed
+    in the signature of _invoke.
 
     :param list cmd: The command in the form of a list of strings
     :returns: The completed process object and its standard output.
     :raises: Scm.LocalException if there was a problem exec'ing the command at all.
     """
     try:
-      process = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+      process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=stderr)
     except OSError as e:
       # Binary DNE or is not executable
       raise cls.LocalException('Failed to execute command {}: {}'.format(' '.join(cmd), e))
@@ -502,7 +505,7 @@ class GitRepositoryReader:
       path_so_far += component
 
       try:
-        obj = parent_tree[component.encode('utf-8')]
+        obj = parent_tree[component.encode()]
       except KeyError:
         raise self.MissingFileException(self.rev, relpath)
 
@@ -529,7 +532,7 @@ class GitRepositoryReader:
           # Is absolute, thus likely points outside the repo.
           raise self.ExternalSymlinkException(self.rev, relpath)
 
-        link_to = os.path.normpath(os.path.join(parent_path, path_data.decode('utf-8')))
+        link_to = os.path.normpath(os.path.join(parent_path, path_data.decode()))
         if link_to.startswith('../') or link_to[0] == '/':
           # Points outside the repo.
           raise self.ExternalSymlinkException(self.rev, relpath)
@@ -604,7 +607,7 @@ class GitRepositoryReader:
       rev = ensure_text(rev)
       relpath = ensure_text(relpath)
       relpath = self._fixup_dot_relative(relpath)
-      spec = '{}:{}\n'.format(rev, relpath).encode('utf-8')
+      spec = f'{rev}:{relpath}\n'.encode()
 
     self._maybe_start_cat_file_process()
     self._cat_file_process.stdin.write(spec)

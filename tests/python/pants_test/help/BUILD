@@ -26,7 +26,6 @@ python_tests(
   sources=['test_help_info_extracter.py'],
   coverage=['pants.help.help_info_extracter'],
   dependencies=[
-    '3rdparty/python:mock',
     'src/python/pants/help',
     'src/python/pants/option',
   ]

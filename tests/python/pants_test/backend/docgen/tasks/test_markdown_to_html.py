@@ -3,10 +3,10 @@
 
 import os
 import unittest
+import unittest.mock
 from textwrap import dedent
 
 import bs4
-import mock
 
 from pants.backend.docgen.register import build_file_aliases
 from pants.backend.docgen.tasks import markdown_to_html_utils
@@ -144,7 +144,7 @@ class MarkdownToHtmlTest(TaskTestBase):
     self.set_options(ignore_failure=True)
     bad_rst = self.target(':bad_rst')
     context = self.context(target_roots=[bad_rst])
-    context.log.warn = mock.Mock()
+    context.log.warn = unittest.mock.Mock()
     task = self.create_task(context)
     task.execute()
 

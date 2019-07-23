@@ -3,8 +3,6 @@
 
 from hashlib import sha1
 
-from future.utils import PY3
-
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
 from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
@@ -22,9 +20,9 @@ class UnpackJarsFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintS
     if isinstance(target, UnpackedJars):
       hasher = sha1()
       for cache_key in sorted(jar.cache_key() for jar in target.all_imported_jar_deps):
-        hasher.update(cache_key.encode('utf-8'))
-      hasher.update(target.payload.fingerprint().encode('utf-8'))
-      return hasher.hexdigest() if PY3 else hasher.hexdigest().decode('utf-8')
+        hasher.update(cache_key.encode())
+      hasher.update(target.payload.fingerprint().encode())
+      return hasher.hexdigest()
     return None
 
 

@@ -257,7 +257,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
     .value_of("local-store-path")
     .map(PathBuf::from)
     .unwrap_or_else(Store::default_path);
-  let mut runtime = tokio::runtime::Runtime::new().unwrap();
+  let runtime = task_executor::Executor::new();
   let (store, store_has_remote) = {
     let (store_result, store_has_remote) = match top_match.values_of("server-address") {
       Some(cas_address) => {
@@ -288,6 +288,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
 
         (
           Store::with_remote(
+            runtime.clone(),
             &store_dir,
             &cas_addresses,
             top_match
@@ -317,7 +318,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           true,
         )
       }
-      None => (Store::local_only(&store_dir), false),
+      None => (Store::local_only(runtime.clone(), &store_dir), false),
     };
     let store = store_result.map_err(|e| {
       format!(
@@ -355,14 +356,15 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           let path = PathBuf::from(args.value_of("path").unwrap());
           // Canonicalize path to guarantee that a relative path has a parent.
           let posix_fs = make_posix_fs(
+            runtime.clone(),
             path
               .canonicalize()
               .map_err(|e| format!("Error canonicalizing path {:?}: {:?}", path, e))?
               .parent()
               .ok_or_else(|| format!("File being saved must have parent but {:?} did not", path))?,
           );
-          let file = runtime
-            .block_on(posix_fs.stat(PathBuf::from(path.file_name().unwrap())))
+          let file = posix_fs
+            .stat_sync(PathBuf::from(path.file_name().unwrap()))
             .unwrap();
           match file {
             fs::Stat::File(f) => {
@@ -416,7 +418,10 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           })
       }
       ("save", Some(args)) => {
-        let posix_fs = Arc::new(make_posix_fs(args.value_of("root").unwrap()));
+        let posix_fs = Arc::new(make_posix_fs(
+          runtime.clone(),
+          args.value_of("root").unwrap(),
+        ));
         let store_copy = store.clone();
         let digest = runtime.block_on(
           posix_fs
@@ -605,8 +610,8 @@ fn expand_files_helper(
     .to_boxed()
 }
 
-fn make_posix_fs<P: AsRef<Path>>(root: P) -> fs::PosixFS {
-  fs::PosixFS::new(&root, &[]).unwrap()
+fn make_posix_fs<P: AsRef<Path>>(executor: task_executor::Executor, root: P) -> fs::PosixFS {
+  fs::PosixFS::new(&root, &[], executor).unwrap()
 }
 
 fn ensure_uploaded_to_remote(
