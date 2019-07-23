@@ -89,7 +89,7 @@ class ApacheThriftGenBase(SimpleCodegenTask):
     # relocate the generated sources to the root of the `target_workdir` so that our base class
     # maps them properly.
     # raise Exception(os.listdir(target_workdir))
-    gen_dir = os.path.join(target_workdir, 'gen-{}'.format(self.gen_directory))
+    gen_dir = os.path.join(target_workdir, f'gen-{self.gen_directory}')
     for path in os.listdir(gen_dir):
       shutil.move(os.path.join(gen_dir, path), target_workdir)
     os.rmdir(gen_dir)
