@@ -122,6 +122,10 @@ class Scoverage(CoverageEngine):
                                 args=["--measurementsDirPath",f"{output_dir}/scoverage/measurements", "--reportDirPath",f"{output_dir}/ScoverageReports"],
                                )
 
+    if result != 0:
+      raise TaskError('java {} ... exited non-zero ({}) - failed to {}'
+        .format('org.pantsbuild.scoverage.report.ScoverageReport', result, 'scoverage-report-generator'))
+
 
   def _execute_scoverage_report_gen(self, measurements_dir, report_dir, target_filter):
     cmd = [

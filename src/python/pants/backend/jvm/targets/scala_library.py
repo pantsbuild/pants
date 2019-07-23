@@ -10,6 +10,7 @@ from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.build_graph.address import Address
 
+SCOVERAGE = "scoverage"
 
 class ScalaLibrary(ExportableJvmLibrary):
   """A Scala library.
@@ -25,6 +26,8 @@ class ScalaLibrary(ExportableJvmLibrary):
 
   default_sources_globs = '*.scala'
   default_sources_exclude_globs = JUnitTests.scala_test_globs
+
+
 
   @classmethod
   def subsystems(cls):
@@ -48,7 +51,7 @@ class ScalaLibrary(ExportableJvmLibrary):
     })
     super().__init__(payload=payload, **kwargs)
 
-    self._scoverage = ScoveragePlatform.global_instance().get_options().enable_scoverage
+    self._scoverage = ScoveragePlatform.global_instance()
 
   @classmethod
   def compute_injectable_specs(cls, kwargs=None, payload=None):
@@ -96,8 +99,17 @@ class ScalaLibrary(ExportableJvmLibrary):
     :return: See constructor.
     :rtype: list of strings.
     """
-    if self._scoverage:
-      return ScoveragePlatform.global_instance().get_scalac_plugins(self)
+    if self._scoverage.get_options().enable_scoverage:
+      # Prevent instrumenting generated targets and targets in blacklist.
+      if self.identifier.startswith(".pants.d.gen") or self._scoverage.is_blacklisted(self):
+        return self.payload.scalac_plugins
+
+      scalac_plugins = self.payload.scalac_plugins
+      if scalac_plugins:
+        scalac_plugins.append(SCOVERAGE)
+      else:
+        scalac_plugins = [SCOVERAGE]
+      return scalac_plugins
 
     return self.payload.scalac_plugins
 
@@ -107,8 +119,16 @@ class ScalaLibrary(ExportableJvmLibrary):
     :return: See constructor.
     :rtype: map from string to list of strings.
     """
-    if self._scoverage:
-      return ScoveragePlatform.global_instance().get_scalac_plugin_args(self)
+    if self._scoverage.get_options().enable_scoverage:
+      scalac_plugin_args = self.payload.scalac_plugin_args
+      if scalac_plugin_args:
+        scalac_plugin_args.update(
+          {"scoverage": ["writeToClasspath:true", f"dataDir:{self.identifier}"]})
+      else:
+        scalac_plugin_args = {
+          "scoverage": ["writeToClasspath:true", f"dataDir:{self.identifier}"]
+        }
+      return scalac_plugin_args
 
     return self.payload.scalac_plugin_args
 
@@ -119,7 +139,12 @@ class ScalaLibrary(ExportableJvmLibrary):
     :return: See constructor.
     :rtype: list
     """
-    if self._scoverage:
-      return ScoveragePlatform.global_instance().get_compiler_option_sets(self)
+    if self._scoverage.get_options().enable_scoverage:
+      compiler_option_sets = self.payload.compiler_option_sets
+      if compiler_option_sets:
+        list(compiler_option_sets).append(SCOVERAGE)
+      else:
+        compiler_option_sets = [SCOVERAGE]
+      return tuple(compiler_option_sets)
 
     return self.payload.compiler_option_sets

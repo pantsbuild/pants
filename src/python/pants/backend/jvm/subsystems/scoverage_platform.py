@@ -26,7 +26,7 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
       default=False,
       type=bool,
       help='Specifies whether to generate scoverage reports for scala test targets.'
-           'Default value is False.If True,'
+           'Default value is False. If True,'
            'implies --test-junit-coverage-processor=scoverage.')
 
     register('--blacklist-file',
@@ -69,49 +69,6 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
       'scoverage': [f"{self.get_options().scoverage_target_path}"],
     }
 
-  def get_scalac_plugins(self, target) -> List[str]:
-    """
-    Adds 'scoverage' to scalac_plugins in case scoverage is enabled for that [target].
-    :return: modified scalac_plugins
-    """
-
-    # Prevent instrumenting generated targets and targets in blacklist.
-    if target.identifier.startswith(".pants.d.gen") or self.is_blacklisted(target):
-      return target.payload.scalac_plugins
-
-    scalac_plugins = target.payload.scalac_plugins
-    if scalac_plugins:
-      scalac_plugins.append(SCOVERAGE)
-    else:
-      scalac_plugins = [SCOVERAGE]
-    return scalac_plugins
-
-  def get_scalac_plugin_args(self, target) -> Dict[str, List[str]]:
-    """
-    Adds 'scoverage' to scalac_plugins_args in case scoverage is enabled for that [target].
-    :return: modified scalac_plugins_args
-    """
-    scalac_plugin_args = target.payload.scalac_plugin_args
-    if scalac_plugin_args:
-      scalac_plugin_args.update(
-        {"scoverage": ["writeToClasspath:true", f"dataDir:{target.identifier}"]})
-    else:
-      scalac_plugin_args = {
-        "scoverage": ["writeToClasspath:true", f"dataDir:{target.identifier}"]
-      }
-    return scalac_plugin_args
-
-  def get_compiler_option_sets(self, target):
-    """
-   Adds 'scoverage' to compiler_options_sets in case scoverage is enabled for that [target].
-   :return: modified compiler_option_sets
-   """
-    compiler_option_sets = target.payload.compiler_option_sets
-    if compiler_option_sets:
-      list(compiler_option_sets).append(SCOVERAGE)
-    else:
-      compiler_option_sets = [SCOVERAGE]
-    return tuple(compiler_option_sets)
 
   def is_blacklisted(self, target) -> bool:
     """
