@@ -8,7 +8,6 @@ import termios
 import time
 from contextlib import contextmanager
 
-from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
@@ -251,9 +250,9 @@ class DaemonPantsRunner:
       hermetic_environment_as(**self._env), \
       encapsulated_global_logger():
       try:
-
         options, _, options_bootstrapper = LocalPantsRunner.parse_options(self._args, self._env)
         graph_helper, target_roots, exit_code = self._scheduler_service.prepare_graph(options, options_bootstrapper)
+        self.exit_code = exit_code
         finalizer()
 
         # Clean global state.
