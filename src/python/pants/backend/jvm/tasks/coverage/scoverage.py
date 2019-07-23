@@ -47,10 +47,11 @@ class Scoverage(CoverageEngine):
         rev='1.0.1-twitter', **kwargs)
 
     def scoverage_report_jar(**kwargs):
-      return [JarDependency(org='org.scoverage', name='scoverage-report_2.12',
-        rev='3.4.9-SNAPSHOT', url='file:/Users/sameera/.m2/repository/org/scoverage/scoverage-report_2.12/3.4.9-SNAPSHOT/scoverage-report_2.12-3.4.9-SNAPSHOT.jar', **kwargs),
+      return [JarDependency(org='org.pantsbuild', name='scoverageReport_2.12',
+        rev='0.0.1-SNAPSHOT', url='file:/Users/sameera/.m2/repository/org/pantsbuild/scoverageReport_2.12/0.0.1-SNAPSHOT/scoverageReport_2.12-0.0.1-SNAPSHOT.jar', **kwargs),
               JarDependency(org='org.apache.directory.studio', name='org.apache.commons.io', rev='2.4'),
-              JarDependency(org='com.github.scopt', name='scopt_2.12', rev='4.0.0-RC2'),
+              JarDependency(org='com.github.scopt', name='scopt_2.12', rev='3.7.0'),
+              JarDependency(org='org.scala-sbt', name='util-logging_2.12', rev='1.3.0-M8'),
               JarDependency(org='com.twitter.scoverage', name='scalac-scoverage-plugin_2.12', rev='1.0.1-twitter')]
 
     register_jvm_tool(register,
@@ -115,7 +116,7 @@ class Scoverage(CoverageEngine):
   def report(self, output_dir, execution_failed_exception=None):
     cobertura_cp = self._settings.tool_classpath('scoverage-report')
     result = self._execute_java(classpath=cobertura_cp,
-                                main='scoverageReport.ScoverageReport',
+                                main='org.pantsbuild.scoverage.report.ScoverageReport',
                                 jvm_options=self._settings.coverage_jvm_options,
                                 args=["--measurementsDirPath",f"{output_dir}/scoverage/measurements", "--reportDirPath",f"{output_dir}/ScoverageReports"],
                                )
