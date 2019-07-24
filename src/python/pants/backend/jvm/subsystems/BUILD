@@ -117,7 +117,7 @@ python_library(
   dependencies = [
     'src/python/pants/option',
     'src/python/pants/subsystem',
-     'src/python/pants/java/jar',
+    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:jvm',
   ],
 )
