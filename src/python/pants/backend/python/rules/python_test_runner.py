@@ -1,13 +1,15 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import List, Set
+
 from pants.backend.python.rules.create_requirements_pex import (RequirementsPex,
                                                                 RequirementsPexRequest)
 from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryWithPrefixToStrip
+from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import BuildFileAddresses, TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonTestsAdaptor
@@ -18,7 +20,6 @@ from pants.source.source_root import SourceRootConfig
 from pants.util.strutil import create_path_env_var
 
 
-# TODO: Support resources
 # TODO(7697): Use a dedicated rule for removing the source root prefix, so that this rule
 # does not have to depend on SourceRootConfig.
 @rule(TestResult, [PythonTestsAdaptor, PyTest, PythonSetup, SourceRootConfig, SubprocessEncodingEnvironment])
@@ -61,32 +62,22 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
     )
   )
 
-  source_roots = source_root_config.get_source_roots()
-
-  # Gather sources and adjust for the source root.
+  # Gather sources and source roots.
   # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of raising to
   # simplify the hasattr() checks here!
-  # TODO(7714): restore the full source name for the stdout of the Pytest run.
-  sources_snapshots_and_source_roots = []
+  source_roots = source_root_config.get_source_roots()
+  sources_digest_list: List[Digest] = []
+  source_root_paths: Set[str] = set()
   for maybe_source_target in all_targets:
-    if hasattr(maybe_source_target, 'sources'):
-      tgt_snapshot = maybe_source_target.sources.snapshot
-      tgt_source_root = source_roots.find_by_path(maybe_source_target.address.spec_path)
-      sources_snapshots_and_source_roots.append((tgt_snapshot, tgt_source_root))
-  all_sources_digests = yield [
-    Get(
-      Digest,
-      DirectoryWithPrefixToStrip(
-        directory_digest=snapshot.directory_digest,
-        prefix=source_root.path
-      )
-    )
-    for snapshot, source_root
-    in sources_snapshots_and_source_roots
-  ]
+    if not hasattr(maybe_source_target, 'sources'):
+      continue
+    sources_digest_list.append(maybe_source_target.sources.snapshot.directory_digest)
+    source_root = source_roots.find_by_path(maybe_source_target.address.spec_path)
+    if source_root is not None:
+      source_root_paths.add(source_root.path)
 
   sources_digest = yield Get(
-    Digest, DirectoriesToMerge(directories=tuple(all_sources_digests)),
+    Digest, DirectoriesToMerge(directories=tuple(sources_digest_list)),
   )
 
   inits_digest = yield Get(InjectedInitDigest, Digest, sources_digest)
@@ -105,6 +96,9 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
   interpreter_search_paths = create_path_env_var(python_setup.interpreter_search_paths)
   pex_exe_env = {
     'PATH': interpreter_search_paths,
+    # This adds support for absolute imports of source roots, e.g.
+    # `src/python/pants` -> `import pants`.
+    'PYTHONPATH': create_path_env_var(sorted(source_root_paths)),
     **subprocess_encoding_environment.invocation_environment_dict
   }
 

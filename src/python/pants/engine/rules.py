@@ -30,7 +30,7 @@ class _RuleVisitor(ast.NodeVisitor):
   """Pull `Get` calls out of an @rule body and validate `yield` statements."""
 
   def __init__(self, func, func_node, func_source, orig_indent, parents_table):
-    super(_RuleVisitor, self).__init__()
+    super().__init__()
     self._gets = []
     self._func = func
     self._func_node = func_node
@@ -218,11 +218,13 @@ def _make_rule(output_type, input_selectors, cacheable=True):
     def resolve_type(name):
       resolved = getattr(owning_module, name, None) or owning_module.__builtins__.get(name, None)
       if resolved is None:
-        raise ValueError('Could not resolve type `{}` in top level of module {}'
-                         .format(name, owning_module.__name__))
+        raise ValueError(
+          f'Could not resolve type `{name}` in top level of module {owning_module.__name__}'
+        )
       elif not isinstance(resolved, type):
-        raise ValueError('Expected a `type` constructor for `{}`, but got: {} (type `{}`)'
-                         .format(name, resolved, type(resolved).__name__))
+        raise ValueError(
+          f'Expected a `type` constructor for `{name}`, but got: {resolved} (type `{type(resolved).__name__}`)'
+        )
       return resolved
 
     gets = OrderedSet()
