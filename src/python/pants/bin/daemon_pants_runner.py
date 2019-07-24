@@ -34,16 +34,18 @@ class DaemonExiter(Exiter):
   TODO: https://github.com/pantsbuild/pants/pull/7606
   """
 
-  def __init__(self, maybe_shutdown_socket):
+  @classmethod
+  @contextmanager
+  def override_global_exiter(cls, maybe_shutdown_socket, finalizer):
+    with ExceptionSink.exiter_as(lambda previous_exiter: cls(maybe_shutdown_socket, finalizer, previous_exiter)):
+      yield
+
+  def __init__(self, maybe_shutdown_socket, finalizer, previous_exiter):
     # N.B. Assuming a fork()'d child, cause os._exit to be called here to avoid the routine
     # sys.exit behavior.
     # TODO: The behavior we're avoiding with the use of os._exit should be described and tested.
     super().__init__(exiter=os._exit)
     self._maybe_shutdown_socket = maybe_shutdown_socket
-    self._finalizer = None
-
-  def set_finalizer(self, finalizer):
-    """Sets a finalizer that will be called before exiting."""
     self._finalizer = finalizer
 
   def exit(self, result=0, msg=None, *args, **kwargs):
@@ -136,7 +138,6 @@ class DaemonPantsRunner:
     self._args = args
     self._env = env
     self._services = services
-    self._exiter = DaemonExiter(maybe_shutdown_socket)
     self._scheduler_service = scheduler_service
 
     self.exit_code = exit_code
@@ -235,6 +236,11 @@ class DaemonPantsRunner:
     client_start_time = env.pop('PANTSD_RUNTRACKER_CLIENT_START_TIME', None)
     return None if client_start_time is None else float(client_start_time)
 
+  def _override_global_exiter(self, maybe_shutdown_socket, finalizer, previous_exiter):
+    # TODO The previous exiter will always be Exiter(os._exit) from the PantsDaemon Class.
+    # Make this explicit.
+    return DaemonExiter(self._maybe_shutdown_socket,)
+
   def run(self):
     # Ensure anything referencing sys.argv inherits the Pailgun'd args.
     sys.argv = self._args
@@ -248,7 +254,8 @@ class DaemonPantsRunner:
     # Invoke a Pants run with stdio redirected and a proxied environment.
     with self.nailgunned_stdio(self._maybe_shutdown_socket, self._env) as finalizer, \
       hermetic_environment_as(**self._env), \
-      encapsulated_global_logger():
+      encapsulated_global_logger(), \
+      DaemonExiter.override_global_exiter(self._maybe_shutdown_socket, finalizer):
       try:
         options, _, options_bootstrapper = LocalPantsRunner.parse_options(self._args, self._env)
         graph_helper, target_roots, exit_code = self._scheduler_service.prepare_v1_graph_run_v2(options, options_bootstrapper)
@@ -256,9 +263,6 @@ class DaemonPantsRunner:
 
         # Clean global state.
         clean_global_runtime_state(reset_subsystem=True)
-
-        # Setup the Exiter's finalizer.
-        self._exiter.set_finalizer(finalizer)
 
         # Otherwise, conduct a normal run.
         runner = LocalPantsRunner.create(
