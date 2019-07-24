@@ -4,7 +4,6 @@
 import multiprocessing
 import os
 import sys
-from textwrap import dedent
 
 from pants.base.build_environment import (get_buildroot, get_default_pants_config_file,
                                           get_pants_cachedir, get_pants_configdir, pants_version)
@@ -38,6 +37,7 @@ class ExecutionOptions(datatype([
   'process_execution_cleanup_local_dirs',
   'process_execution_speculation_delay',
   'process_execution_speculation_strategy',
+  'process_execution_use_local_cache',
   'remote_execution_process_cache_namespace',
   'remote_instance_name',
   'remote_ca_certs_path',
@@ -65,6 +65,7 @@ class ExecutionOptions(datatype([
       process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
       process_execution_speculation_delay=bootstrap_options.process_execution_speculation_delay,
       process_execution_speculation_strategy=bootstrap_options.process_execution_speculation_strategy,
+      process_execution_use_local_cache=bootstrap_options.process_execution_use_local_cache,
       remote_execution_process_cache_namespace=bootstrap_options.remote_execution_process_cache_namespace,
       remote_instance_name=bootstrap_options.remote_instance_name,
       remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
@@ -86,6 +87,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_cleanup_local_dirs=True,
     process_execution_speculation_delay=.1,
     process_execution_speculation_strategy='local_first',
+    process_execution_use_local_cache=True,
     remote_execution_process_cache_namespace=None,
     remote_instance_name=None,
     remote_ca_certs_path=None,
@@ -149,31 +151,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'etc. For example, the setup script we distribute at https://www.pantsbuild.org/install.html#recommended-installation '
                   'uses this value to determine which Python version to run with. You may find the '
                   'version of the pants instance you are running using -v, -V, or --version.')
-
-    register('--pants-runtime-python-version', advanced=True,
-             removal_version='1.19.0.dev0',
-             deprecation_start_version='1.17.0.dev0',
-             removal_hint=dedent("""
-                  This option was only used to help with Pants' migration to run on Python 3. \
-                  Pants will now correctly default to whichever Python versions are supported for \
-                  the current `pants_version` you are using. Please make sure you are using the \
-                  most up-to-date version of the `./pants` script with:
-
-                    curl -L -O https://pantsbuild.github.io/setup/pants
-
-                  and then unset this option."""),
-             help='Use this Python version to run Pants. The option expects the major and minor '
-                  'version, e.g. 2.7 or 3.6. Note Pants code only uses this to verify that you are '
-                  'using the requested interpreter, as Pants cannot dynamically change the '
-                  'interpreter it is using once the program is already running. This option is '
-                  'useful to set in your pants.ini, however, and then you can grep the value to '
-                  'select which interpreter to use for setup scripts (e.g. `./pants`), runner '
-                  'scripts, IDE plugins, etc. For example, the setup script we distribute at '
-                  'https://www.pantsbuild.org/install.html#recommended-installation uses this '
-                  'value to determine which Python version to run with. Also note this does not mean '
-                  'your own code must use this Python version. See '
-                  'https://www.pantsbuild.org/python_readme.html#configure-the-python-version '
-                  'for how to configure your code\'s compatibility.')
 
     register('--plugins', advanced=True, type=list, help='Load these plugins.')
     register('--plugin-cache-dir', advanced=True,
@@ -435,6 +412,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'and fall back to the local host if remote calls take longer than the speculation timeout.\n'
                   '`none`: Do not speculate about long running processes.',
              advanced=True)
+    register('--process-execution-use-local-cache', type=bool, default=True, advanced=True,
+             help='Whether to keep process executions in a local cache persisted to disk.')
 
   @classmethod
   def register_options(cls, register):

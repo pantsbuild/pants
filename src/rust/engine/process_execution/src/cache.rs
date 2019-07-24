@@ -11,11 +11,11 @@ use store::Store;
 use workunit_store::WorkUnitStore;
 
 #[derive(Clone)]
-struct CommandRunner {
-  underlying: Arc<dyn crate::CommandRunner>,
-  process_execution_store: ShardedLmdb,
-  file_store: Store,
-  metadata: ExecuteProcessRequestMetadata,
+pub struct CommandRunner {
+  pub underlying: Arc<dyn crate::CommandRunner>,
+  pub process_execution_store: ShardedLmdb,
+  pub file_store: Store,
+  pub metadata: ExecuteProcessRequestMetadata,
 }
 
 impl crate::CommandRunner for CommandRunner {

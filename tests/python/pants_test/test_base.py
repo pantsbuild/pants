@@ -366,7 +366,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
   @classmethod
   @memoized_method
   def _build_root(cls):
-    cls.real_build_root = BuildRoot().path
     return os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
 
   @classmethod

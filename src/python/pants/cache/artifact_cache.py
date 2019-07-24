@@ -155,7 +155,7 @@ def call_use_cached_files(tup):
     sys.stderr.flush()
     return res
   except NonfatalArtifactCacheError as e:
-    logger.warn('Error calling use_cached_files in artifact cache: {0}'.format(e))
+    logger.warning('Error calling use_cached_files in artifact cache: {0}'.format(e))
     return False
 
 
@@ -172,5 +172,5 @@ def call_insert(tup):
     cache, key, files, overwrite = tup
     return cache.insert(key, files, overwrite)
   except NonfatalArtifactCacheError as e:
-    logger.warn('Error while inserting into artifact cache: {0}'.format(e))
+    logger.warning('Error while inserting into artifact cache: {0}'.format(e))
     return False

@@ -10,6 +10,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Andrew Hamilton
 + Andy Reitz
 + Antoine Tollenaere
++ Asher Foa
 + Bardur Arantsson
 + Benjy Weinberger
 + Bill Farner
@@ -190,6 +191,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Ugo Di Girolamo
 + Wei An
 + Wilhelmina Drengwitz
++ Win Wang
 + Wolfram Arnold
 + Xaelias
 + Yi Cheng

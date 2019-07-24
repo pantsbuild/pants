@@ -18,6 +18,7 @@ class FSEventService(PantsService):
 
   ZERO_DEPTH = ['depth', 'eq', 0]
 
+  PANTS_ALL_FILES_SUBSCRIPTION_NAME = 'all_files'
   PANTS_PID_SUBSCRIPTION_NAME = 'pantsd_pid'
 
   def __init__(self, watchman, build_root):
@@ -31,7 +32,7 @@ class FSEventService(PantsService):
     self._build_root = os.path.realpath(build_root)
     self._handlers = {}
 
-  def register_all_files_handler(self, callback, name='all_files'):
+  def register_all_files_handler(self, callback, name):
     """Registers a subscription for all files under a given watch path.
 
     :param func callback: the callback to execute on each filesystem event

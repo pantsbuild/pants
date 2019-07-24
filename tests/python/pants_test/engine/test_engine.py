@@ -29,7 +29,7 @@ class D:
 
 
 def fn_raises(x):
-  raise Exception('An exception for {}'.format(type(x).__name__))
+  raise Exception(f'An exception for {type(x).__name__}')
 
 
 @rule(A, [B])
@@ -119,8 +119,8 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
     self.assert_equal_with_printing(dedent('''
       1 Exception encountered:
-      Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A)
-        Computing Task(nested_raise(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A, true)
+      Computing Select(<tests.python.pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A)
+        Computing Task(nested_raise(), <tests.python.pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A, true)
           Throw(An exception for B)
             Traceback (most recent call last):
               File LOCATION-INFO, in call
@@ -128,7 +128,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
               File LOCATION-INFO, in nested_raise
                 fn_raises(x)
               File LOCATION-INFO, in fn_raises
-                raise Exception('An exception for {}'.format(type(x).__name__))
+                raise Exception(f'An exception for {type(x).__name__}')
             Exception: An exception for B
       ''').lstrip()+'\n',
       remove_locations_from_traceback(str(cm.exception)))
@@ -171,9 +171,9 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
     self.assert_equal_with_printing(dedent('''
       1 Exception encountered:
-      Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A)
-        Computing Task(a_from_c_and_d(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A, true)
-          Computing Task(d_from_b_nested_raise(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =D, true)
+      Computing Select(<tests.python.pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A)
+        Computing Task(a_from_c_and_d(), <tests.python.pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A, true)
+          Computing Task(d_from_b_nested_raise(), <tests.python.pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =D, true)
             Throw(An exception for B)
               Traceback (most recent call last):
                 File LOCATION-INFO, in call
@@ -185,9 +185,9 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
               Exception: An exception for B
 
 
-      Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A)
-        Computing Task(a_from_c_and_d(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A, true)
-          Computing Task(c_from_b_nested_raise(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =C, true)
+      Computing Select(<tests.python.pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A)
+        Computing Task(a_from_c_and_d(), <tests.python.pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A, true)
+          Computing Task(c_from_b_nested_raise(), <tests.python.pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =C, true)
             Throw(An exception for B)
               Traceback (most recent call last):
                 File LOCATION-INFO, in call

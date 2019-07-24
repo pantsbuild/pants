@@ -94,12 +94,14 @@ process_execution = { path = "process_execution" }
 rand = "0.6"
 reqwest = { version = "0.9.10", default_features = false, features = ["rustls-tls"] }
 rule_graph = { path = "rule_graph" }
+sharded_lmdb = { path = "sharded_lmdb" }
 smallvec = "0.6"
 store = { path = "fs/store" }
 tempfile = "3"
 time = "0.1.40"
 ui = { path = "ui" }
 url = "1.7.1"
+uuid = { version = "0.7", features = ["v4"] }
 task_executor = { path = "task_executor" }
 workunit_store = { path = "workunit_store" }
 

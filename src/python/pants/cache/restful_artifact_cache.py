@@ -84,7 +84,7 @@ class RESTfulArtifactCache(ArtifactCache):
         queue.put(None)
         return res
     except Exception as e:
-      logger.warn('\nError while reading from remote artifact cache: {0}\n'.format(e))
+      logger.warning('\nError while reading from remote artifact cache: {0}\n'.format(e))
       queue.put(None)
       # TODO(peiyu): clean up partially downloaded local file if any
       return UnreadableArtifact(cache_key, e)

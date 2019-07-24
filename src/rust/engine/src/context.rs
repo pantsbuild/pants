@@ -25,8 +25,11 @@ use process_execution::{
 use rand::seq::SliceRandom;
 use reqwest;
 use rule_graph::RuleGraph;
+use sharded_lmdb::ShardedLmdb;
 use std::collections::btree_map::BTreeMap;
 use store::Store;
+
+const GIGABYTES: usize = 1024 * 1024 * 1024;
 
 ///
 /// The core context shared (via Arc) between the Scheduler and the Context objects of
@@ -75,6 +78,7 @@ impl Core {
     process_execution_cleanup_local_dirs: bool,
     process_execution_speculation_delay: Duration,
     process_execution_speculation_strategy: String,
+    process_execution_use_local_cache: bool,
   ) -> Core {
     // Randomize CAS address order to avoid thundering herds from common config.
     let mut remote_store_servers = remote_store_servers;
@@ -92,16 +96,16 @@ impl Core {
     };
 
     // We re-use this token for both the execution and store service; they're generally tied together.
-    let oauth_bearer_token = if let Some(path) = remote_oauth_bearer_token_path {
-      Some(
-        std::fs::read_to_string(&path)
-          .unwrap_or_else(|err| panic!("Error reading root CA certs file {:?}: {}", path, err)),
-      )
-    } else {
-      None
-    };
+    let oauth_bearer_token =
+      if let Some(path) = remote_oauth_bearer_token_path {
+        Some(std::fs::read_to_string(&path).unwrap_or_else(|err| {
+          panic!("Error reading OAuth bearer token file {:?}: {}", path, err)
+        }))
+      } else {
+        None
+      };
 
-    let local_store_dir = local_store_dir.clone();
+    let local_store_dir2 = local_store_dir.clone();
     let store = safe_create_dir_all_ioerror(&local_store_dir)
       .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))
       .and_then(|()| {
@@ -127,6 +131,12 @@ impl Core {
       })
       .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
 
+    let process_execution_metadata = ExecuteProcessRequestMetadata {
+      instance_name: remote_instance_name.clone(),
+      cache_key_gen_version: remote_execution_process_cache_namespace.clone(),
+      platform_properties: remote_execution_extra_platform_properties.clone(),
+    };
+
     let mut command_runner: Box<dyn process_execution::CommandRunner> =
       Box::new(BoundedCommandRunner::new(
         Box::new(process_execution::local::CommandRunner::new(
@@ -144,11 +154,7 @@ impl Core {
           // No problem unwrapping here because the global options validation
           // requires the remote_execution_server be present when remote_execution is set.
           &remote_execution_server.unwrap(),
-          ExecuteProcessRequestMetadata {
-            instance_name: remote_instance_name.clone(),
-            cache_key_gen_version: remote_execution_process_cache_namespace.clone(),
-            platform_properties: remote_execution_extra_platform_properties.clone(),
-          },
+          process_execution_metadata.clone(),
           root_ca_certs.clone(),
           oauth_bearer_token.clone(),
           store.clone(),
@@ -169,6 +175,21 @@ impl Core {
         "none" => remote_command_runner,
         _ => unreachable!(),
       };
+    }
+
+    if process_execution_use_local_cache {
+      let process_execution_store = ShardedLmdb::new(
+        local_store_dir2.join("processes"),
+        5 * GIGABYTES,
+        executor.clone(),
+      )
+      .expect("Could not initialize store for process cache: {:?}");
+      command_runner = Box::new(process_execution::cache::CommandRunner {
+        underlying: command_runner.into(),
+        process_execution_store,
+        file_store: store.clone(),
+        metadata: process_execution_metadata,
+      })
     }
 
     let http_client = reqwest::r#async::Client::new();

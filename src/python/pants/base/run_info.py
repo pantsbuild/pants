@@ -8,9 +8,9 @@ import socket
 import time
 from collections import OrderedDict
 
-from pants import version
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.util.dirutil import safe_mkdir_for
+from pants.version import VERSION
 
 
 class RunInfo:
@@ -55,13 +55,13 @@ class RunInfo:
       key = key.strip()
       val = str(val).strip()
       if ':' in key:
-        raise ValueError('info key "{}" must not contain a colon.'.format(key))
+        raise ValueError(f'info key "{key}" must not contain a colon.')
       kv_pairs.append((key, val))
 
     for k, v in kv_pairs:
       if k in self._info:
-        raise ValueError('info key "{}" already exists with value {}. '
-                         'Cannot add it again with value {}.'.format(k, self._info[k], v))
+        raise ValueError(f'info key "{k}" already exists with value {self._info[k]}. '
+                         'Cannot add it again with value {v}.')
       self._info[k] = v
 
     try:
@@ -81,7 +81,7 @@ class RunInfo:
     # TODO: Get rid of the redundant 'path' key once everyone is off it.
     self.add_infos(('id', run_id), ('timestamp', timestamp), ('datetime', datetime),
                    ('user', user), ('machine', machine), ('path', buildroot),
-                   ('buildroot', buildroot), ('version', version.VERSION))
+                   ('buildroot', buildroot), ('version', VERSION))
 
   def add_scm_info(self):
     """Adds SCM-related info."""

@@ -142,7 +142,7 @@ class LegacyPythonCallbacksParser(Parser):
         if token[1] == 'import':
           line_being_tokenized = token[4]
           if self._build_file_imports_behavior == 'warn':
-            logger.warn('{} tried to import - import statements should be avoided ({})'.format(
+            logger.warning('{} tried to import - import statements should be avoided ({})'.format(
               filepath,
               line_being_tokenized
             ))
