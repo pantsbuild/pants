@@ -7,8 +7,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/testutils:git_util',
+    'build-support/bin:bash_scripts',
     'build-support/bin:check_header',
-    'build-support/bin:check_packages',
-    'build-support/bin:get_added_files',
   ]
 )
