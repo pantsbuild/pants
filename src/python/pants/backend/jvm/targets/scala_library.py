@@ -51,7 +51,7 @@ class ScalaLibrary(ExportableJvmLibrary):
     })
     super().__init__(payload=payload, **kwargs)
 
-    self._scoverage = ScoveragePlatform.global_instance()
+    self._scoverage_instance = ScoveragePlatform.global_instance()
 
   @classmethod
   def compute_injectable_specs(cls, kwargs=None, payload=None):
@@ -99,9 +99,9 @@ class ScalaLibrary(ExportableJvmLibrary):
     :return: See constructor.
     :rtype: list of strings.
     """
-    if self._scoverage.get_options().enable_scoverage:
+    if self._scoverage_instance.get_options().enable_scoverage:
       # Prevent instrumenting generated targets and targets in blacklist.
-      if self.identifier.startswith(".pants.d.gen") or self._scoverage.is_blacklisted(self):
+      if self.identifier.startswith(".pants.d.gen") or self._scoverage_instance.is_blacklisted(self):
         return self.payload.scalac_plugins
 
       scalac_plugins = self.payload.scalac_plugins
@@ -119,7 +119,7 @@ class ScalaLibrary(ExportableJvmLibrary):
     :return: See constructor.
     :rtype: map from string to list of strings.
     """
-    if self._scoverage.get_options().enable_scoverage:
+    if self._scoverage_instance.get_options().enable_scoverage:
       scalac_plugin_args = self.payload.scalac_plugin_args
       if scalac_plugin_args:
         scalac_plugin_args.update(
@@ -139,7 +139,7 @@ class ScalaLibrary(ExportableJvmLibrary):
     :return: See constructor.
     :rtype: list
     """
-    if self._scoverage.get_options().enable_scoverage:
+    if self._scoverage_instance.get_options().enable_scoverage:
       compiler_option_sets = self.payload.compiler_option_sets
       if compiler_option_sets:
         list(compiler_option_sets).append(SCOVERAGE)

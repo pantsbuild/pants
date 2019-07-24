@@ -7,15 +7,12 @@ from pants.subsystem.subsystem import Subsystem
 from pants.java.jar.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.address import Address
-from typing import Any, Dict, List, Optional, Union
 
 
 SCOVERAGE = "scoverage"
-blacklist_file = 'new_blacklist_scoverage'
-
 
 class ScoveragePlatform(InjectablesMixin, Subsystem):
-  """The scala coverage platform."""
+  """The scoverage platform."""
 
   options_scope = 'scoverage'
 
@@ -30,7 +27,6 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
            'implies --test-junit-coverage-processor=scoverage.')
 
     register('--blacklist-file',
-      default=blacklist_file,
       type=str,
       help='Path to files containing targets not to be instrumented.')
 
@@ -38,6 +34,17 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
       default='//:scoverage',
       type=str,
       help='Path to the scoverage dependency.')
+
+  def __init__(self, *args, **kwargs):
+    super(ScoveragePlatform, self).__init__(*args, **kwargs)
+
+    # Setting up the scoverage blacklist files which contains targets
+    # not to be instrumented.
+    if (self.get_options().blacklist_file and
+      os.path.exists(self.get_options().blacklist_file)):
+      self._blacklist_file_contents = open(self.get_options().blacklist_file).read()
+    else:
+      self._blacklist_file_contents = None
 
   def scoverage_jar(self):
     return [JarDependency(org='com.twitter.scoverage', name='scalac-scoverage-plugin_2.12',
@@ -74,10 +81,12 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
     """
     Checks if the [target] is blacklisted or not.
     """
-    if not os.path.exists(self.get_options().blacklist_file):
+
+    # File not specified
+    if not self._blacklist_file_contents:
       return False
 
-    if target.address.spec in open(self.get_options().blacklist_file).read():
+    if target.address.spec in self._blacklist_file_contents:
       return True
     else:
       return False
