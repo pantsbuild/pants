@@ -15,3 +15,4 @@ jar_library(name='scrooge-core',
   ],
 )
 
+
