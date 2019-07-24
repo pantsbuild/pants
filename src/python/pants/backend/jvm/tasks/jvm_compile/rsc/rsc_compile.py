@@ -458,12 +458,15 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     workflow = rsc_compile_context.workflow
 
     # Replica of JvmCompile's _record_target_stats logic
-    self.context.run_tracker.report_target_info(
-      self.options_scope,
-      compile_target,
-      ['compile', 'workflow'],
-      workflow.value
-    )
+    def record(k, v):
+      self.context.run_tracker.report_target_info(
+        self.options_scope,
+        compile_target,
+        ['compile', k],
+        v
+      )
+    record('workflow', workflow)
+    record('execution_strategy', self.execution_strategy_enum)
 
     # Create the rsc job.
     # Currently, rsc only supports outlining scala.
