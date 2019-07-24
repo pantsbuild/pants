@@ -13,6 +13,7 @@ from pants.java.jar.jar_dependency import JarDependency
 from pants.option.custom_types import file_option
 from pants.task.fmt_task_mixin import FmtTaskMixin
 from pants.task.lint_task_mixin import LintTaskMixin
+from pants.util.memo import memoized_property
 
 
 class ScalaFix(RewriteBase):
@@ -54,10 +55,9 @@ class ScalaFix(RewriteBase):
     if options.semantic:
       round_manager.require_data('zinc_args') 
       round_manager.require_data('runtime_classpath')
- 
-  def execute(self): 
-    self.scalac_args = []
-    
+
+  @memoized_property
+  def _scalac_args(self):
     if self.get_options().semantic:
       targets = self.context.targets()
       targets_to_zinc_args = self.context.products.get_data('zinc_args')
@@ -70,11 +70,10 @@ class ScalaFix(RewriteBase):
           if arg.startswith('-S'):
             args.append(arg[2:])
         # All targets will get the same scalac args
-        if not self.scalac_args and args:
-          self.scalac_args = args
-          break
+        if args:
+          return args
 
-    super().execute()
+    return []
 
   @staticmethod
   def _compute_classpath(runtime_classpath, targets):
@@ -103,7 +102,7 @@ class ScalaFix(RewriteBase):
       args.append('--verbose')
 
     # This is how you pass a list of strings to a single arg key
-    for a in self.scalac_args:
+    for a in self._scalac_args:
       args.append('--scalac-options')
       args.append(a)
       
