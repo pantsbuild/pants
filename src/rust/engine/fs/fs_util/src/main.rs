@@ -178,6 +178,11 @@ to this directory.",
           )),
       )
         .subcommand(
+          SubCommand::with_name("directories")
+              .subcommand(SubCommand::with_name("list"))
+              .about("List all directory digests known in the local store")
+        )
+        .subcommand(
           SubCommand::with_name("gc")
               .about("Garbage collect the on-disk store. Note that after running this command, any processes with an open store (e.g. a pantsd) may need to re-initialize their store.")
               .arg(
@@ -545,6 +550,18 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         )),
       }
     }
+    ("directories", Some(sub_match)) => match sub_match.subcommand() {
+      ("list", _) => {
+        for digest in store
+          .all_local_digests(::store::EntryType::Directory)
+          .expect("Error opening store")
+        {
+          println!("{} {}", digest.0, digest.1);
+        }
+        Ok(())
+      }
+      _ => unimplemented!(),
+    },
     ("gc", Some(args)) => {
       let target_size_bytes = value_t!(args.value_of("target-size-bytes"), usize)
         .expect("--target-size-bytes must be passed as a non-negative integer");

@@ -622,6 +622,7 @@ dependencies = [
  "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "reqwest 0.9.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "rule_graph 0.0.1",
+ "sharded_lmdb 0.0.1",
  "smallvec 0.6.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "store 0.1.0",
  "task_executor 0.0.1",
@@ -629,6 +630,7 @@ dependencies = [
  "time 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)",
  "ui 0.0.1",
  "url 1.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "uuid 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "workunit_store 0.0.1",
 ]
 
@@ -1333,6 +1335,7 @@ dependencies = [
  "parking_lot 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "simplelog 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "ui 0.0.1",
+ "uuid 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

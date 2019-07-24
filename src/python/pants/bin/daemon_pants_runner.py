@@ -8,7 +8,6 @@ import termios
 import time
 from contextlib import contextmanager
 
-from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
@@ -110,38 +109,16 @@ class DaemonPantsRunner:
 
   @classmethod
   def create(cls, sock, args, env, services, scheduler_service):
-    maybe_shutdown_socket = MaybeShutdownSocket(sock)
-
-    try:
-      # N.B. This will redirect stdio in the daemon's context to the nailgun session.
-      with cls.nailgunned_stdio(maybe_shutdown_socket, env, handle_stdin=False) as finalizer:
-        options, _, options_bootstrapper = LocalPantsRunner.parse_options(args, env)
-        subprocess_dir = options.for_global_scope().pants_subprocessdir
-        graph_helper, target_roots, exit_code = scheduler_service.prefork(options, options_bootstrapper)
-        finalizer()
-    except Exception:
-      graph_helper = None
-      target_roots = None
-      options_bootstrapper = None
-      # TODO: this should no longer be necessary, remove the creation of subprocess_dir
-      subprocess_dir = os.path.join(get_buildroot(), '.pids')
-      exit_code = 1
-      # TODO This used to raise the _GracefulTerminationException, and maybe it should again, or notify in some way that the prefork has failed.
-
     return cls(
-      maybe_shutdown_socket,
-      args,
-      env,
-      graph_helper,
-      target_roots,
-      services,
-      subprocess_dir,
-      options_bootstrapper,
-      exit_code
+      maybe_shutdown_socket=MaybeShutdownSocket(sock),
+      args=args,
+      env=env,
+      services=services,
+      exit_code=0,
+      scheduler_service=scheduler_service
     )
 
-  def __init__(self, maybe_shutdown_socket, args, env, graph_helper, target_roots, services,
-               metadata_base_dir, options_bootstrapper, exit_code):
+  def __init__(self, maybe_shutdown_socket, args, env, services, exit_code, scheduler_service):
     """
     :param socket socket: A connected socket capable of speaking the nailgun protocol.
     :param list args: The arguments (i.e. sys.argv) for this run.
@@ -155,16 +132,14 @@ class DaemonPantsRunner:
     :param OptionsBootstrapper options_bootstrapper: An OptionsBootstrapper to reuse.
     """
     self._name = self._make_identity()
-    self._metadata_base_dir = metadata_base_dir
     self._maybe_shutdown_socket = maybe_shutdown_socket
     self._args = args
     self._env = env
-    self._graph_helper = graph_helper
-    self._target_roots = target_roots
     self._services = services
-    self._options_bootstrapper = options_bootstrapper
-    self.exit_code = exit_code
     self._exiter = DaemonExiter(maybe_shutdown_socket)
+    self._scheduler_service = scheduler_service
+
+    self.exit_code = exit_code
 
   # TODO: this should probably no longer be necesary, remove.
   def _make_identity(self):
@@ -275,6 +250,10 @@ class DaemonPantsRunner:
       hermetic_environment_as(**self._env), \
       encapsulated_global_logger():
       try:
+        options, _, options_bootstrapper = LocalPantsRunner.parse_options(self._args, self._env)
+        graph_helper, target_roots, exit_code = self._scheduler_service.prepare_v1_graph_run_v2(options, options_bootstrapper)
+        self.exit_code = exit_code
+
         # Clean global state.
         clean_global_runtime_state(reset_subsystem=True)
 
@@ -286,9 +265,9 @@ class DaemonPantsRunner:
           PantsRunFailCheckerExiter(),
           self._args,
           self._env,
-          self._target_roots,
-          self._graph_helper,
-          self._options_bootstrapper,
+          target_roots,
+          graph_helper,
+          options_bootstrapper,
         )
         runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
 

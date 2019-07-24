@@ -64,7 +64,6 @@ python_tests(
     'src/python/pants/util:osutil',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:task_test_base',
-    'tests/python/pants_test/backend/python/tasks:interpreter_cache_test_mixin',
   ]
 )
 

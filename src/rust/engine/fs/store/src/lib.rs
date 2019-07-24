@@ -49,9 +49,12 @@ use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
 
+const MEGABYTES: usize = 1024 * 1024;
+const GIGABYTES: usize = 1024 * MEGABYTES;
+
 // This is the target number of bytes which should be present in all combined LMDB store files
 // after garbage collection. We almost certainly want to make this configurable.
-pub const DEFAULT_LOCAL_STORE_GC_TARGET_BYTES: usize = 4 * 1024 * 1024 * 1024;
+pub const DEFAULT_LOCAL_STORE_GC_TARGET_BYTES: usize = 4 * GIGABYTES;
 
 // Summary of the files and directories uploaded with an operation
 // ingested_file_{count, bytes}: Number and combined size of processed files
@@ -848,6 +851,10 @@ impl Store {
       })
       .to_boxed()
   }
+
+  pub fn all_local_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {
+    self.local.all_digests(entry_type)
+  }
 }
 
 // Only public for testing.
@@ -858,7 +865,7 @@ pub enum EntryType {
 }
 
 mod local {
-  use super::{EntryType, ShrinkBehavior};
+  use super::{EntryType, ShrinkBehavior, GIGABYTES};
 
   use boxfuture::{try_future, BoxFuture, Boxable};
   use bytes::Bytes;
@@ -908,15 +915,11 @@ mod local {
           // travis fail because they can't allocate virtual memory, if there are multiple Stores
           // in memory at the same time. We don't know why they're not efficiently garbage collected
           // by python, but they're not, so...
-          file_dbs: ShardedLmdb::new(
-            files_root.clone(),
-            1024 * 1024 * 1024 * 1024 / 10,
-            executor.clone(),
-          )
-          .map(Arc::new),
+          file_dbs: ShardedLmdb::new(files_root.clone(), 100 * GIGABYTES, executor.clone())
+            .map(Arc::new),
           directory_dbs: ShardedLmdb::new(
             directories_root.clone(),
-            5 * 1024 * 1024 * 1024,
+            5 * GIGABYTES,
             executor.clone(),
           )
           .map(Arc::new),
@@ -1180,6 +1183,26 @@ mod local {
           Err(format!("Got hash collision reading from store - digest {:?} was requested, but retrieved bytes with that fingerprint had length {}. Congratulations, you may have broken sha256! Underlying bytes: {:?}", digest, bytes.len(), bytes))
         }
       }).to_boxed()
+    }
+
+    pub fn all_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {
+      let database = match entry_type {
+        EntryType::File => self.inner.file_dbs.clone(),
+        EntryType::Directory => self.inner.directory_dbs.clone(),
+      };
+      let mut digests = vec![];
+      for &(ref env, ref database, ref _lease_database) in &database?.all_lmdbs() {
+        let txn = env
+          .begin_ro_txn()
+          .map_err(|err| format!("Error beginning transaction to garbage collect: {}", err))?;
+        let mut cursor = txn
+          .open_ro_cursor(*database)
+          .map_err(|err| format!("Failed to open lmdb read cursor: {}", err))?;
+        for (key, bytes) in cursor.iter() {
+          digests.push(Digest(Fingerprint::from_bytes_unsafe(key), bytes.len()));
+        }
+      }
+      Ok(digests)
     }
   }
 
@@ -1625,6 +1648,14 @@ mod local {
       )
     }
 
+    #[test]
+    pub fn all_digests() {
+      let dir = TempDir::new().unwrap();
+      let store = new_store(dir.path());
+      let digest = prime_store_with_file_bytes(&store, TestData::roland().bytes());
+      assert_eq!(Ok(vec![digest]), store.all_digests(EntryType::File));
+    }
+
     pub fn new_store<P: AsRef<Path>>(dir: P) -> ByteStore {
       ByteStore::new(task_executor::Executor::new(), dir).unwrap()
     }
@@ -2002,7 +2033,7 @@ mod remote {
 
   #[cfg(test)]
   mod tests {
-    use super::super::EntryType;
+    use super::super::{EntryType, MEGABYTES};
     use super::ByteStore;
     use bytes::Bytes;
     use hashing::Digest;
@@ -2333,7 +2364,7 @@ mod remote {
         &None,
         None,
         1,
-        10 * 1024 * 1024,
+        10 * MEGABYTES,
         Duration::from_secs(1),
         BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
         1,
@@ -2366,7 +2397,7 @@ mod remote {
 mod tests {
   use super::{
     local, DirectoryMaterializeMetadata, EntryType, FileContent, LoadMetadata, Source, Store,
-    UploadSummary,
+    UploadSummary, MEGABYTES,
   };
 
   use bazel_protos;
@@ -2461,7 +2492,7 @@ mod tests {
       &None,
       None,
       1,
-      10 * 1024 * 1024,
+      10 * MEGABYTES,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
@@ -3142,7 +3173,7 @@ mod tests {
       &None,
       None,
       1,
-      10 * 1024 * 1024,
+      10 * MEGABYTES,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
@@ -3169,7 +3200,7 @@ mod tests {
       &None,
       None,
       1,
-      10 * 1024 * 1024,
+      10 * MEGABYTES,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
@@ -3210,7 +3241,7 @@ mod tests {
       &None,
       Some("Armory.Key".to_owned()),
       1,
-      10 * 1024 * 1024,
+      10 * MEGABYTES,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,
@@ -3237,7 +3268,7 @@ mod tests {
       &None,
       Some("Armory.Key".to_owned()),
       1,
-      10 * 1024 * 1024,
+      10 * MEGABYTES,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
       1,

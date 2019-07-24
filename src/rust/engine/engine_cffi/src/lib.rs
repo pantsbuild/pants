@@ -204,6 +204,7 @@ pub extern "C" fn scheduler_create(
   process_execution_cleanup_local_dirs: bool,
   process_execution_speculation_delay: f64,
   process_execution_speculation_strategy_buf: Buffer,
+  process_execution_use_local_cache: bool,
 ) -> *const Scheduler {
   let root_type_ids = root_type_ids.to_vec();
   let ignore_patterns = ignore_patterns_buf
@@ -320,6 +321,7 @@ pub extern "C" fn scheduler_create(
     // off nightly. https://github.com/rust-lang/rust/issues/54361
     Duration::from_millis((process_execution_speculation_delay * 1000.0).round() as u64),
     process_execution_speculation_strategy,
+    process_execution_use_local_cache,
   ))))
 }
 

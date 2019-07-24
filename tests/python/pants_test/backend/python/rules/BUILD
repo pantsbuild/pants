@@ -2,6 +2,22 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
+  name='create_requirements_pex',
+  source='test_create_requirements_pex.py',
+  dependencies=[
+    'src/python/pants/backend/python/rules',
+    'src/python/pants/backend/python/subsystems',
+    'src/python/pants/engine:fs',
+    'src/python/pants/engine:rules',
+    'src/python/pants/engine:selectors',
+    'src/python/pants/util:collections',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:test_base',
+    'tests/python/pants_test/subsystem:subsystem_utils',
+  ]
+)
+
+python_tests(
   name='inject_init',
   source='test_inject_init.py',
   dependencies=[
@@ -20,20 +36,6 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags={'integration'},
+  timeout = 90,
 )
 
-python_tests(
-  name='resolve_requirements',
-  source='test_resolve_requirements.py',
-  dependencies=[
-    'src/python/pants/backend/python/rules',
-    'src/python/pants/backend/python/subsystems',
-    'src/python/pants/engine:fs',
-    'src/python/pants/engine:rules',
-    'src/python/pants/engine:selectors',
-    'src/python/pants/util:collections',
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-  ]
-)

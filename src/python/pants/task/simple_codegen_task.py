@@ -437,7 +437,7 @@ class SimpleCodegenTask(Task):
       messages.extend(['\t\t{}'.format(source) for source in duped_sources])
     message = '\n'.join(messages)
     if self.get_options().allow_dups:
-      logger.warn(message)
+      logger.warning(message)
     else:
       raise self.DuplicateSourceError(message)
 

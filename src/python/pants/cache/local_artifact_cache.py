@@ -141,7 +141,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
         return True
     except Exception as e:
       # TODO(davidt): Consider being more granular in what is caught.
-      logger.warn('Error while reading {0} from local artifact cache: {1}'.format(tarfile, e))
+      logger.warning('Error while reading {0} from local artifact cache: {1}'.format(tarfile, e))
       safe_delete(tarfile)
       return UnreadableArtifact(cache_key, e)
 
