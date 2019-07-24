@@ -119,7 +119,10 @@ class Scoverage(CoverageEngine):
     result = self._execute_java(classpath=cobertura_cp,
                                 main='org.pantsbuild.scoverage.report.ScoverageReport',
                                 jvm_options=self._settings.coverage_jvm_options,
-                                args=["--measurementsDirPath",f"{output_dir}/scoverage/measurements", "--reportDirPath",f"{output_dir}/ScoverageReports"],
+                                args=["--measurementsDirPath",f"{output_dir}/scoverage/measurements",
+                                  "--htmlDirPath", f"{output_dir}/scoverage/reports/html",
+                                  "--xmlDirPath",f"{output_dir}/scoverage/reports/xml",
+                                  "--cleanOldReports"],
                                )
 
     if result != 0:
