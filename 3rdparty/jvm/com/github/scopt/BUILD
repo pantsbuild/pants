@@ -3,7 +3,7 @@
 
 jar_library(
   jars=[
-    scala_jar(org='com.github.scopt', name='scopt', rev='4.0.0-RC2'),
+    scala_jar(org='com.github.scopt', name='scopt', rev='3.7.0'),
   ],
   # Is used as a command line parser library
 )
