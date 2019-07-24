@@ -6,13 +6,12 @@ package org.pantsbuild.scoverage.report
 case class Settings(
   loadDataDir: Boolean = false,
   measurementsDirPath: String = "",
-  reportDirPath: String = "",
   sourceDirPath: String = ".",
   dataDirPath: String = "",
-  writeHtmlReport: Boolean = true,
-  writeXmlReport: Boolean = true,
-  writeXmlDebug: Boolean = false,
-  cleanOldReports: Boolean = true,
+  htmlDirPath: String = "",
+  xmlDirPath: String = "",
+  xmlDebugDirPath: String = "",
+  cleanOldReports: Boolean = false,
   targetFilters: Seq[String] = Seq())
 
 object Settings {
@@ -31,10 +30,6 @@ object Settings {
       .action((dir: String, s: Settings) => s.copy(measurementsDirPath = dir))
       .text("Directory where all scoverage measurements data is stored.")
 
-    opt[String]("reportDirPath")
-      .action((dir: String, s: Settings) => s.copy(reportDirPath = dir))
-      .text("Target output directory to place the reports.")
-
     opt[String]("sourceDirPath")
       .action((dir: String, s: Settings) => s.copy(sourceDirPath = dir))
       .text("Directory containing the project sources.")
@@ -44,17 +39,17 @@ object Settings {
       .text("Scoverage data file directory to be used in case report needed for single measurements " +
         "directory. Must set `loadDataDir` to use this options.")
 
-    opt[Unit]("writeHtmlReport")
-      .action((_, s: Settings) => s.copy(writeHtmlReport = true))
-      .text("Write the HTML version of the coverage report.")
+    opt[String]("htmlDirPath")
+      .action((dir: String, s: Settings) => s.copy(htmlDirPath = dir))
+      .text("Target output directory to place the html reports.")
 
-    opt[Unit]("writeXmlReport")
-      .action((_, s: Settings) => s.copy(writeXmlReport = true))
-      .text("Write the XML version of the coverage report.")
+    opt[String]("xmlDirPath")
+      .action((dir: String, s: Settings) => s.copy(xmlDirPath = dir))
+      .text("Target output directory to place the xml reports.")
 
-    opt[Unit]("writeXmlDebug")
-      .action((_, s: Settings) => s.copy(writeXmlDebug = true))
-      .text("Write debug information to the XML version of the coverage report.")
+    opt[String]("xmlDebugDirPath")
+      .action((dir: String, s: Settings) => s.copy(xmlDebugDirPath = dir))
+      .text("Target output directory to place the xml debug reports.")
 
     opt[Unit]("cleanOldReports")
       .action((_, s: Settings) => s.copy(cleanOldReports = true))
@@ -62,7 +57,6 @@ object Settings {
 
     opt[Seq[String]]("targetFilters")
       .action((f: Seq[String], s: Settings) => s.copy(targetFilters = f))
-      .text("If not specified, reports are generated for directories with coverage instrument files." +
-        "Else, report is generated only for the directories specified in the list.")
+      .text("Directory names for which report has to be generated.")
   }
 }

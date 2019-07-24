@@ -61,7 +61,7 @@ object ScoverageReport {
    * @param dataDir root directory to search under
    * @return        all the directories and subdirs containing scoverage files beginning at [dataDir]
    */
-  def getAllCoverageDirs(dataDir: File, acc: Seq[File]): Seq[File] = {
+  def getAllCoverageDirs(dataDir: File, acc: Vector[File]): Vector[File] = {
     if (dataDir.listFiles.filter(_.isFile).toSeq.exists(_.getName contains "scoverage.coverage")) {
       dataDir.listFiles.filter(_.isDirectory).toSeq
         .foldRight(dataDir +: acc) { (e, a) => getAllCoverageDirs(e, a) }
@@ -75,10 +75,10 @@ object ScoverageReport {
    * to be generated. If [targetFiles] is empty, report is generated for all
    * measurements directories inside in [dataDir].
    */
-  def filterFiles(dataDir: File, settings: Settings): Seq[File] = {
+  def filterFiles(dataDir: File, settings: Settings): Vector[File] = {
     val targetFiles = settings.targetFilters
 
-    val coverageDirs = getAllCoverageDirs(dataDir, Seq())
+    val coverageDirs = getAllCoverageDirs(dataDir, Vector())
 
     if (targetFiles.nonEmpty) {
       logger.info(s"Looking for targets: $targetFiles")
@@ -140,39 +140,47 @@ object ScoverageReport {
   }
 
   /**
+   *
+   * Cleans and makes the report drectory.
+   */
+  private def prepareFile(file: File, settings: Settings, fileType: String): Unit = {
+    if (settings.cleanOldReports) {
+      logger.info(s"Nuking old $fileType report directories.")
+      if (file.exists) FileUtils.deleteDirectory(file)
+    }
+    if (!file.exists) {
+      logger.info(s"Creating $fileType report directory [$file]")
+      file.mkdirs
+    }
+  }
+  /**
    * Writes coverage reports usign the specified source path to the specified report directory.
    */
   private def writeReports(coverage: Coverage, settings: Settings): Unit = {
     val sourceDir = new File(settings.sourceDirPath)
-    val reportDir = new File(settings.reportDirPath)
-    val reportDirHtml = new File(settings.reportDirPath + "/html")
-    val reportDirXml = new File(settings.reportDirPath + "/xml")
-
     if (sourceDir.exists) {
-      if (settings.cleanOldReports && reportDir.exists) {
-        logger.info(s"Nuking old report directory [$reportDir].")
-        FileUtils.deleteDirectory(reportDir)
-      }
 
-      if (!reportDir.exists) {
-        logger.info(s"Creating HTML report directory [$reportDirHtml]")
-        reportDirHtml.mkdirs
-        logger.info(s"Creating XML report directory [$reportDirXml]")
-        reportDirXml.mkdirs
-      }
-
-      if (settings.writeHtmlReport) {
+      if (!settings.htmlDirPath.isEmpty) {
+        val reportDirHtml = new File(settings.htmlDirPath)
+        prepareFile(reportDirHtml, settings, "html")
         logger.info(s"Writing HTML scoverage reports to [$reportDirHtml]")
         new ScoverageHtmlWriter(Seq(sourceDir), reportDirHtml, None).write(coverage)
       }
 
-      if (settings.writeXmlReport) {
+      if (!settings.xmlDirPath.isEmpty) {
+        val reportDirXml = new File(settings.xmlDirPath)
+        prepareFile(reportDirXml, settings, "xml")
         logger.info(s"Writing XML scoverage reports to [$reportDirXml]")
         new ScoverageXmlWriter(Seq(sourceDir), reportDirXml, false).write(coverage)
-        if (settings.writeXmlDebug) {
-          new ScoverageXmlWriter(Seq(sourceDir), reportDirXml, true).write(coverage)
-        }
       }
+
+      if (!settings.xmlDebugDirPath.isEmpty) {
+        val reportDirXmlDebug = new File(settings.xmlDebugDirPath)
+        prepareFile(reportDirXmlDebug, settings, "xml-debug")
+        logger.info(s"Writing XML-Debug scoverage reports to [$reportDirXmlDebug]")
+        new ScoverageXmlWriter(Seq(sourceDir), reportDirXmlDebug, true).write(coverage)
+      }
+
     } else {
       logger.error(s"Source dir [$sourceDir] does not exist")
       throw new RuntimeException(s"Source dir [$sourceDir] does not exist")
@@ -185,7 +193,8 @@ object ScoverageReport {
   def main(args: Array[String]): Unit = {
     Settings.parser1.parse(args, Settings()) match {
       case Some(settings) =>
-        val writeScoverageReports = settings.writeHtmlReport || settings.writeXmlReport
+        val writeScoverageReports = !settings.htmlDirPath.isEmpty || !settings.xmlDirPath.isEmpty ||
+          !settings.xmlDebugDirPath.isEmpty
 
         settings.loadDataDir match {
           case false =>
@@ -193,13 +202,13 @@ object ScoverageReport {
             logger.info("Coverage loaded successfully.")
             if (writeScoverageReports) {
               writeReports(cov, settings)
-            }
+            } else throw new RuntimeException("No reports generated! See --help to specify type of report.")
           case true =>
             val cov = loadCoverage(settings.dataDirPath)
             logger.info("Coverage loaded successfully!")
             if (writeScoverageReports) {
               writeReports(cov, settings)
-            }
+            } else throw new RuntimeException("No reports generated! See --help to specify type of report.")
         }
 
       case None => throw new RuntimeException("ScoverageReport: Incorrect options supplied.")
