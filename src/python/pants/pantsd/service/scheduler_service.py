@@ -17,8 +17,6 @@ class SchedulerService(PantsService):
   """The pantsd scheduler service.
 
   This service holds an online Scheduler instance that is primed via watchman filesystem events.
-  This provides for a quick fork of pants runs (via the pailgun) with a fully primed ProductGraph
-  in memory.
   """
 
   QUEUE_SIZE = 64
@@ -162,8 +160,11 @@ class SchedulerService(PantsService):
     """
     return self._scheduler.graph_len()
 
-  def prepare_graph(self, options, options_bootstrapper):
-    """Runs all pre-fork logic in the process context of the daemon.
+  def prepare_v1_graph_run_v2(self, options, options_bootstrapper):
+    """For v1 (and v2): computing TargetRoots for a later v1 run
+
+    For v2: running an entire v2 run
+    The exit_code in the return indicates whether any issue was encountered
 
     :returns: `(LegacyGraphSession, TargetRoots, exit_code)`
     """
