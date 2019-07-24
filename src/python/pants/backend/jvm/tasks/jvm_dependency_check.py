@@ -101,7 +101,7 @@ class JvmDependencyCheck(Task):
     fingerprint_strategy = DependencyContext.global_instance().create_fingerprint_strategy(
         classpath_product)
 
-    targets = self.context.targets()
+    targets = [target for target in self.context.targets() if hasattr(target, 'strict_deps')]
 
     with self.invalidated(targets,
                           fingerprint_strategy=fingerprint_strategy,

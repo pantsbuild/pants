@@ -11,6 +11,9 @@ from contextlib import contextmanager
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.base.deprecated import deprecated_conditional
+from pants.java.distribution.distribution import DistributionLocator
+from pants.java.executor import SubprocessExecutor
 from pants.util.contextutil import temporary_dir
 from pants.util.memo import memoized_property
 
@@ -37,7 +40,7 @@ class AnalysisExtraction(NailgunTask):
 
   @classmethod
   def product_types(cls):
-    return ['product_deps_by_target']
+    return ['product_deps_by_target', 'classes_by_source', 'product_deps_by_src']
 
   def _create_products_if_should_run(self):
     """If this task should run, initialize empty products that it will populate.
@@ -84,6 +87,17 @@ class AnalysisExtraction(NailgunTask):
 
   def execute(self):
     # If none of our computed products are necessary, return immediately.
+    deprecated_conditional(
+      lambda: self.context.products.is_required_data('classes_by_source'),
+      '1.20.0.dev2',
+      'The `classes_by_source` product depends on internal compiler details and is no longer produced.'
+    )
+    deprecated_conditional(
+      lambda: self.context.products.is_required_data('product_deps_by_src'),
+      '1.20.0.dev2',
+      'The `classes_by_source` product depends on internal compiler details and is no longer produced.'
+    )
+
     if not self._create_products_if_should_run():
       return
 
@@ -93,21 +107,21 @@ class AnalysisExtraction(NailgunTask):
     fingerprint_strategy = DependencyContext.global_instance().create_fingerprint_strategy(
         classpath_product)
 
-    # classpath fingerprint strategy only works on jvm targets.
-    targets = [target for target in self.context.targets() if classpath_product.get_for_target(target)]
-    all_classpaths = [
+    # classpath fingerprint strategy only works on targets with a classpath.
+    targets = [target for target in self.context.targets() if hasattr(target, 'strict_deps')]
+    potential_deps_classpaths = [
       entry for target in targets for _, entry in classpath_product.get_for_target(target) if entry
     ]
     with self.invalidated(targets,
                           fingerprint_strategy=fingerprint_strategy,
                           invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.all_vts:
-        # class paths for the target we are computing deps for
-        target_cps = [entry for _, entry in classpath_product.get_for_target(vt.target)]
+        # class paths for the artifacts created by the target we are computing deps for
+        target_artifact_classpaths = [entry for _, entry in classpath_product.get_for_target(vt.target)]
 
         jdeps_output_json = self._jdeps_output_json(vt)
         if not vt.valid:
-          self._run_jdeps_analysis(vt.target, target_cps, all_classpaths, jdeps_output_json)
+          self._run_jdeps_analysis(vt.target, target_artifact_classpaths, potential_deps_classpaths, jdeps_output_json)
         self._register_products(vt.target,
                                 jdeps_output_json,
                                 product_deps_by_target)
@@ -116,24 +130,37 @@ class AnalysisExtraction(NailgunTask):
   def _jdeps_summary_line_regex(self):
     return re.compile(r"^.+\s->\s(.+)$")
 
-  def _run_jdeps_analysis(self, target, target_cps, all_classpaths, jdeps_output_json):
-    with self.aliased_classpaths(all_classpaths) as classpaths_by_alias:
+  def _run_jdeps_analysis(self, target, target_artifact_classpaths, potential_deps_classpaths, jdeps_output_json):
+    with self.aliased_classpaths(potential_deps_classpaths) as classpaths_by_alias:
       with open(jdeps_output_json, 'w') as f:
-        if target_cps:
-          # TODO should we find an abs path to jdeps in a better way? a jdk path?
-          cmd = [
-            "jdeps", "-summary",
-            '-classpath', ":".join(cp for cp in classpaths_by_alias.keys()),
-          ] + target_cps
-          jdeps_output = io.StringIO(subprocess.run(cmd, stdout=subprocess.PIPE).stdout.decode('utf-8'))
+        if len(target_artifact_classpaths):
+          jdeps_stdout, jdeps_stderr = self._spawn_jdeps_command(
+            target, target_artifact_classpaths, classpaths_by_alias.keys()
+          ).communicate()
           deps_classpaths = set()
-          for line in jdeps_output:
+          for line in io.StringIO(jdeps_stdout.decode('utf-8')):
             match = self._jdeps_summary_line_regex.fullmatch(line.strip()).group(1)
             deps_classpaths.add(classpaths_by_alias.get(match, match))
 
         else:
           deps_classpaths = []
         json.dump(list(deps_classpaths), f)
+
+  def _spawn_jdeps_command(self, target, target_artifact_classpaths, potential_deps_classpaths):
+    jdk = DistributionLocator.cached(jdk=True)
+    tool_classpath = jdk.find_libs(['tools.jar'])
+
+    args = [
+      "-summary",
+      '-classpath', ":".join(cp for cp in potential_deps_classpaths),
+    ] + target_artifact_classpaths
+
+    java_executor = SubprocessExecutor(jdk)
+    return java_executor.spawn(classpath=tool_classpath,
+                               main='com.sun.tools.jdeps.Main',
+                               jvm_options=self.get_options().jvm_options,
+                               args=args,
+                               stdout=subprocess.PIPE)
 
   def _register_products(self,
                          target,
