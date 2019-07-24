@@ -4,6 +4,8 @@ from pants.backend.codegen.thrift.lib.apache_thrift_gen_base import ApacheThrift
 from pants.util.dirutil import safe_file_dump
 from pants.contrib.node.targets.node_thrift_library import NodeThriftLibrary
 from pants.contrib.node.targets.node_module import NodeModule
+from pants.build_graph.target import Target
+from typing import List
 
 
 class ApacheThriftNodeGen(ApacheThriftGenBase):
@@ -16,41 +18,34 @@ class ApacheThriftNodeGen(ApacheThriftGenBase):
 
   sources_globs = ('**/*',)
 
-  def synthetic_target_type(self, target):
+  def synthetic_target_type(self, target: Target) -> NodeModule:
     return NodeModule
 
   @property
-  def _copy_target_attributes(self):
+  def _copy_target_attributes(self) -> List[str]:
     return ['tags', 'node_scope', 'package_manager', 'build_script', 'output_dir', 'dev_dependency', 'style_ignore_path', 'bin_executables']
 
   def execute_codegen(selt, target, target_workdir):
-    """
-    thrift_target_deps = target.closure(lambda t: isinstance(t, ThriftTargetMixin))
-    all_thrift_sources = [
-      s
-      for s in t.sources_relative_to_buildroot()
-      for t in thrift_target_deps
-    ]
-    """
     sources_list = target.sources_relative_to_target_base()
     if 'yarn.lock' not in sources_list.files:
       safe_file_dump(os.path.join(target_workdir, 'yarn.lock'))
 
     if 'package.json' not in sources_list.files:
-        dependency_list = target.dependencies
-        package_dict = {}
-        package_dict["name"] = target.name
-        package_dict["version"] = "0.0.1"
-        dep_dict = {}
-        for dep in dependency_list:
-            if isinstance(dep, NodeModule):
-                dep_spec = dep.address.spec_path
-                relative_path = os.path.relpath(dep_spec, target_workdir)
-                relative_path = "file:" + relative_path
-                dep_dict[dep.name] = relative_path
+      dependency_list = target.dependencies
+      package_dict = {}
+      package_dict["name"] = target.name
+      package_dict["version"] = "0.0.1"
+      dep_dict = {}
+      for dep in dependency_list:
+        if not isinstance(dep, NodeModule):
+          continue
+        dep_spec = dep.address.spec_path
+        relative_path = os.path.relpath(dep_spec, target_workdir)
+        relative_path = "file:" + relative_path
+        dep_dict[dep.name] = relative_path
 
-        package_dict["dependencies"] = dep_dict
-        with open(os.path.join(target_workdir, 'package.json'), 'w') as f:
-            json.dump(package_dict, f, ensure_ascii=False, indent=2)
+      package_dict["dependencies"] = dep_dict
+      with open(os.path.join(target_workdir, 'package.json'), 'w') as f:
+        json.dump(package_dict, f, ensure_ascii=False, indent=2)
 
     super().execute_codegen(target, target_workdir)

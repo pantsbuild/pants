@@ -122,4 +122,3 @@ class NodeModule(NodePackage):
   @property
   def node_scope(self) -> str:
     return self.payload.node_scope
-  
