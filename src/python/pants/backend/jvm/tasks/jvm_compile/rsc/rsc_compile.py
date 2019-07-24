@@ -465,8 +465,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         ['compile', k],
         v
       )
-    record('workflow', workflow)
-    record('execution_strategy', self.execution_strategy_enum)
+    record('workflow', workflow.value)
+    record('execution_strategy', self.execution_strategy)
 
     # Create the rsc job.
     # Currently, rsc only supports outlining scala.
