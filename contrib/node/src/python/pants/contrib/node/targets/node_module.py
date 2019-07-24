@@ -80,7 +80,7 @@ class NodeModule(NodePackage):
     super().__init__(address=address, payload=payload, **kwargs)
 
   @property
-  def style_ignore_path(self):
+  def style_ignore_path(self) -> str:
     """The name of the ignore path file.
 
     :rtype: string
@@ -88,7 +88,7 @@ class NodeModule(NodePackage):
     return self.payload.style_ignore_path
 
   @property
-  def bin_executables(self):
+  def bin_executables(self) -> dict:
     """A normalized map of bin executable names and local path to an executable
 
     :rtype: dict
@@ -100,7 +100,7 @@ class NodeModule(NodePackage):
     return self.payload.bin_executables
 
   @property
-  def package_manager(self):
+  def package_manager(self) -> str:
     """
 
     :rtype: string
@@ -108,18 +108,18 @@ class NodeModule(NodePackage):
     return self.payload.package_manager
 
   @property
-  def build_script(self):
+  def build_script(self) -> str:
     return self.payload.build_script
 
   @property
-  def output_dir(self):
+  def output_dir(self) -> str:
     return self.payload.output_dir
 
   @property
-  def dev_dependency(self):
+  def dev_dependency(self) -> bool:
     return self.payload.dev_dependency
 
   @property
-  def node_scope(self):
+  def node_scope(self) -> str:
     return self.payload.node_scope
   
