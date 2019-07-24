@@ -21,8 +21,7 @@ from pants.engine.fs import create_fs_rules
 from pants.engine.goal import Goal
 from pants.engine.isolated_process import create_process_rules
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.engine.legacy.graph import (LegacyBuildGraph, TransitiveHydratedTargets,
-                                       create_legacy_graph_tasks)
+from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_tasks
 from pants.engine.legacy.options_parsing import create_options_parsing_rules
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (JvmAppAdaptor, JvmBinaryAdaptor, PageAdaptor,
@@ -167,19 +166,6 @@ class LegacyGraphSession(datatype(['scheduler_session', 'build_file_aliases', 'g
         .format(', '.join(invalid_goals))
       )
       self.invalid_goals = invalid_goals
-
-  def warm_product_graph(self, target_roots):
-    """Warm the scheduler's `ProductGraph` with `TransitiveHydratedTargets` products.
-
-    This method raises only fatal errors, and does not consider failed roots in the execution
-    graph: in the v1 codepath, failed roots are accounted for post-fork.
-
-    :param TargetRoots target_roots: The targets root of the request.
-    """
-    logger.debug('warming target_roots for: %r', target_roots)
-    subjects = [target_roots.specs]
-    request = self.scheduler_session.execution_request([TransitiveHydratedTargets], subjects)
-    self.scheduler_session.execute(request)
 
   def run_console_rules(self, options_bootstrapper, goals, target_roots):
     """Runs @console_rules sequentially and interactively by requesting their implicit Goal products.

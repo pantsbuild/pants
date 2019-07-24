@@ -17,8 +17,6 @@ class SchedulerService(PantsService):
   """The pantsd scheduler service.
 
   This service holds an online Scheduler instance that is primed via watchman filesystem events.
-  This provides for a quick fork of pants runs (via the pailgun) with a fully primed ProductGraph
-  in memory.
   """
 
   QUEUE_SIZE = 64
@@ -162,8 +160,11 @@ class SchedulerService(PantsService):
     """
     return self._scheduler.graph_len()
 
-  def prefork(self, options, options_bootstrapper):
-    """Runs all pre-fork logic in the process context of the daemon.
+  def prepare_v1_graph_run_v2(self, options, options_bootstrapper):
+    """For v1 (and v2): computing TargetRoots for a later v1 run
+
+    For v2: running an entire v2 run
+    The exit_code in the return indicates whether any issue was encountered
 
     :returns: `(LegacyGraphSession, TargetRoots, exit_code)`
     """
@@ -178,21 +179,21 @@ class SchedulerService(PantsService):
     session = self._graph_helper.new_session(zipkin_trace_v2, v2_ui)
 
     if options.for_global_scope().loop:
-      prefork_fn = self._prefork_loop
+      fn = self._loop
     else:
-      prefork_fn = self._prefork_body
+      fn = self._body
 
-    target_roots, exit_code = prefork_fn(session, options, options_bootstrapper)
+    target_roots, exit_code = fn(session, options, options_bootstrapper)
     return session, target_roots, exit_code
 
-  def _prefork_loop(self, session, options, options_bootstrapper):
+  def _loop(self, session, options, options_bootstrapper):
     # TODO: See https://github.com/pantsbuild/pants/issues/6288 regarding Ctrl+C handling.
     iterations = options.for_global_scope().loop_max
     target_roots = None
     exit_code = PANTS_SUCCEEDED_EXIT_CODE
     while iterations and not self._state.is_terminating:
       try:
-        target_roots, exit_code = self._prefork_body(session, options, options_bootstrapper)
+        target_roots, exit_code = self._body(session, options, options_bootstrapper)
       except session.scheduler_session.execution_error_type as e:
         # Render retryable exceptions raised by the Scheduler.
         print(e, file=sys.stderr)
@@ -202,7 +203,7 @@ class SchedulerService(PantsService):
         continue
     return target_roots, exit_code
 
-  def _prefork_body(self, session, options, options_bootstrapper):
+  def _body(self, session, options, options_bootstrapper):
     global_options = options.for_global_scope()
     target_roots = TargetRootsCalculator.create(
       options=options,
@@ -213,9 +214,6 @@ class SchedulerService(PantsService):
     exit_code = PANTS_SUCCEEDED_EXIT_CODE
 
     v1_goals, ambiguous_goals, v2_goals = options.goals_by_version
-
-    if v1_goals or (ambiguous_goals and global_options.v1):
-      session.warm_product_graph(target_roots)
 
     if v2_goals or (ambiguous_goals and global_options.v2):
       goals = v2_goals + (ambiguous_goals if global_options.v2 else tuple())
