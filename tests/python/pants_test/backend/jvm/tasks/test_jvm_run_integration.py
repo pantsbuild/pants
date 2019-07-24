@@ -82,7 +82,7 @@ class JvmRunIntegrationTest(PantsRunIntegrationTest):
     self.assertIn("""Property property.color is null
 Property property.size is null
 Flag -DMyFlag is NOT set
-Max Heap Size: 954728448""", output)
+Max Heap Size is more than 100MB""", output)
 
     output = self.run_pants(
       ['run',
@@ -90,7 +90,7 @@ Max Heap Size: 954728448""", output)
     self.assertIn("""Property property.color is null
 Property property.size is null
 Flag -DMyFlag is NOT set
-Max Heap Size: 954728448""", output)
+Max Heap Size is more than 100MB""", output)
 
     output = self.run_pants(
       ['run',
