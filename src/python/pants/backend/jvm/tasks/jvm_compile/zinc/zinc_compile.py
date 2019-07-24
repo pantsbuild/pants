@@ -438,9 +438,8 @@ class BaseZincCompile(JvmCompile):
         '-Dscala.usejavacp=true',
       ]
     else:
-      # TODO: Extract something common from Executor._create_command to make the command line
-      # TODO: Lean on distribution for the bin/java appending here
       native_image_snapshots = ()
+      # TODO: Lean on distribution for the bin/java appending here
       image_specific_argv =  ['.jdk/bin/java'] + jvm_options + [
         '-cp', zinc_relpath,
         Zinc.ZINC_COMPILE_MAIN
@@ -453,6 +452,7 @@ class BaseZincCompile(JvmCompile):
         ),
       ])
 
+    # TODO: Extract something common from Executor._create_command to make the command line
     argv = image_specific_argv + ['@{}'.format(argfile_snapshot.files[0])]
 
     merged_input_digest = self.context._scheduler.merge_directories(
