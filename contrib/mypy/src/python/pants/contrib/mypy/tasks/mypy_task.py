@@ -20,24 +20,31 @@ from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_info import PexInfo
 from pants.task.lint_task_mixin import LintTaskMixin
+from typing import List
 
 
 class MypyTaskError(TaskError):
-  """Indicates a TaskError from a failing MyPy run"""
+  """Indicates a TaskError from a failing MyPy run."""
 
 class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
   """Invoke the mypy static type analyzer for Python.
 
   Mypy lint task filters out target_roots that are not properly tagged according to
-  --whitelisted-tag-name, and executes my py on targets in context from whitelisted target
-  roots. Next, if any transitive targets from the filtered roots are not whitelisted, a Mypy
-  TaskError will be thrown.
+  --whitelisted-tag-name (defaults to None, and no filtering occurs if this option is 'None'),
+  and executes MyPy on targets in context from whitelisted target roots.
+  Next, if any transitive targets from the filtered roots are not whitelisted, a Warning.
+  will be thrown.
 
   'In context' meaning in the sub-graph where a whitelisted target is the root
   """
 
   _MYPY_COMPATIBLE_INTERPETER_CONSTRAINT = '>=3.5'
   _PYTHON_SOURCE_EXTENSION = '.py'
+
+  deprecated_options_scope = 'mypy'
+  deprecated_options_scope_removal_version = '1.20.0.dev2'
+
+  WARNING_MESSAGE = None
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -49,7 +56,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
     register('--mypy-version', default='0.710', help='The version of mypy to use.')
     register('--config-file', default=None,
              help='Path mypy configuration file, relative to buildroot.')
-    register('--whitelisted-tag-name', default='type_checked',
+    register('--whitelist-tag-name', default=None,
              help='Tag name to identify python targets to execute MyPy')
 
   @classmethod
@@ -75,22 +82,31 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
   def is_python_target(target):
     return isinstance(target, PythonTarget)
 
-  def _is_tagged_target(self, target):
-    return self.get_options().whitelisted_tag_name in target.tags
+  def _is_tagged_target(self, target: Target) -> bool:
+    return self.get_options().whitelist_tag_name in target.tags
 
-  def _is_tagged_non_synthetic_python_target(self, target):
+  def _is_tagged_non_synthetic_python_target(self, target: Target) -> bool:
     return (self.is_non_synthetic_python_target(target) and
             self._is_tagged_target(target))
 
-  def _all_targets_in_context_are_whitelisted(self, targets, targets_in_context):
+  def _all_targets_in_context_are_whitelisted(self, targets: List[Target], targets_in_context: List[Target]) -> bool:
     return len(targets) == 0 or len(targets) == len(targets_in_context)
 
-  def _calculate_python_sources(self, targets):
+  def _whitelist_warning(self) -> None:
+    self.WARNING_MESSAGE = "[WARNING]: All targets in context should be whitelisted for mypy to run"
+    self.context.log.warn(self.WARNING_MESSAGE)
+
+  def _calculate_python_sources(self, target_roots: List[Target]):
     """Filter targets to generate a set of source files from the given targets."""
-    whitelisted_targets = Target.closure_for_targets(list(filter(self._is_tagged_target, targets)))
-    python_eval_targets = list(filter(self._is_tagged_non_synthetic_python_target, list(whitelisted_targets)))
-    if not self._all_targets_in_context_are_whitelisted(python_eval_targets, whitelisted_targets):
-      raise MypyTaskError("All targets in context need to be whitelisted for mypy to run")
+    if self.get_options().whitelist_tag_name:
+      white_listed_targets = Target.closure_for_targets(list(filter(self._is_tagged_target, target_roots)))
+      python_eval_targets = [tgt for tgt in list(white_listed_targets) if self._is_tagged_non_synthetic_python_target(tgt)]
+      if not self._all_targets_in_context_are_whitelisted(python_eval_targets, white_listed_targets):
+        self._whitelist_warning()
+    else:
+      python_eval_targets = filter(self.is_non_synthetic_python_target, Target.closure_for_targets(target_roots))
+      self._whitelist_warning()
+
     sources = set()
     for target in python_eval_targets:
       sources.update(

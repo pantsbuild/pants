@@ -12,10 +12,11 @@ python_tests(
 )
 
 python_tests(
-  name='mypy_tests',
+  name='mypy',
   source = 'test_mypy.py',
   dependencies=[
     'tests/python/pants_test:task_test_base',
     'contrib/mypy/src/python/pants/contrib/mypy/tasks',
   ],
+  timeout = 6000,
 )
