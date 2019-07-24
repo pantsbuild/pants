@@ -52,7 +52,7 @@ object ScoverageReport {
     if (dataDirs.nonEmpty) {
       aggregatedCoverage(dataDirs)
     } else {
-      throw new RuntimeException(s"Datadir ${dataDirs.mkString(",")} empty")
+      throw new RuntimeException(s"No scoverage data directories found.")
     }
   }
 
