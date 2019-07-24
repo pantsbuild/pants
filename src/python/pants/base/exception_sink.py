@@ -10,6 +10,7 @@ import sys
 import threading
 import traceback
 from contextlib import contextmanager
+from typing import Callable
 
 import setproctitle
 
@@ -175,7 +176,22 @@ class ExceptionSink:
     cls._shared_error_fileobj = shared_error_stream
 
   @classmethod
-  def reset_exiter(cls, exiter):
+  def get_global_exiter(cls) -> Exiter:
+    return cls._exiter
+
+  @classmethod
+  @contextmanager
+  def exiter_as(cls, new_exiter_fun: Callable[[Exiter], Exiter]) -> None:
+    previous_exiter = cls._exiter
+    new_exiter = new_exiter_fun(previous_exiter)
+    try:
+      cls.reset_exiter(new_exiter)
+      yield
+    finally:
+      cls.reset_exiter(previous_exiter)
+
+  @classmethod
+  def reset_exiter(cls, exiter: Exiter) -> None:
     """
     Class state:
     - Overwrites `cls._exiter`.
