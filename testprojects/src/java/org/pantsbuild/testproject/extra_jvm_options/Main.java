@@ -5,8 +5,6 @@ import java.lang.management.RuntimeMXBean;
 import java.util.List;
 
 public class Main {
-    final static long oneHundredMegabytes = 1024 * 1024 * 100;
-
     private static void printProperty(String name) {
         String value = System.getProperty(name);
         System.out.println("Property " + name + " is " + value);
@@ -23,12 +21,7 @@ public class Main {
     }
 
     private static void printMaxHeapSize() {
-      Long maxMemory = Runtime.getRuntime().maxMemory();
-      if (maxMemory > oneHundredMegabytes) {
-        System.out.println("Max Heap Size is more than 100MB");
-      } else {
-        System.out.println("Max Heap Size: " + maxMemory);
-      }
+      System.out.println("Max Heap Size: " + Runtime.getRuntime().maxMemory());
     }
 
     public static void main(String args[]) {
