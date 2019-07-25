@@ -104,11 +104,10 @@ class CodeCoverage(Subsystem):
                                        "scoverage (by passing --scoverage-enable-scoverage option)")
 
     if enable_scoverage:
-      if processor is None:
-        logger.info("Scoverage is enabled. Setting coverage engine to scoverage.")
-      elif processor != 'scoverage':
-        logger.warning(f"Scoverage is enabled. Cannot use {processor} as the engine. Setting "
-                       f"coverage engine to scoverage.")
+      if processor not in (None, 'scoverage'):
+        raise  self.InvalidCoverageEngine(f"Scoverage is enabled. "
+                       f"Cannot use {processor} as the engine. Set engine to scoverage "
+                       f"(--test-junit-coverage-processor=scoverage)")
       processor = 'scoverage'
 
     if options.coverage or processor or options.is_flagged('coverage_open'):

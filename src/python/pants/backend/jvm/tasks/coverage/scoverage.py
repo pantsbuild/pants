@@ -35,12 +35,6 @@ class Scoverage(CoverageEngine):
       def slf4j_jar(name):
         return JarDependency(org='org.slf4j', name=name, rev='1.7.5')
 
-      def scopt_jar():
-        return JarDependency(org='com.github.scopt', name='scopt_2.12', rev='3.7.0')
-
-      def commons_jar():
-        return JarDependency(org='commons-io', name='commons-io', rev='2.5')
-
       def scoverage_report_jar(**kwargs):
         return JarDependency(org='org.pantsbuild', name='scoverage-report-generator_2.12',
           rev='0.0.1', **kwargs)
@@ -51,8 +45,8 @@ class Scoverage(CoverageEngine):
         'scoverage-report',
         classpath=[
         scoverage_report_jar(),
-        commons_jar(),
-        scopt_jar(),
+        JarDependency(org='commons-io', name='commons-io', rev='2.5'),
+        JarDependency(org='com.github.scopt', name='scopt_2.12', rev='3.7.0'),
         slf4j_jar('slf4j-simple'), slf4j_jar('slf4j-api'),
         scoverage_jar('scalac-scoverage-plugin_2.12')
         ]
@@ -106,21 +100,27 @@ class Scoverage(CoverageEngine):
     self._report_path = report_path
 
 
-  # All scoverage instrument files have the name "scoverage.coverage" and
-  # all measurement files are called "scoverage.measurements.<Thread ID>".
-  # This function is used in [indtrument(output_dir)] function below to clean up
-  # all pre-existing scoverage files before generating new ones.
+  #
   def _iter_datafiles(self, output_dir):
+    """
+    All scoverage instrument files have the name "scoverage.coverage" and
+    all measurement files are called "scoverage.measurements.<Thread ID>".
+    This function is used in [indtrument(output_dir)] function below to clean up
+    all pre-existing scoverage files before generating new ones.
+    """
     for root, _, files in safe_walk(output_dir):
       for f in files:
         if f.startswith("scoverage"):
           yield os.path.join(root, f)
 
-  # Used below for target filtering. Returns the parent directories
-  # under which all the scoverage data (for all targets) is stored.
-  # Currently, since all scoverage data for a test target is stored under
-  # `scoverage/measurements`, path to `scoverage/measurements` is returned.
+  #
   def _iter_datadirs(self, output_dir):
+    """
+    Used below for target filtering. Returns the parent directories
+    under which all the scoverage data (for all targets) is stored.
+    Currently, since all scoverage data for a test target is stored under
+    `scoverage/measurements`, path to `scoverage/measurements` is returned.
+    """
     for root, dirs, _ in safe_walk(output_dir):
       for d in dirs:
         if d.startswith("measurements"):

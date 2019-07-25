@@ -2,12 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-import os
+import re
 from pants.build_graph.injectables_mixin import InjectablesMixin
 from pants.subsystem.subsystem import Subsystem
 from pants.java.jar.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.address import Address
+from pants.option.custom_types import target_option
 
 logger = logging.getLogger(__name__)
 
@@ -24,30 +25,22 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
     register('--enable-scoverage',
       default=False,
       type=bool,
-      help='Specifies whether to generate scoverage reports for scala test targets.'
-           'Default value is False. If True,'
+      help='Specifies whether to generate scoverage reports for scala test targets. '
+           'Default value is False. If True, '
            'implies --test-junit-coverage-processor=scoverage.')
 
-    register('--blacklist-file',
-      type=str,
-      help='Path to files containing targets not to be instrumented.')
+    register('--blacklist-targets',
+      type=list,
+      member_type=target_option,
+      help='List of targets not to be instrumented. Accepts Regex patterns. All '
+           'targets matching any of the patterns will not be instrumented. If no targets '
+           'are specified, all targets will be instrumented.')
 
     register('--scoverage-target-path',
       default='//:scoverage',
       type=str,
       help='Path to the scoverage dependency.')
 
-  def __init__(self, *args, **kwargs):
-    super(ScoveragePlatform, self).__init__(*args, **kwargs)
-
-    # Setting up the scoverage blacklist files which contains targets
-    # not to be instrumented. Since the file is not expected to be really big,
-    # would it be ok to store it in memory?
-    if (self.get_options().blacklist_file and
-      os.path.exists(self.get_options().blacklist_file)):
-      self._blacklist_file_contents = open(self.get_options().blacklist_file).read()
-    else:
-      self._blacklist_file_contents = None
 
   def scoverage_jar(self):
     return [JarDependency(org='com.twitter.scoverage', name='scalac-scoverage-plugin_2.12',
@@ -84,12 +77,12 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
     """
     Checks if the [target] is blacklisted or not.
     """
-    # File not specified
-    if not self._blacklist_file_contents:
+    # No blacklisted targets specified.
+    if not self.get_options().blacklist_targets:
       return False
 
-    if target.address.spec in self._blacklist_file_contents:
-      logger.warning(f"{target.address.spec} found in blacklist, not instrumented.")
-      return True
-    else:
-      return False
+    for filter in self.get_options().blacklist_targets:
+      if re.search(filter, target.address.spec) is not None:
+        logger.info(f"{target.address.spec} found in blacklist, not instrumented.")
+        return True
+    return False

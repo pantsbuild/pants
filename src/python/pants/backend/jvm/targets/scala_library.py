@@ -9,8 +9,10 @@ from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.build_graph.address import Address
+from pants.build_graph.target import Target
 
 SCOVERAGE = "scoverage"
+
 
 class ScalaLibrary(ExportableJvmLibrary):
   """A Scala library.
@@ -27,13 +29,12 @@ class ScalaLibrary(ExportableJvmLibrary):
   default_sources_globs = '*.scala'
   default_sources_exclude_globs = JUnitTests.scala_test_globs
 
-
-
   @classmethod
   def subsystems(cls):
     return super().subsystems() + (ScalaPlatform, ScoveragePlatform,)
 
-  def __init__(self, java_sources=None, payload=None, **kwargs):
+  def __init__(self, java_sources=None, scalac_plugins=None, scalac_plugin_args=None,
+    compiler_option_sets=None, payload=None, **kwargs):
     """
     :param java_sources: Java libraries this library has a *circular*
       dependency on.
@@ -49,7 +50,46 @@ class ScalaLibrary(ExportableJvmLibrary):
     payload.add_fields({
       'java_sources': PrimitiveField(self.assert_list(java_sources, key_arg='java_sources')),
     })
-    super().__init__(payload=payload, **kwargs)
+
+    if ScoveragePlatform.global_instance().get_options().enable_scoverage:
+      # Settings scalac_plugins
+      if not (Target.compute_target_id(kwargs['address']).startswith(".pants.d.gen") or
+              ScoveragePlatform.global_instance().is_blacklisted(self)):
+        if scalac_plugins:
+          scalac_plugins.append(SCOVERAGE)
+        else:
+          scalac_plugins = [SCOVERAGE]
+
+      # Setting scalac_plugin_args
+      if scalac_plugin_args:
+        scalac_plugin_args.update(
+          {
+            "scoverage": ["writeToClasspath:true",
+              f"dataDir:{Target.compute_target_id(kwargs['address'])}"]
+          })
+      else:
+        scalac_plugin_args = {
+          "scoverage": ["writeToClasspath:true",
+            f"dataDir:{Target.compute_target_id(kwargs['address'])}"]
+        }
+
+      # Setting compiler_option_sets
+      if compiler_option_sets:
+        list(compiler_option_sets).append(SCOVERAGE)
+      else:
+        compiler_option_sets = [SCOVERAGE]
+
+      super().__init__(payload=payload,
+        scalac_plugins=scalac_plugins,
+        scalac_plugin_args=scalac_plugin_args,
+        compiler_option_sets=tuple(compiler_option_sets),
+        **kwargs)
+    else:
+      super().__init__(payload=payload,
+        scalac_plugins=scalac_plugins,
+        scalac_plugin_args=scalac_plugin_args,
+        compiler_option_sets=compiler_option_sets,
+        **kwargs)
 
     self._scoverage_instance = ScoveragePlatform.global_instance()
 
@@ -92,59 +132,3 @@ class ScalaLibrary(ExportableJvmLibrary):
         raise TargetDefinitionException(self, 'No such java target: {}'.format(spec))
       targets.append(target)
     return targets
-
-  @property
-  def scalac_plugins(self):
-    """The names of compiler plugins to use when compiling this target with scalac.
-    :return: See constructor.
-    :rtype: list of strings.
-    """
-    if self._scoverage_instance.get_options().enable_scoverage:
-      # Prevent instrumenting generated targets and targets in blacklist.
-      if self.identifier.startswith(".pants.d.gen") or self._scoverage_instance.is_blacklisted(self):
-        return self.payload.scalac_plugins
-
-      scalac_plugins = self.payload.scalac_plugins
-      if scalac_plugins:
-        scalac_plugins.append(SCOVERAGE)
-      else:
-        scalac_plugins = [SCOVERAGE]
-      return scalac_plugins
-
-    return self.payload.scalac_plugins
-
-  @property
-  def scalac_plugin_args(self):
-    """Map from scalac plugin name to list of args for that plugin.
-    :return: See constructor.
-    :rtype: map from string to list of strings.
-    """
-    if self._scoverage_instance.get_options().enable_scoverage:
-      scalac_plugin_args = self.payload.scalac_plugin_args
-      if scalac_plugin_args:
-        scalac_plugin_args.update(
-          {"scoverage": ["writeToClasspath:true", f"dataDir:{self.identifier}"]})
-      else:
-        scalac_plugin_args = {
-          "scoverage": ["writeToClasspath:true", f"dataDir:{self.identifier}"]
-        }
-      return scalac_plugin_args
-
-    return self.payload.scalac_plugin_args
-
-  @property
-  def compiler_option_sets(self):
-    """For every element in this list, enable the corresponding flags on compilation
-    of targets.
-    :return: See constructor.
-    :rtype: list
-    """
-    if self._scoverage_instance.get_options().enable_scoverage:
-      compiler_option_sets = self.payload.compiler_option_sets
-      if compiler_option_sets:
-        list(compiler_option_sets).append(SCOVERAGE)
-      else:
-        compiler_option_sets = [SCOVERAGE]
-      return tuple(compiler_option_sets)
-
-    return self.payload.compiler_option_sets
