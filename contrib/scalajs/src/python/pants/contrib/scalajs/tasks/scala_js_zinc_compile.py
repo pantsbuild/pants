@@ -12,6 +12,9 @@ class ScalaJSZincCompile(BaseZincCompile):
 
   _name = 'scala-js'
   _file_suffix = '.scala'
+  # TODO: Although this task does not extend rsc, it's currently necessary to claim to in order
+  # to not be skipped by the JvmPlatform setting. When the deprecation of the concrete instance of
+  # `ZincCompile` completes, we can merge a few classes.
   compiler_name = 'rsc'
 
   scalac_plugins = ['scalajs']
