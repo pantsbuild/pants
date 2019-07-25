@@ -64,7 +64,7 @@ class ShardingPlugin(object):
     # We hash-mod to assign to shards to avoid hotspots when there are fewer tests than there
     # are shards.
     for i, item in enumerate(list(x for x in items if not is_conftest(x))):
-      if crc32(str(item.nodeid)) % self._num_shards != self._shard:
+      if crc32(str(item.nodeid).encode()) % self._num_shards != self._shard:
         del items[i - removed]
         removed += 1
     reporter = config.pluginmanager.getplugin('terminalreporter')
