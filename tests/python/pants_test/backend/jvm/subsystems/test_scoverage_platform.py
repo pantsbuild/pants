@@ -17,7 +17,14 @@ class ScoveragePlatformTest(TestBase):
   scoverage_path = '//:scoverage'
   blacklist_file_path = 'my/file/new_blacklist_scoverage_test'
 
-  def setup_scoverage_platform(self):
+  def setup_scoverage_platform(self, create_file=False):
+    tmp = self.create_file(
+      relpath=self.blacklist_file_path,
+      contents=dedent("""
+      a/scala:blacked
+      """)
+    )
+
     options = {
       ScalaPlatform.options_scope: {
         'version': 'custom',
@@ -31,8 +38,18 @@ class ScoveragePlatformTest(TestBase):
       }
     }
 
+    options3 = {
+      ScoveragePlatform.options_scope: {
+        'enable_scoverage' : 'False',
+        'blacklist_file' : f"{tmp}"
+      }
+    }
+
     init_subsystem(ScalaPlatform, options)
-    init_subsystem(ScoveragePlatform, options2)
+    if not create_file:
+      init_subsystem(ScoveragePlatform, options2)
+    else:
+      init_subsystem(ScoveragePlatform, options3)
 
     self.make_target('//:scalastyle',
       JarLibrary,
@@ -135,16 +152,8 @@ class ScoveragePlatformTest(TestBase):
     instrumented as long as `scalac_plugins` do not contain `scoverage`.
     :return:
     """
-    self.setup_scoverage_platform()
+    self.setup_scoverage_platform(create_file=True)
     ScoveragePlatform.global_instance().get_options().enable_scoverage = True
-
-    tmp = self.create_file(
-      relpath=self.blacklist_file_path,
-      contents=dedent("""
-      a/scala:blacked
-      """)
-    )
-    ScoveragePlatform.global_instance().get_options().blacklist_file = tmp
 
     self.create_file(
       relpath='a/scala/pass.scala',
