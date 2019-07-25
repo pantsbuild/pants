@@ -29,10 +29,7 @@ class PantsRunFailCheckerExiter(Exiter):
 
 
 class DaemonExiter(Exiter):
-  """An Exiter that emits unhandled tracebacks and exit codes via the Nailgun protocol.
-
-  TODO: https://github.com/pantsbuild/pants/pull/7606
-  """
+  """An Exiter that emits unhandled tracebacks and exit codes via the Nailgun protocol."""
 
   @classmethod
   @contextmanager
@@ -41,10 +38,7 @@ class DaemonExiter(Exiter):
       yield
 
   def __init__(self, maybe_shutdown_socket, finalizer, previous_exiter):
-    # N.B. Assuming a fork()'d child, cause os._exit to be called here to avoid the routine
-    # sys.exit behavior.
-    # TODO: The behavior we're avoiding with the use of os._exit should be described and tested.
-    super().__init__(exiter=os._exit)
+    super().__init__(exiter=previous_exiter)
     self._maybe_shutdown_socket = maybe_shutdown_socket
     self._finalizer = finalizer
 
