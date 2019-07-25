@@ -91,11 +91,13 @@ class AnalysisExtraction(NailgunTask):
       lambda: self.context.products.is_required_data('classes_by_source'),
       '1.20.0.dev2',
       'The `classes_by_source` product depends on internal compiler details and is no longer produced.'
+      'For similar functionality consume `product_deps_by_target`.'
     )
     deprecated_conditional(
       lambda: self.context.products.is_required_data('product_deps_by_src'),
       '1.20.0.dev2',
-      'The `classes_by_source` product depends on internal compiler details and is no longer produced.'
+      'The `product_deps_by_src` product depends on internal compiler details and is no longer produced. '
+      'For similar functionality consume `product_deps_by_target`.'
     )
 
     if not self._create_products_if_should_run():
@@ -116,7 +118,7 @@ class AnalysisExtraction(NailgunTask):
                           fingerprint_strategy=fingerprint_strategy,
                           invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.all_vts:
-        # class paths for the artifacts created by the target we are computing deps for
+        # A list of class paths to the artifacts created by the target we are computing deps for.
         target_artifact_classpaths = [entry for _, entry in classpath_product.get_for_target(vt.target)]
 
         jdeps_output_json = self._jdeps_output_json(vt)
