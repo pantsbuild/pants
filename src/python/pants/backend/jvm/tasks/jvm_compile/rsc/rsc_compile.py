@@ -123,10 +123,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       Rsc, dep.optionable_cls
     )
 
-  @classmethod
-  def product_types(cls):
-    return ['runtime_classpath']
-
   @memoized_property
   def mirrored_target_option_actions(self):
     return {
