@@ -91,7 +91,6 @@ class ScalaLibrary(ExportableJvmLibrary):
         compiler_option_sets=compiler_option_sets,
         **kwargs)
 
-    self._scoverage_instance = ScoveragePlatform.global_instance()
 
   @classmethod
   def compute_injectable_specs(cls, kwargs=None, payload=None):
