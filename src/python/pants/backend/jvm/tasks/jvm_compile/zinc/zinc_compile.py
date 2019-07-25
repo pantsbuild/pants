@@ -341,13 +341,10 @@ class BaseZincCompile(JvmCompile):
       # That classloader will first delegate to its parent classloader, which will search the
       # regular classpath.  However it's harder to guarantee that our javac will preceed any others
       # on the classpath, so it's safer to prefix it to the bootclasspath.
-      # list of classpath entries
-      javac_classpath_entries = self.javac_classpath()
-      java_path = [relative_to_exec_root(classpath_entry.path) for classpath_entry in javac_classpath_entries]
-
-      jvm_options.extend(['-Xbootclasspath/p:{}'.format(':'.join(java_path))])
+      jvm_options.extend(['-Xbootclasspath/p:{}'.format(':'.join(self.javac_classpath()))])
 
     jvm_options.extend(self._jvm_options)
+
     zinc_args.extend(ctx.sources)
 
     self.log_zinc_file(ctx.analysis_file)

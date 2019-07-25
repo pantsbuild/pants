@@ -66,5 +66,5 @@ class ConsolidateClasspath(JvmBinaryTask):
                 jar.write(entry.path)
 
             # Replace directory classpath entry with its jarpath.
-            classpath_products.remove_for_target(vt.target, [(conf, entry)])
+            classpath_products.remove_for_target(vt.target, [(conf, entry.path)])
             classpath_products.add_for_target(vt.target, [(conf, jarpath)])
