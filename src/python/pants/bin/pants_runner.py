@@ -79,7 +79,6 @@ class PantsRunner:
       logger.debug("Pantsd terminating goal detected: {}".format(self._args))
 
     runner = LocalPantsRunner.create(
-        self._exiter,
         self._args,
         self._env,
         options_bootstrapper=options_bootstrapper

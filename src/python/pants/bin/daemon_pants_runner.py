@@ -6,7 +6,6 @@ import os
 import sys
 import termios
 import time
-import logging
 from contextlib import contextmanager
 
 from pants.base.exception_sink import ExceptionSink
@@ -265,17 +264,17 @@ class DaemonPantsRunner:
         clean_global_runtime_state(reset_subsystem=True)
 
         # Otherwise, conduct a normal run.
-        runner = LocalPantsRunner.create(
-          PantsRunFailCheckerExiter(),
-          self._args,
-          self._env,
-          target_roots,
-          graph_helper,
-          options_bootstrapper,
-        )
-        runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
+        with ExceptionSink.exiter_as(PantsRunFailCheckerExiter):
+          runner = LocalPantsRunner.create(
+            self._args,
+            self._env,
+            target_roots,
+            graph_helper,
+            options_bootstrapper,
+          )
+          runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
 
-        runner.run()
+          runner.run()
       except KeyboardInterrupt:
         self._exiter.exit_and_fail('Interrupted by user.\n')
       except _PantsRunFinishedWithFailureException as e:

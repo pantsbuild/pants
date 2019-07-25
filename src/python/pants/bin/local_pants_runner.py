@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
@@ -26,10 +27,16 @@ logger = logging.getLogger(__name__)
 
 class LocalExiter(Exiter):
 
-  def __init__(self, run_tracker, repro, *args, **kwargs):
+  @classmethod
+  @contextmanager
+  def wrap_global_exiter(cls, run_tracker, repro):
+    with ExceptionSink.exiter_as(lambda previous_exiter: cls(run_tracker, repro, previous_exiter)):
+      yield
+
+  def __init__(self, run_tracker, repro, previous_exiter):
     self._run_tracker = run_tracker
     self._repro = repro
-    super().__init__(*args, **kwargs)
+    super().__init__(previous_exiter)
 
   def exit(self, result=PANTS_SUCCEEDED_EXIT_CODE, msg=None, *args, **kwargs):
     # These strings are prepended to the existing exit message when calling the superclass .exit().
@@ -115,7 +122,7 @@ class LocalPantsRunner:
     )
 
   @classmethod
-  def create(cls, exiter, args, env, target_roots=None, daemon_graph_session=None,
+  def create(cls, args, env, target_roots=None, daemon_graph_session=None,
              options_bootstrapper=None):
     """Creates a new LocalPantsRunner instance by parsing options.
 
@@ -167,7 +174,6 @@ class LocalPantsRunner:
 
     return cls(
       build_root,
-      exiter,
       options,
       options_bootstrapper,
       build_config,
@@ -178,11 +184,10 @@ class LocalPantsRunner:
       profile_path
     )
 
-  def __init__(self, build_root, exiter, options, options_bootstrapper, build_config, target_roots,
+  def __init__(self, build_root, options, options_bootstrapper, build_config, target_roots,
                graph_session, scheduler_session, is_daemon, profile_path):
     """
     :param string build_root: The build root for this run.
-    :param Exiter exiter: The Exiter instance to use for this run.
     :param Options options: The parsed options for this run.
     :param OptionsBootstrapper options_bootstrapper: The OptionsBootstrapper instance to use.
     :param BuildConfiguration build_config: The parsed build configuration for this run.
@@ -192,7 +197,6 @@ class LocalPantsRunner:
     :param string profile_path: The profile path - if any (from from the `PANTS_PROFILE` env var).
     """
     self._build_root = build_root
-    self._exiter = exiter
     self._options = options
     self._options_bootstrapper = options_bootstrapper
     self._build_config = build_config
@@ -221,13 +225,14 @@ class LocalPantsRunner:
     if self._repro:
       self._repro.capture(self._run_tracker.run_info.get_as_dict())
 
-    # The __call__ method of the Exiter allows for the prototype pattern.
-    self._exiter = LocalExiter(self._run_tracker, self._repro, exiter=self._exiter)
-    ExceptionSink.reset_exiter(self._exiter)
-
   def run(self):
-    with maybe_profiled(self._profile_path):
+    with LocalExiter.wrap_global_exiter(self._run_tracker, self._repro), \
+         maybe_profiled(self._profile_path):
       self._run()
+
+  @property
+  def _exiter(self):
+    return ExceptionSink.get_global_exiter()
 
   def _maybe_handle_help(self):
     """Handle requests for `help` information."""
