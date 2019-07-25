@@ -19,7 +19,6 @@ from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated_module
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
@@ -628,11 +627,6 @@ class BaseZincCompile(JvmCompile):
 
 class ZincCompile(BaseZincCompile):
   """Compile Scala and Java code to classfiles using Zinc."""
-
-  deprecated_module(
-    removal_version='1.20.0.dev0',
-    hint_message="compile.zinc task is being phased out. Use compile.rsc:zinc-only option instead."
-  )
   compiler_name = 'zinc'
 
   @classmethod
