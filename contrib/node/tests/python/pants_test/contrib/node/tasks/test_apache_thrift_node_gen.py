@@ -1,7 +1,4 @@
-# import os
 from textwrap import dedent
-
-# from pants.backend.codegen.thrift.lib.thrift import Thrift
 from pants.contrib.node.tasks.apache_thrift_node_gen import ApacheThriftNodeGen
 from pants.contrib.node.targets.node_thrift_library import NodeThriftLibrary
 from pants.contrib.node.targets.node_module import NodeModule
@@ -18,7 +15,6 @@ class ApacheThriftNodeGenTest(TaskTestBase):
     context = self.context(target_roots=[node_thrift_library])
     apache_thrift_gen = self.create_task(context)
     apache_thrift_gen.execute()
-    # import pdb; pdb.set_trace()
 
     def is_synthetic_node_library(target):
       return isinstance(target, NodeModule) and target.is_synthetic
@@ -41,16 +37,16 @@ class ApacheThriftNodeGenTest(TaskTestBase):
     self.assertEqual({'package.json',
                       'yarn.lock',
                       'test_types.js'},
-                     set(synthetic_target.sources_relative_to_source_root()))
+                     set(synthetic_target.sources_relative_to_target_base()))
 
   def test_nested_namespace(self):
     self.create_file('src/thrift/com/foo/test1.thrift', contents=dedent("""
-    namespace js foo.bar
+    namespace js gen.foo.bar
 
     struct Test1 {}
     """))
     self.create_file('src/thrift/com/foo/test2.thrift', contents=dedent("""
-    namespace js foo.bar
+    namespace js gen.foo.bar
 
     struct Test2 {}
     """))
@@ -66,12 +62,12 @@ class ApacheThriftNodeGenTest(TaskTestBase):
 
   def test_namespace_effective(self):
     self.create_file('src/thrift/com/foo/test1.thrift', contents=dedent("""
-    namespace js foo.bar
+    namespace js gen.foo.bar
 
     struct Test1 {}
     """))
     self.create_file('src/thrift/com/foo/test2.thrift', contents=dedent("""
-    namespace js foo.bar
+    namespace js gen.foo.bar
 
     struct Test2 {}
     """))
