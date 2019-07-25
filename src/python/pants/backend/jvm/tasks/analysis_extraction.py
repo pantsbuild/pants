@@ -91,7 +91,6 @@ class AnalysisExtraction(NailgunTask):
       lambda: self.context.products.is_required_data('classes_by_source'),
       '1.20.0.dev2',
       'The `classes_by_source` product depends on internal compiler details and is no longer produced.'
-      'For similar functionality consume `product_deps_by_target`.'
     )
     deprecated_conditional(
       lambda: self.context.products.is_required_data('product_deps_by_src'),
@@ -111,19 +110,22 @@ class AnalysisExtraction(NailgunTask):
 
     # classpath fingerprint strategy only works on targets with a classpath.
     targets = [target for target in self.context.targets() if hasattr(target, 'strict_deps')]
-    potential_deps_classpaths = [
-      entry for target in targets for _, entry in classpath_product.get_for_target(target) if entry
-    ]
     with self.invalidated(targets,
                           fingerprint_strategy=fingerprint_strategy,
                           invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.all_vts:
         # A list of class paths to the artifacts created by the target we are computing deps for.
-        target_artifact_classpaths = [entry for _, entry in classpath_product.get_for_target(vt.target)]
+        target_artifact_classpaths = [path for _, path in classpath_product.get_for_target(vt.target)]
+        potential_deps_classpaths = self._zinc.compile_classpath('runtime_classpath', vt.target)
 
         jdeps_output_json = self._jdeps_output_json(vt)
         if not vt.valid:
-          self._run_jdeps_analysis(vt.target, target_artifact_classpaths, potential_deps_classpaths, jdeps_output_json)
+          self._run_jdeps_analysis(
+            vt.target,
+            target_artifact_classpaths,
+            potential_deps_classpaths,
+            jdeps_output_json
+          )
         self._register_products(vt.target,
                                 jdeps_output_json,
                                 product_deps_by_target)
