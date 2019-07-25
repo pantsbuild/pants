@@ -103,7 +103,7 @@ class _PantsRunFinishedWithFailureException(Exception):
     return self._exit_code
 
 
-class DaemonPantsRunner:
+class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
   """A daemonizing PantsRunner that speaks the nailgun protocol to a remote client.
 
   N.B. this class is primarily used by the PailgunService in pantsd.
@@ -141,10 +141,6 @@ class DaemonPantsRunner:
     self._scheduler_service = scheduler_service
 
     self.exit_code = exit_code
-
-  @property
-  def _exiter(self) -> Exiter:
-    return ExceptionSink.get_global_exiter()
 
   # TODO: this should probably no longer be necesary, remove.
   def _make_identity(self):

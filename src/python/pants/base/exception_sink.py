@@ -175,8 +175,13 @@ class ExceptionSink:
     cls._pid_specific_error_fileobj = pid_specific_error_stream
     cls._shared_error_fileobj = shared_error_stream
 
+  class AccessGlobalExiterMixin:
+    @property
+    def _exiter(self) -> Exiter:
+      return ExceptionSink._get_global_exiter()
+
   @classmethod
-  def get_global_exiter(cls) -> Exiter:
+  def _get_global_exiter(cls) -> Exiter:
     return cls._exiter
 
   @classmethod

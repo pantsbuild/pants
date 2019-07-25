@@ -15,7 +15,7 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 logger = logging.getLogger(__name__)
 
 
-class PantsRunner:
+class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
   """A higher-level runner that delegates runs to either a LocalPantsRunner or RemotePantsRunner."""
 
   def __init__(self, args=None, env=None, start_time=None):
@@ -34,10 +34,6 @@ class PantsRunner:
 
   def will_terminate_pantsd(self):
     return not frozenset(self._args).isdisjoint(self._DAEMON_KILLING_GOALS)
-
-  @property
-  def _exiter(self):
-    return ExceptionSink.get_global_exiter()
 
   def _enable_rust_logging(self, global_bootstrap_options):
     levelname = global_bootstrap_options.level.upper()

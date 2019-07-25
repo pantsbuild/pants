@@ -81,7 +81,7 @@ class LocalExiter(Exiter):
     super().exit(result=result, msg=msg, *args, **kwargs)
 
 
-class LocalPantsRunner:
+class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
   """Handles a single pants invocation running in the process-local context."""
 
   @staticmethod
@@ -229,10 +229,6 @@ class LocalPantsRunner:
     with LocalExiter.wrap_global_exiter(self._run_tracker, self._repro), \
          maybe_profiled(self._profile_path):
       self._run()
-
-  @property
-  def _exiter(self):
-    return ExceptionSink.get_global_exiter()
 
   def _maybe_handle_help(self):
     """Handle requests for `help` information."""
