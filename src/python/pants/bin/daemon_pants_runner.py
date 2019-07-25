@@ -6,6 +6,7 @@ import os
 import sys
 import termios
 import time
+import logging
 from contextlib import contextmanager
 
 from pants.base.exception_sink import ExceptionSink
@@ -142,6 +143,10 @@ class DaemonPantsRunner:
 
     self.exit_code = exit_code
 
+  @property
+  def _exiter(self) -> Exiter:
+    return ExceptionSink.get_global_exiter()
+
   # TODO: this should probably no longer be necesary, remove.
   def _make_identity(self):
     """Generate a ProcessManager identity for a given pants run.
@@ -236,11 +241,6 @@ class DaemonPantsRunner:
     client_start_time = env.pop('PANTSD_RUNTRACKER_CLIENT_START_TIME', None)
     return None if client_start_time is None else float(client_start_time)
 
-  def _override_global_exiter(self, maybe_shutdown_socket, finalizer, previous_exiter):
-    # TODO The previous exiter will always be Exiter(os._exit) from the PantsDaemon Class.
-    # Make this explicit.
-    return DaemonExiter(self._maybe_shutdown_socket,)
-
   def run(self):
     # Ensure anything referencing sys.argv inherits the Pailgun'd args.
     sys.argv = self._args
@@ -253,9 +253,9 @@ class DaemonPantsRunner:
 
     # Invoke a Pants run with stdio redirected and a proxied environment.
     with self.nailgunned_stdio(self._maybe_shutdown_socket, self._env) as finalizer, \
+      DaemonExiter.override_global_exiter(self._maybe_shutdown_socket, finalizer), \
       hermetic_environment_as(**self._env), \
-      encapsulated_global_logger(), \
-      DaemonExiter.override_global_exiter(self._maybe_shutdown_socket, finalizer):
+      encapsulated_global_logger():
       try:
         options, _, options_bootstrapper = LocalPantsRunner.parse_options(self._args, self._env)
         graph_helper, target_roots, exit_code = self._scheduler_service.prepare_v1_graph_run_v2(options, options_bootstrapper)

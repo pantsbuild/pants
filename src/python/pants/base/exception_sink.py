@@ -199,6 +199,7 @@ class ExceptionSink:
     - Overwrites sys.excepthook.
     """
     assert(isinstance(exiter, Exiter))
+    logger.debug(f"overriding the global exiter with {exiter} (from {cls._exiter})")
     # NB: mutate the class variables! This is done before mutating the exception hook, because the
     # uncaught exception handler uses cls._exiter to exit.
     cls._exiter = exiter
