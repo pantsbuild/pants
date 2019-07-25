@@ -18,13 +18,11 @@ logger = logging.getLogger(__name__)
 class PantsRunner:
   """A higher-level runner that delegates runs to either a LocalPantsRunner or RemotePantsRunner."""
 
-  def __init__(self, exiter, args=None, env=None, start_time=None):
+  def __init__(self, args=None, env=None, start_time=None):
     """
-    :param Exiter exiter: The Exiter instance to use for this run.
     :param list args: The arguments (sys.argv) for this run. (Optional, default: sys.argv)
     :param dict env: The environment for this run. (Optional, default: os.environ)
     """
-    self._exiter = exiter
     self._args = args or sys.argv
     self._env = env or os.environ
     self._start_time = start_time
@@ -36,6 +34,10 @@ class PantsRunner:
 
   def will_terminate_pantsd(self):
     return not frozenset(self._args).isdisjoint(self._DAEMON_KILLING_GOALS)
+
+  @property
+  def _exiter(self):
+    return ExceptionSink.get_global_exiter()
 
   def _enable_rust_logging(self, global_bootstrap_options):
     levelname = global_bootstrap_options.level.upper()
@@ -49,10 +51,6 @@ class PantsRunner:
            not global_bootstrap_options.concurrent
 
   def run(self):
-    # Register our exiter at the beginning of the run() method so that any code in this process from
-    # this point onwards will use that exiter in the case of a fatal error.
-    ExceptionSink.reset_exiter(self._exiter)
-
     options_bootstrapper = OptionsBootstrapper.create(env=self._env, args=self._args)
     bootstrap_options = options_bootstrapper.bootstrap_options
     global_bootstrap_options = bootstrap_options.for_global_scope()
