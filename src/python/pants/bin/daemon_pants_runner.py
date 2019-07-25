@@ -7,9 +7,10 @@ import sys
 import termios
 import time
 from contextlib import contextmanager
+from typing import Callable
 
 from pants.base.exception_sink import ExceptionSink
-from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, Exiter
+from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode, Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.init.logging import encapsulated_global_logger
 from pants.init.util import clean_global_runtime_state
@@ -33,16 +34,20 @@ class DaemonExiter(Exiter):
 
   @classmethod
   @contextmanager
-  def override_global_exiter(cls, maybe_shutdown_socket, finalizer):
+  def override_global_exiter(cls, maybe_shutdown_socket: MaybeShutdownSocket, finalizer: Callable[[], None]) -> None:
     with ExceptionSink.exiter_as(lambda previous_exiter: cls(maybe_shutdown_socket, finalizer, previous_exiter)):
       yield
 
-  def __init__(self, maybe_shutdown_socket, finalizer, previous_exiter):
+  def __init__(self,
+    maybe_shutdown_socket: MaybeShutdownSocket,
+    finalizer: Callable[[], None],
+    previous_exiter: Exiter):
+
     super().__init__(exiter=previous_exiter)
     self._maybe_shutdown_socket = maybe_shutdown_socket
     self._finalizer = finalizer
 
-  def exit(self, result=0, msg=None, *args, **kwargs):
+  def exit(self, result: ExitCode = 0, msg: str = None, *args, **kwargs):
     """Exit the runtime."""
     if self._finalizer:
       try:
@@ -79,7 +84,7 @@ class _PantsRunFinishedWithFailureException(Exception):
   Will be raised by the exiter passed to LocalPantsRunner.
   """
 
-  def __init__(self, exit_code=PANTS_FAILED_EXIT_CODE):
+  def __init__(self, exit_code: ExitCode = PANTS_FAILED_EXIT_CODE):
     """
     :param int exit_code: an optional exit code (defaults to PANTS_FAILED_EXIT_CODE)
     """
@@ -93,7 +98,7 @@ class _PantsRunFinishedWithFailureException(Exception):
     self._exit_code = exit_code
 
   @property
-  def exit_code(self):
+  def exit_code(self) -> ExitCode:
     return self._exit_code
 
 
