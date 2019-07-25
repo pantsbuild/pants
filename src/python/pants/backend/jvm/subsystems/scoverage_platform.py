@@ -1,6 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 import os
 from pants.build_graph.injectables_mixin import InjectablesMixin
 from pants.subsystem.subsystem import Subsystem
@@ -8,6 +9,7 @@ from pants.java.jar.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.address import Address
 
+logger = logging.getLogger(__name__)
 
 SCOVERAGE = "scoverage"
 
@@ -39,7 +41,8 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
     super(ScoveragePlatform, self).__init__(*args, **kwargs)
 
     # Setting up the scoverage blacklist files which contains targets
-    # not to be instrumented.
+    # not to be instrumented. Since the file is not expected to be really big,
+    # would it be ok to store it in memory?
     if (self.get_options().blacklist_file and
       os.path.exists(self.get_options().blacklist_file)):
       self._blacklist_file_contents = open(self.get_options().blacklist_file).read()
@@ -81,12 +84,12 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
     """
     Checks if the [target] is blacklisted or not.
     """
-
     # File not specified
     if not self._blacklist_file_contents:
       return False
 
     if target.address.spec in self._blacklist_file_contents:
+      logger.warning(f"{target.address.spec} found in blacklist, not instrumented.")
       return True
     else:
       return False

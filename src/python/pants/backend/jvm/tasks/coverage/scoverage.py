@@ -4,7 +4,6 @@
 
 import functools
 import os
-import subprocess
 import re
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
@@ -176,6 +175,11 @@ class Scoverage(CoverageEngine):
 
     if result != 0:
       raise TaskError(f"java {main} ... exited non-zero ({result}) - failed to scoverage-report-generator")
+
+    self._settings.log.info(f"Scoverage html reports available at {output_dir}/scoverage/reports/html")
+    self._settings.log.info(f"Scoverage xml reports available at {output_dir}/scoverage/reports/xml")
+    if self._settings.coverage_open:
+      return os.path.join(output_dir, 'scoverage', 'reports', 'html', 'index.html')
 
 
   # Returns the directories under [measurements_dir] which need to
