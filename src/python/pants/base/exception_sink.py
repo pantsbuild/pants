@@ -189,11 +189,12 @@ class ExceptionSink:
   def exiter_as(cls, new_exiter_fun: Callable[[Exiter], Exiter]) -> None:
     previous_exiter = cls._exiter
     new_exiter = new_exiter_fun(previous_exiter)
-    try:
-      cls._reset_exiter(new_exiter)
-      yield
-    finally:
-      cls._reset_exiter(previous_exiter)
+    # NB: We don't want to try/finally here, because we want exceptions to propagate
+    # with the most recent exiter installed in sys.excepthook.
+    # If we wrap this in a try:finally, exceptions will be caught and exiters unset.
+    cls._reset_exiter(new_exiter)
+    yield
+    cls._reset_exiter(previous_exiter)
 
   @classmethod
   def _reset_exiter(cls, exiter: Exiter) -> None:
