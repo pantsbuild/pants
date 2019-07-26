@@ -271,13 +271,7 @@ class PytestTest(PytestTestBase):
 
     self.add_to_build_file(
       'tests',
-      '''python_tests(
-  name = "sleep_no_timeout",
-  sources = ["test_core_sleep.py"],
-  dependencies = ["lib:core"],
-  coverage = ["core"],
-  timeout = 0,
-)
+      '''
 
 python_tests(
   name = "sleep_timeout",
@@ -391,8 +385,10 @@ python_tests(
       'tests/test_core_sleep.py',
       dedent("""
           import core
+          import time
 
           def test_three():
+            time.sleep(10)
             assert 1 == core.one()
         """))
 
@@ -423,7 +419,6 @@ python_tests(
     self.green3 = self.target('tests:green3')
     self.red = self.target('tests:red')
     self.red_in_class = self.target('tests:red_in_class')
-    self.sleep_no_timeout = self.target('tests:sleep_no_timeout')
     self.sleep_timeout = self.target('tests:sleep_timeout')
     self.error = self.target('tests:error')
     self.failure_outside_function = self.target('tests:failure_outside_function')
@@ -461,6 +456,15 @@ python_tests(
   @ensure_cached(PytestRun, expected_num_artifacts=3)
   def test_cache_greens_slow(self):
     self.run_tests(targets=[self.green, self.green2, self.green3], fast=False)
+
+  def test_timeout_slow(self):
+    # Confirm that if we run fast=False with timeouts, the correct test is blamed.
+    self.run_failing_tests(
+        targets=[self.green, self.sleep_timeout],
+        failed_targets=[self.sleep_timeout],
+        fast=False,
+        timeout_default=3,
+      )
 
   @ensure_cached(PytestRun, expected_num_artifacts=1)
   def test_out_of_band_deselect_fast_success(self):
