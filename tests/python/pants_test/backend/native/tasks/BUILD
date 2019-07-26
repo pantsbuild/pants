@@ -5,6 +5,7 @@ python_tests(
     'src/python/pants/backend/native/tasks',
   ],
   tags={'platform_specific_behavior'},
+  timeout=240,
 )
 
 python_library(
