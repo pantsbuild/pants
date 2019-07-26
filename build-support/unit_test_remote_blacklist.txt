@@ -11,4 +11,3 @@ tests/python/pants_test/ivy:bootstrapper
 tests/python/pants_test/ivy:ivy_subsystem
 tests/python/pants_test/java/distribution:distribution
 tests/python/pants_test/option:testing
-tests/python/pants_test/repo_scripts:git_hooks

@@ -1,15 +1,14 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_library(
-  name = 'common',
-  sources = 'common.py',
-  tags = {'type_checked'},
+files(
+  name = 'bash_scripts',
+  sources = globs('*.sh'),
 )
 
 python_binary(
   name = 'check_banned_imports',
-  sources = 'check_banned_imports.py',
+  source = 'check_banned_imports.py',
   dependencies = [
     ':common',
   ],
@@ -18,7 +17,7 @@ python_binary(
 
 python_binary(
   name = 'check_header',
-  sources = 'check_header.py',
+  source = 'check_header.py',
   dependencies = [
     ':common',
   ],
@@ -27,7 +26,7 @@ python_binary(
 
 python_binary(
   name = 'check_pants_pex_abi',
-  sources = 'check_pants_pex_abi.py',
+  source = 'check_pants_pex_abi.py',
   dependencies = [
     ':common',
   ],
@@ -36,16 +35,22 @@ python_binary(
 
 python_binary(
   name = 'ci',
-  sources = 'ci.py',
+  source = 'ci.py',
   dependencies = [
     ':common',
   ],
   tags = {'type_checked'},
 )
 
+python_library(
+  name = 'common',
+  source = 'common.py',
+  tags = {'type_checked'},
+)
+
 python_binary(
   name = 'deploy_to_s3',
-  sources = 'deploy_to_s3.py',
+  source = 'deploy_to_s3.py',
   dependencies = [
     ':common',
   ],
@@ -64,13 +69,13 @@ python_binary(
 
 python_binary(
   name = 'mypy',
-  sources = 'mypy.py',
+  source = 'mypy.py',
   tags = {'type_checked'},
 )
 
 python_binary(
   name = 'shellcheck',
-  sources = 'shellcheck.py',
+  source = 'shellcheck.py',
   dependencies = [
     ':common',
   ],
