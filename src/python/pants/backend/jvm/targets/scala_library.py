@@ -57,45 +57,28 @@ class ScalaLibrary(ExportableJvmLibrary):
       'java_sources': PrimitiveField(self.assert_list(java_sources, key_arg='java_sources')),
     })
 
-    if ScoveragePlatform.global_instance().get_options().enable_scoverage:
-      # Settings scalac_plugins
-      # Preventing instrumentation of generated targets or targets in Scoverage blacklist option.
-      if not self.skip_instrumentation(**kwargs):
-        if scalac_plugins:
-          scalac_plugins.append(SCOVERAGE)
-        else:
-          scalac_plugins = [SCOVERAGE]
+    scalac_plugins = scalac_plugins or []
+    scalac_plugin_args = scalac_plugin_args or {}
+    compiler_option_sets = compiler_option_sets or set()
 
-      # Setting scalac_plugin_args
-      if scalac_plugin_args:
+    # Modify these options in case scoverage is enabled.
+    if ScoveragePlatform.global_instance().get_options().enable_scoverage:
+      if not self.skip_instrumentation(**kwargs):
+        scalac_plugins.append(SCOVERAGE)
+
         scalac_plugin_args.update(
           {
             "scoverage": ["writeToClasspath:true",
               f"dataDir:{Target.compute_target_id(kwargs['address'])}"]
           })
-      else:
-        scalac_plugin_args = {
-          "scoverage": ["writeToClasspath:true",
-            f"dataDir:{Target.compute_target_id(kwargs['address'])}"]
-        }
 
-      # Setting compiler_option_sets
-      if compiler_option_sets:
-        list(compiler_option_sets).append(SCOVERAGE)
-      else:
-        compiler_option_sets = [SCOVERAGE]
+        compiler_option_sets.update([SCOVERAGE])
 
-      super().__init__(payload=payload,
-        scalac_plugins=scalac_plugins,
-        scalac_plugin_args=scalac_plugin_args,
-        compiler_option_sets=tuple(compiler_option_sets),
-        **kwargs)
-    else:
-      super().__init__(payload=payload,
-        scalac_plugins=scalac_plugins,
-        scalac_plugin_args=scalac_plugin_args,
-        compiler_option_sets=compiler_option_sets,
-        **kwargs)
+    super().__init__(payload=payload,
+      scalac_plugins=scalac_plugins,
+      scalac_plugin_args=scalac_plugin_args,
+      compiler_option_sets=compiler_option_sets,
+      **kwargs)
 
   @classmethod
   def compute_injectable_specs(cls, kwargs=None, payload=None):

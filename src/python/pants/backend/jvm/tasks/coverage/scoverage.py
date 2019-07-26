@@ -6,12 +6,11 @@ import os
 import re
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
-from pants.java.jar.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.coverage.engine import CoverageEngine
 from pants.base.exceptions import TaskError
+from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import relativize_paths, safe_mkdir, safe_mkdir_for, safe_walk, touch
-
 
 
 class Scoverage(CoverageEngine):
@@ -28,7 +27,6 @@ class Scoverage(CoverageEngine):
     def register_options(cls, register):
       super(Scoverage.Factory, cls).register_options(register)
 
-
       def scoverage_jar(name, **kwargs):
         return JarDependency(org='com.twitter.scoverage', name=name, rev='1.0.1-twitter', **kwargs)
 
@@ -39,26 +37,25 @@ class Scoverage(CoverageEngine):
         return JarDependency(org='org.pantsbuild', name='scoverage-report-generator_2.12',
           rev='0.0.1', **kwargs)
 
-
       # We need to inject report generator at runtime.
       cls.register_jvm_tool(register,
         'scoverage-report',
         classpath=[
-        scoverage_report_jar(),
-        JarDependency(org='commons-io', name='commons-io', rev='2.5'),
-        JarDependency(org='com.github.scopt', name='scopt_2.12', rev='3.7.0'),
-        slf4j_jar('slf4j-simple'), slf4j_jar('slf4j-api'),
-        scoverage_jar('scalac-scoverage-plugin_2.12')
+          scoverage_report_jar(),
+          JarDependency(org='commons-io', name='commons-io', rev='2.5'),
+          JarDependency(org='com.github.scopt', name='scopt_2.12', rev='3.7.0'),
+          slf4j_jar('slf4j-simple'), slf4j_jar('slf4j-api'),
+          scoverage_jar('scalac-scoverage-plugin_2.12')
         ]
       )
 
       register('--target-filters', type=list, default=[],
-        help='Regex patterns passed to scoverage report generator, specifying which targets should be '
+        help='Regex patterns passed to scoverage report generator, specifying which targets '
+             'should be '
              'included in reports. All targets matching any of the patterns will be '
              'included when generating reports. If no targets are specified, all '
              'targets are included, which would be the same as specifying ".*" as a '
              'filter.')
-
 
     def create(self, settings, targets, execute_java_for_targets):
       """
@@ -73,7 +70,7 @@ class Scoverage(CoverageEngine):
       """
 
       report_path = self.tool_classpath_from_products(settings.context.products, 'scoverage-report',
-                                                        scope='scoverage-report')
+        scope='scoverage-report')
 
       target_filters = Scoverage.Factory.global_instance().get_options().target_filters
 
@@ -98,7 +95,6 @@ class Scoverage(CoverageEngine):
     self._execute_java = functools.partial(execute_java_for_targets, targets)
     self._coverage_force = settings.options.coverage_force
     self._report_path = report_path
-
 
   #
   def _iter_datafiles(self, output_dir):
@@ -127,12 +123,10 @@ class Scoverage(CoverageEngine):
           yield os.path.join(root, d)
           break
 
-
   def instrument(self, output_dir):
     # Since scoverage does compile time instrumentation, we only need to clean-up existing runs.
     for datafile in self._iter_datafiles(output_dir):
       os.unlink(datafile)
-
 
   def run_modifications(self, output_dir):
     measurement_dir = os.path.join(output_dir, "scoverage", "measurements")
@@ -140,7 +134,6 @@ class Scoverage(CoverageEngine):
     data_dir_option = f'-Dscoverage_measurement_path={measurement_dir}'
 
     return self.RunModifications.create(extra_jvm_options=[data_dir_option])
-
 
   def report(self, output_dir, execution_failed_exception=None):
     if execution_failed_exception:
@@ -162,27 +155,26 @@ class Scoverage(CoverageEngine):
     for parent_measurements_dir in self._iter_datadirs(output_dir):
       final_target_dirs += self.filter_scoverage_targets(parent_measurements_dir)
 
-    args = ["--measurementsDirPath",f"{output_dir}",
-            "--htmlDirPath", f"{html_report_path}",
-            "--xmlDirPath", f"{xml_report_path}",
-            "--targetFilters", f"{','.join(final_target_dirs)}"]
-
+    args = ["--measurementsDirPath", f"{output_dir}",
+      "--htmlDirPath", f"{html_report_path}",
+      "--xmlDirPath", f"{xml_report_path}",
+      "--targetFilters", f"{','.join(final_target_dirs)}"]
 
     result = self._execute_java(classpath=scoverage_cp,
-                                main=main,
-                                jvm_options=self._settings.coverage_jvm_options,
-                                args=args,
-                                workunit_factory=self._context.new_workunit,
-                                workunit_name='scoverage-report-generator')
+      main=main,
+      jvm_options=self._settings.coverage_jvm_options,
+      args=args,
+      workunit_factory=self._context.new_workunit,
+      workunit_name='scoverage-report-generator')
 
     if result != 0:
-      raise TaskError(f"java {main} ... exited non-zero ({result}) - failed to scoverage-report-generator")
+      raise TaskError(
+        f"java {main} ... exited non-zero ({result}) - failed to scoverage-report-generator")
 
     self._settings.log.info(f"Scoverage html reports available at {html_report_path}")
     self._settings.log.info(f"Scoverage xml reports available at {xml_report_path}")
     if self._settings.coverage_open:
       return os.path.join(html_report_path, 'index.html')
-
 
   # Returns the directories under [measurements_dir] which need to
   # be passed to the report generator. If no filter is specified,

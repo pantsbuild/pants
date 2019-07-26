@@ -1,14 +1,14 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants_test.test_base import TestBase
-from pants_test.subsystem.subsystem_util import init_subsystem
-from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
-from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
-from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.java.jar.jar_dependency import JarDependency
 
+from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
+from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
+from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.java.jar.jar_dependency import JarDependency
+from pants_test.subsystem.subsystem_util import init_subsystem
+from pants_test.test_base import TestBase
 
 from textwrap import dedent
 
@@ -27,10 +27,9 @@ class ScoveragePlatformTest(TestBase):
 
     options2 = {
       ScoveragePlatform.options_scope: {
-        'enable_scoverage' : 'False'
+        'enable_scoverage': 'False'
       }
     }
-
 
     init_subsystem(ScalaPlatform, options)
     init_subsystem(ScoveragePlatform, options2)
@@ -43,12 +42,12 @@ class ScoveragePlatformTest(TestBase):
     self.make_target('//:scala-repl',
       JarLibrary,
       jars=[
-        JarDependency(org = 'org.scala-lang',
-          name = 'jline',
-          rev = '2.10.5'),
-        JarDependency(org = 'org.scala-lang',
-          name = 'scala-compiler',
-          rev = '2.10.5')])
+        JarDependency(org='org.scala-lang',
+          name='jline',
+          rev='2.10.5'),
+        JarDependency(org='org.scala-lang',
+          name='scala-compiler',
+          rev='2.10.5')])
 
     self.make_target('//:scalac',
       JarLibrary,
@@ -58,8 +57,6 @@ class ScoveragePlatformTest(TestBase):
       JarLibrary,
       jars=[JarDependency('org.scala-lang', 'scala-library', '2.10.5')])
 
-
-
   # ==========> TESTS <=============
   # ================================
   def test_subsystem_defaults(self):
@@ -68,7 +65,6 @@ class ScoveragePlatformTest(TestBase):
     subsystem = ScoveragePlatform.global_instance()
 
     self.assertEqual(False, subsystem.get_options().enable_scoverage)
-    self.assertEqual(self.scoverage_path, subsystem.get_options().scoverage_target_path)
 
   def test_subsystem_option_sets(self):
     init_subsystem(ScoveragePlatform)
@@ -77,8 +73,6 @@ class ScoveragePlatformTest(TestBase):
     subsystem = ScoveragePlatform.global_instance()
 
     self.assertEqual(True, subsystem.get_options().enable_scoverage)
-    self.assertEqual(self.scoverage_path, subsystem.get_options().scoverage_target_path)
-
 
   def test_library_scoverage_enabled(self):
     self.setup_scoverage_platform()
@@ -102,7 +96,6 @@ class ScoveragePlatformTest(TestBase):
     self.assertIn('//:scoverage', list(map(lambda t: t.address.spec, scala_target.dependencies)))
     self.assertIn('scoverage', list(scala_target.compiler_option_sets))
 
-
   def test_library_scoverage_disabled(self):
     self.setup_scoverage_platform()
     ScoveragePlatform.global_instance().get_options().enable_scoverage = False
@@ -123,10 +116,9 @@ class ScoveragePlatformTest(TestBase):
     self.assertNotIn('scoverage', scala_target.scalac_plugins)
     if scala_target.scalac_plugin_args:
       self.assertNotIn('scoverage', scala_target.scalac_plugin_args)
-    self.assertNotIn('//:scoverage', list(map(lambda t: t.address.spec ,scala_target.dependencies)))
+    self.assertNotIn('//:scoverage', list(map(lambda t: t.address.spec, scala_target.dependencies)))
     if scala_target.compiler_option_sets:
       self.assertNotIn('scoverage', list(scala_target.compiler_option_sets))
-
 
   def test_blacklist(self):
     """
@@ -154,5 +146,3 @@ class ScoveragePlatformTest(TestBase):
     scala_target = self.make_target('a/scala:blacked', ScalaLibrary, sources=['pass.scala'])
 
     self.assertNotIn('scoverage', scala_target.scalac_plugins)
-
-

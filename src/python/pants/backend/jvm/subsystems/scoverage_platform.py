@@ -3,16 +3,19 @@
 
 import logging
 import re
-from pants.build_graph.injectables_mixin import InjectablesMixin
-from pants.subsystem.subsystem import Subsystem
-from pants.java.jar.jar_dependency import JarDependency
+
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.address import Address
+from pants.build_graph.injectables_mixin import InjectablesMixin
+from pants.java.jar.jar_dependency import JarDependency
 from pants.option.custom_types import target_option
+from pants.subsystem.subsystem import Subsystem
+
 
 logger = logging.getLogger(__name__)
 
 SCOVERAGE = "scoverage"
+
 
 class ScoveragePlatform(InjectablesMixin, Subsystem):
   """The scoverage platform."""
@@ -35,7 +38,6 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
       help='List of targets not to be instrumented. Accepts Regex patterns. All '
            'targets matching any of the patterns will not be instrumented. If no targets '
            'are specified, all targets will be instrumented.')
-
 
   def scoverage_jar(self):
     return [JarDependency(org='com.twitter.scoverage', name='scalac-scoverage-plugin_2.12',
@@ -67,7 +69,6 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
       # Target spec for scoverage plugin.
       'scoverage': [f"//:scoverage"],
     }
-
 
   def is_blacklisted(self, target_address_spec) -> bool:
     """
