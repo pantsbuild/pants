@@ -418,7 +418,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     pytest_binary = self.context.products.get_data(PytestPrep.PytestBinary)
     return ensure_interpreter_search_path_env(pytest_binary.interpreter)
 
-  def _do_run_tests_with_args(self, pex, args):
+  def _do_run_tests_with_args(self, test_targets, pex, args):
     try:
       env = dict(os.environ)
 
@@ -455,7 +455,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
                                      labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
         # NB: Constrain the pex environment to ensure the use of the selected interpreter!
         env.update(self._ensure_pytest_interpreter_search_path())
-        rc = self.spawn_and_wait(pex, workunit=workunit, args=args, setsid=True, env=env)
+        rc = self.spawn_and_wait(test_targets, pex, workunit=workunit, args=args, setsid=True, env=env)
         return PytestResult.rc(rc)
     except ErrorWhileTesting:
       # spawn_and_wait wraps the test runner in a timeout, so it could
@@ -643,7 +643,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
         os.unlink(junitxml_path)
 
       with self._maybe_run_in_chroot():
-        result = self._do_run_tests_with_args(pytest_binary.pex, args)
+        result = self._do_run_tests_with_args(test_targets, pytest_binary.pex, args)
 
       # There was a problem prior to test execution preventing junit xml file creation so just let
       # the failure result bubble.

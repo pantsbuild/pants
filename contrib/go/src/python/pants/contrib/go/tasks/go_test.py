@@ -125,5 +125,5 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
       with self.context.new_workunit(
           name='go test', cmd=safe_shlex_join(go_cmd.cmdline), labels=workunit_labels) as workunit:
 
-        exit_code = self.spawn_and_wait(workunit=workunit, go_cmd=go_cmd, cwd=chroot)
+        exit_code = self.spawn_and_wait(test_targets, workunit=workunit, go_cmd=go_cmd, cwd=chroot)
         return TestResult.rc(exit_code)
