@@ -44,7 +44,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
   deprecated_options_scope = 'mypy'
   deprecated_options_scope_removal_version = '1.20.0.dev2'
 
-  WARNING_MESSAGE = None
+  WARNING_MESSAGE = "[WARNING]: All targets in context should be whitelisted for mypy to run"
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -93,7 +93,6 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
     return len(targets) == 0 or len(targets) == len(targets_in_context)
 
   def _whitelist_warning(self) -> None:
-    self.WARNING_MESSAGE = "[WARNING]: All targets in context should be whitelisted for mypy to run"
     self.context.log.warn(self.WARNING_MESSAGE)
 
   def _calculate_python_sources(self, target_roots: List[Target]):
