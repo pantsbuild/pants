@@ -5,7 +5,6 @@ import os
 import time
 
 from pants.base.exception_sink import ExceptionSink
-from pants.base.exiter import Exiter
 from pants.bin.pants_runner import PantsRunner
 from pants.util.contextutil import maybe_profiled
 
@@ -28,12 +27,8 @@ def test_env():
 def main():
   start_time = time.time()
 
-  # NB: This is the root exiter, so we don't need a contextmanager for this.
-  exiter = Exiter()
-  ExceptionSink.reset_exiter(exiter)
-
   with maybe_profiled(os.environ.get('PANTSC_PROFILE')):
     try:
       PantsRunner(start_time=start_time).run()
     except KeyboardInterrupt as e:
-      exiter.exit_and_fail('Interrupted by user:\n{}'.format(e))
+      ExceptionSink.get_global_exiter().exit_and_fail('Interrupted by user:\n{}'.format(e))

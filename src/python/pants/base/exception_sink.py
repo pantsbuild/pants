@@ -178,10 +178,10 @@ class ExceptionSink:
   class AccessGlobalExiterMixin:
     @property
     def _exiter(self) -> Exiter:
-      return ExceptionSink._get_global_exiter()
+      return ExceptionSink.get_global_exiter()
 
   @classmethod
-  def _get_global_exiter(cls) -> Exiter:
+  def get_global_exiter(cls) -> Exiter:
     return cls._exiter
 
   @classmethod
@@ -190,13 +190,13 @@ class ExceptionSink:
     previous_exiter = cls._exiter
     new_exiter = new_exiter_fun(previous_exiter)
     try:
-      cls.reset_exiter(new_exiter)
+      cls._reset_exiter(new_exiter)
       yield
     finally:
-      cls.reset_exiter(previous_exiter)
+      cls._reset_exiter(previous_exiter)
 
   @classmethod
-  def reset_exiter(cls, exiter: Exiter) -> None:
+  def _reset_exiter(cls, exiter: Exiter) -> None:
     """
     Class state:
     - Overwrites `cls._exiter`.
@@ -506,7 +506,7 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
 # Set the initial log location, for fatal errors during import time.
 ExceptionSink.reset_log_location(os.path.join(os.getcwd(), '.pants.d'))
 # Sets except hook for exceptions at import time.
-ExceptionSink.reset_exiter(Exiter(exiter=sys.exit))
+ExceptionSink._reset_exiter(Exiter(exiter=sys.exit))
 # Sets a SIGUSR2 handler.
 ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer)
 # Sets a handler that logs nonfatal signals to the exception sink before exiting.

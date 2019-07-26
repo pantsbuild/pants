@@ -259,7 +259,7 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
         clean_global_runtime_state(reset_subsystem=True)
 
         # Otherwise, conduct a normal run.
-        with ExceptionSink.exiter_as(PantsRunFailCheckerExiter):
+        with ExceptionSink.exiter_as(lambda _: PantsRunFailCheckerExiter()):
           runner = LocalPantsRunner.create(
             self._args,
             self._env,
