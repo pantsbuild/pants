@@ -53,6 +53,35 @@ class ScalaFixIntegrationTest(PantsRunIntegrationTest):
       test_fix = self.run_pants(['lint', target], options)
       self.assert_success(test_fix)
 
+  def test_scalafix_scalacoptions(self):
+
+    rules = {
+      'rules': 'RemoveUnused',
+      'semantic': True
+    }
+    options = {
+      'scala': {
+        'scalac_plugin_dep': f'{TEST_DIR}/rsc_compat:semanticdb-scalac',
+        'scalac_plugins': '+["semanticdb"]'
+      },
+      'compile.zinc': {'args': '+["-S-Ywarn-unused"]'},
+      'lint.scalafix': rules,
+      'fmt.scalafix': rules,
+      'lint.scalastyle': {'skip': True}
+    }
+
+    test_file_name = f'{TEST_DIR}/rsc_compat/RscCompat.scala'
+
+    with self.with_overwritten_file_content(test_file_name):
+      # format an incorrectly formatted file.
+      target = f'{TEST_DIR}/rsc_compat'
+      fmt_result = self.run_pants(['fmt', target], options)
+      self.assert_success(fmt_result)
+
+      # verify that the lint check passes.
+      test_fix = self.run_pants(['lint', target], options)
+      self.assert_success(test_fix)
+
   def test_rsccompat_fmt(self):
     options =  {
       'scala': {
