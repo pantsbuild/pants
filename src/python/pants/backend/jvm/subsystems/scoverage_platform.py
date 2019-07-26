@@ -73,7 +73,7 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
     }
 
 
-  def is_blacklisted(self, target) -> bool:
+  def is_blacklisted(self, target_address_spec) -> bool:
     """
     Checks if the [target] is blacklisted or not.
     """
@@ -82,7 +82,7 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
       return False
 
     for filter in self.get_options().blacklist_targets:
-      if re.search(filter, target.address.spec) is not None:
-        logger.info(f"{target.address.spec} found in blacklist, not instrumented.")
+      if re.search(filter, target_address_spec) is not None:
+        logger.info(f"{target_address_spec} found in blacklist, not instrumented.")
         return True
     return False

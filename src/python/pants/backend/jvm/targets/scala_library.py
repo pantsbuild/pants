@@ -54,7 +54,7 @@ class ScalaLibrary(ExportableJvmLibrary):
     if ScoveragePlatform.global_instance().get_options().enable_scoverage:
       # Settings scalac_plugins
       if not (Target.compute_target_id(kwargs['address']).startswith(".pants.d.gen") or
-              ScoveragePlatform.global_instance().is_blacklisted(self)):
+              ScoveragePlatform.global_instance().is_blacklisted(kwargs['address'].spec)):
         if scalac_plugins:
           scalac_plugins.append(SCOVERAGE)
         else:
