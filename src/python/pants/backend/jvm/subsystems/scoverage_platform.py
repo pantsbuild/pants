@@ -36,11 +36,6 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
            'targets matching any of the patterns will not be instrumented. If no targets '
            'are specified, all targets will be instrumented.')
 
-    register('--scoverage-target-path',
-      default='//:scoverage',
-      type=str,
-      help='Path to the scoverage dependency.')
-
 
   def scoverage_jar(self):
     return [JarDependency(org='com.twitter.scoverage', name='scalac-scoverage-plugin_2.12',
@@ -69,7 +64,8 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
   @property
   def injectables_spec_mapping(self):
     return {
-      'scoverage': [f"{self.get_options().scoverage_target_path}"],
+      # Target spec for scoverage plugin.
+      'scoverage': [f"//:scoverage"],
     }
 
 

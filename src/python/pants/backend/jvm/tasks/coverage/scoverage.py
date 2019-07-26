@@ -153,16 +153,19 @@ class Scoverage(CoverageEngine):
 
     main = 'org.pantsbuild.scoverage.report.ScoverageReport'
     scoverage_cp = self._report_path
+    html_report_path = os.path.join(output_dir, 'scoverage', 'reports', 'html')
+    xml_report_path = os.path.join(output_dir, 'scoverage', 'reports', 'xml')
+    safe_mkdir(html_report_path, clean=True)
+    safe_mkdir(xml_report_path, clean=True)
 
     final_target_dirs = []
     for parent_measurements_dir in self._iter_datadirs(output_dir):
       final_target_dirs += self.filter_scoverage_targets(parent_measurements_dir)
 
     args = ["--measurementsDirPath",f"{output_dir}",
-            "--htmlDirPath", f"{output_dir}/scoverage/reports/html",
-            "--xmlDirPath", f"{output_dir}/scoverage/reports/xml",
-            "--targetFilters", f"{','.join(final_target_dirs)}",
-            "--cleanOldReports"]
+            "--htmlDirPath", f"{html_report_path}",
+            "--xmlDirPath", f"{xml_report_path}",
+            "--targetFilters", f"{','.join(final_target_dirs)}"]
 
 
     result = self._execute_java(classpath=scoverage_cp,
@@ -175,14 +178,15 @@ class Scoverage(CoverageEngine):
     if result != 0:
       raise TaskError(f"java {main} ... exited non-zero ({result}) - failed to scoverage-report-generator")
 
-    self._settings.log.info(f"Scoverage html reports available at {output_dir}/scoverage/reports/html")
-    self._settings.log.info(f"Scoverage xml reports available at {output_dir}/scoverage/reports/xml")
+    self._settings.log.info(f"Scoverage html reports available at {html_report_path}")
+    self._settings.log.info(f"Scoverage xml reports available at {xml_report_path}")
     if self._settings.coverage_open:
-      return os.path.join(output_dir, 'scoverage', 'reports', 'html', 'index.html')
+      return os.path.join(html_report_path, 'index.html')
 
 
   # Returns the directories under [measurements_dir] which need to
-  # be passed to the report generator.
+  # be passed to the report generator. If no filter is specified,
+  # all the directories are returned.
   def filter_scoverage_targets(self, measurements_dir):
     return [d for d in os.listdir(measurements_dir) if self._include_dir(d)]
 
