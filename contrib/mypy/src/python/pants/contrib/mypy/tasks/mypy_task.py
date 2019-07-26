@@ -32,8 +32,8 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
   Mypy lint task filters out target_roots that are not properly tagged according to
   --whitelisted-tag-name (defaults to None, and no filtering occurs if this option is 'None'),
   and executes MyPy on targets in context from whitelisted target roots.
-  Next, if any transitive targets from the filtered roots are not whitelisted, a Warning.
-  will be thrown.
+  Next, if any transitive targets from the filtered roots are not whitelisted, a warning
+  will be printed.
 
   'In context' meaning in the sub-graph where a whitelisted target is the root
   """
@@ -89,8 +89,8 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
     return (self.is_non_synthetic_python_target(target) and
             self._is_tagged_target(target))
 
-  def _all_targets_in_context_are_whitelisted(self, targets: List[Target], targets_in_context: List[Target]) -> bool:
-    return len(targets) == 0 or len(targets) == len(targets_in_context)
+  def _all_targets_are_whitelisted(self, targets: List[Target], all_targets: List[Target]) -> bool:
+    return len(targets) == 0 or len(targets) == len(all_targets)
 
   def _whitelist_warning(self) -> None:
     self.context.log.warn(self.WARNING_MESSAGE)

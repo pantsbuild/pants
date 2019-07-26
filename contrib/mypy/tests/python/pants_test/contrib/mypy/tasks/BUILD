@@ -18,5 +18,4 @@ python_tests(
     'tests/python/pants_test:task_test_base',
     'contrib/mypy/src/python/pants/contrib/mypy/tasks',
   ],
-  timeout = 6000,
 )
