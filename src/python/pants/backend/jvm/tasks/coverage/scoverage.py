@@ -22,7 +22,7 @@ class Scoverage(CoverageEngine):
 
     # Cannot have the same scope as ScoveragePlatform, i.e they
     # both cannot share the scope `scoverage`.
-    options_scope = 'scoverage-runtime'
+    options_scope = 'scoverage-report'
 
     @classmethod
     def register_options(cls, register):
@@ -53,7 +53,7 @@ class Scoverage(CoverageEngine):
       )
 
       register('--target-filters', type=list, default=[],
-        help='Regex patterns passed to scoverage, specifying which targets should be '
+        help='Regex patterns passed to scoverage report generator, specifying which targets should be '
              'included in reports. All targets matching any of the patterns will be '
              'included when generating reports. If no targets are specified, all '
              'targets are included, which would be the same as specifying ".*" as a '
@@ -73,7 +73,7 @@ class Scoverage(CoverageEngine):
       """
 
       report_path = self.tool_classpath_from_products(settings.context.products, 'scoverage-report',
-                                                        scope='scoverage-runtime')
+                                                        scope='scoverage-report')
 
       target_filters = Scoverage.Factory.global_instance().get_options().target_filters
 
@@ -105,7 +105,7 @@ class Scoverage(CoverageEngine):
     """
     All scoverage instrument files have the name "scoverage.coverage" and
     all measurement files are called "scoverage.measurements.<Thread ID>".
-    This function is used in [indtrument(output_dir)] function below to clean up
+    This function is used in [instrument(output_dir)] function below to clean up
     all pre-existing scoverage files before generating new ones.
     """
     for root, _, files in safe_walk(output_dir):

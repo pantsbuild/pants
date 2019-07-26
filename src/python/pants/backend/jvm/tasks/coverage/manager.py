@@ -77,8 +77,7 @@ class CodeCoverage(Subsystem):
     # We need to fingerprint this even though it nominally UI-only affecting option since the
     # presence of this option alone can implicitly flag on `--coverage`.
     register('--coverage-open', type=bool, fingerprint=True,
-             help='Open the generated HTML coverage report in a browser. Implies --coverage '
-                  'with cobertura as the engine.')
+             help='Open the generated HTML coverage report in a browser. Implies --coverage ')
 
     register('--coverage-jvm-options', advanced=True, type=list, fingerprint=True,
              help='JVM flags to be added when running the coverage processor. For example: '

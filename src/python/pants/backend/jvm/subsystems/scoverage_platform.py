@@ -83,6 +83,6 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
 
     for filter in self.get_options().blacklist_targets:
       if re.search(filter, target_address_spec) is not None:
-        logger.info(f"{target_address_spec} found in blacklist, not instrumented.")
+        logger.debug(f"{target_address_spec} found in blacklist, not instrumented.")
         return True
     return False

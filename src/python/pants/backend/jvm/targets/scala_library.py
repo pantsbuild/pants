@@ -11,6 +11,7 @@ from pants.base.payload_field import PrimitiveField
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 
+
 SCOVERAGE = "scoverage"
 
 
@@ -33,6 +34,11 @@ class ScalaLibrary(ExportableJvmLibrary):
   def subsystems(cls):
     return super().subsystems() + (ScalaPlatform, ScoveragePlatform,)
 
+  @staticmethod
+  def skip_instrumentation(**kwargs):
+    return (Target.compute_target_id(kwargs['address']).startswith(".pants.d.gen") or
+            ScoveragePlatform.global_instance().is_blacklisted(kwargs['address'].spec))
+
   def __init__(self, java_sources=None, scalac_plugins=None, scalac_plugin_args=None,
     compiler_option_sets=None, payload=None, **kwargs):
     """
@@ -53,8 +59,8 @@ class ScalaLibrary(ExportableJvmLibrary):
 
     if ScoveragePlatform.global_instance().get_options().enable_scoverage:
       # Settings scalac_plugins
-      if not (Target.compute_target_id(kwargs['address']).startswith(".pants.d.gen") or
-              ScoveragePlatform.global_instance().is_blacklisted(kwargs['address'].spec)):
+      # Preventing instrumentation of generated targets or targets in Scoverage blacklist option.
+      if not self.skip_instrumentation(**kwargs):
         if scalac_plugins:
           scalac_plugins.append(SCOVERAGE)
         else:
@@ -90,7 +96,6 @@ class ScalaLibrary(ExportableJvmLibrary):
         scalac_plugin_args=scalac_plugin_args,
         compiler_option_sets=compiler_option_sets,
         **kwargs)
-
 
   @classmethod
   def compute_injectable_specs(cls, kwargs=None, payload=None):
