@@ -15,7 +15,6 @@ python_tests(
   name = 'build_root',
   sources = ['test_build_root.py'],
   dependencies = [
-    '//:pants_script',
     'src/python/pants/base:build_root',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

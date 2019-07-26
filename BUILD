@@ -1,6 +1,10 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+# NB: We cannot depend on `./pants`. When running tests with V1, the folder in `.pants.d` will strip
+# the prefix so `src/python/pants` -> `pants`. You cannot both have a directory named `pants` and a
+# file named `pants`, so this causes most V1 tests to fail.
+
 files(
   name = 'build_tools',
   source = 'BUILD.tools',
@@ -11,16 +15,6 @@ files(
   source = '3rdparty/BUILD',
 )
 
-# NB: Be careful when using this in tests! Some tests will use this to determine the buildroot and
-# then dynamically try to open other files relative to the buildroot, such as BUILD.tools. This
-# should not be used to dynamically import other files—those must be explicitly imported via their
-# own BUILD entries.
-files(
-  name = 'pants_script',
-  source = 'pants',
-)
-
-# Usually this must be accompanied with `pants_script` to be discovered properly.
 files(
   name = 'pants_ini',
   source = 'pants.ini'

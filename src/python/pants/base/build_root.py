@@ -11,33 +11,31 @@ from pants.util.meta import Singleton
 class BuildRoot(Singleton):
   """Represents the global workspace build root.
 
-  By default a pants workspace is defined by a root directory where a file called 'pants' -
-  typically the pants runner script - lives.  This path can also be manipulated through
+  By default a Pants workspace is defined by a root directory where a file called 'pants' -
+  typically the Pants runner script - lives. The expected file can be changed from 'pants' to
+  something else, which is useful for testing. Likewise, this path can also be manipulated through
   this interface for re-location of the build root in tests.
-
-  TODO: If this ever causes a problem (because some subdir that people run pants in
-        legitimately contains a file called 'pants') then we can add a second check for
-        an explicit sentinel file, like 'BUILDROOT'.
   """
 
   class NotFoundError(Exception):
     """Raised when unable to find the current workspace build root."""
 
-  @classmethod
-  def find_buildroot(cls):
+  def find_buildroot(self):
     buildroot = os.path.abspath(os.getcwd())
-    while not os.path.isfile(os.path.join(buildroot, 'pants')):
+    while not os.path.isfile(os.path.join(buildroot, self._sentinel_filename)):
       parent = os.path.dirname(buildroot)
       if buildroot != parent:
         buildroot = parent
       else:
-        raise cls.NotFoundError('No buildroot detected. Pants detects the buildroot by looking '
-                                'for a file named pants in the cwd and its ancestors.  Typically '
-                                'this is the runner script that executes pants.  If you have no '
-                                'such script you can create an empty file in your buildroot.')
+        raise self.NotFoundError('No buildroot detected. Pants detects the buildroot by looking '
+                                 f'for a file named {self._sentinel_filename} in the cwd and its '
+                                 'ancestors. Typically this is the runner script that executes '
+                                 'Pants. If you have no such script you can create an empty file '
+                                 'in your buildroot.')
     return buildroot
 
-  def __init__(self):
+  def __init__(self, *, sentinel_filename: str = "pants"):
+    self._sentinel_filename = sentinel_filename
     self._root_dir = None
 
   @property

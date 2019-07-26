@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from collections import defaultdict
+from pathlib import Path
 
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_util import is_list_option
@@ -180,8 +181,15 @@ def create_options_for_optionables(optionables,
   # TODO: This sequence is a bit repetitive of the real registration sequence.
 
   # Register bootstrap options and grab their default values for use in subsequent registration.
-  GlobalOptionsRegistrar.register_bootstrap_options(register_func(GLOBAL_SCOPE))
+  # We override the default buildroot sentinel filename of "pants" and create a temporary file so
+  # that we can load up pants.ini without any issues.
+  buildroot_sentinel_filename = "pants.test"
+  Path(buildroot_sentinel_filename).touch()
+  GlobalOptionsRegistrar.register_bootstrap_options(
+    register_func(GLOBAL_SCOPE), buildroot_sentinel_filename=buildroot_sentinel_filename
+  )
   bootstrap_option_values = _FakeOptionValues(all_options[GLOBAL_SCOPE].copy())
+  Path(buildroot_sentinel_filename).unlink()
 
   # Now register the full global scope options.
   GlobalOptionsRegistrar.register_options(register_func(GLOBAL_SCOPE))

@@ -101,7 +101,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
   options_scope_category = ScopeInfo.GLOBAL
 
   @classmethod
-  def register_bootstrap_options(cls, register):
+  def register_bootstrap_options(cls, register, *, buildroot_sentinel_filename: str = "pants"):
     """Register bootstrap options.
 
     "Bootstrap options" are a small set of options whose values are useful when registering other
@@ -114,10 +114,10 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     Note that regular code can also access these options as normal global-scope options. Their
     status as "bootstrap options" is only pertinent during option registration.
     """
-    buildroot = get_buildroot()
+    buildroot = get_buildroot(sentinel_filename=buildroot_sentinel_filename)
     default_distdir_name = 'dist'
     default_distdir = os.path.join(buildroot, default_distdir_name)
-    default_rel_distdir = '/{}/'.format(default_distdir_name)
+    default_rel_distdir = f'/{default_distdir_name}/'
 
     register('-l', '--level', choices=['trace', 'debug', 'info', 'warn'], default='info',
              recursive=True, help='Set the logging level.')

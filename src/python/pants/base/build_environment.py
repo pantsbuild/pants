@@ -23,12 +23,12 @@ def pants_release():
           .format(version=pants_version()))
 
 
-def get_buildroot():
-  """Returns the pants build root, calculating it if needed.
+def get_buildroot(*, sentinel_filename: str = "pants") -> str:
+  """Returns the Pants build root, calculating it if needed.
 
   :API: public
   """
-  return BuildRoot().path
+  return BuildRoot(sentinel_filename=sentinel_filename).path
 
 
 def get_pants_cachedir():

@@ -4,7 +4,6 @@
 python_library(
   dependencies=[
     '//:pants_ini',
-    '//:pants_script',
     'src/python/pants/option',
   ],
 )
