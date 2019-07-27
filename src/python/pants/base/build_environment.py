@@ -23,16 +23,12 @@ def pants_release():
           .format(version=pants_version()))
 
 
-def get_buildroot(*, sentinel_filename: str = "pants") -> str:
+def get_buildroot() -> str:
   """Returns the Pants build root, calculating it if needed.
 
   :API: public
-  :param sentinel_filename: The file to look for to establish the buildroot. This is currently only
-                            used for testing purposes.
   """
-  build_root = BuildRoot()
-  build_root.sentinel_file = sentinel_filename
-  return build_root.path
+  return BuildRoot().path
 
 
 def get_pants_cachedir():
@@ -53,9 +49,9 @@ def get_pants_configdir():
   return os.path.expanduser(os.path.join(config_home, 'pants'))
 
 
-def get_default_pants_config_file(*, buildroot_sentinel_filename: str = "pants") -> str:
+def get_default_pants_config_file() -> str:
   """Return the default location of the pants config file."""
-  return os.path.join(get_buildroot(sentinel_filename=buildroot_sentinel_filename), 'pants.ini')
+  return os.path.join(get_buildroot(), 'pants.ini')
 
 
 _SCM = None

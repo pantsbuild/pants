@@ -101,7 +101,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
   options_scope_category = ScopeInfo.GLOBAL
 
   @classmethod
-  def register_bootstrap_options(cls, register, *, buildroot_sentinel_filename: str = "pants"):
+  def register_bootstrap_options(cls, register):
     """Register bootstrap options.
 
     "Bootstrap options" are a small set of options whose values are useful when registering other
@@ -114,7 +114,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     Note that regular code can also access these options as normal global-scope options. Their
     status as "bootstrap options" is only pertinent during option registration.
     """
-    buildroot = get_buildroot(sentinel_filename=buildroot_sentinel_filename)
+    buildroot = get_buildroot()
     default_distdir_name = 'dist'
     default_distdir = os.path.join(buildroot, default_distdir_name)
     default_rel_distdir = f'/{default_distdir_name}/'
@@ -195,10 +195,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'live outside of the dir used by `--pants-workdir` to allow for tracking '
                   'subprocesses that outlive the workdir data (e.g. `./pants server`).')
     register('--pants-config-files', advanced=True, type=list, daemon=False,
-             default=[
-               get_default_pants_config_file(buildroot_sentinel_filename=buildroot_sentinel_filename)
-             ],
-             help='Paths to Pants config files.')
+             default=[get_default_pants_config_file()], help='Paths to Pants config files.')
     # TODO: Deprecate the --pantsrc/--pantsrc-files options?  This would require being able
     # to set extra config file locations in an initial bootstrap config file.
     register('--pantsrc', advanced=True, type=bool, default=True,
