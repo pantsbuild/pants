@@ -7,9 +7,7 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-
 from pants.java.jar.jar_dependency import JarDependency
-
 from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.test_base import TestBase
 
