@@ -43,5 +43,4 @@ class RunnerIntegrationTest(PantsRunIntegrationTest):
       },
     })
     self.assert_success(non_warning_run)
-    self.assertNotIn('DEPRECATED', non_warning_run.stderr_data)
     self.assertNotIn('test warning', non_warning_run.stderr_data)

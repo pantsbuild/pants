@@ -1,6 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import enum
 import functools
 import os
 from multiprocessing import cpu_count
@@ -26,12 +27,14 @@ from pants.backend.jvm.tasks.jvm_compile.missing_dependency_finder import (Compi
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnitLabel
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, PathGlobsAndRoot
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
+from pants.option.ranked_value import RankedValue
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import Timer, temporary_dir
 from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_file_dump, safe_mkdir,
@@ -55,6 +58,11 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
   """
 
   size_estimators = create_size_estimators()
+
+  class Compiler(enum.Enum):
+    ZINC = 'zinc'
+    RSC = 'rsc'
+    JAVAC = 'javac'
 
   @classmethod
   def size_estimator_by_name(cls, estimation_strategy_name):
@@ -387,9 +395,21 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                           sources=self._compute_sources_for_target(target))
 
   def execute(self):
-    if JvmPlatform.global_instance().get_options().compiler != self.compiler_name:
-      # If the requested compiler is not the one supported by this task,
-      # bail early.
+    requested_compiler = JvmPlatform.global_instance().get_options().compiler
+    if requested_compiler != self.compiler_name:
+      return
+    deprecated_conditional(
+      lambda:  requested_compiler == self.Compiler.ZINC,
+      removal_version='1.20.0.dev0',
+      entity_description='Requested a deprecated compiler: [{}].'.format(requested_compiler),
+      hint_message='Compiler will be defaulted to [{}].'.format(self.compiler_name))
+
+    if requested_compiler == self.Compiler.ZINC and self.compiler_name == self.Compiler.RSC:
+      # Issue a deprecation warning (above) and rewrite zinc to rsc, as zinc is being deprecated.
+      JvmPlatform.global_instance().get_options().compiler = RankedValue(0, self.compiler_name)
+    elif requested_compiler != self.compiler_name:
+      # If the requested compiler is not the one supported by this task, log and abort
+      self.context.log.debug('Requested an unsupported compiler [{}], aborting'.format(requested_compiler))
       return
 
     # In case we have no relevant targets and return early, create the requested product maps.

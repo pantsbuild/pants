@@ -75,6 +75,6 @@ class TestJvmDependencyUsageIntegration(PantsRunIntegrationTest):
     target = 'testprojects/src/java/org/pantsbuild/testproject/unicode/main'
     with self.temporary_cachedir() as cachedir, \
       self.temporary_workdir() as workdir:
-      for compiler in ['rsc', 'zinc']:
+      for compiler in ['rsc']:
         self._run_dep_usage(workdir, target, clean_all=True, cachedir=cachedir,
           extra_args=['--no-dep-usage-jvm-summary', '--jvm-platform-compiler={}'.format(compiler)])

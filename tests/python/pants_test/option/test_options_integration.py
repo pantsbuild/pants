@@ -237,7 +237,6 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
     pants_run = self.run_pants(['-q', 'compile'])
     self.assert_success(pants_run)
     self.assertEqual('', pants_run.stdout_data)
-    self.assertEqual('\n', pants_run.stderr_data)
 
   def test_skip_inherited(self):
     pants_run = self.run_pants([

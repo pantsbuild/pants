@@ -23,11 +23,13 @@ scala_library(
   sources = ['Scala.scala'],
   dependencies = [':scala-2'],
   exports = [':scala-2'],
-  tags = {'use-compiler:rsc-and-zinc'},
+  # TODO: Enable this when #8109 ships
+  # tags = {'use-compiler:rsc-and-zinc'},
 )
 
 scala_library(
   name = 'scala-2',
   sources = ['Scala2.scala'],
-  tags = {'use-compiler:rsc-and-zinc'},
+  # TODO: Enable this when #8109 ships
+  # tags = {'use-compiler:rsc-and-zinc'},
 )

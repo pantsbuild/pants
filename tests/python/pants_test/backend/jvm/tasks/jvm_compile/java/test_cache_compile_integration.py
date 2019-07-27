@@ -38,7 +38,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       temporary_dir(root_dir=get_buildroot()) as src_dir:
 
       config = {
-        'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
+        'cache.compile.rsc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
         'compile.zinc': {'incremental_caching': True},
         'java': {'strict_deps': False},
       }
@@ -107,7 +107,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         temporary_dir(root_dir=get_buildroot()) as src_dir:
 
       config = {
-        'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
+        'cache.compile.rsc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
         'compile.zinc': {'incremental_caching': True },
       }
 
@@ -144,7 +144,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       # Should cause NotMain.class to be removed
       self.run_compile(cachetest_spec, config, workdir)
 
-      root = os.path.join(workdir, 'compile', 'zinc')
+      root = os.path.join(workdir, 'compile', 'rsc')
 
       task_versions = [p for p in os.listdir(root) if p != 'current']
       self.assertEqual(len(task_versions), 1, 'Expected 1 task version.')
@@ -159,7 +159,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       self.assertIn('current', target_workdirs)
 
       def classfiles(d):
-        cd = os.path.join(target_workdir_root, d, 'classes', 'org', 'pantsbuild', 'cachetest')
+        cd = os.path.join(target_workdir_root, d, 'zinc', 'classes', 'org', 'pantsbuild', 'cachetest')
         return sorted(os.listdir(cd))
 
       # One workdir should contain NotMain, and the other should contain Main.
@@ -172,7 +172,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
     with temporary_dir() as cache_dir, temporary_dir(root_dir=get_buildroot()) as src_dir, \
       temporary_dir(root_dir=get_buildroot(), suffix='.pants.d') as workdir:
       config = {
-        'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
+        'cache.compile.rsc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
       }
 
       dep_src_file = os.path.join(src_dir, 'org', 'pantsbuild', 'dep', 'A.scala')
@@ -207,7 +207,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         run_two = self.run_compile(con_spec, config, new_workdir)
         self.assertTrue(
             re.search(
-              "\[zinc\][^[]*\[cache\][^[]*Using cached artifacts for 2 targets.",
+              "Using cached artifacts for 2 targets.",
               run_two.stdout_data),
             run_two.stdout_data)
 
@@ -223,7 +223,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         run_three = self.run_compile(con_spec, config, new_workdir)
         self.assertTrue(
             re.search(
-              r"/org/pantsbuild/consumer:consumer\)[^[]*\[compile\][^[]*\[zinc\]\W*\[info\] Compile success",
+              r"consumer[\s\S]*Compile success",
               run_three.stdout_data),
             run_three.stdout_data)
 
@@ -261,7 +261,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       def complete_config(config):
         # Clone the input config and add cache settings.
         cache_settings = {'write_to': [cache_dir], 'read_from': [cache_dir]}
-        return dict(list(config.items()) + [('cache.compile.zinc', cache_settings)])
+        return dict(list(config.items()) + [('cache.compile.rsc', cache_settings)])
 
       buildfile = os.path.join(src_dir, 'BUILD')
       spec = os.path.join(src_dir, ':cachetest')

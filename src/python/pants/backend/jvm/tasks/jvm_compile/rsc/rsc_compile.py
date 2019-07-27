@@ -9,6 +9,7 @@ import re
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext  # noqa
 from pants.backend.jvm.subsystems.rsc import Rsc
 from pants.backend.jvm.subsystems.shader import Shader
+from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
@@ -18,6 +19,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.mirrored_target_option_mixin import MirroredTargetOptionMixin
+from pants.cache.cache_setup import CacheSetup
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryToMaterialize, PathGlobs,
                              PathGlobsAndRoot)
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
@@ -107,10 +109,18 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   _name = 'mixed' # noqa
   compiler_name = 'rsc'
 
+  deprecated_options_scope = 'compile.zinc'
+  deprecated_options_scope_removal_version = '1.20.0.dev0'
+
   @classmethod
   def subsystem_dependencies(cls):
+    dep = CacheSetup.scoped(
+      Zinc.Factory,
+      removal_version='1.20.0.dev0',
+      removal_hint='Cache options for `zinc` should move to `rsc`.'
+    )
     return super().subsystem_dependencies() + (
-      Rsc,
+      Rsc, dep.optionable_cls
     )
 
   @memoized_property
@@ -161,8 +171,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       help='Always compile targets marked with this tag with rsc, unless the workflow is '
            'specified on the cli.')
     register('--workflow', type=cls.JvmCompileWorkflowType,
-      default=cls.JvmCompileWorkflowType.rsc_and_zinc, metavar='<workflow>',
-      help='The workflow to use to compile JVM targets.')
+      default=cls.JvmCompileWorkflowType.zinc_only, metavar='<workflow>',
+      help='The workflow to use to compile JVM targets.', fingerprint=True)
 
     register('--extra-rsc-args', type=list, default=[],
              help='Extra arguments to pass to the rsc invocation.')
@@ -227,8 +237,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       zinc_cc = merged_cc.zinc_cc
       if rsc_cc.workflow is not None:
         cp_entries = rsc_cc.workflow.resolve_for_enum_variant({
-          'zinc-only': lambda: confify([zinc_cc.jar_file]),
-          'zinc-java': lambda: confify([zinc_cc.jar_file]),
+          'zinc-only': lambda: confify([self._classpath_for_context(zinc_cc)]),
+          'zinc-java': lambda: confify([self._classpath_for_context(zinc_cc)]),
           'rsc-and-zinc': lambda: confify([rsc_cc.rsc_jar_file]),
         })()
         self.context.products.get_data('rsc_mixed_compile_classpath').add_for_target(

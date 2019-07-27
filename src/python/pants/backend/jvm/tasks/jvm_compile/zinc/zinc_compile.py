@@ -632,7 +632,6 @@ class BaseZincCompile(JvmCompile):
 
 class ZincCompile(BaseZincCompile):
   """Compile Scala and Java code to classfiles using Zinc."""
-
   compiler_name = 'zinc'
 
   @classmethod

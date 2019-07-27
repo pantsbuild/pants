@@ -21,9 +21,9 @@ _HEADER = 'invocation_id,task_name,targets_hash,target_id,cache_key_id,cache_key
 _REPORT_LOCATION = 'reports/latest/invalidation-report.csv'
 
 _ENTRY = re.compile(r'^\d+,\S+,(init|pre-check|post-check),(True|False)')
-_INIT = re.compile(r'^\d+,ZincCompile_compile_zinc,\w+,\S+,init,(True|False)')
-_POST = re.compile(r'^\d+,ZincCompile_compile_zinc,\w+,\S+,post-check,(True|False)')
-_PRE = re.compile(r'^\d+,ZincCompile_compile_zinc,\w+,\S+,pre-check,(True|False)')
+_INIT = re.compile(r'^\d+,RscCompile_compile_rsc,\w+,\S+,init,(True|False)')
+_POST = re.compile(r'^\d+,RscCompile_compile_rsc,\w+,\S+,post-check,(True|False)')
+_PRE = re.compile(r'^\d+,RscCompile_compile_rsc,\w+,\S+,pre-check,(True|False)')
 
 
 class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
@@ -39,6 +39,9 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       self.assertTrue(os.path.exists(output))
       with open(output, 'r') as f:
         self.assertEqual(_HEADER, f.readline())
+        init = False
+        pre = False
+        post = False
         for line in f.readlines():
           self.assertTrue(_ENTRY.match(line))
           if _INIT.match(line):
@@ -64,8 +67,8 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       output = os.path.join(workdir, 'reports', report_dirs[0], 'invalidation-report.csv')
       self.assertTrue(os.path.exists(output), msg='Missing report file {}'.format(output))
 
-  INFO_LEVEL_COMPILE_MSG='Compiling 1 zinc source in 1 target (examples/src/java/org/pantsbuild/example/hello/simple:simple).'
-  DEBUG_LEVEL_COMPILE_MSG='compile(examples/src/java/org/pantsbuild/example/hello/simple:simple) finished with status Successful'
+  INFO_LEVEL_COMPILE_MSG='Compiling 1 mixed source in 1 target (examples/src/java/org/pantsbuild/example/hello/simple:simple).'
+  DEBUG_LEVEL_COMPILE_MSG='examples/src/java/org/pantsbuild/example/hello/simple:simple) finished with status Successful'
 
   def test_output_level_warn(self):
     command = ['compile',
@@ -117,10 +120,10 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
                'examples/src/java/org/pantsbuild/example/hello::']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
-    self.assertIn('Compiling 1 zinc source in 1 target (examples/src/java/org/pantsbuild/example/hello/greet:greet)',
+    self.assertIn('Compiling 1 mixed source in 1 target (examples/src/java/org/pantsbuild/example/hello/greet:greet)',
                   pants_run.stdout_data)
-    # Check zinc's label
-    self.assertIn('[zinc]\n', pants_run.stdout_data)
+    # Check rsc's label
+    self.assertIn('[rsc]\n', pants_run.stdout_data)
 
   def test_suppress_compiler_output(self):
     command = ['compile',
@@ -129,13 +132,13 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
                '--reporting-console-tool-output-format={ "COMPILER" : "CHILD_SUPPRESS"}']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
-    self.assertIn('Compiling 1 zinc source in 1 target (examples/src/java/org/pantsbuild/example/hello/greet:greet)',
+    self.assertIn('Compiling 1 mixed source in 1 target (examples/src/java/org/pantsbuild/example/hello/greet:greet)',
                   pants_run.stdout_data)
     for line in pants_run.stdout_data:
-      # zinc's stdout should be suppressed
+      # rsc's stdout should be suppressed
       self.assertNotIn('Compile success at ', line)
-      # zinc's label should be suppressed
-      self.assertNotIn('[zinc]', line)
+      # rsc's label should be suppressed
+      self.assertNotIn('[rsc]', line)
 
   def test_suppress_background_workunits_output(self):
     command = ['compile',
@@ -301,15 +304,15 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
       trace = assert_single_element(ZipkinHandler.traces.values())
 
-      zinc_task_span = self.find_spans_by_name_and_service_name(trace, 'zinc', 'pants/task')
-      self.assertEqual(len(zinc_task_span), 1)
-      zinc_task_span_id = zinc_task_span[0]['id']
+      rsc_task_span = self.find_spans_by_name_and_service_name(trace, 'rsc', 'pants/task')
+      self.assertEqual(len(rsc_task_span), 1)
+      rsc_task_span_id = rsc_task_span[0]['id']
 
       compile_workunit_spans = self.find_spans_by_name_and_service_name(
         trace, 'compile', 'pants/workunit'
       )
       self.assertEqual(len(compile_workunit_spans), 3)
-      self.assertTrue(all(span['parentId'] == zinc_task_span_id for span in compile_workunit_spans))
+      self.assertTrue(all(span['parentId'] == rsc_task_span_id for span in compile_workunit_spans))
 
   @staticmethod
   def find_spans_by_name_and_service_name(trace, name, service_name):

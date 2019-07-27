@@ -59,7 +59,7 @@ minimized=("$(./pants minimize ${dependees[@]})")
 # once, but that would merge all the classpaths of all the test targets together, which may cause
 # errors. See https://www.pantsbuild.org/3rdparty_jvm.html#managing-transitive-dependencies.
 # TODO(#7480): Background cache activity when running in a loop can sometimes lead to race conditions which
-# cause pants to error. This can probably be worked around with --no-cache-compile-zinc-write. See
+# cause pants to error. This can probably be worked around with --no-cache-compile-rsc-write. See
 # https://github.com/pantsbuild/pants/issues/7480.
 for target in $(cat minimized.txt); do
   ./pants test $target

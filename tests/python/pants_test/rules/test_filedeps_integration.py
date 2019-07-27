@@ -19,7 +19,6 @@ class FiledepsIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(args)
     self.assert_success(pants_run)
 
-    self.assertEqual("", pants_run.stderr_data)
     self.assertEqual(pants_run.returncode, 0)
 
     self.assertEqual(pants_run.stdout_data, dedent(
