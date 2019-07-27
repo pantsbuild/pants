@@ -155,9 +155,9 @@ class Scoverage(CoverageEngine):
       final_target_dirs += self.filter_scoverage_targets(parent_measurements_dir)
 
     args = ["--measurementsDirPath", f"{output_dir}",
-      "--htmlDirPath", f"{html_report_path}",
-      "--xmlDirPath", f"{xml_report_path}",
-      "--targetFilters", f"{','.join(final_target_dirs)}"]
+            "--htmlDirPath", f"{html_report_path}",
+            "--xmlDirPath", f"{xml_report_path}",
+            "--targetFilters", f"{','.join(final_target_dirs)}"]
 
     result = self._execute_java(classpath=scoverage_cp,
       main=main,
