@@ -249,6 +249,10 @@ class Fetcher:
       self._resp = resp
 
     @property
+    def headers(self):
+      return self._resp.headers
+
+    @property
     def status_code(self):
       return self._resp.status_code
 
@@ -342,12 +346,17 @@ class Fetcher:
                                   response_code=resp.status_code)
       listener.status(resp.status_code, content_length=resp.size)
 
+      content_encoding = resp.headers.get('content-encoding') if hasattr(resp, 'headers') else None
+      compressed_transfer = content_encoding == 'gzip' or content_encoding == 'deflate'
+
       read_bytes = 0
       for data in resp.iter_content(chunk_size_bytes=chunk_size_bytes):
         listener.recv_chunk(data)
         read_bytes += len(data)
-      if resp.size and read_bytes != resp.size:
+
+      if resp.size and read_bytes != resp.size and not compressed_transfer:
         raise self.Error('Expected {} bytes, read {}'.format(resp.size, read_bytes))
+
       listener.finished()
 
   def download(self, url, listener=None, path_or_fd=None, chunk_size_bytes=None, timeout_secs=None):
