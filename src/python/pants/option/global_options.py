@@ -195,7 +195,10 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'live outside of the dir used by `--pants-workdir` to allow for tracking '
                   'subprocesses that outlive the workdir data (e.g. `./pants server`).')
     register('--pants-config-files', advanced=True, type=list, daemon=False,
-             default=[get_default_pants_config_file()], help='Paths to Pants config files.')
+             default=[
+               get_default_pants_config_file(buildroot_sentinel_filename=buildroot_sentinel_filename)
+             ],
+             help='Paths to Pants config files.')
     # TODO: Deprecate the --pantsrc/--pantsrc-files options?  This would require being able
     # to set extra config file locations in an initial bootstrap config file.
     register('--pantsrc', advanced=True, type=bool, default=True,

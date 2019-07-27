@@ -53,9 +53,9 @@ def get_pants_configdir():
   return os.path.expanduser(os.path.join(config_home, 'pants'))
 
 
-def get_default_pants_config_file():
+def get_default_pants_config_file(*, buildroot_sentinel_filename: str = "pants") -> str:
   """Return the default location of the pants config file."""
-  return os.path.join(get_buildroot(), 'pants.ini')
+  return os.path.join(get_buildroot(sentinel_filename=buildroot_sentinel_filename), 'pants.ini')
 
 
 _SCM = None
