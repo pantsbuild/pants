@@ -32,7 +32,7 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
-  timeout = 240,
+  timeout = 540,
 )
 
 python_tests(
