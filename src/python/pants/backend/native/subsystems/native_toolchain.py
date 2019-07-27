@@ -156,7 +156,7 @@ class GCCInstallLocationForLLVM(datatype(['toolchain_dir'])):
   @property
   def as_clang_argv(self):
     # TODO(#6143): describe exactly what this argument does to the clang/clang++ invocation!
-    return ['--gcc-toolchain={}'.format(self.toolchain_dir)]
+    return [f'--gcc-toolchain={self.toolchain_dir}']
 
 
 @rule(GCCInstallLocationForLLVM, [GCC])
