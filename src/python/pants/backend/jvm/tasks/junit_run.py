@@ -319,6 +319,7 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
           self.context.log.debug('platform = {}'.format(platform))
           with environment_as(**dict(target_env_vars)):
             subprocess_result = self.spawn_and_wait(
+              relevant_targets,
               executor=SubprocessExecutor(distribution),
               distribution=distribution,
               classpath=complete_classpath,

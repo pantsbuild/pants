@@ -37,7 +37,7 @@ class TestRunnerTaskMixinTest(TaskTestBase):
 
       def _execute(self, all_targets):
         self.call_list.append(['_execute', all_targets])
-        self.spawn_and_wait()
+        self.spawn_and_wait(all_targets)
 
       def _spawn(self, *args, **kwargs):
         self.call_list.append(['_spawn', args, kwargs])
@@ -143,7 +143,7 @@ class TestRunnerTaskMixinSimpleTimeoutTest(TaskTestBase):
       waited_for = None
 
       def _execute(self, all_targets):
-        self.spawn_and_wait()
+        self.spawn_and_wait(all_targets)
 
       def _spawn(self, *args, **kwargs):
         timeouts = self.get_options().timeouts
@@ -232,7 +232,7 @@ class TestRunnerTaskMixinGracefulTimeoutTest(TaskTestBase):
 
       def _execute(self, all_targets):
         self.call_list.append(['_execute', all_targets])
-        self.spawn_and_wait()
+        self.spawn_and_wait(all_targets)
 
       def _spawn(self, *args, **kwargs):
         self.call_list.append(['_spawn', args, kwargs])
@@ -317,8 +317,8 @@ class TestRunnerTaskMixinMultipleTargets(TaskTestBase):
     class TestRunnerTaskMixinMultipleTargetsTask(TestRunnerTaskMixin, TaskBase):
       wait_time = None
 
-      def _execute(self, all_targets):
-        self.spawn_and_wait()
+      def _execute(self, _all_targets):
+        self.spawn_and_wait(self.current_targets)
 
       def _spawn(self, *args, **kwargs):
         terminate_wait = self.get_options().timeout_terminate_wait
@@ -346,9 +346,6 @@ class TestRunnerTaskMixinMultipleTargets(TaskTestBase):
 
       def _validate_target(self, target):
         pass
-
-      def _get_test_targets_for_spawn(self):
-        return self.current_targets
 
     return TestRunnerTaskMixinMultipleTargetsTask
 
