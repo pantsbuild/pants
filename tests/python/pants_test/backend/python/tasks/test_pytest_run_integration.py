@@ -43,6 +43,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
                                 '--coverage=auto',
                                 '--timeout-default=1',
                                 '--cache-ignore',
+                                '--chroot',
                                 'testprojects/tests/python/pants/timeout:exceeds_timeout',
                                 '--',
                                 '-kexceeds_timeout'])
@@ -66,6 +67,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
                                 '--timeout-default={}'.format(self._non_flaky_timeout_seconds),
                                 '--coverage=auto',
                                 '--cache-ignore',
+                                '--chroot',
                                 'testprojects/tests/python/pants/timeout:ignores_terminate'])
     end = time.time()
     self.assert_failure(pants_run)
