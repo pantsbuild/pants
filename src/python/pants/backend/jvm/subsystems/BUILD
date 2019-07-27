@@ -112,6 +112,17 @@ python_library(
 )
 
 python_library(
+  name = 'scoverage_platform',
+  sources = ['scoverage_platform.py'],
+  dependencies = [
+    'src/python/pants/option',
+    'src/python/pants/subsystem',
+    'src/python/pants/java/jar',
+    'src/python/pants/backend/jvm/targets:jvm',
+  ],
+)
+
+python_library(
   name = 'shader',
   sources = ['shader.py'],
   dependencies = [

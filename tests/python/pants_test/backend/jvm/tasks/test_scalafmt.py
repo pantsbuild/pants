@@ -5,6 +5,7 @@ import os
 from textwrap import dedent
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
+from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.scalafmt import ScalaFmtCheckFormat, ScalaFmtFormat
@@ -30,6 +31,7 @@ class ScalaFmtTestBase(NailgunTaskTestBase):
     super().setUp()
 
     init_subsystem(ScalaPlatform)
+    init_subsystem(ScoveragePlatform)
     init_subsystem(SourceRootConfig)
 
     self.configuration = self.create_file(

@@ -19,6 +19,24 @@ python_tests(
   sources=['test_custom_scala.py'],
   dependencies=[
     'src/python/pants/backend/jvm/subsystems:scala_platform',
+    'src/python/pants/backend/jvm/subsystems:scoverage_platform',
+    'src/python/pants/java/jar',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/backend/jvm/tasks:scalastyle',
+    'src/python/pants/backend/jvm/tasks/jvm_compile/zinc',
+    'tests/python/pants_test/jvm:nailgun_task_test_base',
+    'tests/python/pants_test/subsystem:subsystem_utils',
+  ]
+)
+
+
+python_tests(
+  name='test_scoverage_platform',
+  sources=['test_scoverage_platform.py'],
+  dependencies=[
+    'src/python/pants/backend/jvm/subsystems:scala_platform',
+    'src/python/pants/backend/jvm/subsystems:scoverage_platform',
     'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',

@@ -6,6 +6,7 @@ from textwrap import dedent
 
 from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
+from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.junit_tests import JUnitTests
@@ -294,6 +295,7 @@ class RscCompileTest(NailgunTaskTestBase):
     init_subsystem(
       JUnit,
     )
+    init_subsystem(ScoveragePlatform)
     self.make_target(
       '//:scala-library',
       target_type=JarLibrary,

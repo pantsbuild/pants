@@ -322,6 +322,11 @@ class BaseZincCompile(JvmCompile):
     zinc_args.append('-transactional')
 
     compiler_option_sets_args = self.get_merged_args_for_compiler_option_sets(compiler_option_sets)
+
+    # Needed to make scoverage CodeGrid highlighting work
+    if 'scoverage' in scalac_plugin_map.keys():
+      compiler_option_sets_args += ['-S-Yrangepos']
+
     zinc_args.extend(compiler_option_sets_args)
 
     if not self._clear_invalid_analysis:

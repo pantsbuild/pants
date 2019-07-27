@@ -5,6 +5,7 @@ import logging
 from textwrap import dedent
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
+from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
@@ -68,6 +69,7 @@ class ScalastyleTest(NailgunTaskTestBase):
         'version': '2.11'
       }
     })
+    init_subsystem(ScoveragePlatform)
 
   def test_initialize_config_no_config_settings(self):
     with self.assertRaises(Scalastyle.UnspecifiedConfig):
