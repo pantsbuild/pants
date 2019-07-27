@@ -96,7 +96,6 @@ class CodeCoverage(Subsystem):
   class InvalidCoverageEngine(Exception):
     """Indicates an invalid coverage engine type was selected."""
 
-
   def get_coverage_engine(self, task, output_dir, all_targets, execute_java):
     options = task.get_options()
     enable_scoverage = ScoveragePlatform.global_instance().get_options().enable_scoverage

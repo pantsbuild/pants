@@ -10,7 +10,7 @@ from pants.backend.jvm.tasks.coverage.engine import CoverageEngine
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
-from pants.util.dirutil import relativize_paths, safe_mkdir, safe_mkdir_for, safe_walk, touch
+from pants.util.dirutil import safe_mkdir, safe_walk
 
 
 class Scoverage(CoverageEngine):
@@ -75,7 +75,6 @@ class Scoverage(CoverageEngine):
       target_filters = Scoverage.Factory.global_instance().get_options().target_filters
 
       return Scoverage(report_path, target_filters, settings, targets, execute_java_for_targets)
-
 
   def __init__(self, report_path, target_filters, settings, targets, execute_java_for_targets):
     """
