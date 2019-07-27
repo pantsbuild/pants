@@ -16,13 +16,14 @@ class BuildRootTest(unittest.TestCase):
 
   def setUp(self):
     Path(self.sentinel_filename).touch()
-    self.build_root = BuildRoot(sentinel_filename=self.sentinel_filename)
-    self.original_path = BuildRoot(sentinel_filename=self.sentinel_filename).path
+    self.build_root = BuildRoot()
+    self.build_root.sentinel_file = self.sentinel_filename
+    self.original_path = self.build_root.path
     self.new_path = os.path.realpath(safe_mkdtemp())
     self.build_root.reset()
 
   def tearDown(self):
-    self.build_root.reset()
+    self.build_root.sentinel_file = "pants"
     Path(self.sentinel_filename).unlink()
     safe_rmtree(self.new_path)
 
@@ -54,12 +55,18 @@ class BuildRootTest(unittest.TestCase):
     self.assertEqual(self.original_path, self.build_root.path)
 
   def test_singleton(self):
-    self.assertEqual(
-      BuildRoot(sentinel_filename=self.sentinel_filename).path,
-      BuildRoot(sentinel_filename=self.sentinel_filename).path
-    )
+    self.assertEqual(BuildRoot().path, BuildRoot().path)
     BuildRoot().path = self.new_path
     self.assertEqual(BuildRoot().path, BuildRoot().path)
+
+  def test_sentinel_file(self):
+    test_filename = "test_new_sentinel"
+    Path(test_filename).touch()
+    self.build_root.sentinel_file = test_filename
+    try:
+      self.assertEqual(Path(self.build_root.path), Path.cwd())
+    finally:
+      Path(test_filename).unlink()
 
   def test_not_found(self):
     with temporary_dir() as root:

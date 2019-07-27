@@ -27,8 +27,12 @@ def get_buildroot(*, sentinel_filename: str = "pants") -> str:
   """Returns the Pants build root, calculating it if needed.
 
   :API: public
+  :param sentinel_filename: The file to look for to establish the buildroot. This is currently only
+                            used for testing purposes.
   """
-  return BuildRoot(sentinel_filename=sentinel_filename).path
+  build_root = BuildRoot()
+  build_root.sentinel_file = sentinel_filename
+  return build_root.path
 
 
 def get_pants_cachedir():
