@@ -3,7 +3,6 @@
 
 import os
 import unittest
-from pathlib import Path
 
 from pants.base.build_root import BuildRoot
 from pants.util.contextutil import environment_as, pushd, temporary_dir
@@ -12,19 +11,14 @@ from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree, touch
 
 class BuildRootTest(unittest.TestCase):
 
-  sentinel_filename = "pants.test"
-
   def setUp(self):
-    Path(self.sentinel_filename).touch()
     self.build_root = BuildRoot()
-    self.build_root.sentinel_file = self.sentinel_filename
     self.original_path = self.build_root.path
     self.new_path = os.path.realpath(safe_mkdtemp())
     self.build_root.reset()
 
   def tearDown(self):
-    self.build_root.sentinel_file = "pants"
-    Path(self.sentinel_filename).unlink()
+    self.build_root.reset()
     safe_rmtree(self.new_path)
 
   def test_via_set(self):
@@ -39,7 +33,7 @@ class BuildRootTest(unittest.TestCase):
   def test_via_pants_runner(self):
     with temporary_dir() as root:
       root = os.path.realpath(root)
-      touch(os.path.join(root, self.sentinel_filename))
+      touch(os.path.join(root, "BUILD_ROOT"))
       with pushd(root):
         self.assertEqual(root, self.build_root.path)
 
@@ -58,15 +52,6 @@ class BuildRootTest(unittest.TestCase):
     self.assertEqual(BuildRoot().path, BuildRoot().path)
     BuildRoot().path = self.new_path
     self.assertEqual(BuildRoot().path, BuildRoot().path)
-
-  def test_sentinel_file(self):
-    test_filename = "test_new_sentinel"
-    Path(test_filename).touch()
-    self.build_root.sentinel_file = test_filename
-    try:
-      self.assertEqual(Path(self.build_root.path), Path.cwd())
-    finally:
-      Path(test_filename).unlink()
 
   def test_not_found(self):
     with temporary_dir() as root:

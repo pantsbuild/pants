@@ -1,9 +1,12 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-# NB: We cannot depend on `./pants`. When running tests with V1, the folder in `.pants.d` will strip
-# the prefix so `src/python/pants` -> `pants`. You cannot both have a directory named `pants` and a
-# file named `pants`, so this causes most V1 tests to fail.
+# We use this to establish the build root, rather than `./pants`, because we cannot safely use the
+# latter as the sentinel filename per https://github.com/pantsbuild/pants/pull/8105.
+files(
+  name = 'build_root',
+  source = "BUILD_ROOT",
+)
 
 files(
   name = 'build_tools',

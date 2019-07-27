@@ -3,6 +3,7 @@
 
 import os
 from contextlib import contextmanager
+from pathlib import Path
 
 from pants.util.meta import Singleton
 
@@ -11,31 +12,29 @@ from pants.util.meta import Singleton
 class BuildRoot(Singleton):
   """Represents the global workspace build root.
 
-  By default a Pants workspace is defined by a root directory where a file called 'pants' -
-  typically the Pants runner script - lives. The expected file can be changed from 'pants' to
-  something else, which is useful for testing. Likewise, this path can also be manipulated through
-  this interface for re-location of the build root in tests.
+  By default a Pants workspace is defined by a root directory where one of multiple sentinel files
+  reside, such as `pants` or `BUILD_ROOT`. This path can also be manipulated through this interface
+  for re-location of the build root in tests.
   """
+
+  sentinel_files = ["pants", "BUILDROOT", "BUILD_ROOT"]
 
   class NotFoundError(Exception):
     """Raised when unable to find the current workspace build root."""
 
-  def find_buildroot(self):
-    buildroot = os.path.abspath(os.getcwd())
-    while not os.path.isfile(os.path.join(buildroot, self.sentinel_file)):
-      parent = os.path.dirname(buildroot)
-      if buildroot != parent:
-        buildroot = parent
+  def find_buildroot(self) -> str:
+    buildroot = Path.cwd().resolve()
+    while not any((Path(buildroot) / sentinel).is_file() for sentinel in self.sentinel_files):
+      if buildroot != buildroot.parent:
+        buildroot = buildroot.parent
       else:
         raise self.NotFoundError('No buildroot detected. Pants detects the buildroot by looking '
-                                 f'for a file named {self.sentinel_file} in the cwd and its '
-                                 'ancestors. Typically this is the runner script that executes '
-                                 'Pants. If you have no such script you can create an empty file '
-                                 'in your buildroot.')
-    return buildroot
+                                 f'for at least one file from {self.sentinel_files} in the cwd and '
+                                 'its ancestors. If you have none of these files, you can create '
+                                 'an empty file in your buildroot.')
+    return str(buildroot)
 
   def __init__(self) -> None:
-    self._sentinel_filename = "pants"
     self._root_dir = None
 
   @property
@@ -57,17 +56,6 @@ class BuildRoot(Singleton):
     if not os.path.exists(path):
       raise ValueError(f'Build root does not exist: {root_dir}')
     self._root_dir = path
-
-  @property
-  def sentinel_file(self) -> str:
-    """File to look for in order to establish the buildroot."""
-    return self._sentinel_filename
-
-  @sentinel_file.setter
-  def sentinel_file(self, filename: str) -> None:
-    """Replaces the sentinel filename and resets the buildroot because it is no longer valid."""
-    self._sentinel_filename = filename
-    self.reset()
 
   def reset(self):
     """Clears the last calculated build root for the current workspace."""
