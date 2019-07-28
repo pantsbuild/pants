@@ -129,7 +129,7 @@ As an example, scoverage reports for the `example` project can be generated as:
     :::bash
     ./pants --scoverage-enable-scoverage test examples/tests/scala/org/pantsbuild/example/hello/welcome
 
-Scoverage supports the following options:
+Scoverage supports the following options:  
 `--scoverage-enable-scoverage` (required)
 Specifies whether to generate scoverage reports for scala test targets.
 Default value is False. If True, implies `--test-junit-coverage-processor=scoverage.`
