@@ -73,6 +73,12 @@ class SubsystemClientMixin:
     """Iterate over the direct subsystem dependencies of this Optionable."""
     for dep in cls.subsystem_dependencies():
       if isinstance(dep, SubsystemDependency):
+        if cls.deprecated_options_scope is not None:
+          yield dep.copy(
+              scope=cls.deprecated_options_scope,
+              removal_version=cls.deprecated_options_scope_removal_version,
+              removal_hint=f'Use {dep.options_scope}',
+            )
         yield dep
       else:
         yield SubsystemDependency(dep, GLOBAL_SCOPE, removal_version=None, removal_hint=None)
@@ -153,7 +159,7 @@ class SubsystemClientMixin:
           collect_scope_infos(dep.subsystem_cls, GLOBAL_SCOPE)
           if not dep.is_global():
             collect_scope_infos(dep.subsystem_cls,
-                                scope,
+                                dep.scope or scope,
                                 removal_version=dep.removal_version,
                                 removal_hint=dep.removal_hint)
 
