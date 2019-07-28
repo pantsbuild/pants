@@ -38,7 +38,7 @@ class LifecycleStubTask(Task):
     exit_msg = self._lifecycle_stubs.add_exiter_message
     if exit_msg:
       new_exiter = MessagingExiter(exit_msg)
-      ExceptionSink.reset_exiter(new_exiter)
+      ExceptionSink._reset_exiter(new_exiter)
 
     output_file = self._lifecycle_stubs.new_interactive_stream_output_file
     if output_file:

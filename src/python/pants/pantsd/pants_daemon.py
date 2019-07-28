@@ -406,11 +406,10 @@ class PantsDaemon(FingerprintedProcessManager):
   def run_sync(self):
     """Synchronously run pantsd."""
     # Switch log output to the daemon's log stream from here forward.
+    # Also, register an exiter using os._exit to ensure we only close stdio streams once.
     self._close_stdio()
-    with self._pantsd_logging() as (log_stream, log_filename):
-
-      # Register an exiter using os._exit to ensure we only close stdio streams once.
-      ExceptionSink.reset_exiter(Exiter(exiter=os._exit))
+    with self._pantsd_logging() as (log_stream, log_filename), \
+         ExceptionSink.exiter_as(lambda _: Exiter(exiter=os._exit)):
 
       # We don't have any stdio streams to log to anymore, so we log to a file.
       # We don't override the faulthandler destination because the stream we get will proxy things

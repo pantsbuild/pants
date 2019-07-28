@@ -7,9 +7,10 @@ import sys
 import termios
 import time
 from contextlib import contextmanager
+from typing import Callable
 
 from pants.base.exception_sink import ExceptionSink
-from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, Exiter
+from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode, Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.init.logging import encapsulated_global_logger
 from pants.init.util import clean_global_runtime_state
@@ -29,24 +30,24 @@ class PantsRunFailCheckerExiter(Exiter):
 
 
 class DaemonExiter(Exiter):
-  """An Exiter that emits unhandled tracebacks and exit codes via the Nailgun protocol.
+  """An Exiter that emits unhandled tracebacks and exit codes via the Nailgun protocol."""
 
-  TODO: https://github.com/pantsbuild/pants/pull/7606
-  """
+  @classmethod
+  @contextmanager
+  def override_global_exiter(cls, maybe_shutdown_socket: MaybeShutdownSocket, finalizer: Callable[[], None]) -> None:
+    with ExceptionSink.exiter_as(lambda previous_exiter: cls(maybe_shutdown_socket, finalizer, previous_exiter)):
+      yield
 
-  def __init__(self, maybe_shutdown_socket):
-    # N.B. Assuming a fork()'d child, cause os._exit to be called here to avoid the routine
-    # sys.exit behavior.
-    # TODO: The behavior we're avoiding with the use of os._exit should be described and tested.
-    super().__init__(exiter=os._exit)
+  def __init__(self,
+    maybe_shutdown_socket: MaybeShutdownSocket,
+    finalizer: Callable[[], None],
+    previous_exiter: Exiter):
+
+    super().__init__(exiter=previous_exiter)
     self._maybe_shutdown_socket = maybe_shutdown_socket
-    self._finalizer = None
-
-  def set_finalizer(self, finalizer):
-    """Sets a finalizer that will be called before exiting."""
     self._finalizer = finalizer
 
-  def exit(self, result=0, msg=None, *args, **kwargs):
+  def exit(self, result: ExitCode = 0, msg: str = None, *args, **kwargs):
     """Exit the runtime."""
     if self._finalizer:
       try:
@@ -83,7 +84,7 @@ class _PantsRunFinishedWithFailureException(Exception):
   Will be raised by the exiter passed to LocalPantsRunner.
   """
 
-  def __init__(self, exit_code=PANTS_FAILED_EXIT_CODE):
+  def __init__(self, exit_code: ExitCode = PANTS_FAILED_EXIT_CODE):
     """
     :param int exit_code: an optional exit code (defaults to PANTS_FAILED_EXIT_CODE)
     """
@@ -97,11 +98,11 @@ class _PantsRunFinishedWithFailureException(Exception):
     self._exit_code = exit_code
 
   @property
-  def exit_code(self):
+  def exit_code(self) -> ExitCode:
     return self._exit_code
 
 
-class DaemonPantsRunner:
+class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
   """A daemonizing PantsRunner that speaks the nailgun protocol to a remote client.
 
   N.B. this class is primarily used by the PailgunService in pantsd.
@@ -136,7 +137,6 @@ class DaemonPantsRunner:
     self._args = args
     self._env = env
     self._services = services
-    self._exiter = DaemonExiter(maybe_shutdown_socket)
     self._scheduler_service = scheduler_service
 
     self.exit_code = exit_code
@@ -247,6 +247,7 @@ class DaemonPantsRunner:
 
     # Invoke a Pants run with stdio redirected and a proxied environment.
     with self.nailgunned_stdio(self._maybe_shutdown_socket, self._env) as finalizer, \
+      DaemonExiter.override_global_exiter(self._maybe_shutdown_socket, finalizer), \
       hermetic_environment_as(**self._env), \
       encapsulated_global_logger():
       try:
@@ -257,21 +258,18 @@ class DaemonPantsRunner:
         # Clean global state.
         clean_global_runtime_state(reset_subsystem=True)
 
-        # Setup the Exiter's finalizer.
-        self._exiter.set_finalizer(finalizer)
-
         # Otherwise, conduct a normal run.
-        runner = LocalPantsRunner.create(
-          PantsRunFailCheckerExiter(),
-          self._args,
-          self._env,
-          target_roots,
-          graph_helper,
-          options_bootstrapper,
-        )
-        runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
+        with ExceptionSink.exiter_as_until_exception(lambda _: PantsRunFailCheckerExiter()):
+          runner = LocalPantsRunner.create(
+            self._args,
+            self._env,
+            target_roots,
+            graph_helper,
+            options_bootstrapper,
+          )
+          runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
 
-        runner.run()
+          runner.run()
       except KeyboardInterrupt:
         self._exiter.exit_and_fail('Interrupted by user.\n')
       except _PantsRunFinishedWithFailureException as e:
