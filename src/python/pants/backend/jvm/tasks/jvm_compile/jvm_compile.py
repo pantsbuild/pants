@@ -448,8 +448,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         for ccs in compile_contexts.values():
           cc = self.select_runtime_context(ccs)
           for conf in self._confs:
-            classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir.path)])
-            classpath_product.add_for_target(cc.target, [(conf, cc.jar_file.path)])
+            classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
+            classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
 
   def _classpath_for_context(self, context):
     if self.get_options().use_classpath_jars:

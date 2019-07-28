@@ -1,9 +1,14 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
 from abc import abstractmethod
 
+from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
+from pants.base.build_environment import get_buildroot
+from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot
 from pants.task.task import Task
+from pants.util.dirutil import fast_relpath
 
 
 class ResourcesTask(Task):
@@ -49,17 +54,38 @@ class ResourcesTask(Task):
                           fingerprint_strategy=self.create_invalidation_strategy(),
                           invalidate_dependents=False,
                           topological_order=False) as invalidation:
-      for vt in invalidation.all_vts:
+      for vt in invalidation.invalid_vts:
+        # Generate resources to the chroot.
+        self.prepare_resources(vt.target, vt.results_dir)
+        processed_targets.append(vt.target)
+      for vt, digest in self._capture_resources(invalidation.all_vts):
         # Register the target's chroot in the products.
         for conf in self.get_options().confs:
-          runtime_classpath.add_for_target(vt.target, [(conf, vt.results_dir)])
-        # And if it was invalid, generate the resources to the chroot.
-        if not vt.valid:
-          self.prepare_resources(vt.target, vt.results_dir)
-          processed_targets.append(vt.target)
-          vt.update()
+          runtime_classpath.add_for_target(vt.target, [(conf, ClasspathEntry(vt.results_dir, digest))])
 
     return processed_targets
+
+  def _capture_resources(self, vts):
+    """Given a list of VersionedTargets, capture DirectoryDigests for all of them.
+
+    :returns: A list of tuples of VersionedTargets and digests for their content.
+    """
+    # Capture Snapshots for each directory, using an optional adjacent digest. Create the digest
+    # afterward if it does not exist.
+    buildroot = get_buildroot()
+    snapshots = self.context._scheduler.capture_snapshots(
+      tuple(
+        PathGlobsAndRoot(
+          PathGlobs([os.path.join(fast_relpath(vt.results_dir, buildroot), '**')]),
+          buildroot,
+          Digest.load(vt.current_results_dir),
+        ) for vt in vts
+      ))
+    result = []
+    for vt, snapshot in zip(vts, snapshots):
+      snapshot.directory_digest.dump(vt.current_results_dir)
+      result.append((vt, snapshot.directory_digest))
+    return result
 
   @abstractmethod
   def find_all_relevant_resources_targets(self):

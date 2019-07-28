@@ -14,15 +14,6 @@ from pants_test.backend.jvm.tasks.missing_jvm_check import is_missing_jvm
 
 
 class ZincCompileIntegrationTest(BaseCompileIT):
-
-  def test_java_src_zinc_compile(self):
-    with self.do_test_compile('examples/src/java/::'):
-      # run succeeded as expected
-      pass
-    with self.do_test_compile('examples/tests/java/::'):
-      # run succeeded as expected
-      pass
-
   def test_in_process(self):
     with self.temporary_workdir() as workdir:
       with self.temporary_cachedir() as cachedir:
@@ -361,29 +352,3 @@ class ZincCompileIntegrationTest(BaseCompileIT):
           ]:
             path = os.path.join(compile_dir, path_suffix)
             self.assertTrue(os.path.exists(path), "Want path {} to exist".format(path))
-
-  def test_hermetic_binary_with_3rdparty_dependencies(self):
-    for use_classpath_jars in (False, True):
-      config = {
-        'compile.zinc': {
-          'execution_strategy': 'hermetic',
-          'use_classpath_jars': use_classpath_jars,
-          'incremental': False,
-        },
-      }
-
-      with self.temporary_workdir() as workdir:
-        with self.temporary_file_content("readme.txt", b"yo"):
-          pants_run = self.run_pants_with_workdir(
-            [
-              'run',
-              'testprojects/src/java/org/pantsbuild/testproject/cwdexample',
-            ],
-            workdir,
-            config,
-          )
-          self.assert_success(pants_run)
-          self.assertIn(
-            'Found readme.txt',
-            pants_run.stdout_data,
-          )
