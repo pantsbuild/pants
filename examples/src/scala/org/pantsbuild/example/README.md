@@ -140,7 +140,7 @@ included in reports. All targets matching any of the patterns will be
 included when generating reports. If no targets are specified, all
 targets are included, which would be the same as specifying ".*" as a filter.
 
-`--scoverage-blacklist-targets` (optional; troubleshooting)  
+`--scoverage-blacklist-targets` (optional; troubleshooting)
 Scoverage works by instrumenting targets at compile time. However, some targets cannot be
 instrumented at all as doing so results in exceeding JVM code size limits. Thus, if you receive
 the following error when compiling with scoverage:
