@@ -3,9 +3,9 @@
 
 import os
 import subprocess
+from typing import List
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
-from pants.build_graph.target import Target
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
@@ -14,13 +14,13 @@ from pants.backend.python.tasks.resolve_requirements_task_base import ResolveReq
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.build_graph.target import Target
+from pants.task.lint_task_mixin import LintTaskMixin
 from pants.util.contextutil import temporary_file_path
 from pants.util.memo import memoized_property
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_info import PexInfo
-from pants.task.lint_task_mixin import LintTaskMixin
-from typing import List
 
 
 class MypyTaskError(TaskError):
@@ -98,13 +98,12 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
   def _calculate_python_sources(self, target_roots: List[Target]):
     """Filter targets to generate a set of source files from the given targets."""
     if self.get_options().whitelist_tag_name:
-      white_listed_targets = self._filter_targets(Target.closure_for_targets(list(filter(self._is_tagged_target, target_roots))))
-      python_eval_targets = [tgt for tgt in list(white_listed_targets) if self._is_tagged_non_synthetic_python_target(tgt)]
+      white_listed_targets = self._filter_targets(Target.closure_for_targets([self._is_tagged_target(tgt) for tgt in target_roots]))
+      python_eval_targets = [tgt for tgt in white_listed_targets if self._is_tagged_non_synthetic_python_target(tgt)]
       if not self._all_targets_in_context_are_whitelisted(python_eval_targets, white_listed_targets):
         self._whitelist_warning()
     else:
-      python_eval_targets = self._filter_targets(list(filter(self.is_non_synthetic_python_target, Target.closure_for_targets(target_roots))))
-      self._whitelist_warning()
+      python_eval_targets = self._filter_targets([self.is_non_synthetic_python_target(tgt) for tgt in Target.closure_for_targets(target_roots)])
 
     sources = set()
     for target in python_eval_targets:
@@ -134,7 +133,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
     mypy_version = self.get_options().mypy_version
 
     mypy_requirement_pex = self.resolve_requirement_strings(
-      py3_interpreter, ['mypy=={}'.format(mypy_version)])
+      py3_interpreter, [f'mypy=={mypy_version}'])
 
     path = os.path.realpath(os.path.join(self.workdir, str(py3_interpreter.identity), mypy_version))
     if not os.path.isdir(path):
@@ -145,8 +144,8 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
   def execute(self):
     mypy_interpreter = self.find_mypy_interpreter()
     if not mypy_interpreter:
-      raise TaskError('Unable to find a Python {} interpreter (required for mypy).'
-                      .format(self._MYPY_COMPATIBLE_INTERPETER_CONSTRAINT))
+      raise TaskError(f'Unable to find a Python {self._MYPY_COMPATIBLE_INTERPETER_CONSTRAINT} '
+                      f'interpreter (required for mypy).')
 
     sources = self._calculate_python_sources(self.context.target_roots)
     if not sources:
@@ -163,15 +162,14 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
     with temporary_file_path() as sources_list_path:
       with open(sources_list_path, 'w') as f:
         for source in sources:
-          f.write('{}\n'.format(source))
+          f.write(f'{source}\n')
       # Construct the mypy command line.
-      cmd = ['--python-version={}'.format(interpreter_for_targets.identity.python)]
+      cmd = [f'--python-version={interpreter_for_targets.identity.python}']
       if self.get_options().config_file:
-        cmd.append('--config-file={}'.format(os.path.join(get_buildroot(),
-                                                          self.get_options().config_file)))
+        cmd.append(f'--config-file={os.path.join(get_buildroot(), self.get_options().config_file)}')
       cmd.extend(self.get_passthru_args())
-      cmd.append('@{}'.format(sources_list_path))
-      self.context.log.debug('mypy command: {}'.format(' '.join(cmd)))
+      cmd.append(f'@{sources_list_path}')
+      self.context.log.debug(f'mypy command: {" ".join(cmd)}')
 
       # Collect source roots for the targets being checked.
       source_roots = self._collect_source_roots()
@@ -187,4 +185,4 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
         returncode = self._run_mypy(mypy_interpreter, cmd,
           env={'MYPYPATH': mypy_path}, stdout=workunit.output('stdout'), stderr=subprocess.STDOUT)
         if returncode != 0:
-          raise MypyTaskError('mypy failed: code={}'.format(returncode))
+          raise MypyTaskError(f'mypy failed: code={returncode}')
