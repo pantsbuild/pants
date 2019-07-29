@@ -5,22 +5,75 @@ This document describes releases leading up to the ``1.19.x`` ``stable`` series.
 1.19.0rc0 (29/07/2019)
 ----------------------
 
+API Changes
+~~~~~~~~~~~
+
+* Fail for missing classpath entries with hermetic execution. (#8037)
+  `PR #8037 <https://github.com/pantsbuild/pants/pull/8037>`_
+
+* Deprecate ZincCompile task in favor of RscCompile (#8047)
+  `PR #8047 <https://github.com/pantsbuild/pants/pull/8047>`_
 
 New Features
 ~~~~~~~~~~~~
 
+* Add support for scoverage (#8064)
+  `PR #8064 <https://github.com/pantsbuild/pants/pull/8064>`_
+
+* add script to generate zinc native-images, with example usage (#8036)
+  `PR #8036 <https://github.com/pantsbuild/pants/pull/8036>`_
+
 * Add fs_util subcommand to list known directories (#8100)
   `PR #8100 <https://github.com/pantsbuild/pants/pull/8100>`_
-
 
 Bugfixes
 ~~~~~~~~
 
+* Revert "use jdeps to run dep-usage task (#8093)"
+  `PR #8093 <https://github.com/pantsbuild/pants/pull/8093>`_
+
+* Properly manage the lifetime of Exiters in Daemon Runs (#7996)
+  `PR #7996 <https://github.com/pantsbuild/pants/pull/7996>`_
+
+* Properly handle source roots and resources with V2 Pytest runner (#8063)
+  `PR #8063 <https://github.com/pantsbuild/pants/pull/8063>`_
+  `PR #8060#discussion_r304191700, <https://github.com/pantsbuild/pants/pull/8060#discussion_r304191700,>`_
+  `PR #8063#issuecomment-513433518 <https://github.com/pantsbuild/pants/pull/8063#issuecomment-513433518>`_
+
 * [pantsd] Don't ignore the first watchman event for the daemon pid (#8096)
   `PR #8096 <https://github.com/pantsbuild/pants/pull/8096>`_
 
+* Loosen constraints on the jvm heap size for tests in extra_jvm_options (#8106)
+  `PR #8106 <https://github.com/pantsbuild/pants/pull/8106>`_
+
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Lower test timeouts in travis to get better debug output. (#8110)
+  `PR #8110 <https://github.com/pantsbuild/pants/pull/8110>`_
+
+* Upgrade cloc to 1.80 and add error handling (#8111)
+  `Issue #401, <https://github.com/AlDanial/cloc/issues/401,>`_
+  `PR #8111 <https://github.com/pantsbuild/pants/pull/8111>`_
+
+*  Rewrite `test_git_hooks.py` to be hermetic (#8085)
+  `PR #8085 <https://github.com/pantsbuild/pants/pull/8085>`_
+
+* use jdeps to run dep-usage task (#8093)
+  `PR #8093 <https://github.com/pantsbuild/pants/pull/8093>`_
+
+* Balance pytest test sharding (#8108)
+  `PR #8108 <https://github.com/pantsbuild/pants/pull/8108>`_
+
+* Record per-target compile workflow stats when using RscCompile (#8092)
+  `PR #8092 <https://github.com/pantsbuild/pants/pull/8092>`_
+
+* Parse zinc args and pass scalac options into scalafix (#8091)
+>`_ttps://github.com/pantsbuild/pants/issues/7914
+  `PR #8091 <https://github.com/pantsbuild/pants/pull/8091>`_
+
+* Scoverage report generator (#8098)
+  `PR #8098 <https://github.com/pantsbuild/pants/pull/8098>`_
 
 * [pantsd] Remove dead code around prefork graph warming (#8095)
   `PR #8095 <https://github.com/pantsbuild/pants/pull/8095>`_
@@ -45,6 +98,9 @@ Refactoring, Improvements, and Tooling
 
 Documentation
 ~~~~~~~~~~~~~
+
+* Prepare 1.17.0rc2 and render 1.18.x. (#8114)
+  `PR #8114 <https://github.com/pantsbuild/pants/pull/8114>`_
 
 * Update CONTRIBUTORS.md
 
