@@ -98,12 +98,12 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
   def _calculate_python_sources(self, target_roots: List[Target]):
     """Filter targets to generate a set of source files from the given targets."""
     if self.get_options().whitelist_tag_name:
-      white_listed_targets = self._filter_targets(Target.closure_for_targets([self._is_tagged_target(tgt) for tgt in target_roots]))
+      white_listed_targets = self._filter_targets(Target.closure_for_targets([tgt for tgt in target_roots if self._is_tagged_target(tgt)]))
       python_eval_targets = [tgt for tgt in white_listed_targets if self._is_tagged_non_synthetic_python_target(tgt)]
-      if not self._all_targets_in_context_are_whitelisted(python_eval_targets, white_listed_targets):
+      if not self._all_targets_are_whitelisted(python_eval_targets, white_listed_targets):
         self._whitelist_warning()
     else:
-      python_eval_targets = self._filter_targets([self.is_non_synthetic_python_target(tgt) for tgt in Target.closure_for_targets(target_roots)])
+      python_eval_targets = self._filter_targets([tgt for tgt in Target.closure_for_targets(target_roots) if self.is_non_synthetic_python_target(tgt)])
 
     sources = set()
     for target in python_eval_targets:
