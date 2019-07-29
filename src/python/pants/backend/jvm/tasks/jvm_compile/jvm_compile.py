@@ -1,7 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import enum
 import functools
 import os
 from multiprocessing import cpu_count
@@ -40,6 +39,7 @@ from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_file_
                                 safe_rmtree)
 from pants.util.fileutil import create_size_estimators
 from pants.util.memo import memoized_method, memoized_property
+from pants.util.meta import classproperty
 
 
 # Well known metadata file to register javac plugins.
@@ -57,11 +57,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
   """
 
   size_estimators = create_size_estimators()
-
-  class Compiler(enum.Enum):
-    ZINC = 'zinc'
-    RSC = 'rsc'
-    JAVAC = 'javac'
 
   @classmethod
   def size_estimator_by_name(cls, estimation_strategy_name):
@@ -168,6 +163,10 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
   _name = None
   # The name used in JvmPlatform to refer to this compiler task.
   compiler_name = None
+
+  @classproperty
+  def compiler(cls):
+    return JvmPlatform.Compiler(cls.compiler_name)
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -395,16 +394,16 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   def execute(self):
     requested_compiler = JvmPlatform.global_instance().get_options().compiler
-    if requested_compiler == self.Compiler.ZINC.value and self.compiler_name == self.Compiler.RSC.value:
+    if requested_compiler == JvmPlatform.Compiler.zinc and self.compiler == self.Compiler.rsc:
       # Issue a deprecation warning and continue running.
       deprecated_conditional(
         lambda:  True,
         removal_version='1.20.0.dev0',
         entity_description=f'Requested a deprecated compiler: [{requested_compiler}].',
-        hint_message='Compiler will be defaulted to [{self.compiler_name}].')
-    elif requested_compiler != self.compiler_name:
+        hint_message='Compiler will be defaulted to [{self.compiler}].')
+    elif requested_compiler != self.compiler:
       # If the requested compiler is not the one supported by this task, log and abort
-      self.context.log.debug(f'Requested a compiler [{requested_compiler}] other than this one [{self.compiler_name}], skipping.')
+      self.context.log.debug(f'Requested a compiler [{requested_compiler}] other than this one [{self.compiler}], skipping.')
       return
 
     # In case we have no relevant targets and return early, create the requested product maps.
