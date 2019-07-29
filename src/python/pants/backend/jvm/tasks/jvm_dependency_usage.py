@@ -70,8 +70,9 @@ class JvmDependencyUsage(Task):
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)
     if not options.use_cached:
+      round_manager.require_data('classes_by_source')
       round_manager.require_data('runtime_classpath')
-      round_manager.require_data('product_deps_by_target')
+      round_manager.require_data('product_deps_by_src')
     else:
       # We want to have synthetic targets in build graph to deserialize nodes properly.
       round_manager.optional_data('java')
@@ -162,7 +163,6 @@ class JvmDependencyUsage(Task):
     targets = self.context.targets()
     targets_by_file = self._analyzer.targets_by_file(targets)
     transitive_deps_by_target = self._analyzer.compute_transitive_deps_by_target(targets)
-
     def creator(target):
       transitive_deps = set(transitive_deps_by_target.get(target))
       node = self.create_dep_usage_node(target, targets_by_file, transitive_deps)
@@ -247,20 +247,20 @@ class JvmDependencyUsage(Task):
 
     # Record the used products and undeclared Edges for this target. Note that some of
     # these may be self edges, which are considered later.
-    product_deps_by_target = self.context.products.get_data('product_deps_by_target')
-    product_deps_for_target = product_deps_by_target.get(target, [])
-    # product_deps is a list of class files / jars
-    for product_dep in product_deps_for_target:
-      for dep_tgt in targets_by_file.get(product_dep, []):
-        derived_from = dep_tgt.concrete_derived_from
-        if not self._select(derived_from):
-          continue
-        # Create edge only for those direct or transitive dependencies in order to
-        # disqualify irrelevant targets that happen to share some file in sources,
-        # not uncommon when globs especially rglobs is used.
-        if derived_from not in transitive_deps:
-          continue
-        node.add_edge(_construct_edge(dep_tgt, products_used={product_dep}), derived_from)
+    product_deps_by_src = self.context.products.get_data('product_deps_by_src')
+    target_product_deps_by_src = product_deps_by_src.get(target, {})
+    for product_deps in target_product_deps_by_src.values():
+      for product_dep in product_deps:
+        for dep_tgt in targets_by_file.get(product_dep, []):
+          derived_from = dep_tgt.concrete_derived_from
+          if not self._select(derived_from):
+            continue
+          # Create edge only for those direct or transitive dependencies in order to
+          # disqualify irrelevant targets that happen to share some file in sources,
+          # not uncommon when globs especially rglobs is used.
+          if not derived_from in transitive_deps:
+            continue
+          node.add_edge(_construct_edge(dep_tgt, products_used={product_dep}), derived_from)
 
     return node
 
