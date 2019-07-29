@@ -31,7 +31,7 @@ from pants.util.dirutil import mergetree, safe_mkdir, safe_mkdir_for
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.objects import datatype
 from pants.util.process_handler import SubprocessProcessHandler
-from pants.util.strutil import safe_shlex_join, safe_shlex_split
+from pants.util.strutil import safe_shlex_join
 from pants.util.xml_parser import XmlParser
 
 
@@ -107,14 +107,6 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
                   "emitted to that file (prefix). Note that tests may run in a different cwd, so "
                   "it's best to use an absolute path to make it easy to find the subprocess "
                   "profiles later.")
-
-    # TODO(John Sirois): Remove this option. The cleanup work is tracked in:
-    #   https://github.com/pantsbuild/pants/issues/7802
-    register('--options', type=list, fingerprint=True,
-             removal_version='1.19.0.dev2',
-             removal_hint='Use the `--passthrough-args` option instead. You my need to remove'
-                          'some argument quoting when converting.',
-             help='Pass these options to pytest. You can also use pass-through args.')
 
     register('--coverage', fingerprint=True,
              help='Emit coverage information for specified packages or directories (absolute or '
@@ -629,9 +621,6 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       if self.get_options().colors:
         args.extend(['--color', 'yes'])
 
-      if self.get_options().options:
-        for opt in self.get_options().options:
-          args.extend(safe_shlex_split(opt))
       args.extend(self.get_passthru_args())
 
       args.extend(test_args)
