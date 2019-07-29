@@ -45,14 +45,6 @@ class RscCompileIntegration(BaseCompileIT, AbstractTestGenerator):
                 'incremental': False,
                 'use_classpath_jars': False,
               })
-              if resolver == 'ivy':
-                resolver_scope = 'resolve.ivy'
-              else:
-                assert resolver == 'coursier'
-                resolver_scope = 'resolve.coursier'
-              config[resolver_scope] = {
-                'capture_snapshots': True,
-              }
 
             execution_strategy.resolve_for_enum_variant({
               'nailgun': lambda: None,
