@@ -72,15 +72,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'scala_library_integration',
-  sources = ['test_scala_library_integration.py'],
-  dependencies = [
-    'tests/python/pants_test:int-test',
-  ],
-  tags = {'integration'},
-)
-
-python_tests(
   name = 'python_target',
   sources = ['test_python_target.py'],
   dependencies = [
