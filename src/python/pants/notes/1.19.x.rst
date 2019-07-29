@@ -5,9 +5,6 @@ This document describes releases leading up to the ``1.19.x`` ``stable`` series.
 1.19.0rc0 (29/07/2019)
 ----------------------
 
-API Changes
-~~~~~~~~~~~
-
 
 New Features
 ~~~~~~~~~~~~

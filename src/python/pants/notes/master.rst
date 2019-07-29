@@ -13,7 +13,6 @@ New Features
 * Add fs_util subcommand to list known directories (#8100)
   `PR #8100 <https://github.com/pantsbuild/pants/pull/8100>`_
 
-
 Bugfixes
 ~~~~~~~~
 
