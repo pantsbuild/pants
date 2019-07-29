@@ -143,8 +143,10 @@ class AnalysisExtraction(NailgunTask):
           ).communicate()
           deps_classpaths = set()
           for line in io.StringIO(jdeps_stdout.decode('utf-8')):
-            match = self._jdeps_summary_line_regex.fullmatch(line.strip()).group(1)
-            deps_classpaths.add(classpaths_by_alias.get(match, match))
+            match = self._jdeps_summary_line_regex.fullmatch(line.strip())
+            if match is not None:
+              dep_name = match.group(1)
+              deps_classpaths.add(classpaths_by_alias.get(dep_name, dep_name))
 
         else:
           deps_classpaths = []
@@ -153,11 +155,13 @@ class AnalysisExtraction(NailgunTask):
   def _spawn_jdeps_command(self, target, target_artifact_classpaths, potential_deps_classpaths):
     jdk = DistributionLocator.cached(jdk=True)
     tool_classpath = jdk.find_libs(['tools.jar'])
+    potential_deps_classpath = ":".join(cp for cp in potential_deps_classpaths)
 
-    args = [
-      "-summary",
-      '-classpath', ":".join(cp for cp in potential_deps_classpaths),
-    ] + target_artifact_classpaths
+    args = ["-summary"]
+    if potential_deps_classpath:
+      args.extend(['-classpath', potential_deps_classpath])
+
+    args.extend(target_artifact_classpaths)
 
     java_executor = SubprocessExecutor(jdk)
     return java_executor.spawn(classpath=tool_classpath,
