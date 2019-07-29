@@ -118,7 +118,7 @@ class/trait or via a `@RunWith` annotation; so you can use
 
 ### Scala Code Coverage: Scoverage
 
-Code coverage reports for Scala projects can be genrated with the help of Scoverage. To generate
+Code coverage reports for Scala projects can be generated with the help of Scoverage. To generate a
 Scoverage report, run the test command with the following additional option(s):
 
     :::bash
