@@ -883,7 +883,7 @@ python_tests(
 
   def test_options_shlexed(self):
     with self.marking_tests() as (target, assert_test_run, assert_test_not_run):
-      self.run_tests([target], "-m", "'purple or red'")
+      self.run_tests([target], "-m", "purple or red")
       assert_test_not_run('test_one')
       assert_test_run('test_two')
       assert_test_not_run('test_three')
