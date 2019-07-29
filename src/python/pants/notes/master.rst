@@ -58,7 +58,7 @@ Refactoring, Improvements, and Tooling
   `Issue #401, <https://github.com/AlDanial/cloc/issues/401,>`_
   `PR #8111 <https://github.com/pantsbuild/pants/pull/8111>`_
 
-*  Rewrite `test_git_hooks.py` to be hermetic (#8085)
+* Rewrite `test_git_hooks.py` to be hermetic (#8085)
   `PR #8085 <https://github.com/pantsbuild/pants/pull/8085>`_
 
 * use jdeps to run dep-usage task (#8093)
@@ -71,7 +71,6 @@ Refactoring, Improvements, and Tooling
   `PR #8092 <https://github.com/pantsbuild/pants/pull/8092>`_
 
 * Parse zinc args and pass scalac options into scalafix (#8091)
->`_ttps://github.com/pantsbuild/pants/issues/7914
   `PR #8091 <https://github.com/pantsbuild/pants/pull/8091>`_
 
 * Scoverage report generator (#8098)
