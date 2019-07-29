@@ -400,7 +400,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         lambda:  True,
         removal_version='1.20.0.dev0',
         entity_description=f'Requested a deprecated compiler: [{requested_compiler}].',
-        hint_message='Compiler will be defaulted to [{self.compiler}].')
+        hint_message=f'Compiler will be defaulted to [{self.compiler}].')
     elif requested_compiler != self.compiler:
       # If the requested compiler is not the one supported by this task, log and abort
       self.context.log.debug(f'Requested a compiler [{requested_compiler}] other than this one [{self.compiler}], skipping.')
