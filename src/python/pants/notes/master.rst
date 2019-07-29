@@ -4,6 +4,51 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.19.0rc0 (29/07/2019)
+----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add fs_util subcommand to list known directories (#8100)
+  `PR #8100 <https://github.com/pantsbuild/pants/pull/8100>`_
+
+
+Bugfixes
+~~~~~~~~
+
+* [pantsd] Don't ignore the first watchman event for the daemon pid (#8096)
+  `PR #8096 <https://github.com/pantsbuild/pants/pull/8096>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* [pantsd] Remove dead code around prefork graph warming (#8095)
+  `PR #8095 <https://github.com/pantsbuild/pants/pull/8095>`_
+
+* Use remote build execution to run several unit tests (#8051)
+  `Issue #7649, <https://github.com/pantsbuild/pants/issues/7649,>`_
+  `PR #8051 <https://github.com/pantsbuild/pants/pull/8051>`_
+
+* Report the stats version pants is using to the server. (#8086)
+  `PR #8086 <https://github.com/pantsbuild/pants/pull/8086>`_
+
+* Remove unused unit-test.sh script (#8083)
+  `PR #8083 <https://github.com/pantsbuild/pants/pull/8083>`_
+
+* Use direct import of version.py (#8078)
+  `PR #8078 <https://github.com/pantsbuild/pants/pull/8078>`_
+  `PR #8077#discussion_r305555451 <https://github.com/pantsbuild/pants/pull/8077#discussion_r305555451>`_
+
+* Refactor V2 PEX creation rules (#8080)
+  `PR #8080 <https://github.com/pantsbuild/pants/pull/8080>`_
+  `PR #8063 <https://github.com/pantsbuild/pants/pull/8063>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Update CONTRIBUTORS.md
+
 1.19.0.dev0 (7/20/2019)
 -----------------------
 
