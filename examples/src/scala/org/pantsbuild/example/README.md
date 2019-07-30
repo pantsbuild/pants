@@ -116,6 +116,47 @@ supported by default.  Most other scala test frameworks support running with JUn
 class/trait or via a `@RunWith` annotation; so you can use
 `junit_tests` for your scala tests as well.
 
+### Scala Code Coverage: Scoverage
+
+Code coverage reports for Scala projects can be generated with the help of Scoverage. To generate a
+Scoverage report, run the test command with the following additional option(s):
+
+    :::bash
+    ./pants --scoverage-enable-scoverage test ${TARGETS}
+
+As an example, scoverage reports for the `example` project can be generated as:
+
+    :::bash
+    ./pants --scoverage-enable-scoverage test examples/tests/scala/org/pantsbuild/example/hello/welcome
+
+Scoverage supports the following options:   
+`--scoverage-enable-scoverage` (required)   
+Specifies whether to generate scoverage reports for scala test targets.
+Default value is False. If True, implies `--test-junit-coverage-processor=scoverage.`
+
+`--scoverage-report-target-filters` (optional)   
+Regex patterns passed to scoverage report generator, specifying which targets should be
+included in reports. All targets matching any of the patterns will be
+included when generating reports. If no targets are specified, all
+targets are included, which would be the same as specifying ".*" as a filter.
+
+`--scoverage-blacklist-targets` (optional; troubleshooting)   
+Scoverage works by instrumenting targets at compile time. However, some targets cannot be
+instrumented at all as doing so results in exceeding JVM code size limits. Thus, if you receive
+the following error when compiling with scoverage:
+
+    :::bash
+    Could not write class ${CLASS NAME} because it exceeds JVM code size limits.
+    Method ${METHOD NAME} code too large!
+    ... much build output ...
+    FAILURE: Compilation failure: Failed jobs: compile(${FAILED TARGET NAME})
+
+You can prevent instrumenting the failed target by running the command as follows:
+
+    :::bash
+    ./pants --scoverage-enable-scoverage --scoverage-blacklist-targets='["${FAILED TARGET NAME}"]' ${TEST TARGET}
+
+
 Formatting and Linting
 ----------------------
 
