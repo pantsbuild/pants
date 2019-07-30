@@ -64,9 +64,8 @@ class JvmDependencyCheck(Task):
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)
     if not cls._skip(options):
-      round_manager.require_data('product_deps_by_src')
+      round_manager.require_data('product_deps_by_target')
       round_manager.require_data('runtime_classpath')
-      round_manager.require_data('zinc_analysis')
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
@@ -102,15 +101,15 @@ class JvmDependencyCheck(Task):
     fingerprint_strategy = DependencyContext.global_instance().create_fingerprint_strategy(
         classpath_product)
 
-    targets = list(self.context.products.get_data('zinc_analysis').keys())
+    targets = [target for target in self.context.targets() if hasattr(target, 'strict_deps')]
 
     with self.invalidated(targets,
                           fingerprint_strategy=fingerprint_strategy,
                           invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.invalid_vts:
-        product_deps_by_src = self.context.products.get_data('product_deps_by_src').get(vt.target)
-        if product_deps_by_src is not None:
-          self.check(vt.target, product_deps_by_src)
+        product_deps_for_target = self.context.products.get_data('product_deps_by_target').get(vt.target)
+        if product_deps_for_target is not None:
+          self.check(vt.target, product_deps_for_target)
 
   def check(self, src_tgt, actual_deps):
     """Check for missing deps.
@@ -130,8 +129,11 @@ class JvmDependencyCheck(Task):
 
       def filter_whitelisted(missing_deps):
         # Removing any targets that exist in the whitelist from the list of dependency issues.
-        return [(tgt_pair, evidence) for (tgt_pair, evidence) in missing_deps
-                            if tgt_pair[0].address not in self._target_whitelist]
+        return [
+          (tgt_pair, evidence)
+          for (tgt_pair, evidence) in missing_deps
+          if tgt_pair[0].address not in self._target_whitelist
+        ]
 
       missing_direct_tgt_deps = filter_whitelisted(missing_direct_tgt_deps)
 
@@ -139,7 +141,7 @@ class JvmDependencyCheck(Task):
         log_fn = (self.context.log.error if self._check_missing_direct_deps == 'fatal'
                   else self.context.log.warn)
         for (tgt_pair, evidence) in missing_direct_tgt_deps:
-          evidence_str = '\n'.join(['  {} uses {}'.format(shorten(e[0]), shorten(e[1]))
+          evidence_str = '\n'.join(['  {} uses {}'.format(e[0].address.spec, shorten(e[1]))
                                     for e in evidence])
           log_fn('Missing direct BUILD dependency {} -> {} because:\n{}'
                  .format(tgt_pair[0].address.spec, tgt_pair[1].address.spec, evidence_str))
@@ -180,6 +182,7 @@ class JvmDependencyCheck(Task):
     All paths in the input and output are absolute.
     """
     analyzer = self._analyzer
+
     def must_be_explicit_dep(dep):
       # We don't require explicit deps on the java runtime, so we shouldn't consider that
       # a missing dep.
@@ -204,22 +207,23 @@ class JvmDependencyCheck(Task):
     missing_direct_tgt_deps_map = defaultdict(list)  # The same, but for direct deps.
 
     targets_by_file = analyzer.targets_by_file(self.context.targets())
-    buildroot = get_buildroot()
-    abs_srcs = [os.path.join(buildroot, src) for src in src_tgt.sources_relative_to_buildroot()]
-    for src in abs_srcs:
-      for actual_dep in filter(must_be_explicit_dep, actual_deps.get(src, [])):
-        actual_dep_tgts = targets_by_file.get(actual_dep)
-        # actual_dep_tgts is usually a singleton. If it's not, we only need one of these
-        # to be in our declared deps to be OK.
-        if actual_dep_tgts is None:
-          missing_file_deps.add((src_tgt, actual_dep))
-        elif not target_or_java_dep_in_targets(src_tgt, actual_dep_tgts):
-          # Obviously intra-target deps are fine.
-          canonical_actual_dep_tgt = next(iter(actual_dep_tgts))
-          if canonical_actual_dep_tgt not in src_tgt.dependencies:
-            # The canonical dep is the only one a direct dependency makes sense on.
-            missing_direct_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append(
-                (src, actual_dep))
+    for actual_dep in filter(must_be_explicit_dep, actual_deps):
+      actual_dep_tgts = targets_by_file.get(actual_dep)
+      # actual_dep_tgts is usually a singleton. If it's not, we only need one of these
+      # to be in our declared deps to be OK.
+      if actual_dep_tgts is None:
+        missing_file_deps.add((src_tgt, actual_dep))
+      elif not target_or_java_dep_in_targets(src_tgt, actual_dep_tgts):
+        # Obviously intra-target deps are fine.
+        canonical_actual_dep_tgt = next(iter(actual_dep_tgts))
+        if canonical_actual_dep_tgt not in src_tgt.dependencies:
+          # The canonical dep is the only one a direct dependency makes sense on.
+          # TODO get rid of src usage here. we dont have a way to map class
+          # files back to source files when using jdeps. I think we can get away without
+          # listing the src file directly and just list the target which has the transient
+          # dep
+          missing_direct_tgt_deps_map[(src_tgt, canonical_actual_dep_tgt)].append(
+              (src_tgt, actual_dep))
 
     return (list(missing_file_deps),
             list(missing_direct_tgt_deps_map.items()))
@@ -254,6 +258,8 @@ class JvmDependencyCheck(Task):
     """
     # Flatten the product deps of this target.
     product_deps = set()
+    # TODO update actual deps will just be a list, not a dict when switching to
+    # product_deps_by_target_product.
     for dep_entries in actual_deps.values():
       product_deps.update(dep_entries)
 
