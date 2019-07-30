@@ -6,6 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import json
 import os
+import subprocess
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
@@ -13,8 +14,7 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.java.jar.jar_dependency import JarDependency
 from pants.util.contextutil import environment_as
-from pants.util.dirutil import safe_mkdir
-from pants.util.process_handler import subprocess
+from pants.util.dirutil import safe_file_dump, safe_mkdir
 
 from pants.contrib.bloop.tasks.config.bloop_export_config import BloopExportConfig
 
@@ -53,6 +53,8 @@ class BloopWriteExport(NailgunTask):
     bloop_export = self.context.products.get_data(BloopExportConfig.BloopExport)
 
     export_result = json.dumps(bloop_export.exported_targets_map, indent=4, separators=(',', ': '))
+
+    safe_file_dump(os.path.join(get_buildroot(), 'idk.json'), payload=export_result, mode='w')
 
     output_dir = os.path.join(get_buildroot(), self.get_options().output_dir)
     safe_mkdir(output_dir)

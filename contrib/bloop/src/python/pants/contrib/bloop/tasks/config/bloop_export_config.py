@@ -4,7 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from future.utils import text_type
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.base.build_environment import get_buildroot
 from pants.java.distribution.distribution import DistributionLocator
@@ -46,7 +45,7 @@ class BloopExportConfig(ModifiedExportTaskBase):
   def register_options(cls, register):
     super(BloopExportConfig, cls).register_options(register)
 
-    register('--reported-scala-version', type=text_type, default='2.12.8',
+    register('--reported-scala-version', default='2.12.8',
              help='Scala version to report to ensime. Defaults to the scala platform version.')
 
   @classmethod
@@ -75,8 +74,8 @@ class BloopExportConfig(ModifiedExportTaskBase):
       reported_scala_version = self._scala_platform.version
 
     scala_compiler_jars = [
-      text_type(fast_relpath(cpe.path, get_buildroot())) for cpe in
-      self._scala_platform.compiler_classpath_entries(self.context.products, self.context._scheduler)
+      str(fast_relpath(cpe.path, get_buildroot())) for cpe in
+      self._scala_platform.compiler_classpath_entries(self.context.products)
     ]
 
     export_config = self.BloopExport(
