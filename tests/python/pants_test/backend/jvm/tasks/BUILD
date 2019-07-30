@@ -79,7 +79,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:int-test',
   ],
-  timeout=180,
+  timeout=360,
   tags = {'integration'},
 )
 
@@ -453,7 +453,7 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
-  timeout = 240,
+  timeout = 540,
 )
 
 python_library(
