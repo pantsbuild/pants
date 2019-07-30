@@ -1,10 +1,12 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.contrib.mypy.tasks.mypy_task import MypyTask, MypyTaskError
-from pants_test.task_test_base import TaskTestBase
-from pants.backend.python.targets.python_library import PythonLibrary
 from unittest.mock import MagicMock
+
+from pants.backend.python.targets.python_library import PythonLibrary
+from pants_test.task_test_base import TaskTestBase
+
+from pants.contrib.mypy.tasks.mypy_task import MypyTask, MypyTaskError
 
 
 class MyPyTests(TaskTestBase):
