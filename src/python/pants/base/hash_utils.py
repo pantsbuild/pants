@@ -63,7 +63,7 @@ class CoercingEncoder(json.JSONEncoder):
       return self.encode(key_obj)
 
   def _is_natively_encodable(self, o):
-    return isinstance(o, (type(None), bool, int, list, str, bytes))
+    return isinstance(o, (type(None), bool, int, list, str, bytes, float))
 
   def default(self, o):
     if self._is_natively_encodable(o):
