@@ -235,12 +235,12 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       hermetic_environment_as(**self._env), \
       encapsulated_global_logger():
       try:
+        # Clean global state.
+        clean_global_runtime_state(reset_subsystem=True)
+
         options, _, options_bootstrapper = LocalPantsRunner.parse_options(self._args, self._env)
         graph_helper, target_roots, exit_code = self._scheduler_service.prepare_v1_graph_run_v2(options, options_bootstrapper)
         self.exit_code = exit_code
-
-        # Clean global state.
-        clean_global_runtime_state(reset_subsystem=True)
 
         # Otherwise, conduct a normal run.
         with ExceptionSink.exiter_as_until_exception(lambda _: PantsRunFailCheckerExiter()):
