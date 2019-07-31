@@ -26,6 +26,7 @@ from pex.pex_info import PexInfo
 class MypyTaskError(TaskError):
   """Indicates a TaskError from a failing MyPy run."""
 
+
 class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
   """Invoke the mypy static type analyzer for Python.
 
