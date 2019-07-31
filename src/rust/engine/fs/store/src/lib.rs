@@ -32,6 +32,7 @@ pub use crate::snapshot::{OneOffStoreFileByDigest, Snapshot, StoreFileByDigest};
 use bazel_protos;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
+use concrete_time::TimeSpan;
 use dirs;
 use fs::FileContent;
 use futures::{future, Future};
@@ -46,7 +47,6 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
-use time::Timespec;
 use workunit_store::WorkUnitStore;
 
 use parking_lot::Mutex;
@@ -69,53 +69,6 @@ pub struct UploadSummary {
   pub uploaded_file_bytes: usize,
   #[serde(skip)]
   pub upload_wall_time: Duration,
-}
-
-/// A timespan represented as two floating point representations of seconds
-#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
-pub struct TimeSpan {
-  /// Number of seconds since the UNIX_EPOCH with precision to the nanosecond
-  pub start: f64,
-  /// Number of seconds since `start` with precision to the nanosecond
-  pub duration: f64,
-}
-
-impl TimeSpan {
-  const NANOSECS_IN_SEC: f64 = 1_000_000_000_f64;
-  // Sadly not quite stable in std yet.
-  fn duration_as_secs_f64(d: Duration) -> f64 {
-    (d.as_nanos() as f64) / (Self::NANOSECS_IN_SEC)
-  }
-
-  fn system_time_as_secs_f64(time: &SystemTime) -> f64 {
-    let since_epoch = time
-      .duration_since(std::time::UNIX_EPOCH)
-      .expect("Surely you're not before the unix epoch?");
-    Self::duration_as_secs_f64(since_epoch)
-  }
-
-  pub fn since(start: &SystemTime) -> TimeSpan {
-    let now = Self::system_time_as_secs_f64(&SystemTime::now());
-    let start = Self::system_time_as_secs_f64(start);
-    TimeSpan {
-      start,
-      duration: now - start,
-    }
-  }
-
-  fn timespec_from_f64_secs(seconds: f64) -> Timespec {
-    let secs = seconds as i64;
-    let subsec_nanos = ((seconds - secs as f64) * Self::NANOSECS_IN_SEC) as i32;
-    Timespec::new(secs, subsec_nanos)
-  }
-
-  pub fn start_timestamp(self) -> Timespec {
-    Self::timespec_from_f64_secs(self.start)
-  }
-
-  pub fn end_timestamp(self) -> Timespec {
-    Self::timespec_from_f64_secs(self.start + self.duration)
-  }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -1794,6 +1747,7 @@ mod remote {
   use bazel_protos;
   use boxfuture::{BoxFuture, Boxable};
   use bytes::{Bytes, BytesMut};
+  use concrete_time::TimeSpan;
   use digest::{Digest as DigestTrait, FixedOutput};
   use futures::{self, future, Future, IntoFuture, Sink, Stream};
   use grpcio;
@@ -2023,11 +1977,9 @@ mod remote {
           }
         })
         .then(move |future| {
-          let time_span = super::TimeSpan::since(&start_time);
           let workunit = workunit_store::WorkUnit {
             name: workunit_name.clone(),
-            start_timestamp: time_span.start_timestamp(),
-            end_timestamp: time_span.end_timestamp(),
+            time_span: TimeSpan::since(&start_time),
             span_id: workunit_store::generate_random_64bit_string(),
             parent_id: workunit_store::get_parent_id(),
           };
@@ -2104,11 +2056,9 @@ mod remote {
           }
         })
         .then(move |future| {
-          let time_span = super::TimeSpan::since(&start_time);
           let workunit = workunit_store::WorkUnit {
             name: workunit_name.clone(),
-            start_timestamp: time_span.start_timestamp(),
-            end_timestamp: time_span.end_timestamp(),
+            time_span: TimeSpan::since(&start_time),
             span_id: workunit_store::generate_random_64bit_string(),
             parent_id: workunit_store::get_parent_id(),
           };
@@ -2154,11 +2104,9 @@ mod remote {
             })
         })
         .then(move |future| {
-          let time_span = super::TimeSpan::since(&start_time);
           let workunit = workunit_store::WorkUnit {
             name: workunit_name.clone(),
-            start_timestamp: time_span.start_timestamp(),
-            end_timestamp: time_span.end_timestamp(),
+            time_span: TimeSpan::since(&start_time),
             span_id: workunit_store::generate_random_64bit_string(),
             parent_id: workunit_store::get_parent_id(),
           };

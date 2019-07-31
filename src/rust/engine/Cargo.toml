@@ -21,6 +21,7 @@ members = [
   ".",
   "async_semaphore",
   "boxfuture",
+  "concrete_time",
   "engine_cffi",
   "fs",
   "fs/brfs",
@@ -55,6 +56,7 @@ default-members = [
   ".",
   "async_semaphore",
   "boxfuture",
+  "concrete_time",
   "engine_cffi",
   "fs",
   "fs/fs_util",
@@ -79,6 +81,7 @@ default-members = [
 [dependencies]
 boxfuture = { path = "boxfuture" }
 bytes = "0.4.5"
+concrete_time = { path = "concrete_time" }
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures = "0.1.27"

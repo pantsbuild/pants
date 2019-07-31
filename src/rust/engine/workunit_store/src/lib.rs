@@ -26,19 +26,18 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use concrete_time::TimeSpan;
 use futures::task_local;
 use parking_lot::Mutex;
 use rand::thread_rng;
 use rand::Rng;
 use std::collections::HashSet;
 use std::sync::Arc;
-use time::Timespec;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct WorkUnit {
   pub name: String,
-  pub start_timestamp: Timespec,
-  pub end_timestamp: Timespec,
+  pub time_span: TimeSpan,
   pub span_id: String,
   pub parent_id: Option<String>,
 }

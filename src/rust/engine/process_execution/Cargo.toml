@@ -23,7 +23,7 @@ sharded_lmdb = {  path = "../sharded_lmdb" }
 store = { path = "../fs/store" }
 task_executor = { path = "../task_executor" }
 tempfile = "3"
-time = "0.1.40"
+concrete_time = { path = "../concrete_time" }
 tokio-codec = "0.1"
 tokio-process = "0.2.1"
 tokio-timer = "0.2"

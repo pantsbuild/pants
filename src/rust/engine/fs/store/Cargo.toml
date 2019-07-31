@@ -8,6 +8,7 @@ edition = "2018"
 bazel_protos = { path = "../../process_execution/bazel_protos" }
 boxfuture = { path = "../../boxfuture" }
 bytes = "0.4.5"
+concrete_time = { path = "../../concrete_time" }
 digest = "0.8"
 dirs = "1"
 fs = { path = ".." }
@@ -30,7 +31,6 @@ tempfile = "3"
 tokio-threadpool = "0.1.12"
 uuid = { version = "0.7.1", features = ["v4"] }
 workunit_store = {path = "../../workunit_store" }
-time = "0.1.42"
 
 [dev-dependencies]
 maplit = "*"

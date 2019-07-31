@@ -60,7 +60,6 @@ use std::os::raw;
 use std::panic;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use time::Timespec;
 
 // TODO: Consider renaming and making generic for collections of PyResults.
 #[repr(C)]
@@ -106,6 +105,7 @@ pub extern "C" fn externs_set(
   store_dict: StoreTupleExtern,
   store_bytes: StoreBytesExtern,
   store_utf8: StoreUtf8Extern,
+  store_u64: StoreU64Extern,
   store_i64: StoreI64Extern,
   store_f64: StoreF64Extern,
   store_bool: StoreBoolExtern,
@@ -133,6 +133,7 @@ pub extern "C" fn externs_set(
     store_dict,
     store_bytes,
     store_utf8,
+    store_u64,
     store_i64,
     store_f64,
     store_bool,
@@ -351,10 +352,14 @@ pub extern "C" fn scheduler_metrics(
             let mut workunit_zipkin_trace_info = vec![
               externs::store_utf8("name"),
               externs::store_utf8(&workunit.name),
-              externs::store_utf8("start_timestamp"),
-              externs::store_f64(timespec_as_float_secs(&workunit.start_timestamp)),
-              externs::store_utf8("end_timestamp"),
-              externs::store_f64(timespec_as_float_secs(&workunit.end_timestamp)),
+              externs::store_utf8("start_secs"),
+              externs::store_u64(workunit.time_span.start.secs),
+              externs::store_utf8("start_nanos"),
+              externs::store_u64(u64::from(workunit.time_span.start.nanos)),
+              externs::store_utf8("duration_secs"),
+              externs::store_u64(workunit.time_span.duration.secs),
+              externs::store_utf8("duration_nanos"),
+              externs::store_u64(u64::from(workunit.time_span.duration.nanos)),
               externs::store_utf8("span_id"),
               externs::store_utf8(&workunit.span_id),
             ];
@@ -371,13 +376,6 @@ pub extern "C" fn scheduler_metrics(
       externs::store_dict(&values).into()
     })
   })
-}
-
-fn timespec_as_float_secs(timespec: &Timespec) -> f64 {
-  //  Reverting time from Timespec to f64 decreases precision.
-  let whole_secs = timespec.sec as f64;
-  let fract_part_in_nanos = f64::from(timespec.nsec);
-  whole_secs + fract_part_in_nanos / 1_000_000_000.0
 }
 
 ///
