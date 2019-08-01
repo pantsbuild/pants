@@ -19,16 +19,6 @@ class DepExportsIntegrationTest(PantsRunIntegrationTest):
   def hermetic(cls):
     return True
 
-  def test_compilation(self):
-    for lang in self.SRC_TYPES:
-      path = os.path.join(self.SRC_PREFIX, lang, self.SRC_PACKAGE)
-      pants_run = self.run_pants(['list', '{}::'.format(path)])
-      self.assert_success(pants_run)
-      target_list = pants_run.stdout_data.strip().split('\n')
-      for target in target_list:
-        pants_run = self.run_pants(['compile', '--lint-scalafmt-skip', target])
-        self.assert_success(pants_run)
-
   def modify_exports_and_compile(self, target, modify_file):
     with self.temporary_sourcedir() as tmp_src:
       src_dir = os.path.relpath(os.path.join(tmp_src, os.path.basename(self.SRC_PACKAGE)), get_buildroot())

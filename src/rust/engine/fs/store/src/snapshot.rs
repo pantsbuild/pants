@@ -4,7 +4,7 @@
 use crate::Store;
 use bazel_protos;
 use boxfuture::{try_future, BoxFuture, Boxable};
-use fs::{Dir, File, GlobMatching, PathGlobs, PathStat, PosixFS};
+use fs::{Dir, File, GlobMatching, PathGlobs, PathStat, PosixFS, SymlinkBehavior};
 use futures::future::{self, join_all};
 use futures::Future;
 use hashing::{Digest, EMPTY_DIGEST};
@@ -459,7 +459,8 @@ impl Snapshot {
   /// Note that we don't use a Graph here, and don't cache any intermediate steps, we just place
   /// the resultant Snapshot into the store and return it. This is important, because we're reading
   /// things from arbitrary filepaths which we don't want to cache in the graph, as we don't watch
-  /// them for changes.
+  /// them for changes. Because we're not caching things, we can safely configure the virtual
+  /// filesystem to be symlink-oblivious.
   ///
   /// If the `digest_hint` is given, first attempt to load the Snapshot using that Digest, and only
   /// fall back to actually walking the filesystem if we don't have it (either due to garbage
@@ -478,11 +479,16 @@ impl Snapshot {
     future::result(digest_hint.ok_or_else(|| "No digest hint provided.".to_string()))
       .and_then(move |digest| Snapshot::from_digest(store, digest))
       .or_else(|_| {
-        let posix_fs = Arc::new(try_future!(PosixFS::new(root_path, &[], executor)));
+        let posix_fs = Arc::new(try_future!(PosixFS::new_with_symlink_behavior(
+          root_path,
+          &[],
+          executor,
+          SymlinkBehavior::Oblivious
+        )));
 
         posix_fs
           .expand(path_globs)
-          .map_err(|err| format!("Error expanding globs: {:?}", err))
+          .map_err(|err| format!("Error expanding globs: {}", err))
           .and_then(|path_stats| {
             Snapshot::from_path_stats(
               store2.clone(),
