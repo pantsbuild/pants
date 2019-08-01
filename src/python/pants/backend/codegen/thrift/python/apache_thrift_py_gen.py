@@ -11,6 +11,8 @@ from pants.util.dirutil import safe_delete, safe_walk
 
 class ApacheThriftPyGen(ApacheThriftGenBase):
   """Generate Python source files from thrift IDL files."""
+  options_scope = 'asdf'
+
   gentarget_type = PythonThriftLibrary
   thrift_generator = 'py'
   default_gen_options_map = {
