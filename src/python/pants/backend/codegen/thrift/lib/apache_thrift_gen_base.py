@@ -83,6 +83,7 @@ class ApacheThriftGenBase(SimpleCodegenTask):
       with self.context.new_workunit(name=source,
                                      labels=[WorkUnitLabel.TOOL],
                                      cmd=' '.join(cmd)) as workunit:
+        self.context.log.debug(f'cmd: {cmd}')
         result = subprocess.call(cmd,
                                  stdout=workunit.output('stdout'),
                                  stderr=workunit.output('stderr'))
