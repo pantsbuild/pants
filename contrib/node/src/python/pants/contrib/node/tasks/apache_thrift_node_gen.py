@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from pants.backend.codegen.thrift.lib.apache_thrift_gen_base import ApacheThriftGenBase
 from pants.util.dirutil import safe_file_dump
 from pants.contrib.node.targets.node_thrift_library import NodeThriftLibrary
@@ -23,7 +24,8 @@ class ApacheThriftNodeGen(ApacheThriftGenBase):
 
   @property
   def _copy_target_attributes(self) -> List[str]:
-    return ['tags', 'node_scope', 'package_manager', 'build_script', 'output_dir', 'dev_dependency', 'style_ignore_path', 'bin_executables']
+    return ['tags', 'node_scope', 'package_manager', 'build_script',
+            'output_dir', 'dev_dependency', 'style_ignore_path', 'bin_executables']
 
   def execute_codegen(selt, target, target_workdir):
     sources_list = target.sources_relative_to_target_base()
@@ -35,6 +37,8 @@ class ApacheThriftNodeGen(ApacheThriftGenBase):
       package_dict = {}
       package_dict["name"] = target.name
       package_dict["version"] = "0.0.1"
+      main_name = os.path.basename(target.sources_relative_to_buildroot()[0])
+      package_dict["main"] = re.sub(r'\.thrift', '_types.js', main_name)
       dep_dict = {}
       for dep in dependency_list:
         if not isinstance(dep, NodeModule):
