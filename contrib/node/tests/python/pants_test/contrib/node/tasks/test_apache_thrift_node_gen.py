@@ -11,6 +11,19 @@ class ApacheThriftNodeGenTest(TaskTestBase):
   def task_type(cls):
     return ApacheThriftNodeGen
 
+  def generate_multiple_thrift_targets(self, node_thrift_library):
+    context = self.context(target_roots=[node_thrift_library])
+    apache_thrift_gen = self.create_task(context)
+    apache_thrift_gen.execute()
+
+    def is_synthetic_node_library(target):
+      return isinstance(target, NodeModule) and target.is_synthetic
+
+    synthetic_targets = context.targets(predicate=is_synthetic_node_library)
+
+    self.assertNotEqual(0, len(synthetic_targets))
+    return synthetic_targets[0], synthetic_targets[1]
+
   def generate_single_thrift_target(self, node_thrift_library):
     context = self.context(target_roots=[node_thrift_library])
     apache_thrift_gen = self.create_task(context)
@@ -26,7 +39,7 @@ class ApacheThriftNodeGenTest(TaskTestBase):
 
   def test_single_namespace(self):
     self.create_file('src/thrift/com/foo/test.thrift', contents=dedent("""
-    namespace js foo.bar
+    namespace js gen.foo.bar
 
     struct Test {}
     """))
@@ -58,7 +71,7 @@ class ApacheThriftNodeGenTest(TaskTestBase):
                       'yarn.lock',
                       'test1_types.js',
                       'test2_types.js'},
-                     set(synthetic_target.sources_relative_to_source_root()))
+                     set(synthetic_target.sources_relative_to_target_base()))
 
   def test_namespace_effective(self):
     self.create_file('src/thrift/com/foo/test1.thrift', contents=dedent("""
@@ -81,3 +94,38 @@ class ApacheThriftNodeGenTest(TaskTestBase):
     synthetic_target2 = self.generate_single_thrift_target(test2)
 
     self.assertNotEqual(synthetic_target1, synthetic_target2)
+
+  def test_thrift_target_dependable(self):
+    self.create_file('src/thrift/com/foo/test1.thrift', contents=dedent("""
+    namespace js gen.foo.bar
+
+    struct Test1 {}
+    """))
+    test1 = self.make_target(spec='src/thrift/com/foo:test1',
+                             target_type=NodeThriftLibrary,
+                             sources=['test1.thrift'])
+
+    self.create_file('src/thrift/com/foo/test2.thrift', contents=dedent("""
+    namespace js gen.foo.bar
+    include "test1.thrift"
+
+    struct Test2 {
+      1: required test1.Test1 test_obj;
+    }
+    """))
+
+    test2 = self.make_target(spec='src/thrift/com/foo:test2',
+                             target_type=NodeThriftLibrary,
+                             sources=['test2.thrift'],
+                             dependencies=[test1])
+    synthetic_node_target1, synthetic_node_target2 = self.generate_multiple_thrift_targets(test2)
+
+    self.assertEqual({'package.json',
+                      'yarn.lock',
+                      'test1_types.js'},
+                     set(synthetic_node_target1.sources_relative_to_target_base()))
+
+    self.assertEqual({'package.json',
+                      'yarn.lock',
+                      'test2_types.js'},
+                     set(synthetic_node_target2.sources_relative_to_target_base()))
