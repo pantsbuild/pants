@@ -160,4 +160,7 @@ class NodeResolve(NodeTask):
                                                   resolve_locally=True,
                                                   install_optional=True,
                                                   frozen_lockfile=False)
-          node_paths_local.resolved(target, results_dir)
+          if target.is_synthetic:
+            node_paths_local.resolved(target.concrete_derived_from, results_dir)
+          else:
+            node_paths_local.resolved(target, results_dir)

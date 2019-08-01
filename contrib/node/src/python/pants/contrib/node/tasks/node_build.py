@@ -69,7 +69,9 @@ class NodeBuild(NodeTask):
       for vt in invalidation_check.all_vts:
         target = vt.target
         node_installed_path = node_paths.node_path(target)
-
+        # Relying on NodePaths not having a node resolver defined for NodeThriftLibrary targets
+        if not node_installed_path:
+          continue
         with pushd(node_installed_path):
           if not vt.valid:
             self._run_build_script(
