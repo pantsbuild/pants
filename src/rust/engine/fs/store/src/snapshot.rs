@@ -4,7 +4,7 @@
 use crate::Store;
 use bazel_protos;
 use boxfuture::{try_future, BoxFuture, Boxable};
-use fs::{Dir, File, GlobMatching, PathGlobs, PathStat, PosixFS};
+use fs::{Dir, File, GlobMatching, PathGlobs, PathStat, PosixFS, SymlinkBehavior};
 use futures::future::{self, join_all};
 use futures::Future;
 use hashing::{Digest, EMPTY_DIGEST};
@@ -479,11 +479,11 @@ impl Snapshot {
     future::result(digest_hint.ok_or_else(|| "No digest hint provided.".to_string()))
       .and_then(move |digest| Snapshot::from_digest(store, digest))
       .or_else(|_| {
-        let posix_fs = Arc::new(try_future!(PosixFS::new_symlink_aware(
+        let posix_fs = Arc::new(try_future!(PosixFS::new_with_symlink_behavior(
           root_path,
           &[],
           executor,
-          false
+          SymlinkBehavior::Oblivious
         )));
 
         posix_fs

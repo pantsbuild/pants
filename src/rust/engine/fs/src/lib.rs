@@ -540,20 +540,26 @@ pub struct GlobWithSource {
   source: GlobSource,
 }
 
+#[derive(Clone)]
+pub enum SymlinkBehavior {
+  Aware,
+  Oblivious,
+}
+
 ///
 /// All Stats consumed or returned by this type are relative to the root.
 ///
-/// If `symlink_aware` is true (as it is by default), `scandir` will produce `Link` entries so that
-/// a consumer can explicitly track their expansion. Otherwise, it will allow the operating system
-/// to expand the link to its underlying type without regard to the links traversed, and `scandir`
-/// will produce only `Dir` and `File` entries.
+/// If `symlink_behavior` is Aware (as it is by default), `scandir` will produce `Link` entries so
+/// that a consumer can explicitly track their expansion. Otherwise, if Oblivious, operations will
+/// allow the operating system to expand links to their underlying types without regard to the
+/// links traversed, and `scandir` will produce only `Dir` and `File` entries.
 ///
 #[derive(Clone)]
 pub struct PosixFS {
   root: Dir,
   ignore: Arc<GitignoreStyleExcludes>,
   executor: task_executor::Executor,
-  symlink_aware: bool,
+  symlink_behavior: SymlinkBehavior,
 }
 
 impl PosixFS {
@@ -562,14 +568,14 @@ impl PosixFS {
     ignore_patterns: &[String],
     executor: task_executor::Executor,
   ) -> Result<PosixFS, String> {
-    Self::new_symlink_aware(root, ignore_patterns, executor, true)
+    Self::new_with_symlink_behavior(root, ignore_patterns, executor, SymlinkBehavior::Aware)
   }
 
-  pub fn new_symlink_aware<P: AsRef<Path>>(
+  pub fn new_with_symlink_behavior<P: AsRef<Path>>(
     root: P,
     ignore_patterns: &[String],
     executor: task_executor::Executor,
-    symlink_aware: bool,
+    symlink_behavior: SymlinkBehavior,
   ) -> Result<PosixFS, String> {
     let root: &Path = root.as_ref();
     let canonical_root = root
@@ -598,7 +604,7 @@ impl PosixFS {
       root: canonical_root,
       ignore: ignore,
       executor: executor,
-      symlink_aware: symlink_aware,
+      symlink_behavior: symlink_behavior,
     })
   }
 
@@ -622,13 +628,16 @@ impl PosixFS {
       .map(|readdir| {
         let dir_entry = readdir?;
         let (file_type, compute_metadata): (_, Box<FnOnce() -> Result<_, _>>) =
-          if self.symlink_aware {
-            // Use the dir_entry metadata, which is symlink aware.
-            (dir_entry.file_type()?, Box::new(|| dir_entry.metadata()))
-          } else {
-            // Use an independent stat call to get metadata, which is symlink oblivious.
-            let metadata = std::fs::metadata(dir_abs.join(dir_entry.file_name()))?;
-            (metadata.file_type(), Box::new(|| Ok(metadata)))
+          match self.symlink_behavior {
+            SymlinkBehavior::Aware => {
+              // Use the dir_entry metadata, which is symlink aware.
+              (dir_entry.file_type()?, Box::new(|| dir_entry.metadata()))
+            }
+            SymlinkBehavior::Oblivious => {
+              // Use an independent stat call to get metadata, which is symlink oblivious.
+              let metadata = std::fs::metadata(dir_abs.join(dir_entry.file_name()))?;
+              (metadata.file_type(), Box::new(|| Ok(metadata)))
+            }
           };
         PosixFS::stat_internal(
           &root,
@@ -778,10 +787,9 @@ impl PosixFS {
 
   pub fn stat_sync(&self, relative_path: PathBuf) -> Result<Stat, io::Error> {
     let abs_path = self.root.0.join(&relative_path);
-    let metadata = if self.symlink_aware {
-      fs::symlink_metadata(abs_path)?
-    } else {
-      fs::metadata(abs_path)?
+    let metadata = match self.symlink_behavior {
+      SymlinkBehavior::Aware => fs::symlink_metadata(abs_path)?,
+      SymlinkBehavior::Oblivious => fs::metadata(abs_path)?,
     };
     PosixFS::stat_internal(&self.root.0, relative_path, metadata.file_type(), || {
       Ok(metadata)
@@ -923,7 +931,7 @@ mod posixfs_test {
 
   use super::{
     Dir, DirectoryListing, File, GlobExpansionConjunction, GlobMatching, Link, PathGlobs, PathStat,
-    PathStatGetter, PosixFS, Stat, StrictGlobMatching, VFS,
+    PathStatGetter, PosixFS, Stat, StrictGlobMatching, SymlinkBehavior, VFS,
   };
   use boxfuture::{BoxFuture, Boxable};
   use futures::future::{self, Future};
@@ -1039,6 +1047,25 @@ mod posixfs_test {
   }
 
   #[test]
+  fn stat_symlink_oblivious() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let posix_fs = new_posixfs_symlink_oblivious(&dir.path());
+    let path = PathBuf::from("marmosets");
+    make_file(&dir.path().join(&path), &[], 0o600);
+
+    let link_path = PathBuf::from("remarkably_similar_marmoset");
+    std::os::unix::fs::symlink(&dir.path().join(path), dir.path().join(&link_path)).unwrap();
+    // Symlink oblivious stat will give us the destination type.
+    assert_eq!(
+      posix_fs.stat_sync(link_path.clone()).unwrap(),
+      super::Stat::File(File {
+        path: link_path,
+        is_executable: false,
+      })
+    )
+  }
+
+  #[test]
   fn stat_other() {
     new_posixfs("/dev")
       .stat_sync(PathBuf::from("null"))
@@ -1070,7 +1097,6 @@ mod posixfs_test {
   #[test]
   fn scandir() {
     let dir = tempfile::TempDir::new().unwrap();
-    let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("enclosure");
     std::fs::create_dir(dir.path().join(&path)).unwrap();
 
@@ -1099,8 +1125,34 @@ mod posixfs_test {
 
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
+    // Symlink aware.
     assert_eq!(
-      runtime.block_on(posix_fs.scandir(Dir(path))).unwrap(),
+      runtime
+        .block_on(new_posixfs(&dir.path()).scandir(Dir(path.clone())))
+        .unwrap(),
+      DirectoryListing(vec![
+        Stat::File(File {
+          path: a_marmoset.clone(),
+          is_executable: false,
+        }),
+        Stat::File(File {
+          path: feed.clone(),
+          is_executable: true,
+        }),
+        Stat::Dir(Dir(hammock.clone())),
+        Stat::Link(Link(remarkably_similar_marmoset.clone())),
+        Stat::File(File {
+          path: sneaky_marmoset.clone(),
+          is_executable: false,
+        }),
+      ])
+    );
+
+    // Symlink oblivious.
+    assert_eq!(
+      runtime
+        .block_on(new_posixfs_symlink_oblivious(&dir.path()).scandir(Dir(path)))
+        .unwrap(),
       DirectoryListing(vec![
         Stat::File(File {
           path: a_marmoset,
@@ -1111,7 +1163,10 @@ mod posixfs_test {
           is_executable: true,
         }),
         Stat::Dir(Dir(hammock)),
-        Stat::Link(Link(remarkably_similar_marmoset)),
+        Stat::File(File {
+          path: remarkably_similar_marmoset,
+          is_executable: false,
+        }),
         Stat::File(File {
           path: sneaky_marmoset,
           is_executable: false,
@@ -1259,6 +1314,16 @@ mod posixfs_test {
 
   fn new_posixfs<P: AsRef<Path>>(dir: P) -> PosixFS {
     PosixFS::new(dir.as_ref(), &[], task_executor::Executor::new()).unwrap()
+  }
+
+  fn new_posixfs_symlink_oblivious<P: AsRef<Path>>(dir: P) -> PosixFS {
+    PosixFS::new_with_symlink_behavior(
+      dir.as_ref(),
+      &[],
+      task_executor::Executor::new(),
+      SymlinkBehavior::Oblivious,
+    )
+    .unwrap()
   }
 
   ///
