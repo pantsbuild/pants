@@ -108,8 +108,8 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
   def _whitelist_warning(self, targets_not_whitelisted: List[Target]) -> None:
     self.context.log.warn(self.WARNING_MESSAGE)
     if self.get_options().verbose:
-        output = self._format_targets_not_whitelisted(targets_not_whitelisted)
-        self.context.log.warn(f"{output}")
+      output = self._format_targets_not_whitelisted(targets_not_whitelisted)
+      self.context.log.warn(f"{output}")
 
   def _calculate_python_sources(self, target_roots: List[Target]):
     """Filter targets to generate a set of source files from the given targets."""
