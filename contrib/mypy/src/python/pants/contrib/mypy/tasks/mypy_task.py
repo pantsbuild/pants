@@ -45,7 +45,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
   deprecated_options_scope = 'mypy'
   deprecated_options_scope_removal_version = '1.20.0.dev2'
 
-  WARNING_MESSAGE = "[WARNING]: All targets in context should be whitelisted for mypy to run"
+  WARNING_MESSAGE = "[WARNING]: Targets not currently whitelisted and may cause issues."
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -59,6 +59,8 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
              help='Path mypy configuration file, relative to buildroot.')
     register('--whitelist-tag-name', default=None,
              help='Tag name to identify python targets to execute MyPy')
+    register('--verbose', type=bool, default=False,
+             help='Extra detail showing non-whitelisted targets')
 
   @classmethod
   def supports_passthru_args(cls):
@@ -90,19 +92,33 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
     return (self.is_non_synthetic_python_target(target) and
             self._is_tagged_target(target))
 
-  def _all_targets_are_whitelisted(self, targets: List[Target], all_targets: List[Target]) -> bool:
-    return len(targets) == 0 or len(targets) == len(all_targets)
+  def _not_tagged_non_synthetic_python_target(self, target: Target) -> bool:
+    return (self.is_non_synthetic_python_target(target) and
+            not self._is_tagged_target(target))
 
-  def _whitelist_warning(self) -> None:
+  def _all_targets_are_whitelisted(self, whitelisted_targets: List[Target], all_targets: List[Target]) -> bool:
+    return len(whitelisted_targets) == 0 or len(whitelisted_targets) == len(all_targets)
+
+  def _format_targets_not_whitelisted(self, targets: Target) -> str:
+    output = ''
+    for target in targets:
+      output = output + f"{target.address.spec}\n"
+    return output
+
+  def _whitelist_warning(self, targets_not_whitelisted: List[Target]) -> None:
     self.context.log.warn(self.WARNING_MESSAGE)
+    if self.get_options().verbose:
+        output = self._format_targets_not_whitelisted(targets_not_whitelisted)
+        self.context.log.warn(f"{output}")
 
   def _calculate_python_sources(self, target_roots: List[Target]):
     """Filter targets to generate a set of source files from the given targets."""
     if self.get_options().whitelist_tag_name:
-      white_listed_targets = self._filter_targets(Target.closure_for_targets([tgt for tgt in target_roots if self._is_tagged_target(tgt)]))
-      python_eval_targets = [tgt for tgt in white_listed_targets if self._is_tagged_non_synthetic_python_target(tgt)]
-      if not self._all_targets_are_whitelisted(python_eval_targets, white_listed_targets):
-        self._whitelist_warning()
+      all_targets = self._filter_targets(Target.closure_for_targets([tgt for tgt in target_roots if self._is_tagged_target(tgt)]))
+      python_eval_targets = [tgt for tgt in all_targets if self._is_tagged_non_synthetic_python_target(tgt)]
+      if not self._all_targets_are_whitelisted(python_eval_targets, all_targets):
+        targets_not_whitelisted = [tgt for tgt in all_targets if self._not_tagged_non_synthetic_python_target(tgt)]
+        self._whitelist_warning(targets_not_whitelisted)
     else:
       python_eval_targets = self._filter_targets([tgt for tgt in Target.closure_for_targets(target_roots) if self.is_non_synthetic_python_target(tgt)])
 
