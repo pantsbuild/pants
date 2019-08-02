@@ -443,13 +443,12 @@ impl WrappedNode for ReadLink {
   type Item = LinkDest;
 
   fn run(self, context: Context) -> NodeFuture<LinkDest> {
-    let link = self.0.clone();
     context
       .core
       .vfs
       .read_link(&self.0)
       .map(LinkDest)
-      .map_err(move |e| throw(&format!("Failed to read_link for {:?}: {:?}", link, e)))
+      .map_err(|e| throw(&format!("{}", e)))
       .to_boxed()
   }
 }
@@ -470,12 +469,11 @@ impl WrappedNode for DigestFile {
   type Item = hashing::Digest;
 
   fn run(self, context: Context) -> NodeFuture<hashing::Digest> {
-    let file = self.0.clone();
     context
       .core
       .vfs
       .read_file(&self.0)
-      .map_err(move |e| throw(&format!("Error reading file {:?}: {:?}", file, e,)))
+      .map_err(|e| throw(&format!("{}", e)))
       .and_then(move |c| {
         context
           .core
@@ -504,15 +502,12 @@ impl WrappedNode for Scandir {
   type Item = Arc<DirectoryListing>;
 
   fn run(self, context: Context) -> NodeFuture<Arc<DirectoryListing>> {
-    let dir = self.0.clone();
     context
       .core
       .vfs
       .scandir(self.0)
-      .then(move |listing_res| match listing_res {
-        Ok(listing) => Ok(Arc::new(listing)),
-        Err(e) => Err(throw(&format!("Failed to scandir for {:?}: {:?}", dir, e))),
-      })
+      .map(Arc::new)
+      .map_err(|e| throw(&format!("{}", e)))
       .to_boxed()
   }
 }

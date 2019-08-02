@@ -2,6 +2,11 @@
 ======================
 This document describes releases leading up to the ``1.17.x`` ``stable`` series.
 
+1.17.0 (8/01/2019)
+------------------
+
+The first stable release of `1.17.x`, with no changes since the previous rc.
+
 1.17.0rc2 (7/26/2019)
 ---------------------
 

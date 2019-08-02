@@ -1,7 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import datetime
 import os
 import sys
 import termios
@@ -115,39 +114,24 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       args=args,
       env=env,
       services=services,
-      exit_code=0,
       scheduler_service=scheduler_service
     )
 
-  def __init__(self, maybe_shutdown_socket, args, env, services, exit_code, scheduler_service):
+  def __init__(self, maybe_shutdown_socket, args, env, services, scheduler_service):
     """
-    :param socket socket: A connected socket capable of speaking the nailgun protocol.
+    :param MaybeShutdownSocket maybe_shutdown_socket: A connected socket capable of speaking the nailgun protocol.
     :param list args: The arguments (i.e. sys.argv) for this run.
     :param dict env: The environment (i.e. os.environ) for this run.
-    :param LegacyGraphSession graph_helper: The LegacyGraphSession instance to use for BuildGraph
-                                            construction. In the event of an exception, this will be
-                                            None.
-    :param TargetRoots target_roots: The `TargetRoots` for this run.
     :param PantsServices services: The PantsServices that are currently running.
-    :param str metadata_base_dir: The ProcessManager metadata_base_dir from options.
-    :param OptionsBootstrapper options_bootstrapper: An OptionsBootstrapper to reuse.
+    :param SchedulerService scheduler_service: The SchedulerService that holds the warm graph.
     """
-    self._name = self._make_identity()
     self._maybe_shutdown_socket = maybe_shutdown_socket
     self._args = args
     self._env = env
     self._services = services
     self._scheduler_service = scheduler_service
 
-    self.exit_code = exit_code
-
-  # TODO: this should probably no longer be necesary, remove.
-  def _make_identity(self):
-    """Generate a ProcessManager identity for a given pants run.
-
-    This provides for a reasonably unique name e.g. 'pantsd-run-2015-09-16T23_17_56_581899'.
-    """
-    return 'pantsd-run-{}'.format(datetime.datetime.now().strftime('%Y-%m-%dT%H_%M_%S_%f'))
+    self.exit_code = PANTS_SUCCEEDED_EXIT_CODE
 
   @classmethod
   @contextmanager
@@ -251,12 +235,12 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       hermetic_environment_as(**self._env), \
       encapsulated_global_logger():
       try:
+        # Clean global state.
+        clean_global_runtime_state(reset_subsystem=True)
+
         options, _, options_bootstrapper = LocalPantsRunner.parse_options(self._args, self._env)
         graph_helper, target_roots, exit_code = self._scheduler_service.prepare_v1_graph_run_v2(options, options_bootstrapper)
         self.exit_code = exit_code
-
-        # Clean global state.
-        clean_global_runtime_state(reset_subsystem=True)
 
         # Otherwise, conduct a normal run.
         with ExceptionSink.exiter_as_until_exception(lambda _: PantsRunFailCheckerExiter()):

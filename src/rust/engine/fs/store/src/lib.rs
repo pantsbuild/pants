@@ -45,7 +45,7 @@ use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 use parking_lot::Mutex;
 
@@ -69,17 +69,43 @@ pub struct UploadSummary {
   pub upload_wall_time: Duration,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-pub enum Source {
-  Local,
-  Remote,
+/// A timespan represented as two floating point representations of seconds
+#[derive(Copy, Clone, Debug, PartialEq, Serialize)]
+pub struct TimeSpan {
+  /// Number of seconds since the UNIX_EPOCH with precision to the nanosecond
+  pub start: f64,
+  /// Number of seconds since `start` with precision to the nanosecond
+  pub duration: f64,
+}
+
+impl TimeSpan {
+  const NANOSECS_IN_SEC: f64 = 1_000_000_000_f64;
+  // Sadly not quite stable in std yet.
+  fn duration_as_secs_f64(d: Duration) -> f64 {
+    (d.as_nanos() as f64) / (Self::NANOSECS_IN_SEC)
+  }
+
+  fn system_time_as_secs_f64(time: &SystemTime) -> f64 {
+    let since_epoch = time
+      .duration_since(std::time::UNIX_EPOCH)
+      .expect("Surely you're not before the unix epoch?");
+    Self::duration_as_secs_f64(since_epoch)
+  }
+
+  pub fn since(start: &SystemTime) -> TimeSpan {
+    let now = Self::system_time_as_secs_f64(&SystemTime::now());
+    let start = Self::system_time_as_secs_f64(start);
+    TimeSpan {
+      start,
+      duration: now - start,
+    }
+  }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
-pub struct LoadMetadata {
-  pub source: Source,
-  pub start: Option<f64>,
-  pub duration: Option<f64>,
+pub enum LoadMetadata {
+  Local,
+  Remote(TimeSpan),
 }
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -346,26 +372,15 @@ impl Store {
   ) -> BoxFuture<Option<(T, LoadMetadata)>, String> {
     let local = self.local.clone();
     let maybe_remote = self.remote.clone();
-    let start = std::time::Instant::now();
-    let start_since_epoch = std::time::SystemTime::now()
-      .duration_since(std::time::UNIX_EPOCH)
-      .expect("Surely you're not before the unix epoch?");
+    let start = SystemTime::now();
     self
       .local
       .load_bytes_with(entry_type, digest, f_local)
       .and_then(
         move |maybe_local_value| match (maybe_local_value, maybe_remote) {
-          (Some(value_result), _) => future::done(value_result.map(|res| {
-            Some((
-              res,
-              LoadMetadata {
-                source: Source::Local,
-                start: None,
-                duration: None,
-              },
-            ))
-          }))
-          .to_boxed(),
+          (Some(value_result), _) => {
+            future::done(value_result.map(|res| Some((res, LoadMetadata::Local)))).to_boxed()
+          }
           (None, None) => future::ok(None).to_boxed(),
           (None, Some(remote)) => remote
             .load_bytes_with(entry_type, digest, move |bytes: Bytes| bytes)
@@ -376,21 +391,8 @@ impl Store {
                     .store_bytes(entry_type, bytes, true)
                     .and_then(move |stored_digest| {
                       if digest == stored_digest {
-                        let duration = std::time::Instant::now() - start;
-
-                        // Sadly not quite stable in std yet.
-                        fn as_secs_f64(d: std::time::Duration) -> f64 {
-                          (d.as_nanos() as f64) / (1_000_000_000_f64)
-                        }
-
-                        Ok(Some((
-                          value,
-                          LoadMetadata {
-                            source: Source::Remote,
-                            start: Some(as_secs_f64(start_since_epoch)),
-                            duration: Some(as_secs_f64(duration)),
-                          },
-                        )))
+                        let time_span = TimeSpan::since(&start);
+                        Ok(Some((value, LoadMetadata::Remote(time_span))))
                       } else {
                         Err(format!(
                           "CAS gave wrong digest: expected {:?}, got {:?}",
@@ -2396,7 +2398,7 @@ mod remote {
 #[cfg(test)]
 mod tests {
   use super::{
-    local, DirectoryMaterializeMetadata, EntryType, FileContent, LoadMetadata, Source, Store,
+    local, DirectoryMaterializeMetadata, EntryType, FileContent, LoadMetadata, Store,
     UploadSummary, MEGABYTES,
   };
 
@@ -2419,6 +2421,14 @@ mod tests {
   use std::time::Duration;
   use tempfile::TempDir;
   use testutil::data::{TestData, TestDirectory};
+  impl LoadMetadata {
+    fn is_remote(&self) -> bool {
+      match self {
+        LoadMetadata::Local => false,
+        LoadMetadata::Remote(_) => true,
+      }
+    }
+  }
 
   pub fn big_file_fingerprint() -> Fingerprint {
     Fingerprint::from_hex_string("8dfba0adc29389c63062a68d76b2309b9a2486f1ab610c4720beabbdc273301f")
@@ -3657,11 +3667,7 @@ mod tests {
       .block_on(store.materialize_directory(mat_dir.path().to_owned(), outer_dir.digest()))
       .unwrap();
 
-    let local = LoadMetadata {
-      source: Source::Local,
-      duration: None,
-      start: None,
-    };
+    let local = LoadMetadata::Local;
 
     let want = DirectoryMaterializeMetadata {
       metadata: local.clone(),
@@ -3713,18 +3719,15 @@ mod tests {
       .block_on(store.materialize_directory(mat_dir.path().to_owned(), outer_dir.digest()))
       .unwrap();
 
+    assert!(metadata
+      .child_directories
+      .get("pets")
+      .unwrap()
+      .metadata
+      .is_remote());
     assert_eq!(
-      Source::Remote,
-      metadata
-        .child_directories
-        .get("pets")
-        .unwrap()
-        .metadata
-        .source
-    );
-    assert_eq!(
-      Source::Local,
-      metadata
+      LoadMetadata::Local,
+      *metadata
         .child_directories
         .get("pets")
         .unwrap()
@@ -3734,7 +3737,6 @@ mod tests {
         .child_files
         .get("roland")
         .unwrap()
-        .source
     );
   }
 }
