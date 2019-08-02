@@ -3,6 +3,7 @@
 
 import os
 import subprocess
+from typing import List
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -13,6 +14,8 @@ from pants.backend.python.tasks.resolve_requirements_task_base import ResolveReq
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.build_graph.target import Target
+from pants.task.lint_task_mixin import LintTaskMixin
 from pants.util.contextutil import temporary_file_path
 from pants.util.memo import memoized_property
 from pex.interpreter import PythonInterpreter
@@ -20,11 +23,29 @@ from pex.pex import PEX
 from pex.pex_info import PexInfo
 
 
-class MypyTask(ResolveRequirementsTaskBase):
-  """Invoke the mypy static type analyzer for Python."""
+class MypyTaskError(TaskError):
+  """Indicates a TaskError from a failing MyPy run."""
+
+
+class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
+  """Invoke the mypy static type analyzer for Python.
+
+  Mypy lint task filters out target_roots that are not properly tagged according to
+  --whitelisted-tag-name (defaults to None, and no filtering occurs if this option is 'None'),
+  and executes MyPy on targets in context from whitelisted target roots.
+  Next, if any transitive targets from the filtered roots are not whitelisted, a warning
+  will be printed.
+
+  'In context' meaning in the sub-graph where a whitelisted target is the root
+  """
 
   _MYPY_COMPATIBLE_INTERPETER_CONSTRAINT = '>=3.5'
   _PYTHON_SOURCE_EXTENSION = '.py'
+
+  deprecated_options_scope = 'mypy'
+  deprecated_options_scope_removal_version = '1.20.0.dev2'
+
+  WARNING_MESSAGE = "[WARNING]: Targets not currently whitelisted and may cause issues."
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -36,6 +57,10 @@ class MypyTask(ResolveRequirementsTaskBase):
     register('--mypy-version', default='0.710', help='The version of mypy to use.')
     register('--config-file', default=None,
              help='Path mypy configuration file, relative to buildroot.')
+    register('--whitelist-tag-name', default=None,
+             help='Tag name to identify python targets to execute MyPy')
+    register('--verbose', type=bool, default=False,
+             help='Extra detail showing non-whitelisted targets')
 
   @classmethod
   def supports_passthru_args(cls):
@@ -60,9 +85,43 @@ class MypyTask(ResolveRequirementsTaskBase):
   def is_python_target(target):
     return isinstance(target, PythonTarget)
 
-  def _calculate_python_sources(self, targets):
-    """Generate a set of source files from the given targets."""
-    python_eval_targets = filter(self.is_non_synthetic_python_target, targets)
+  def _is_tagged_target(self, target: Target) -> bool:
+    return self.get_options().whitelist_tag_name in target.tags
+
+  def _is_tagged_non_synthetic_python_target(self, target: Target) -> bool:
+    return (self.is_non_synthetic_python_target(target) and
+            self._is_tagged_target(target))
+
+  def _not_tagged_non_synthetic_python_target(self, target: Target) -> bool:
+    return (self.is_non_synthetic_python_target(target) and
+            not self._is_tagged_target(target))
+
+  def _all_targets_are_whitelisted(self, whitelisted_targets: List[Target], all_targets: List[Target]) -> bool:
+    return len(whitelisted_targets) == 0 or len(whitelisted_targets) == len(all_targets)
+
+  def _format_targets_not_whitelisted(self, targets: Target) -> str:
+    output = ''
+    for target in targets:
+      output = output + f"{target.address.spec}\n"
+    return output
+
+  def _whitelist_warning(self, targets_not_whitelisted: List[Target]) -> None:
+    self.context.log.warn(self.WARNING_MESSAGE)
+    if self.get_options().verbose:
+      output = self._format_targets_not_whitelisted(targets_not_whitelisted)
+      self.context.log.warn(f"{output}")
+
+  def _calculate_python_sources(self, target_roots: List[Target]):
+    """Filter targets to generate a set of source files from the given targets."""
+    if self.get_options().whitelist_tag_name:
+      all_targets = self._filter_targets(Target.closure_for_targets([tgt for tgt in target_roots if self._is_tagged_target(tgt)]))
+      python_eval_targets = [tgt for tgt in all_targets if self._is_tagged_non_synthetic_python_target(tgt)]
+      if not self._all_targets_are_whitelisted(python_eval_targets, all_targets):
+        targets_not_whitelisted = [tgt for tgt in all_targets if self._not_tagged_non_synthetic_python_target(tgt)]
+        self._whitelist_warning(targets_not_whitelisted)
+    else:
+      python_eval_targets = self._filter_targets([tgt for tgt in Target.closure_for_targets(target_roots) if self.is_non_synthetic_python_target(tgt)])
+
     sources = set()
     for target in python_eval_targets:
       sources.update(
@@ -91,7 +150,7 @@ class MypyTask(ResolveRequirementsTaskBase):
     mypy_version = self.get_options().mypy_version
 
     mypy_requirement_pex = self.resolve_requirement_strings(
-      py3_interpreter, ['mypy=={}'.format(mypy_version)])
+      py3_interpreter, [f'mypy=={mypy_version}'])
 
     path = os.path.realpath(os.path.join(self.workdir, str(py3_interpreter.identity), mypy_version))
     if not os.path.isdir(path):
@@ -102,8 +161,8 @@ class MypyTask(ResolveRequirementsTaskBase):
   def execute(self):
     mypy_interpreter = self.find_mypy_interpreter()
     if not mypy_interpreter:
-      raise TaskError('Unable to find a Python {} interpreter (required for mypy).'
-                      .format(self._MYPY_COMPATIBLE_INTERPETER_CONSTRAINT))
+      raise TaskError(f'Unable to find a Python {self._MYPY_COMPATIBLE_INTERPETER_CONSTRAINT} '
+                      f'interpreter (required for mypy).')
 
     sources = self._calculate_python_sources(self.context.target_roots)
     if not sources:
@@ -120,22 +179,19 @@ class MypyTask(ResolveRequirementsTaskBase):
     with temporary_file_path() as sources_list_path:
       with open(sources_list_path, 'w') as f:
         for source in sources:
-          f.write('{}\n'.format(source))
-
+          f.write(f'{source}\n')
       # Construct the mypy command line.
-      cmd = ['--python-version={}'.format(interpreter_for_targets.identity.python)]
+      cmd = [f'--python-version={interpreter_for_targets.identity.python}']
       if self.get_options().config_file:
-        cmd.append('--config-file={}'.format(os.path.join(get_buildroot(),
-                                                          self.get_options().config_file)))
+        cmd.append(f'--config-file={os.path.join(get_buildroot(), self.get_options().config_file)}')
       cmd.extend(self.get_passthru_args())
-      cmd.append('@{}'.format(sources_list_path))
-      self.context.log.debug('mypy command: {}'.format(' '.join(cmd)))
+      cmd.append(f'@{sources_list_path}')
+      self.context.log.debug(f'mypy command: {" ".join(cmd)}')
 
       # Collect source roots for the targets being checked.
       source_roots = self._collect_source_roots()
 
       mypy_path = os.pathsep.join([os.path.join(get_buildroot(), root) for root in source_roots])
-
       # Execute mypy.
       with self.context.new_workunit(
         name='check',
@@ -146,4 +202,4 @@ class MypyTask(ResolveRequirementsTaskBase):
         returncode = self._run_mypy(mypy_interpreter, cmd,
           env={'MYPYPATH': mypy_path}, stdout=workunit.output('stdout'), stderr=subprocess.STDOUT)
         if returncode != 0:
-          raise TaskError('mypy failed: code={}'.format(returncode))
+          raise MypyTaskError(f'mypy failed: code={returncode}')
