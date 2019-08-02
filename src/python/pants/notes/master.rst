@@ -4,6 +4,62 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.20.0.dev0 (02/08/2019)
+------------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix span id bug (#8129)
+  `PR #8129 <https://github.com/pantsbuild/pants/pull/8129>`_
+
+* Unrevert #8093 and fix jdeps parsing. (#8125)
+  `PR #8125 <https://github.com/pantsbuild/pants/pull/8125>`_
+
+* Disable remote execution of unit tests temporarily. (#8138)
+  `PR #8138 <https://github.com/pantsbuild/pants/pull/8138>`_
+
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* pin tensorflow example to 1.13.1 (#8135)
+  `PR #8135 <https://github.com/pantsbuild/pants/pull/8135>`_
+
+* Disable symlink checking for uncached Snapshot captures (#8074)
+  `PR #8074 <https://github.com/pantsbuild/pants/pull/8074>`_
+
+* Encapsulate TimeSpan logic in fs/store (#8122)
+  `PR #8122 <https://github.com/pantsbuild/pants/pull/8122>`_
+
+* [pantsd] Clear the global state of subsystems earlier, plus refactorings (#8130)
+  `PR #8130 <https://github.com/pantsbuild/pants/pull/8130>`_
+
+* use f-strings in PythonAWSLambda (#8115)
+  `PR #8115 <https://github.com/pantsbuild/pants/pull/8115>`_
+
+* Mark float as natively encodable to silence hash_utils warning (#8121)
+  `PR #8121 <https://github.com/pantsbuild/pants/pull/8121>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Update engine README for Params (#7600)
+  `PR #7600 <https://github.com/pantsbuild/pants/pull/7600>`_
+
+* Scoverage documentation (#8119)
+  `PR #8119 <https://github.com/pantsbuild/pants/pull/8119>`_
+
+Testing
+~~~~~~~
+
+* Add test to check return of hex_16_digit_string function (#8133)
+  `PR #8133 <https://github.com/pantsbuild/pants/pull/8133>`_
+
+* Remove redundant tests and expand timeouts. (#8126)
+  `PR #8126 <https://github.com/pantsbuild/pants/pull/8126>`_
+
+
 1.19.0rc0 (29/07/2019)
 ----------------------
 
