@@ -55,9 +55,9 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
   @classmethod
   def register_options(cls, register):
     register('--mypy-version', default='0.710', help='The version of mypy to use.')
-    register('--config-file', default=None,
+    register('--config-file', default='build-support/mypy/mypy.ini',
              help='Path mypy configuration file, relative to buildroot.')
-    register('--whitelist-tag-name', default=None,
+    register('--whitelist-tag-name', default='type_checked',
              help='Tag name to identify python targets to execute MyPy')
     register('--verbose', type=bool, default=False,
              help='Extra detail showing non-whitelisted targets')
@@ -99,7 +99,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
   def _all_targets_are_whitelisted(self, whitelisted_targets: List[Target], all_targets: List[Target]) -> bool:
     return len(whitelisted_targets) == 0 or len(whitelisted_targets) == len(all_targets)
 
-  def _format_targets_not_whitelisted(self, targets: Target) -> str:
+  def _format_targets_not_whitelisted(self, targets: List[Target]) -> str:
     output = ''
     for target in targets:
       output = output + f"{target.address.spec}\n"

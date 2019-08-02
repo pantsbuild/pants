@@ -60,7 +60,10 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
   # TODO: add a test case for this while including a pexrc file, as python checkstyle currently fails
   # quite often with a pexrc available.
   echo "* Checking lint"
-  ./pants --lint-mypy-verbose=true --lint-mypy-whitelist-tag-name=type_checked --exclude-target-regexp='testprojects/.*' --changed-parent="${MERGE_BASE}" lint || exit 1
+  ./pants --exclude-target-regexp='testprojects/.*' --changed-parent="${MERGE_BASE}" lint || exit 1
+
+   echo "* Checking types for targets marked \`type_checked\`"  
+  ./build-support/bin/mypy.py || exit 1
 
   if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then
     echo "* Checking formatting of rust files"
