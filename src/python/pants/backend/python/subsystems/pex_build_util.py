@@ -313,7 +313,7 @@ class PexBuilderWrapper:
     sources = chroot.get('source') | chroot.get('resource')
     missing_init_files = identify_missing_init_files(sources)
     if missing_init_files:
-      with temporary_file() as ns_package:
+      with temporary_file(permissions=0o644) as ns_package:
         ns_package.write(b'__import__("pkg_resources").declare_namespace(__name__)')
         ns_package.flush()
         for missing_init_file in missing_init_files:
