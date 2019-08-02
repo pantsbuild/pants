@@ -718,6 +718,7 @@ pub extern "C" fn match_path_globs(path_globs: Handle, paths_buf: BufferBuffer) 
 #[no_mangle]
 pub extern "C" fn capture_snapshots(
   scheduler_ptr: *mut Scheduler,
+  session_ptr: *mut Session,
   path_globs_and_root_tuple_wrapper: Handle,
 ) -> PyResult {
   let values = externs::project_multi(&path_globs_and_root_tuple_wrapper.into(), "dependencies");
@@ -746,6 +747,7 @@ pub extern "C" fn capture_snapshots(
       return e.into();
     }
   };
+  let workunit_store = with_session(session_ptr, |session| session.workunit_store());
 
   with_scheduler(scheduler_ptr, |scheduler| {
     let core = scheduler.core.clone();
@@ -761,6 +763,7 @@ pub extern "C" fn capture_snapshots(
               root,
               path_globs,
               digest_hint,
+              workunit_store.clone(),
             )
             .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
           })
@@ -775,6 +778,7 @@ pub extern "C" fn capture_snapshots(
 #[no_mangle]
 pub extern "C" fn merge_directories(
   scheduler_ptr: *mut Scheduler,
+  session_ptr: *mut Session,
   directories_value: Handle,
 ) -> PyResult {
   let digests_result: Result<Vec<hashing::Digest>, String> =
@@ -789,6 +793,7 @@ pub extern "C" fn merge_directories(
       return e.into();
     }
   };
+  let workunit_store = with_session(session_ptr, |session| session.workunit_store());
 
   with_scheduler(scheduler_ptr, |scheduler| {
     scheduler
@@ -797,6 +802,7 @@ pub extern "C" fn merge_directories(
       .block_on(store::Snapshot::merge_directories(
         scheduler.core.store(),
         digests,
+        workunit_store,
       ))
       .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
       .into()

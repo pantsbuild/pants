@@ -81,6 +81,7 @@ impl CommandRunner {
           store.clone(),
           &OneOffStoreFileByDigest::new(store, posix_fs),
           path_stats,
+          WorkUnitStore::new(),
         )
       })
       .to_boxed()

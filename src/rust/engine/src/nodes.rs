@@ -31,7 +31,7 @@ use rule_graph;
 
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
 use store::{self, StoreFileByDigest};
-use workunit_store::{generate_random_64bit_string, set_parent_id, WorkUnit};
+use workunit_store::{generate_random_64bit_string, set_parent_id, WorkUnit, WorkUnitStore};
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
@@ -65,7 +65,7 @@ impl VFS<Failure> for Context {
 }
 
 impl StoreFileByDigest<Failure> for Context {
-  fn store_by_digest(&self, file: File) -> BoxFuture<hashing::Digest, Failure> {
+  fn store_by_digest(&self, file: File, _: WorkUnitStore) -> BoxFuture<hashing::Digest, Failure> {
     self.get(DigestFile(file.clone()))
   }
 }
@@ -154,6 +154,7 @@ impl WrappedNode for Select {
   type Item = Value;
 
   fn run(self, context: Context) -> NodeFuture<Value> {
+    let workunit_store = context.session.workunit_store();
     match &self.entry {
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => match inner
         .rule()
@@ -203,7 +204,7 @@ impl WrappedNode for Select {
                   .into_iter()
                   .map(|val| lift_digest(&val).map_err(|str| throw(&str)))
                   .collect();
-              store::Snapshot::merge_directories(core.store(), try_future!(digests))
+              store::Snapshot::merge_directories(core.store(), try_future!(digests), workunit_store)
                 .map_err(|err| throw(&err))
                 .map(move |digest| Snapshot::store_directory(&core, &digest))
                 .to_boxed()
@@ -221,7 +222,8 @@ impl WrappedNode for Select {
               lift_digest(&directory_digest_val).map_err(|str| throw(&str))
             })
             .and_then(move |digest| {
-              store::Snapshot::from_digest(context.core.store(), digest).map_err(|str| throw(&str))
+              store::Snapshot::from_digest(context.core.store(), digest, workunit_store)
+                .map_err(|str| throw(&str))
             })
             .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
             .to_boxed()
@@ -248,9 +250,14 @@ impl WrappedNode for Select {
               Ok((digest, prefix))
             })
             .and_then(|(digest, prefix)| {
-              store::Snapshot::strip_prefix(core.store(), digest, PathBuf::from(prefix))
-                .map_err(|err| throw(&err))
-                .map(move |digest| Snapshot::store_directory(&core, &digest))
+              store::Snapshot::strip_prefix(
+                core.store(),
+                digest,
+                PathBuf::from(prefix),
+                workunit_store,
+              )
+              .map_err(|err| throw(&err))
+              .map(move |digest| Snapshot::store_directory(&core, &digest))
             })
             .to_boxed()
         }
@@ -268,7 +275,7 @@ impl WrappedNode for Select {
               context
                 .core
                 .store()
-                .contents_for_directory(digest)
+                .contents_for_directory(digest, workunit_store)
                 .map_err(|str| throw(&str))
                 .map(move |files_content| Snapshot::store_files_content(&context, &files_content))
             })
@@ -533,8 +540,13 @@ impl Snapshot {
       .expand(path_globs)
       .map_err(|e| format!("PathGlobs expansion failed: {}", e))
       .and_then(move |path_stats| {
-        store::Snapshot::from_path_stats(context.core.store(), &context, path_stats)
-          .map_err(move |e| format!("Snapshot failed: {}", e))
+        store::Snapshot::from_path_stats(
+          context.core.store(),
+          &context,
+          path_stats,
+          WorkUnitStore::new(),
+        )
+        .map_err(move |e| format!("Snapshot failed: {}", e))
       })
       .map_err(|e| throw(&e))
       .to_boxed()
@@ -648,6 +660,7 @@ impl DownloadedFile {
     core: Arc<Core>,
     url: Url,
     digest: hashing::Digest,
+    workunit_store: WorkUnitStore,
   ) -> BoxFuture<store::Snapshot, String> {
     let file_name = try_future!(url
       .path_segments()
@@ -657,7 +670,7 @@ impl DownloadedFile {
 
     core
       .store()
-      .load_file_bytes_with(digest, |_| ())
+      .load_file_bytes_with(digest, |_| (), workunit_store)
       .and_then(move |maybe_bytes| {
         maybe_bytes
           .map(|((), _metadata)| future::ok(()).to_boxed())
@@ -680,7 +693,7 @@ impl DownloadedFile {
     }
 
     impl StoreFileByDigest<String> for Digester {
-      fn store_by_digest(&self, _: File) -> BoxFuture<hashing::Digest, String> {
+      fn store_by_digest(&self, _: File, _: WorkUnitStore) -> BoxFuture<hashing::Digest, String> {
         future::ok(self.digest).to_boxed()
       }
     }
@@ -695,6 +708,7 @@ impl DownloadedFile {
           is_executable: true,
         },
       }],
+      WorkUnitStore::new(),
     )
   }
 
@@ -812,7 +826,12 @@ impl WrappedNode for DownloadedFile {
     .map_err(|str| throw(&str)));
 
     self
-      .load_or_download(context.core.clone(), url, expected_digest)
+      .load_or_download(
+        context.core.clone(),
+        url,
+        expected_digest,
+        context.session.workunit_store(),
+      )
       .map(Arc::new)
       .map_err(|err| throw(&err))
       .to_boxed()

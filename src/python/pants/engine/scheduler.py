@@ -285,35 +285,40 @@ class Scheduler:
       self._native.lib.nodes_destroy(raw_roots)
     return roots
 
-  def capture_snapshots(self, path_globs_and_roots):
+  def capture_snapshots(self, session, path_globs_and_roots):
     """Synchronously captures Snapshots for each matching PathGlobs rooted at a its root directory.
 
     This is a blocking operation, and should be avoided where possible.
 
+    :param session Session: the session in which work units shall be recorded.
     :param path_globs_and_roots tuple<PathGlobsAndRoot>: The PathGlobs to capture, and the root
            directory relative to which each should be captured.
     :returns: A tuple of Snapshots.
     """
     result = self._native.lib.capture_snapshots(
       self._scheduler,
+      session,
       self._to_value(_PathGlobsAndRootCollection(path_globs_and_roots)),
     )
     return self._raise_or_return(result)
 
-  def merge_directories(self, directory_digests):
+  def merge_directories(self, session, directory_digests):
     """Merges any number of directories.
 
+    :param session Session: the session in which work units shall be recorded.
     :param directory_digests: Tuple of DirectoryDigests.
     :return: A Digest.
     """
     result = self._native.lib.merge_directories(
       self._scheduler,
+      session,
       self._to_value(_DirectoryDigests(directory_digests)),
     )
     return self._raise_or_return(result)
 
   def materialize_directories(self, session, directories_paths_and_digests):
     """Creates the specified directories on the file system.
+
     :param session Session: the session in which work units shall be recorded.
     :param directories_paths_and_digests tuple<DirectoryToMaterialize>: Tuple of the path and
            digest of the directories to materialize.
@@ -573,10 +578,10 @@ class SchedulerSession:
            directory relative to which each should be captured.
     :returns: A tuple of Snapshots.
     """
-    return self._scheduler.capture_snapshots(path_globs_and_roots)
+    return self._scheduler.capture_snapshots(self._session, path_globs_and_roots)
 
   def merge_directories(self, directory_digests):
-    return self._scheduler.merge_directories(directory_digests)
+    return self._scheduler.merge_directories(self._session, directory_digests)
 
   def materialize_directories(self, directories_paths_and_digests):
     """Creates the specified directories on the file system.
