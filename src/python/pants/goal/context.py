@@ -9,7 +9,6 @@ from contextlib import contextmanager
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_scm
-from pants.base.deprecated import deprecated
 from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.target import Target
@@ -67,11 +66,6 @@ class Context:
     self._replace_targets(target_roots)
     self._invalidation_report = invalidation_report
     self._scheduler = scheduler
-
-  @property
-  @deprecated('1.17.0.dev2', hint_message='Use the build_configuration property.')
-  def build_file_parser(self):
-    return self._build_file_parser
 
   @property
   def options(self):

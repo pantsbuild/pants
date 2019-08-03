@@ -110,13 +110,13 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   compiler_name = 'rsc'
 
   deprecated_options_scope = 'compile.zinc'
-  deprecated_options_scope_removal_version = '1.20.0.dev0'
+  deprecated_options_scope_removal_version = '1.20.0.dev2'
 
   @classmethod
   def subsystem_dependencies(cls):
     dep = CacheSetup.scoped(
       Zinc.Factory,
-      removal_version='1.20.0.dev0',
+      removal_version='1.20.0.dev2',
       removal_hint='Cache options for `zinc` should move to `rsc`.'
     )
     return super().subsystem_dependencies() + (
