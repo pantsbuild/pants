@@ -81,9 +81,7 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
 
   @memoized_property
   def _build_and_test_flags(self):
-    # Maintain the non-shlexed behavior for now to avoid breakage.
-    single_string_flags = self.get_options().build_and_test_flags.split()
-    return single_string_flags + [
+    return  [
       single_flag
       for flags_section in self.get_options().shlexed_build_and_test_flags
       for single_flag in safe_shlex_split(flags_section)
