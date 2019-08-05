@@ -316,25 +316,6 @@ class Scheduler:
     )
     return self._raise_or_return(result)
 
-  def materialize_directories(self, session, directories_paths_and_digests):
-    """Creates the specified directories on the file system.
-
-    :param session Session: the session in which work units shall be recorded.
-    :param directories_paths_and_digests tuple<DirectoryToMaterialize>: Tuple of the path and
-           digest of the directories to materialize.
-    :returns: Nothing or an error.
-    """
-    # Ensure there isn't more than one of the same directory paths and paths do not have the same prefix.
-    dir_list = [dpad.path for dpad in directories_paths_and_digests]
-    check_no_overlapping_paths(dir_list)
-
-    result = self._native.lib.materialize_directories(
-      self._scheduler,
-      session,
-      self._to_value(_DirectoriesToMaterialize(directories_paths_and_digests)),
-    )
-    return self._raise_or_return(result)
-
   def lease_files_in_graph(self):
     self._native.lib.lease_files_in_graph(self._scheduler)
 
@@ -585,12 +566,20 @@ class SchedulerSession:
 
   def materialize_directories(self, directories_paths_and_digests):
     """Creates the specified directories on the file system.
-
     :param directories_paths_and_digests tuple<DirectoryToMaterialize>: Tuple of the path and
            digest of the directories to materialize.
     :returns: Nothing or an error.
     """
-    return self._scheduler.materialize_directories(self._session, directories_paths_and_digests)
+    # Ensure there isn't more than one of the same directory paths and paths do not have the same prefix.
+    dir_list = [dpad.path for dpad in directories_paths_and_digests]
+    check_no_overlapping_paths(dir_list)
+
+    result = self._scheduler._native.lib.materialize_directories(
+      self._scheduler._scheduler,
+      self._session,
+      self._scheduler._to_value(_DirectoriesToMaterialize(directories_paths_and_digests)),
+    )
+    return self._scheduler._raise_or_return(result)
 
   def lease_files_in_graph(self):
     self._scheduler.lease_files_in_graph()
