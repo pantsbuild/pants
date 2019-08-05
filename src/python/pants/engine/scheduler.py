@@ -285,20 +285,6 @@ class Scheduler:
       self._native.lib.nodes_destroy(raw_roots)
     return roots
 
-  def merge_directories(self, session, directory_digests):
-    """Merges any number of directories.
-
-    :param session Session: the session in which work units shall be recorded.
-    :param directory_digests: Tuple of DirectoryDigests.
-    :return: A Digest.
-    """
-    result = self._native.lib.merge_directories(
-      self._scheduler,
-      session,
-      self._to_value(_DirectoryDigests(directory_digests)),
-    )
-    return self._raise_or_return(result)
-
   def lease_files_in_graph(self):
     self._native.lib.lease_files_in_graph(self._scheduler)
 
@@ -550,7 +536,17 @@ class SchedulerSession:
     return self._scheduler._raise_or_return(result)
 
   def merge_directories(self, directory_digests):
-    return self._scheduler.merge_directories(self._session, directory_digests)
+    """Merges any number of directories.
+
+    :param directory_digests: Tuple of DirectoryDigests.
+    :return: A Digest.
+    """
+    result = self._scheduler._native.lib.merge_directories(
+      self._scheduler._scheduler,
+      self._session,
+      self._scheduler._to_value(_DirectoryDigests(directory_digests)),
+    )
+    return self._scheduler._raise_or_return(result)
 
   def materialize_directories(self, directories_paths_and_digests):
     """Creates the specified directories on the file system.
