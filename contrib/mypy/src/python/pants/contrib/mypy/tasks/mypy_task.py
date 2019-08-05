@@ -33,8 +33,8 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
   Mypy lint task filters out target_roots that are not properly tagged according to
   --whitelisted-tag-name (defaults to None, and no filtering occurs if this option is 'None'),
   and executes MyPy on targets in context from whitelisted target roots.
-  Next, if any transitive targets from the filtered roots are not whitelisted, a warning
-  will be printed.
+  (if any transitive targets from the filtered roots are not whitelisted, a warning
+  will be printed.)
 
   'In context' meaning in the sub-graph where a whitelisted target is the root
   """
@@ -55,9 +55,9 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
   @classmethod
   def register_options(cls, register):
     register('--mypy-version', default='0.710', help='The version of mypy to use.')
-    register('--config-file', default='build-support/mypy/mypy.ini',
+    register('--config-file', default=None,
              help='Path mypy configuration file, relative to buildroot.')
-    register('--whitelist-tag-name', default='type_checked',
+    register('--whitelist-tag-name', default=None,
              help='Tag name to identify python targets to execute MyPy')
     register('--verbose', type=bool, default=False,
              help='Extra detail showing non-whitelisted targets')
