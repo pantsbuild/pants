@@ -2664,7 +2664,7 @@ pub mod tests {
       }
     };
 
-    assert_eq!(got_workunits, want_workunits);
+    assert!(got_workunits.is_superset(&want_workunits));
   }
 
   pub fn echo_foo_request() -> ExecuteProcessRequest {

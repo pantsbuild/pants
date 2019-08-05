@@ -2059,22 +2059,26 @@ mod remote {
       _entry_type: EntryType,
       digest: Digest,
       f: F,
-      // TODO PC: add workunits for remote operations
-      _workunit_store: WorkUnitStore,
+      workunit_store: WorkUnitStore,
     ) -> BoxFuture<Option<T>, String> {
+      let start_time = std::time::SystemTime::now();
+
       let store = self.clone();
+      let resource_name = format!(
+        "{}/blobs/{}/{}",
+        store.instance_name.clone().unwrap_or_default(),
+        digest.0,
+        digest.1
+      );
+      let workunit_name = format!("load_bytes_with({})", resource_name.clone());
+      let workunit_store = workunit_store.clone();
       self
         .with_byte_stream_client(move |client| {
           match client
             .read_opt(
               &{
                 let mut req = bazel_protos::bytestream::ReadRequest::new();
-                req.set_resource_name(format!(
-                  "{}/blobs/{}/{}",
-                  store.instance_name.clone().unwrap_or_default(),
-                  digest.0,
-                  digest.1
-                ));
+                req.set_resource_name(resource_name.clone());
                 req.set_read_offset(0);
                 // 0 means no limit.
                 req.set_read_limit(0);
@@ -2115,6 +2119,18 @@ mod remote {
             ))
             .to_boxed(),
           }
+        })
+        .then(move |future| {
+          let time_span = super::TimeSpan::since(&start_time);
+          let workunit = workunit_store::WorkUnit {
+            name: workunit_name.clone(),
+            start_timestamp: time_span.start_timestamp(),
+            end_timestamp: time_span.end_timestamp(),
+            span_id: workunit_store::generate_random_64bit_string(),
+            parent_id: workunit_store::get_parent_id(),
+          };
+          workunit_store.add_workunit(workunit);
+          future
         })
         .to_boxed()
     }
