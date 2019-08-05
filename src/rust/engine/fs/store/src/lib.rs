@@ -1936,9 +1936,10 @@ mod remote {
     pub fn store_bytes(
       &self,
       bytes: Bytes,
-      // TODO PC: add workunits for remote operations
-      _workunit_store: WorkUnitStore,
+      workunit_store: WorkUnitStore,
     ) -> BoxFuture<Digest, String> {
+      let start_time = std::time::SystemTime::now();
+
       let mut hasher = Sha256::default();
       hasher.input(&bytes);
       let fingerprint = Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice());
@@ -1951,6 +1952,8 @@ mod remote {
         digest.0,
         digest.1,
       );
+      let workunit_name = format!("store_bytes({})", resource_name.clone());
+      let workunit_store = workunit_store.clone();
       let store = self.clone();
       self
         .with_byte_stream_client(move |client| {
@@ -2035,6 +2038,18 @@ mod remote {
                 .to_boxed()
             }
           }
+        })
+        .then(move |future| {
+          let time_span = super::TimeSpan::since(&start_time);
+          let workunit = workunit_store::WorkUnit {
+            name: workunit_name.clone(),
+            start_timestamp: time_span.start_timestamp(),
+            end_timestamp: time_span.end_timestamp(),
+            span_id: workunit_store::generate_random_64bit_string(),
+            parent_id: workunit_store::get_parent_id(),
+          };
+          workunit_store.add_workunit(workunit);
+          future
         })
         .to_boxed()
     }
