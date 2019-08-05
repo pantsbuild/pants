@@ -4,6 +4,7 @@
 import os
 import pathlib
 import stat
+from contextlib import contextmanager
 
 from pex.pex_builder import PEXBuilder
 
@@ -34,6 +35,17 @@ class TestPexBuilderWrapper(TestBase):
     subsystem_util.init_subsystem(PexBuilderWrapper.Factory)
     return PexBuilderWrapper.Factory.create(PEXBuilder(**kwargs))
 
+  @staticmethod
+  @contextmanager
+  def extracted_pex(pex):
+    with temporary_dir() as chroot, open_zip(pex) as zip:
+      prior_umask = os.umask(0o022)
+      try:
+        zip.extractall(path=chroot)
+      finally:
+        os.umask(prior_umask)
+      yield pathlib.Path(chroot)
+
   def test(self):
     subsystem_util.init_subsystem(SourceRootConfig)
     self.create_file('src/python/package/module.py')
@@ -45,11 +57,7 @@ class TestPexBuilderWrapper(TestBase):
     pbw.add_sources_from(implicit_package_target)
     with temporary_file_path() as pex:
       pbw.build(pex)
-      with temporary_dir() as chroot, open_zip(pex) as zip:
-        zip.extractall(path=chroot)
-
-        chroot_path = pathlib.Path(chroot)
-
+      with self.extracted_pex(pex) as chroot_path:
         # Check the paths we know about:
         package_path = chroot_path / 'package'
         self.assert_dir_perms(package_path)
