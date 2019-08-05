@@ -155,6 +155,7 @@ impl super::CommandRunner for CommandRunner {
         let command_runner = self.clone();
         let command_runner2 = self.clone();
         let command_runner3 = self.clone();
+        let workunit_store2 = workunit_store.clone();
         let execute_request = Arc::new(execute_request);
         let execute_request2 = execute_request.clone();
 
@@ -165,7 +166,10 @@ impl super::CommandRunner for CommandRunner {
           .store_proto_locally(&command)
           .join(self.store_proto_locally(&action))
           .and_then(move |(command_digest, action_digest)| {
-            store2.ensure_remote_has_recursive(vec![command_digest, action_digest, input_files])
+            store2.ensure_remote_has_recursive(
+              vec![command_digest, action_digest, input_files],
+              workunit_store2.clone(),
+            )
           })
           .and_then(move |summary| {
             history.current_attempt += summary;
@@ -191,10 +195,11 @@ impl super::CommandRunner for CommandRunner {
                 let operations_client = operations_client.clone();
                 let command_runner2 = command_runner2.clone();
                 let command_runner3 = command_runner3.clone();
+                let workunit_store2 = workunit_store.clone();
                 let f = command_runner2.extract_execute_response(
                   operation,
                   &mut history,
-                  workunit_store.clone(),
+                  workunit_store2.clone(),
                 );
                 f.map(future::Loop::Break).or_else(move |value| {
                   match value {
@@ -218,8 +223,9 @@ impl super::CommandRunner for CommandRunner {
                       };
 
                       let execute_request = execute_request2.clone();
+                      let workunit_store = workunit_store2.clone();
                       store
-                        .ensure_remote_has_recursive(missing_digests)
+                        .ensure_remote_has_recursive(missing_digests, workunit_store.clone())
                         .and_then(move |summary| {
                           let mut history = history;
                           history.current_attempt += summary;
@@ -482,6 +488,7 @@ impl CommandRunner {
             self.store.clone(),
             execute_response,
             execution_attempts,
+            workunit_store,
           )
           .map_err(ExecutionError::Fatal)
           .to_boxed();
@@ -694,10 +701,19 @@ pub fn populate_fallible_execution_result(
   store: Store,
   execute_response: bazel_protos::remote_execution::ExecuteResponse,
   execution_attempts: Vec<ExecutionStats>,
+  workunit_store: WorkUnitStore,
 ) -> impl Future<Item = FallibleExecuteProcessResult, Error = String> {
-  extract_stdout(&store, &execute_response)
-    .join(extract_stderr(&store, &execute_response))
-    .join(extract_output_files(store, &execute_response))
+  extract_stdout(&store, &execute_response, workunit_store.clone())
+    .join(extract_stderr(
+      &store,
+      &execute_response,
+      workunit_store.clone(),
+    ))
+    .join(extract_output_files(
+      store,
+      &execute_response,
+      workunit_store.clone(),
+    ))
     .and_then(move |((stdout, stderr), output_directory)| {
       Ok(FallibleExecuteProcessResult {
         stdout: stdout,
@@ -712,6 +728,7 @@ pub fn populate_fallible_execution_result(
 fn extract_stdout(
   store: &Store,
   execute_response: &bazel_protos::remote_execution::ExecuteResponse,
+  workunit_store: WorkUnitStore,
 ) -> BoxFuture<Bytes, String> {
   if execute_response.get_result().has_stdout_digest() {
     let stdout_digest_result: Result<Digest, String> =
@@ -719,7 +736,7 @@ fn extract_stdout(
     let stdout_digest =
       try_future!(stdout_digest_result.map_err(|err| format!("Error extracting stdout: {}", err)));
     store
-      .load_file_bytes_with(stdout_digest, |v| v)
+      .load_file_bytes_with(stdout_digest, |v| v, workunit_store)
       .map_err(move |error| {
         format!(
           "Error fetching stdout digest ({:?}): {:?}",
@@ -750,6 +767,7 @@ fn extract_stdout(
 fn extract_stderr(
   store: &Store,
   execute_response: &bazel_protos::remote_execution::ExecuteResponse,
+  workunit_store: WorkUnitStore,
 ) -> BoxFuture<Bytes, String> {
   if execute_response.get_result().has_stderr_digest() {
     let stderr_digest_result: Result<Digest, String> =
@@ -757,7 +775,7 @@ fn extract_stderr(
     let stderr_digest =
       try_future!(stderr_digest_result.map_err(|err| format!("Error extracting stderr: {}", err)));
     store
-      .load_file_bytes_with(stderr_digest, |v| v)
+      .load_file_bytes_with(stderr_digest, |v| v, workunit_store)
       .map_err(move |error| {
         format!(
           "Error fetching stderr digest ({:?}): {:?}",
@@ -788,6 +806,7 @@ fn extract_stderr(
 fn extract_output_files(
   store: Store,
   execute_response: &bazel_protos::remote_execution::ExecuteResponse,
+  workunit_store: WorkUnitStore,
 ) -> BoxFuture<Digest, String> {
   // Get Digests of output Directories.
   // Then we'll make a Directory for the output files, and merge them.
@@ -859,7 +878,7 @@ fn extract_output_files(
   }
 
   impl StoreFileByDigest<String> for StoreOneOffRemoteDigest {
-    fn store_by_digest(&self, file: File) -> BoxFuture<Digest, String> {
+    fn store_by_digest(&self, file: File, _: WorkUnitStore) -> BoxFuture<Digest, String> {
       match self.map_of_paths_to_digests.get(&file.path) {
         Some(digest) => future::ok(*digest),
         None => future::err(format!(
@@ -876,6 +895,7 @@ fn extract_output_files(
     store.clone(),
     &StoreOneOffRemoteDigest::new(path_map),
     &path_stats,
+    workunit_store.clone(),
   )
   .map_err(move |error| {
     format!(
@@ -886,7 +906,7 @@ fn extract_output_files(
   .join(future::join_all(directory_digests))
   .and_then(|(files_digest, mut directory_digests)| {
     directory_digests.push(files_digest);
-    Snapshot::merge_directories(store, directory_digests)
+    Snapshot::merge_directories(store, directory_digests, workunit_store)
       .map_err(|err| format!("Error when merging output files and directories: {}", err))
   })
   .to_boxed()
@@ -1588,7 +1608,11 @@ pub mod tests {
     {
       assert_eq!(
         runtime
-          .block_on(local_store.load_file_bytes_with(test_stdout.digest(), |v| v))
+          .block_on(local_store.load_file_bytes_with(
+            test_stdout.digest(),
+            |v| v,
+            WorkUnitStore::new()
+          ))
           .unwrap()
           .unwrap()
           .0,
@@ -1596,7 +1620,11 @@ pub mod tests {
       );
       assert_eq!(
         runtime
-          .block_on(local_store.load_file_bytes_with(test_stderr.digest(), |v| v))
+          .block_on(local_store.load_file_bytes_with(
+            test_stderr.digest(),
+            |v| v,
+            WorkUnitStore::new()
+          ))
           .unwrap()
           .unwrap()
           .0,
@@ -2636,7 +2664,7 @@ pub mod tests {
       }
     };
 
-    assert_eq!(got_workunits, want_workunits);
+    assert!(got_workunits.is_superset(&want_workunits));
   }
 
   pub fn echo_foo_request() -> ExecuteProcessRequest {
@@ -2866,6 +2894,7 @@ pub mod tests {
     runtime.block_on(super::extract_output_files(
       command_runner.store.clone(),
       &execute_response,
+      WorkUnitStore::new(),
     ))
   }
 

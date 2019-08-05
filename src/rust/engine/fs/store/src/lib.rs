@@ -46,6 +46,8 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
+use time::Timespec;
+use workunit_store::WorkUnitStore;
 
 use parking_lot::Mutex;
 
@@ -99,6 +101,20 @@ impl TimeSpan {
       start,
       duration: now - start,
     }
+  }
+
+  fn timespec_from_f64_secs(seconds: f64) -> Timespec {
+    let secs = seconds as i64;
+    let subsec_nanos = ((seconds - secs as f64) * Self::NANOSECS_IN_SEC) as i32;
+    Timespec::new(secs, subsec_nanos)
+  }
+
+  pub fn start_timestamp(self) -> Timespec {
+    Self::timespec_from_f64_secs(self.start)
+  }
+
+  pub fn end_timestamp(self) -> Timespec {
+    Self::timespec_from_f64_secs(self.start + self.duration)
   }
 }
 
@@ -276,6 +292,7 @@ impl Store {
     &self,
     digest: Digest,
     f: F,
+    workunit_store: WorkUnitStore,
   ) -> BoxFuture<Option<(T, LoadMetadata)>, String> {
     // No transformation or verification is needed for files, so we pass in a pair of functions
     // which always succeed, whether the underlying bytes are coming from a local or remote store.
@@ -287,6 +304,7 @@ impl Store {
       digest,
       move |v: Bytes| Ok(f_local(v)),
       move |v: Bytes| Ok(f_remote(v)),
+      workunit_store,
     )
   }
 
@@ -322,6 +340,7 @@ impl Store {
   pub fn load_directory(
     &self,
     digest: Digest,
+    workunit_store: WorkUnitStore,
   ) -> BoxFuture<Option<(bazel_protos::remote_execution::Directory, LoadMetadata)>, String> {
     self.load_bytes_with(
       EntryType::Directory,
@@ -351,6 +370,7 @@ impl Store {
         bazel_protos::verify_directory_canonical(&directory)?;
         Ok(directory)
       },
+      workunit_store,
     )
   }
 
@@ -369,6 +389,7 @@ impl Store {
     digest: Digest,
     f_local: FLocal,
     f_remote: FRemote,
+    workunit_store: WorkUnitStore,
   ) -> BoxFuture<Option<(T, LoadMetadata)>, String> {
     let local = self.local.clone();
     let maybe_remote = self.remote.clone();
@@ -383,7 +404,12 @@ impl Store {
           }
           (None, None) => future::ok(None).to_boxed(),
           (None, Some(remote)) => remote
-            .load_bytes_with(entry_type, digest, move |bytes: Bytes| bytes)
+            .load_bytes_with(
+              entry_type,
+              digest,
+              move |bytes: Bytes| bytes,
+              workunit_store.clone(),
+            )
             .and_then(move |maybe_bytes: Option<Bytes>| match maybe_bytes {
               Some(bytes) => future::done(f_remote(bytes.clone()))
                 .and_then(move |value| {
@@ -419,6 +445,7 @@ impl Store {
   pub fn ensure_remote_has_recursive(
     &self,
     digests: Vec<Digest>,
+    workunit_store: WorkUnitStore,
   ) -> BoxFuture<UploadSummary, String> {
     let start_time = Instant::now();
 
@@ -437,7 +464,7 @@ impl Store {
           expanded_digests.insert(digest, EntryType::File);
         }
         Ok(Some(EntryType::Directory)) => {
-          expanding_futures.push(self.expand_directory(digest));
+          expanding_futures.push(self.expand_directory(digest, workunit_store.clone()));
         }
         Ok(None) => {
           return future::err(format!("Failed to upload digest {:?}: Not found", digest))
@@ -453,6 +480,7 @@ impl Store {
     let local = self.local.clone();
     let remote = remote.clone();
     let remote2 = remote.clone();
+    let workunit_store2 = workunit_store.clone();
     future::join_all(expanding_futures)
       .map(move |futures| {
         for mut digests in futures {
@@ -468,7 +496,7 @@ impl Store {
             .to_boxed();
         }
         let request = remote.find_missing_blobs_request(ingested_digests.keys());
-        let f = remote.list_missing_digests(request);
+        let f = remote.list_missing_digests(request, workunit_store.clone());
         f.map(move |digests_to_upload| (digests_to_upload, ingested_digests))
           .to_boxed()
       })
@@ -479,8 +507,11 @@ impl Store {
             .map(|digest| {
               let entry_type = ingested_digests[&digest];
               let remote = remote2.clone();
+              let workunit_store = workunit_store2.clone();
               local
-                .load_bytes_with(entry_type, digest, move |bytes| remote.store_bytes(bytes))
+                .load_bytes_with(entry_type, digest, move |bytes| {
+                  remote.store_bytes(bytes, workunit_store.clone())
+                })
                 .and_then(move |maybe_future| match maybe_future {
                   Some(future) => Ok(future),
                   None => Err(format!("Failed to upload digest {:?}: Not found", digest)),
@@ -510,10 +541,14 @@ impl Store {
   /// Download a directory from Remote ByteStore recursively to the local one. Called only with the
   /// Digest of a Directory.
   ///
-  pub fn ensure_local_has_recursive_directory(&self, dir_digest: Digest) -> BoxFuture<(), String> {
+  pub fn ensure_local_has_recursive_directory(
+    &self,
+    dir_digest: Digest,
+    workunit_store: WorkUnitStore,
+  ) -> BoxFuture<(), String> {
     let store = self.clone();
     self
-      .load_directory(dir_digest)
+      .load_directory(dir_digest, workunit_store.clone())
       .and_then(move |directory_opt| {
         directory_opt
           .map(|(dir, _metadata)| dir)
@@ -526,7 +561,13 @@ impl Store {
           .iter()
           .map(|file_node| {
             let file_digest = try_future!(file_node.get_digest().into());
-            store.load_bytes_with(EntryType::File, file_digest, |_| Ok(()), |_| Ok(()))
+            store.load_bytes_with(
+              EntryType::File,
+              file_digest,
+              |_| Ok(()),
+              |_| Ok(()),
+              workunit_store.clone(),
+            )
           })
           .collect::<Vec<_>>();
 
@@ -536,7 +577,7 @@ impl Store {
           .iter()
           .map(move |child_dir| {
             let child_digest = try_future!(child_dir.get_digest().into());
-            store.ensure_local_has_recursive_directory(child_digest)
+            store.ensure_local_has_recursive_directory(child_digest, workunit_store.clone())
           })
           .collect::<Vec<_>>();
         future::join_all(file_futures)
@@ -590,16 +631,24 @@ impl Store {
     }
   }
 
-  pub fn expand_directory(&self, digest: Digest) -> BoxFuture<HashMap<Digest, EntryType>, String> {
+  pub fn expand_directory(
+    &self,
+    digest: Digest,
+    workunit_store: WorkUnitStore,
+  ) -> BoxFuture<HashMap<Digest, EntryType>, String> {
     self
-      .walk(digest, |_, _, digest, directory| {
-        let mut digest_types = Vec::new();
-        digest_types.push((digest, EntryType::Directory));
-        for file in directory.get_files() {
-          digest_types.push((try_future!(file.get_digest().into()), EntryType::File));
-        }
-        future::ok(digest_types).to_boxed()
-      })
+      .walk(
+        digest,
+        |_, _, digest, directory| {
+          let mut digest_types = Vec::new();
+          digest_types.push((digest, EntryType::Directory));
+          for file in directory.get_files() {
+            digest_types.push((try_future!(file.get_digest().into()), EntryType::File));
+          }
+          future::ok(digest_types).to_boxed()
+        },
+        workunit_store,
+      )
       .map(|digest_pairs_per_directory| {
         Iterator::flatten(digest_pairs_per_directory.into_iter().map(Vec::into_iter)).collect()
       })
@@ -614,6 +663,7 @@ impl Store {
     &self,
     destination: PathBuf,
     digest: Digest,
+    workunit_store: WorkUnitStore,
   ) -> BoxFuture<DirectoryMaterializeMetadata, String> {
     let root = Arc::new(Mutex::new(None));
     self
@@ -621,6 +671,7 @@ impl Store {
         destination,
         RootOrParentMetadataBuilder::Root(root.clone()),
         digest,
+        workunit_store,
       )
       .map(|()| Arc::try_unwrap(root).unwrap().into_inner().unwrap().build())
       .to_boxed()
@@ -631,6 +682,7 @@ impl Store {
     destination: PathBuf,
     root_or_parent_metadata: RootOrParentMetadataBuilder,
     digest: Digest,
+    workunit_store: WorkUnitStore,
   ) -> BoxFuture<(), String> {
     if let RootOrParentMetadataBuilder::Root(..) = root_or_parent_metadata {
       try_future!(fs::safe_create_dir_all(&destination));
@@ -640,7 +692,7 @@ impl Store {
 
     let store = self.clone();
     self
-      .load_directory(digest)
+      .load_directory(digest, workunit_store.clone())
       .and_then(move |directory_and_metadata_opt| {
         let (directory, metadata) = directory_and_metadata_opt
           .ok_or_else(|| format!("Directory with digest {:?} not found", digest))?;
@@ -677,7 +729,12 @@ impl Store {
             let child_files = child_files.clone();
             let name = file_node.get_name().to_owned();
             store
-              .materialize_file(path, digest, file_node.is_executable)
+              .materialize_file(
+                path,
+                digest,
+                file_node.is_executable,
+                workunit_store.clone(),
+              )
               .map(move |metadata| child_files.lock().insert(name, metadata))
               .to_boxed()
           })
@@ -696,7 +753,7 @@ impl Store {
               child_files.clone(),
             ));
 
-            store.materialize_directory_helper(path, builder, digest)
+            store.materialize_directory_helper(path, builder, digest, workunit_store.clone())
           })
           .collect::<Vec<_>>();
         future::join_all(file_futures)
@@ -711,23 +768,28 @@ impl Store {
     destination: PathBuf,
     digest: Digest,
     is_executable: bool,
+    workunit_store: WorkUnitStore,
   ) -> BoxFuture<LoadMetadata, String> {
     self
-      .load_file_bytes_with(digest, move |bytes| {
-        OpenOptions::new()
-          .create(true)
-          .write(true)
-          .mode(if is_executable { 0o755 } else { 0o644 })
-          .open(&destination)
-          .and_then(|mut f| {
-            f.write_all(&bytes)?;
-            // See `materialize_directory`, but we fundamentally materialize files for other
-            // processes to read; as such, we must ensure data is flushed to disk and visible
-            // to them as opposed to just our process.
-            f.sync_all()
-          })
-          .map_err(|e| format!("Error writing file {:?}: {:?}", destination, e))
-      })
+      .load_file_bytes_with(
+        digest,
+        move |bytes| {
+          OpenOptions::new()
+            .create(true)
+            .write(true)
+            .mode(if is_executable { 0o755 } else { 0o644 })
+            .open(&destination)
+            .and_then(|mut f| {
+              f.write_all(&bytes)?;
+              // See `materialize_directory`, but we fundamentally materialize files for other
+              // processes to read; as such, we must ensure data is flushed to disk and visible
+              // to them as opposed to just our process.
+              f.sync_all()
+            })
+            .map_err(|e| format!("Error writing file {:?}: {:?}", destination, e))
+        },
+        workunit_store.clone(),
+      )
       .and_then(move |write_result| match write_result {
         Some((Ok(()), metadata)) => Ok(metadata),
         Some((Err(e), _metadata)) => Err(e),
@@ -737,28 +799,41 @@ impl Store {
   }
 
   // Returns files sorted by their path.
-  pub fn contents_for_directory(&self, digest: Digest) -> BoxFuture<Vec<FileContent>, String> {
+  pub fn contents_for_directory(
+    &self,
+    digest: Digest,
+    workunit_store: WorkUnitStore,
+  ) -> BoxFuture<Vec<FileContent>, String> {
+    let workunit_store_clone = workunit_store.clone();
     self
-      .walk(digest, |store, path_so_far, _, directory| {
-        future::join_all(
-          directory
-            .get_files()
-            .iter()
-            .map(move |file_node| {
-              let path = path_so_far.join(file_node.get_name());
-              store
-                .load_file_bytes_with(try_future!(file_node.get_digest().into()), |b| b)
-                .and_then(move |maybe_bytes| {
-                  maybe_bytes
-                    .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))
-                    .map(|(content, _metadata)| FileContent { path, content })
-                })
-                .to_boxed()
-            })
-            .collect::<Vec<_>>(),
-        )
-        .to_boxed()
-      })
+      .walk(
+        digest,
+        move |store, path_so_far, _, directory| {
+          future::join_all(
+            directory
+              .get_files()
+              .iter()
+              .map(|file_node| {
+                let path = path_so_far.join(file_node.get_name());
+                store
+                  .load_file_bytes_with(
+                    try_future!(file_node.get_digest().into()),
+                    |b| b,
+                    workunit_store.clone(),
+                  )
+                  .and_then(move |maybe_bytes| {
+                    maybe_bytes
+                      .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))
+                      .map(|(content, _metadata)| FileContent { path, content })
+                  })
+                  .to_boxed()
+              })
+              .collect::<Vec<_>>(),
+          )
+          .to_boxed()
+        },
+        workunit_store_clone,
+      )
       .map(|file_contents_per_directory| {
         let mut vec =
           Iterator::flatten(file_contents_per_directory.into_iter().map(Vec::into_iter))
@@ -791,11 +866,18 @@ impl Store {
     &self,
     digest: Digest,
     f: F,
+    workunit_store: WorkUnitStore,
   ) -> BoxFuture<Vec<T>, String> {
     let f = Arc::new(f);
     let accumulator = Arc::new(Mutex::new(Vec::new()));
     self
-      .walk_helper(digest, PathBuf::new(), f, accumulator.clone())
+      .walk_helper(
+        digest,
+        PathBuf::new(),
+        f,
+        accumulator.clone(),
+        workunit_store,
+      )
       .map(|()| {
         Arc::try_unwrap(accumulator)
           .unwrap_or_else(|_| panic!("walk_helper violated its contract."))
@@ -821,10 +903,11 @@ impl Store {
     path_so_far: PathBuf,
     f: Arc<F>,
     accumulator: Arc<Mutex<Vec<T>>>,
+    workunit_store: WorkUnitStore,
   ) -> BoxFuture<(), String> {
     let store = self.clone();
     self
-      .load_directory(digest)
+      .load_directory(digest, workunit_store.clone())
       .and_then(move |maybe_directory| match maybe_directory {
         Some((directory, _metadata)) => {
           let result_for_directory = f(&store, &path_so_far, digest, &directory);
@@ -841,7 +924,13 @@ impl Store {
                   .map(move |dir_node| {
                     let subdir_digest = try_future!(dir_node.get_digest().into());
                     let path = path_so_far.join(dir_node.get_name());
-                    store.walk_helper(subdir_digest, path, f.clone(), accumulator.clone())
+                    store.walk_helper(
+                      subdir_digest,
+                      path,
+                      f.clone(),
+                      accumulator.clone(),
+                      workunit_store.clone(),
+                    )
                   })
                   .collect::<Vec<_>>(),
               )
@@ -1234,7 +1323,7 @@ mod local {
 
       let testdata = TestData::roland();
       assert_eq!(
-        block_on(new_store(dir.path()).store_bytes(EntryType::File, testdata.bytes(), false)),
+        block_on(new_store(dir.path()).store_bytes(EntryType::File, testdata.bytes(), false,)),
         Ok(testdata.digest())
       );
     }
@@ -1247,7 +1336,7 @@ mod local {
       block_on(new_store(dir.path()).store_bytes(EntryType::File, testdata.bytes(), false))
         .unwrap();
       assert_eq!(
-        block_on(new_store(dir.path()).store_bytes(EntryType::File, testdata.bytes(), false)),
+        block_on(new_store(dir.path()).store_bytes(EntryType::File, testdata.bytes(), false,)),
         Ok(testdata.digest())
       );
     }
@@ -1277,7 +1366,7 @@ mod local {
       let testdir = TestDirectory::containing_roland();
 
       assert_eq!(
-        block_on(new_store(dir.path()).store_bytes(EntryType::Directory, testdir.bytes(), false)),
+        block_on(new_store(dir.path()).store_bytes(EntryType::Directory, testdir.bytes(), false,)),
         Ok(testdir.digest())
       );
 
@@ -1716,6 +1805,7 @@ mod remote {
   use std::sync::Arc;
   use std::time::Duration;
   use uuid;
+  use workunit_store::WorkUnitStore;
 
   #[derive(Clone)]
   pub struct ByteStore {
@@ -1826,7 +1916,13 @@ mod remote {
       call_option
     }
 
-    pub fn store_bytes(&self, bytes: Bytes) -> BoxFuture<Digest, String> {
+    pub fn store_bytes(
+      &self,
+      bytes: Bytes,
+      workunit_store: WorkUnitStore,
+    ) -> BoxFuture<Digest, String> {
+      let start_time = std::time::SystemTime::now();
+
       let mut hasher = Sha256::default();
       hasher.input(&bytes);
       let fingerprint = Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice());
@@ -1839,6 +1935,8 @@ mod remote {
         digest.0,
         digest.1,
       );
+      let workunit_name = format!("store_bytes({})", resource_name.clone());
+      let workunit_store = workunit_store.clone();
       let store = self.clone();
       self
         .with_byte_stream_client(move |client| {
@@ -1924,6 +2022,18 @@ mod remote {
             }
           }
         })
+        .then(move |future| {
+          let time_span = super::TimeSpan::since(&start_time);
+          let workunit = workunit_store::WorkUnit {
+            name: workunit_name.clone(),
+            start_timestamp: time_span.start_timestamp(),
+            end_timestamp: time_span.end_timestamp(),
+            span_id: workunit_store::generate_random_64bit_string(),
+            parent_id: workunit_store::get_parent_id(),
+          };
+          workunit_store.add_workunit(workunit);
+          future
+        })
         .to_boxed()
     }
 
@@ -1932,20 +2042,26 @@ mod remote {
       _entry_type: EntryType,
       digest: Digest,
       f: F,
+      workunit_store: WorkUnitStore,
     ) -> BoxFuture<Option<T>, String> {
+      let start_time = std::time::SystemTime::now();
+
       let store = self.clone();
+      let resource_name = format!(
+        "{}/blobs/{}/{}",
+        store.instance_name.clone().unwrap_or_default(),
+        digest.0,
+        digest.1
+      );
+      let workunit_name = format!("load_bytes_with({})", resource_name.clone());
+      let workunit_store = workunit_store.clone();
       self
         .with_byte_stream_client(move |client| {
           match client
             .read_opt(
               &{
                 let mut req = bazel_protos::bytestream::ReadRequest::new();
-                req.set_resource_name(format!(
-                  "{}/blobs/{}/{}",
-                  store.instance_name.clone().unwrap_or_default(),
-                  digest.0,
-                  digest.1
-                ));
+                req.set_resource_name(resource_name.clone());
                 req.set_read_offset(0);
                 // 0 means no limit.
                 req.set_read_limit(0);
@@ -1987,6 +2103,18 @@ mod remote {
             .to_boxed(),
           }
         })
+        .then(move |future| {
+          let time_span = super::TimeSpan::since(&start_time);
+          let workunit = workunit_store::WorkUnit {
+            name: workunit_name.clone(),
+            start_timestamp: time_span.start_timestamp(),
+            end_timestamp: time_span.end_timestamp(),
+            span_id: workunit_store::generate_random_64bit_string(),
+            parent_id: workunit_store::get_parent_id(),
+          };
+          workunit_store.add_workunit(workunit);
+          future
+        })
         .to_boxed()
     }
 
@@ -1997,25 +2125,46 @@ mod remote {
     pub fn list_missing_digests(
       &self,
       request: bazel_protos::remote_execution::FindMissingBlobsRequest,
+      workunit_store: WorkUnitStore,
     ) -> impl Future<Item = HashSet<Digest>, Error = String> {
+      let start_time = std::time::SystemTime::now();
+
       let store = self.clone();
-      self.with_cas_client(move |client| {
-        client
-          .find_missing_blobs_opt(&request, store.call_option())
-          .map_err(|err| {
-            format!(
-              "Error from server in response to find_missing_blobs_request: {:?}",
-              err
-            )
-          })
-          .and_then(|response| {
-            response
-              .get_missing_blob_digests()
-              .iter()
-              .map(|digest| digest.into())
-              .collect()
-          })
-      })
+      let workunit_name = format!(
+        "list_missing_digests({})",
+        store.instance_name.clone().unwrap_or_default()
+      );
+      let workunit_store = workunit_store.clone();
+      self
+        .with_cas_client(move |client| {
+          client
+            .find_missing_blobs_opt(&request, store.call_option())
+            .map_err(|err| {
+              format!(
+                "Error from server in response to find_missing_blobs_request: {:?}",
+                err
+              )
+            })
+            .and_then(|response| {
+              response
+                .get_missing_blob_digests()
+                .iter()
+                .map(|digest| digest.into())
+                .collect()
+            })
+        })
+        .then(move |future| {
+          let time_span = super::TimeSpan::since(&start_time);
+          let workunit = workunit_store::WorkUnit {
+            name: workunit_name.clone(),
+            start_timestamp: time_span.start_timestamp(),
+            end_timestamp: time_span.end_timestamp(),
+            span_id: workunit_store::generate_random_64bit_string(),
+            parent_id: workunit_store::get_parent_id(),
+          };
+          workunit_store.add_workunit(workunit);
+          future
+        })
     }
 
     pub(super) fn find_missing_blobs_request<'a, Digests: Iterator<Item = &'a Digest>>(
@@ -2044,6 +2193,7 @@ mod remote {
     use std::collections::HashSet;
     use std::time::Duration;
     use testutil::data::{TestData, TestDirectory};
+    use workunit_store::WorkUnitStore;
 
     use super::super::tests::{
       big_file_bytes, big_file_digest, big_file_fingerprint, block_on, new_cas,
@@ -2172,7 +2322,7 @@ mod remote {
 
       let store = new_byte_store(&cas);
       assert_eq!(
-        block_on(store.store_bytes(testdata.bytes())),
+        block_on(store.store_bytes(testdata.bytes(), WorkUnitStore::new())),
         Ok(testdata.digest())
       );
 
@@ -2202,7 +2352,7 @@ mod remote {
       let fingerprint = big_file_fingerprint();
 
       assert_eq!(
-        block_on(store.store_bytes(all_the_henries.clone())),
+        block_on(store.store_bytes(all_the_henries.clone(), WorkUnitStore::new())),
         Ok(big_file_digest())
       );
 
@@ -2230,7 +2380,7 @@ mod remote {
 
       let store = new_byte_store(&cas);
       assert_eq!(
-        block_on(store.store_bytes(empty_file.bytes())),
+        block_on(store.store_bytes(empty_file.bytes(), WorkUnitStore::new())),
         Ok(empty_file.digest())
       );
 
@@ -2246,7 +2396,8 @@ mod remote {
       let cas = StubCAS::always_errors();
 
       let store = new_byte_store(&cas);
-      let error = block_on(store.store_bytes(TestData::roland().bytes())).expect_err("Want error");
+      let error = block_on(store.store_bytes(TestData::roland().bytes(), WorkUnitStore::new()))
+        .expect_err("Want error");
       assert!(
         error.contains("Error from server"),
         format!("Bad error message, got: {}", error)
@@ -2271,7 +2422,8 @@ mod remote {
         1,
       )
       .unwrap();
-      let error = block_on(store.store_bytes(TestData::roland().bytes())).expect_err("Want error");
+      let error = block_on(store.store_bytes(TestData::roland().bytes(), WorkUnitStore::new()))
+        .expect_err("Want error");
       assert!(
         error.contains("Error attempting to upload digest"),
         format!("Bad error message, got: {}", error)
@@ -2285,7 +2437,8 @@ mod remote {
       let store = new_byte_store(&cas);
       assert_eq!(
         block_on(store.list_missing_digests(
-          store.find_missing_blobs_request(vec![TestData::roland().digest()].iter())
+          store.find_missing_blobs_request(vec![TestData::roland().digest()].iter()),
+          WorkUnitStore::new(),
         )),
         Ok(HashSet::new())
       );
@@ -2303,7 +2456,10 @@ mod remote {
       digest_set.insert(digest);
 
       assert_eq!(
-        block_on(store.list_missing_digests(store.find_missing_blobs_request(vec![digest].iter()))),
+        block_on(store.list_missing_digests(
+          store.find_missing_blobs_request(vec![digest].iter()),
+          WorkUnitStore::new(),
+        )),
         Ok(digest_set)
       );
     }
@@ -2316,6 +2472,7 @@ mod remote {
 
       let error = block_on(store.list_missing_digests(
         store.find_missing_blobs_request(vec![TestData::roland().digest()].iter()),
+        WorkUnitStore::new(),
       ))
       .expect_err("Want error");
       assert!(
@@ -2390,7 +2547,7 @@ mod remote {
       entry_type: EntryType,
       digest: Digest,
     ) -> Result<Option<Bytes>, String> {
-      block_on(store.load_bytes_with(entry_type, digest, |b| b))
+      block_on(store.load_bytes_with(entry_type, digest, |b| b, WorkUnitStore::new()))
     }
   }
 }
@@ -2421,6 +2578,8 @@ mod tests {
   use std::time::Duration;
   use tempfile::TempDir;
   use testutil::data::{TestData, TestDirectory};
+  use workunit_store::WorkUnitStore;
+
   impl LoadMetadata {
     fn is_remote(&self) -> bool {
       match self {
@@ -2468,7 +2627,7 @@ mod tests {
   }
 
   pub fn load_file_bytes(store: &Store, digest: Digest) -> Result<Option<Bytes>, String> {
-    block_on(store.load_file_bytes_with(digest, |bytes| bytes))
+    block_on(store.load_file_bytes_with(digest, |bytes| bytes, WorkUnitStore::new()))
       .map(|option| option.map(|(bytes, _metadata)| bytes))
   }
 
@@ -2525,7 +2684,7 @@ mod tests {
 
     let cas = new_cas(1024);
     assert_eq!(
-      load_file_bytes(&new_store(dir.path(), cas.address()), testdata.digest()),
+      load_file_bytes(&new_store(dir.path(), cas.address()), testdata.digest(),),
       Ok(Some(testdata.bytes()))
     );
     assert_eq!(0, cas.read_request_count());
@@ -2546,10 +2705,12 @@ mod tests {
 
     let cas = new_cas(1024);
     assert_eq!(
-      block_on(new_store(dir.path(), cas.address()).load_directory(testdir.digest()))
-        .unwrap()
-        .unwrap()
-        .0,
+      block_on(
+        new_store(dir.path(), cas.address()).load_directory(testdir.digest(), WorkUnitStore::new())
+      )
+      .unwrap()
+      .unwrap()
+      .0,
       testdir.directory()
     );
     assert_eq!(0, cas.read_request_count());
@@ -2569,7 +2730,7 @@ mod tests {
     );
     assert_eq!(1, cas.read_request_count());
     assert_eq!(
-      local::tests::load_file_bytes(&local::tests::new_store(dir.path()), testdata.digest()),
+      local::tests::load_file_bytes(&local::tests::new_store(dir.path()), testdata.digest(),),
       Ok(Some(testdata.bytes())),
       "Read from local cache"
     );
@@ -2584,10 +2745,12 @@ mod tests {
     let testdir = TestDirectory::containing_roland();
 
     assert_eq!(
-      block_on(new_store(dir.path(), cas.address()).load_directory(testdir.digest()))
-        .unwrap()
-        .unwrap()
-        .0,
+      block_on(
+        new_store(dir.path(), cas.address()).load_directory(testdir.digest(), WorkUnitStore::new())
+      )
+      .unwrap()
+      .unwrap()
+      .0,
       testdir.directory()
     );
     assert_eq!(1, cas.read_request_count());
@@ -2622,30 +2785,32 @@ mod tests {
 
     block_on(
       new_store(dir.path(), cas.address())
-        .ensure_local_has_recursive_directory(recursive_testdir_digest),
+        .ensure_local_has_recursive_directory(recursive_testdir_digest, WorkUnitStore::new()),
     )
     .expect("Downloading recursive directory should have succeeded.");
 
     assert_eq!(
-      load_file_bytes(&new_local_store(dir.path()), roland.digest()),
+      load_file_bytes(&new_local_store(dir.path()), roland.digest(),),
       Ok(Some(roland.bytes()))
     );
     assert_eq!(
-      load_file_bytes(&new_local_store(dir.path()), catnip.digest()),
+      load_file_bytes(&new_local_store(dir.path()), catnip.digest(),),
       Ok(Some(catnip.bytes()))
     );
     assert_eq!(
-      block_on(new_local_store(dir.path()).load_directory(testdir_digest))
+      block_on(new_local_store(dir.path()).load_directory(testdir_digest, WorkUnitStore::new()))
         .unwrap()
         .unwrap()
         .0,
       testdir_directory
     );
     assert_eq!(
-      block_on(new_local_store(dir.path()).load_directory(recursive_testdir_digest))
-        .unwrap()
-        .unwrap()
-        .0,
+      block_on(
+        new_local_store(dir.path()).load_directory(recursive_testdir_digest, WorkUnitStore::new())
+      )
+      .unwrap()
+      .unwrap()
+      .0,
       recursive_testdir_directory
     );
   }
@@ -2671,10 +2836,10 @@ mod tests {
 
     let cas = StubCAS::empty();
     assert_eq!(
-      block_on(
-        new_store(dir.path(), cas.address())
-          .load_directory(TestDirectory::containing_roland().digest())
-      ),
+      block_on(new_store(dir.path(), cas.address()).load_directory(
+        TestDirectory::containing_roland().digest(),
+        WorkUnitStore::new()
+      )),
       Ok(None)
     );
     assert_eq!(1, cas.read_request_count());
@@ -2706,9 +2871,11 @@ mod tests {
     let dir = TempDir::new().unwrap();
 
     let cas = StubCAS::always_errors();
-    let error =
-      block_on(new_store(dir.path(), cas.address()).load_directory(TestData::roland().digest()))
-        .expect_err("Want error");
+    let error = block_on(
+      new_store(dir.path(), cas.address())
+        .load_directory(TestData::roland().digest(), WorkUnitStore::new()),
+    )
+    .expect_err("Want error");
     assert!(
       cas.read_request_count() > 0,
       "Want read_request_count > 0 but got {}",
@@ -2727,8 +2894,10 @@ mod tests {
     let testdata = TestData::roland();
 
     let cas = new_cas(1024);
-    block_on(new_store(dir.path(), cas.address()).load_directory(testdata.digest()))
-      .expect_err("Want error");
+    block_on(
+      new_store(dir.path(), cas.address()).load_directory(testdata.digest(), WorkUnitStore::new()),
+    )
+    .expect_err("Want error");
 
     assert_eq!(
       local::tests::load_directory_proto_bytes(
@@ -2771,8 +2940,11 @@ mod tests {
         non_canonical_directory_bytes,
       )
       .build();
-    block_on(new_store(dir.path(), cas.address()).load_directory(directory_digest.clone()))
-      .expect_err("Want error");
+    block_on(
+      new_store(dir.path(), cas.address())
+        .load_directory(directory_digest.clone(), WorkUnitStore::new()),
+    )
+    .expect_err("Want error");
 
     assert_eq!(
       local::tests::load_directory_proto_bytes(
@@ -2831,8 +3003,10 @@ mod tests {
 
     let empty_dir = TestDirectory::empty();
 
-    let expanded = block_on(new_local_store(dir.path()).expand_directory(empty_dir.digest()))
-      .expect("Error expanding directory");
+    let expanded = block_on(
+      new_local_store(dir.path()).expand_directory(empty_dir.digest(), WorkUnitStore::new()),
+    )
+    .expect("Error expanding directory");
     let want: HashMap<Digest, EntryType> = vec![(empty_dir.digest(), EntryType::Directory)]
       .into_iter()
       .collect();
@@ -2849,8 +3023,10 @@ mod tests {
     block_on(new_local_store(dir.path()).record_directory(&testdir.directory(), false))
       .expect("Error storing directory locally");
 
-    let expanded = block_on(new_local_store(dir.path()).expand_directory(testdir.digest()))
-      .expect("Error expanding directory");
+    let expanded = block_on(
+      new_local_store(dir.path()).expand_directory(testdir.digest(), WorkUnitStore::new()),
+    )
+    .expect("Error expanding directory");
     let want: HashMap<Digest, EntryType> = vec![
       (testdir.digest(), EntryType::Directory),
       (roland.digest(), EntryType::File),
@@ -2874,9 +3050,11 @@ mod tests {
     block_on(new_local_store(dir.path()).record_directory(&testdir.directory(), false))
       .expect("Error storing directory locally");
 
-    let expanded =
-      block_on(new_local_store(dir.path()).expand_directory(recursive_testdir.digest()))
-        .expect("Error expanding directory");
+    let expanded = block_on(
+      new_local_store(dir.path())
+        .expand_directory(recursive_testdir.digest(), WorkUnitStore::new()),
+    )
+    .expect("Error expanding directory");
     let want: HashMap<Digest, EntryType> = vec![
       (recursive_testdir.digest(), EntryType::Directory),
       (testdir.digest(), EntryType::Directory),
@@ -2893,7 +3071,8 @@ mod tests {
     let dir = TempDir::new().unwrap();
     let digest = TestDirectory::containing_roland().digest();
     let error =
-      block_on(new_local_store(dir.path()).expand_directory(digest)).expect_err("Want error");
+      block_on(new_local_store(dir.path()).expand_directory(digest, WorkUnitStore::new()))
+        .expect_err("Want error");
     assert!(
       error.contains(&format!("{:?}", digest)),
       "Bad error message: {}",
@@ -2910,8 +3089,11 @@ mod tests {
     block_on(new_local_store(dir.path()).record_directory(&recursive_testdir.directory(), false))
       .expect("Error storing directory locally");
 
-    let error = block_on(new_local_store(dir.path()).expand_directory(recursive_testdir.digest()))
-      .expect_err("Want error");
+    let error = block_on(
+      new_local_store(dir.path())
+        .expand_directory(recursive_testdir.digest(), WorkUnitStore::new()),
+    )
+    .expect_err("Want error");
     assert!(
       error.contains(&format!(
         "{}",
@@ -2935,7 +3117,8 @@ mod tests {
     assert_eq!(cas.blobs.lock().get(&testdata.fingerprint()), None);
 
     block_on(
-      new_store(dir.path(), cas.address()).ensure_remote_has_recursive(vec![testdata.digest()]),
+      new_store(dir.path(), cas.address())
+        .ensure_remote_has_recursive(vec![testdata.digest()], WorkUnitStore::new()),
     )
     .expect("Error uploading file");
 
@@ -2962,7 +3145,8 @@ mod tests {
     assert_eq!(cas.blobs.lock().get(&testdir.fingerprint()), None);
 
     block_on(
-      new_store(dir.path(), cas.address()).ensure_remote_has_recursive(vec![testdir.digest()]),
+      new_store(dir.path(), cas.address())
+        .ensure_remote_has_recursive(vec![testdir.digest()], WorkUnitStore::new()),
     )
     .expect("Error uploading directory");
 
@@ -2990,7 +3174,8 @@ mod tests {
       .expect("Error storing file locally");
 
     block_on(
-      new_store(dir.path(), cas.address()).ensure_remote_has_recursive(vec![testdata.digest()]),
+      new_store(dir.path(), cas.address())
+        .ensure_remote_has_recursive(vec![testdata.digest()], WorkUnitStore::new()),
     )
     .expect("Error uploading file");
 
@@ -3002,7 +3187,8 @@ mod tests {
     assert_eq!(cas.blobs.lock().get(&testdir.fingerprint()), None);
 
     block_on(
-      new_store(dir.path(), cas.address()).ensure_remote_has_recursive(vec![testdir.digest()]),
+      new_store(dir.path(), cas.address())
+        .ensure_remote_has_recursive(vec![testdir.digest()], WorkUnitStore::new()),
     )
     .expect("Error uploading directory");
 
@@ -3030,7 +3216,8 @@ mod tests {
       .expect("Error storing file locally");
 
     block_on(
-      new_store(dir.path(), cas.address()).ensure_remote_has_recursive(vec![roland.digest()]),
+      new_store(dir.path(), cas.address())
+        .ensure_remote_has_recursive(vec![roland.digest()], WorkUnitStore::new()),
     )
     .expect("Error uploading big file");
 
@@ -3043,8 +3230,10 @@ mod tests {
     assert_eq!(cas.blobs.lock().get(&testdir.fingerprint()), None);
 
     block_on(
-      new_store(dir.path(), cas.address())
-        .ensure_remote_has_recursive(vec![testdir.digest(), catnip.digest()]),
+      new_store(dir.path(), cas.address()).ensure_remote_has_recursive(
+        vec![testdir.digest(), catnip.digest()],
+        WorkUnitStore::new(),
+      ),
     )
     .expect("Error uploading directory");
 
@@ -3069,7 +3258,7 @@ mod tests {
 
     block_on(
       new_store(dir.path(), cas.address())
-        .ensure_remote_has_recursive(vec![extra_big_file_digest()]),
+        .ensure_remote_has_recursive(vec![extra_big_file_digest()], WorkUnitStore::new()),
     )
     .expect("Error uploading directory");
 
@@ -3081,7 +3270,7 @@ mod tests {
 
     block_on(
       new_store(dir.path(), cas.address())
-        .ensure_remote_has_recursive(vec![extra_big_file_digest()]),
+        .ensure_remote_has_recursive(vec![extra_big_file_digest()], WorkUnitStore::new()),
     )
     .expect("Error uploading directory");
 
@@ -3102,7 +3291,8 @@ mod tests {
     assert_eq!(cas.blobs.lock().get(&testdata.fingerprint()), None);
 
     let error = block_on(
-      new_store(dir.path(), cas.address()).ensure_remote_has_recursive(vec![testdata.digest()]),
+      new_store(dir.path(), cas.address())
+        .ensure_remote_has_recursive(vec![testdata.digest()], WorkUnitStore::new()),
     )
     .expect_err("Want error");
     assert_eq!(
@@ -3125,7 +3315,8 @@ mod tests {
     assert_eq!(cas.blobs.lock().get(&testdir.fingerprint()), None);
 
     let error = block_on(
-      new_store(dir.path(), cas.address()).ensure_remote_has_recursive(vec![testdir.digest()]),
+      new_store(dir.path(), cas.address())
+        .ensure_remote_has_recursive(vec![testdir.digest()], WorkUnitStore::new()),
     )
     .expect_err("Want error");
     assert_eq!(
@@ -3152,8 +3343,11 @@ mod tests {
 
     let wrong_digest = Digest(testdata.fingerprint(), testdata.len() + 1);
 
-    block_on(new_store(dir.path(), cas.address()).ensure_remote_has_recursive(vec![wrong_digest]))
-      .expect_err("Expect error uploading file");
+    block_on(
+      new_store(dir.path(), cas.address())
+        .ensure_remote_has_recursive(vec![wrong_digest], WorkUnitStore::new()),
+    )
+    .expect_err("Expect error uploading file");
 
     assert_eq!(cas.blobs.lock().get(&testdata.fingerprint()), None);
   }
@@ -3190,8 +3384,10 @@ mod tests {
     )
     .unwrap();
 
-    block_on(store_with_remote.ensure_remote_has_recursive(vec![testdir.digest()]))
-      .expect("Error uploading");
+    block_on(
+      store_with_remote.ensure_remote_has_recursive(vec![testdir.digest()], WorkUnitStore::new()),
+    )
+    .expect("Error uploading");
   }
 
   #[test]
@@ -3218,10 +3414,14 @@ mod tests {
     .unwrap();
 
     assert_eq!(
-      block_on(store_with_remote.load_file_bytes_with(TestData::roland().digest(), |b| b))
-        .unwrap()
-        .unwrap()
-        .0,
+      block_on(store_with_remote.load_file_bytes_with(
+        TestData::roland().digest(),
+        |b| b,
+        WorkUnitStore::new()
+      ))
+      .unwrap()
+      .unwrap()
+      .0,
       TestData::roland().bytes()
     )
   }
@@ -3258,8 +3458,10 @@ mod tests {
     )
     .unwrap();
 
-    block_on(store_with_remote.ensure_remote_has_recursive(vec![testdir.digest()]))
-      .expect("Error uploading");
+    block_on(
+      store_with_remote.ensure_remote_has_recursive(vec![testdir.digest()], WorkUnitStore::new()),
+    )
+    .expect("Error uploading");
   }
 
   #[test]
@@ -3286,10 +3488,14 @@ mod tests {
     .unwrap();
 
     assert_eq!(
-      block_on(store_with_remote.load_file_bytes_with(TestData::roland().digest(), |b| b))
-        .unwrap()
-        .unwrap()
-        .0,
+      block_on(store_with_remote.load_file_bytes_with(
+        TestData::roland().digest(),
+        |b| b,
+        WorkUnitStore::new()
+      ))
+      .unwrap()
+      .unwrap()
+      .0,
       TestData::roland().bytes()
     )
   }
@@ -3301,8 +3507,13 @@ mod tests {
 
     let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
-    block_on(store.materialize_file(file.clone(), TestData::roland().digest(), false))
-      .expect_err("Want unknown digest error");
+    block_on(store.materialize_file(
+      file.clone(),
+      TestData::roland().digest(),
+      false,
+      WorkUnitStore::new(),
+    ))
+    .expect_err("Want unknown digest error");
   }
 
   #[test]
@@ -3315,7 +3526,7 @@ mod tests {
     let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
     block_on(store.store_file_bytes(testdata.bytes(), false)).expect("Error saving bytes");
-    block_on(store.materialize_file(file.clone(), testdata.digest(), false))
+    block_on(store.materialize_file(file.clone(), testdata.digest(), false, WorkUnitStore::new()))
       .expect("Error materializing file");
     assert_eq!(file_contents(&file), testdata.bytes());
     assert!(!is_executable(&file));
@@ -3331,7 +3542,7 @@ mod tests {
     let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
     block_on(store.store_file_bytes(testdata.bytes(), false)).expect("Error saving bytes");
-    block_on(store.materialize_file(file.clone(), testdata.digest(), true))
+    block_on(store.materialize_file(file.clone(), testdata.digest(), true, WorkUnitStore::new()))
       .expect("Error materializing file");
     assert_eq!(file_contents(&file), testdata.bytes());
     assert!(is_executable(&file));
@@ -3346,6 +3557,7 @@ mod tests {
     block_on(store.materialize_directory(
       materialize_dir.path().to_owned(),
       TestDirectory::recursive().digest(),
+      WorkUnitStore::new(),
     ))
     .expect_err("Want unknown digest error");
   }
@@ -3371,6 +3583,7 @@ mod tests {
     block_on(store.materialize_directory(
       materialize_dir.path().to_owned(),
       recursive_testdir.digest(),
+      WorkUnitStore::new(),
     ))
     .expect("Error materializing");
 
@@ -3402,8 +3615,12 @@ mod tests {
     block_on(store.store_file_bytes(catnip.bytes(), false))
       .expect("Error saving catnip file bytes");
 
-    block_on(store.materialize_directory(materialize_dir.path().to_owned(), testdir.digest()))
-      .expect("Error materializing");
+    block_on(store.materialize_directory(
+      materialize_dir.path().to_owned(),
+      testdir.digest(),
+      WorkUnitStore::new(),
+    ))
+    .expect("Error materializing");
 
     assert_eq!(list_dir(materialize_dir.path()), vec!["feed", "food"]);
     assert_eq!(
@@ -3423,8 +3640,9 @@ mod tests {
     let store_dir = TempDir::new().unwrap();
     let store = new_local_store(store_dir.path());
 
-    let file_contents = block_on(store.contents_for_directory(TestDirectory::empty().digest()))
-      .expect("Getting FileContents");
+    let file_contents =
+      block_on(store.contents_for_directory(TestDirectory::empty().digest(), WorkUnitStore::new()))
+        .expect("Getting FileContents");
 
     assert_same_filecontents(file_contents, vec![]);
   }
@@ -3445,8 +3663,9 @@ mod tests {
     block_on(store.store_file_bytes(catnip.bytes(), false))
       .expect("Error saving catnip file bytes");
 
-    let file_contents = block_on(store.contents_for_directory(recursive_testdir.digest()))
-      .expect("Getting FileContents");
+    let file_contents =
+      block_on(store.contents_for_directory(recursive_testdir.digest(), WorkUnitStore::new()))
+        .expect("Getting FileContents");
 
     assert_same_filecontents(
       file_contents,
@@ -3556,7 +3775,8 @@ mod tests {
     block_on(local_store.store_file_bytes(testcatnip.bytes(), false))
       .expect("Error storing file locally");
     let mut summary = block_on(
-      new_store(dir.path(), cas.address()).ensure_remote_has_recursive(vec![testdir.digest()]),
+      new_store(dir.path(), cas.address())
+        .ensure_remote_has_recursive(vec![testdir.digest()], WorkUnitStore::new()),
     )
     .expect("Error uploading file");
 
@@ -3600,7 +3820,8 @@ mod tests {
 
     // Store testroland first, which should return a summary of one file
     let mut data_summary = block_on(
-      new_store(dir.path(), cas.address()).ensure_remote_has_recursive(vec![testroland.digest()]),
+      new_store(dir.path(), cas.address())
+        .ensure_remote_has_recursive(vec![testroland.digest()], WorkUnitStore::new()),
     )
     .expect("Error uploading file");
     data_summary.upload_wall_time = Duration::default();
@@ -3620,7 +3841,8 @@ mod tests {
     // It should see the digest of testroland already in cas,
     // and not report it in uploads.
     let mut dir_summary = block_on(
-      new_store(dir.path(), cas.address()).ensure_remote_has_recursive(vec![testdir.digest()]),
+      new_store(dir.path(), cas.address())
+        .ensure_remote_has_recursive(vec![testdir.digest()], WorkUnitStore::new()),
     )
     .expect("Error uploading directory");
 
@@ -3664,7 +3886,11 @@ mod tests {
 
     let mat_dir = tempfile::tempdir().unwrap();
     let metadata = runtime
-      .block_on(store.materialize_directory(mat_dir.path().to_owned(), outer_dir.digest()))
+      .block_on(store.materialize_directory(
+        mat_dir.path().to_owned(),
+        outer_dir.digest(),
+        WorkUnitStore::new(),
+      ))
       .unwrap();
 
     let local = LoadMetadata::Local;
@@ -3716,7 +3942,11 @@ mod tests {
 
     let mat_dir = tempfile::tempdir().unwrap();
     let metadata = runtime
-      .block_on(store.materialize_directory(mat_dir.path().to_owned(), outer_dir.digest()))
+      .block_on(store.materialize_directory(
+        mat_dir.path().to_owned(),
+        outer_dir.digest(),
+        WorkUnitStore::new(),
+      ))
       .unwrap();
 
     assert!(metadata

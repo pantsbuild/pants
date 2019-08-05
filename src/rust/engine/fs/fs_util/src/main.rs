@@ -345,9 +345,11 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             .parse::<usize>()
             .expect("size_bytes must be a non-negative number");
           let digest = Digest(fingerprint, size_bytes);
-          let write_result = runtime.block_on(
-            store.load_file_bytes_with(digest, |bytes| io::stdout().write_all(&bytes).unwrap()),
-          )?;
+          let write_result = runtime.block_on(store.load_file_bytes_with(
+            digest,
+            |bytes| io::stdout().write_all(&bytes).unwrap(),
+            workunit_store::WorkUnitStore::new(),
+          ))?;
           write_result
             .ok_or_else(|| {
               ExitError(
@@ -376,7 +378,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
               let digest = runtime
                 .block_on(
                   store::OneOffStoreFileByDigest::new(store.clone(), Arc::new(posix_fs))
-                    .store_by_digest(f),
+                    .store_by_digest(f, workunit_store::WorkUnitStore::new()),
                 )
                 .unwrap();
 
@@ -410,7 +412,11 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           .expect("size_bytes must be a non-negative number");
         let digest = Digest(fingerprint, size_bytes);
         runtime
-          .block_on(store.materialize_directory(destination, digest))
+          .block_on(store.materialize_directory(
+            destination,
+            digest,
+            workunit_store::WorkUnitStore::new(),
+          ))
           .map(|metadata| {
             eprintln!("{}", serde_json::to_string_pretty(&metadata).unwrap());
           })
@@ -448,6 +454,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
                 store_copy.clone(),
                 &store::OneOffStoreFileByDigest::new(store_copy, posix_fs),
                 paths,
+                workunit_store::WorkUnitStore::new(),
               )
             })
             .map(|snapshot| snapshot.digest),
@@ -470,10 +477,10 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         let digest = Digest(fingerprint, size_bytes);
         let proto_bytes = match args.value_of("output-format").unwrap() {
           "binary" => runtime
-            .block_on(store.load_directory(digest))
+            .block_on(store.load_directory(digest, workunit_store::WorkUnitStore::new()))
             .map(|maybe_d| maybe_d.map(|(d, _metadata)| d.write_to_bytes().unwrap())),
           "text" => runtime
-            .block_on(store.load_directory(digest))
+            .block_on(store.load_directory(digest, workunit_store::WorkUnitStore::new()))
             .map(|maybe_p| maybe_p.map(|(p, _metadata)| format!("{:?}\n", p).as_bytes().to_vec())),
           "recursive-file-list" => runtime
             .block_on(expand_files(store, digest))
@@ -527,16 +534,24 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         .parse::<usize>()
         .expect("size_bytes must be a non-negative number");
       let digest = Digest(fingerprint, size_bytes);
-      let v = match runtime.block_on(store.load_file_bytes_with(digest, |bytes| bytes))? {
-        None => runtime.block_on(store.load_directory(digest).map(|maybe_dir| {
-          maybe_dir.map(|(dir, _metadata)| {
-            Bytes::from(
-              dir
-                .write_to_bytes()
-                .expect("Error serializing Directory proto"),
-            )
-          })
-        }))?,
+      let v = match runtime.block_on(store.load_file_bytes_with(
+        digest,
+        |bytes| bytes,
+        workunit_store::WorkUnitStore::new(),
+      ))? {
+        None => runtime.block_on(
+          store
+            .load_directory(digest, workunit_store::WorkUnitStore::new())
+            .map(|maybe_dir| {
+              maybe_dir.map(|(dir, _metadata)| {
+                Bytes::from(
+                  dir
+                    .write_to_bytes()
+                    .expect("Error serializing Directory proto"),
+                )
+              })
+            }),
+        )?,
         Some((bytes, _metadata)) => Some(bytes),
       };
       match v {
@@ -594,7 +609,7 @@ fn expand_files_helper(
   files: Arc<Mutex<Vec<(String, Digest)>>>,
 ) -> BoxFuture<Option<()>, String> {
   store
-    .load_directory(digest)
+    .load_directory(digest, workunit_store::WorkUnitStore::new())
     .and_then(|maybe_dir| match maybe_dir {
       Some((dir, _metadata)) => {
         {
@@ -638,7 +653,7 @@ fn ensure_uploaded_to_remote(
 ) -> impl Future<Item = SummaryWithDigest, Error = String> {
   let summary = if store_has_remote {
     store
-      .ensure_remote_has_recursive(vec![digest])
+      .ensure_remote_has_recursive(vec![digest], workunit_store::WorkUnitStore::new())
       .map(Some)
       .to_boxed()
   } else {

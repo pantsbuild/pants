@@ -23,6 +23,7 @@ store = { path = "../store" }
 task_executor = { path = "../../task_executor" }
 time = "0.1.39"
 tokio = "0.1"
+workunit_store = { path = "../../workunit_store" }
 
 [dev-dependencies]
 bytes = "0.4.5"
