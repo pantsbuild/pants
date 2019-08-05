@@ -15,8 +15,6 @@ class List(LineOriented, Goal):
 
   name = 'list'
 
-  deprecated_cache_setup_removal_version = '1.18.0.dev2'
-
   @classmethod
   def register_options(cls, register):
     super().register_options(register)

@@ -160,11 +160,13 @@ Created by running `./build-support/bin/contributors.sh`.
 + Paul Yau
 + Peiyu Wang
 + Peter Seibel
++ Pierre Chevalier
 + Qicheng Ma
 + Robert Stapenhurst
 + Roger Jiang
 + Rushal Verma
 + Ryan Williams
++ Sameer Arora
 + Sameer Brenn
 + Sara Solano
 + Senthil Kumaran
