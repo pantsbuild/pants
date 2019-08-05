@@ -2142,27 +2142,46 @@ mod remote {
     pub fn list_missing_digests(
       &self,
       request: bazel_protos::remote_execution::FindMissingBlobsRequest,
-      // TODO PC: add workunits for remote operations
-      _workunit_store: WorkUnitStore,
+      workunit_store: WorkUnitStore,
     ) -> impl Future<Item = HashSet<Digest>, Error = String> {
+      let start_time = std::time::SystemTime::now();
+
       let store = self.clone();
-      self.with_cas_client(move |client| {
-        client
-          .find_missing_blobs_opt(&request, store.call_option())
-          .map_err(|err| {
-            format!(
-              "Error from server in response to find_missing_blobs_request: {:?}",
-              err
-            )
-          })
-          .and_then(|response| {
-            response
-              .get_missing_blob_digests()
-              .iter()
-              .map(|digest| digest.into())
-              .collect()
-          })
-      })
+      let workunit_name = format!(
+        "list_missing_digests({})",
+        store.instance_name.clone().unwrap_or_default()
+      );
+      let workunit_store = workunit_store.clone();
+      self
+        .with_cas_client(move |client| {
+          client
+            .find_missing_blobs_opt(&request, store.call_option())
+            .map_err(|err| {
+              format!(
+                "Error from server in response to find_missing_blobs_request: {:?}",
+                err
+              )
+            })
+            .and_then(|response| {
+              response
+                .get_missing_blob_digests()
+                .iter()
+                .map(|digest| digest.into())
+                .collect()
+            })
+        })
+        .then(move |future| {
+          let time_span = super::TimeSpan::since(&start_time);
+          let workunit = workunit_store::WorkUnit {
+            name: workunit_name.clone(),
+            start_timestamp: time_span.start_timestamp(),
+            end_timestamp: time_span.end_timestamp(),
+            span_id: workunit_store::generate_random_64bit_string(),
+            parent_id: workunit_store::get_parent_id(),
+          };
+          workunit_store.add_workunit(workunit);
+          future
+        })
     }
 
     pub(super) fn find_missing_blobs_request<'a, Digests: Iterator<Item = &'a Digest>>(
