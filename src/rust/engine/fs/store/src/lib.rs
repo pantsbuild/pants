@@ -47,7 +47,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 use time::Timespec;
-use workunit_store::{WorkUnit, WorkUnitStore};
+use workunit_store::WorkUnitStore;
 
 use parking_lot::Mutex;
 
@@ -770,11 +770,6 @@ impl Store {
     is_executable: bool,
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<LoadMetadata, String> {
-    let workunit_name = format!(
-      "materialize_file({:?}, {:?})",
-      destination.as_path(),
-      digest
-    );
     self
       .load_file_bytes_with(
         digest,
@@ -799,18 +794,6 @@ impl Store {
         Some((Ok(()), metadata)) => Ok(metadata),
         Some((Err(e), _metadata)) => Err(e),
         None => Err(format!("File with digest {:?} not found", digest)),
-      })
-      .inspect(move |metadata: &LoadMetadata| {
-        if let LoadMetadata::Remote(time_span) = metadata {
-          let workunit = WorkUnit {
-            name: workunit_name,
-            start_timestamp: time_span.start_timestamp(),
-            end_timestamp: time_span.end_timestamp(),
-            span_id: workunit_store::generate_random_64bit_string(),
-            parent_id: workunit_store::get_parent_id(),
-          };
-          workunit_store.add_workunit(workunit)
-        }
       })
       .to_boxed()
   }
