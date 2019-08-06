@@ -42,8 +42,8 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
   _MYPY_COMPATIBLE_INTERPETER_CONSTRAINT = '>=3.5'
   _PYTHON_SOURCE_EXTENSION = '.py'
 
-  # deprecated_options_scope = 'mypy'
-  # deprecated_options_scope_removal_version = '1.21.0.dev0'
+  deprecated_options_scope = 'mypy'
+  deprecated_options_scope_removal_version = '1.21.0.dev0'
 
   WARNING_MESSAGE = "[WARNING]: Targets not currently whitelisted and may cause issues."
 
