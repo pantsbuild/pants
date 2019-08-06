@@ -398,11 +398,13 @@ class RunTracker(Subsystem):
                         cookies=cookies.get_cookie_jar(), allow_redirects=False)
       if res.status_code in {307, 308}:
         return do_post(res.headers['location'], num_redirects_allowed - 1)
-      elif res.status_code != 200:
+      elif 300 <= res.status_code < 400 or res.status_code == 401:
         error(f'HTTP error code: {res.status_code}. Reason: {res.reason}.')
-        if 300 <= res.status_code < 400 or res.status_code == 401:
-          print(f'Use `path/to/pants login --to={auth_provider}` to authenticate '
+        print(f'Use `path/to/pants login --to={auth_provider}` to authenticate '
                 'against the stats upload service.', file=sys.stderr)
+        return False
+      elif not res.ok:
+        error(f'HTTP error code: {res.status_code}. Reason: {res.reason}.')
         return False
       return True
 
