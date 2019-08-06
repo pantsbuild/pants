@@ -6,8 +6,6 @@ import functools
 import os
 from multiprocessing import cpu_count
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
