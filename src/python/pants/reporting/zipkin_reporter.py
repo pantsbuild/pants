@@ -15,6 +15,8 @@ from pants.reporting.reporter import Reporter
 
 logger = logging.getLogger(__name__)
 
+NANOSECONDS_PER_SECOND = 1000000000.0
+
 
 class HTTPTransportHandler(BaseTransportHandler):
   def __init__(self, endpoint):
@@ -156,7 +158,14 @@ class ZipkinReporter(Reporter):
   def bulk_record_workunits(self, engine_workunits):
     """A collection of workunits from v2 engine part"""
     for workunit in engine_workunits:
-      duration = workunit['end_timestamp'] - workunit['start_timestamp']
+      start_timestamp = from_secs_and_nanos_to_float(
+        workunit['start_secs'],
+        workunit['start_nanos']
+      )
+      duration = from_secs_and_nanos_to_float(
+        workunit['duration_secs'],
+        workunit['duration_nanos']
+      )
 
       local_tracer = get_default_tracer()
 
@@ -176,5 +185,9 @@ class ZipkinReporter(Reporter):
         flags='0', # flags: stores flags header. Currently unused
         is_sampled=True,
       )
-      span.start_timestamp = workunit['start_timestamp']
+      span.start_timestamp = start_timestamp
       span.stop()
+
+
+def from_secs_and_nanos_to_float(secs, nanos):
+  return secs + ( nanos / NANOSECONDS_PER_SECOND )
