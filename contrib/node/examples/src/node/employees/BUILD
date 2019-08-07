@@ -1,8 +1,7 @@
 node_thrift_library(
   sources=rglobs('*.thrift'),
   dependencies=[
-    'contrib/node/examples/src/node/employee-dep:dep',
+    'contrib/node/examples/src/node/employee-dep:employee-dep',
   ],
   package_manager='yarn',
-  node_scope='node',
 )
