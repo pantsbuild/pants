@@ -99,6 +99,10 @@ class ApacheThriftGenBase(SimpleCodegenTask):
     os.rmdir(gen_dir)
 
   @memoized_property
+  def _thrift_version(self):
+    return Thrift.scoped_instance(self).version()
+
+  @memoized_property
   def _thrift_binary(self):
     return Thrift.scoped_instance(self).select(context=self.context)
 
