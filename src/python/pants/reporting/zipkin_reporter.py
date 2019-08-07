@@ -2,15 +2,20 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import os
+import time
 
 import requests
-from py_zipkin import Encoding, get_default_tracer
+from py_zipkin import Encoding, get_default_tracer, Kind
+from py_zipkin.encoding import Span
+from py_zipkin.logging_helper import ZipkinLoggingContext, LOGGING_END_KEY
 from py_zipkin.transport import BaseTransportHandler
 from py_zipkin.util import generate_random_64bit_string
 from py_zipkin.zipkin import ZipkinAttrs, create_attrs_for_span
 
 from pants.base.workunit import WorkUnitLabel
 from pants.reporting.reporter import Reporter
+from pants.util.dirutil import safe_mkdir
 
 
 logger = logging.getLogger(__name__)
@@ -30,10 +35,65 @@ class HTTPTransportHandler(BaseTransportHandler):
       requests.post(
         self.endpoint,
         data=payload,
-        headers={'Content-Type': 'application/x-thrift'},
+        headers={'Content-Type': 'application/json'},
       )
     except Exception as err:
       logger.error("Failed to post the payload to zipkin server. Error {}".format(err))
+
+
+def emit_spans(self):
+
+  if not self.zipkin_attrs.is_sampled:
+    self._get_tracer().clear()
+    return
+
+  end_timestamp = time.time()
+  annotations = {}
+
+  if self.add_logging_annotation:
+    annotations[LOGGING_END_KEY] = time.time()
+  last_span = Span(
+    trace_id=self.zipkin_attrs.trace_id,
+    name=self.span_name,
+    parent_id=self.zipkin_attrs.parent_span_id,
+    span_id=self.zipkin_attrs.span_id,
+    kind=Kind.CLIENT if self.client_context else Kind.SERVER,
+    timestamp=self.start_timestamp,
+    duration=end_timestamp - self.start_timestamp,
+    local_endpoint=self.endpoint,
+    remote_endpoint=self.remote_endpoint,
+    shared=not self.report_root_timestamp,
+    annotations=annotations,
+    tags=self.tags,
+  )
+  self._get_tracer().add_span(last_span)
+
+  safe_mkdir(self.zipkin_spans_dir)
+  encoded_spans = []
+  file_count = 1
+
+  for span in self._get_tracer().get_spans():
+    encoded_span = self.encoder.encode_span(span)
+    if len(encoded_spans) == self.max_span_batch_size:
+      if os.path.exists(self.zipkin_spans_dir):
+        file_path = os.path.join(self.zipkin_spans_dir, 'spans-{}-{}'.format(file_count, self.encoding))
+        save_spans_to_file(encoded_spans, file_path)
+      encoded_spans = []
+      file_count += 1
+    encoded_spans.append(encoded_span)
+  if os.path.exists(self.zipkin_spans_dir):
+    file_path = os.path.join(self.zipkin_spans_dir, 'spans-{}-{}'.format(file_count, self.encoding))
+    print("File_path {}".format(file_path))
+    save_spans_to_file(encoded_spans, file_path)
+
+  self._get_tracer().clear()
+
+
+def save_spans_to_file(encoded_spans, file_path):
+  with open(file_path, 'a') as f:
+    f.write('[')
+    f.write(','.join(encoded_spans))
+    f.write(']')
 
 
 class ZipkinReporter(Reporter):
@@ -116,7 +176,7 @@ class ZipkinReporter(Reporter):
         service_name=self.service_name_prefix.format("main"),
         span_name=workunit.name,
         transport_handler=self.handler,
-        encoding=Encoding.V1_THRIFT,
+        encoding=Encoding.V1_JSON,
         zipkin_attrs=zipkin_attrs,
         max_span_batch_size=self.max_span_batch_size,
       )
@@ -144,6 +204,9 @@ class ZipkinReporter(Reporter):
     span.start_timestamp = workunit.start_time
     if first_span and span.zipkin_attrs.is_sampled:
       span.logging_context.start_timestamp = workunit.start_time
+      span.logging_context.emit_spans = emit_spans.__get__(span.logging_context, ZipkinLoggingContext)
+      span.logging_context.zipkin_spans_dir = os.path.join(self.run_tracker.run_info_dir, 'zipkin')
+      span.logging_context.encoding = span.encoding
     workunit.zipkin_span = span
 
   def end_workunit(self, workunit):
