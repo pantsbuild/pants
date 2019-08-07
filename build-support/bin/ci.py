@@ -300,11 +300,7 @@ def run_cargo_audit() -> None:
         "build-support/bin/native/cargo",
         "ensure-installed",
         "--package=cargo-audit",
-        "--version=0.6.1",
-        # TODO(John Sirois): Kill --git-url/--git-rev when we upgrade to cargo-audit > 0.6.1.
-        # See: https://github.com/pantsbuild/pants/issues/7760 for context.
-        "--git-url=https://github.com/RustSec/cargo-audit",
-        "--git-rev=1c298bcda2c74f4a1bd8f0d8482b3577ee94fbb3",
+        "--version=0.7.0",
       ], check=True)
       subprocess.run([
         "build-support/bin/native/cargo",
