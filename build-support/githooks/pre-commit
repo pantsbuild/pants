@@ -62,7 +62,7 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
   echo "* Checking lint"
   ./pants --exclude-target-regexp='testprojects/.*' --changed-parent="${MERGE_BASE}" lint || exit 1
 
-  echo "* Checking types for targets marked \`type_checked\`"
+  echo "* Checking types for targets marked \`type_checked\`"  
   ./build-support/bin/mypy.py || exit 1
 
   if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then

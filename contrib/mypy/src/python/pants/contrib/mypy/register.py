@@ -7,4 +7,4 @@ from pants.contrib.mypy.tasks.mypy_task import MypyTask
 
 
 def register_goals():
-  task(name='mypy', action=MypyTask).install('mypy')
+  task(name='mypy', action=MypyTask).install('lint')
