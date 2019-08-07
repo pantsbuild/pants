@@ -61,19 +61,13 @@ class Package:
     j = json.load(f)
     return j["info"]["version"]
 
-  def owners(self,
-             html_node_type='a',
-             html_node_class='sidebar-section__user-gravatar',
-             html_node_attr='aria-label'):
+  def owners(self):
     url = "https://pypi.org/pypi/{}/{}".format(self.name, self.latest_version())
     url_content = urlopen(url).read()
     parser = BeautifulSoup(url_content, 'html.parser')
-    owners = [
-      item.attrs[html_node_attr]
-      for item
-      in parser.find_all(html_node_type, class_=html_node_class)
-    ]
-    return {owner.lower() for owner in owners}
+    owners = {span.find('a', recursive=False).get_text().strip().lower()
+              for span in parser.find_all('span', class_='sidebar-section__maintainer')}
+    return owners
 
 
 def core_packages():
