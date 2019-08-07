@@ -40,7 +40,7 @@ python_tests(
     'tests/python/pants_test/cache:cache_server',
   ],
   tags = {'integration'},
-  timeout=180,
+  timeout=600,
 )
 
 python_tests(
