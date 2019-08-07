@@ -16,6 +16,7 @@ from pants.contrib.node.subsystems.package_managers import (PACKAGE_MANAGER_NPM,
 from pants.contrib.node.subsystems.resolvers.node_resolver_base import NodeResolverBase
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.tasks.node_resolve import NodeResolve
+from pants.contrib.node.tasks.node_paths import NodePathsLocal
 
 
 class NpmResolver(Subsystem, NodeResolverBase):
@@ -71,6 +72,8 @@ class NpmResolver(Subsystem, NodeResolverBase):
       force = force if force is not None else self.get_options().force
       frozen_lockfile = frozen_lockfile if frozen_lockfile is not None else self.get_options().frozen_lockfile
 
+    if target.is_synthetic:
+      frozen_lockfile = False
     if not resolve_locally:
       self._copy_sources(target, results_dir)
     with pushd(results_dir):
@@ -137,9 +140,12 @@ class NpmResolver(Subsystem, NodeResolverBase):
 
       # Apply node-scoping rules if applicable
       node_scope = dep.payload.node_scope or node_task.node_distribution.node_scope
-      dep_package_name = self._scoped_package_name(node_task, dep.package_name, node_scope)
+      dep_package_name = self._scoped_package_name(node_task, package_name, node_scope)
       # Symlink each target
-      dep_path = node_paths.node_path(dep)
+      if isinstance(node_paths, NodePathsLocal):
+        dep_path = node_paths.node_path(dep.concrete_derived_from)
+      else:
+        dep_path = node_paths.node_path(dep)
       node_module_dir = os.path.join(results_dir, 'node_modules')
       relative_symlink(dep_path, os.path.join(node_module_dir, dep_package_name))
       # If there are any bin, we need to symlink those as well

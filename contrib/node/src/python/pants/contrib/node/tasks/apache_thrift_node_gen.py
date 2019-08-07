@@ -27,7 +27,7 @@ class ApacheThriftNodeGen(ApacheThriftGenBase):
     return ['tags', 'node_scope', 'package_manager', 'build_script',
             'output_dir', 'dev_dependency', 'style_ignore_path', 'bin_executables']
 
-  def execute_codegen(selt, target, target_workdir):
+  def execute_codegen(self, target, target_workdir):
     sources_list = target.sources_relative_to_target_base()
     if 'yarn.lock' not in sources_list.files:
       safe_file_dump(os.path.join(target_workdir, 'yarn.lock'))
@@ -36,7 +36,7 @@ class ApacheThriftNodeGen(ApacheThriftGenBase):
       dependency_list = target.dependencies
       package_dict = {}
       package_dict["name"] = target.name
-      package_dict["version"] = "0.0.1"
+      package_dict["version"] = self._thrift_version
       main_name = os.path.basename(target.sources_relative_to_buildroot()[0])
       package_dict["main"] = re.sub(r'\.thrift', '_types.js', main_name)
       dep_dict = {}
@@ -47,7 +47,7 @@ class ApacheThriftNodeGen(ApacheThriftGenBase):
         relative_path = os.path.relpath(dep_spec, target_workdir)
         relative_path = "file:" + relative_path
         dep_dict[dep.name] = relative_path
-
+      dep_dict["thrift"] = self._thrift_version
       package_dict["dependencies"] = dep_dict
       with open(os.path.join(target_workdir, 'package.json'), 'w') as f:
         json.dump(package_dict, f, ensure_ascii=False, indent=2)
