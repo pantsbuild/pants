@@ -3,7 +3,7 @@ node_module(
   sources=globs('package.json', 'yarn.lock', '.babelrc', 'test/*.js'),
   package_manager='yarn',
   dependencies=[
-    'contrib/node/examples/src/node/employee-dep'
+    'contrib/node/examples/src/node/employee-dep:employee-dep'
   ],
 )
 
