@@ -26,7 +26,6 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use log::warn;
 use serde_derive::Serialize;
 
 /// A concrete data representation of a duration.
@@ -107,20 +106,19 @@ impl TimeSpan {
     start: &protobuf::well_known_types::Timestamp,
     end: &protobuf::well_known_types::Timestamp,
     time_span_description: &str,
-  ) -> Option<Self> {
+  ) -> Result<Self, String> {
     let start = Self::std_duration_from_protobuf_timestamp(start);
     let end = Self::std_duration_from_protobuf_timestamp(end);
     let time_span = end.checked_sub(start).map(|duration| TimeSpan {
       start: start.into(),
       duration: duration.into(),
     });
-    if time_span.is_none() {
-      warn!(
+    time_span.ok_or_else(|| {
+      format!(
         "Got negative {} time: {:?} - {:?}",
         time_span_description, end, start
-      );
-    }
-    time_span
+      )
+    })
   }
 }
 
@@ -158,7 +156,10 @@ mod tests {
     );
   }
 
-  fn time_span_from_start_and_duration_in_seconds(start: i64, duration: i64) -> Option<TimeSpan> {
+  fn time_span_from_start_and_duration_in_seconds(
+    start: i64,
+    duration: i64,
+  ) -> Result<TimeSpan, String> {
     use protobuf::well_known_types::Timestamp;
     let mut start_timestamp = Timestamp::new();
     start_timestamp.set_seconds(start);
@@ -171,7 +172,7 @@ mod tests {
   fn time_span_from_start_and_end_given_positive_duration() {
     let span = time_span_from_start_and_duration_in_seconds(42, 10);
     assert_eq!(
-      Some(TimeSpan {
+      Ok(TimeSpan {
         start: Duration::new(42, 0),
         duration: Duration::new(10, 0),
       }),
@@ -182,6 +183,6 @@ mod tests {
   #[test]
   fn time_span_from_start_and_end_given_negative_duration() {
     let span = time_span_from_start_and_duration_in_seconds(42, -10);
-    assert!(span.is_none());
+    assert!(span.is_err());
   }
 }

@@ -13,7 +13,7 @@ use fs::{self, File, PathStat};
 use futures::{future, Future, Stream};
 use grpcio;
 use hashing::{Digest, Fingerprint};
-use log::{debug, trace};
+use log::{debug, trace, warn};
 use protobuf::{self, Message, ProtobufEnum};
 use sha2::Sha256;
 use store::{Snapshot, Store, StoreFileByDigest};
@@ -411,64 +411,76 @@ impl CommandRunner {
           let parent_id = get_parent_id();
           let result_cached = execute_response.get_cached_result();
 
-          if let Some(time_span) = TimeSpan::from_start_and_end(
+          match TimeSpan::from_start_and_end(
             metadata.get_queued_timestamp(),
             metadata.get_worker_start_timestamp(),
             "remote queue",
           ) {
-            attempts.current_attempt.remote_queue = Some(time_span.duration.into());
-            maybe_add_workunit(
-              result_cached,
-              "remote execution action scheduling",
-              time_span,
-              parent_id.clone(),
-              &workunit_store,
-            );
+            Ok(time_span) => {
+              attempts.current_attempt.remote_queue = Some(time_span.duration.into());
+              maybe_add_workunit(
+                result_cached,
+                "remote execution action scheduling",
+                time_span,
+                parent_id.clone(),
+                &workunit_store,
+              );
+            }
+            Err(s) => warn!("{}", s),
           };
 
-          if let Some(time_span) = TimeSpan::from_start_and_end(
+          match TimeSpan::from_start_and_end(
             metadata.get_input_fetch_start_timestamp(),
             metadata.get_input_fetch_completed_timestamp(),
             "remote input fetch",
           ) {
-            attempts.current_attempt.remote_input_fetch = Some(time_span.duration.into());
-            maybe_add_workunit(
-              result_cached,
-              "remote execution worker input fetching",
-              time_span,
-              parent_id.clone(),
-              &workunit_store,
-            );
+            Ok(time_span) => {
+              attempts.current_attempt.remote_input_fetch = Some(time_span.duration.into());
+              maybe_add_workunit(
+                result_cached,
+                "remote execution worker input fetching",
+                time_span,
+                parent_id.clone(),
+                &workunit_store,
+              );
+            }
+            Err(s) => warn!("{}", s),
           }
 
-          if let Some(time_span) = TimeSpan::from_start_and_end(
+          match TimeSpan::from_start_and_end(
             metadata.get_execution_start_timestamp(),
             metadata.get_execution_completed_timestamp(),
             "remote execution",
           ) {
-            attempts.current_attempt.remote_execution = Some(time_span.duration.into());
-            maybe_add_workunit(
-              result_cached,
-              "remote execution worker command executing",
-              time_span,
-              parent_id.clone(),
-              &workunit_store,
-            );
+            Ok(time_span) => {
+              attempts.current_attempt.remote_execution = Some(time_span.duration.into());
+              maybe_add_workunit(
+                result_cached,
+                "remote execution worker command executing",
+                time_span,
+                parent_id.clone(),
+                &workunit_store,
+              );
+            }
+            Err(s) => warn!("{}", s),
           }
 
-          if let Some(time_span) = TimeSpan::from_start_and_end(
+          match TimeSpan::from_start_and_end(
             metadata.get_output_upload_start_timestamp(),
             metadata.get_output_upload_completed_timestamp(),
             "remote output store",
           ) {
-            attempts.current_attempt.remote_output_store = Some(time_span.duration.into());
-            maybe_add_workunit(
-              result_cached,
-              "remote execution worker output uploading",
-              time_span,
-              parent_id,
-              &workunit_store,
-            );
+            Ok(time_span) => {
+              attempts.current_attempt.remote_output_store = Some(time_span.duration.into());
+              maybe_add_workunit(
+                result_cached,
+                "remote execution worker output uploading",
+                time_span,
+                parent_id,
+                &workunit_store,
+              );
+            }
+            Err(s) => warn!("{}", s),
           }
           attempts.current_attempt.was_cache_hit = execute_response.cached_result;
         }
