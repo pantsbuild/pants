@@ -462,7 +462,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         # Otherwise, fail it.
         on_success=ivts.update,
         on_failure=ivts.force_invalidate)
-        
+
     workflow = rsc_compile_context.workflow
 
     # Replica of JvmCompile's _record_target_stats logic
@@ -705,22 +705,3 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   @memoized_method
   def _jdk_libs_abs(self, nonhermetic_dist):
     return nonhermetic_dist.find_libs(self._JDK_LIB_NAMES)
-
-  # TODO: rename this, make it public, and explain what "searching for invalid targets" refers to!
-  def _on_invalid_compile_dependency(self, dep, compile_target, contexts):
-    """Decide whether to continue searching for invalid targets to use in the execution graph.
-
-    If a necessary dep is a rsc-and-zinc dep and the root is a zinc-only one, continue to recurse
-    because otherwise we'll drop the path between Zinc compile of the zinc-only target and a Zinc
-    compile of a transitive rsc-and-zinc dependency.
-
-    This is only an issue for graphs like J -> S1 -> S2, where J is a zinc-only target,
-    S1/2 are rsc-and-zinc targets and S2 must be on the classpath to compile J successfully.
-    """
-    def dep_has_rsc_compile():
-      return contexts[dep].rsc_cc.workflow == self.JvmCompileWorkflowType.rsc_and_zinc
-    return contexts[compile_target].rsc_cc.workflow.resolve_for_enum_variant({
-      'zinc-java': dep_has_rsc_compile,
-      'zinc-only': dep_has_rsc_compile,
-      'rsc-and-zinc': lambda: False
-    })()
