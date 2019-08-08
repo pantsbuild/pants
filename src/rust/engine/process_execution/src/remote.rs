@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 use bazel_protos;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
+use concrete_time::TimeSpan;
 use digest::{Digest as DigestTrait, FixedOutput};
 use fs::{self, File, PathStat};
 use futures::{future, Future, Stream};
@@ -16,8 +17,6 @@ use log::{debug, trace, warn};
 use protobuf::{self, Message, ProtobufEnum};
 use sha2::Sha256;
 use store::{Snapshot, Store, StoreFileByDigest};
-use time;
-use time::Timespec;
 use tokio_timer::Delay;
 
 use super::{
@@ -409,72 +408,79 @@ impl CommandRunner {
         trace!("Got (nested) execute response: {:?}", execute_response);
         if execute_response.get_result().has_execution_metadata() {
           let metadata = execute_response.get_result().get_execution_metadata();
-          let enqueued = timespec_from(metadata.get_queued_timestamp());
-          let worker_start = timespec_from(metadata.get_worker_start_timestamp());
-          let input_fetch_start = timespec_from(metadata.get_input_fetch_start_timestamp());
-          let input_fetch_completed = timespec_from(metadata.get_input_fetch_completed_timestamp());
-          let execution_start = timespec_from(metadata.get_execution_start_timestamp());
-          let execution_completed = timespec_from(metadata.get_execution_completed_timestamp());
-          let output_upload_start = timespec_from(metadata.get_output_upload_start_timestamp());
-          let output_upload_completed =
-            timespec_from(metadata.get_output_upload_completed_timestamp());
           let parent_id = get_parent_id();
           let result_cached = execute_response.get_cached_result();
-          match (worker_start - enqueued).to_std() {
-            Ok(duration) => {
-              attempts.current_attempt.remote_queue = Some(duration);
+
+          match TimeSpan::from_start_and_end(
+            metadata.get_queued_timestamp(),
+            metadata.get_worker_start_timestamp(),
+            "remote queue",
+          ) {
+            Ok(time_span) => {
+              attempts.current_attempt.remote_queue = Some(time_span.duration.into());
               maybe_add_workunit(
                 result_cached,
                 "remote execution action scheduling",
-                enqueued,
-                worker_start,
+                time_span,
                 parent_id.clone(),
                 &workunit_store,
               );
             }
-            Err(err) => warn!("Got negative remote queue time: {}", err),
-          }
-          match (input_fetch_completed - input_fetch_start).to_std() {
-            Ok(duration) => {
-              attempts.current_attempt.remote_input_fetch = Some(duration);
+            Err(s) => warn!("{}", s),
+          };
+
+          match TimeSpan::from_start_and_end(
+            metadata.get_input_fetch_start_timestamp(),
+            metadata.get_input_fetch_completed_timestamp(),
+            "remote input fetch",
+          ) {
+            Ok(time_span) => {
+              attempts.current_attempt.remote_input_fetch = Some(time_span.duration.into());
               maybe_add_workunit(
                 result_cached,
                 "remote execution worker input fetching",
-                input_fetch_start,
-                input_fetch_completed,
+                time_span,
                 parent_id.clone(),
                 &workunit_store,
               );
             }
-            Err(err) => warn!("Got negative remote input fetch time: {}", err),
+            Err(s) => warn!("{}", s),
           }
-          match (execution_completed - execution_start).to_std() {
-            Ok(duration) => {
-              attempts.current_attempt.remote_execution = Some(duration);
+
+          match TimeSpan::from_start_and_end(
+            metadata.get_execution_start_timestamp(),
+            metadata.get_execution_completed_timestamp(),
+            "remote execution",
+          ) {
+            Ok(time_span) => {
+              attempts.current_attempt.remote_execution = Some(time_span.duration.into());
               maybe_add_workunit(
                 result_cached,
                 "remote execution worker command executing",
-                execution_start,
-                execution_completed,
+                time_span,
                 parent_id.clone(),
                 &workunit_store,
               );
             }
-            Err(err) => warn!("Got negative remote execution time: {}", err),
+            Err(s) => warn!("{}", s),
           }
-          match (output_upload_completed - output_upload_start).to_std() {
-            Ok(duration) => {
-              attempts.current_attempt.remote_output_store = Some(duration);
+
+          match TimeSpan::from_start_and_end(
+            metadata.get_output_upload_start_timestamp(),
+            metadata.get_output_upload_completed_timestamp(),
+            "remote output store",
+          ) {
+            Ok(time_span) => {
+              attempts.current_attempt.remote_output_store = Some(time_span.duration.into());
               maybe_add_workunit(
                 result_cached,
                 "remote execution worker output uploading",
-                output_upload_start,
-                output_upload_completed,
+                time_span,
                 parent_id,
                 &workunit_store,
               );
             }
-            Err(err) => warn!("Got negative remote output store time: {}", err),
+            Err(s) => warn!("{}", s),
           }
           attempts.current_attempt.was_cache_hit = execute_response.cached_result;
         }
@@ -584,8 +590,7 @@ impl CommandRunner {
 fn maybe_add_workunit(
   result_cached: bool,
   name: &str,
-  start_time: Timespec,
-  end_time: Timespec,
+  time_span: concrete_time::TimeSpan,
   parent_id: Option<String>,
   workunit_store: &WorkUnitStore,
 ) {
@@ -594,8 +599,7 @@ fn maybe_add_workunit(
   if !result_cached {
     let workunit = WorkUnit {
       name: String::from(name),
-      start_timestamp: start_time,
-      end_timestamp: end_time,
+      time_span,
       span_id: generate_random_64bit_string(),
       parent_id,
     };
@@ -988,10 +992,6 @@ fn digest(message: &dyn Message) -> Result<Digest, String> {
   ))
 }
 
-fn timespec_from(timestamp: &protobuf::well_known_types::Timestamp) -> time::Timespec {
-  time::Timespec::new(timestamp.seconds, timestamp.nanos)
-}
-
 #[cfg(test)]
 pub mod tests {
   use bazel_protos;
@@ -1021,7 +1021,6 @@ pub mod tests {
   use std::ops::Sub;
   use std::path::PathBuf;
   use std::time::Duration;
-  use time::Timespec;
   use workunit_store::{workunits_with_constant_span_id, WorkUnit, WorkUnitStore};
 
   #[derive(Debug, PartialEq)]
@@ -2633,32 +2632,43 @@ pub mod tests {
 
     let got_workunits = workunits_with_constant_span_id(&workunit_store);
 
+    use concrete_time::Duration;
+    use concrete_time::TimeSpan;
+
     let want_workunits = hashset! {
       WorkUnit {
         name: String::from("remote execution action scheduling"),
-        start_timestamp: Timespec::new(0, 0),
-        end_timestamp: Timespec::new(1, 0),
+        time_span: TimeSpan {
+            start: Duration::new(0, 0),
+            duration: Duration::new(1, 0),
+        },
         span_id: String::from("ignore"),
         parent_id: None,
       },
       WorkUnit {
         name: String::from("remote execution worker input fetching"),
-        start_timestamp: Timespec::new(2, 0),
-        end_timestamp: Timespec::new(3, 0),
+        time_span: TimeSpan {
+            start: Duration::new(2, 0),
+            duration: Duration::new(1, 0),
+        },
         span_id: String::from("ignore"),
         parent_id: None,
       },
       WorkUnit {
         name: String::from("remote execution worker command executing"),
-        start_timestamp: Timespec::new(4, 0),
-        end_timestamp: Timespec::new(5, 0),
+        time_span: TimeSpan {
+            start: Duration::new(4, 0),
+            duration: Duration::new(1, 0),
+        },
         span_id: String::from("ignore"),
         parent_id: None,
       },
       WorkUnit {
         name: String::from("remote execution worker output uploading"),
-        start_timestamp: Timespec::new(6, 0),
-        end_timestamp: Timespec::new(7, 0),
+        time_span: TimeSpan {
+            start: Duration::new(6, 0),
+            duration: Duration::new(1, 0),
+        },
         span_id: String::from("ignore"),
         parent_id: None,
       }

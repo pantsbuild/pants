@@ -381,9 +381,15 @@ class _FFISpecification(object):
     c = self._ffi.from_handle(context_handle)
     return c.to_value(self._ffi.string(utf8_ptr, utf8_len).decode())
 
+  @_extern_decl('Handle', ['ExternContext*', 'uint64_t'])
+  def extern_store_u64(self, context_handle, u64):
+    """Given a context and uint64_t, return a new Handle to represent the uint64_t."""
+    c = self._ffi.from_handle(context_handle)
+    return c.to_value(u64)
+
   @_extern_decl('Handle', ['ExternContext*', 'int64_t'])
   def extern_store_i64(self, context_handle, i64):
-    """Given a context and int32_t, return a new Handle to represent the int32_t."""
+    """Given a context and int64_t, return a new Handle to represent the int64_t."""
     c = self._ffi.from_handle(context_handle)
     return c.to_value(i64)
 
@@ -683,6 +689,7 @@ class Native(Singleton):
                            self.ffi_lib.extern_store_dict,
                            self.ffi_lib.extern_store_bytes,
                            self.ffi_lib.extern_store_utf8,
+                           self.ffi_lib.extern_store_u64,
                            self.ffi_lib.extern_store_i64,
                            self.ffi_lib.extern_store_f64,
                            self.ffi_lib.extern_store_bool,

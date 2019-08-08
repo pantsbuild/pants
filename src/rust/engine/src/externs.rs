@@ -115,6 +115,10 @@ pub fn store_utf8_osstr(utf8: &OsStr) -> Value {
   with_externs(|e| (e.store_utf8)(e.context, bytes.as_ptr(), bytes.len() as u64).into())
 }
 
+pub fn store_u64(val: u64) -> Value {
+  with_externs(|e| (e.store_u64)(e.context, val).into())
+}
+
 pub fn store_i64(val: i64) -> Value {
   with_externs(|e| (e.store_i64)(e.context, val).into())
 }
@@ -341,6 +345,7 @@ pub struct Externs {
   pub store_dict: StoreTupleExtern,
   pub store_bytes: StoreBytesExtern,
   pub store_utf8: StoreUtf8Extern,
+  pub store_u64: StoreU64Extern,
   pub store_i64: StoreI64Extern,
   pub store_f64: StoreF64Extern,
   pub store_bool: StoreBoolExtern,
@@ -375,6 +380,8 @@ pub type StoreTupleExtern =
 pub type StoreBytesExtern = extern "C" fn(*const ExternContext, *const u8, u64) -> Handle;
 
 pub type StoreUtf8Extern = extern "C" fn(*const ExternContext, *const u8, u64) -> Handle;
+
+pub type StoreU64Extern = extern "C" fn(*const ExternContext, u64) -> Handle;
 
 pub type StoreI64Extern = extern "C" fn(*const ExternContext, i64) -> Handle;
 

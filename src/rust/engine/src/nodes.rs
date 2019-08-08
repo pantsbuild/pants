@@ -10,6 +10,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::{self, fmt};
 
+use concrete_time::TimeSpan;
 use futures::future::{self, Future};
 use futures::Stream;
 use url::Url;
@@ -1121,8 +1122,8 @@ impl Node for NodeKey {
     let span_id = generate_random_64bit_string();
     let node_workunit_params = if context.session.should_record_zipkin_spans() {
       let node_name = format!("{}", self);
-      let start_timestamp = time::get_time();
-      Some((node_name, start_timestamp, span_id.clone()))
+      let start_time = std::time::SystemTime::now();
+      Some((node_name, start_time, span_id.clone()))
     } else {
       None
     };
@@ -1141,12 +1142,10 @@ impl Node for NodeKey {
       }
     })
     .inspect(move |_: &NodeResult| {
-      if let Some((node_name, start_timestamp, span_id)) = node_workunit_params {
-        let end_timestamp = time::get_time();
+      if let Some((node_name, start_time, span_id)) = node_workunit_params {
         let workunit = WorkUnit {
           name: node_name,
-          start_timestamp,
-          end_timestamp,
+          time_span: TimeSpan::since(&start_time),
           span_id,
           // TODO: set parent_id with the proper value, issue #7969
           parent_id: None,

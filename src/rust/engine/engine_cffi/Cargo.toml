@@ -17,7 +17,6 @@ logging = { path = "../logging" }
 rule_graph = { path = "../rule_graph" }
 store = { path = "../fs/store" }
 tar_api = { path = "../tar_api" }
-time = "0.1.40"
 workunit_store = { path = "../workunit_store" }
 
 [build-dependencies]
