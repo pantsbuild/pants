@@ -212,7 +212,7 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'platform_specific_behavior', 'integration'},
-  timeout = 360,
+  timeout = 540,
 )
 
 python_tests(
