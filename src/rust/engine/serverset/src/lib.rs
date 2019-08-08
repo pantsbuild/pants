@@ -86,7 +86,7 @@ pub enum Health {
 }
 
 // Ideally this would use Durations when https://github.com/rust-lang/rust/issues/54361 stabilises.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 struct UnhealthyInfo {
   unhealthy_since: Instant,
   next_attempt_after_millis: f64,
@@ -127,7 +127,7 @@ impl UnhealthyInfo {
 #[derive(Debug)]
 struct Backend<T> {
   server: T,
-  unhealthy_info: Arc<Mutex<Option<UnhealthyInfo>>>,
+  unhealthy_info: Option<UnhealthyInfo>,
 }
 
 // Ideally this would use Durations when https://github.com/rust-lang/rust/issues/54361 stabilises.
@@ -193,7 +193,7 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
           .into_iter()
           .map(|s| Backend {
             server: connect(&s),
-            unhealthy_info: Arc::new(Mutex::new(None)),
+            unhealthy_info: None,
           })
           .collect(),
         next: 0,
@@ -227,8 +227,8 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
       let i = inner.next % server_count;
       inner.next = inner.next.wrapping_add(1);
       let server = &inner.connections[i];
-      let unhealthy_info = server.unhealthy_info.lock();
-      if let Some(ref unhealthy_info) = *unhealthy_info {
+      let unhealthy_info = &server.unhealthy_info;
+      if let Some(ref unhealthy_info) = unhealthy_info {
         // Server is unhealthy. Note when it will become healthy.
 
         let healthy_at = unhealthy_info.healthy_at();
@@ -262,24 +262,26 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
   }
 
   pub fn report_health(&self, token: HealthReportToken, health: Health) {
-    let inner = self.inner.lock();
-    let mut unhealthy_info = inner.connections[token.index].unhealthy_info.lock();
+    let mut inner = self.inner.lock();
+    let backoff_config = inner.backoff_config;
+    let mut unhealthy_info = inner.connections[token.index].unhealthy_info.as_mut();
     match health {
       Health::Unhealthy => {
         if unhealthy_info.is_some() {
-          if let Some(ref mut unhealthy_info) = *unhealthy_info {
-            unhealthy_info.increase_backoff(inner.backoff_config);
+          if let Some(ref mut unhealthy_info) = unhealthy_info {
+            unhealthy_info.increase_backoff(backoff_config);
           }
         } else {
-          *unhealthy_info = Some(UnhealthyInfo::new(inner.backoff_config));
+          inner.connections[token.index].unhealthy_info =
+            Some(UnhealthyInfo::new(inner.backoff_config));
         }
       }
       Health::Healthy => {
         if unhealthy_info.is_some() {
-          *unhealthy_info = unhealthy_info
-            .take()
+          inner.connections[token.index].unhealthy_info = unhealthy_info
+            .copied()
             .unwrap()
-            .decrease_backoff(inner.backoff_config);
+            .decrease_backoff(backoff_config);
         }
       }
     }
