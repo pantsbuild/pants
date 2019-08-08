@@ -115,7 +115,7 @@ impl Core {
           Store::with_remote(
             executor.clone(),
             local_store_dir,
-            &remote_store_servers,
+            remote_store_servers,
             remote_instance_name.clone(),
             &root_ca_certs,
             oauth_bearer_token.clone(),

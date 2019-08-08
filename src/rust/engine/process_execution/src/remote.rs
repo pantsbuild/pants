@@ -1570,7 +1570,7 @@ pub mod tests {
     let store = Store::with_remote(
       runtime.clone(),
       &store_dir_path,
-      &[cas.address()],
+      vec![cas.address()],
       None,
       &None,
       None,
@@ -1944,7 +1944,7 @@ pub mod tests {
     let store = Store::with_remote(
       runtime.clone(),
       store_dir,
-      &[cas.address()],
+      vec![cas.address()],
       None,
       &None,
       None,
@@ -2037,7 +2037,7 @@ pub mod tests {
     let store = Store::with_remote(
       task_executor::Executor::new(),
       store_dir,
-      &[cas.address()],
+      vec![cas.address()],
       None,
       &None,
       None,
@@ -2105,7 +2105,7 @@ pub mod tests {
     let store = Store::with_remote(
       runtime.clone(),
       store_dir,
-      &[cas.address()],
+      vec![cas.address()],
       None,
       &None,
       None,
@@ -2848,7 +2848,7 @@ pub mod tests {
     let store = Store::with_remote(
       task_executor::Executor::new(),
       store_dir,
-      &[cas.address()],
+      vec![cas.address()],
       None,
       &None,
       None,

@@ -72,7 +72,7 @@ pub struct HealthReportToken {
 }
 
 struct Inner<T> {
-  servers: Vec<Backend<T>>,
+  connections: Vec<Backend<T>>,
 
   // Only visible for testing
   pub(crate) next: AtomicUsize,
@@ -179,17 +179,21 @@ impl BackoffConfig {
 }
 
 impl<T: Clone + Send + Sync + 'static> Serverset<T> {
-  pub fn new(servers: Vec<T>, backoff_config: BackoffConfig) -> Result<Self, String> {
+  pub fn new<Connect: Fn(&str) -> T>(
+    servers: Vec<String>,
+    connect: Connect,
+    backoff_config: BackoffConfig,
+  ) -> Result<Self, String> {
     if servers.is_empty() {
       return Err("Must supply some servers".to_owned());
     }
 
     Ok(Serverset {
       inner: Arc::new(Inner {
-        servers: servers
+        connections: servers
           .into_iter()
           .map(|s| Backend {
-            server: s,
+            server: connect(&s),
             unhealthy_info: Arc::new(Mutex::new(None)),
           })
           .collect(),
@@ -216,12 +220,12 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
   ///
   pub fn next(&self) -> BoxFuture<(T, HealthReportToken), String> {
     let now = Instant::now();
-    let server_count = self.inner.servers.len();
+    let server_count = self.inner.connections.len();
 
     let mut earliest_future = None;
     for _ in 0..server_count {
       let i = self.inner.next.fetch_add(1, Ordering::Relaxed) % server_count;
-      let server = &self.inner.servers[i];
+      let server = &self.inner.connections[i];
       let unhealthy_info = server.unhealthy_info.lock();
       if let Some(ref unhealthy_info) = *unhealthy_info {
         // Server is unhealthy. Note when it will become healthy.
@@ -248,7 +252,7 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
     }
     // Unwrap is safe because if we hadn't populated earliest_future, we would already have returned.
     let (index, instant) = earliest_future.unwrap();
-    let server = self.inner.servers[index].server.clone();
+    let server = self.inner.connections[index].server.clone();
     // Note that Delay::new_at(time in the past) gets immediately scheduled.
     Delay::new(instant)
       .map_err(|err| format!("Error delaying for serverset: {}", err))
@@ -257,7 +261,7 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
   }
 
   pub fn report_health(&self, token: HealthReportToken, health: Health) {
-    let mut unhealthy_info = self.inner.servers[token.index].unhealthy_info.lock();
+    let mut unhealthy_info = self.inner.connections[token.index].unhealthy_info.lock();
     match health {
       Health::Unhealthy => {
         if unhealthy_info.is_some() {
@@ -282,7 +286,7 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
 
 impl<T: std::fmt::Debug> std::fmt::Debug for Serverset<T> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-    write!(f, "Serverset {{ {:?} }}", self.inner.servers)
+    write!(f, "Serverset {{ {:?} }}", self.inner.connections)
   }
 }
 
@@ -296,6 +300,7 @@ mod tests {
   use std::sync::atomic::Ordering;
   use std::sync::Arc;
   use std::time::Duration;
+  use testutil::owned_string_vec;
 
   fn backoff_config() -> BackoffConfig {
     BackoffConfig::new(Duration::from_millis(10), 2.0, Duration::from_millis(100)).unwrap()
@@ -304,13 +309,19 @@ mod tests {
   #[test]
   fn no_servers_is_error() {
     let servers: Vec<String> = vec![];
-    Serverset::new(servers, backoff_config()).expect_err("Want error constructing with no servers");
+    Serverset::new(servers, str::to_owned, backoff_config())
+      .expect_err("Want error constructing with no servers");
   }
 
   #[test]
   fn round_robins() {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
-    let s = Serverset::new(vec!["good", "bad"], backoff_config()).unwrap();
+    let s = Serverset::new(
+      owned_string_vec(&["good", "bad"]),
+      str::to_owned,
+      backoff_config(),
+    )
+    .unwrap();
 
     expect_both(&mut rt, &s, 2);
   }
@@ -318,7 +329,12 @@ mod tests {
   #[test]
   fn handles_overflow_internally() {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
-    let s = Serverset::new(vec!["good", "bad"], backoff_config()).unwrap();
+    let s = Serverset::new(
+      owned_string_vec(&["good", "bad"]),
+      str::to_owned,
+      backoff_config(),
+    )
+    .unwrap();
     s.inner.next.store(std::usize::MAX, Ordering::SeqCst);
 
     // 3 because we may skip some values if the number of servers isn't a factor of
@@ -335,7 +351,12 @@ mod tests {
   #[test]
   fn skips_unhealthy() {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
-    let s = Serverset::new(vec!["good", "bad"], backoff_config()).unwrap();
+    let s = Serverset::new(
+      owned_string_vec(&["good", "bad"]),
+      str::to_owned,
+      backoff_config(),
+    )
+    .unwrap();
 
     mark_bad_as_bad(&mut rt, &s, Health::Unhealthy);
 
@@ -345,7 +366,12 @@ mod tests {
   #[test]
   fn reattempts_unhealthy() {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
-    let s = Serverset::new(vec!["good", "bad"], backoff_config()).unwrap();
+    let s = Serverset::new(
+      owned_string_vec(&["good", "bad"]),
+      str::to_owned,
+      backoff_config(),
+    )
+    .unwrap();
 
     mark_bad_as_bad(&mut rt, &s, Health::Unhealthy);
 
@@ -357,7 +383,12 @@ mod tests {
   #[test]
   fn backoff_when_unhealthy() {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
-    let s = Serverset::new(vec!["good", "bad"], backoff_config()).unwrap();
+    let s = Serverset::new(
+      owned_string_vec(&["good", "bad"]),
+      str::to_owned,
+      backoff_config(),
+    )
+    .unwrap();
 
     mark_bad_as_bad(&mut rt, &s, Health::Unhealthy);
 
@@ -387,7 +418,12 @@ mod tests {
   #[test]
   fn waits_if_all_unhealthy() {
     let backoff_config = backoff_config();
-    let s = Serverset::new(vec!["good", "bad"], backoff_config).unwrap();
+    let s = Serverset::new(
+      owned_string_vec(&["good", "bad"]),
+      str::to_owned,
+      backoff_config,
+    )
+    .unwrap();
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
     for _ in 0..2 {
@@ -409,11 +445,7 @@ mod tests {
     assert!(start.elapsed() > Duration::from_millis(9))
   }
 
-  fn expect_both(
-    runtime: &mut tokio::runtime::Runtime,
-    s: &Serverset<&'static str>,
-    repetitions: usize,
-  ) {
+  fn expect_both(runtime: &mut tokio::runtime::Runtime, s: &Serverset<String>, repetitions: usize) {
     let visited = Arc::new(Mutex::new(HashSet::new()));
 
     runtime
@@ -432,22 +464,18 @@ mod tests {
       ))
       .unwrap();
 
-    let expect: HashSet<_> = vec!["good", "bad"].into_iter().collect();
+    let expect: HashSet<_> = owned_string_vec(&["good", "bad"]).into_iter().collect();
     assert_eq!(unwrap(visited), expect);
   }
 
-  fn mark_bad_as_bad(
-    runtime: &mut tokio::runtime::Runtime,
-    s: &Serverset<&'static str>,
-    health: Health,
-  ) {
+  fn mark_bad_as_bad(runtime: &mut tokio::runtime::Runtime, s: &Serverset<String>, health: Health) {
     let mark_bad_as_baded_bad = Arc::new(Mutex::new(false));
     for _ in 0..2 {
       let s = s.clone();
       let mark_bad_as_baded_bad = mark_bad_as_baded_bad.clone();
       runtime
         .block_on(s.next().map(move |(server, token)| {
-          if server == "bad" {
+          if &server == "bad" {
             *mark_bad_as_baded_bad.lock() = true;
             s.report_health(token, health);
           } else {
@@ -461,7 +489,7 @@ mod tests {
 
   fn expect_only_good(
     runtime: &mut tokio::runtime::Runtime,
-    s: &Serverset<&'static str>,
+    s: &Serverset<String>,
     duration: Duration,
   ) {
     let buffer = Duration::from_millis(1);
@@ -476,7 +504,7 @@ mod tests {
       runtime
         .block_on(s.next().map(move |(server, token)| {
           if start.elapsed() < duration - buffer {
-            assert_eq!("good", server);
+            assert_eq!("good", &server);
             *did_get_at_least_one_good.lock() = true;
           } else {
             *should_break.lock() = true;

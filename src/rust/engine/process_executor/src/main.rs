@@ -248,7 +248,7 @@ fn main() {
       Store::with_remote(
         executor.clone(),
         local_store_path,
-        &[cas_server.to_owned()],
+        vec![cas_server.to_owned()],
         remote_instance_arg.clone(),
         &root_ca_certs,
         oauth_bearer_token,
