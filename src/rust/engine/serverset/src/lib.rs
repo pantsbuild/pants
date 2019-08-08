@@ -309,7 +309,7 @@ mod tests {
   #[test]
   fn no_servers_is_error() {
     let servers: Vec<String> = vec![];
-    Serverset::new(servers, str::to_owned, backoff_config())
+    Serverset::new(servers, fake_connect, backoff_config())
       .expect_err("Want error constructing with no servers");
   }
 
@@ -318,7 +318,7 @@ mod tests {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
     let s = Serverset::new(
       owned_string_vec(&["good", "bad"]),
-      str::to_owned,
+      fake_connect,
       backoff_config(),
     )
     .unwrap();
@@ -331,7 +331,7 @@ mod tests {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
     let s = Serverset::new(
       owned_string_vec(&["good", "bad"]),
-      str::to_owned,
+      fake_connect,
       backoff_config(),
     )
     .unwrap();
@@ -353,7 +353,7 @@ mod tests {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
     let s = Serverset::new(
       owned_string_vec(&["good", "bad"]),
-      str::to_owned,
+      fake_connect,
       backoff_config(),
     )
     .unwrap();
@@ -368,7 +368,7 @@ mod tests {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
     let s = Serverset::new(
       owned_string_vec(&["good", "bad"]),
-      str::to_owned,
+      fake_connect,
       backoff_config(),
     )
     .unwrap();
@@ -385,7 +385,7 @@ mod tests {
     let mut rt = tokio::runtime::Runtime::new().unwrap();
     let s = Serverset::new(
       owned_string_vec(&["good", "bad"]),
-      str::to_owned,
+      fake_connect,
       backoff_config(),
     )
     .unwrap();
@@ -420,7 +420,7 @@ mod tests {
     let backoff_config = backoff_config();
     let s = Serverset::new(
       owned_string_vec(&["good", "bad"]),
-      str::to_owned,
+      fake_connect,
       backoff_config,
     )
     .unwrap();
@@ -517,5 +517,10 @@ mod tests {
     assert!(*did_get_at_least_one_good.lock());
 
     std::thread::sleep(buffer * 2);
+  }
+
+  /// For tests, we just use Strings as servers, as it's an easy type we can make from addresses.
+  fn fake_connect(s: &str) -> String {
+    s.to_owned()
   }
 }
