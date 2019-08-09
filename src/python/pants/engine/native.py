@@ -842,6 +842,7 @@ class Native(Singleton):
         execution_options.remote_store_chunk_bytes,
         execution_options.remote_store_chunk_upload_timeout_seconds,
         execution_options.remote_store_rpc_retries,
+        execution_options.remote_store_connection_limit,
         self.context.utf8_buf_buf(execution_options.remote_execution_extra_platform_properties),
         execution_options.process_execution_local_parallelism,
         execution_options.process_execution_remote_parallelism,

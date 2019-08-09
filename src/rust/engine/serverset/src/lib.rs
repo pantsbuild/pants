@@ -44,7 +44,7 @@ pub use crate::retry::Retry;
 /// resources at an exponentially backed off interval. Unhealthy resources mark_bad_as_baded healthy will ease
 /// back into rotation with exponential ease-in.
 ///
-pub struct Serverset<T> {
+pub struct Serverset<T: Clone> {
   inner: Arc<Mutex<Inner<T>>>,
 }
 
@@ -67,16 +67,57 @@ impl<T: Clone + Send + Sync + 'static> Clone for Serverset<T> {
 #[derive(Clone, Copy, Debug)]
 #[must_use]
 pub struct HealthReportToken {
-  index: usize,
+  server_index: usize,
 }
 
-struct Inner<T> {
-  connections: Vec<Backend<T>>,
+struct Connection<T: Clone> {
+  connection: T,
+  server_index: usize,
+}
 
+struct Inner<T: Clone> {
+  // Order is immutable through the lifetime of a Serverset, but contents of the Backend may change.
+  servers: Vec<Backend>,
   // Only visible for testing
-  pub(crate) next: usize,
+  pub(crate) next_server: usize,
+
+  // Points into the servers list; may change over time.
+  connections: Vec<Connection<T>>,
+  next_connection: usize,
+
+  connect: Box<Fn(&str) -> T + 'static + Send>,
+
+  connection_limit: usize,
 
   backoff_config: BackoffConfig,
+}
+
+impl<T: Clone> Inner<T> {
+  fn connect(&mut self) -> Option<(T, HealthReportToken)> {
+    for _ in 0..self.servers.len() {
+      let server_index = self.next_server % self.servers.len();
+      self.next_server = self.next_server.wrapping_add(1);
+      let server = &self.servers[server_index];
+      if server.is_healthy() && !self.is_connected(server_index) {
+        let connection = (self.connect)(&server.server);
+        self.connections.push(Connection {
+          connection: connection.clone(),
+          server_index,
+        });
+        return Some((connection, HealthReportToken { server_index }));
+      }
+    }
+    None
+  }
+
+  fn is_connected(&self, server_index: usize) -> bool {
+    for connection in &self.connections {
+      if connection.server_index == server_index {
+        return true;
+      }
+    }
+    false
+  }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -125,9 +166,19 @@ impl UnhealthyInfo {
 }
 
 #[derive(Debug)]
-struct Backend<T> {
-  server: T,
+struct Backend {
+  server: String,
   unhealthy_info: Option<UnhealthyInfo>,
+}
+
+impl Backend {
+  fn is_healthy(&self) -> bool {
+    if let Some(unhealthy_info) = self.unhealthy_info {
+      unhealthy_info.healthy_at() < std::time::Instant::now()
+    } else {
+      true
+    }
+  }
 }
 
 // Ideally this would use Durations when https://github.com/rust-lang/rust/issues/54361 stabilises.
@@ -178,25 +229,33 @@ impl BackoffConfig {
 }
 
 impl<T: Clone + Send + Sync + 'static> Serverset<T> {
-  pub fn new<Connect: Fn(&str) -> T>(
+  pub fn new<Connect: Fn(&str) -> T + 'static + Send>(
     servers: Vec<String>,
     connect: Connect,
+    connection_limit: usize,
     backoff_config: BackoffConfig,
   ) -> Result<Self, String> {
     if servers.is_empty() {
       return Err("Must supply some servers".to_owned());
     }
+    if connection_limit == 0 {
+      return Err("Must supply connection_limit greater than 0".to_owned());
+    }
 
     Ok(Serverset {
       inner: Arc::new(Mutex::new(Inner {
-        connections: servers
+        servers: servers
           .into_iter()
-          .map(|s| Backend {
-            server: connect(&s),
+          .map(|server| Backend {
+            server,
             unhealthy_info: None,
           })
           .collect(),
-        next: 0,
+        next_server: 0,
+        connections: vec![],
+        next_connection: 0,
+        connect: Box::new(connect),
+        connection_limit,
         backoff_config,
       })),
     })
@@ -220,51 +279,65 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
   pub fn next(&self) -> BoxFuture<(T, HealthReportToken), String> {
     let now = Instant::now();
     let mut inner = self.inner.lock();
-    let server_count = inner.connections.len();
+
+    let existing_connections = inner.connections.len();
+    if existing_connections < inner.connection_limit && inner.servers.len() > existing_connections {
+      // Find a healthy server without a connection, connect to it.
+      if let Some(ret) = inner.connect() {
+        inner.next_connection = inner.next_connection.wrapping_add(1);
+        return futures::future::ok(ret).to_boxed();
+      }
+    }
+
+    if !inner.connections.is_empty() {
+      let next_connection = inner.next_connection;
+      inner.next_connection = inner.next_connection.wrapping_add(1);
+      let connection = &inner.connections[next_connection % inner.connections.len()];
+      return futures::future::ok((
+        connection.connection.clone(),
+        HealthReportToken {
+          server_index: connection.server_index,
+        },
+      ))
+      .to_boxed();
+    }
 
     let mut earliest_future = None;
-    for _ in 0..server_count {
-      let i = inner.next % server_count;
-      inner.next = inner.next.wrapping_add(1);
-      let server = &inner.connections[i];
+    for _ in 0..inner.servers.len() {
+      let i = inner.next_server % inner.servers.len();
+      inner.next_server = inner.next_server.wrapping_add(1);
+      let server = &inner.servers[i];
       let unhealthy_info = &server.unhealthy_info;
       if let Some(ref unhealthy_info) = unhealthy_info {
-        // Server is unhealthy. Note when it will become healthy.
-
         let healthy_at = unhealthy_info.healthy_at();
 
         if healthy_at > now {
-          let healthy_sooner_than_previous = if let Some((_, previous_healthy_at)) = earliest_future
-          {
+          let healthy_sooner_than_previous = if let Some(previous_healthy_at) = earliest_future {
             previous_healthy_at > healthy_at
           } else {
             true
           };
 
           if healthy_sooner_than_previous {
-            earliest_future = Some((i, healthy_at));
+            earliest_future = Some(healthy_at);
           }
-          continue;
         }
-      }
-      // A healthy server! Use it!
-      return futures::future::ok((server.server.clone(), HealthReportToken { index: i }))
-        .to_boxed();
+      } // else cannot happen, or we would already have connected and returned.
     }
     // Unwrap is safe because if we hadn't populated earliest_future, we would already have returned.
-    let (index, instant) = earliest_future.unwrap();
-    let server = inner.connections[index].server.clone();
-    // Note that Delay::new_at(time in the past) gets immediately scheduled.
+    let instant = earliest_future.unwrap();
+
+    let serverset = self.clone();
     Delay::new(instant)
       .map_err(|err| format!("Error delaying for serverset: {}", err))
-      .map(move |()| (server, HealthReportToken { index }))
+      .and_then(move |()| serverset.next())
       .to_boxed()
   }
 
   pub fn report_health(&self, token: HealthReportToken, health: Health) {
     let mut inner = self.inner.lock();
     let backoff_config = inner.backoff_config;
-    let mut unhealthy_info = inner.connections[token.index].unhealthy_info.as_mut();
+    let mut unhealthy_info = inner.servers[token.server_index].unhealthy_info.as_mut();
     match health {
       Health::Unhealthy => {
         if unhealthy_info.is_some() {
@@ -272,13 +345,17 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
             unhealthy_info.increase_backoff(backoff_config);
           }
         } else {
-          inner.connections[token.index].unhealthy_info =
+          inner.servers[token.server_index].unhealthy_info =
             Some(UnhealthyInfo::new(inner.backoff_config));
         }
+
+        inner
+          .connections
+          .retain(|conn| conn.server_index != token.server_index);
       }
       Health::Healthy => {
         if unhealthy_info.is_some() {
-          inner.connections[token.index].unhealthy_info = unhealthy_info
+          inner.servers[token.server_index].unhealthy_info = unhealthy_info
             .copied()
             .unwrap()
             .decrease_backoff(backoff_config);
@@ -288,10 +365,10 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
   }
 }
 
-impl<T: std::fmt::Debug> std::fmt::Debug for Serverset<T> {
+impl<T: Clone> std::fmt::Debug for Serverset<T> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
     let inner = self.inner.lock();
-    write!(f, "Serverset {{ {:?} }}", inner.connections)
+    write!(f, "Serverset {{ {:?} }}", inner.servers)
   }
 }
 
@@ -313,8 +390,22 @@ mod tests {
   #[test]
   fn no_servers_is_error() {
     let servers: Vec<String> = vec![];
-    Serverset::new(servers, fake_connect, backoff_config())
+    Serverset::new(servers, fake_connect, 1, backoff_config())
       .expect_err("Want error constructing with no servers");
+  }
+
+  #[test]
+  fn one_request_works() {
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let s = Serverset::new(
+      owned_string_vec(&["good"]),
+      fake_connect,
+      1,
+      backoff_config(),
+    )
+    .unwrap();
+
+    assert_eq!(rt.block_on(s.next()).unwrap().0, "good".to_owned());
   }
 
   #[test]
@@ -323,6 +414,7 @@ mod tests {
     let s = Serverset::new(
       owned_string_vec(&["good", "bad"]),
       fake_connect,
+      2,
       backoff_config(),
     )
     .unwrap();
@@ -336,10 +428,11 @@ mod tests {
     let s = Serverset::new(
       owned_string_vec(&["good", "bad"]),
       fake_connect,
+      2,
       backoff_config(),
     )
     .unwrap();
-    s.inner.lock().next = std::usize::MAX;
+    s.inner.lock().next_server = std::usize::MAX;
 
     // 3 because we may skip some values if the number of servers isn't a factor of
     // std::usize::MAX, so we make sure to go around them all again after overflowing.
@@ -358,6 +451,7 @@ mod tests {
     let s = Serverset::new(
       owned_string_vec(&["good", "bad"]),
       fake_connect,
+      2,
       backoff_config(),
     )
     .unwrap();
@@ -373,6 +467,7 @@ mod tests {
     let s = Serverset::new(
       owned_string_vec(&["good", "bad"]),
       fake_connect,
+      2,
       backoff_config(),
     )
     .unwrap();
@@ -381,7 +476,7 @@ mod tests {
 
     expect_only_good(&mut rt, &s, Duration::from_millis(10));
 
-    expect_both(&mut rt, &s, 2);
+    expect_both(&mut rt, &s, 3);
   }
 
   #[test]
@@ -390,6 +485,7 @@ mod tests {
     let s = Serverset::new(
       owned_string_vec(&["good", "bad"]),
       fake_connect,
+      2,
       backoff_config(),
     )
     .unwrap();
@@ -408,7 +504,7 @@ mod tests {
 
     expect_only_good(&mut rt, &s, Duration::from_millis(40));
 
-    expect_both(&mut rt, &s, 2);
+    expect_both(&mut rt, &s, 3);
   }
 
   #[test]
@@ -417,6 +513,7 @@ mod tests {
     let s = Serverset::new(
       owned_string_vec(&["good", "bad"]),
       fake_connect,
+      2,
       backoff_config,
     )
     .unwrap();
@@ -476,14 +573,17 @@ mod tests {
       let s = s.clone();
       let mark_bad_as_baded_bad = mark_bad_as_baded_bad.clone();
       let (server, token) = runtime.block_on(s.next()).unwrap();
-      if server == "bad" {
+      if &server == "bad" {
         *mark_bad_as_baded_bad.lock() = true;
         s.report_health(token, health);
       } else {
         s.report_health(token, Health::Healthy);
       }
     }
-    assert!(*mark_bad_as_baded_bad.lock());
+    assert!(
+      *mark_bad_as_baded_bad.lock(),
+      "Wasn't offered bad as a possible server, so didn't mark it bad"
+    );
   }
 
   fn expect_only_good(
@@ -502,7 +602,7 @@ mod tests {
       let did_get_at_least_one_good = did_get_at_least_one_good.clone();
       let (server, token) = runtime.block_on(s.next()).unwrap();
       if start.elapsed() < duration - buffer {
-        assert_eq!("good", server);
+        assert_eq!("good", &server);
         *did_get_at_least_one_good.lock() = true;
       } else {
         *should_break.lock() = true;
