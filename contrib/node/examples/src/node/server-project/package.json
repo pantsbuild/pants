@@ -2,9 +2,9 @@
   "name": "server-project",
   "version": "1.0.0",
   "devDependencies": {
-    "babel-core": "6.22.1",
-    "babel-cli": "6.22.1",
-    "mocha": "2.3.0"
+    "babel-core": "^6.22.1",
+    "babel-cli": "^6.22.1",
+    "mocha": "^2.3.0"
   },
   "bin": "dist/main.js",
   "main": "dist/Server.js",
