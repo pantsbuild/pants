@@ -37,7 +37,9 @@ class HTTPTransportHandler(BaseTransportHandler):
     try:
       command = 'curl -v -X POST -H "Content-Type: application/json" --data @{} {}'.format(file_path, self.endpoint)
       args = command.split(' ')
-      subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+      p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+      logger.debug("pid of child process that sends spans to Zipkin server: {}".format(p.pid))
 
     except Exception as err:
       logger.error("Failed to post the payload to zipkin server. Error {}".format(err))

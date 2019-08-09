@@ -8,9 +8,8 @@ import unittest
 from collections import defaultdict
 from http.server import BaseHTTPRequestHandler
 
+import psutil
 from parameterized import parameterized
-from py_zipkin import Encoding
-from py_zipkin.encoding import convert_spans
 
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import http_server
@@ -176,6 +175,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     with http_server(ZipkinHandler) as port:
       endpoint = "http://localhost:{}".format(port)
       command = [
+        '-ldebug',
         '--reporting-zipkin-endpoint={}'.format(endpoint),
         'cloc',
         'src/python/pants:version'
@@ -183,6 +183,11 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
       pants_run = self.run_pants(command)
       self.assert_success(pants_run)
+
+      child_processes = self.find_child_processes_that_send_spans(pants_run.stderr_data)
+      self.assertTrue(child_processes)
+
+      self.wait_spans_to_be_sent(child_processes)
 
       trace = assert_single_element(ZipkinHandler.traces.values())
 
@@ -201,6 +206,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       trace_id = "aaaaaaaaaaaaaaaa"
       parent_span_id = "ffffffffffffffff"
       command = [
+        '-ldebug',
         '--reporting-zipkin-endpoint={}'.format(endpoint),
         '--reporting-zipkin-trace-id={}'.format(trace_id),
         '--reporting-zipkin-parent-id={}'.format(parent_span_id),
@@ -210,6 +216,11 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
       pants_run = self.run_pants(command)
       self.assert_success(pants_run)
+
+      child_processes = self.find_child_processes_that_send_spans(pants_run.stderr_data)
+      self.assertTrue(child_processes)
+
+      self.wait_spans_to_be_sent(child_processes)
 
       trace = assert_single_element(ZipkinHandler.traces.values())
 
@@ -231,6 +242,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     with http_server(ZipkinHandler) as port:
       endpoint = "http://localhost:{}".format(port)
       command = [
+        '-ldebug',
         '--reporting-zipkin-endpoint={}'.format(endpoint),
         '--reporting-zipkin-sample-rate=0.0',
         'cloc',
@@ -240,6 +252,9 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       pants_run = self.run_pants(command)
       self.assert_success(pants_run)
 
+      child_processes = self.find_child_processes_that_send_spans(pants_run.stderr_data)
+      self.assertFalse(child_processes)
+
       num_of_traces = len(ZipkinHandler.traces)
       self.assertEqual(num_of_traces, 0)
 
@@ -248,6 +263,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     with http_server(ZipkinHandler) as port:
       endpoint = "http://localhost:{}".format(port)
       command = [
+        '-ldebug',
         '--reporting-zipkin-endpoint={}'.format(endpoint),
         '--reporting-zipkin-trace-v2',
         'cloc',
@@ -256,6 +272,11 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
       pants_run = self.run_pants(command)
       self.assert_success(pants_run)
+
+      child_processes = self.find_child_processes_that_send_spans(pants_run.stderr_data)
+      self.assertTrue(child_processes)
+
+      self.wait_spans_to_be_sent(child_processes)
 
       trace = assert_single_element(ZipkinHandler.traces.values())
 
@@ -270,6 +291,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     with http_server(ZipkinHandler) as port:
       endpoint = "http://localhost:{}".format(port)
       command = [
+        '-ldebug',
         '--no-v1',
         '--v2',
         '--reporting-zipkin-endpoint={}'.format(endpoint),
@@ -280,6 +302,11 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
       pants_run = self.run_pants(command)
       self.assert_success(pants_run)
+
+      child_processes = self.find_child_processes_that_send_spans(pants_run.stderr_data)
+      self.assertTrue(child_processes)
+
+      self.wait_spans_to_be_sent(child_processes)
 
       trace = assert_single_element(ZipkinHandler.traces.values())
 
@@ -294,6 +321,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     with http_server(ZipkinHandler) as port:
       endpoint = "http://localhost:{}".format(port)
       command = [
+        '-ldebug',
         '--reporting-zipkin-endpoint={}'.format(endpoint),
         'compile',
         'examples/src/scala/org/pantsbuild/example/several_scala_targets::'
@@ -301,6 +329,11 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
       pants_run = self.run_pants(command)
       self.assert_success(pants_run)
+
+      child_processes = self.find_child_processes_that_send_spans(pants_run.stderr_data)
+      self.assertTrue(child_processes)
+
+      self.wait_spans_to_be_sent(child_processes)
 
       trace = assert_single_element(ZipkinHandler.traces.values())
 
@@ -328,6 +361,24 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def find_spans_by_parentId(trace, parent_id):
     return [span for span in trace if span.get('parentId') == parent_id]
 
+  @staticmethod
+  def find_child_processes_that_send_spans(pants_result_stderr):
+    child_processes = set()
+    for line in pants_result_stderr.split('\n'):
+      if "pid of child process that sends spans to Zipkin server:" in line:
+        i = line.rindex(':')
+        child_process_pid = line[i+1:]
+        child_processes.add(int(child_process_pid))
+    return child_processes
+
+  @staticmethod
+  def wait_spans_to_be_sent(child_processes):
+    existing_child_processes = child_processes.copy()
+    while existing_child_processes:
+      for child_pid in child_processes:
+        if child_pid in existing_child_processes and not psutil.pid_exists(child_pid):
+          existing_child_processes.remove(child_pid)
+
 
 def zipkin_handler():
   class ZipkinHandler(BaseHTTPRequestHandler):
@@ -335,8 +386,7 @@ def zipkin_handler():
 
     def do_POST(self):
       content_length = self.headers.get('content-length')
-      thrift_trace = self.rfile.read(int(content_length))
-      json_trace = convert_spans(thrift_trace, Encoding.V1_JSON, Encoding.V1_THRIFT)
+      json_trace = self.rfile.read(int(content_length))
       trace = json.loads(json_trace)
       for span in trace:
         trace_id = span["traceId"]
