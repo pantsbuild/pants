@@ -363,6 +363,8 @@ mod tests {
 
     expect_only_good(&mut rt, &s, Duration::from_millis(10));
 
+    // mark_bad_as_bad asserts that we attempted to use the bad server as a side effect, so this
+    // checks that we did re-use the server after the lame period.
     mark_bad_as_bad(&mut rt, &s, Health::Unhealthy);
 
     expect_only_good(&mut rt, &s, Duration::from_millis(20));
@@ -370,16 +372,6 @@ mod tests {
     mark_bad_as_bad(&mut rt, &s, Health::Unhealthy);
 
     expect_only_good(&mut rt, &s, Duration::from_millis(40));
-
-    mark_bad_as_bad(&mut rt, &s, Health::Healthy);
-
-    expect_only_good(&mut rt, &s, Duration::from_millis(20));
-
-    mark_bad_as_bad(&mut rt, &s, Health::Healthy);
-
-    expect_only_good(&mut rt, &s, Duration::from_millis(10));
-
-    mark_bad_as_bad(&mut rt, &s, Health::Healthy);
 
     expect_both(&mut rt, &s, 2);
   }
