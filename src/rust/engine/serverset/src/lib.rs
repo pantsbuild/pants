@@ -390,6 +390,9 @@ mod tests {
     let s = Serverset::new(vec!["good", "bad"], backoff_config).unwrap();
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
+    // We will get an address 4 times, and mark it as unhealthy each of those times.
+    // That means that each server will be marked bad twice, which according to our backoff config
+    // means they should be marked as unavailable for 20ms each.
     for _ in 0..4 {
       let s = s.clone();
       runtime
@@ -402,10 +405,12 @@ mod tests {
 
     let start = std::time::Instant::now();
 
+    // This should take at least 20ms because both servers are marked as unhealthy.
     runtime.block_on(s.next()).unwrap();
 
-    // The serverset is configured to block for 20ms; make sure we waited for at least 10ms for
-    // stability, in case it took a few ms to mark the second server as unhealthy.
+    // Make sure we waited for at least 10ms; we should have waited 20ms, but it may have taken a
+    // little time to mark a server as unhealthy, so we have some padding between what we expect
+    // (20ms) and what we assert (10ms).
     let elapsed = start.elapsed();
     assert!(
       elapsed > Duration::from_millis(10),
