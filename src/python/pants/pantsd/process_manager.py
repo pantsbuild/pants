@@ -438,6 +438,14 @@ class ProcessManager(ProcessMetadataManager):
     if purge:
       self.purge_metadata(force=True)
 
+  def current_memory_usage(self):
+    """Return the current memory usage of the pantsd process (which must be running)
+
+    :return: memory usage in bytes
+    """
+    assert self.is_alive(), f"Cannot read memory of dead process with pid {self._pid}"
+    return psutil.Process(self._pid).memory_info()[0]
+
   def daemonize(self, pre_fork_opts=None, post_fork_parent_opts=None, post_fork_child_opts=None,
                 fork_context=None, write_pid=True):
     """Perform a double-fork, execute callbacks and write the child pid file.

@@ -6,7 +6,6 @@ import os
 import time
 from contextlib import contextmanager
 
-import psutil
 from colors import bold, cyan, magenta
 
 from pants.pantsd.process_manager import ProcessManager
@@ -57,14 +56,6 @@ class PantsDaemonMonitor(ProcessManager):
     assert self._pid is not None and self.is_alive(), 'cannot assert that pantsd is running. Try calling assert_started before calling this method.'
     return self._pid
 
-  def current_memory_usage(self):
-    """Return the current memory usage of the pantsd process (which must be running)
-
-    :return: memory usage in bytes
-    """
-    self.assert_running()
-    return psutil.Process(self._pid).memory_info()[0]
-
   def assert_running(self):
     if not self._pid:
       return self.assert_started()
@@ -76,6 +67,11 @@ class PantsDaemonMonitor(ProcessManager):
     assert self._pid is not None, 'cannot assert pantsd stoppage. Try calling assert_started before calling this method.'
     assert self.is_dead(), 'pantsd should be stopped!'
     return self._pid
+
+  def current_memory_usage(self):
+    """Return the memory usage, but await for metadata first."""
+    self.assert_running()
+    return super().current_memory_usage()
 
 
 class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
