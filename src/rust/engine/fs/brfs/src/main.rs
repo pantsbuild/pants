@@ -689,7 +689,7 @@ fn main() {
     Some(address) => Store::with_remote(
       runtime.clone(),
       &store_path,
-      &[address.to_owned()],
+      vec![address.to_owned()],
       args.value_of("remote-instance-name").map(str::to_owned),
       &root_ca_certs,
       oauth_bearer_token,

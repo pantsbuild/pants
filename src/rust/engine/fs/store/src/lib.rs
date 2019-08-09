@@ -197,7 +197,7 @@ impl Store {
   pub fn with_remote<P: AsRef<Path>>(
     executor: task_executor::Executor,
     path: P,
-    cas_addresses: &[String],
+    cas_addresses: Vec<String>,
     instance_name: Option<String>,
     root_ca_certs: &Option<Vec<u8>>,
     oauth_bearer_token: Option<String>,
@@ -1728,7 +1728,7 @@ mod remote {
 
   impl ByteStore {
     pub fn new(
-      cas_addresses: &[String],
+      cas_addresses: Vec<String>,
       instance_name: Option<String>,
       root_ca_certs: &Option<Vec<u8>>,
       oauth_bearer_token: Option<String>,
@@ -1740,22 +1740,19 @@ mod remote {
     ) -> Result<ByteStore, String> {
       let env = Arc::new(grpcio::Environment::new(thread_count));
 
-      let channels = cas_addresses
-        .iter()
-        .map(|cas_address| {
-          let builder = grpcio::ChannelBuilder::new(env.clone());
-          if let Some(ref root_ca_certs) = root_ca_certs {
-            let creds = grpcio::ChannelCredentialsBuilder::new()
-              .root_cert(root_ca_certs.clone())
-              .build();
-            builder.secure_connect(cas_address, creds)
-          } else {
-            builder.connect(cas_address)
-          }
-        })
-        .collect();
+      let connect = |cas_address: &str| {
+        let builder = grpcio::ChannelBuilder::new(env.clone());
+        if let Some(ref root_ca_certs) = root_ca_certs {
+          let creds = grpcio::ChannelCredentialsBuilder::new()
+            .root_cert(root_ca_certs.clone())
+            .build();
+          builder.secure_connect(cas_address, creds)
+        } else {
+          builder.connect(cas_address)
+        }
+      };
 
-      let serverset = Serverset::new(channels, backoff_config)?;
+      let serverset = Serverset::new(cas_addresses, connect, backoff_config)?;
 
       Ok(ByteStore {
         instance_name,
@@ -2183,7 +2180,7 @@ mod remote {
       let cas = StubCAS::empty();
 
       let store = ByteStore::new(
-        &[cas.address()],
+        vec![cas.address()],
         None,
         &None,
         None,
@@ -2258,7 +2255,7 @@ mod remote {
     #[test]
     fn write_connection_error() {
       let store = ByteStore::new(
-        &[String::from("doesnotexist.example")],
+        vec![String::from("doesnotexist.example")],
         None,
         &None,
         None,
@@ -2331,7 +2328,7 @@ mod remote {
       let cas2 = StubCAS::builder().file(&roland).file(&catnip).build();
 
       let store = ByteStore::new(
-        &[cas1.address(), cas2.address()],
+        vec![cas1.address(), cas2.address()],
         None,
         &None,
         None,
@@ -2359,7 +2356,7 @@ mod remote {
 
     fn new_byte_store(cas: &StubCAS) -> ByteStore {
       ByteStore::new(
-        &[cas.address()],
+        vec![cas.address()],
         None,
         &None,
         None,
@@ -2487,7 +2484,7 @@ mod tests {
     Store::with_remote(
       task_executor::Executor::new(),
       dir,
-      &[cas_address],
+      vec![cas_address],
       None,
       &None,
       None,
@@ -3168,7 +3165,7 @@ mod tests {
     let store_with_remote = Store::with_remote(
       task_executor::Executor::new(),
       dir.path(),
-      &[cas.address()],
+      vec![cas.address()],
       Some("dark-tower".to_owned()),
       &None,
       None,
@@ -3195,7 +3192,7 @@ mod tests {
     let store_with_remote = Store::with_remote(
       task_executor::Executor::new(),
       dir.path(),
-      &[cas.address()],
+      vec![cas.address()],
       Some("dark-tower".to_owned()),
       &None,
       None,
@@ -3236,7 +3233,7 @@ mod tests {
     let store_with_remote = Store::with_remote(
       task_executor::Executor::new(),
       dir.path(),
-      &[cas.address()],
+      vec![cas.address()],
       None,
       &None,
       Some("Armory.Key".to_owned()),
@@ -3263,7 +3260,7 @@ mod tests {
     let store_with_remote = Store::with_remote(
       task_executor::Executor::new(),
       dir.path(),
-      &[cas.address()],
+      vec![cas.address()],
       None,
       &None,
       Some("Armory.Key".to_owned()),
