@@ -390,7 +390,7 @@ mod tests {
     let s = Serverset::new(vec!["good", "bad"], backoff_config).unwrap();
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
-    for _ in 0..2 {
+    for _ in 0..4 {
       let s = s.clone();
       runtime
         .block_on(
@@ -404,9 +404,14 @@ mod tests {
 
     runtime.block_on(s.next()).unwrap();
 
-    // The serverset is configured to block for 10ms; make sure we waited for at least 9ms for
-    // stability.
-    assert!(start.elapsed() > Duration::from_millis(9))
+    // The serverset is configured to block for 20ms; make sure we waited for at least 10ms for
+    // stability, in case it took a few ms to mark the second server as unhealthy.
+    let elapsed = start.elapsed();
+    assert!(
+      elapsed > Duration::from_millis(10),
+      "Waited for {:?} (less than expected)",
+      elapsed
+    );
   }
 
   fn expect_both(
