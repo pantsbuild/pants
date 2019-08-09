@@ -423,21 +423,53 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
           )
         )
 
-  def test_max_memory_flag_does_not_invalidate_daemon(self):
+  def test_max_memory_flag_does_not_invalidate_daemon_by_default(self):
     """Validates that, if we pass a value that is large enough to a running daemon, it will not restart."""
     with self.pantsd_successful_run_context() as (pantsd_run, checker, _, _):
       cmd = ['filter', 'testprojects/::']
       # Assert that pantsd can complete this run successfully, and we have an active pantsd
-      self.assert_success(pantsd_run(cmd))
+      pantsd_run(cmd)
       checker.assert_running()
 
       # Pass an extra flag, to set the maximum memory used by the daemon.
       twenty_times_the_used_memory = 20 * (checker.current_memory_usage())
-      cmd_max_memory = [f'--daemon-max-memory-usage={twenty_times_the_used_memory}'] + cmd
+      max_memory_config = {'GLOBAL': {'daemon_max_memory_usage': twenty_times_the_used_memory}}
 
       # Assert that passing this flag (with more than enough memory) doesn't restart the daemon
-      self.assert_success(pantsd_run(cmd_max_memory))
+      pantsd_run(cmd, extra_config=max_memory_config)
       checker.assert_running()
+
+  def test_max_memory_flag_invalidates_the_daemon_correctly(self):
+    """
+    Validates that, if we pass a value that is lower than the current memory usage of the daemon,
+    the daemon will restart.
+    """
+    with self.pantsd_successful_run_context() as (pantsd_run, checker, _, _):
+      cmd = ['filter', 'testprojects/::']
+      # Assert that pantsd can complete this run successfully, and we have an active pantsd
+      pantsd_run(cmd)
+      checker.assert_running()
+
+      # Read the pidfile, to record which daemon is running.
+      # NB: The file should already exist because we ran checker.assert_running,
+      # so we have a deterministic timeout of 0.
+      first_daemon_pid = checker.await_pid(0)
+
+      # Pass an extra flag, to set the maximum memory used by the daemon.
+      half_as_much_memory = int(0.5 * (checker.current_memory_usage()))
+      max_memory_config = {'GLOBAL': {'daemon_max_memory_usage': half_as_much_memory}}
+
+      # Assert that passing this flag, with less memory than the daemon is using, invalidates the daemon.
+      run = pantsd_run(cmd, extra_config=max_memory_config)
+      print(run.stdout_data)
+
+      # Check that this has invalidated the previous daemon.
+      checker.assert_stopped()
+
+      # Read the new pidfile, and assert that they are different.
+      # TODO This assumes that the OS has allocated different PIDs for daemons, which might not be the case.
+      second_daemon_pid = checker.await_pid(0)
+      self.assertNotEqual(first_daemon_pid, second_daemon_pid)
 
   def test_pantsd_invalidation_stale_sources(self):
     test_path = 'tests/python/pants_test/daemon_correctness_test_0001'
