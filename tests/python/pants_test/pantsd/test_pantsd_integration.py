@@ -423,7 +423,6 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
           )
         )
 
-
   def test_max_memory_flag_does_not_invalidate_daemon_by_default(self):
     """Validates that, if we pass a value that is large enough to a running daemon, it will not restart."""
     with self.warm_daemon() as (cmd, pantsd_run, checker):
@@ -439,28 +438,26 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     """
     Validates that, if we pass a value that is lower than the current memory usage of the daemon,
     the daemon will restart.
+
+    NB: We check that a new pantsd has started by capturing the pantsd processes that were started
+    since the test began to run named `pantsd [...]`. We rely of psutil.Process' definition of
+    equality.
     """
     with self.warm_daemon() as (cmd, pantsd_run, checker):
       # Read the pidfile, to record which daemon is running.
       # NB: The file should already exist because we ran checker.assert_running,
       # so we have a deterministic timeout of 0.
-      first_daemon_pid = checker.await_pid(0)
+      before_daemon_processes = checker.runner_process_context.current_processes()
 
       # Pass an extra flag, to set the maximum memory used by the daemon.
-      half_as_much_memory = int(0.5 * (checker.current_memory_usage()))
-      max_memory_config = {'GLOBAL': {'daemon_max_memory_usage': half_as_much_memory}}
+      much_less_memory = int(0.1 * (checker.current_memory_usage()))
+      max_memory_config = {'GLOBAL': {'daemon_max_memory_usage': f'{much_less_memory}'}}
 
-      # Assert that passing this flag, with less memory than the daemon is using, invalidates the daemon.
-      run = pantsd_run(cmd, extra_config=max_memory_config)
-      print(run.stdout_data)
+      pantsd_run(cmd, extra_config=max_memory_config)
 
-      # Check that this has invalidated the previous daemon.
-      checker.assert_stopped()
-
-      # Read the new pidfile, and assert that they are different.
-      # TODO This assumes that the OS has allocated different PIDs for daemons, which might not be the case.
-      second_daemon_pid = checker.await_pid(0)
-      self.assertNotEqual(first_daemon_pid, second_daemon_pid)
+      # Assert that the set of tracked pantsd processes has changed since we ran pants the last time.
+      after_daemon_processes = checker.runner_process_context.current_processes()
+      self.assertNotEqual(before_daemon_processes, after_daemon_processes)
 
   def test_pantsd_invalidation_stale_sources(self):
     test_path = 'tests/python/pants_test/daemon_correctness_test_0001'
