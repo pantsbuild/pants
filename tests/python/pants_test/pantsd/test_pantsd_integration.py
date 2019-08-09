@@ -423,6 +423,22 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
           )
         )
 
+  def test_max_memory_flag_does_not_invalidate_daemon(self):
+    """Validates that, if we pass a value that is large enough to a running daemon, it will not restart."""
+    with self.pantsd_successful_run_context() as (pantsd_run, checker, _, _):
+      cmd = ['filter', 'testprojects/::']
+      # Assert that pantsd can complete this run successfully, and we have an active pantsd
+      self.assert_success(pantsd_run(cmd))
+      checker.assert_running()
+
+      # Pass an extra flag, to set the maximum memory used by the daemon.
+      twenty_times_the_used_memory = 20 * (checker.current_memory_usage())
+      cmd_max_memory = [f'--daemon-max-memory-usage={twenty_times_the_used_memory}'] + cmd
+
+      # Assert that passing this flag (with more than enough memory) doesn't restart the daemon
+      self.assert_success(pantsd_run(cmd_max_memory))
+      checker.assert_running()
+
   def test_pantsd_invalidation_stale_sources(self):
     test_path = 'tests/python/pants_test/daemon_correctness_test_0001'
     test_build_file = os.path.join(test_path, 'BUILD')
