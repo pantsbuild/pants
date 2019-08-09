@@ -493,6 +493,16 @@ class PantsDaemon(FingerprintedProcessManager):
     if include_watchman:
       self.watchman_launcher.terminate()
 
+  def _has_exceeded_memory_usage(self):
+    used_memory = self.current_memory_usage()
+    max_memory = self._bootstrap_options.for_global_scope().daemon_max_memory_usage
+    exceeded = used_memory > max_memory
+    self._logger.debug(f"pantsd is using {used_memory}b of memory, max is {max_memory}b")
+    if exceeded:
+      self._logger.info(f"pantsd exceeded it's alloted memory usage! (usage={used_memory}, max={max_memory})")
+
+    return exceeded
+
   def needs_restart(self, option_fingerprint):
     """
     Overrides ProcessManager.needs_restart, to account for the case where pantsd is running
@@ -502,7 +512,8 @@ class PantsDaemon(FingerprintedProcessManager):
     """
     should_shutdown_after_run = self._bootstrap_options.for_global_scope().shutdown_pantsd_after_run
     return super().needs_restart(option_fingerprint) or \
-           (self.is_alive() and should_shutdown_after_run)
+           (self.is_alive() and should_shutdown_after_run) or \
+           self._has_exceeded_memory_usage()
 
 
 def launch():
