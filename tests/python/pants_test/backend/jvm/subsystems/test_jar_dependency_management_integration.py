@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from unittest import expectedFailure
 
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_resolver
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
@@ -46,7 +46,6 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
       for jar in jar_set:
         self.assertEqual(value, jar in classpath)
 
-  @ensure_resolver
   def test_unmanaged_no_default(self):
     self._assert_run_classpath({
       self.set_default: True,
@@ -54,7 +53,6 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
       self.set_managed2: False,
     }, 'unmanaged')
 
-  @ensure_resolver
   def test_unmanaged_default2(self):
     self._assert_run_classpath({
       self.set_default: False,
@@ -62,7 +60,6 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
       self.set_managed2: True,
     }, 'unmanaged', default_target=self.manager2_target, conflict_strategy='USE_MANAGED')
 
-  @ensure_resolver
   def test_managed(self):
     self._assert_run_classpath({
       ('commons-io',): False,
@@ -71,7 +68,6 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
       self.set_managed2: False,
     }, 'managed', conflict_strategy='USE_MANAGED')
 
-  @ensure_resolver
   def test_managed_ignore_default(self):
     self._assert_run_classpath({
       self.set_default: False,
@@ -79,7 +75,6 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
       self.set_managed2: False,
     }, 'managed', default_target=self.manager2_target, conflict_strategy='USE_MANAGED')
 
-  @ensure_resolver
   def test_managed_auto(self):
     self._assert_run_classpath({
       self.set_default: False,
@@ -87,21 +82,18 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
       self.set_managed2: False,
     }, 'managed-auto')
 
-  @ensure_resolver
   def test_managed_use_direct(self):
     self._assert_run_classpath({
       self.JarSet(self.set_default.jersey, self.set_managed.jsr311): True,
       self.set_managed2: False,
     }, 'managed', conflict_strategy='USE_DIRECT')
 
-  @ensure_resolver
   def test_managed_fail(self):
     run = self._run_project('managed', conflict_strategy='FAIL')
     self.assert_failure(run)
     # Check for snippet of expected error message.
     self.assertIn('An artifact directly specified', run.stdout_data)
 
-  @ensure_resolver
   def test_unmanaged_fail(self):
     run = self._run_project('unmanaged', default_target=self.manager_target,
                             conflict_strategy='FAIL')
@@ -109,14 +101,12 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
     # Check for snippet of expected error message.
     self.assertIn('An artifact directly specified', run.stdout_data)
 
-  @ensure_resolver
   def test_managed_forceful(self):
     self._assert_run_classpath({
       self.JarSet(self.set_default.jersey, self.set_managed.jsr311): True,
       self.set_managed2: False,
     }, 'forceful', conflict_strategy='USE_DIRECT_IF_FORCED')
 
-  @ensure_resolver
   def test_managed_redundant(self):
     self._assert_run_classpath({
       self.set_default: False,
@@ -124,12 +114,10 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
       self.set_managed2: False,
     }, 'redundant')
 
-  @ensure_resolver
   def test_forceful_fail(self):
     run = self._run_project('forceful', conflict_strategy='FAIL')
     self.assert_failure(run)
 
-  @ensure_resolver
   def test_managed_forceful_use_managed(self):
     self._assert_run_classpath({
       self.set_default: False,
@@ -137,7 +125,6 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
       self.set_managed2: False,
     }, 'forceful', conflict_strategy='USE_MANAGED')
 
-  @ensure_resolver
   def test_managed_jar_libraries_targets(self):
     expected_specs = [
       'testprojects/3rdparty/managed:args4j.args4j',
@@ -155,7 +142,6 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
     for spec in expected_specs:
       self.assertIn(spec, run.stdout_data)
 
-  @ensure_resolver
   def test_managed_jar_libraries_resolve(self):
     run = self.run_pants([
       'resolve',
@@ -163,7 +149,6 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
     ])
     self.assert_success(run)
 
-  @ensure_resolver
   def test_two_managers_build(self):
     with self._testing_build_file():
       with temporary_dir() as distdir:
@@ -181,7 +166,6 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
         self.assertTrue(os.path.exists(bin1))
         self.assertTrue(os.path.exists(bin2))
 
-  @ensure_resolver
   def test_all_targets_work(self):
     with self._testing_build_file():
       run = self.run_pants([
