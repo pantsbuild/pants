@@ -423,12 +423,8 @@ mod tests {
     // means they should be marked as unavailable for 20ms each.
     for _ in 0..4 {
       let s = s.clone();
-      runtime
-        .block_on(
-          s.next()
-            .map(move |(_server, token)| s.report_health(token, Health::Unhealthy)),
-        )
-        .unwrap();
+      let (_server, token) = runtime.block_on(s.next()).unwrap();
+      s.report_health(token, Health::Unhealthy);
     }
 
     let start = std::time::Instant::now();
@@ -475,16 +471,13 @@ mod tests {
     for _ in 0..2 {
       let s = s.clone();
       let mark_bad_as_baded_bad = mark_bad_as_baded_bad.clone();
-      runtime
-        .block_on(s.next().map(move |(server, token)| {
-          if &server == "bad" {
-            *mark_bad_as_baded_bad.lock() = true;
-            s.report_health(token, health);
-          } else {
-            s.report_health(token, Health::Healthy);
-          }
-        }))
-        .unwrap();
+      let (server, token) = runtime.block_on(s.next()).unwrap();
+      if server == "bad" {
+        *mark_bad_as_baded_bad.lock() = true;
+        s.report_health(token, health);
+      } else {
+        s.report_health(token, Health::Healthy);
+      }
     }
     assert!(*mark_bad_as_baded_bad.lock());
   }
@@ -503,17 +496,14 @@ mod tests {
       let s = s.clone();
       let should_break = should_break.clone();
       let did_get_at_least_one_good = did_get_at_least_one_good.clone();
-      runtime
-        .block_on(s.next().map(move |(server, token)| {
-          if start.elapsed() < duration - buffer {
-            assert_eq!("good", &server);
-            *did_get_at_least_one_good.lock() = true;
-          } else {
-            *should_break.lock() = true;
-          }
-          s.report_health(token, Health::Healthy);
-        }))
-        .unwrap();
+      let (server, token) = runtime.block_on(s.next()).unwrap();
+      if start.elapsed() < duration - buffer {
+        assert_eq!("good", server);
+        *did_get_at_least_one_good.lock() = true;
+      } else {
+        *should_break.lock() = true;
+      }
+      s.report_health(token, Health::Healthy);
     }
 
     assert!(*did_get_at_least_one_good.lock());
