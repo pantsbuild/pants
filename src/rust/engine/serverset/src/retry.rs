@@ -51,6 +51,7 @@ impl<T: Clone + Send + Sync + 'static> Retry<T> {
 #[cfg(test)]
 mod tests {
   use crate::{BackoffConfig, Retry, Serverset};
+  use maplit::hashset;
   use std::time::Duration;
   use testutil::owned_string_vec;
 
@@ -69,15 +70,15 @@ mod tests {
       BackoffConfig::new(Duration::from_millis(10), 2.0, Duration::from_millis(100)).unwrap(),
     )
     .unwrap();
-    let mut v = vec![];
+    let mut saw = hashset![];
     for _ in 0..3 {
-      v.push(
+      saw.insert(
         runtime
           .block_on(Retry(s.clone()).all_errors_immediately(|v| v, 1))
           .unwrap(),
       );
     }
-    assert_eq!(owned_string_vec(&["good", "enough", "good"]), v);
+    assert_eq!(saw, hashset!["good".to_owned(), "enough".to_owned()]);
   }
 
   #[test]
