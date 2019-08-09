@@ -7,6 +7,7 @@ import sys
 import threading
 from contextlib import contextmanager
 
+import humanfriendly
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
@@ -495,11 +496,13 @@ class PantsDaemon(FingerprintedProcessManager):
 
   def _has_exceeded_memory_usage(self):
     used_memory = self.current_memory_usage()
-    max_memory = self._bootstrap_options.for_global_scope().daemon_max_memory_usage
-    exceeded = used_memory > max_memory
-    self._logger.debug(f"pantsd is using {used_memory}b of memory, max is {max_memory}b")
+    humanfriendly_max_memory = self._bootstrap_options.for_global_scope().daemon_max_memory_usage
+    parsed_max_memory = humanfriendly.parse_size(humanfriendly_max_memory)
+    exceeded = used_memory > parsed_max_memory
+    self._logger.debug(f"pantsd is using {used_memory}b of memory, max is {humanfriendly_max_memory} ({parsed_max_memory} bytes)")
     if exceeded:
-      self._logger.info(f"pantsd exceeded it's alloted memory usage! (usage={used_memory}, max={max_memory})")
+      humanfriendly_used_memory = humanfriendly.format_size(used_memory)
+      self._logger.info(f"pantsd exceeded it's alloted memory usage! usage=({humanfriendly_used_memory})={used_memory} bytes, max=({humanfriendly_used_memory})={parsed_max_memory} bytes")
 
     return exceeded
 

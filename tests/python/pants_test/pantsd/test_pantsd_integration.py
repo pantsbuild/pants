@@ -12,6 +12,8 @@ import time
 import unittest
 from textwrap import dedent
 
+import humanfriendly
+
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, safe_open, touch
 from pants_test.pants_run_integration_test import read_pantsd_log
@@ -451,7 +453,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
       # Pass an extra flag, to set the maximum memory used by the daemon.
       much_less_memory = int(0.1 * (checker.current_memory_usage()))
-      max_memory_config = {'GLOBAL': {'daemon_max_memory_usage': f'{much_less_memory}'}}
+      max_memory_config = {'GLOBAL': {'daemon_max_memory_usage': humanfriendly.format_size(much_less_memory)}}
 
       pantsd_run(cmd, extra_config=max_memory_config)
 
