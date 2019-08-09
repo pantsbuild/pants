@@ -5,6 +5,7 @@ import functools
 import os
 import time
 from contextlib import contextmanager
+from typing import List
 
 from colors import bold, cyan, magenta
 
@@ -183,3 +184,16 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
     else:
       self.assert_failure(run)
     return run
+
+  @contextmanager
+  def warm_daemon(self, *, cmd: List[str] = ['filter', 'testprojects/::'], **kwargs):
+    """Starts an inocuous daemon run, and yields the checker for that run while the run is still active.
+
+    :param cmd: Command to start the daemon with.
+    """
+    with self.pantsd_successful_run_context(**kwargs) as (pantsd_run, checker, _, _):
+      # Assert that pantsd can complete this run successfully, and we have an active pantsd
+      pantsd_run(cmd)
+      checker.assert_running()
+
+      yield (cmd, pantsd_run, checker)

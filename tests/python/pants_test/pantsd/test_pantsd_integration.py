@@ -423,14 +423,10 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
           )
         )
 
+
   def test_max_memory_flag_does_not_invalidate_daemon_by_default(self):
     """Validates that, if we pass a value that is large enough to a running daemon, it will not restart."""
-    with self.pantsd_successful_run_context() as (pantsd_run, checker, _, _):
-      cmd = ['filter', 'testprojects/::']
-      # Assert that pantsd can complete this run successfully, and we have an active pantsd
-      pantsd_run(cmd)
-      checker.assert_running()
-
+    with self.warm_daemon() as (cmd, pantsd_run, checker):
       # Pass an extra flag, to set the maximum memory used by the daemon.
       twenty_times_the_used_memory = 20 * (checker.current_memory_usage())
       max_memory_config = {'GLOBAL': {'daemon_max_memory_usage': twenty_times_the_used_memory}}
@@ -444,12 +440,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     Validates that, if we pass a value that is lower than the current memory usage of the daemon,
     the daemon will restart.
     """
-    with self.pantsd_successful_run_context() as (pantsd_run, checker, _, _):
-      cmd = ['filter', 'testprojects/::']
-      # Assert that pantsd can complete this run successfully, and we have an active pantsd
-      pantsd_run(cmd)
-      checker.assert_running()
-
+    with self.warm_daemon() as (cmd, pantsd_run, checker):
       # Read the pidfile, to record which daemon is running.
       # NB: The file should already exist because we ran checker.assert_running,
       # so we have a deterministic timeout of 0.
