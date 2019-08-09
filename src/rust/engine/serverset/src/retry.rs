@@ -52,12 +52,20 @@ impl<T: Clone + Send + Sync + 'static> Retry<T> {
 mod tests {
   use crate::{BackoffConfig, Retry, Serverset};
   use std::time::Duration;
+  use testutil::owned_string_vec;
 
   #[test]
   fn retries() {
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
     let s = Serverset::new(
-      vec![Ok("good"), Err("bad".to_owned()), Ok("enough")],
+      owned_string_vec(&["good", "bad", "enough"]),
+      |s| {
+        if s == "bad" {
+          Err(s.to_owned())
+        } else {
+          Ok(s.to_owned())
+        }
+      },
       BackoffConfig::new(Duration::from_millis(10), 2.0, Duration::from_millis(100)).unwrap(),
     )
     .unwrap();
@@ -69,14 +77,15 @@ mod tests {
           .unwrap(),
       );
     }
-    assert_eq!(vec!["good", "enough", "good"], v);
+    assert_eq!(owned_string_vec(&["good", "enough", "good"]), v);
   }
 
   #[test]
   fn gives_up_on_enough_bad() {
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
     let s = Serverset::new(
-      vec![Err("bad".to_owned())],
+      vec!["bad".to_owned()],
+      |s| Err(s.to_owned()),
       BackoffConfig::new(Duration::from_millis(1), 1.0, Duration::from_millis(1)).unwrap(),
     )
     .unwrap();
