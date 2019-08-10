@@ -4,6 +4,46 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.20.0.dev1 (09/08/2019)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Move MyPy from isolated goal into 'lint' goal and add MyPy whitelist/opt-in type checking (#8099)
+  `PR #8099 <https://github.com/pantsbuild/pants/pull/8099>`_
+
+Bugfixes
+~~~~~~~~
+
+* Use more consistent time representation throughout the engine (#8143)
+  `PR #8143 <https://github.com/pantsbuild/pants/pull/8143>`_
+
+* Fix the PyPI project owner scraping heuristic. (#8144)
+  `PR #8144 <https://github.com/pantsbuild/pants/pull/8144>`_
+
+* Ensure injected `__init__.py` are world readable. (#8139)
+  `PR #8139 <https://github.com/pantsbuild/pants/pull/8139>`_
+
+* Don't hard code expecting HTTP 200 as the only success response code, all 20x responses are success codes. (#8102)
+  `PR #8102 <https://github.com/pantsbuild/pants/pull/8102>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Serverset makes connections from addresses (#8149)
+  `PR #8149 <https://github.com/pantsbuild/pants/pull/8149>`_
+
+* Upgrade pex to 1.6.9. (#8151)
+  `PR #8151 <https://github.com/pantsbuild/pants/pull/8151>`_
+
+* Bump test timeouts for targets that recently affected master. (#8146)
+  `PR #8146 <https://github.com/pantsbuild/pants/pull/8146>`_
+
+* remove complicated invalid dep check in rsc compile (#8131)
+  `PR #8131 <https://github.com/pantsbuild/pants/pull/8131>`_
+
+
 1.20.0.dev0 (02/08/2019)
 ------------------------
 

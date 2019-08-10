@@ -140,6 +140,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Mike Lindsey
 + Mike Solomon
 + Misho Krastev
++ Mohamed Abdi
 + Moses Nakamura
 + Nadav Samet
 + Neil Sanchala
