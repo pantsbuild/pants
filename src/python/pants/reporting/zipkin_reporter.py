@@ -69,7 +69,7 @@ class ZipkinReporter(Reporter):
     self.tracer = get_default_tracer()
     self.run_tracker = run_tracker
     self.service_name_prefix = service_name_prefix
-    self.max_span_batch_size = int(max_span_batch_size)
+    self.max_span_batch_size = max_span_batch_size
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
