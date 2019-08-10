@@ -16,7 +16,7 @@ API Changes
 Bugfixes
 ~~~~~~~~
 
-*  Use more consistent time representation throughout the engine (#8143)
+* Use more consistent time representation throughout the engine (#8143)
   `PR #8143 <https://github.com/pantsbuild/pants/pull/8143>`_
 
 * Fix the PyPI project owner scraping heuristic. (#8144)
