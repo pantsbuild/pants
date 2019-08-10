@@ -15,6 +15,7 @@ API Changes
 
 Bugfixes
 ~~~~~~~~
+
 *  Use more consistent time representation throughout the engine (#8143)
   `PR #8143 <https://github.com/pantsbuild/pants/pull/8143>`_
 
@@ -29,6 +30,7 @@ Bugfixes
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 * Serverset makes connections from addresses (#8149)
   `PR #8149 <https://github.com/pantsbuild/pants/pull/8149>`_
 
