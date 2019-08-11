@@ -365,7 +365,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def find_child_processes_that_send_spans(pants_result_stderr):
     child_processes = set()
     for line in pants_result_stderr.split('\n'):
-      if "pid of child process that sends spans to Zipkin server:" in line:
+      if "Sending spans to Zipkin server from pid:" in line:
         i = line.rindex(':')
         child_process_pid = line[i+1:]
         child_processes.add(int(child_process_pid))

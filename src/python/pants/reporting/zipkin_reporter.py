@@ -7,10 +7,10 @@ import subprocess
 import time
 
 import requests
-from py_zipkin import Encoding, get_default_tracer, Kind
-from py_zipkin.encoding import Span
+from py_zipkin import Encoding, Kind, get_default_tracer
+from py_zipkin.encoding import Span, get_encoder
 from py_zipkin.exception import ZipkinError
-from py_zipkin.logging_helper import ZipkinLoggingContext, LOGGING_END_KEY
+from py_zipkin.logging_helper import LOGGING_END_KEY, ZipkinLoggingContext
 from py_zipkin.thrift import copy_endpoint_with_new_service_name
 from py_zipkin.transport import BaseTransportHandler
 from py_zipkin.util import generate_random_64bit_string
@@ -35,11 +35,14 @@ class HTTPTransportHandler(BaseTransportHandler):
 
   def send(self, file_path):
     try:
-      command = 'curl -v -X POST -H "Content-Type: application/json" --data @{} {}'.format(file_path, self.endpoint)
-      args = command.split(' ')
+      args = ['curl',
+              '-X', 'POST',
+              '-H', '"Content-Type: application/json"',
+              '--data', '@' + file_path,
+              self.endpoint]
       p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
-      logger.debug("pid of child process that sends spans to Zipkin server: {}".format(p.pid))
+      logger.debug("Sending spans to Zipkin server from pid: {}".format(p.pid))
 
     except Exception as err:
       logger.error("Failed to post the payload to zipkin server. Error {}".format(err))
@@ -214,11 +217,17 @@ def from_secs_and_nanos_to_float(secs, nanos):
 
 
 def emit_spans(self):
+  """
+  This function replaces ZipkinLoggingContext method from py_zipkin.
+  In this function a derictory is created where encoded Zipkin spans can be stored.
+  ZipkinSpanSender is used instead of ZipkinBatchSender from py_zipkin.
+  """
 
   if not self.zipkin_attrs.is_sampled:
     self._get_tracer().clear()
     return
 
+  # Record last span.
   end_timestamp = time.time()
 
   annotations = {}
@@ -245,7 +254,6 @@ def emit_spans(self):
 
   spans_sender = ZipkinSpanSender(self.transport_handler,
     self.max_span_batch_size,
-    self.encoder,
     self.zipkin_spans_dir,
     self.encoding)
 
@@ -263,13 +271,24 @@ def emit_spans(self):
 
 
 class ZipkinSpanSender(object):
+  """
+  This class and it's functionality is similar to ZipkinBatchSender class from py_zipkin.
+  Currently it encodes spans only in json format.
+  Encoded spans are saved in files.
+  """
 
-  MAX_BATCH_SIZE = 100
-
-  def __init__(self, transport_handler, max_span_batch_size, encoder, zipkin_spans_dir, encoding):
+  def __init__(self, transport_handler, max_span_batch_size, zipkin_spans_dir, encoding):
+    """
+    :param BaseTransportHandler transport_handler: Function that takes path to a file and uses it to send spans to
+    the Zipkin server.
+    :param int max_span_batch_size: Spans in a trace are sent in batches,
+            max_span_batch_size defines max size of one batch
+    :param string zipkin_spans_dir: path to directory were encoded Zipkin spans are stored.
+    :param Encoding encoding: Output encoding format. Currently only JSON spans are supported.
+    """
     self.transport_handler = transport_handler
-    self.max_span_batch_size = max_span_batch_size or self.MAX_BATCH_SIZE
-    self.encoder = encoder
+    self.max_span_batch_size = max_span_batch_size or 100
+    self.encoder = get_encoder(encoding)
     self.zipkin_spans_dir = zipkin_spans_dir
     self.file_count = 0
     self.encoding = encoding
