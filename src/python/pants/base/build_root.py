@@ -24,14 +24,15 @@ class BuildRoot(Singleton):
 
   def find_buildroot(self) -> str:
     buildroot = Path.cwd().resolve()
-    while not any((Path(buildroot) / sentinel).is_file() for sentinel in self.sentinel_files):
+    while not any((buildroot / sentinel).is_file() for sentinel in self.sentinel_files):
       if buildroot != buildroot.parent:
         buildroot = buildroot.parent
       else:
-        raise self.NotFoundError('No buildroot detected. Pants detects the buildroot by looking '
-                                 f'for at least one file from {self.sentinel_files} in the cwd and '
-                                 'its ancestors. If you have none of these files, you can create '
-                                 'an empty file in your buildroot.')
+        raise self.NotFoundError(
+          'No build root detected. Pants detects the build root by looking for at least one file '
+          f'from {self.sentinel_files} in the cwd and its ancestors. If you have none of these '
+          f'files, you can create an empty file in your build root.'
+        )
     return str(buildroot)
 
   def __init__(self) -> None:

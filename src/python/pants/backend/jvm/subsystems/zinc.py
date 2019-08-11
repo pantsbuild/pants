@@ -3,6 +3,7 @@
 
 import os
 from hashlib import sha1
+from pathlib import Path
 from threading import Lock
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
@@ -212,37 +213,29 @@ class Zinc:
     return self._zinc_factory.hackily_snapshot(context)
 
   @memoized_property
-  def dist(self):
-    """Return the `Distribution` selected for Zinc based on execution strategy.
-
-    :rtype: pants.java.distribution.distribution.Distribution
-    """
+  def dist(self) -> Distribution:
+    """Return the `Distribution` selected for Zinc based on execution strategy."""
     underlying_dist = self.underlying_dist
-    if self._execution_strategy != NailgunTaskBase.HERMETIC:
-      # symlink .pants.d/.jdk -> /some/java/home/
-      jdk_home_symlink = os.path.relpath(
-        os.path.join(self._zinc_factory.get_options().pants_workdir, '.jdk'),
-        get_buildroot())
-
-      # Since this code can be run in multi-threading mode due to multiple
-      # zinc workers, we need to make sure the file operations below are atomic.
-      with self._lock:
-        # Create the symlink if it does not exist, or points to a file that doesn't exist,
-        # (e.g., a JDK that is no longer present), or points to the wrong JDK.
-        if (not os.path.exists(jdk_home_symlink) or
-            os.readlink(jdk_home_symlink) != underlying_dist.home):
-          safe_delete(jdk_home_symlink)  # Safe-delete, in case it's a broken symlink.
-          os.symlink(underlying_dist.home, jdk_home_symlink)
-
-      return Distribution(home_path=jdk_home_symlink)
-    else:
+    if self._execution_strategy == NailgunTaskBase.HERMETIC:
       return underlying_dist
+    # symlink .pants.d/.jdk -> /some/java/home/
+    jdk_home_symlink = (
+      Path(self._zinc_factory.get_options().pants_workdir) / '.jdk'
+    ).relative_to(get_buildroot())
+
+    # Since this code can be run in multi-threading mode due to multiple
+    # zinc workers, we need to make sure the file operations below are atomic.
+    with self._lock:
+      # Create the symlink if it does not exist, or points to a file that doesn't exist,
+      # (e.g., a JDK that is no longer present), or points to the wrong JDK.
+      if not jdk_home_symlink.exists() or jdk_home_symlink.resolve() != Path(underlying_dist.home):
+        safe_delete(str(jdk_home_symlink))  # Safe-delete, in case it's a broken symlink.
+        jdk_home_symlink.symlink_to(underlying_dist.home)
+
+    return Distribution(home_path=jdk_home_symlink)
 
   @property
-  def underlying_dist(self):
-    """
-    :rtype: pants.java.distribution.distribution.Distribution
-    """
+  def underlying_dist(self) -> Distribution:
     return self._zinc_factory.dist
 
   @memoized_property
