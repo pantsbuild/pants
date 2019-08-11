@@ -22,7 +22,7 @@ from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.distribution.distribution import Distribution
 from pants.java.jar.jar_dependency import JarDependency
-from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir
+from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_mkdir_for
 from pants.util.fileutil import safe_hardlink_or_copy
 from pants.util.memo import memoized_method, memoized_property
 
@@ -230,6 +230,7 @@ class Zinc:
       # (e.g., a JDK that is no longer present), or points to the wrong JDK.
       if not jdk_home_symlink.exists() or jdk_home_symlink.resolve() != Path(underlying_dist.home):
         safe_delete(str(jdk_home_symlink))  # Safe-delete, in case it's a broken symlink.
+        safe_mkdir_for(jdk_home_symlink)
         jdk_home_symlink.symlink_to(underlying_dist.home)
 
     return Distribution(home_path=jdk_home_symlink)
