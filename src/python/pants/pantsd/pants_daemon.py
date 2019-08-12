@@ -527,9 +527,7 @@ class PantsDaemon(FingerprintedProcessManager):
     :param option_fingerprint: A fingeprint of the global bootstrap options.
     :return: True if the daemon needs to restart.
     """
-    should_shutdown_after_run = self._bootstrap_options.for_global_scope().shutdown_pantsd_after_run
     return super().needs_restart(option_fingerprint) or \
-           (self.is_alive() and should_shutdown_after_run) or \
            self._has_exceeded_memory_usage()
 
 
