@@ -521,14 +521,6 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
 # TODO: add testing for fatal errors at import-time, which may occur if there are errors in plugins.
 
 
-# Set the initial log location, for fatal errors during import time.
-# FIXME: Because this happens at import time, it happens before any configuration is available. We
-# should either switch this to a bootstrap location that is only used before configuration is read,
-# or...?
-#ExceptionSink.reset_log_location(os.path.join(os.getcwd(), '.pants.d'))
-
-
-
 # Sets except hook for exceptions at import time.
 ExceptionSink._reset_exiter(Exiter(exiter=sys.exit))
 # Sets a SIGUSR2 handler.
