@@ -4,13 +4,8 @@
 import logging
 import os
 import subprocess
-import time
 
-from py_zipkin import Encoding, Kind, get_default_tracer
-from py_zipkin.encoding import Span, get_encoder
-from py_zipkin.exception import ZipkinError
-from py_zipkin.logging_helper import LOGGING_END_KEY, ZipkinLoggingContext
-from py_zipkin.thrift import copy_endpoint_with_new_service_name
+from py_zipkin import Encoding, get_default_tracer
 from py_zipkin.transport import BaseTransportHandler
 from py_zipkin.util import generate_random_64bit_string
 from py_zipkin.zipkin import ZipkinAttrs, create_attrs_for_span
@@ -26,27 +21,42 @@ NANOSECONDS_PER_SECOND = 1000000000.0
 
 
 class HTTPTransportHandler(BaseTransportHandler):
-  def __init__(self, endpoint, zipkin_spans_dir):
+  def __init__(self, endpoint, zipkin_spans_dir, encoding):
     self.endpoint = endpoint
     self.zipkin_spans_dir = zipkin_spans_dir
+    self.file_count = 0
+    self.encoding = encoding
 
   def get_max_payload_bytes(self):
     return None
 
-  def send(self, file_path):
+  def send(self, payload):
     try:
-      args = ['curl',
-              '-X', 'POST',
-              '-H', '"Content-Type: application/json"',
-              '--data', '@' + file_path,
-              self.endpoint]
-      file_path_to_stdout_stderr = os.path.join(self.zipkin_spans_dir, 'std_out_err_output')
-      p = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=open(file_path_to_stdout_stderr, 'w'), stderr=subprocess.STDOUT, close_fds=False)
+      if os.path.exists(self.zipkin_spans_dir):
+        self.file_count += 1
+        file_path_to_store_spans = os.path.join(
+          self.zipkin_spans_dir, 'spans-{}-{}'.format(self.file_count, self.encoding)
+        )
 
-      logger.debug("Sending spans to Zipkin server from pid: {}".format(p.pid))
-      logger.debug(
-        "stdout and stderr for pid {} are located at '{}'".format(p.pid, file_path_to_stdout_stderr)
-      )
+        with open(file_path_to_store_spans, 'w') as f:
+          f.write(payload)
+
+        args = ['curl', '-v',
+                '-X', 'POST',
+                '-H', '"Content-Type: application/json"',
+                '--data', '@' + file_path_to_store_spans,
+                self.endpoint]
+        file_path_to_stdout_stderr = os.path.join(self.zipkin_spans_dir,
+                                                  'stdout_stderr_output_{}'.format(self.file_count))
+        p = subprocess.Popen(args, stdin=subprocess.DEVNULL,
+                             stdout=open(file_path_to_stdout_stderr, 'w'),
+                             stderr=subprocess.STDOUT, close_fds=False)
+
+        logger.debug("Sending spans to Zipkin server from pid: {}".format(p.pid))
+        logger.debug("stdout and stderr for pid {} are located at '{}'".format(
+          p.pid,
+          file_path_to_stdout_stderr)
+        )
 
     except Exception as err:
       logger.error("Failed to post the payload to zipkin server. Error {}".format(err))
@@ -81,12 +91,16 @@ class ZipkinReporter(Reporter):
     self.parent_id = parent_id
     self.sample_rate = float(sample_rate)
     self.endpoint = endpoint
+    self.encoding = Encoding.V1_JSON
     self.tracer = get_default_tracer()
     self.run_tracker = run_tracker
     self.service_name_prefix = service_name_prefix
     self.max_span_batch_size = max_span_batch_size
     self.zipkin_spans_dir = os.path.join(self.run_tracker.run_info_dir, 'zipkin')
-    self.handler = HTTPTransportHandler(endpoint, self.zipkin_spans_dir)
+    self.handler = HTTPTransportHandler(endpoint, self.zipkin_spans_dir, self.encoding)
+
+    # Derictory to store encoded spans.
+    safe_mkdir(self.zipkin_spans_dir)
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
@@ -133,7 +147,7 @@ class ZipkinReporter(Reporter):
         service_name=self.service_name_prefix.format("main"),
         span_name=workunit.name,
         transport_handler=self.handler,
-        encoding=Encoding.V1_JSON,
+        encoding=self.encoding,
         zipkin_attrs=zipkin_attrs,
         max_span_batch_size=self.max_span_batch_size,
       )
@@ -161,9 +175,6 @@ class ZipkinReporter(Reporter):
     span.start_timestamp = workunit.start_time
     if first_span and span.zipkin_attrs.is_sampled:
       span.logging_context.start_timestamp = workunit.start_time
-      span.logging_context.emit_spans = emit_spans.__get__(span.logging_context, ZipkinLoggingContext)
-      span.logging_context.zipkin_spans_dir = self.zipkin_spans_dir
-      span.logging_context.encoding = span.encoding
     workunit.zipkin_span = span
 
   def end_workunit(self, workunit):
@@ -218,145 +229,3 @@ class ZipkinReporter(Reporter):
 
 def from_secs_and_nanos_to_float(secs, nanos):
   return secs + ( nanos / NANOSECONDS_PER_SECOND )
-
-
-def emit_spans(self):
-  """
-  This function replaces ZipkinLoggingContext method from py_zipkin.
-  In this function a derictory is created where encoded Zipkin spans can be stored.
-  ZipkinSpanSender is used instead of ZipkinBatchSender from py_zipkin.
-  """
-
-  if not self.zipkin_attrs.is_sampled:
-    self._get_tracer().clear()
-    return
-
-  # Record last span.
-  end_timestamp = time.time()
-
-  annotations = {}
-  if self.add_logging_annotation:
-    annotations[LOGGING_END_KEY] = time.time()
-
-  last_span = Span(
-    trace_id=self.zipkin_attrs.trace_id,
-    name=self.span_name,
-    parent_id=self.zipkin_attrs.parent_span_id,
-    span_id=self.zipkin_attrs.span_id,
-    kind=Kind.CLIENT if self.client_context else Kind.SERVER,
-    timestamp=self.start_timestamp,
-    duration=end_timestamp - self.start_timestamp,
-    local_endpoint=self.endpoint,
-    remote_endpoint=self.remote_endpoint,
-    shared=not self.report_root_timestamp,
-    annotations=annotations,
-    tags=self.tags,
-  )
-  self._get_tracer().add_span(last_span)
-
-  safe_mkdir(self.zipkin_spans_dir)
-
-  spans_sender = ZipkinSpanSender(self.transport_handler,
-    self.max_span_batch_size,
-    self.zipkin_spans_dir,
-    self.encoding)
-
-  with spans_sender:
-    if os.path.exists(self.zipkin_spans_dir):
-      for span in self._get_tracer().get_spans():
-        span.local_endpoint = copy_endpoint_with_new_service_name(
-          self.endpoint,
-          span.local_endpoint.service_name,
-        )
-
-        spans_sender.add_span(span)
-
-  self._get_tracer().clear()
-
-
-class ZipkinSpanSender(object):
-  """
-  This class and it's functionality is similar to ZipkinBatchSender class from py_zipkin.
-  Currently it encodes spans only in json format.
-  Encoded spans are saved in files.
-  """
-
-  def __init__(self, transport_handler, max_span_batch_size, zipkin_spans_dir, encoding):
-    """
-    :param BaseTransportHandler transport_handler: Function that takes path to a file and uses it to send spans to
-    the Zipkin server.
-    :param int max_span_batch_size: Spans in a trace are sent in batches,
-            max_span_batch_size defines max size of one batch
-    :param string zipkin_spans_dir: path to directory were encoded Zipkin spans are stored.
-    :param Encoding encoding: Output encoding format. Currently only JSON spans are supported.
-    """
-    self.transport_handler = transport_handler
-    self.max_span_batch_size = max_span_batch_size or 100
-    self.encoder = get_encoder(encoding)
-    self.zipkin_spans_dir = zipkin_spans_dir
-    self.file_count = 0
-    self.encoding = encoding
-
-    if isinstance(self.transport_handler, BaseTransportHandler):
-      self.max_payload_bytes = self.transport_handler.get_max_payload_bytes()
-    else:
-      self.max_payload_bytes = None
-
-  def __enter__(self):
-    self._reset_queue()
-    return self
-
-  def __exit__(self, _exc_type, _exc_value, _exc_traceback):
-    if any((_exc_type, _exc_value, _exc_traceback)):
-      filename = os.path.split(_exc_traceback.tb_frame.f_code.co_filename)[1]
-      error = '({0}:{1}) {2}: {3}'.format(
-        filename,
-        _exc_traceback.tb_lineno,
-        _exc_type.__name__,
-        _exc_value,
-      )
-      raise ZipkinError(error)
-    else:
-      self.flush()
-
-  def _reset_queue(self):
-    self.queue = []
-    self.current_size = 0
-    self.file_count += 1
-
-  def add_span(self, span):
-    encoded_span = self.encoder.encode_span(span)
-
-    # If we've already reached the max batch size or the new span doesn't
-    # fit in max_payload_bytes, send what we've collected until now and
-    # start a new batch.
-    is_over_size_limit = (
-      self.max_payload_bytes is not None and
-      not self.encoder.fits(
-        current_count=len(self.queue),
-        current_size=self.current_size,
-        max_size=self.max_payload_bytes,
-        new_span=encoded_span,
-      )
-    )
-    is_over_portion_limit = len(self.queue) >= self.max_span_batch_size
-    if is_over_size_limit or is_over_portion_limit:
-      self.flush()
-
-    self.queue.append(encoded_span)
-    self.current_size += len(encoded_span)
-
-  def flush(self):
-    if self.transport_handler and len(self.queue) > 0:
-      file_path = os.path.join(
-        self.zipkin_spans_dir, 'spans-{}-{}'.format(self.file_count, self.encoding)
-      )
-      self.save_json_spans_to_file(file_path)
-      self.transport_handler(file_path)
-    self._reset_queue()
-
-  def save_json_spans_to_file(self, file_path):
-    with open(file_path, 'a') as f:
-      f.write('[')
-      f.write(','.join(self.queue))
-      f.write(']')
