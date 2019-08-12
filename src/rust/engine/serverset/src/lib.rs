@@ -110,13 +110,16 @@ impl<T: Clone> Inner<T> {
     None
   }
 
+  fn can_make_more_connections(&self) -> bool {
+    let existing_connections = self.connections.len();
+    existing_connections < self.connection_limit && self.servers.len() > existing_connections
+  }
+
   fn is_connected(&self, server_index: usize) -> bool {
-    for connection in &self.connections {
-      if connection.server_index == server_index {
-        return true;
-      }
-    }
-    false
+    self
+      .connections
+      .iter()
+      .any(|connection| connection.server_index == server_index)
   }
 }
 
@@ -229,6 +232,10 @@ impl BackoffConfig {
 }
 
 impl<T: Clone + Send + Sync + 'static> Serverset<T> {
+  // Connect is currently infallible (i.e. doesn't return a Result type). This is because the only
+  // type we use this for at the moment treats connections as infallible. If we start using a
+  // Serverset for some type where connections can fail, we should consider factoring that into when
+  // connections are considered unhealthy.
   pub fn new<Connect: Fn(&str) -> T + 'static + Send>(
     servers: Vec<String>,
     connect: Connect,
@@ -241,16 +248,17 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
     if connection_limit == 0 {
       return Err("Must supply connection_limit greater than 0".to_owned());
     }
+    let servers = servers
+      .into_iter()
+      .map(|server| Backend {
+        server,
+        unhealthy_info: None,
+      })
+      .collect();
 
     Ok(Serverset {
       inner: Arc::new(Mutex::new(Inner {
-        servers: servers
-          .into_iter()
-          .map(|server| Backend {
-            server,
-            unhealthy_info: None,
-          })
-          .collect(),
+        servers,
         next_server: 0,
         connections: vec![],
         next_connection: 0,
@@ -277,11 +285,9 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
   /// first server to become healthy after all are unhealthy).
   ///
   pub fn next(&self) -> BoxFuture<(T, HealthReportToken), String> {
-    let now = Instant::now();
     let mut inner = self.inner.lock();
 
-    let existing_connections = inner.connections.len();
-    if existing_connections < inner.connection_limit && inner.servers.len() > existing_connections {
+    if inner.can_make_more_connections() {
       // Find a healthy server without a connection, connect to it.
       if let Some(ret) = inner.connect() {
         inner.next_connection = inner.next_connection.wrapping_add(1);
@@ -302,30 +308,15 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
       .to_boxed();
     }
 
-    let mut earliest_future = None;
-    for _ in 0..inner.servers.len() {
-      let i = inner.next_server % inner.servers.len();
-      inner.next_server = inner.next_server.wrapping_add(1);
-      let server = &inner.servers[i];
-      let unhealthy_info = &server.unhealthy_info;
-      if let Some(ref unhealthy_info) = unhealthy_info {
-        let healthy_at = unhealthy_info.healthy_at();
-
-        if healthy_at > now {
-          let healthy_sooner_than_previous = if let Some(previous_healthy_at) = earliest_future {
-            previous_healthy_at > healthy_at
-          } else {
-            true
-          };
-
-          if healthy_sooner_than_previous {
-            earliest_future = Some(healthy_at);
-          }
-        }
-      } // else cannot happen, or we would already have connected and returned.
-    }
-    // Unwrap is safe because if we hadn't populated earliest_future, we would already have returned.
-    let instant = earliest_future.unwrap();
+    // Unwrap is safe because _some_ server must have an unhealthy_info or we would've already
+    // returned it.
+    let instant = inner
+      .servers
+      .iter()
+      .filter_map(|server| server.unhealthy_info)
+      .map(|info| info.healthy_at())
+      .min()
+      .unwrap();
 
     let serverset = self.clone();
     Delay::new(instant)
