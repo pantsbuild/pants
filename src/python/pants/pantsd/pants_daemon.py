@@ -494,17 +494,23 @@ class PantsDaemon(FingerprintedProcessManager):
     if include_watchman:
       self.watchman_launcher.terminate()
 
-  def _has_exceeded_memory_usage(self):
-    used_memory = self.current_memory_usage()
-    humanfriendly_max_memory = self._bootstrap_options.for_global_scope().daemon_max_memory_usage
-    parsed_max_memory = humanfriendly.parse_size(humanfriendly_max_memory)
-    exceeded = used_memory > parsed_max_memory
-    self._logger.debug(f"pantsd is using {used_memory}b of memory, max is {humanfriendly_max_memory} ({parsed_max_memory} bytes)")
-    if exceeded:
-      humanfriendly_used_memory = humanfriendly.format_size(used_memory)
-      self._logger.info(f"pantsd exceeded it's alloted memory usage! usage=({humanfriendly_used_memory})={used_memory} bytes, max=({humanfriendly_used_memory})={parsed_max_memory} bytes")
+  def _has_exceeded_memory_usage(self) -> bool:
+    process_memory_usage = self.current_memory_usage()
+    if process_memory_usage.is_alive:
+      bytes_used = process_memory_usage.bytes_used
+      humanfriendly_max_memory = self._bootstrap_options.for_global_scope().daemon_max_memory_usage
+      parsed_max_memory = humanfriendly.parse_size(humanfriendly_max_memory)
+      exceeded = bytes_used > parsed_max_memory
+      self._logger.debug(f"pantsd is using {bytes_used}b of memory, max is {humanfriendly_max_memory} ({parsed_max_memory} bytes)")
+      if exceeded:
+        humanfriendly_used_memory = humanfriendly.format_size(bytes_used)
+        self._logger.info(f"pantsd exceeded it's alloted memory usage! usage=({humanfriendly_used_memory})={bytes_used} bytes, max=({humanfriendly_used_memory})={parsed_max_memory} bytes")
 
-    return exceeded
+      return exceeded
+    else:
+      # NB: We return false, because a dead process has never exceeded memory limits.
+      # We trust on other process-cleaning mechanisms in pants to get rid of the dead pantsd.
+      return False
 
   def needs_restart(self, option_fingerprint):
     """

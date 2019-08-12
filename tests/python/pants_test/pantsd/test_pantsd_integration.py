@@ -409,7 +409,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         self.assert_success(pantsd_run(cmd))
         checker.assert_running()
 
-      final_memory_usage = checker.current_memory_usage()
+      final_memory_usage = checker.current_memory_usage_unwrapped()
       self.assertTrue(
           initial_memory_usage <= final_memory_usage,
           "Memory usage inverted unexpectedly: {} > {}".format(
@@ -429,7 +429,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     """Validates that, if we pass a value that is large enough to a running daemon, it will not restart."""
     with self.warm_daemon() as (cmd, pantsd_run, checker):
       # Pass an extra flag, to set the maximum memory used by the daemon.
-      twenty_times_the_used_memory = 20 * (checker.current_memory_usage())
+      twenty_times_the_used_memory = 20 * (checker.current_memory_usage_unwrapped())
       max_memory_config = {'GLOBAL': {'daemon_max_memory_usage': twenty_times_the_used_memory}}
 
       # Assert that passing this flag (with more than enough memory) doesn't restart the daemon
@@ -452,7 +452,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
       before_daemon_processes = checker.runner_process_context.current_processes()
 
       # Pass an extra flag, to set the maximum memory used by the daemon.
-      much_less_memory = int(0.1 * (checker.current_memory_usage()))
+      much_less_memory = int(0.1 * (checker.current_memory_usage_unwrapped()))
       max_memory_config = {'GLOBAL': {'daemon_max_memory_usage': humanfriendly.format_size(much_less_memory)}}
 
       pantsd_run(cmd, extra_config=max_memory_config)

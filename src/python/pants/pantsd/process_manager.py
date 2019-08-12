@@ -17,6 +17,7 @@ from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.process.subprocess import Subprocess
 from pants.util.dirutil import read_file, rm_rf, safe_file_dump, safe_mkdir
 from pants.util.memo import memoized_property
+from pants.util.objects import datatype
 
 
 logger = logging.getLogger(__name__)
@@ -438,13 +439,26 @@ class ProcessManager(ProcessMetadataManager):
     if purge:
       self.purge_metadata(force=True)
 
-  def current_memory_usage(self):
+  class ProcessMemoryUsage(datatype([
+    ("is_alive", bool),
+    ("bytes_used", int)
+  ])): pass
+
+  def current_memory_usage(self) -> ProcessMemoryUsage:
     """Return the current memory usage of the pantsd process (which must be running)
 
-    :return: memory usage in bytes
+    :return: memory usage in bytes. If the process is not alive, it returns 0
     """
-    assert self.is_alive(), f"Cannot read memory of dead process with pid {self._pid}"
-    return psutil.Process(self._pid).memory_info()[0]
+    if self.is_alive():
+      return ProcessManager.ProcessMemoryUsage(
+        True,
+        psutil.Process(self._pid).memory_info()[0]
+      )
+    else:
+      return ProcessManager.ProcessMemoryUsage(
+        False,
+        0
+      )
 
   def daemonize(self, pre_fork_opts=None, post_fork_parent_opts=None, post_fork_child_opts=None,
                 fork_context=None, write_pid=True):

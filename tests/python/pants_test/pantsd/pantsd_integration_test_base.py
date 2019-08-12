@@ -69,10 +69,16 @@ class PantsDaemonMonitor(ProcessManager):
     assert self.is_dead(), 'pantsd should be stopped!'
     return self._pid
 
-  def current_memory_usage(self):
+  class PantsdIsDeadException(Exception): pass
+
+  def current_memory_usage_unwrapped(self) -> int:
     """Return the memory usage, but await for metadata first."""
     self.assert_running()
-    return super().current_memory_usage()
+    usage = self.current_memory_usage()
+    if usage.is_alive:
+      return usage.bytes_used
+    else:
+      raise PantsDaemonMonitor.PantsdIsDeadException("Pantsd died unexpectedly between blocking for metadata and now.")
 
 
 class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
