@@ -84,7 +84,13 @@ class PantsDaemonSignalHandler(SignalHandler):
     super().__init__()
     self._daemon = daemon
 
+  def handle_sigterm(self, signum, frame):
+    if self._daemon._has_exceeded_memory_usage():
+      self._daemon._logger.error('pantsd has exceeded its memory limit!')
+    super().handle_sigterm(signum, frame)
+
   def handle_sigint(self, signum, _frame):
+    self._daemon._logger.error('pantsd has received a SIGINT!')
     self._daemon.terminate(include_watchman=False)
 
 
@@ -490,6 +496,7 @@ class PantsDaemon(FingerprintedProcessManager):
 
     N.B. This should always be called under care of the `lifecycle_lock`.
     """
+    self._logger.error(f'pantsd is about to terminate (include_watchman={include_watchman})')
     super().terminate()
     if include_watchman:
       self.watchman_launcher.terminate()
@@ -498,13 +505,13 @@ class PantsDaemon(FingerprintedProcessManager):
     process_memory_usage = self.current_memory_usage()
     if process_memory_usage.is_alive:
       bytes_used = process_memory_usage.bytes_used
+      humanfriendly_used_memory = humanfriendly.format_size(bytes_used)
       humanfriendly_max_memory = self._bootstrap_options.for_global_scope().daemon_max_memory_usage
       parsed_max_memory = humanfriendly.parse_size(humanfriendly_max_memory)
+      self._logger.debug(f"pantsd is using {humanfriendly_used_memory} ({bytes_used} bytes) of memory, max is {humanfriendly_max_memory} ({parsed_max_memory} bytes)")
       exceeded = bytes_used > parsed_max_memory
-      self._logger.debug(f"pantsd is using {bytes_used}b of memory, max is {humanfriendly_max_memory} ({parsed_max_memory} bytes)")
       if exceeded:
-        humanfriendly_used_memory = humanfriendly.format_size(bytes_used)
-        self._logger.info(f"pantsd exceeded it's alloted memory usage! usage=({humanfriendly_used_memory})={bytes_used} bytes, max=({humanfriendly_used_memory})={parsed_max_memory} bytes")
+        self._logger.info(f"pantsd exceeded it's alloted memory usage! usage=({humanfriendly_used_memory})={bytes_used} bytes, max=({humanfriendly_max_memory})={parsed_max_memory} bytes")
 
       return exceeded
     else:
