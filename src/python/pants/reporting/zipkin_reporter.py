@@ -6,7 +6,6 @@ import os
 import subprocess
 import time
 
-import requests
 from py_zipkin import Encoding, Kind, get_default_tracer
 from py_zipkin.encoding import Span, get_encoder
 from py_zipkin.exception import ZipkinError
@@ -27,8 +26,9 @@ NANOSECONDS_PER_SECOND = 1000000000.0
 
 
 class HTTPTransportHandler(BaseTransportHandler):
-  def __init__(self, endpoint):
+  def __init__(self, endpoint, zipkin_spans_dir):
     self.endpoint = endpoint
+    self.zipkin_spans_dir = zipkin_spans_dir
 
   def get_max_payload_bytes(self):
     return None
@@ -40,9 +40,13 @@ class HTTPTransportHandler(BaseTransportHandler):
               '-H', '"Content-Type: application/json"',
               '--data', '@' + file_path,
               self.endpoint]
-      p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+      file_path_to_stdout_stderr = os.path.join(self.zipkin_spans_dir, 'std_out_err_output')
+      p = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=open(file_path_to_stdout_stderr, 'w'), stderr=subprocess.STDOUT, close_fds=False)
 
       logger.debug("Sending spans to Zipkin server from pid: {}".format(p.pid))
+      logger.debug(
+        "stdout and stderr for pid {} are located at '{}'".format(p.pid, file_path_to_stdout_stderr)
+      )
 
     except Exception as err:
       logger.error("Failed to post the payload to zipkin server. Error {}".format(err))
@@ -73,7 +77,6 @@ class ZipkinReporter(Reporter):
     """
     super().__init__(run_tracker, settings)
     # Create a transport handler
-    self.handler = HTTPTransportHandler(endpoint)
     self.trace_id = trace_id
     self.parent_id = parent_id
     self.sample_rate = float(sample_rate)
@@ -82,6 +85,8 @@ class ZipkinReporter(Reporter):
     self.run_tracker = run_tracker
     self.service_name_prefix = service_name_prefix
     self.max_span_batch_size = max_span_batch_size
+    self.zipkin_spans_dir = os.path.join(self.run_tracker.run_info_dir, 'zipkin')
+    self.handler = HTTPTransportHandler(endpoint, self.zipkin_spans_dir)
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
@@ -156,9 +161,8 @@ class ZipkinReporter(Reporter):
     span.start_timestamp = workunit.start_time
     if first_span and span.zipkin_attrs.is_sampled:
       span.logging_context.start_timestamp = workunit.start_time
-      if span.encoding in (Encoding.V1_JSON, Encoding.V2_JSON):
-        span.logging_context.emit_spans = emit_spans.__get__(span.logging_context, ZipkinLoggingContext)
-      span.logging_context.zipkin_spans_dir = os.path.join(self.run_tracker.run_info_dir, 'zipkin')
+      span.logging_context.emit_spans = emit_spans.__get__(span.logging_context, ZipkinLoggingContext)
+      span.logging_context.zipkin_spans_dir = self.zipkin_spans_dir
       span.logging_context.encoding = span.encoding
     workunit.zipkin_span = span
 
