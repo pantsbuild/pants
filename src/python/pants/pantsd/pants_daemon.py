@@ -86,11 +86,11 @@ class PantsDaemonSignalHandler(SignalHandler):
 
   def handle_sigterm(self, signum, frame):
     if self._daemon._has_exceeded_memory_usage():
-      self._daemon._logger.error('pantsd has exceeded its memory limit!')
+      self._daemon._logger.info('pantsd has exceeded its memory limit!')
     super().handle_sigterm(signum, frame)
 
   def handle_sigint(self, signum, _frame):
-    self._daemon._logger.error('pantsd has received a SIGINT!')
+    self._daemon._logger.info('pantsd has received a SIGINT!')
     self._daemon.terminate(include_watchman=False)
 
 
@@ -416,7 +416,8 @@ class PantsDaemon(FingerprintedProcessManager):
     # Also, register an exiter using os._exit to ensure we only close stdio streams once.
     self._close_stdio()
     with self._pantsd_logging() as (log_stream, log_filename), \
-         ExceptionSink.exiter_as(lambda _: Exiter(exiter=os._exit)):
+         ExceptionSink.exiter_as(lambda _: Exiter(exiter=os._exit)), \
+         ExceptionSink.trapped_signals(PantsDaemonSignalHandler(self)):
 
       # We don't have any stdio streams to log to anymore, so we log to a file.
       # We don't override the faulthandler destination because the stream we get will proxy things
@@ -496,7 +497,7 @@ class PantsDaemon(FingerprintedProcessManager):
 
     N.B. This should always be called under care of the `lifecycle_lock`.
     """
-    self._logger.error(f'pantsd is about to terminate (include_watchman={include_watchman})')
+    self._logger.debug(f'pantsd is about to terminate (include_watchman={include_watchman})')
     super().terminate()
     if include_watchman:
       self.watchman_launcher.terminate()
