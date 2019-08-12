@@ -82,8 +82,8 @@ class PythonBinaryCreate(Task):
     for binary in binaries:
       name = binary.name
       if name in names:
-        raise TaskError('Cannot build two binaries with the same name in a single invocation. '
-                        '{} and {} both have the name {}.'.format(binary, names[name], name))
+        raise TaskError(f'Cannot build two binaries with the same name in a single invocation. '
+                        '{binary} and {names[name]} both have the name {name}.')
       names[name] = binary
 
     with self.invalidated(binaries, invalidate_dependents=True) as invalidation_check:

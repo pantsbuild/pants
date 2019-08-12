@@ -86,7 +86,8 @@ class Git(Scm):
       process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=stderr)
     except OSError as e:
       # Binary DNE or is not executable
-      raise cls.LocalException('Failed to execute command {}: {}'.format(' '.join(cmd), e))
+      cmd_str = ' '.join(cmd)
+      raise cls.LocalException(f'Failed to execute command {cmd_str}: {e}')
     out, _ = process.communicate()
     return process, out
 
@@ -97,7 +98,8 @@ class Git(Scm):
   @classmethod
   def _check_result(cls, cmd, result, failure_msg=None, raise_type=Scm.ScmException):
     if result != 0:
-      raise raise_type(failure_msg or '{} failed with exit code {}'.format(' '.join(cmd), result))
+      cmd_str = ' '.join(cmd)
+      raise raise_type(failure_msg or f'{cmd_str} failed with exit code {result}')
 
   def __init__(self, binary='git', gitdir=None, worktree=None, remote=None, branch=None):
     """Creates a git scm proxy that assumes the git repository is in the cwd by default.
@@ -139,8 +141,8 @@ class Git(Scm):
 
     origins = list(origin_urls())
     if len(origins) != 1:
-      raise Scm.LocalException("Unable to find remote named 'origin' that accepts pushes "
-                               "amongst:\n{}".format(git_output))
+      raise Scm.LocalException(f"Unable to find remote named 'origin' that accepts pushes "
+                               "amongst:\n{git_output}")
     return origins[0]
 
   @property
@@ -269,8 +271,8 @@ class Git(Scm):
                                    raise_type=Scm.LocalException)
         return value.strip()
 
-      self._remote = self._remote or get_local_config('branch.{}.remote'.format(branch))
-      self._branch = self._branch or get_local_config('branch.{}.merge'.format(branch))
+      self._remote = self._remote or get_local_config(f'branch.{branch}.remote')
+      self._branch = self._branch or get_local_config(f'branch.{branch}.merge')
     return self._remote, self._branch
 
   def _check_call(self, args, failure_msg=None, raise_type=None):
@@ -326,7 +328,7 @@ class GitRepositoryReader:
       self.rev = rev
 
     def __str__(self):
-      return "MissingFileException({}, {})".format(self.relpath, self.rev)
+      return f"MissingFileException({self.relpath}, {self.rev})"
 
   class IsDirException(Exception):
 
@@ -335,7 +337,7 @@ class GitRepositoryReader:
       self.rev = rev
 
     def __str__(self):
-      return "IsDirException({}, {})".format(self.relpath, self.rev)
+      return f"IsDirException({self.relpath}, {self.rev})"
 
   class NotADirException(Exception):
 
@@ -344,7 +346,7 @@ class GitRepositoryReader:
       self.rev = rev
 
     def __str__(self):
-      return "NotADirException({}, {})".format(self.relpath, self.rev)
+      return f"NotADirException({self.relpath}, {self.rev})"
 
   class SymlinkLoopException(Exception):
 
@@ -353,7 +355,7 @@ class GitRepositoryReader:
       self.rev = rev
 
     def __str__(self):
-      return "SymlinkLoop({}, {})".format(self.relpath, self.rev)
+      return f"SymlinkLoop({self.relpath}, {self.rev})"
 
   class ExternalSymlinkException(Exception):
 
@@ -362,7 +364,7 @@ class GitRepositoryReader:
       self.rev = rev
 
     def __str__(self):
-      return "ExternalSymlink({}, {})".format(self.relpath, self.rev)
+      return f"ExternalSymlink({self.relpath}, {self.rev})"
 
   class GitDiedException(Exception):
     pass
@@ -616,7 +618,7 @@ class GitRepositoryReader:
     while not header:
       header = self._cat_file_process.stdout.readline()
       if self._cat_file_process.poll() is not None:
-        raise self.GitDiedException("Git cat-file died while trying to read '{}'.".format(spec))
+        raise self.GitDiedException(f"Git cat-file died while trying to read '{spec}'.")
 
     header = header.rstrip()
     parts = header.rsplit(SPACE, 2)
