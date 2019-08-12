@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 from contextlib import contextmanager
+from pathlib import Path
 from textwrap import dedent
 
 from pants.backend.python.subsystems.python_repos import PythonRepos
@@ -31,20 +32,21 @@ class CheckstyleTest(PythonTaskTestBase):
   py3_constraint = 'CPython>=3.4,<3.6'
 
   @staticmethod
-  def build_checker_wheel(root_dir):
+  def build_checker_wheel(root_dir: str) -> str:
     target = Checkstyle._CHECKER_ADDRESS_SPEC
-    subprocess.check_call([os.path.join(get_buildroot(), 'pants'),
-                           '--pants-distdir={}'.format(root_dir),
-                           'setup-py',
-                           '--run=bdist_wheel --universal',
-                           target])
+    command = [
+      os.path.join(get_buildroot(), 'pants'),
+      f'--pants-distdir={root_dir}',
+      'setup-py',
+      '--run=bdist_wheel --universal',
+      target
+    ]
+    subprocess.run(command, check=True)
 
-    for root, _, files in os.walk(root_dir):
-      for f in files:
-        if f.endswith('.whl'):
-          return os.path.join(root, f)
-
-    raise AssertionError('Failed to generate a wheel for {}'.format(target))
+    wheel_files = Path(root_dir).rglob("*.whl")
+    if not wheel_files:
+      raise AssertionError(f'Failed to generate a wheel for {target}')
+    return str(next(wheel_files))
 
   @staticmethod
   def install_wheel(wheel, root_dir):
@@ -79,8 +81,7 @@ class CheckstyleTest(PythonTaskTestBase):
       # Ensure our checkstyle task runs under the same interpreter we are running under so that
       # local resolves find dists compatible with the current interpreter.
       current_interpreter = PythonInterpreter.get()
-      constraint = '{}=={}'.format(current_interpreter.identity.interpreter,
-                                   current_interpreter.identity.version_str)
+      constraint = f'{current_interpreter.identity.interpreter}=={current_interpreter.identity.version_str}'
       self.set_options_for_scope(PythonSetup.options_scope, interpreter_constraints=[constraint])
 
       prior = sys.path[:]
