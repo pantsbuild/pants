@@ -1,4 +1,8 @@
+# Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from pants_test.test_base import TestBase
+
 from pants.contrib.node.targets.node_thrift_library import NodeThriftLibrary
 
 
@@ -6,6 +10,7 @@ class NodeThriftLibraryTest(TestBase):
   def test_bin_executables_string(self) -> None:
     target = self.make_target(spec=':name', target_type=NodeThriftLibrary, package_name='name',
                               bin_executables='./cli.js')
+    self.assertTrue(isinstance(target, NodeThriftLibrary))
     self.assertEqual('./cli.js', target.payload.bin_executables)
 
   def test_bin_executables_dict(self) -> None:

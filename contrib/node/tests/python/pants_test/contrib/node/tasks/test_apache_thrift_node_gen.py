@@ -1,8 +1,13 @@
+# Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 from textwrap import dedent
-from pants.contrib.node.tasks.apache_thrift_node_gen import ApacheThriftNodeGen
-from pants.contrib.node.targets.node_thrift_library import NodeThriftLibrary
-from pants.contrib.node.targets.node_module import NodeModule
+
 from pants_test.task_test_base import TaskTestBase
+
+from pants.contrib.node.targets.node_module import NodeModule
+from pants.contrib.node.targets.node_thrift_library import NodeThriftLibrary
+from pants.contrib.node.tasks.apache_thrift_node_gen import ApacheThriftNodeGen
 
 
 class ApacheThriftNodeGenTest(TaskTestBase):
@@ -22,7 +27,7 @@ class ApacheThriftNodeGenTest(TaskTestBase):
     synthetic_targets = context.targets(predicate=is_synthetic_node_library)
 
     self.assertNotEqual(0, len(synthetic_targets))
-    return synthetic_targets[0], synthetic_targets[1]
+    return synthetic_targets
 
   def generate_single_thrift_target(self, node_thrift_library):
     context = self.context(target_roots=[node_thrift_library])

@@ -30,7 +30,7 @@ class NodeInstallIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(command=command)
     self.assert_success(pants_run)
 
-  def test_node_install_yarn_workspaces(self):
+  def test_node_install_node_thrift_js_test(self):
     command = ['node-install',
                # Use same install parameters as resolve.node in .pants.d, I.E. don't generate a new yarn.lock file
                '--npm-resolver-force-option-override=True',
