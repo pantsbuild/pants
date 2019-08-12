@@ -11,7 +11,7 @@ from pants.goal.products import MultipleRootedProducts
 from pants.util.contextutil import pushd
 from pants.util.dirutil import absolute_symlink
 
-from pants.contrib.node.tasks.node_paths import NodePaths
+from pants.contrib.node.tasks.node_paths import NodePaths, NodePathsLocal
 from pants.contrib.node.tasks.node_task import NodeTask
 
 
@@ -27,6 +27,7 @@ class NodeBuild(NodeTask):
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)
     round_manager.require_data(NodePaths)
+    round_manager.require_data(NodePathsLocal)
 
   @property
   def create_target_dirs(self):
@@ -59,6 +60,8 @@ class NodeBuild(NodeTask):
 
   def execute(self):
     node_paths = self.context.products.get_data(NodePaths)
+    # Getting a NodePathsLocal since now we have generated targets being resolved.
+    node_paths_local = self.context.products.get_data(NodePathsLocal)
     runtime_classpath_product = self.context.products.get_data(
       'runtime_classpath', init_func=ClasspathProducts.init_func(self.get_options().pants_workdir))
     bundleable_js_product = self.context.products.get_data(
@@ -69,9 +72,10 @@ class NodeBuild(NodeTask):
       for vt in invalidation_check.all_vts:
         target = vt.target
         node_installed_path = node_paths.node_path(target)
-        # Relying on NodePaths not having a node resolver defined for NodeThriftLibrary targets
-        if not node_installed_path:
-          continue
+        if node_installed_path is None:
+          node_installed_path = node_paths_local.node_path(target)
+          if node_installed_path is None:
+            raise Exception(f"No node-install path found for target {target.address.spec}.")
         with pushd(node_installed_path):
           if not vt.valid:
             self._run_build_script(

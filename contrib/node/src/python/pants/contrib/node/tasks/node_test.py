@@ -7,7 +7,7 @@ from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import pushd
 from pants.util.process_handler import SubprocessProcessHandler
 
-from pants.contrib.node.tasks.node_paths import NodePaths
+from pants.contrib.node.tasks.node_paths import NodePaths, NodePathsLocal
 from pants.contrib.node.tasks.node_task import NodeTask
 
 
@@ -26,6 +26,7 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)
     round_manager.require_data(NodePaths)
+    round_manager.require_data(NodePathsLocal)
 
   @classmethod
   def supports_passthru_args(cls):
