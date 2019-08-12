@@ -7,6 +7,7 @@ node_module(
   ],
 )
 
+# TODO(#8168): Make JS test compatible with newer Mocha versions.
 node_test(
   name='mocha',
   dependencies=[
