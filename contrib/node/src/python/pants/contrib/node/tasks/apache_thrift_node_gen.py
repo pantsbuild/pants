@@ -1,12 +1,17 @@
-import os
+# Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 import json
+import os
 import re
-from pants.backend.codegen.thrift.lib.apache_thrift_gen_base import ApacheThriftGenBase
-from pants.util.dirutil import safe_file_dump
-from pants.contrib.node.targets.node_thrift_library import NodeThriftLibrary
-from pants.contrib.node.targets.node_module import NodeModule
-from pants.build_graph.target import Target
 from typing import List
+
+from pants.backend.codegen.thrift.lib.apache_thrift_gen_base import ApacheThriftGenBase
+from pants.build_graph.target import Target
+from pants.util.dirutil import safe_file_dump
+
+from pants.contrib.node.targets.node_module import NodeModule
+from pants.contrib.node.targets.node_thrift_library import NodeThriftLibrary
 
 
 class ApacheThriftNodeGen(ApacheThriftGenBase):
@@ -42,7 +47,7 @@ class ApacheThriftNodeGen(ApacheThriftGenBase):
       dep_dict = {}
       for dep in dependency_list:
         if not isinstance(dep, NodeModule):
-          continue
+          raise Exception("One of the dependencies is not an instance of NodeModule.")
         dep_spec = dep.address.spec_path
         relative_path = os.path.relpath(dep_spec, target_workdir)
         relative_path = "file:" + relative_path

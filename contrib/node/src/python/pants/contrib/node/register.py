@@ -9,10 +9,11 @@ from pants.contrib.node.subsystems.resolvers.node_preinstalled_module_resolver i
 from pants.contrib.node.subsystems.resolvers.npm_resolver import NpmResolver
 from pants.contrib.node.targets.node_bundle import NodeBundle
 from pants.contrib.node.targets.node_module import NodeModule
-from pants.contrib.node.targets.node_thrift_library import NodeThriftLibrary  
 from pants.contrib.node.targets.node_preinstalled_module import NodePreinstalledModule
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
 from pants.contrib.node.targets.node_test import NodeTest as NodeTestTarget
+from pants.contrib.node.targets.node_thrift_library import NodeThriftLibrary
+from pants.contrib.node.tasks.apache_thrift_node_gen import ApacheThriftNodeGen
 from pants.contrib.node.tasks.javascript_style import JavascriptStyleFmt, JavascriptStyleLint
 from pants.contrib.node.tasks.node_build import NodeBuild
 from pants.contrib.node.tasks.node_bundle import NodeBundle as NodeBundleTask
@@ -21,7 +22,6 @@ from pants.contrib.node.tasks.node_repl import NodeRepl
 from pants.contrib.node.tasks.node_resolve import NodeResolve
 from pants.contrib.node.tasks.node_run import NodeRun
 from pants.contrib.node.tasks.node_test import NodeTest as NodeTestTask
-from pants.contrib.node.tasks.apache_thrift_node_gen import ApacheThriftNodeGen
 
 
 def build_file_aliases():
