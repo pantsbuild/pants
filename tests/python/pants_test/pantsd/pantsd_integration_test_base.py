@@ -193,7 +193,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
 
   @contextmanager
   def warm_daemon(self, *, cmd: List[str] = ['filter', 'testprojects/::'], **kwargs):
-    """Starts an inocuous daemon run, and yields the checker for that run while the run is still active.
+    """Starts an innocuous daemon run, and yields the checker for that run while the run is still active.
 
     :param cmd: Command to start the daemon with.
     """

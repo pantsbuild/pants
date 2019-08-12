@@ -512,7 +512,7 @@ class PantsDaemon(FingerprintedProcessManager):
       self._logger.debug(f"pantsd is using {humanfriendly_used_memory} ({bytes_used} bytes) of memory, max is {humanfriendly_max_memory} ({parsed_max_memory} bytes)")
       exceeded = bytes_used > parsed_max_memory
       if exceeded:
-        self._logger.info(f"pantsd exceeded it's alloted memory usage! usage=({humanfriendly_used_memory})={bytes_used} bytes, max=({humanfriendly_max_memory})={parsed_max_memory} bytes")
+        self._logger.info(f"pantsd exceeded its allotted memory usage! usage=({humanfriendly_used_memory})={bytes_used} bytes, max=({humanfriendly_max_memory})={parsed_max_memory} bytes")
 
       return exceeded
     else:
