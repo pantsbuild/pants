@@ -31,7 +31,6 @@ use futures;
 use boxfuture::{BoxFuture, Boxable};
 use futures::Future;
 use parking_lot::Mutex;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio_timer::Delay;
@@ -46,7 +45,7 @@ pub use crate::retry::Retry;
 /// back into rotation with exponential ease-in.
 ///
 pub struct Serverset<T> {
-  inner: Arc<Inner<T>>,
+  inner: Arc<Mutex<Inner<T>>>,
 }
 
 impl<T: Clone + Send + Sync + 'static> Clone for Serverset<T> {
@@ -75,7 +74,7 @@ struct Inner<T> {
   connections: Vec<Backend<T>>,
 
   // Only visible for testing
-  pub(crate) next: AtomicUsize,
+  pub(crate) next: usize,
 
   backoff_config: BackoffConfig,
 }
@@ -87,7 +86,7 @@ pub enum Health {
 }
 
 // Ideally this would use Durations when https://github.com/rust-lang/rust/issues/54361 stabilises.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 struct UnhealthyInfo {
   unhealthy_since: Instant,
   next_attempt_after_millis: f64,
@@ -128,7 +127,7 @@ impl UnhealthyInfo {
 #[derive(Debug)]
 struct Backend<T> {
   server: T,
-  unhealthy_info: Arc<Mutex<Option<UnhealthyInfo>>>,
+  unhealthy_info: Option<UnhealthyInfo>,
 }
 
 // Ideally this would use Durations when https://github.com/rust-lang/rust/issues/54361 stabilises.
@@ -189,17 +188,17 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
     }
 
     Ok(Serverset {
-      inner: Arc::new(Inner {
+      inner: Arc::new(Mutex::new(Inner {
         connections: servers
           .into_iter()
           .map(|s| Backend {
             server: connect(&s),
-            unhealthy_info: Arc::new(Mutex::new(None)),
+            unhealthy_info: None,
           })
           .collect(),
-        next: AtomicUsize::new(0),
+        next: 0,
         backoff_config,
-      }),
+      })),
     })
   }
 
@@ -220,14 +219,16 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
   ///
   pub fn next(&self) -> BoxFuture<(T, HealthReportToken), String> {
     let now = Instant::now();
-    let server_count = self.inner.connections.len();
+    let mut inner = self.inner.lock();
+    let server_count = inner.connections.len();
 
     let mut earliest_future = None;
     for _ in 0..server_count {
-      let i = self.inner.next.fetch_add(1, Ordering::Relaxed) % server_count;
-      let server = &self.inner.connections[i];
-      let unhealthy_info = server.unhealthy_info.lock();
-      if let Some(ref unhealthy_info) = *unhealthy_info {
+      let i = inner.next % server_count;
+      inner.next = inner.next.wrapping_add(1);
+      let server = &inner.connections[i];
+      let unhealthy_info = &server.unhealthy_info;
+      if let Some(ref unhealthy_info) = unhealthy_info {
         // Server is unhealthy. Note when it will become healthy.
 
         let healthy_at = unhealthy_info.healthy_at();
@@ -252,7 +253,7 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
     }
     // Unwrap is safe because if we hadn't populated earliest_future, we would already have returned.
     let (index, instant) = earliest_future.unwrap();
-    let server = self.inner.connections[index].server.clone();
+    let server = inner.connections[index].server.clone();
     // Note that Delay::new_at(time in the past) gets immediately scheduled.
     Delay::new(instant)
       .map_err(|err| format!("Error delaying for serverset: {}", err))
@@ -261,23 +262,26 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
   }
 
   pub fn report_health(&self, token: HealthReportToken, health: Health) {
-    let mut unhealthy_info = self.inner.connections[token.index].unhealthy_info.lock();
+    let mut inner = self.inner.lock();
+    let backoff_config = inner.backoff_config;
+    let mut unhealthy_info = inner.connections[token.index].unhealthy_info.as_mut();
     match health {
       Health::Unhealthy => {
         if unhealthy_info.is_some() {
-          if let Some(ref mut unhealthy_info) = *unhealthy_info {
-            unhealthy_info.increase_backoff(self.inner.backoff_config);
+          if let Some(ref mut unhealthy_info) = unhealthy_info {
+            unhealthy_info.increase_backoff(backoff_config);
           }
         } else {
-          *unhealthy_info = Some(UnhealthyInfo::new(self.inner.backoff_config));
+          inner.connections[token.index].unhealthy_info =
+            Some(UnhealthyInfo::new(inner.backoff_config));
         }
       }
       Health::Healthy => {
         if unhealthy_info.is_some() {
-          *unhealthy_info = unhealthy_info
-            .take()
+          inner.connections[token.index].unhealthy_info = unhealthy_info
+            .copied()
             .unwrap()
-            .decrease_backoff(self.inner.backoff_config);
+            .decrease_backoff(backoff_config);
         }
       }
     }
@@ -286,7 +290,8 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
 
 impl<T: std::fmt::Debug> std::fmt::Debug for Serverset<T> {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-    write!(f, "Serverset {{ {:?} }}", self.inner.connections)
+    let inner = self.inner.lock();
+    write!(f, "Serverset {{ {:?} }}", inner.connections)
   }
 }
 
@@ -297,7 +302,6 @@ mod tests {
   use parking_lot::Mutex;
   use std;
   use std::collections::HashSet;
-  use std::sync::atomic::Ordering;
   use std::sync::Arc;
   use std::time::Duration;
   use testutil::owned_string_vec;
@@ -335,7 +339,7 @@ mod tests {
       backoff_config(),
     )
     .unwrap();
-    s.inner.next.store(std::usize::MAX, Ordering::SeqCst);
+    s.inner.lock().next = std::usize::MAX;
 
     // 3 because we may skip some values if the number of servers isn't a factor of
     // std::usize::MAX, so we make sure to go around them all again after overflowing.
