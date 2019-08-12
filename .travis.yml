@@ -731,8 +731,7 @@ matrix:
         - *py37_linux_test_config_env
         - CACHE_NAME=unit_tests.v2.py37
       script:
-        # TODO: Remote execution disabled (by removing `--remote-execution-enabled`) due to #8137.
-        - travis_wait 50 ./build-support/bin/ci.py --python-tests-v2 --python-version 3.7
+        - travis_wait 50 ./build-support/bin/ci.py --python-tests-v2 --remote-execution-enabled --python-version 3.7
 
     - <<: *py36_lint
     - <<: *py37_lint
@@ -746,8 +745,7 @@ matrix:
         - *py36_linux_test_config_env
         - CACHE_NAME=unit_tests.v2.py36
       script:
-        # TODO: Remote execution disabled (by removing `--remote-execution-enabled`) due to #8137.
-        - travis_wait 50 ./build-support/bin/ci.py --python-tests-v2
+        - travis_wait 50 ./build-support/bin/ci.py --python-tests-v2 --remote-execution-enabled
 
     - <<: *py36_linux_test_config
       name: "Unit tests - V1 test runner (Py3.6 PEX)"
