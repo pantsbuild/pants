@@ -86,9 +86,8 @@ class RunInfo:
   def add_scm_info(self):
     """Adds SCM-related info."""
     scm = get_scm()
-    if scm:
-      revision = scm.commit_id
-      branch = scm.branch_name or revision
-    else:
-      revision, branch = 'none', 'none'
+    if not scm:
+      return
+    revision = scm.commit_id
+    branch = scm.branch_name or revision
     self.add_infos(('revision', revision), ('branch', branch))
