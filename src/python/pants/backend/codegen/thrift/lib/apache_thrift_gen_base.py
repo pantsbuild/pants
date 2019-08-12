@@ -20,6 +20,7 @@ from pants.util.meta import classproperty
 
 
 class ApacheThriftGenBase(SimpleCodegenTask):
+
   # The name of the thrift generator to use. Subclasses must set.
   # E.g., java, py (see `thrift -help` for all available generators).
   @classproperty
