@@ -396,11 +396,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     requested_compiler = JvmPlatform.global_instance().get_options().compiler
     if requested_compiler != self.compiler_name:
       return
-    deprecated_conditional(
-      lambda:  requested_compiler == self.Compiler.ZINC,
-      removal_version='1.20.0.dev2',
-      entity_description='Requested a deprecated compiler: [{}].'.format(requested_compiler),
-      hint_message='Compiler will be defaulted to [{}].'.format(self.compiler_name))
 
     if requested_compiler == self.Compiler.ZINC and self.compiler_name == self.Compiler.RSC:
       # Issue a deprecation warning (above) and rewrite zinc to rsc, as zinc is being deprecated.
