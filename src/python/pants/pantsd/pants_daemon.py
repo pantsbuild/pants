@@ -125,6 +125,7 @@ class PantsDaemon(FingerprintedProcessManager):
       stub_pantsd = cls.create(options_bootstrapper, full_init=False)
       with stub_pantsd._services.lifecycle_lock:
         if stub_pantsd.needs_restart(stub_pantsd.options_fingerprint):
+          stub_pantsd._logger.info('Starting up a fresh Pants Daemon...')
           # Once we determine we actually need to launch, recreate with full initialization.
           pantsd = cls.create(options_bootstrapper)
           return pantsd.launch()
@@ -459,19 +460,6 @@ class PantsDaemon(FingerprintedProcessManager):
     self._logger.debug('cmd is: PANTS_ENTRYPOINT={} {}'.format(entry_point, ' '.join(cmd)))
     # TODO: Improve error handling on launch failures.
     os.spawnve(os.P_NOWAIT, sys.executable, cmd, env=exec_env)
-
-  def needs_launch(self):
-    """Determines if pantsd needs to be launched.
-
-    N.B. This should always be called under care of the `lifecycle_lock`.
-
-    :returns: True if the daemon needs launching, False otherwise.
-    :rtype: bool
-    """
-    new_fingerprint = self.options_fingerprint
-    self._logger.debug('pantsd: is_alive={} new_fingerprint={} current_fingerprint={}'
-                       .format(self.is_alive(), new_fingerprint, self.fingerprint))
-    return self.needs_restart(new_fingerprint)
 
   def launch(self):
     """Launches pantsd in a subprocess.
