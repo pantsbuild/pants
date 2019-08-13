@@ -401,10 +401,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     """Validates that after N runs, memory usage has increased by no more than X percent."""
     number_of_runs = 10
     max_memory_increase_fraction = 0.40 # TODO https://github.com/pantsbuild/pants/issues/7647
-    with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, config):
-      cmd = ['filter', 'testprojects::']
-      self.assert_success(pantsd_run(cmd))
-      initial_memory_usage = checker.current_memory_usage()
+    with self.warm_daemon() as (cmd, pantsd_run, checker):
+      initial_memory_usage = checker.current_memory_usage_unwrapped()
       for _ in range(number_of_runs):
         self.assert_success(pantsd_run(cmd))
         checker.assert_running()
