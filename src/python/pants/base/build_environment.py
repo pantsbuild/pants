@@ -23,8 +23,8 @@ def pants_release():
           .format(version=pants_version()))
 
 
-def get_buildroot():
-  """Returns the pants build root, calculating it if needed.
+def get_buildroot() -> str:
+  """Returns the Pants build root, calculating it if needed.
 
   :API: public
   """
@@ -49,7 +49,7 @@ def get_pants_configdir():
   return os.path.expanduser(os.path.join(config_home, 'pants'))
 
 
-def get_default_pants_config_file():
+def get_default_pants_config_file() -> str:
   """Return the default location of the pants config file."""
   return os.path.join(get_buildroot(), 'pants.ini')
 
