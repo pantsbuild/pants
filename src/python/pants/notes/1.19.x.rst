@@ -2,7 +2,46 @@
 ======================
 This document describes releases leading up to the ``1.19.x`` ``stable`` series.
 
-1.19.0rc0 (29/07/2019)
+1.19.0rc1 (08/12/2019)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Move MyPy from isolated goal into 'lint' goal and add MyPy whitelist/opt-in type checking (#8099)
+  `PR #8099 <https://github.com/pantsbuild/pants/pull/8099>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Unrevert #8093 and fix jdeps parsing. (#8125)
+  `PR #8125 <https://github.com/pantsbuild/pants/pull/8125>`_
+
+Bugfixes
+~~~~~~~~
+
+* remove complicated invalid dep check in rsc compile (#8131)
+  `PR #8131 <https://github.com/pantsbuild/pants/pull/8131>`_
+
+* [pantsd] Clear the global state of subsystems earlier, plus refactorings (#8130)
+  `PR #8130 <https://github.com/pantsbuild/pants/pull/8130>`_
+
+* Fix span id bug (#8129)
+  `PR #8129 <https://github.com/pantsbuild/pants/pull/8129>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Disable remote execution of unit tests temporarily. (#8138)
+  `PR #8138 <https://github.com/pantsbuild/pants/pull/8138>`_
+
+* Disable symlink checking for uncached Snapshot captures (#8074)
+  `PR #8074 <https://github.com/pantsbuild/pants/pull/8074>`_
+
+* Remove redundant tests and expand timeouts. (#8126)
+  `PR #8126 <https://github.com/pantsbuild/pants/pull/8126>`_
+
+1.19.0rc0 (07/29/2019)
 ----------------------
 
 API Changes
