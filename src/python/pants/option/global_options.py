@@ -281,7 +281,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
 
     # NB: This flag doesn't intrinsically need to invalidate the daemon, because it will invalidate
     # it anyway if the memory constraint is exceeded.
-    register('--daemon-max-memory-usage', advanced=True, type=str, default='10GB', daemon=False,
+    # We use a very large default intentionally, because we want this to be configurable, and
+    # we don't want to break existing usages with this change.
+    register('--daemon-max-memory-usage', advanced=True, type=str, default='1TB', daemon=False,
              help='The maximum amount of memory the daemon is allowed to have. '
                   'If the daemon goes above this memory limit, it will restart itself before running.')
 
