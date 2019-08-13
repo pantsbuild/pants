@@ -17,13 +17,15 @@ FROM gcr.io/cloud-marketplace/google/rbe-ubuntu16-04@sha256:da0f21c71abce3bbb92c
 RUN apt-get update
 RUN apt-get install -y \
   build-essential \
-  zlib1g-dev \
+  gcc-multilib \
+  g++-multilib \
   libbz2-dev \
   libreadline-dev \
   libssl-dev \
   libsqlite3-dev \
   libffi-dev \
-  python-openssl
+  python-openssl \
+  zlib1g-dev
 
 # Even though the image already comes installed with Python 2.7, 3.5, and 3.6, we install our own
 # via Pyenv because we need Python 3.7 and want consistency in how we install them.
