@@ -1,0 +1,2 @@
+# Used for our tests to find the build root, as we cannot safely use `./pants`
+# for the sentinel filename per https://github.com/pantsbuild/pants/pull/8105.
