@@ -143,7 +143,14 @@ class NodeResolve(NodeTask):
             if not vt.valid:
               resolver_for_target_type = self._resolver_for_target(target).global_instance()
               resolver_for_target_type.resolve_target(self, target, vt.results_dir, node_paths)
-            node_paths.resolved(target, vt.results_dir)
+            if target.is_synthetic:
+              # In the case that the target is synthetic, there could be potentially two “targets”,
+              # the derived_concrete and the implied target itself. So we store node_thrift_library
+              # as well as it’s node_module counterpart (2 keys, with identical installed_path)
+              node_paths.resolved(target.concrete_derived_from, vt.results_dir)
+              node_paths.resolved(target, vt.results_dir)
+            else:
+              node_paths.resolved(target, vt.results_dir)
     if self.context.products.is_required_data(NodePathsLocal):
       node_paths_local = self.context.products.get_data(NodePathsLocal, init_func=NodePathsLocal)
       # Always resolve targets if NodePathsLocal is required.
@@ -160,7 +167,8 @@ class NodeResolve(NodeTask):
                                                   resolve_locally=True,
                                                   install_optional=True,
                                                   frozen_lockfile=False)
-          # If the target is synthetic, the node_paths_local is not able to resolve
+          # If the target is synthetic, the node_paths_local is to be resolved with the derived
+          # target as the reference hence it needs to be casted back to the derived type.
           if target.is_synthetic:
             node_paths_local.resolved(target.concrete_derived_from, results_dir)
           else:
