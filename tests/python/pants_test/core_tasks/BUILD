@@ -59,18 +59,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'roots',
-  sources = ['test_roots.py'],
-  dependencies = [
-    'src/python/pants/base:build_environment',
-    'src/python/pants/core_tasks',
-    'src/python/pants/source',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:task_test_base',
-  ],
-)
-
-python_tests(
   name = 'substitute_target_aliases_integration',
   sources = ['test_substitute_target_aliases_integration.py'],
   dependencies = [

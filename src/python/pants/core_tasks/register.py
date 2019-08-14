@@ -11,7 +11,6 @@ from pants.core_tasks.noop import NoopCompile, NoopTest
 from pants.core_tasks.pantsd_kill import PantsDaemonKill
 from pants.core_tasks.reporting_server_kill import ReportingServerKill
 from pants.core_tasks.reporting_server_run import ReportingServerRun
-from pants.core_tasks.roots import ListRoots
 from pants.core_tasks.run_prep_command import (RunBinaryPrepCommand, RunCompilePrepCommand,
                                                RunTestPrepCommand)
 from pants.core_tasks.substitute_aliased_targets import SubstituteAliasedTargets
@@ -86,7 +85,6 @@ def register_goals():
   task(name='legacy', action=NoopTest).install('test')
 
   # Workspace information.
-  task(name='roots', action=ListRoots).install()
   task(name='bash-completion', action=BashCompletion).install()
 
   # Handle sources that aren't loose files in the repo.
