@@ -16,7 +16,7 @@ class Roots(LineOriented, Goal):
 def list_roots(console, options, source_root_config):
   all_roots = source_root_config.get_source_roots().all_roots()
   with Roots.line_oriented(options, console) as (print_stdout, print_stderr):
-    for src_root in all_roots:
+    for src_root in sorted(all_roots, key=lambda x: x.path):
       all_langs = ','.join(sorted(src_root.langs))
       print_stdout(f"{src_root.path}: {all_langs or '*'}")
   yield Roots(exit_code=0)
