@@ -71,7 +71,8 @@ class NpmResolver(Subsystem, NodeResolverBase):
       production_only = production_only if production_only is not None else self.get_options().install_production
       force = force if force is not None else self.get_options().force
       frozen_lockfile = frozen_lockfile if frozen_lockfile is not None else self.get_options().frozen_lockfile
-
+    # Synthetic targets need to depend on thrift for which a valid frozen_lockfile needs to be hydrated
+    # during the install phase since it's not there as an option.
     if target.is_synthetic:
       frozen_lockfile = False
     if not resolve_locally:
