@@ -148,9 +148,7 @@ class NodeResolve(NodeTask):
               # the derived_concrete and the implied target itself. So we store node_thrift_library
               # as well as it’s node_module counterpart (2 keys, with identical installed_path)
               node_paths.resolved(target.concrete_derived_from, vt.results_dir)
-              node_paths.resolved(target, vt.results_dir)
-            else:
-              node_paths.resolved(target, vt.results_dir)
+            node_paths.resolved(target, vt.results_dir)
     if self.context.products.is_required_data(NodePathsLocal):
       node_paths_local = self.context.products.get_data(NodePathsLocal, init_func=NodePathsLocal)
       # Always resolve targets if NodePathsLocal is required.
