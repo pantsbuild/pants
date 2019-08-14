@@ -76,13 +76,20 @@ struct Connection<T: Clone> {
 }
 
 struct Inner<T: Clone> {
-  // Order is immutable through the lifetime of a Serverset, but contents of the Backend may change.
+  // Order and size is immutable through the lifetime of a Serverset, but contents of the Backend
+  // may change. This in particular means that it's ok for a Connection to point at an index in this
+  // Vec.
   servers: Vec<Backend>,
   // Only visible for testing
+  // When a new connection is desired, this (mod servers.len()) points at the index into servers
+  // where we will start trying to make connections.
   pub(crate) next_server: usize,
 
-  // Points into the servers list; may change over time.
+  // Points into the servers list; may change over time. Nothing should hold indexes into this Vec
+  // (except `next_connection` which refers to an order rather than a particular Connection).
   connections: Vec<Connection<T>>,
+  // When an existing connection is to be re-used, this (mod connections.len()) points at which
+  // connection will be used.
   next_connection: usize,
 
   connect: Box<Fn(&str) -> T + 'static + Send>,
@@ -272,6 +279,10 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
   ///
   /// Get the next (probably) healthy backend to use.
   ///
+  /// This aims to roughly load-balance between a number of open connections to servers, but does
+  /// not guarantee to do so perfectly. In particular, whenever a connection is opened or closed,
+  /// we are likely to re-order slightly.
+  ///
   /// The caller will be given a backend to use, and should call Serverset::report_health with the
   /// supplied token, and the observed health of that backend.
   ///
@@ -290,7 +301,6 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
     if inner.can_make_more_connections() {
       // Find a healthy server without a connection, connect to it.
       if let Some(ret) = inner.connect() {
-        inner.next_connection = inner.next_connection.wrapping_add(1);
         return futures::future::ok(ret).to_boxed();
       }
     }
