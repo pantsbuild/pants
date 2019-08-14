@@ -7,8 +7,6 @@ coverage>=4.5,<4.6
 docutils==0.14
 fasteners==0.14.1
 Markdown==2.1.1
-# TODO(6282): once we can upgrade Pytest to 4.2.1+, we can remove the more-itertools requirement
-more-itertools<6.0.0 ; python_version<'3'
 packaging==16.8
 parameterized==0.6.1
 pathspec==0.5.9
@@ -17,8 +15,8 @@ psutil==5.4.8
 Pygments==2.3.1
 pyopenssl==17.3.0
 pystache==0.5.3
-pytest-cov>=2.5,<2.6
-pytest>=3.4,<4.0
+pytest-cov>=2.6,<2.8
+pytest>=4.1,<5.0
 python-Levenshtein==0.12.0
 pywatchman==1.4.1
 PyYAML==5.1.2
