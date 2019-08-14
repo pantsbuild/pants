@@ -9,7 +9,7 @@ from pants.source.source_root import SourceRootConfig
 
 class Roots(LineOriented, Goal):
   """List the repo's registered source roots."""
-  name = 'rootsv2'
+  name = 'roots'
 
 
 @console_rule(Roots, [Console, Roots.Options, SourceRootConfig])
