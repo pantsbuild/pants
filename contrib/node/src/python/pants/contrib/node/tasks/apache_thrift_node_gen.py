@@ -7,6 +7,7 @@ import re
 from typing import List
 
 from pants.backend.codegen.thrift.lib.apache_thrift_gen_base import ApacheThriftGenBase
+from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
 from pants.util.dirutil import safe_file_dump
 
@@ -47,7 +48,7 @@ class ApacheThriftNodeGen(ApacheThriftGenBase):
       dep_dict = {}
       for dep in dependency_list:
         if not isinstance(dep, NodeModule):
-          raise Exception("One of the dependencies is not an instance of NodeModule.")
+          raise TaskError("One of the dependencies is not an instance of NodeModule.")
         dep_spec = dep.address.spec_path
         relative_path = os.path.relpath(dep_spec, target_workdir)
         relative_path = "file:" + relative_path
