@@ -208,7 +208,7 @@ class BaseZincCompileIntegrationTest:
     with self.do_test_compile(
         'examples/src/scala/org/pantsbuild/example/scalac/plugin:simple_scalac_plugin',
         expected_files=['SimpleScalacPlugin.class', 'scalac-plugin.xml'],
-        extra_args=['--compile-zinc-debug-symbols']):
+        extra_args=['--compile-rsc-debug-symbols']):
       pass
 
   def test_zinc_unsupported_option(self):
@@ -220,8 +220,8 @@ class BaseZincCompileIntegrationTest:
             cachedir,
             'testprojects/src/scala/org/pantsbuild/testproject/emptyscala',
             extra_args=[
-              '--compile-zinc-args=-recompile-all-fraction',
-              '--compile-zinc-args=0.5',
+              '--compile-rsc-args=-recompile-all-fraction',
+              '--compile-rsc-args=0.5',
             ])
         self.assert_success(pants_run)
 
@@ -247,9 +247,9 @@ class BaseZincCompileIntegrationTest:
     test_combination('nonfatal', expect_success=True)
 
     test_combination('fatal', expect_success=True,
-      extra_args=['--compile-zinc-compiler-option-sets-enabled-args={"fatal_warnings": ["-C-Werror"]}'])
+      extra_args=['--compile-rsc-compiler-option-sets-enabled-args={"fatal_warnings": ["-C-Werror"]}'])
     test_combination('fatal', expect_success=False,
-      extra_args=['--compile-zinc-compiler-option-sets-disabled-args={"fatal_warnings": ["-S-Xfatal-warnings"]}'])
+      extra_args=['--compile-rsc-compiler-option-sets-disabled-args={"fatal_warnings": ["-S-Xfatal-warnings"]}'])
 
   @unittest.expectedFailure
   def test_soft_excludes_at_compiletime(self):
@@ -399,8 +399,8 @@ class BaseZincCompileIntegrationTest:
 
   def test_hermetic(self):
     extra_args = [
-        '--compile-zinc-execution-strategy=hermetic',
-        '--compile-zinc-incremental=False',
+        '--compile-rsc-execution-strategy=hermetic',
+        '--compile-rsc-incremental=False',
       ]
 
     with self.do_test_compile('examples/src/scala/org/pantsbuild/example/hello/exe', extra_args=extra_args):

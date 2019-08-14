@@ -57,7 +57,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
               workdir,
               cachedir,
               'testprojects/src/java/org/pantsbuild/testproject/compilation_warnings:{}'.format(target),
-              extra_args=['--compile-zinc-warning-args=-C-Xlint:all'])
+              extra_args=['--compile-rsc-warning-args=-C-Xlint:all'])
 
           if expect_success:
             self.assert_success(pants_run)
@@ -79,7 +79,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
 
     with self.do_test_compile(target_rel_spec,
       expected_files = list(classpath_file_by_target_id.values()),
-      extra_args=['--compile-zinc-capture-classpath']) as found:
+      extra_args=['--compile-rsc-capture-classpath']) as found:
       for target_id, filename in classpath_file_by_target_id.items():
         found_classpath_file = self.get_only(found, filename)
         with open(found_classpath_file, 'r') as f:
@@ -97,7 +97,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
     classpath_filename = '{}.txt'.format(target_id)
     with self.do_test_compile(target_spec,
                               expected_files=[classpath_filename, 'PrintVersion.class'],
-                              extra_args=['--compile-zinc-capture-classpath']) as found:
+                              extra_args=['--compile-rsc-capture-classpath']) as found:
       found_classpath_file = self.get_only(found, classpath_filename)
       self.assertTrue(found_classpath_file
                       .endswith(os.path.join('compile_classpath', classpath_filename)))
@@ -110,7 +110,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
     classpath_filename = '{}.txt'.format(target_id)
     with self.do_test_compile(target_spec,
                               expected_files=['PrintVersion.class'],
-                              extra_args=['--no-compile-zinc-capture-classpath']) as found:
+                              extra_args=['--no-compile-rsc-capture-classpath']) as found:
       self.assertFalse(classpath_filename in found)
 
   @skipIf(is_missing_jvm('1.8'), 'no java 1.8 installation on testing machine')

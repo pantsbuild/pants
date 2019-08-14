@@ -287,4 +287,4 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
 
 class CacheCompileIntegrationWithZjarsTest(CacheCompileIntegrationTest):
-  _EXTRA_TASK_ARGS = ['--compile-zinc-use-classpath-jars']
+  _EXTRA_TASK_ARGS = ['--compile-rsc-use-classpath-jars']

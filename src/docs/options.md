@@ -146,7 +146,7 @@ must use an equals sign to set a value.
 There's a useful shorthand that can save some typing when setting multiple options for a single task:
 If you invoke a task explicitly on the command line then you can follow that task with unqualified
 options in its scope. E.g., `./pants compile.zinc --no-incremental --name-hashing`
-instead of `./pants compile --no-compile-zinc-incremental --compile-zinc-name-hashing`.
+instead of `./pants compile --no-compile-rsc-incremental --compile-rsc-name-hashing`.
 
 Note that this shorthand requires you to mention a specific task, not just a goal: `./pants compile.zinc`
 instead of just `./pants compile` as you would usually enter. All tasks in the `compile` goal will
@@ -281,7 +281,7 @@ When in doubt, the scope is described in the heading for each option in the help
     compile.zinc options:
     Compile Scala and Java code using Zinc.
 
-    --[no-]compile-zinc-debug-symbols (default: False)
+    --[no-]compile-rsc-debug-symbols (default: False)
         Compile with debug symbol enabled.
     ...
 

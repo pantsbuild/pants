@@ -194,7 +194,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
         'compile',
         'export-classpath',
         'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
-        '--compile-zinc-debug-symbols',
+        '--compile-rsc-debug-symbols',
         '--workdir-max-build-entries={}'.format(max_entries_per_target)
       ], workdir))
 
@@ -204,7 +204,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
         target_dir_in_pantsd
       )
       new_cache_dir_fingerprinted = self.get_cache_subdir(target_dir_in_pantsd, other_dirs=newest_expected_dirs)
-      # subsequent run with --compile-zinc-debug-symbols will invalidate previous build thus triggering the clean up.
+      # subsequent run with --compile-rsc-debug-symbols will invalidate previous build thus triggering the clean up.
       self.assertNotEqual(new_cache_dir_fingerprinted, remaining_cache_dir_fingerprinted)
       new_fingerprinted_realdir = os.path.realpath(os.path.join(target_dir_in_pantsd, 'current'))
       self.assertEqual(new_fingerprinted_realdir,

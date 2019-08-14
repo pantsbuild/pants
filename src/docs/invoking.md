@@ -34,7 +34,7 @@ Consider the following command:
 + `--level` is a global flag.
 + The goal and task to run are `compile.zinc`.
 + The `--no-delete-scratch` is shorthand for the
-  `--compile-zinc-no-delete-scratch` flag.
+  `--compile-rsc-no-delete-scratch` flag.
 + The `--resolve-ivy-open` command is a fully qualified flag and
   applies to the `resolve.ivy` task.  Although the task `resolve.ivy`
   isn't specified on the command line it implicitly runs because
@@ -70,7 +70,7 @@ task and goal name to use the short form flag.  Here's an example of
 using the long form to pass an option to the `zinc` task:
 
     :::bash
-    ./pants --no-compile-zinc-delete-scratch compile src::
+    ./pants --no-compile-rsc-delete-scratch compile src::
 
 To use the shorthand form of the option, specify both goal and task
 name as `compile.zinc`:
@@ -87,7 +87,7 @@ You can use shorthand even when you want to pass options to multiple
 tasks by listing each task.  For example:
 
     :::bash
-    ./pants compile --compile-zinc-no-delete-scratch --resolve-ivy-open src::
+    ./pants compile --compile-rsc-no-delete-scratch --resolve-ivy-open src::
 
 can also be expressed using shorthand flags:
 

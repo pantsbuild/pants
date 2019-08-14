@@ -10,7 +10,7 @@ class MissingDependencyFinderIntegrationTest(PantsRunIntegrationTest):
 
   def test_missing_deps_found(self):
     target = 'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist:missingjardepswhitelist'
-    run = self.run_pants(['compile', target, '--compile-zinc-suggest-missing-deps'])
+    run = self.run_pants(['compile', target, '--compile-rsc-suggest-missing-deps'])
     self.assert_failure(run)
     self.assertTrue(re.search('Found the following deps from target\'s transitive dependencies '
                               'that provide the missing classes:.*'
@@ -26,8 +26,8 @@ class MissingDependencyFinderIntegrationTest(PantsRunIntegrationTest):
     run = self.run_pants([
       'compile',
       target,
-      '--compile-zinc-suggest-missing-deps',
-      '--compile-zinc-buildozer=path/to/buildozer',
+      '--compile-rsc-suggest-missing-deps',
+      '--compile-rsc-buildozer=path/to/buildozer',
     ])
     self.assert_failure(run)
     self.assertTrue(re.search("\n *path/to/buildozer 'add dependencies 3rdparty:guava' " + target,
@@ -36,7 +36,7 @@ class MissingDependencyFinderIntegrationTest(PantsRunIntegrationTest):
 
   def test_missing_deps_not_found(self):
     target = 'testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target'
-    run = self.run_pants(['compile', target, '--compile-zinc-suggest-missing-deps', '-ldebug'])
+    run = self.run_pants(['compile', target, '--compile-rsc-suggest-missing-deps', '-ldebug'])
     self.assert_failure(run)
     self.assertTrue(re.search('Unable to find any deps from target\'s transitive dependencies '
                               'that provide the following missing classes:.*'
