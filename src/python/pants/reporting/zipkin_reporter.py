@@ -41,7 +41,8 @@ class ZipkinReporter(Reporter):
     Reporter that implements Zipkin tracing.
   """
 
-  def __init__(self, run_tracker, settings, endpoint, trace_id, parent_id, sample_rate, service_name_prefix):
+  def __init__(self, run_tracker, settings, endpoint, trace_id, parent_id, sample_rate,
+                service_name_prefix, max_span_batch_size):
     """
     When trace_id and parent_id are set a Zipkin trace will be created with given trace_id
     and parent_id. If trace_id and parent_id are set to None, a trace_id will be randomly
@@ -53,6 +54,10 @@ class ZipkinReporter(Reporter):
     :param string trace_id: The overall 64 or 128-bit ID of the trace. May be None.
     :param string parent_id: The 64-bit ID for a parent span that invokes Pants. May be None.
     :param float sample_rate: Rate at which to sample Zipkin traces. Value 0.0 - 100.0.
+    :param string service_name_prefix: Prefix for service name.
+    :param int max_span_batch_size: Spans in a trace are sent in batches,
+           max_span_batch_size defines max size of one batch.
+
     """
     super().__init__(run_tracker, settings)
     # Create a transport handler
@@ -64,6 +69,7 @@ class ZipkinReporter(Reporter):
     self.tracer = get_default_tracer()
     self.run_tracker = run_tracker
     self.service_name_prefix = service_name_prefix
+    self.max_span_batch_size = max_span_batch_size
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
@@ -107,11 +113,12 @@ class ZipkinReporter(Reporter):
         self.parent_id = zipkin_attrs.span_id
 
       span = local_tracer.zipkin_span(
-        service_name=self.service_name_prefix.format(service_name),
+        service_name=self.service_name_prefix.format("main"),
         span_name=workunit.name,
         transport_handler=self.handler,
         encoding=Encoding.V1_THRIFT,
         zipkin_attrs=zipkin_attrs,
+        max_span_batch_size=self.max_span_batch_size,
       )
     else:
       # If start_workunit is called from a new thread local_tracer doesn't have zipkin attributes.
@@ -130,7 +137,7 @@ class ZipkinReporter(Reporter):
       span.zipkin_attrs = span.zipkin_attrs._replace(
         parent_span_id=workunit.parent.zipkin_span.zipkin_attrs.span_id
       )
-      span.service_name = "pants background workunit"
+      span.service_name = self.service_name_prefix.format("background")
 
     # Goals and tasks save their start time at the beginning of their run.
     # This start time is passed to workunit, because the workunit may be created much later.
