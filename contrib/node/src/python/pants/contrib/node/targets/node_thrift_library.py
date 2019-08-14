@@ -8,10 +8,3 @@ class NodeThriftLibrary(NodeModule):
   """
   A Node library generated from Thrift IDL Files
   """
-  # def __init__(self, **kwargs):
-  #   super().__init__(**kwargs)
-  #   if 'package.json' in self.payload.sources:
-  #     raise Exception("Use default generated package.json.")
-
-  #   if 'yarn.lock' in self.payload.sources:
-  #     raise Exception("Use default generated yarn.lock.")
