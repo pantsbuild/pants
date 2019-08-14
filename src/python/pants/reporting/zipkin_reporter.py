@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 NANOSECONDS_PER_SECOND = 1000000000.0
 
 
-class HTTPTransportHandler(BaseTransportHandler):
+class AsyncHTTPTransportHandler(BaseTransportHandler):
   def __init__(self, endpoint, zipkin_spans_dir, encoding):
     self.endpoint = endpoint
     self.zipkin_spans_dir = zipkin_spans_dir
@@ -32,31 +32,36 @@ class HTTPTransportHandler(BaseTransportHandler):
 
   def send(self, payload):
     try:
-      if os.path.exists(self.zipkin_spans_dir):
-        self.file_count += 1
-        file_path_to_store_spans = os.path.join(
-          self.zipkin_spans_dir, 'spans-{}-{}'.format(self.file_count, self.encoding)
+      if not os.path.exists(self.zipkin_spans_dir):
+        logger.error(
+          "Not uploading Zipkin spans because directory {} got deleted".format(self.zipkin_spans_dir)
         )
+        return
 
-        with open(file_path_to_store_spans, 'w') as f:
-          f.write(payload)
+      self.file_count += 1
+      file_path_to_store_spans = os.path.join(
+        self.zipkin_spans_dir, 'spans-{}-{}'.format(self.file_count, self.encoding)
+      )
 
-        args = ['curl', '-v',
-                '-X', 'POST',
-                '-H', '"Content-Type: application/json"',
-                '--data', '@' + file_path_to_store_spans,
-                self.endpoint]
-        file_path_to_stdout_stderr = os.path.join(self.zipkin_spans_dir,
-                                                  'stdout_stderr_output_{}'.format(self.file_count))
-        p = subprocess.Popen(args, stdin=subprocess.DEVNULL,
-                             stdout=open(file_path_to_stdout_stderr, 'w'),
-                             stderr=subprocess.STDOUT, close_fds=False)
+      with open(file_path_to_store_spans, 'w') as f:
+        f.write(payload)
 
-        logger.debug("Sending spans to Zipkin server from pid: {}".format(p.pid))
-        logger.debug("stdout and stderr for pid {} are located at '{}'".format(
-          p.pid,
-          file_path_to_stdout_stderr)
-        )
+      args = ['curl', '-v',
+              '-X', 'POST',
+              '-H', 'Content-Type: application/json',
+              '--data', '@' + file_path_to_store_spans,
+              self.endpoint]
+      file_path_to_stdout_stderr = os.path.join(self.zipkin_spans_dir,
+                                                'stdout_stderr_output_{}'.format(self.file_count))
+      p = subprocess.Popen(args, stdin=subprocess.DEVNULL,
+                           stdout=open(file_path_to_stdout_stderr, 'w'),
+                           stderr=subprocess.STDOUT, close_fds=False)
+
+      logger.debug("Sending spans to Zipkin server from pid: {}".format(p.pid))
+      logger.debug("stdout and stderr for pid {} are located at '{}'".format(
+        p.pid,
+        file_path_to_stdout_stderr)
+      )
 
     except Exception as err:
       logger.error("Failed to post the payload to zipkin server. Error {}".format(err))
@@ -97,9 +102,9 @@ class ZipkinReporter(Reporter):
     self.service_name_prefix = service_name_prefix
     self.max_span_batch_size = max_span_batch_size
     self.zipkin_spans_dir = os.path.join(self.run_tracker.run_info_dir, 'zipkin')
-    self.handler = HTTPTransportHandler(endpoint, self.zipkin_spans_dir, self.encoding)
+    self.handler = AsyncHTTPTransportHandler(endpoint, self.zipkin_spans_dir, self.encoding)
 
-    # Derictory to store encoded spans.
+    # Directory to store encoded spans.
     safe_mkdir(self.zipkin_spans_dir)
 
   def start_workunit(self, workunit):
