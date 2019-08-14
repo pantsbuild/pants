@@ -50,10 +50,10 @@ Plugins can be integrated in one of two ways:
 
 #### Global plugins
 
-Global plugins are specified using the `scalac_plugins` key in the `compile.zinc` section of `pants.ini`:
+Global plugins are specified using the `scalac_plugins` key in the `compile.rsc` section of `pants.ini`:
 
 ```
-[compile.zinc]
+[compile.rsc]
 scalac_plugins: ['simple_scalac_plugin']
 
 ```
@@ -61,7 +61,7 @@ scalac_plugins: ['simple_scalac_plugin']
 Plugins can optionally take arguments, specified like this:
 
 ```
-[compile.zinc]
+[compile.rsc]
 scalac_plugins: ['simple_scalac_plugin]
 scalac_plugin_args: {
     'simple_scalac_plugin': ['arg1', 'arg2']

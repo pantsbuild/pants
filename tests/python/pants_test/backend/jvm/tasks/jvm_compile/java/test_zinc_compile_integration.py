@@ -136,7 +136,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
     with temporary_dir() as cache_dir:
       config = {
         'cache.compile.rsc': {'write_to': [cache_dir]},
-        'compile.zinc': {
+        'compile.rsc': {
           'execution_strategy': 'hermetic',
           'use_classpath_jars': False,
           'incremental': True,
@@ -160,7 +160,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
     with temporary_dir() as cache_dir:
       config = {
         'cache.compile.rsc': {'write_to': [cache_dir]},
-        'compile.zinc': {
+        'compile.rsc': {
           'execution_strategy': 'hermetic',
           'use_classpath_jars': False,
           'incremental': False,
@@ -190,7 +190,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
     with temporary_dir() as cache_dir:
       config = {
         'cache.compile.rsc': {'write_to': [cache_dir]},
-        'compile.zinc': {
+        'compile.rsc': {
           'execution_strategy': 'subprocess',
           'use_classpath_jars': False,
           'incremental': False,
@@ -221,7 +221,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
     with temporary_dir() as cache_dir:
       config = {
         'cache.compile.rsc': {'write_to': [cache_dir]},
-        'compile.zinc': {
+        'compile.rsc': {
           'execution_strategy': 'hermetic',
           'use_classpath_jars': False,
           'incremental': False,
@@ -260,7 +260,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
     with temporary_dir() as cache_dir:
       config = {
         'cache.compile.rsc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
-        'compile.zinc': {
+        'compile.rsc': {
           'execution_strategy': 'hermetic',
           'use_classpath_jars': False,
           'incremental': False,

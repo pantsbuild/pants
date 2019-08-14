@@ -64,7 +64,7 @@ class ScalaFixIntegrationTest(PantsRunIntegrationTest):
         'scalac_plugin_dep': f'{TEST_DIR}/rsc_compat:semanticdb-scalac',
         'scalac_plugins': '+["semanticdb"]'
       },
-      'compile.zinc': {'args': '+["-S-Ywarn-unused"]'},
+      'compile.rsc': {'args': '+["-S-Ywarn-unused"]'},
       'lint.scalafix': rules,
       'fmt.scalafix': rules,
       'lint.scalastyle': {'skip': True}

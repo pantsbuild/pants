@@ -78,7 +78,7 @@ function run_zinc_compile_with_tracing {
     # clobber symbols from concurrent compiles.
     ./pants -ldebug \
             --no-zinc-native-image \
-            compile.zinc \
+            compile.rsc \
             --execution-strategy=hermetic \
             --worker-count=1 \
             --no-incremental \
@@ -213,7 +213,7 @@ function exercise_native_image_for_compilation {
 
   export PANTS_COMPILE_ZINC_JVM_OPTIONS='[]'
   ./pants --zinc-native-image --zinc-version="$ZINC_IMAGE_VERSION" \
-          compile.zinc --execution-strategy=hermetic --no-incremental --cache-ignore \
+          compile.rsc --execution-strategy=hermetic --no-incremental --cache-ignore \
           test \
           "${other_args[@]}" \
     || return "$?"

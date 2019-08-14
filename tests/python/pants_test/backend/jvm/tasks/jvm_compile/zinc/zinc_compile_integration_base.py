@@ -50,7 +50,7 @@ class BaseZincCompileIntegrationTest:
         SHAPELESS_TARGET,
         # Flags to enable profiling and statistics on target
         config={
-          'compile.zinc': {
+          'compile.rsc': {
             'default_compiler_option_sets': ['profile'],
             'compiler_option_sets_enabled_args': {
               'profile': [
@@ -342,7 +342,7 @@ class BaseZincCompileIntegrationTest:
 
       config = {
         'cache.compile.rsc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
-        'compile.zinc': {'incremental_caching': True },
+        'compile.rsc': {'incremental_caching': True },
       }
 
       srcfile = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.java')

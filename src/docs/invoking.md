@@ -29,16 +29,16 @@ shorthand flags must immediately follow the goal they apply to.
 Consider the following command:
 
     :::bash
-    ./pants --level=debug compile.zinc --no-delete-scratch --resolve-ivy-open src::
+    ./pants --level=debug compile.rsc --no-delete-scratch --resolve-ivy-open src::
 
 + `--level` is a global flag.
-+ The goal and task to run are `compile.zinc`.
++ The goal and task to run are `compile.rsc`.
 + The `--no-delete-scratch` is shorthand for the
   `--compile-rsc-no-delete-scratch` flag.
 + The `--resolve-ivy-open` command is a fully qualified flag and
   applies to the `resolve.ivy` task.  Although the task `resolve.ivy`
   isn't specified on the command line it implicitly runs because
-  `compile.zinc` task depends on it.
+  `compile.rsc` task depends on it.
 
 You can pass options to pants using the a config file, the
 environment, or command line flags. See the
@@ -73,10 +73,10 @@ using the long form to pass an option to the `zinc` task:
     ./pants --no-compile-rsc-delete-scratch compile src::
 
 To use the shorthand form of the option, specify both goal and task
-name as `compile.zinc`:
+name as `compile.rsc`:
 
     :::bash
-    ./pants  compile.zinc --no-delete-scratch src::
+    ./pants  compile.rsc --no-delete-scratch src::
 
 This is especially handy if you have lots of options to type:
 
@@ -92,7 +92,7 @@ tasks by listing each task.  For example:
 can also be expressed using shorthand flags:
 
     :::bash
-    ./pants --level=debug compile.zinc --no-delete-scratch resolve.ivy --open src::
+    ./pants --level=debug compile.rsc --no-delete-scratch resolve.ivy --open src::
 
 Passthrough Args
 ----------------

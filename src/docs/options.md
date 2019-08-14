@@ -17,7 +17,7 @@ Pants has many moving parts, and more can be added via custom plugins. To avoid 
 each configurable component is qualified by a _scope_.
 
 + Global options belong to the global scope.
-+ Options for task `task` in goal `goal` belong to the `goal.task` scope. E.g., `gen.thrift` or `compile.zinc`.
++ Options for task `task` in goal `goal` belong to the `goal.task` scope. E.g., `gen.thrift` or `compile.rsc`.
   However if the task has the same name as the goal, then the scope is just that name. E.g., `./pants list`,
   not `./pants list.list`.
 + Options for the global instance of subsystem `subsystem` belong to the `subsystem` scope. E.g., `jvm` or `cache`.
@@ -145,16 +145,16 @@ must use an equals sign to set a value.
 
 There's a useful shorthand that can save some typing when setting multiple options for a single task:
 If you invoke a task explicitly on the command line then you can follow that task with unqualified
-options in its scope. E.g., `./pants compile.zinc --no-incremental --name-hashing`
+options in its scope. E.g., `./pants compile.rsc --no-incremental --name-hashing`
 instead of `./pants compile --no-compile-rsc-incremental --compile-rsc-name-hashing`.
 
-Note that this shorthand requires you to mention a specific task, not just a goal: `./pants compile.zinc`
+Note that this shorthand requires you to mention a specific task, not just a goal: `./pants compile.rsc`
 instead of just `./pants compile` as you would usually enter. All tasks in the `compile` goal will
-still be executed, not just `compile.zinc`, but the `.zinc` addition is a convenience to support shorthand options.
+still be executed, not just `compile.rsc`, but the `.zinc` addition is a convenience to support shorthand options.
 
 Of course this works when specifying multiple goals, e.g.,
 
-`./pants compile.zinc --no-incremental --name-hashing test.junit --parallel-threads=4`
+`./pants compile.rsc --no-incremental --name-hashing test.junit --parallel-threads=4`
 
 
 ### Environment Variables
@@ -204,7 +204,7 @@ The `[DEFAULT]` section is special: its values are available in all other sectio
     [gen.thrift]
     workdir: %(thrift_workdir)s
 
-    [compile.zinc]
+    [compile.rsc]
     args: [
         '-C-Tnowarnprefixes', '-C%(thrift_workdir)s',
       ]
@@ -266,19 +266,19 @@ in the help output:
 
     :::ini
     # Wrong
-    [compile]  # The correct scope for the 'warnings' option is compile.zinc
+    [compile]  # The correct scope for the 'warnings' option is compile.rsc
     zinc_warnings: False
 
     # Right
-    [compile.zinc]
+    [compile.rsc]
     warnings: False
 
 When in doubt, the scope is described in the heading for each option in the help output:
 
     ::bash
-    $ ./pants compile.zinc --help
+    $ ./pants compile.rsc --help
 
-    compile.zinc options:
+    compile.rsc options:
     Compile Scala and Java code using Zinc.
 
     --[no-]compile-rsc-debug-symbols (default: False)

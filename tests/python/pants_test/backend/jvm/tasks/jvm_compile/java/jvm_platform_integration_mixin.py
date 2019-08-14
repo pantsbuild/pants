@@ -16,7 +16,7 @@ class JvmPlatformIntegrationMixin:
   def get_pants_compile_args(self):
     """List of arguments to pants that determine what compiler to use.
 
-    The compiling task must be the last argument (eg, compile.zinc).
+    The compiling task must be the last argument (eg, compile.rsc).
     """
     raise NotImplementedError
 

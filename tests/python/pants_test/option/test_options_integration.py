@@ -255,7 +255,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
     self.assertIn('unpack-jars.colors = True', lines)
     self.assertIn('imports.ivy-imports.colors = True', lines)
     self.assertIn('compile.colors = True', lines)
-    self.assertIn('compile.zinc.colors = False', lines)
+    self.assertIn('compile.rsc.colors = False', lines)
     # These should be omitted because they have the same value as their super-scope.
     self.assertNotIn('jvm-platform-validate.colors = False', lines)
     self.assertNotIn('resolve.ivy.colors = False', lines)

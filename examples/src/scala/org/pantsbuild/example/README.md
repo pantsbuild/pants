@@ -192,7 +192,7 @@ Then, reference it from `pants.ini` to load the plugin, and enable semantic rewr
 compilation for `fmt` and `lint`:
 
     :::ini
-    [compile.zinc]
+    [compile.rsc]
     args: [
         # The `-S` prefix here indicates that zinc should pass this option to scalac rather than
         # to javac (`-C` prefix).
