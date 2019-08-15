@@ -73,7 +73,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def test_output_level_warn(self):
     command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello/simple',
-               '--compile-zinc-level=warn']
+               '--compile-rsc-level=warn']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
     self.assertFalse(self.INFO_LEVEL_COMPILE_MSG in pants_run.stdout_data)
@@ -82,7 +82,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def test_output_level_info(self):
     command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello/simple',
-               '--compile-zinc-level=info']
+               '--compile-rsc-level=info']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
     self.assertTrue(self.INFO_LEVEL_COMPILE_MSG in pants_run.stdout_data)
@@ -91,7 +91,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def test_output_level_debug(self):
     command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello/simple',
-               '--compile-zinc-level=debug']
+               '--compile-rsc-level=debug']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
     self.assertTrue(self.INFO_LEVEL_COMPILE_MSG in pants_run.stdout_data)
@@ -100,7 +100,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def test_output_color_enabled(self):
     command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello/simple',
-               '--compile-zinc-colors']
+               '--compile-rsc-colors']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
     self.assertTrue(self.INFO_LEVEL_COMPILE_MSG + '\x1b[0m' in pants_run.stdout_data)

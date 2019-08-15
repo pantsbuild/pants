@@ -382,13 +382,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'Format: property=value. Multiple values should be specified as multiple '
                   'occurrences of this flag. Pants itself may add additional platform properties.',
                    type=list, default=[])
-
-    # This should eventually deprecate the RunTracker worker count, which is used for legacy cache
-    # lookups via CacheSetup in TaskBase.
-    register('--process-execution-parallelism', type=int, dest='local_execution_parallelism',
-             removal_version='1.20.0.dev2', advanced=True,
-             removal_hint='Use --process-execution-local-parallelism, and/or --process-execution-remote-parallelism instead.',
-             help='Number of concurrent processes that may be executed locally.')
     register('--process-execution-local-parallelism', type=int, default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_parallelism,
              advanced=True,
              help='Number of concurrent processes that may be executed locally.')

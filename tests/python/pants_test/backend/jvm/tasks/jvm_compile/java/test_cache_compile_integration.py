@@ -39,7 +39,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
       config = {
         'cache.compile.rsc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
-        'compile.zinc': {'incremental_caching': True},
+        'compile.rsc': {'incremental_caching': True},
         'java': {'strict_deps': False},
       }
       target_dir = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest')
@@ -108,7 +108,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
       config = {
         'cache.compile.rsc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
-        'compile.zinc': {'incremental_caching': True },
+        'compile.rsc': {'incremental_caching': True },
       }
 
       srcfile = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.java')
@@ -232,7 +232,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
     srcfile = 'A.java'
     def config(incremental_caching):
-      return { 'compile.zinc': {'incremental_caching': incremental_caching} }
+      return { 'compile.rsc': {'incremental_caching': incremental_caching} }
 
     self._do_test_caching(
         Compile({srcfile: "class A {}"}, config(False), 1),
@@ -244,7 +244,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
     """Tests that with --no-incremental and --no-incremental-caching, we always write artifacts."""
 
     srcfile = 'A.java'
-    config = {'compile.zinc': {'incremental': False, 'incremental_caching': False}}
+    config = {'compile.rsc': {'incremental': False, 'incremental_caching': False}}
 
     self._do_test_caching(
         Compile({srcfile: "class A {}"}, config, 1),
@@ -287,4 +287,4 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
 
 class CacheCompileIntegrationWithZjarsTest(CacheCompileIntegrationTest):
-  _EXTRA_TASK_ARGS = ['--compile-zinc-use-classpath-jars']
+  _EXTRA_TASK_ARGS = ['--compile-rsc-use-classpath-jars']

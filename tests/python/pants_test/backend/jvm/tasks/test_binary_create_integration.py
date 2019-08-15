@@ -82,7 +82,7 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
         jar_filename = os.path.join(distdir, '{}.jar'.format(name))
         command = [
           '--pants-distdir={}'.format(distdir),
-          '--no-compile-zinc-capture-classpath',
+          '--no-compile-rsc-capture-classpath',
           'binary',
           'testprojects/src/java/org/pantsbuild/testproject/deployexcludes:{}'.format(name),
         ]

@@ -11,7 +11,6 @@ from contextlib import contextmanager
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.base.deprecated import deprecated_conditional
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.util.contextutil import temporary_dir
@@ -40,7 +39,7 @@ class AnalysisExtraction(NailgunTask):
 
   @classmethod
   def product_types(cls):
-    return ['product_deps_by_target', 'classes_by_source', 'product_deps_by_src']
+    return ['product_deps_by_target']
 
   def _create_products_if_should_run(self):
     """If this task should run, initialize empty products that it will populate.
@@ -86,19 +85,6 @@ class AnalysisExtraction(NailgunTask):
       yield aliases
 
   def execute(self):
-    # If none of our computed products are necessary, return immediately.
-    deprecated_conditional(
-      lambda: self.context.products.is_required_data('classes_by_source'),
-      '1.20.0.dev2',
-      'The `classes_by_source` product depends on internal compiler details and is no longer produced.'
-    )
-    deprecated_conditional(
-      lambda: self.context.products.is_required_data('product_deps_by_src'),
-      '1.20.0.dev2',
-      'The `product_deps_by_src` product depends on internal compiler details and is no longer produced. '
-      'For similar functionality consume `product_deps_by_target`.'
-    )
-
     if not self._create_products_if_should_run():
       return
 

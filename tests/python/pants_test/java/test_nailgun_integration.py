@@ -30,7 +30,7 @@ class TestNailgunIntegration(PantsRunIntegrationTest):
       # Override the PANTS_CONFIG_FILES="pants.travis-ci.ini" used within TravisCI to enable
       # nailgun usage for the purpose of exercising that stack in the integration test.
       config={'DEFAULT': {'execution_strategy': 'nailgun'},
-              'compile.zinc': {'nailgun_timeout_seconds': '0.00002'}}
+              'compile.rsc': {'nailgun_timeout_seconds': '0.00002'}}
     )
     self.assert_failure(pants_run)
     self.assertRegex(
