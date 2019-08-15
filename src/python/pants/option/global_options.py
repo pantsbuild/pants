@@ -115,9 +115,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     status as "bootstrap options" is only pertinent during option registration.
     """
     buildroot = get_buildroot()
-    default_distdir_name = 'dist'
-    default_distdir = os.path.join(buildroot, default_distdir_name)
-    default_rel_distdir = f'/{default_distdir_name}/'
 
     register('-l', '--level', choices=['trace', 'debug', 'info', 'warn'], default='info',
              recursive=True, help='Set the logging level.')

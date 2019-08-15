@@ -220,7 +220,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
     # Some integration tests rely on clean subsystem state (e.g., to set up a DistributionLocator).
     Subsystem.reset()
 
-  @contextmanager
   def temporary_workdir(self, cleanup=True):
     # We can hard-code '.pants.d' here because we know that will always be its value
     # in the pantsbuild/pants repo (e.g., that's what we .gitignore in that repo).
@@ -228,17 +227,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     # which we don't have a reference to here.
     root = os.path.join(get_buildroot(), '.pants.d', 'tmp')
     safe_mkdir(root)
-    # Create a temporary file, and then remove it before yielding. This allows the copy of pants
-    # that will work in the workdir to create it. Finally, if a symlink was created (as with the
-    # pants_physical_workdir_base option), delete the destination in addition to the link.
-    with temporary_file_path(root_dir=root, cleanup=cleanup, suffix='.pants.d') as path:
-      safe_delete(path)
-      yield path
-      if cleanup:
-        if os.path.islink(path):
-          safe_rmtree(os.readlink(path))
-        else:
-          safe_rmtree(path)
+    return temporary_dir(root_dir=root, cleanup=cleanup, suffix='.pants.d')
 
   def temporary_cachedir(self):
     return temporary_dir(suffix='__CACHEDIR')
@@ -333,9 +322,10 @@ class PantsRunIntegrationTest(unittest.TestCase):
         ini.add_section(section)
         for key, value in section_config.items():
           ini.set(section, key, value)
-      with temporary_file(cleanup=False, suffix='.pants.ini', binary_mode=False) as ini_file:
-        args.append('--pants-config-files=' + ini_file.name)
-        ini.write(ini_file)
+      ini_file_name = os.path.join(workdir, 'pants.ini')
+      with safe_open(ini_file_name, mode='w') as fp:
+        ini.write(fp)
+      args.append('--pants-config-files=' + ini_file_name)
 
     pants_script = os.path.join(build_root or get_buildroot(), self.PANTS_SCRIPT_NAME)
 
@@ -608,8 +598,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
     dirs_to_copy = ('3rdparty', 'contrib') + tuple(dirs_to_copy or [])
 
     with self.temporary_workdir() as tmp_dir:
-      # To ensure temp workdir exists
-      safe_mkdir(tmp_dir)
       for filename in files_to_copy:
         shutil.copy(os.path.join(get_buildroot(), filename), os.path.join(tmp_dir, filename))
 
