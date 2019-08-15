@@ -18,7 +18,8 @@ python_tests(
   name = "tests",
   dependencies = [
     ':core',
-    'tests/python/pants_test:console_rule_test_base'
+    'tests/python/pants_test:console_rule_test_base',
+    'tests/python/pants_test/engine:util'
   ]
 )
 

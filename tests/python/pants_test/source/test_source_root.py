@@ -85,7 +85,7 @@ class SourceRootTest(TestBase):
 
     # Test fixed roots.
     trie.add_fixed('mysrc/scalastuff', ('scala',))
-    self.assertEqual(('mysrc/scalastuff', ('scala',), UNKNOWN),
+    self.assertEqual(SourceRoot('mysrc/scalastuff', ('scala',), UNKNOWN),
                       trie.find('mysrc/scalastuff/org/pantsbuild/foo/Foo.scala'))
     self.assertIsNone(trie.find('my/project/mysrc/scalastuff/org/pantsbuild/foo/Foo.scala'))
 
@@ -95,18 +95,60 @@ class SourceRootTest(TestBase):
     self.assertEqual(root('src/go/src', ('go',)),
                       trie.find('src/go/src/foo/bar/baz.go'))
 
+  def test_source_root_trie_traverse(self):
+    def make_trie() -> SourceRootTrie:
+      return SourceRootTrie(SourceRootFactory({
+      'jvm': ('java', 'scala'),
+      'py': ('python',)
+    }))
+
+    trie = make_trie()
+    self.assertEqual(set(), trie.traverse())
+
+    trie.add_pattern('src/*')
+    trie.add_pattern('src/main/*')
+    self.assertEqual({
+      'src/*',
+      'src/main/*'
+    }, trie.traverse())
+
+    trie = make_trie()
+    trie.add_pattern('*')
+    trie.add_pattern('src/*/code')
+    trie.add_pattern('src/main/*/code')
+    trie.add_pattern('src/main/*')
+    trie.add_pattern('src/main/*/foo')
+    self.assertEqual({
+      '*',
+      'src/*/code',
+      'src/main/*/code',
+      'src/main/*',
+      'src/main/*',
+      'src/main/*/foo',
+    }, trie.traverse())
+
+    trie = make_trie()
+    trie.add_fixed('src/scala-source-code', ('scala',))
+    trie.add_pattern('src/*/code')
+    trie.add_pattern('src/main/*/code')
+    self.assertEqual({
+      'src/*/code',
+      '^/src/scala-source-code',
+      'src/main/*/code',
+    }, trie.traverse())
+
   def test_fixed_source_root_at_buildroot(self):
     trie = SourceRootTrie(SourceRootFactory({}))
     trie.add_fixed('', ('proto',))
 
-    self.assertEqual(('', ('proto',), UNKNOWN),
+    self.assertEqual(SourceRoot('', ('proto',), UNKNOWN),
                       trie.find('foo/proto/bar/baz.proto'))
 
   def test_source_root_pattern_at_buildroot(self):
     trie = SourceRootTrie(SourceRootFactory({}))
     trie.add_pattern('*')
 
-    self.assertEqual(('java', ('java',), UNKNOWN),
+    self.assertEqual(SourceRoot('java', ('java',), UNKNOWN),
                       trie.find('java/bar/baz.proto'))
 
   def test_invalid_patterns(self):

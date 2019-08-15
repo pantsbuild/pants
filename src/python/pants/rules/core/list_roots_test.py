@@ -3,8 +3,77 @@
 
 import json
 
+from pants.engine.fs import Digest, PathGlobs, Snapshot
 from pants.rules.core import list_roots
+from pants.source.source_root import SourceRoot, SourceRootCategories, SourceRootConfig
 from pants_test.console_rule_test_base import ConsoleRuleTestBase
+from pants_test.engine.util import run_rule
+from pants_test.test_base import TestBase
+
+
+class AllRootsTest(TestBase):
+  def test_all_roots(self):
+    SOURCE = SourceRootCategories.SOURCE
+    TEST = SourceRootCategories.TEST
+    THIRDPARTY = SourceRootCategories.THIRDPARTY
+
+    options = {
+      'pants_ignore': [],
+      'source_root_patterns': ['src/*', 'src/example/*'],
+      'source_roots': {
+        # Fixed roots should trump patterns which would detect contrib/go/examples/src/go here.
+        'contrib/go/examples/src/go/src': ['go'],
+
+        # Dir does not exist, should not be listed as a root.
+        'java': ['java']}
+    }
+    options.update(self.options[''])  # We need inherited values for pants_workdir etc.
+
+    self.context(for_subsystems=[SourceRootConfig], options={
+      SourceRootConfig.options_scope: options
+    })
+
+    source_root_config = SourceRootConfig.global_instance()
+    source_roots = source_root_config.get_source_roots()
+
+    # Ensure that we see any manually added roots.
+    source_roots.add_source_root('fixed/root/jvm', ('java', 'scala'), TEST)
+
+    # This function mocks out reading real directories off the file system
+    def provider_rule(path_globs: PathGlobs) -> Snapshot:
+      path = path_globs.include[0]
+      mapping = {
+          '**/src/test/*/': (),
+          '**/3rdparty/*/': ("contrib/go/examples/3rdparty/go", ),
+          '**/src/*/': ('contrib/go/examples/src/go/src', 'src/java', 'src/python', 'src/kotlin', 'my/project/src/java'),
+          '**/3rd_party/*/': (),
+          '**/test/*/': (),
+          'java/': (),
+          '**/third_party/*/': (),
+          '**/src/example/*/': ('src/example/java', 'src/example/python'),
+          'contrib/go/examples/src/go/src/': (),
+          '**/tests/*/': (),
+          '**/thirdparty/*/': (),
+          'fixed/root/jvm/': ('fixed/root/jvm',),
+      }
+      dirs = mapping[path]
+      return Snapshot(Digest('abcdef', 10), (), dirs)
+
+    output = run_rule(list_roots.all_roots, source_root_config, {
+      (Snapshot, PathGlobs): provider_rule
+    })
+
+    self.assertEqual({SourceRoot('contrib/go/examples/3rdparty/go', ('go',), THIRDPARTY),
+                       SourceRoot('contrib/go/examples/src/go/src', ('go',), SOURCE),
+                       SourceRoot('src/java', ('java',), SOURCE),
+                       SourceRoot('src/python', ('python',), SOURCE),
+                       SourceRoot('src/kotlin', ('kotlin',), SOURCE),
+                       SourceRoot('src/example/java', ('java',), SOURCE),
+                       SourceRoot('src/example/python', ('python',), SOURCE),
+                       SourceRoot('my/project/src/java', ('java',), SOURCE),
+                       SourceRoot('fixed/root/jvm', ('java','scala'), TEST)
+                      },
+                      set(output))
 
 
 class RootsTest(ConsoleRuleTestBase):
