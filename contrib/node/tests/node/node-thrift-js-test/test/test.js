@@ -1,7 +1,7 @@
 /* eslint-env mocha */
 import 'babel-polyfill'
 import assert from 'assert'
-import Name from 'employee-dep' //full path contrib.node..
+import Name from 'employee-dep/dep_types' //full path contrib.node..
 
 describe('Testing Node Thrift JS generation', () => {
   describe('Employee Test', () => {

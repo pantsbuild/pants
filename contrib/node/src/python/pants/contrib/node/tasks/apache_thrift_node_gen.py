@@ -3,7 +3,6 @@
 
 import json
 import os
-import re
 from typing import List
 
 from pants.backend.codegen.thrift.lib.apache_thrift_gen_base import ApacheThriftGenBase
@@ -34,7 +33,6 @@ class ApacheThriftNodeGen(ApacheThriftGenBase):
             'output_dir', 'dev_dependency', 'style_ignore_path', 'bin_executables']
 
   def execute_codegen(self, target, target_workdir):
-    sources_list = target.sources_relative_to_target_base()
     safe_file_dump(os.path.join(target_workdir, 'yarn.lock'))
     dependency_list = target.dependencies
     package_dict = {}
