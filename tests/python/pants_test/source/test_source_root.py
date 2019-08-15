@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.source.source_root import (SourceRoot, SourceRootCategories, SourceRootConfig,
-                                      SourceRootFactory, SourceRootTrie)
+                                      SourceRootFactory, SourceRootTrie, UncanonicalizedSourceRoot)
 from pants_test.test_base import TestBase
 
 
@@ -90,6 +90,51 @@ class SourceRootTest(TestBase):
     trie.add_fixed('src/go/src', ('go',))
     self.assertEqual(root('src/go/src', ('go',)),
                       trie.find('src/go/src/foo/bar/baz.go'))
+
+  def test_source_root_trie_traverse(self):
+    def make_trie() -> SourceRootTrie:
+      return SourceRootTrie(SourceRootFactory({
+      'jvm': ('java', 'scala'),
+      'py': ('python',)
+    }))
+
+    def root(path, langs):
+      return UncanonicalizedSourceRoot(path, langs, UNKNOWN)
+
+    trie = make_trie()
+    self.assertEqual(set(), trie.traverse())
+
+    trie.add_pattern('src/*')
+    trie.add_pattern('src/main/*')
+    self.assertEqual({
+      root('src/*', ('jvm','py')),
+      root('src/main/*', ('jvm', 'py'))
+    }, trie.traverse())
+
+    trie = make_trie()
+    trie.add_pattern('*')
+    trie.add_pattern('src/*/code')
+    trie.add_pattern('src/main/*/code')
+    trie.add_pattern('src/main/*')
+    trie.add_pattern('src/main/*/foo')
+    self.assertEqual({
+      root('*', ('jvm', 'py')),
+      root('src/*/code', ('jvm', 'py')),
+      root('src/main/*/code', ('jvm', 'py')),
+      root('src/main/*', ('jvm', 'py')),
+      root('src/main/*', ('jvm', 'py')),
+      root('src/main/*/foo', ('jvm', 'py'))
+    }, trie.traverse())
+
+    trie = make_trie()
+    trie.add_fixed('src/scala-source-code', ('scala',))
+    trie.add_pattern('src/*/code')
+    trie.add_pattern('src/main/*/code')
+    self.assertEqual({
+      root('src/*/code', ('jvm', 'py')),
+      root('^/src/scala-source-code', ('scala',)),
+      root('src/main/*/code', ('jvm', 'py'))
+    }, trie.traverse())
 
   def test_fixed_source_root_at_buildroot(self):
     trie = SourceRootTrie(SourceRootFactory({}))

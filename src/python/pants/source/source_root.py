@@ -3,6 +3,7 @@
 
 import os
 from collections import namedtuple
+from typing import Set
 
 from pants.base.project_tree_factory import get_project_tree
 from pants.subsystem.subsystem import Subsystem
@@ -18,6 +19,10 @@ class SourceRootCategories:
 
 
 SourceRoot = namedtuple('_SourceRoot', ['path', 'langs', 'category'])
+
+# Named tuple of path/langs/category, where the langs are deliberately not canonicalized in order to match up
+# with the actual directory names on disk
+UncanonicalizedSourceRoot = namedtuple('UncanonicalizedSourceRoot', ['path', 'langs', 'category'])
 
 
 class SourceRootFactory:
@@ -361,6 +366,25 @@ class SourceRootTrie:
     node.category = category
     node.is_terminal = True
 
+  def traverse(self) -> Set[UncanonicalizedSourceRoot]:
+    uncanonicalized_source_roots = set()
+    lang_canonicalizations = self._source_root_factory._lang_canonicalizations
+    all_lang_names = tuple(lang_canonicalizations.keys())
+
+    def traverse_helper(node, path_components):
+      for name in node.children:
+        child = node.children[name]
+        if child.is_terminal:
+          effective_path = '/'.join([*path_components, name])
+          effective_lang_names = child.langs if len(child.langs) != 0 else all_lang_names
+          category = child.category
+          root = UncanonicalizedSourceRoot(effective_path, effective_lang_names, category)
+          uncanonicalized_source_roots.add(root)
+        traverse_helper(child, [*path_components, name])
+
+    traverse_helper(self._root, [])
+    return uncanonicalized_source_roots
+
   def find(self, path):
     """Find the source root for the given path."""
     keys = ['^'] + path.split(os.path.sep)
@@ -377,6 +401,7 @@ class SourceRootTrie:
         else:
           node = child
           j += 1
+
       if node.is_terminal:
         if j == 1:  # The match was on the root itself.
           path = ''
