@@ -242,7 +242,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
     pants_run = self.run_pants([
       '--no-colors', '--no-jvm-platform-validate-colors', '--test-junit-colors',
       '--unpack-jars-colors', '--no-resolve-ivy-colors', '--imports-ivy-imports-colors',
-      '--compile-colors', '--no-compile-zinc-colors',
+      '--compile-colors', '--no-compile-rsc-colors',
       'options', '--skip-inherited', '--name=colors',
     ])
     self.assert_success(pants_run)
