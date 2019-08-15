@@ -61,11 +61,9 @@ class NodeResolverBase(ABC):
     address_path = self.parse_file_path(file_path)
     if not address_path:
       return None
-
     dep_spec_path = os.path.normpath(os.path.join(target.address.spec_path, address_path))
     for dep in target.dependencies:
-      if dep.is_synthetic:
-        return dep
+      import pdb; pdb.set_trace()
       if dep.package_name == package_name and dep.address.spec_path == dep_spec_path:
         return dep
     return None
