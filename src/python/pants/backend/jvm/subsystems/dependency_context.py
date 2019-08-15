@@ -41,8 +41,8 @@ class DependencyContext(Subsystem, DependencyContextBase):
     for dep in target.closure(bfs=True, **self.target_closure_kwargs):
       yield dep
 
-  def create_fingerprint_strategy(self, classpath_products):
-    return ResolvedJarAwareFingerprintStrategy(classpath_products, self)
+  def create_fingerprint_strategy(self, classpath_products, additional_confs=None):
+    return ResolvedJarAwareFingerprintStrategy(classpath_products, self, additional_confs)
 
   def defaulted_property(self, target, option_name):
     """Computes a language property setting for the given JvmTarget.
@@ -74,10 +74,11 @@ class DependencyContext(Subsystem, DependencyContextBase):
 class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
   """Task fingerprint strategy that also includes the resolved coordinates of dependent jars."""
 
-  def __init__(self, classpath_products, dep_context):
+  def __init__(self, classpath_products, dep_context, additional_confs):
     super().__init__()
     self._classpath_products = classpath_products
     self._dep_context = dep_context
+    self._additional_confs = additional_confs
 
   def compute_fingerprint(self, target):
     if isinstance(target, Resources):
@@ -86,6 +87,8 @@ class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
 
     hasher = hashlib.sha1()
     hasher.update(target.payload.fingerprint().encode())
+    # Adding tags into cache key because it may decide which workflow applies to the target.
+    hasher.update(','.join(sorted(target.tags)).encode())
     if isinstance(target, JarLibrary):
       # NB: Collects only the jars for the current jar_library, and hashes them to ensure that both
       # the resolved coordinates, and the requested coordinates are used. This ensures that if a
@@ -96,6 +99,10 @@ class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
         [target])
       for _, entry in classpath_entries:
         hasher.update(str(entry.coordinate).encode())
+
+    for conf in self._additional_confs:
+      hasher.update(conf.encode())
+
     return hasher.hexdigest()
 
   def direct(self, target):

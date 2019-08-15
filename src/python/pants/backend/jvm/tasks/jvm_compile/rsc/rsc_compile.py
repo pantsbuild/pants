@@ -133,6 +133,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   def implementation_version(cls):
     return super().implementation_version() + [('RscCompile', 173)]
 
+  def additional_confs_for_fignerprinting(self):
+    return [self.get_options().workflow.value]
+
   class JvmCompileWorkflowType(enum(['zinc-only', 'zinc-java', 'rsc-and-zinc'])):
     """Target classifications used to correctly schedule Zinc and Rsc jobs.
 
