@@ -608,6 +608,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
     dirs_to_copy = ('3rdparty', 'contrib') + tuple(dirs_to_copy or [])
 
     with self.temporary_workdir() as tmp_dir:
+      # To ensure temp workdir exists
+      safe_mkdir(tmp_dir)
       for filename in files_to_copy:
         shutil.copy(os.path.join(get_buildroot(), filename), os.path.join(tmp_dir, filename))
 
