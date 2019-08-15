@@ -10,4 +10,4 @@ class ZincCompileJvmPlatformIntegrationTest(JvmPlatformIntegrationMixin,
                                             PantsRunIntegrationTest):
 
   def get_pants_compile_args(self):
-    return ['compile.zinc']
+    return ['compile.rsc']
