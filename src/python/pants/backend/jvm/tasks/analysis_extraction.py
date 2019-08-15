@@ -11,7 +11,6 @@ from contextlib import contextmanager
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.base.deprecated import deprecated_conditional
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.util.contextutil import temporary_dir
