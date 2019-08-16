@@ -3,7 +3,7 @@
 
 import os
 from collections import namedtuple
-from typing import Set
+from typing import NamedTuple, Sequence, Set, Tuple
 
 from pants.base.project_tree_factory import get_project_tree
 from pants.subsystem.subsystem import Subsystem
@@ -20,9 +20,13 @@ class SourceRootCategories:
 
 SourceRoot = namedtuple('_SourceRoot', ['path', 'langs', 'category'])
 
-# Named tuple of path/langs/category, where the langs are deliberately not canonicalized in order to match up
-# with the actual directory names on disk
-UncanonicalizedSourceRoot = namedtuple('UncanonicalizedSourceRoot', ['path', 'langs', 'category'])
+
+class UncanonicalizedSourceRoot(NamedTuple):
+  """Named tuple of path/langs/category, where the langs are deliberately not canonicalized in order to match up
+     with the actual directory names on disk"""
+  path: str
+  langs: Tuple[str,...]
+  category: SourceRootCategories
 
 
 class SourceRootFactory:
@@ -367,20 +371,19 @@ class SourceRootTrie:
     node.is_terminal = True
 
   def traverse(self) -> Set[UncanonicalizedSourceRoot]:
-    uncanonicalized_source_roots = set()
+    uncanonicalized_source_roots: Set[UncanonicalizedSourceRoot] = set()
     lang_canonicalizations = self._source_root_factory._lang_canonicalizations
     all_lang_names = tuple(lang_canonicalizations.keys())
 
-    def traverse_helper(node, path_components):
+    def traverse_helper(node: SourceRootTrie.Node, path_components: Sequence[str]):
       for name in node.children:
         child = node.children[name]
         if child.is_terminal:
           effective_path = '/'.join([*path_components, name])
           effective_lang_names = child.langs if len(child.langs) != 0 else all_lang_names
-          category = child.category
-          root = UncanonicalizedSourceRoot(effective_path, effective_lang_names, category)
+          root = UncanonicalizedSourceRoot( path=effective_path, langs=effective_lang_names, category=child.category)
           uncanonicalized_source_roots.add(root)
-        traverse_helper(child, [*path_components, name])
+        traverse_helper(node=child, path_components=[*path_components, name])
 
     traverse_helper(self._root, [])
     return uncanonicalized_source_roots
