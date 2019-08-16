@@ -227,7 +227,7 @@ def safe_file(path, suffix=None, cleanup=True):
   :param str suffix: Use this suffix to create the copy. Otherwise use a random string.
   :param bool cleanup: Whether or not to clean up the copy.
   """
-  safe_path = '{0}.{1}'.format(path, suffix or uuid.uuid4())
+  safe_path = '{}.{}'.format(path, suffix or uuid.uuid4())
   if os.path.exists(path):
     shutil.copy(path, safe_path)
   try:
@@ -270,13 +270,13 @@ def open_zip(path_or_file, *args, **kwargs):
   :returns: `class 'contextlib.GeneratorContextManager`.
   """
   if not path_or_file:
-    raise InvalidZipPath('Invalid zip location: {}'.format(path_or_file))
+    raise InvalidZipPath(f'Invalid zip location: {path_or_file}')
   allowZip64 = kwargs.pop('allowZip64', True)
   try:
     zf = zipfile.ZipFile(path_or_file, *args, allowZip64=allowZip64, **kwargs)
   except zipfile.BadZipfile as bze:
     # Use the realpath in order to follow symlinks back to the problem source file.
-    raise zipfile.BadZipfile("Bad Zipfile {0}: {1}".format(os.path.realpath(path_or_file), bze))
+    raise zipfile.BadZipfile("Bad Zipfile {}: {}".format(os.path.realpath(path_or_file), bze))
   try:
     yield zf
   finally:
@@ -362,7 +362,7 @@ def maybe_profiled(profile_path):
     view_cmd = green('gprof2dot -f pstats {path} | dot -Tpng -o {path}.png && open {path}.png'
                      .format(path=profile_path))
     logging.getLogger().info(
-      'Dumped profile data to: {}\nUse e.g. {} to render and view.'.format(profile_path, view_cmd)
+      f'Dumped profile data to: {profile_path}\nUse e.g. {view_cmd} to render and view.'
     )
 
 

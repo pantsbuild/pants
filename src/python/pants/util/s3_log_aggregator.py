@@ -22,7 +22,7 @@ class Measure:
     return self
 
 
-class S3LogAccumulator(object):
+class S3LogAccumulator:
   """Aggregates total downloaded bytes per file from S3 logs.
 
   Helps us track which binaries our S3 bandwidth costs are being spent on.
@@ -88,9 +88,9 @@ class S3LogAccumulator(object):
   def _prettyprint_bytes(x):
     for unit in ['B', 'KB', 'MB', 'GB']:
       if abs(x) < 1024.0:
-        return '{:3.1f}{}'.format(x, unit)
+        return f'{x:3.1f}{unit}'
       x /= 1024.0
-    return '{:.1f}TB'.format(x)
+    return f'{x:.1f}TB'
 
 
 
