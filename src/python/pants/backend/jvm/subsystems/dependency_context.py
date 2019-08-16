@@ -10,6 +10,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.base.fingerprint_strategy import FingerprintStrategy
+from pants.base.hash_utils import stable_json_sha1
 from pants.build_graph.dependency_context import DependencyContext as DependencyContextBase
 from pants.build_graph.resources import Resources
 from pants.build_graph.target_scopes import Scopes
@@ -87,7 +88,7 @@ class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
     hasher = hashlib.sha1()
     hasher.update(target.payload.fingerprint().encode())
     # Adding tags into cache key because it may decide which workflow applies to the target.
-    hasher.update(','.join(sorted(target.tags)).encode())
+    hasher.update(stable_json_sha1(target.tags).encode())
     if isinstance(target, JarLibrary):
       # NB: Collects only the jars for the current jar_library, and hashes them to ensure that both
       # the resolved coordinates, and the requested coordinates are used. This ensures that if a
