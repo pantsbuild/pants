@@ -54,8 +54,6 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
 
     # Initialize the workdir early enough to ensure that logging has a destination.
     init_workdir(global_bootstrap_options)
-    # Set the initial log location, for fatal errors during import time.
-    ExceptionSink.reset_log_location(os.path.join(os.getcwd(), '.pants.d'))
 
     # We enable Rust logging here,
     # and everything before it will be routed through regular Python logging.

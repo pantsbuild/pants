@@ -519,8 +519,8 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
 # Setup global state such as signal handlers and sys.excepthook with probably-safe values at module
 # import time.
 # TODO: add testing for fatal errors at import-time, which may occur if there are errors in plugins.
-
-
+# Set the initial log location, for fatal errors during import time.
+ExceptionSink.reset_log_location(os.path.join(os.getcwd(), '.pants.d'))
 # Sets except hook for exceptions at import time.
 ExceptionSink._reset_exiter(Exiter(exiter=sys.exit))
 # Sets a SIGUSR2 handler.
