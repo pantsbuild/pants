@@ -392,9 +392,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                                                               'post_compile_merge_dir'),
                           sources=self._compute_sources_for_target(target))
 
-  def additional_confs_for_fignerprinting(self):
-    return []
-
   def execute(self):
     requested_compiler = JvmPlatform.global_instance().get_options().compiler
     if requested_compiler != self.compiler_name:
@@ -425,7 +422,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     classpath_product = self.create_runtime_classpath()
 
     fingerprint_strategy = DependencyContext.global_instance().create_fingerprint_strategy(
-        classpath_product, self.additional_confs_for_fignerprinting())
+        classpath_product)
     # Note, JVM targets are validated (`vts.update()`) as they succeed.  As a result,
     # we begin writing artifacts out to the cache immediately instead of waiting for
     # all targets to finish.
