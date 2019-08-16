@@ -115,6 +115,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     status as "bootstrap options" is only pertinent during option registration.
     """
     buildroot = get_buildroot()
+    default_distdir_name = 'dist'
+    default_rel_distdir = f'/{default_distdir_name}/'
 
     register('-l', '--level', choices=['trace', 'debug', 'info', 'warn'], default='info',
              recursive=True, help='Set the logging level.')
@@ -219,7 +221,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'This does not affect any other filesystem operations. '
                   'Patterns use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')
     register('--pants-ignore', advanced=True, type=list,
-             default=['.*/'],
+             default=['.*/', default_rel_distdir],
              help='Paths to ignore for all filesystem operations performed by pants '
                   '(e.g. BUILD file scanning, glob matching, etc). '
                   'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). '
