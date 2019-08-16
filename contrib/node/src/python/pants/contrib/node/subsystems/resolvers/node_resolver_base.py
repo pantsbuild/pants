@@ -63,7 +63,6 @@ class NodeResolverBase(ABC):
       return None
     dep_spec_path = os.path.normpath(os.path.join(target.address.spec_path, address_path))
     for dep in target.dependencies:
-      import pdb; pdb.set_trace()
       if dep.package_name == package_name and dep.address.spec_path == dep_spec_path:
         return dep
     return None
