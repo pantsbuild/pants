@@ -13,7 +13,7 @@ from zlib import crc32
 import pytest
 
 
-class NodeRenamerPlugin(object):
+class NodeRenamerPlugin:
   """A pytest plugin to modify the console output of test names.
 
   Replaces the chroot-based source paths with the source-tree based ones, which are more readable
@@ -47,7 +47,7 @@ class NodeRenamerPlugin(object):
       item._nodeid = real_nodeid
 
 
-class ShardingPlugin(object):
+class ShardingPlugin:
   def __init__(self, shard, num_shards):
     self._shard = shard
     self._num_shards = num_shards

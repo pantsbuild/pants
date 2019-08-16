@@ -23,7 +23,7 @@ class attrdict(dict):
     return self.get(key)
 
 
-class fake_log(object):
+class fake_log:
   def debug(self, string):
     pass
 

@@ -103,7 +103,7 @@ class Goal(datatype([('exit_code', int)]), metaclass=ABCMeta):
     return _Options
 
 
-class _GoalOptions(object):
+class _GoalOptions:
   """A marker trait for the anonymous inner `Goal.Options` classes for `Goal`s."""
 
 

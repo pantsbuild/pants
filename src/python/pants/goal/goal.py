@@ -125,7 +125,7 @@ class Goal:
     return ret
 
 
-class _Goal(object):
+class _Goal:
   def __init__(self, name):
     """Don't call this directly.
 

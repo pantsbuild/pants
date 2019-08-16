@@ -37,7 +37,7 @@ class ResolvedJar:
            'directory_digest={!r})'.format(*self._id)
 
 
-class M2Coordinate(object):
+class M2Coordinate:
   """Represents a fully qualified name of an artifact.
 
   :API: public

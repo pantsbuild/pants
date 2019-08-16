@@ -5,7 +5,7 @@ import threading
 from io import BytesIO
 
 
-class _RWBuf(object):
+class _RWBuf:
   """An unbounded read-write buffer.
 
   Can be used as a file-like object for reading and writing.

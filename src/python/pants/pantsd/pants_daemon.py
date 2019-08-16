@@ -34,7 +34,7 @@ from pants.util.objects import datatype
 from pants.util.strutil import ensure_text
 
 
-class _LoggerStream(object):
+class _LoggerStream:
   """A sys.std{out,err} replacement that pipes output to a logger.
 
   N.B. `logging.Logger` expects unicode. However, most of our outstream logic, such as in `exiter.py`,

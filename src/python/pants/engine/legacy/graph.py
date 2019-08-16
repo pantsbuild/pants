@@ -247,7 +247,7 @@ class LegacyBuildGraph(BuildGraph):
       yield hydrated_target.address
 
 
-class _DependentGraph(object):
+class _DependentGraph:
   """A graph for walking dependent addresses of TargetAdaptor objects.
 
   This avoids/imitates constructing a v1 BuildGraph object, because that codepath results

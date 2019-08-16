@@ -416,7 +416,7 @@ class _UnknownEnvironment(_DistributionEnvironment):
     return itertools.chain(*(pe.jvm_locations for pe in self._possible_environments))
 
 
-class _Locator(object):
+class _Locator:
   class Error(Distribution.Error):
     """Error locating a java distribution."""
 

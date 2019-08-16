@@ -869,7 +869,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       local_distribution = JvmPlatform.preferred_jvm_distribution(settings_args, strict=False)
     return local_distribution
 
-  class _HermeticDistribution(object):
+  class _HermeticDistribution:
     def __init__(self, home_path, distribution):
       self._underlying = distribution
       self._home = home_path

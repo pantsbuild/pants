@@ -17,7 +17,7 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
     self.maxDiff = None
 
   def test_get_description_from_docstring(self):
-    class Test1(object):
+    class Test1:
       """First line.
 
       Subsequent
@@ -30,7 +30,7 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
     self.assertEqual(('First line.', ['Subsequent', 'lines.', '', '  with indentations']),
                      BuildDictionaryInfoExtracter.get_description_from_docstring(Test1))
 
-    class Test2(object):
+    class Test2:
       """Only one line."""
 
     self.assertEqual(('Only one line.', []),

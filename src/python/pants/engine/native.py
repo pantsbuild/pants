@@ -217,7 +217,7 @@ def _extern_decl(return_type, arg_types):
   return wrapper
 
 
-class _FFISpecification(object):
+class _FFISpecification:
 
   def __init__(self, ffi, lib):
     self._ffi = ffi

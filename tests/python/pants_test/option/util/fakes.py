@@ -11,7 +11,7 @@ from pants.option.ranked_value import RankedValue
 from pants.option.scope import GLOBAL_SCOPE
 
 
-class _FakeOptionValues(object):
+class _FakeOptionValues:
   def __init__(self, option_values):
     self._option_values = option_values
 

@@ -91,7 +91,7 @@ class PantsService(ABC):
     self._state.mark_terminating()
 
 
-class _ServiceState(object):
+class _ServiceState:
   """A threadsafe state machine for controlling a service running in another thread.
 
   The state machine represents two stable states:

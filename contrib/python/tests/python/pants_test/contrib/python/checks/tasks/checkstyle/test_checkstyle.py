@@ -127,7 +127,7 @@ class CheckstyleTest(PythonTaskTestBase):
   @parameterized.expand(CHECKER_RESOLVE_METHOD)
   def test_pass(self, unused_test_name, resolve_local):
     self.create_file('a/python/pass.py', contents=dedent("""
-                       class UpperCase(object):
+                       class UpperCase:
                          pass
                      """))
     target = self.make_target('a/python:pass', PythonLibrary, sources=['pass.py'])
@@ -136,7 +136,7 @@ class CheckstyleTest(PythonTaskTestBase):
   @parameterized.expand(CHECKER_RESOLVE_METHOD)
   def test_failure(self, unused_test_name, resolve_local):
     self.create_file('a/python/fail.py', contents=dedent("""
-                        class lower_case(object):
+                        class lower_case:
                           pass
                        """))
     target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'])
@@ -147,7 +147,7 @@ class CheckstyleTest(PythonTaskTestBase):
   @parameterized.expand(CHECKER_RESOLVE_METHOD)
   def test_suppressed_file_passes(self, unused_test_name, resolve_local):
     self.create_file('a/python/fail.py', contents=dedent("""
-                        class lower_case(object):
+                        class lower_case:
                           pass
                        """))
     suppression_file = self.create_file('suppress.txt', contents=dedent("""
@@ -159,7 +159,7 @@ class CheckstyleTest(PythonTaskTestBase):
   @parameterized.expand(CHECKER_RESOLVE_METHOD)
   def test_failure_fail_false(self, unused_test_name, resolve_local):
     self.create_file('a/python/fail.py', contents=dedent("""
-                        class lower_case(object):
+                        class lower_case:
                           pass
                      """))
     target = self.make_target('a/python:fail', PythonLibrary, sources=['fail.py'])
