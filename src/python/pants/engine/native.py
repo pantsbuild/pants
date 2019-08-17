@@ -590,7 +590,7 @@ class Native(Singleton):
 
   class CFFIExternMethodRuntimeErrorInfo(datatype([
       ('exc_type', type),
-      ('exc_value', SubclassesOf(Exception)),
+      ('exc_value', SubclassesOf(Exception, KeyboardInterrupt)),
       'traceback',
   ])):
     """Encapsulates an exception raised when a CFFI extern is called so that it can be displayed.

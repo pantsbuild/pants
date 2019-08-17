@@ -530,4 +530,4 @@ ExceptionSink.reset_signal_handler(SignalHandler())
 # to explicitly request it. The exception log will have any stacktraces regardless so this should
 # not hamper debugging.
 ExceptionSink.reset_should_print_backtrace_to_terminal(
-  should_print_backtrace=os.environ.get('PANTS_PRINT_EXCEPTION_STACKTRACE') == 'True')
+  should_print_backtrace=os.environ.get('PANTS_PRINT_EXCEPTION_STACKTRACE', 'True') == 'True')
