@@ -1,4 +1,3 @@
-contrib/python/tests/python/pants_test/contrib/python/checks/tasks/checkstyle:checkstyle
 tests/python/pants_test/backend/codegen/antlr/java:integration
 tests/python/pants_test/backend/codegen/protobuf/java:integration
 tests/python/pants_test/backend/codegen/wire/java:integration

@@ -189,10 +189,17 @@ def get_blacklisted_targets(path: str) -> Set[str]:
   return {line.strip() for line in Path(path).read_text().splitlines()}
 
 
-def get_all_targets(globs: List[str], *, tag: Optional[str] = None) -> Set[str]:
-  command = ["./pants.pex", "--filter-type=python_tests", "filter"] + globs
+def get_all_python_tests(*, tag: Optional[str] = None) -> Set[str]:
+  command = [
+    "./pants.pex",
+    "--filter-type=python_tests",
+    "filter",
+    "src/python::",
+    "tests/python::",
+    "contrib::"
+  ]
   if tag is not None:
-    command.append(f"--tag={tag}")
+    command.insert(1, f"--tag={tag}")
   return set(subprocess.run(
     command, stdout=subprocess.PIPE, encoding="utf-8", check=True
   ).stdout.strip().split("\n"))
@@ -332,41 +339,39 @@ def run_cargo_audit() -> None:
 
 
 def run_python_tests_v1() -> None:
-  known_v2_failures_file = "build-support/unit_test_v2_blacklist.txt"
+  check_pants_pex_exists()
+
+  blacklisted_v2_targets = get_blacklisted_targets("build-support/unit_test_v2_blacklist.txt")
+  blacklisted_chroot_targets = get_blacklisted_targets("build-support/unit_test_chroot_blacklist.txt")
+  chrooted_targets = blacklisted_v2_targets - blacklisted_chroot_targets
+
   with travis_section("PythonTestsV1", "Running Python unit tests with V1 test runner"):
-    check_pants_pex_exists()
+
     try:
-      subprocess.run([
-        "./pants.pex",
-        f"--target-spec-file={known_v2_failures_file}",
-        "test.pytest",
-      ] + PYTEST_PASSTHRU_ARGS, check=True)
+      subprocess.run(
+        ["./pants.pex", "test.pytest"] + sorted(chrooted_targets) + PYTEST_PASSTHRU_ARGS,
+        check=True
+      )
+      subprocess.run(
+        [
+          "./pants.pex",
+          "--no-test-pytest-chroot",
+          "test.pytest"
+        ] + sorted(blacklisted_chroot_targets) + PYTEST_PASSTHRU_ARGS,
+        check=True
+      )
     except subprocess.CalledProcessError:
       die("Python unit test failure (V1 test runner")
     else:
       green("V1 unit tests passed.")
 
-    try:
-      subprocess.run([
-        "./pants.pex",
-        "--tag=-integration",
-        "--exclude-target-regexp=./*testprojects/.*",
-        "test.pytest",
-        "contrib::",
-      ] + PYTEST_PASSTHRU_ARGS, check=True)
-    except subprocess.CalledProcessError:
-      die("Contrib Python test failure")
-    else:
-      green("Contrib unit tests passed.")
-
 
 def run_python_tests_v2(*, remote_execution_enabled: bool) -> None:
-
   check_pants_pex_exists()
 
   blacklisted_v2_targets = get_blacklisted_targets("build-support/unit_test_v2_blacklist.txt")
   blacklisted_remote_targets = get_blacklisted_targets("build-support/unit_test_remote_blacklist.txt")
-  all_targets = get_all_targets(["src/python::", "tests/python::"], tag="-integration")
+  all_targets = get_all_python_tests(tag="-integration")
   v2_compatible_targets = all_targets - blacklisted_v2_targets
   if remote_execution_enabled:
     remote_execution_targets = v2_compatible_targets - blacklisted_remote_targets
@@ -445,27 +450,21 @@ def run_jvm_tests() -> None:
 
 
 def run_integration_tests(*, shard: Optional[str]) -> None:
-
   check_pants_pex_exists()
 
-  blacklisted_chroot_targets = get_blacklisted_targets("build-support/chroot_blacklist.txt")
-  all_targets = get_all_targets(["src/python::", "tests/python::", "contrib::"], tag="+integration")
+  blacklisted_chroot_targets = get_blacklisted_targets("build-support/integration_test_chroot_blacklist.txt")
+  all_targets = get_all_python_tests(tag="+integration")
   chrooted_targets = sorted(all_targets - blacklisted_chroot_targets)
 
-  command = [
-    "./pants.pex",
-    "--tag=+integration",
-    "--exclude-target-regexp=.*/testprojects/.*",
-    "test.pytest",
-  ]
+  command = ["./pants.pex", "test.pytest"]
   if shard is not None:
     command.append(f"--test-pytest-test-shard={shard}")
-  command.extend(PYTEST_PASSTHRU_ARGS)
   with travis_section("IntegrationTests", f"Running Pants Integration tests {shard if shard is not None else ''}"):
     try:
-      subprocess.run(command + chrooted_targets, check=True)
+      subprocess.run(command + chrooted_targets + PYTEST_PASSTHRU_ARGS, check=True)
       subprocess.run(
-        command + sorted(blacklisted_chroot_targets) + ["--no-test-pytest-chroot"], check=True
+        command + ["--no-test-pytest-chroot"] + sorted(blacklisted_chroot_targets) + PYTEST_PASSTHRU_ARGS,
+        check=True
       )
     except subprocess.CalledProcessError:
       die("Integration test failure.")
