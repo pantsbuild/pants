@@ -21,7 +21,7 @@ class XmlParser:
       parsed_xml = parse(xml_path)
     # Minidom is a frontend for various parsers, only Exception covers ill-formed .xml for them all.
     except Exception as e:
-      raise cls.XmlError(f'Error parsing xml file at {xml_path}: {e}')
+      raise cls.XmlError(f'Error parsing xml file at {xml_path}: {e!r}')
     return parsed_xml
 
   @classmethod
@@ -30,7 +30,7 @@ class XmlParser:
     try:
       parsed_xml = cls._parse(xml_path)
     except OSError as e:
-      raise XmlParser.XmlError(f"Problem reading xml file at {xml_path}: {e}")
+      raise XmlParser.XmlError(f"Problem reading xml file at {xml_path}: {e!r}")
     return cls(xml_path, parsed_xml)
 
   def __init__(self, xml_path, parsed_xml):
@@ -52,12 +52,10 @@ class XmlParser:
     """
     parsed_element = self.parsed.getElementsByTagName(element)
     if not parsed_element:
-      raise self.XmlError("There is no '{}' element in "
-                          "xml file at: {}".format(element, self.xml_path))
+      raise self.XmlError(f"There is no '{element}' element in xml file at: {self.xml_path}")
     parsed_attribute = parsed_element[0].getAttribute(attribute)
     if not parsed_attribute:
-      raise self.XmlError("There is no '{}' attribute in "
-                          "xml at: {}".format(attribute, self.xml_path))
+      raise self.XmlError(f"There is no '{attribute}' attribute in xml at: {self.xml_path}")
     return parsed_attribute
 
   def get_optional_attribute(self, element, attribute):
