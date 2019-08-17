@@ -185,8 +185,11 @@ def get_remote_execution_oauth_token_path() -> Iterator[str]:
 # Blacklists
 # -------------------------------------------------------------------------
 
-def get_blacklisted_targets(path: str) -> Set[str]:
-  return {line.strip() for line in Path(path).read_text().splitlines()}
+def get_blacklisted_targets(filename: str) -> Set[str]:
+  return {
+    line.strip()
+    for line in Path(f"build-support/ci_blacklists/{filename}").read_text().splitlines()
+  }
 
 
 def get_all_python_tests(*, tag: Optional[str] = None) -> Set[str]:
@@ -341,8 +344,8 @@ def run_cargo_audit() -> None:
 def run_python_tests_v1() -> None:
   check_pants_pex_exists()
 
-  blacklisted_v2_targets = get_blacklisted_targets("build-support/unit_test_v2_blacklist.txt")
-  blacklisted_chroot_targets = get_blacklisted_targets("build-support/unit_test_chroot_blacklist.txt")
+  blacklisted_v2_targets = get_blacklisted_targets("unit_test_v2_blacklist.txt")
+  blacklisted_chroot_targets = get_blacklisted_targets("unit_test_chroot_blacklist.txt")
   chrooted_targets = blacklisted_v2_targets - blacklisted_chroot_targets
 
   with travis_section("PythonTestsV1", "Running Python unit tests with V1 test runner"):
@@ -369,8 +372,8 @@ def run_python_tests_v1() -> None:
 def run_python_tests_v2(*, remote_execution_enabled: bool) -> None:
   check_pants_pex_exists()
 
-  blacklisted_v2_targets = get_blacklisted_targets("build-support/unit_test_v2_blacklist.txt")
-  blacklisted_remote_targets = get_blacklisted_targets("build-support/unit_test_remote_blacklist.txt")
+  blacklisted_v2_targets = get_blacklisted_targets("unit_test_v2_blacklist.txt")
+  blacklisted_remote_targets = get_blacklisted_targets("unit_test_remote_blacklist.txt")
   all_targets = get_all_python_tests(tag="-integration")
   v2_compatible_targets = all_targets - blacklisted_v2_targets
   if remote_execution_enabled:
@@ -452,7 +455,7 @@ def run_jvm_tests() -> None:
 def run_integration_tests(*, shard: Optional[str]) -> None:
   check_pants_pex_exists()
 
-  blacklisted_chroot_targets = get_blacklisted_targets("build-support/integration_test_chroot_blacklist.txt")
+  blacklisted_chroot_targets = get_blacklisted_targets("integration_test_chroot_blacklist.txt")
   all_targets = get_all_python_tests(tag="+integration")
   chrooted_targets = sorted(all_targets - blacklisted_chroot_targets)
 
