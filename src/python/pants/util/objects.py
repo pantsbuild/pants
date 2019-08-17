@@ -18,7 +18,7 @@ class TypeCheckError(TypeError):
   # TODO: make some wrapper exception class to make this kind of
   # prefixing easy (maybe using a class field format string?).
   def __init__(self, type_name, msg, *args, **kwargs):
-    formatted_msg = "type check error in class {}: {}".format(type_name, msg)
+    formatted_msg = f"type check error in class {type_name}: {msg}"
     super().__init__(formatted_msg, *args, **kwargs)
 
 
@@ -105,7 +105,7 @@ def datatype(field_decls, superclass_name=None, **kwargs):
         this_object = super().__new__(cls, *args, **kwargs)
       except TypeError as e:
         raise cls.make_type_error(
-          "error in namedtuple() base constructor: {}".format(e))
+          f"error in namedtuple() base constructor: {e}")
 
       # TODO: Make this kind of exception pattern (filter for errors then display them all at once)
       # more ergonomic.
@@ -122,7 +122,7 @@ def datatype(field_decls, superclass_name=None, **kwargs):
           field_constraint.validate_satisfied_by(field_value)
         except TypeConstraintError as e:
           type_failure_msgs.append(
-            "field '{}' was invalid: {}".format(field_name, e))
+            f"field '{field_name}' was invalid: {e}")
       if type_failure_msgs:
         raise cls.make_type_error(
           '{} type checking constructor arguments:\n{}'
@@ -203,7 +203,7 @@ def datatype(field_decls, superclass_name=None, **kwargs):
       args_formatted = []
       for field_name in field_names:
         field_value = getattr(self, field_name)
-        args_formatted.append("{}={!r}".format(field_name, field_value))
+        args_formatted.append(f"{field_name}={field_value!r}")
       return '{class_name}({args_joined})'.format(
         class_name=type(self).__name__,
         args_joined=', '.join(args_formatted))
@@ -464,7 +464,7 @@ class TypeOnlyConstraint(TypeConstraint):
     if not types:
       raise ValueError('Must supply at least one type')
     if any(not isinstance(t, type) for t in types):
-      raise TypeError('Supplied types must be types. {!r}'.format(types))
+      raise TypeError(f'Supplied types must be types. {types!r}')
 
     if len(types) == 1:
       type_list = types[0].__name__

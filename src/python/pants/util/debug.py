@@ -43,7 +43,7 @@ class ProxyLogger(namedtuple('ProxyLogger', ['wrapped_object', 'log_path'])):
     def wrapped_method_call(*args, **kwargs):
       r = getattr(self.wrapped_object, attr)(*args, **kwargs)
       dlog(
-        '{}.{}(*{}, **{}) -> {}'.format(self.wrapped_object, attr, args, kwargs, r),
+        f'{self.wrapped_object}.{attr}(*{args}, **{kwargs}) -> {r}',
         self.log_path
       )
       return r
