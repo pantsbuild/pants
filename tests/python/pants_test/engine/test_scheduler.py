@@ -62,6 +62,27 @@ def transitive_coroutine_rule(c: C) -> D:
   yield D(b)
 
 
+@dataclass
+class NonFrozenDataclass:
+  x: int
+
+
+@dataclass(frozen=True)
+class FrozenFieldsDataclass:
+  x: int
+  y: str
+
+
+@dataclass(frozen=True)
+class ResultDataclass:
+  something: str
+
+
+@rule(ResultDataclass, [FrozenFieldsDataclass])
+def dataclass_rule(obj):
+  return ResultDataclass(something=f'x={obj.x}, y={obj.y}')
+
+
 @union
 class UnionBase:
   pass
@@ -179,6 +200,8 @@ class SchedulerTest(TestBase):
       consumes_a_and_b,
       transitive_b_c,
       transitive_coroutine_rule,
+      dataclass_rule,
+      RootRule(FrozenFieldsDataclass),
       RootRule(UnionWrapper),
       UnionRule(UnionBase, UnionA),
       UnionRule(UnionWithNonMemberErrorMsg, UnionX),
@@ -243,6 +266,12 @@ Type A is not a member of the UnionBase @union
     expected_msg = "specific error message for UnionA instance"
     with self._assert_execution_error(expected_msg):
       self.scheduler.product_request(UnionX, [Params(UnionWrapper(UnionA()))])
+
+  def test_dataclass_products_rule(self):
+    result, = self.scheduler.product_request(
+      ResultDataclass,
+      [Params(FrozenFieldsDataclass(3, "test string"))])
+    self.assertEquals(result.something, 'x=3, y=test string')
 
 
 class SchedulerWithNestedRaiseTest(TestBase):
@@ -357,3 +386,13 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
                                raise Exception(f'An exception for {type(x).__name__}')
                            Exception: An exception for B''').lstrip() + '\n\n',  # Traces include two empty lines after.
                                trace)
+
+
+class RuleIndexingErrorTest(TestBase):
+
+  def test_non_frozen_dataclass_error(self):
+
+    with self.assertRaisesWithMessage(TypeError, dedent("""\
+      type check error in class RootRule: 1 error type checking constructor arguments:
+      field 'output_type' was invalid: type <class 'pants_test.engine.test_scheduler.NonFrozenDataclass'> is a dataclass declared without `frozen=True`! The engine requires that fields in params are immutable for stable hashing!""")):
+      RootRule(NonFrozenDataclass)

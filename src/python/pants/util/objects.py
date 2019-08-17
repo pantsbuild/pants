@@ -43,12 +43,8 @@ class DatatypeMixin(ABC):
     """
     return cls.type_check_error_type(cls.__name__, msg, *args, **kwargs)
 
-  @abstractmethod
-  def copy(self, **kwargs):
-    """Return a new object of the same type, replacing specified fields with new values"""
 
-
-# TODO(#7074): Migrate to python 3 dataclasses!
+@deprecated('1.22.0.dev2', hint_message='Use @dataclass to declare typed named tuples instead!')
 def datatype(field_decls, superclass_name=None, **kwargs):
   """A wrapper for `namedtuple` that accounts for the type of the object in equality.
 
@@ -401,14 +397,8 @@ class TypedCollection(TypeConstraint):
   def __init__(self, constraint):
     """Create a `TypeConstraint` which validates each member of a collection with `constraint`.
 
-    :param TypeOnlyConstraint constraint: the `TypeConstraint` to apply to each element. This is
-                                          currently required to be a `TypeOnlyConstraint` to avoid
-                                          complex prototypal type relationships.
+    :param TypeConstraint constraint: the `TypeConstraint` to apply to each element.
     """
-
-    if not isinstance(constraint, TypeOnlyConstraint):
-      raise TypeError("constraint for collection must be a {}! was: {}"
-                      .format(TypeOnlyConstraint.__name__, constraint))
 
     description = '{}({})'.format(type(self).__name__, constraint)
 

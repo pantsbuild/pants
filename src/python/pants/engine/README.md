@@ -28,7 +28,7 @@ produce the requested value.
 ### Products and Params
 
 The engine executes your `@rule`s in order to (recursively) compute a `Product` of the requested
-type for a set of `Param`s. This recursive type search leads to a loosely coupled (and yet still 
+type for a set of `Param`s. This recursive type search leads to a loosely coupled (and yet still
 statically checked) form of dependency injection.
 
 When an `@rule` runs, it requires a set of `Param`s that the engine has determined are needed to
@@ -76,52 +76,61 @@ In cases where this search detects any ambiguity (generally because there are tw
 that can provide the same product with the same number of parameters), rule graph compilation will
 fail with a useful error message.
 
-### Datatypes
+### How to Declare Engine `Param` Types
 
 In practical use, builtin types like `str` or `int` do not provide enough information to
-disambiguate between various types of data in `@rule` signatures, so declaring small `datatype` 
-definitions to provide a unique and descriptive type is highly recommended:
+disambiguate between various types of data in `@rule` signatures, so declaring small, unique classes
+to encapsulate different states can help to make `@rule`sets with complex control flow between rules
+more declarative and self-documenting.
+
+#### Requirements for an Engine `Param`
+
+To use an instance of some class `C` as a `Param` to the engine:
+1. instances of `C` must be immutable,
+2. `__hash__` and `__eq__` must be implemented such that when constructing two separate instances of `C` with the same argument list `...`, `C(...) == C(...)` and `hash(C(...)) == hash(C(...))`.
+  - This can be ignored for singleton `Param`s.
+
+#### Benefits of using `@dataclass` for a `Param`
+[Python 3 `@dataclass`es](https://docs.python.org/3/library/dataclasses.html) satisfy the above requirements for engine `Param`s. Using `@dataclass` to declare engine `Param` types also provides additional benefits compared to alternatives:
+1. a compact and high-performance representation which can be stably shared across FFI boundaries,
+2. static type checking via [the `dataclasses` mypy plugin](https://github.com/python/mypy/blob/master/mypy/plugins/dataclasses.py),
+3. a concise, standard, and pythonic way to declare classes.
+
+
+#### Example Usage of `@dataclass` for Engine `Param`s
+
+*Note that the [3rdparty `dataclasses` library](https://github.com/ericvsmith/dataclasses) must be in your BUILD file and `import`ed in Python 3.6!*
 
 ```python
-class FormattedInt(datatype(['content'])): pass
+from dataclasses import dataclass
+
+
+# NB: Pants currently requires that `frozen=True` must be set in the `@dataclass`
+# decorator!
+@dataclass(frozen=True)
+class FormattedInt:
+  content: str
 
 @rule
 def int_to_str(value: int) -> FormattedInt:
   return FormattedInt('{}'.format(value))
 
-# Field values can be specified with positional and/or keyword arguments in the constructor:
+# Instances can be constructed and accessed the same way as for normal `@dataclass`es.
 x = FormattedInt('a string')
-x = FormattedInt(content='a string')
-
-# Field values can be accessed after construction by name or index:
-print(x.content)    # 'a string'
-print(x[0])         # 'a string'
+assert x == FormattedInt(content='a string')
+print(x.content)                # 'a string'
 
 # datatype objects can be easily inspected:
-print(x)            # 'FormattedInt(content=a string)'
-```
+print(x)                        # 'FormattedInt(content="a string")'
 
-#### Types of Fields
-
-`datatype()` accepts a list of *field declarations*, and returns a type which can be subclassed. A
-*field declaration* can just be a string (e.g. `'field_name'`), which is then used as the field
-name, as with `FormattedInt` above. A field can also be declared with a tuple of two elements: the
-field name string, and a `TypeConstraint` for the field (e.g. `('field_name',
-Exactly(FieldType))`). The bare type name (e.g. `FieldType`) can also be used as a shorthand for
-`Exactly(FieldType)`. If the tuple form is used, the constructor will create your object, then raise
-an error if the field value does not satisfy the type constraint.
-
-``` python
-class TypedDatatype(datatype([('field_name', Exactly(str, int))])):
+# All mypy types, including parameterized types, may be used in field definitions.
+@dataclass(frozen=True)
+class TypedDatatype:
   """Example of a datatype with a more complex field type constraint."""
-```
+  field_name: Union[str, int]
 
-Assigning a specific type to a field can be somewhat unidiomatic in Python, and may be unexpected or
-unnatural to use. However, regardless of whether the object is created directly with type-checked
-fields or whether it's produced from a set of rules by the engine's dependency injection, it is
-extremely useful to formalize the assumptions made about the value of an object into a specific
-type, even if the type just wraps a single field. The `datatype()` function makes it simple and
-efficient to apply that strategy.
+print(TypedDatatype("huh")) # 'TypedDatatype(field_name=huh)'
+```
 
 ### Gets and RootRules
 

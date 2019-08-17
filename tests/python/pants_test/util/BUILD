@@ -108,6 +108,18 @@ python_tests(
 )
 
 python_tests(
+  name = 'objects-mypy',
+  sources = ['test_objects_mypy.py'],
+  coverage = ['pants.util.objects'],
+  dependencies = [
+    'testprojects/src/python/mypy:mypy-passing-examples',
+    'testprojects/src/python/mypy:mypy-failing-examples',
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'}
+)
+
+python_tests(
   name = 'osutil',
   sources = ['test_osutil.py'],
   dependencies = [

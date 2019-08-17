@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import ast
+import dataclasses
 import inspect
 import itertools
 import logging
@@ -12,7 +13,7 @@ from collections import OrderedDict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Any, Callable, Dict, Optional, Tuple, Type, cast
+from typing import Any, Callable, Dict, Optional, Set, Tuple, Type, cast
 
 import asttokens
 from twitter.common.collections import OrderedSet
@@ -483,6 +484,18 @@ class TaskRule(Rule):
   _dependency_optionables: Tuple
   cacheable: bool
 
+  @classmethod
+  def _validate_type_field(cls, type_obj):
+    if not isinstance(type_obj, type):
+      raise TypeError(f'Inputs and outputs provided to @rules must be types! Was: {type_obj}.')
+    if dataclasses.is_dataclass(type_obj):
+      if not (type_obj.__dataclass_params__.frozen or
+              getattr(type_obj, frozen_after_init.sentinel_attr, False)):
+        raise TypeError(
+          f'type {type_obj} is a dataclass declared without `frozen=True` or @frozen_after_init! '
+          'The engine requires that fields in params are immutable for stable hashing!')
+    return type_obj
+
   def __init__(
     self,
     output_type: Type,
@@ -493,8 +506,13 @@ class TaskRule(Rule):
     dependency_optionables: Optional[Tuple] = None,
     cacheable: bool = True,
   ):
-    self._output_type = output_type
-    self.input_selectors = input_selectors
+    self._output_type = self._validate_type_field(output_type)
+    self.input_selectors = tuple(self._validate_type_field(t) for t in input_selectors)
+    for g in input_gets:
+      product_type = g.product
+      subject_type = g.subject_declared_type
+      self._validate_type_field(product_type)
+      self._validate_type_field(subject_type)
     self.input_gets = input_gets
     self.func = func
     self._dependency_rules = dependency_rules or ()
@@ -549,13 +567,16 @@ class RootRule(Rule):
     return tuple()
 
 
-# TODO: add typechecking here -- use dicts for `union_rules`.
 @dataclass(frozen=True)
 class RuleIndex:
   """Holds a normalized index of Rules used to instantiate Nodes."""
   rules: Any
   roots: Any
   union_rules: Any
+
+  rules: Dict[Any, Any]
+  roots: Set[Any]
+  union_rules: Dict[Any, Any]
 
   @classmethod
   def create(cls, rule_entries, union_rules=None):
