@@ -112,15 +112,16 @@ class PythonVersion(Enum):
 # shards create a pants.pex, and then upload it to S3 for all of the test
 # shards to pull down.
 
-AWS_GET_PANTS_PEX = (
-  "./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET} "
-  "${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
-)
+AWS_GET_PANTS_PEX_COMMAND = ' '.join([
+  "./build-support/bin/get_ci_bootstrapped_pants_pex.sh",
+  '${BOOTSTRAPPED_PEX_BUCKET}',
+  "${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}",
+])
 
-AWS_DEPLOY_PANTS_PEX = (
-  "aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex "
-  "${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
-)
+AWS_DEPLOY_PANTS_PEX_COMMAND = ' '.join([
+  "aws", "--no-sign-request", "--region", "us-east-1", "s3", "cp",
+  "${TRAVIS_BUILD_DIR}/pants.pex", "${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
+])
 
 # ----------------------------------------------------------------------
 # Docker
@@ -128,22 +129,23 @@ AWS_DEPLOY_PANTS_PEX = (
 
 def docker_build_travis_ci_image(*, python_version: PythonVersion) -> str:
   centos_version = 6 if python_version.is_py36 else 7
-  return (
-    'docker build --rm -t travis_ci '
-    f'--build-arg "BASE_IMAGE=pantsbuild/centos{centos_version}:latest" '
-    '--build-arg "TRAVIS_USER=$(id -un)" '
-    '--build-arg "TRAVIS_UID=$(id -u)" '
-    '--build-arg "TRAVIS_GROUP=$(id -gn)" '
-    '--build-arg "TRAVIS_GID=$(id -g)" '
-    'build-support/docker/travis_ci/'
-  )
+  return ' '.join([
+    "docker", "build", "--rm", "-t", "travis_ci",
+    "--build-arg", f'"BASE_IMAGE=pantsbuild/centos{centos_version}:latest"',
+    "--build-arg", '"TRAVIS_USER=$(id -un)"',
+    "--build-arg", '"TRAVIS_UID=$(id -u)"',
+    "--build-arg", '"TRAVIS_GROUP=$(id -gn)"',
+    "--build-arg", '"TRAVIS_GID=$(id -g)"',
+    "build-support/docker/travis_ci/"
+  ])
 
 
 def docker_run_travis_ci_image(command: str) -> str:
-  return (
-    'docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir" '
-    f'travis_ci:latest sh -c "{command}"'
-  )
+  return ' '.join([
+    "docker", "run", "--rm", "-t", "-v", '"${HOME}:/travis/home"',
+    "-v", '"${TRAVIS_BUILD_DIR}:/travis/workdir"', "travis_ci:latest",
+    "sh", "-c", f'"{command}"'
+  ])
 
 
 # ----------------------------------------------------------------------
@@ -271,7 +273,7 @@ def linux_shard(
     "env": [],
   }
   if load_test_config:
-    setup["before_script"] = [AWS_GET_PANTS_PEX]
+    setup["before_script"] = [AWS_GET_PANTS_PEX_COMMAND]
     setup["env"] = [
       f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.linux",
       "PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem",
@@ -337,7 +339,7 @@ def osx_shard(
   if osx_image is not None:
     setup["osx_image"] = osx_image
   if load_test_config:
-    setup["before_script"].append(AWS_GET_PANTS_PEX)
+    setup["before_script"].append(AWS_GET_PANTS_PEX_COMMAND)
     setup["env"].append(f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.osx")
   return setup
 
@@ -375,10 +377,10 @@ def bootstrap_linux(python_version: PythonVersion) -> Dict:
     "script": [
       docker_build_travis_ci_image(python_version=python_version),
       docker_run_travis_ci_image(command),
-      AWS_DEPLOY_PANTS_PEX,
+      AWS_DEPLOY_PANTS_PEX_COMMAND,
     ]
   }
-  shard["env"].extend(_bootstrap_env(python_version=python_version, platform=Platform.linux))
+  shard["env"] = shard.get("env", []) + _bootstrap_env(python_version=python_version, platform=Platform.linux)
   return shard
 
 
@@ -392,9 +394,9 @@ def bootstrap_osx(python_version: PythonVersion) -> Dict:
     "name": f"Build OSX native engine and pants.pex (Python {python_version.decimal})",
     "after_failure": ["./build-support/bin/ci-failure.sh"],
     "stage": python_version.default_stage(is_bootstrap=True).value,
-    "script": _bootstrap_command(python_version=python_version) + [AWS_DEPLOY_PANTS_PEX]
+    "script": _bootstrap_command(python_version=python_version) + [AWS_DEPLOY_PANTS_PEX_COMMAND]
   }
-  shard["env"].extend(_bootstrap_env(python_version=python_version, platform=Platform.osx))
+  shard["env"] = shard.get("env", []) + _bootstrap_env(python_version=python_version, platform=Platform.osx)
   return shard
 
 # ----------------------------------------------------------------------
@@ -409,7 +411,7 @@ def lint(python_version: PythonVersion) -> Dict:
       f"./build-support/bin/ci.py --githooks --sanity-checks --doc-gen --lint --python-version {python_version.decimal}"
     ]
   }
-  shard["env"].append(f"CACHE_NAME=lint.py{python_version.number}")
+  shard["env"] = shard.get("env", []) + [f"CACHE_NAME=lint.py{python_version.number}"]
   return shard
 
 # -------------------------------------------------------------------------
@@ -452,7 +454,7 @@ def unit_tests_v2(python_version: PythonVersion) -> Dict:
       f"travis_wait 50 ./build-support/bin/ci.py --python-tests-v2 --remote-execution-enabled --python-version {python_version.decimal}",
     ],
   }
-  shard["env"].append(f"CACHE_NAME=unit_tests.v2.py{python_version.number}")
+  shard["env"] = shard.get("env", []) + [f"CACHE_NAME=unit_tests.v2.py{python_version.number}"]
   return shard
 
 
@@ -465,7 +467,7 @@ def unit_tests_v1(python_version: PythonVersion) -> Dict:
       f"./build-support/bin/ci.py --plugin-tests --python-version {python_version.decimal}",
     ],
   }
-  shard["env"].append(f"CACHE_NAME=unit_tests.v1.py{python_version.number}")
+  shard["env"] = shard.get("env", []) + [f"CACHE_NAME=unit_tests.v1.py{python_version.number}"]
   return shard
 
 # ----------------------------------------------------------------------
@@ -496,7 +498,7 @@ def build_wheels_linux() -> Dict:
       docker_run_travis_ci_image(command)
     ]
   }
-  shard["env"].extend(_build_wheels_env(platform=Platform.linux))
+  shard["env"] = shard.get("env", []) + (_build_wheels_env(platform=Platform.linux))
   return shard
 
 
@@ -506,12 +508,12 @@ def build_wheels_osx() -> Dict:
     "name": "Build OSX wheels (Python 3.6)",
     "script": _build_wheels_command(),
   }
-  shard["env"].extend(_build_wheels_env(platform=Platform.osx) + [
+  shard["env"] = shard.get("env", []) + _build_wheels_env(platform=Platform.osx) + [
     # We ensure selection of the pyenv interpreter by PY aware scripts and pants.pex with these
     # env vars.
     'PY=${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin/python',
     """PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${PYENV_PY36_VERSION}']\""""
-  ])
+  ]
   return shard
 
 
@@ -534,9 +536,9 @@ def integration_tests(python_version: PythonVersion, *, use_pantsd: bool = False
         ),
       ]
     }
-    shard["env"].append(
+    shard["env"] = shard.get("env", []) + [
       f"CACHE_NAME=integration.shard_{shard_num}.py{python_version.number}{'.pantsd' if use_pantsd else ''}"
-    )
+    ]
     if use_pantsd:
       shard["stage"] = Stage.test_cron.value
       shard["env"].append('USE_PANTSD_FOR_INTEGRATION_TESTS="true"')
@@ -598,7 +600,7 @@ def osx_platform_tests(python_version: PythonVersion) -> Dict:
       f"./build-support/bin/ci.py --platform-specific-tests --python-version {python_version.decimal}"
     ],
   }
-  shard["env"].append(f"CACHE_NAME=osx_platform_tests.py{python_version.number}")
+  shard["env"] = shard.get("env", []) + [f"CACHE_NAME=osx_platform_tests.py{python_version.number}"]
   return shard
 
 # -------------------------------------------------------------------------
@@ -615,7 +617,7 @@ def _osx_sanity_check(
       f"MODE=debug ./build-support/bin/ci.py --sanity-checks --python-version {python_version.decimal}"
     ],
   }
-  shard["env"].append(f"CACHE_NAME=osx_sanity.10_{os_version_number}.py{python_version.number}")
+  shard["env"] = shard.get("env", []) + [f"CACHE_NAME=osx_sanity.10_{os_version_number}.py{python_version.number}"]
   return shard
 
 
@@ -639,7 +641,7 @@ def jvm_tests(python_version: PythonVersion) -> Dict:
     "name": f"JVM tests (Python {python_version.decimal})",
     "script": [f"./build-support/bin/ci.py --jvm-tests --python-version {python_version.decimal}"]
   }
-  shard["env"].append(f"CACHE_NAME=jvm_tests.py{python_version.number}")
+  shard["env"] = shard.get("env", []) + [f"CACHE_NAME=jvm_tests.py{python_version.number}"]
   return shard
 
 # -------------------------------------------------------------------------
@@ -699,7 +701,7 @@ def deploy_stable() -> Dict:
       }
     }
   }
-  shard["env"].extend(["PANTS_PEX_RELEASE=stable", "CACHE_NAME=deploy.stable"])
+  shard["env"] = shard.get("env", []) + ["PANTS_PEX_RELEASE=stable", "CACHE_NAME=deploy.stable"]
   return shard
 
 
@@ -709,11 +711,11 @@ def deploy_unstable() -> Dict:
     "name": "Deploy unstable pants.pex (Python 3.6)",
     "stage": Stage.build_unstable.value,
   }
-  shard["script"].extend([
+  shard["script"] = shard.get("script", []) + [
     "mkdir -p dist/deploy/pex/",
     "mv dist/pants*.pex dist/deploy/pex/",
-  ])
-  shard["env"].extend(["PREPARE_DEPLOY=1", "CACHE_NAME=deploy.unstable"])
+  ]
+  shard["env"] = shard.get("env", []) + ["PREPARE_DEPLOY=1", "CACHE_NAME=deploy.unstable"]
   return shard
 
 # ----------------------------------------------------------------------
