@@ -23,7 +23,6 @@ def main() -> None:
 
   if args.bootstrap:
     bootstrap(clean=args.bootstrap_clean, python_version=args.python_version)
-  set_run_from_pex()
 
   if args.githooks:
     run_githooks()
@@ -147,14 +146,6 @@ def setup_python_interpreter(version: PythonVersion) -> None:
   if constraints_env_var not in os.environ:
     os.environ[constraints_env_var] = f"['CPython=={version}.*']"
   banner(f"Setting interpreter constraints to {os.environ[constraints_env_var]}")
-
-
-def set_run_from_pex() -> None:
-  # We want all invocations of ./pants (apart from the bootstrapping one above) to delegate
-  # to ./pants.pex, and not themselves attempt to bootstrap.
-  # In this file we invoke ./pants.pex directly anyway, but some of those invocations will run
-  # integration tests that shell out to `./pants`, so we set this env var for those cases.
-  os.environ["RUN_PANTS_FROM_PEX"] = "1"
 
 
 @contextmanager

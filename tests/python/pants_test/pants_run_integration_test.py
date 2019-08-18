@@ -172,7 +172,15 @@ def _read_log(filename):
 class PantsRunIntegrationTest(unittest.TestCase):
   """A base class useful for integration tests for targets in the same repo."""
 
-  PANTS_SCRIPT_NAME = 'pants'
+  # NB: We must depend on pants.pex, rather than pants, because with V1 we strip the prefix of
+  # source roots, so `src/python/pants` becomes the directory `pants`. We cannot have a directory
+  # named `pants` and a file named `pants`. This is the same reason in
+  # https://github.com/pantsbuild/pants/pull/8105 we added `BUILD_ROOT` as an alternate way to
+  # find the build root.
+  #
+  # Warning: because this is a generated file, it is possible to fall out-of-date. Regenerate via
+  # `build-support/bin/ci.py --bootstrap`.
+  PANTS_SCRIPT_NAME = 'pants.pex'
 
   @classmethod
   def use_pantsd_env_var(cls):
@@ -209,9 +217,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
         # Needed to find python interpreters and other binaries.
         'PATH',
         'PANTS_PROFILE',
-        # Ensure that the underlying ./pants invocation doesn't run from sources
-        # (and therefore bootstrap) if we don't want it to.
-        'RUN_PANTS_FROM_PEX',
       ]
 
   def setUp(self):
