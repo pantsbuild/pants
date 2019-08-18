@@ -352,15 +352,11 @@ def run_python_tests_v1() -> None:
 
     try:
       subprocess.run(
-        ["./pants.pex", "test.pytest"] + sorted(chrooted_targets) + PYTEST_PASSTHRU_ARGS,
+        ["./pants.pex", "--test-pytest-chroot", "test.pytest"] + sorted(chrooted_targets) + PYTEST_PASSTHRU_ARGS,
         check=True
       )
       subprocess.run(
-        [
-          "./pants.pex",
-          "--no-test-pytest-chroot",
-          "test.pytest"
-        ] + sorted(blacklisted_chroot_targets) + PYTEST_PASSTHRU_ARGS,
+        ["./pants.pex", "test.pytest"] + sorted(blacklisted_chroot_targets) + PYTEST_PASSTHRU_ARGS,
         check=True
       )
     except subprocess.CalledProcessError:
@@ -454,21 +450,13 @@ def run_jvm_tests() -> None:
 
 def run_integration_tests(*, shard: Optional[str]) -> None:
   check_pants_pex_exists()
-
-  blacklisted_chroot_targets = get_blacklisted_targets("integration_test_chroot_blacklist.txt")
   all_targets = get_all_python_tests(tag="+integration")
-  chrooted_targets = sorted(all_targets - blacklisted_chroot_targets)
-
   command = ["./pants.pex", "test.pytest"]
   if shard is not None:
     command.append(f"--test-pytest-test-shard={shard}")
   with travis_section("IntegrationTests", f"Running Pants Integration tests {shard if shard is not None else ''}"):
     try:
-      subprocess.run(command + chrooted_targets + PYTEST_PASSTHRU_ARGS, check=True)
-      subprocess.run(
-        command + ["--no-test-pytest-chroot"] + sorted(blacklisted_chroot_targets) + PYTEST_PASSTHRU_ARGS,
-        check=True
-      )
+      subprocess.run(command + sorted(all_targets) + PYTEST_PASSTHRU_ARGS, check=True)
     except subprocess.CalledProcessError:
       die("Integration test failure.")
 
