@@ -828,6 +828,7 @@ matrix:
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - PREPARE_DEPLOY=1
     - CACHE_NAME=wheels.osx.py36
     - PY=${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin/python
@@ -4396,6 +4397,7 @@ matrix:
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - CACHE_NAME=osx_platform_tests.py36
     language: generic
     name: OSX platform-specific tests (Python 3.6)
@@ -4424,6 +4426,7 @@ matrix:
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
     - CACHE_NAME=osx_platform_tests.py37
     language: generic
     name: OSX platform-specific tests (Python 3.7)
@@ -4452,6 +4455,7 @@ matrix:
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - CACHE_NAME=osx_sanity.10_12.py36
     language: generic
     name: OSX 10.12 sanity check (Python 3.6)
@@ -4481,6 +4485,7 @@ matrix:
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
     - CACHE_NAME=osx_sanity.10_12.py37
     language: generic
     name: OSX 10.12 sanity check (Python 3.7)
@@ -4510,6 +4515,7 @@ matrix:
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - CACHE_NAME=osx_sanity.10_13.py36
     language: generic
     name: OSX 10.13 sanity check (Python 3.6)
@@ -4539,6 +4545,7 @@ matrix:
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
+    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
     - CACHE_NAME=osx_sanity.10_13.py37
     language: generic
     name: OSX 10.13 sanity check (Python 3.7)

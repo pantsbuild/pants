@@ -307,7 +307,7 @@ def _osx_env_with_pyenv(python_version: PythonVersion) -> List[str]:
     'LDFLAGS="-L/usr/local/opt/openssl/lib"',
     'CPPFLAGS="-I/usr/local/opt/openssl/include"',
     'PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"',
-    f'PATH="${{PYENV_ROOT}}/versions/${{PYENV_PY{python_version.number}_VERSION}}/bin:${{PATH}}"'
+    f'PATH="${{PYENV_ROOT}}/versions/${{PYENV_PY{python_version.number}_VERSION}}/bin:${{PATH}}"',
   ]
 
 
@@ -338,6 +338,7 @@ def osx_shard(
     setup["osx_image"] = osx_image
   if load_test_config:
     setup["before_script"].append(AWS_GET_PANTS_PEX)
+    setup["env"].append(f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.osx")
   return setup
 
 # ----------------------------------------------------------------------
