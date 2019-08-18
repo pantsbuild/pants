@@ -10,7 +10,7 @@ import tempfile
 from contextlib import contextmanager
 from enum import Enum
 from pathlib import Path
-from typing import Iterator, List, Optional, Set
+from typing import Iterator, List, NamedTuple, Optional, Set
 
 from common import banner, die, green, travis_section
 
@@ -175,30 +175,82 @@ def get_remote_execution_oauth_token_path() -> Iterator[str]:
     yield tf.name
 
 # -------------------------------------------------------------------------
-# Blacklists
+# Blacklists and whitelists
 # -------------------------------------------------------------------------
 
-def get_blacklisted_targets(filename: str) -> Set[str]:
-  return {
-    line.strip()
-    for line in Path(f"build-support/ci_blacklists/{filename}").read_text().splitlines()
-  }
+Target = str
+TargetSet = Set[Target]
 
 
-def get_all_python_tests(*, tag: Optional[str] = None) -> Set[str]:
-  command = [
-    "./pants.pex",
-    "--filter-type=python_tests",
-    "filter",
-    "src/python::",
-    "tests/python::",
-    "contrib::"
-  ]
-  if tag is not None:
-    command.insert(1, f"--tag={tag}")
-  return set(subprocess.run(
-    command, stdout=subprocess.PIPE, encoding="utf-8", check=True
-  ).stdout.strip().split("\n"))
+class DefaultTestBehavior(Enum):
+  v1_no_chroot = 1
+  v2_remote = 2
+
+
+class TestType(Enum):
+  unit = "unit"
+  integration = "integration"
+
+
+class TestTargetSets(NamedTuple):
+  v1_no_chroot: TargetSet
+  v1_chroot: TargetSet
+  v2_local: TargetSet
+  v2_remote: TargetSet
+
+  @staticmethod
+  def calculate(
+    *, test_type: TestType, default_behavior: DefaultTestBehavior, remote_execution_enabled: bool
+  ) -> 'TestTargetSets':
+
+    def get_listed_targets(filename: str) -> TargetSet:
+      list_path = Path(f"build-support/ci_lists/{filename}")
+      if not list_path.exists():
+        return set()
+      return {line.strip() for line in list_path.read_text().splitlines()}
+
+    all_targets = set(subprocess.run(
+      [
+        "./pants.pex",
+        f"--tag={'-' if test_type == TestType.unit else '+'}integration"
+        "--filter-type=python_tests",
+        "filter",
+        "src/python::",
+        "tests/python::",
+        "contrib::"
+      ], stdout=subprocess.PIPE, encoding="utf-8", check=True
+    ).stdout.strip().split("\n"))
+
+    if default_behavior == DefaultTestBehavior.v2_remote:
+      blacklisted_chroot_targets = get_listed_targets(f"{test_type}_chroot_blacklist.txt")
+      blacklisted_v2_targets = get_listed_targets(f"{test_type}_v2_blacklist.txt")
+      blacklisted_remote_targets = get_listed_targets(f"{test_type}_remote_blacklist.txt")
+
+      v1_no_chroot_targets = blacklisted_chroot_targets
+      v1_chroot_targets = blacklisted_v2_targets
+      v2_local_targets = blacklisted_remote_targets
+      v2_remote_targets = all_targets - v2_local_targets - v1_chroot_targets - v1_no_chroot_targets
+
+    else:
+      whitelisted_chroot_targets = get_listed_targets(f"{test_type}_chroot_whitelist.txt")
+      whitelisted_v2_targets = get_listed_targets(f"{test_type}_v2_whitelist.txt")
+      whitelisted_remote_targets = get_listed_targets(f"{test_type}_remote_whitelist.txt")
+
+      v2_remote_targets = whitelisted_remote_targets
+      v2_local_targets = whitelisted_v2_targets
+      v1_chroot_targets = whitelisted_chroot_targets
+      v1_no_chroot_targets = all_targets - v1_chroot_targets - v2_local_targets - v2_remote_targets
+
+    if not remote_execution_enabled:
+      v2_local_targets |= v2_remote_targets
+      v2_remote_targets = set()
+
+    return TestTargetSets(
+      v1_no_chroot=v1_no_chroot_targets,
+      v1_chroot=v1_chroot_targets,
+      v2_local=v2_local_targets,
+      v2_remote=v2_remote_targets
+    )
 
 # -------------------------------------------------------------------------
 # Bootstrap pants.pex
@@ -334,27 +386,18 @@ def run_cargo_audit() -> None:
 
 def run_unit_tests(*, remote_execution_enabled: bool) -> None:
   check_pants_pex_exists()
-
-  all_targets = get_all_python_tests(tag="-integration")
-  blacklisted_chroot_targets = get_blacklisted_targets("unit_test_chroot_blacklist.txt")
-  blacklisted_v2_targets = get_blacklisted_targets("unit_test_v2_blacklist.txt")
-  blacklisted_remote_targets = get_blacklisted_targets("unit_test_remote_blacklist.txt")
-
-  v1_no_chroot_targets = blacklisted_chroot_targets
-  v1_chroot_targets = blacklisted_v2_targets
-  v2_local_targets = blacklisted_remote_targets
-  v2_remote_targets = all_targets - v2_local_targets - v1_chroot_targets - v1_no_chroot_targets
-
+  target_sets = TestTargetSets.calculate(
+    test_type=TestType.unit,
+    default_behavior=DefaultTestBehavior.v2_remote,
+    remote_execution_enabled=remote_execution_enabled
+  )
   basic_command = ["./pants.pex", "test.pytest"]
   v2_command = ["./pants.pex", "--no-v1", "--v2", "test.pytest"]
-  v1_no_chroot_command = basic_command + sorted(v1_no_chroot_targets) + PYTEST_PASSTHRU_ARGS
-  v1_chroot_command = basic_command + ["--test-pytest-chroot"] + sorted(v1_chroot_targets) + PYTEST_PASSTHRU_ARGS
-  v2_local_command = v2_command + sorted(v2_local_targets)
+  v1_no_chroot_command = basic_command + sorted(target_sets.v1_no_chroot) + PYTEST_PASSTHRU_ARGS
+  v1_chroot_command = basic_command + ["--test-pytest-chroot"] + sorted(target_sets.v1_chroot) + PYTEST_PASSTHRU_ARGS
+  v2_local_command = v2_command + sorted(target_sets.v2_local)
 
-  if not remote_execution_enabled:
-    v2_local_targets = v2_local_targets | v2_remote_targets
-    v2_local_command = v2_command + sorted(v2_local_targets)
-  else:
+  if remote_execution_enabled:
     with travis_section(
       "UnitTestsRemote", "Running unit tests via remote execution"
     ), get_remote_execution_oauth_token_path() as oauth_token_path:
@@ -365,7 +408,7 @@ def run_unit_tests(*, remote_execution_enabled: bool) -> None:
           "--process-execution-speculation-strategy=none",
           f"--remote-oauth-bearer-token-path={oauth_token_path}",
           "test.pytest",
-        ] + sorted(v2_remote_targets)
+        ] + sorted(target_sets.v2_remote)
       try:
         subprocess.run(v2_remote_command, check=True)
       except subprocess.CalledProcessError:
@@ -419,13 +462,21 @@ def run_jvm_tests() -> None:
 
 def run_integration_tests(*, shard: Optional[str]) -> None:
   check_pants_pex_exists()
-  all_targets = get_all_python_tests(tag="+integration")
+  target_sets = TestTargetSets.calculate(
+    test_type=TestType.integration,
+    default_behavior=DefaultTestBehavior.v1_no_chroot,
+    remote_execution_enabled=False
+  )
   command = ["./pants.pex", "test.pytest"]
   if shard is not None:
     command.append(f"--test-pytest-test-shard={shard}")
   with travis_section("IntegrationTests", f"Running Pants Integration tests {shard if shard is not None else ''}"):
     try:
-      subprocess.run(command + sorted(all_targets) + PYTEST_PASSTHRU_ARGS, check=True)
+      subprocess.run(
+        command + ["--test-pytest-chroot"] + sorted(target_sets.v1_chroot) + PYTEST_PASSTHRU_ARGS,
+        check=True
+      )
+      subprocess.run(command + sorted(target_sets.v1_no_chroot) + PYTEST_PASSTHRU_ARGS, check=True)
     except subprocess.CalledProcessError:
       die("Integration test failure.")
 

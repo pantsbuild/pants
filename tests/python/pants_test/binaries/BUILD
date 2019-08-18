@@ -12,13 +12,3 @@ python_tests(
     'tests/python/pants_test:test_base',
   ]
 )
-
-python_tests(
-  name='integration',
-  sources=globs('test_*_integration.py'),
-  dependencies=[
-    'src/python/pants/base:build_environment',
-    'src/python/pants/util:process_handler',
-  ],
-  tags = {'integration'},
-)
