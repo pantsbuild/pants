@@ -79,10 +79,10 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
     build-support/bin/check_rust_target_headers.sh || exit 1
   fi
 
-  if git diff "${MERGE_BASE}" --name-only | grep build-support/travis > /dev/null; then
+  if git diff "${MERGE_BASE}" --name-only | grep build-support/bin/generate_travis_yml.py > /dev/null; then
     echo "* Checking .travis.yml generation"
     actual_travis_yml=$(<.travis.yml)
-    expected_travis_yml=$(./pants --quiet run build-support/travis:generate_travis_yml)
+    expected_travis_yml=$(./pants --quiet run build-support/bin:generate_travis_yml)
     [ "${expected_travis_yml}" == "${actual_travis_yml}" ] || \
       die "Travis config generator changed but .travis.yml file not regenerated. See top of that file for instructions."
   fi

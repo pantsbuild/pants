@@ -1,9 +1,0 @@
-{{! Note we mount ${HOME} to cache the ${HOME}/.cache/pants/rust-toolchain. }}
-docker run
---rm -t
--v "${HOME}:/travis/home"
--v "${TRAVIS_BUILD_DIR}:/travis/workdir"
-travis_ci:latest
-{{! $docker_run_command is an environment variable with an expected string value like
-`"echo 'hello' && exit 1"`. It should be set in the env section.}}
-sh -c "${docker_run_command}"
