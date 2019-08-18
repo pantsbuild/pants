@@ -172,8 +172,8 @@ def _read_log(filename):
 class PantsRunIntegrationTest(unittest.TestCase):
   """A base class useful for integration tests for targets in the same repo."""
 
-  # NB: We must depend on pants.pex, rather than pants, because with V1 we strip the prefix of
-  # source roots, so `src/python/pants` becomes the directory `pants`. We cannot have a directory
+  # NB: We must depend on `pants.pex`, rather than `pants`, because we strip the prefix of source
+  # roots, so `src/python/pants` becomes the directory `pants`. We cannot have a directory
   # named `pants` and a file named `pants`. This is the same reason in
   # https://github.com/pantsbuild/pants/pull/8105 we added `BUILD_ROOT` as an alternate way to
   # find the build root.
