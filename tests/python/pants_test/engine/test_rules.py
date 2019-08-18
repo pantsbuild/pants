@@ -85,7 +85,7 @@ class RuleIndexTest(TestBase):
     with self.assertRaisesWithMessage(
       TypeError,
       "Rule entry A() had an unexpected type: <class "
-      "'tests.python.pants_test.engine.test_rules.A'>. Rules either extend Rule or UnionRule, or "
+      "'pants_test.engine.test_rules.A'>. Rules either extend Rule or UnionRule, or "
       "are static functions decorated with @rule."""):
       RuleIndex.create([A()])
 
@@ -750,7 +750,7 @@ class RuleGraphTest(TestBase):
 
   def test_invalid_get_arguments(self):
     with self.assertRaisesWithMessage(ValueError, """\
-Could not resolve type `XXX` in top level of module tests.python.pants_test.engine.test_rules"""):
+Could not resolve type `XXX` in top level of module pants_test.engine.test_rules"""):
       class XXX: pass
       @rule(A, [])
       def f():
