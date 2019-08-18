@@ -3,7 +3,7 @@
 
 from enum import Enum
 from textwrap import dedent
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import yaml
 
@@ -84,7 +84,7 @@ class PythonVersion(Enum):
 
   @property
   def number(self) -> int:
-      return {self.py36: 36, self.py37: 37}[self]
+    return {self.py36: 36, self.py37: 37}[self]
 
   @property
   def decimal(self) -> float:
@@ -238,6 +238,7 @@ def _linux_before_install(include_test_config: bool = True) -> List[str]:
     ])
   return commands
 
+
 def linux_shard(
   *,
   load_test_config: bool = True,
@@ -300,6 +301,16 @@ def linux_fuse_shard() -> Dict:
   }
 
 
+def _osx_env_with_pyenv(python_version: PythonVersion) -> List[str]:
+  return [
+    'PATH="/usr/local/opt/openssl/bin:${PATH}"',
+    'LDFLAGS="-L/usr/local/opt/openssl/lib"',
+    'CPPFLAGS="-I/usr/local/opt/openssl/include"',
+    'PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"',
+    f'PATH="${{PYENV_ROOT}}/versions/${{PYENV_PY{python_version.number}_VERSION}}/bin:${{PATH}}"'
+  ]
+
+
 def osx_shard(
   *,
   load_test_config: bool = True,
@@ -320,13 +331,7 @@ def osx_shard(
       './build-support/bin/install_aws_cli_for_ci.sh',
       f'./build-support/bin/install_python_for_ci.sh "${{PYENV_PY27_VERSION}}" "${{PYENV_PY{python_version.number}_VERSION}}"',
     ],
-    "env": [
-      'PATH="/usr/local/opt/openssl/bin:${PATH}"',
-      'LDFLAGS="-L/usr/local/opt/openssl/lib"',
-      'CPPFLAGS="-I/usr/local/opt/openssl/include"',
-      'PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"',
-      f'PATH="${{PYENV_ROOT}}/versions/${{PYENV_PY{python_version.number}_VERSION}}/bin:${{PATH}}"'
-    ],
+    "env": _osx_env_with_pyenv(python_version),
     "stage": python_version.default_stage().value
   }
   if osx_image is not None:
@@ -347,6 +352,7 @@ def _bootstrap_command(*, python_version: PythonVersion) -> List[str]:
   if python_version.is_py36:
     command.append('./build-support/bin/release.sh -f')
   return command
+
 
 def _bootstrap_env(*, python_version: PythonVersion, platform: Platform) -> List[str]:
   env = [
@@ -433,6 +439,34 @@ def cargo_audit() -> Dict:
     "env": ["CACHE_NAME=cargo_audit"],
   }
 
+# -------------------------------------------------------------------------
+# Unit tests
+# -------------------------------------------------------------------------
+
+def unit_tests_v2(python_version: PythonVersion) -> Dict:
+  shard = {
+    **linux_shard(python_version=python_version),
+    "name": f"Unit tests - V2 test runner (Python {python_version.decimal})",
+    "script": [
+      f"travis_wait 50 ./build-support/bin/ci.py --python-tests-v2 --remote-execution-enabled --python-version {python_version.decimal}",
+    ],
+  }
+  shard["env"].append(f"CACHE_NAME=unit_tests.v2.py{python_version.number}")
+  return shard
+
+
+def unit_tests_v1(python_version: PythonVersion) -> Dict:
+  shard = {
+    **linux_shard(python_version=python_version),
+    "name": f"Unit tests - V1 test runner (Python {python_version.decimal})",
+    "script": [
+      f"./build-support/bin/ci.py --python-tests-v1 --python-version {python_version.decimal}",
+      f"./build-support/bin/ci.py --plugin-tests --python-version {python_version.decimal}",
+    ],
+  }
+  shard["env"].append(f"CACHE_NAME=unit_tests.v1.py{python_version.number}")
+  return shard
+
 # ----------------------------------------------------------------------
 # Build wheels
 # ----------------------------------------------------------------------
@@ -479,6 +513,208 @@ def build_wheels_osx() -> Dict:
   ])
   return shard
 
+
+# -------------------------------------------------------------------------
+# Integration tests
+# -------------------------------------------------------------------------
+
+NUM_INTEGRATION_SHARDS = 20
+
+
+def integration_tests(python_version: PythonVersion, *, use_pantsd: bool = False) -> List[Dict]:
+  def make_shard(*, shard_num: int) -> Dict:
+    shard = {
+      **linux_shard(python_version=python_version),
+      "name": f"Integration tests {'with Pantsd' if use_pantsd else ''} - shard {shard_num} (Python {python_version.decimal})",
+      "script": [
+        (
+          f"./build-support/bin/ci.py --integration-tests --integration-shard "
+          f"{shard_num}/{NUM_INTEGRATION_SHARDS} --python-version {python_version.decimal}"
+        ),
+      ]
+    }
+    shard["env"].append(
+      f"CACHE_NAME=integration.shard_{shard_num}.py{python_version.number}{'.pantsd' if use_pantsd else ''}"
+    )
+    if use_pantsd:
+      shard["stage"] = Stage.test_cron.value
+      shard["env"].append('USE_PANTSD_FOR_INTEGRATION_TESTS="true"')
+    return shard
+  return [make_shard(shard_num=i) for i in range(NUM_INTEGRATION_SHARDS)]
+
+# -------------------------------------------------------------------------
+# Rust tests
+# -------------------------------------------------------------------------
+
+_RUST_TESTS_BASE = {
+  **CACHE_NATIVE_ENGINE,
+  "stage": Stage.test.value,
+  "before_script": ["ulimit -c unlimited", "ulimit -n 8192"],
+  "script": ["./build-support/bin/ci.py --rust-tests"],
+}
+
+
+def rust_tests_linux() -> Dict:
+  return {
+    **_RUST_TESTS_BASE,
+    **linux_fuse_shard(),
+    "name": "Rust tests - Linux",
+    "env": ["CACHE_NAME=rust_tests.linux"]
+  }
+
+
+def rust_tests_osx() -> Dict:
+  return {
+    **_RUST_TESTS_BASE,
+    "name": "Rust tests - OSX",
+    "os": "osx",
+    # Fuse actually works on this image. It hangs on many others.
+    "osx_image": "xcode8.3",
+    "addons": {"homebrew": {
+      # We must update or else Brew will complain that it is too outdated
+      # (See https://travis-ci.org/pantsbuild/pants/jobs/546948768#L278).
+      "update": True,
+      "packages": ["openssl"],
+      "casks": ["osxfuse"]
+    }},
+    "before_install": [
+      './build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY36_VERSION}"',
+    ],
+    "env": _osx_env_with_pyenv(python_version=PythonVersion.py36) + [
+      "CACHE_NAME=rust_tests.osx"
+    ]
+  }
+
+# -------------------------------------------------------------------------
+# OSX platform tests
+# -------------------------------------------------------------------------
+
+def osx_platform_tests(python_version: PythonVersion) -> Dict:
+  shard = {
+    **osx_shard(python_version=python_version),
+    "name": f"OSX platform-specific tests (Python {python_version.decimal})",
+    "script": [
+      f"./build-support/bin/ci.py --platform-specific-tests --python-version {python_version.decimal}"
+    ],
+  }
+  shard["env"].append(f"CACHE_NAME=osx_platform_tests.py{python_version.number}")
+  return shard
+
+# -------------------------------------------------------------------------
+# OSX sanity checks
+# -------------------------------------------------------------------------
+
+def _osx_sanity_check(
+  python_version: PythonVersion, *, os_version_number: int, osx_image: str
+) -> Dict:
+  shard = {
+    **osx_shard(python_version=python_version, osx_image=osx_image),
+    "name": f"OSX 10.{os_version_number} sanity check (Python {python_version.decimal})",
+    "script": [
+      f"MODE=debug ./build-support/bin/ci.py --sanity-checks --python-version {python_version.decimal}"
+    ],
+  }
+  shard["env"].append(f"CACHE_NAME=osx_sanity.10_{os_version_number}.py{python_version.number}")
+  return shard
+
+
+def osx_10_12_sanity_check(python_version: PythonVersion) -> Dict:
+  return _osx_sanity_check(python_version, os_version_number=12, osx_image="xcode9.2")
+
+
+def osx_10_13_sanity_check(python_version: PythonVersion) -> Dict:
+  return _osx_sanity_check(python_version, os_version_number=13, osx_image="xcode10.1")
+
+# -------------------------------------------------------------------------
+# JVM tests
+# -------------------------------------------------------------------------
+
+def jvm_tests(python_version: PythonVersion) -> Dict:
+  shard = {
+    **linux_shard(python_version=python_version),
+    # NB: linux_fuse comes after linux_shard to ensure that linux_fuse's before_install
+    # entry is used.
+    **linux_fuse_shard(),
+    "name": f"JVM tests (Python {python_version.decimal})",
+    "script": [f"./build-support/bin/ci.py --jvm-tests --python-version {python_version.decimal}"]
+  }
+  shard["env"].append(f"CACHE_NAME=jvm_tests.py{python_version.number}")
+  return shard
+
+# -------------------------------------------------------------------------
+# Deploy
+# -------------------------------------------------------------------------
+
+DEPLOY_SETTINGS = {
+  "provider": "script",
+  "script": "./build-support/bin/deploy_to_s3.py",
+  # Otherwise travis will stash dist/deploy and the deploy will fail.
+  "skip_cleanup": True,
+  "on": {
+    "condition": "$PREPARE_DEPLOY = 1",
+    # NB: We mainly want deploys for `master` commits; but we also need new binaries for stable
+    # release branches; eg `1.3.x`
+    "all_branches": True,
+    "repo": "pantsbuild.pants",
+  }
+}
+
+
+def _deploy_base() -> Dict:
+  return {
+    "os": "linux",
+    "dist": "trusty",
+    "language": "python",
+    "python": ["3.6"],
+    "before_install": [
+      # TODO(John Sirois): Get rid of this in favor of explicitly adding pyenv versions to the PATH:
+      #   https://github.com/pantsbuild/pants/issues/7601
+      "pyenv global 3.6.3",
+    ],
+    "script": ["./build-support/bin/release.sh -p"],
+    "env": ["RUN_PANTS_FROM_PEX=1"]
+  }
+
+
+def deploy_stable() -> Dict:
+  shard = {
+    **_deploy_base(),
+    "name": "Deploy stable pants.pex (Python 3.6)",
+    "stage": Stage.build_stable.value,
+    "deploy": {
+      # See https://docs.travis-ci.com/user/deployment/releases/
+      "provider": "releases",
+      # The pantsbuild-ci-bot OAuth token, see the pantsbuild vault for details.
+      "api_key": {
+        "secure": "u0aCsiuVGOg28YxG0sQUovuUm29kKwQfFgHbNz2TT5L+cGoHxGl4aoVOCtuwWYEtbNGmYc8/3WRS3C/jOiqQj6JEgHUzWOsnfKUObEqNhisAmXbzBbKc0wPQTL8WNK+DKFh32sD3yPYcw+a5PTLO56+o7rqlI25LK7A17WesHC4="
+      },
+      "file_glob": True,
+      "file": "dist/deploy/pex/*",
+      "skip_cleanup": True,
+      "on": {
+        # We only release a pex for Pants releases, which are tagged.
+        "tags": True,
+        "repo": "pantsbuild/pants"
+      }
+    }
+  }
+  shard["env"].extend(["PANTS_PEX_RELEASE=stable", "CACHE_NAME=deploy.stable"])
+  return shard
+
+
+def deploy_unstable() -> Dict:
+  shard = {
+    **_deploy_base(),
+    "name": "Deploy unstable pants.pex (Python 3.6)",
+    "stage": Stage.build_unstable.value,
+  }
+  shard["script"].extend([
+    "mkdir -p dist/deploy/pex/",
+    "mv dist/pants*.pex dist/deploy/pex/",
+  ])
+  shard["env"].extend(["PREPARE_DEPLOY=1", "CACHE_NAME=deploy.unstable"])
+  return shard
+
 # ----------------------------------------------------------------------
 # Main file
 # ----------------------------------------------------------------------
@@ -496,16 +732,36 @@ def main() -> None:
     "conditions": "v1",
     "env": {"global": GLOBAL_ENV_VARS},
     "stages": Stage.all_entries(),
+    "deploy": DEPLOY_SETTINGS,
     "matrix": {"include": [
       *[bootstrap_linux(v) for v in PythonVersion],
       *[bootstrap_osx(v) for v in PythonVersion],
       {**bootstrap_linux(PythonVersion.py36), "stage": Stage.bootstrap_cron.value},
       {**bootstrap_osx(PythonVersion.py36), "stage": Stage.bootstrap_cron.value},
+      # NB: We move this test here, above the other unit tests, to ensure that the shard is #5. Per
+      # the token generator design
+      # https://docs.google.com/document/d/1gL3D1f-AzL_LzRxWLskCpVQ2ZlB_26GTETgXkXsrpDY/edit#heading=h.akhkfdtqfpw,
+      # the RBE token server will only give tokens to job number #5, so we must do this for the cron
+      # job to work with remoting.
+      unit_tests_v2(PythonVersion.py37),
       *[lint(v) for v in PythonVersion],
       clippy(),
       cargo_audit(),
+      unit_tests_v2(PythonVersion.py36),
+      *[unit_tests_v1(v) for v in PythonVersion],
       build_wheels_linux(),
       build_wheels_osx(),
+      *[integration_tests(PythonVersion.py36)],
+      *[integration_tests(PythonVersion.py36, use_pantsd=True)],
+      *[integration_tests(PythonVersion.py37)],
+      rust_tests_linux(),
+      rust_tests_osx(),
+      *[osx_platform_tests(v) for v in PythonVersion],
+      *[osx_10_12_sanity_check(v) for v in PythonVersion],
+      *[osx_10_13_sanity_check(v) for v in PythonVersion],
+      *[jvm_tests(v) for v in PythonVersion],
+      deploy_stable(),
+      deploy_unstable(),
     ]},
   }, Dumper=NoAliasDumper)
   print(f"{HEADER}\n\n{generated_yaml}")

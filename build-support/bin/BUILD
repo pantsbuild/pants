@@ -63,7 +63,6 @@ python_binary(
   dependencies = [
     '3rdparty/python:PyYAML',
   ],
-  tags = {'type_checked'},
 )
 
 python_binary(
