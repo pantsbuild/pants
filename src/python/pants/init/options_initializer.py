@@ -3,6 +3,7 @@
 
 import logging
 import os
+import re
 import sys
 
 import pkg_resources
@@ -104,16 +105,14 @@ class OptionsInitializer:
     buildroot.
     """
     pants_ignore = list(global_options.pants_ignore)
-    # temp workdir is /path/to/<pants_workdir>/tmp/tmp<process_id>.pants.d
-    tmp_workdir_rel_path = "{}/tmp".format(fast_relpath_optional(global_options.pants_workdir,
-      buildroot).split(os.path.sep)[0])
 
     def add_ignore(absolute_path):
       # To ensure that the path is ignored regardless of whether it is a symlink or a directory, we
       # strip trailing slashes (which would signal that we wanted to ignore only directories).
       maybe_rel_path = fast_relpath_optional(absolute_path, buildroot)
-      # Exclude temp workdir from <pants_ignore>
-      if maybe_rel_path and not maybe_rel_path.startswith(tmp_workdir_rel_path):
+      # Exclude temp workdir from <pants_ignore>.
+      # temp workdir is /path/to/<pants_workdir>/tmp/tmp<process_id>.pants.d
+      if maybe_rel_path and not re.search("tmp/tmp(.+).pants.d", maybe_rel_path):
         rel_path = maybe_rel_path.rstrip(os.path.sep)
         pants_ignore.append(f'/{rel_path}')
 
