@@ -10,9 +10,8 @@ class FiledepsIntegrationTest(PantsRunIntegrationTest):
 
   def test_filedeps_multiple_targets_with_dep(self):
     args = [
-      '--no-v1',
-      '--v2',
       'fast-filedeps',
+      '--no-absolute',
       'examples/src/scala/org/pantsbuild/example/hello/exe:exe',
       'examples/src/scala/org/pantsbuild/example/hello/welcome:welcome'
     ]
@@ -23,13 +22,13 @@ class FiledepsIntegrationTest(PantsRunIntegrationTest):
 
     self.assertEqual(pants_run.stdout_data, dedent(
       '''\
-      examples/src/scala/org/pantsbuild/example/hello/exe/BUILD
-      examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala
-      examples/src/scala/org/pantsbuild/example/hello/welcome/BUILD
-      examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala
       examples/src/java/org/pantsbuild/example/hello/greet/BUILD
       examples/src/java/org/pantsbuild/example/hello/greet/Greeting.java
       examples/src/resources/org/pantsbuild/example/hello/BUILD
       examples/src/resources/org/pantsbuild/example/hello/world.txt
+      examples/src/scala/org/pantsbuild/example/hello/exe/BUILD
+      examples/src/scala/org/pantsbuild/example/hello/exe/Exe.scala
+      examples/src/scala/org/pantsbuild/example/hello/welcome/BUILD
+      examples/src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala
       ''')
     )
