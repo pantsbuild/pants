@@ -27,9 +27,10 @@ python_library(
   sources = [
     'pants_run_integration_test.py'
   ],
-   dependencies = [
+  dependencies = [
     '3rdparty/python:ansicolors',
     '3rdparty/python:dataclasses',
+    'build-support/regexes',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
     'src/python/pants/base:exiter',
@@ -49,7 +50,6 @@ target(
   name = 'int-test',
   dependencies=[
     ':int-test-for-export',
-
     # NB: 'pants_run_integration_test.py' runs ./pants in a subprocess, so test results will depend
     # on the pants binary and all of its transitive dependencies. Adding the dependencies below is
     # our best proxy for ensuring that any test target depending on this target will be invalidated

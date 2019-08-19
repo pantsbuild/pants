@@ -6,6 +6,7 @@ python_tests(
     '3rdparty/python:parameterized',
     '3rdparty/python:pex',
     '3rdparty/python:wheel',
+    'build-support/regexes',
     'contrib/python/src/python/pants/contrib/python/checks/tasks/checkstyle',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python/targets',

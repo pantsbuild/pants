@@ -50,8 +50,9 @@ class TestResult:
   @classmethod
   def from_error(cls, error):
     if not isinstance(error, TaskError):
-      raise AssertionError('Can only synthesize a {} from a TaskError, given a {}'
-                           .format(cls.__name__, type(error).__name__))
+      raise AssertionError(
+        f'Can only synthesize a {cls.__name__} from a TaskError, given a {type(error).__name__}'
+      )
     return cls(str(error), rc=error.exit_code, failed_targets=error.failed_targets)
 
   def with_failed_targets(self, failed_targets):
@@ -123,9 +124,9 @@ class TestRunnerTaskMixin:
     if (self.get_options().timeout_maximum is not None
         and self.get_options().timeout_default is not None
         and self.get_options().timeout_maximum < self.get_options().timeout_default):
-      message = "Error: timeout-default: {} exceeds timeout-maximum: {}".format(
-        self.get_options().timeout_maximum,
-        self.get_options().timeout_default
+      message = (
+        f"Error: timeout-default: {self.get_options().timeout_maximum} exceeds timeout-maximum: "
+        f"{self.get_options().timeout_default}"
       )
       self.context.log.error(message)
       raise ErrorWhileTesting(message)
@@ -198,8 +199,7 @@ class TestRunnerTaskMixin:
       """Indicates an error parsing a xml report file."""
 
       def __init__(self, xml_path, cause):
-        super().__init__('Error parsing test result file {}: {}'
-          .format(xml_path, cause))
+        super().__init__(f'Error parsing test result file {xml_path}: {cause}')
         self.xml_path = xml_path
         self.cause = cause
 
