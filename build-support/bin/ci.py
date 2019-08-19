@@ -182,6 +182,32 @@ def get_remote_execution_oauth_token_path() -> Iterator[str]:
     yield tf.name
 
 # -------------------------------------------------------------------------
+# Blacklists
+# -------------------------------------------------------------------------
+
+def get_blacklisted_targets(filename: str) -> Set[str]:
+  return {
+    line.strip()
+    for line in Path(f"build-support/ci_blacklists/{filename}").read_text().splitlines()
+  }
+
+
+def get_all_python_tests(*, tag: Optional[str] = None) -> Set[str]:
+  command = [
+    "./pants.pex",
+    "--filter-type=python_tests",
+    "filter",
+    "src/python::",
+    "tests/python::",
+    "contrib::"
+  ]
+  if tag is not None:
+    command.insert(1, f"--tag={tag}")
+  return set(subprocess.run(
+    command, stdout=subprocess.PIPE, encoding="utf-8", check=True
+  ).stdout.strip().split("\n"))
+
+# -------------------------------------------------------------------------
 # Bootstrap pants.pex
 # -------------------------------------------------------------------------
 
@@ -316,60 +342,42 @@ def run_cargo_audit() -> None:
 
 
 def run_python_tests_v1() -> None:
-  known_v2_failures_file = "build-support/unit_test_v2_blacklist.txt"
+  check_pants_pex_exists()
+
+  blacklisted_v2_targets = get_blacklisted_targets("unit_test_v2_blacklist.txt")
+  blacklisted_chroot_targets = get_blacklisted_targets("unit_test_chroot_blacklist.txt")
+  chrooted_targets = blacklisted_v2_targets - blacklisted_chroot_targets
+
   with travis_section("PythonTestsV1", "Running Python unit tests with V1 test runner"):
-    check_pants_pex_exists()
+
     try:
-      subprocess.run([
-        "./pants.pex",
-        f"--target-spec-file={known_v2_failures_file}",
-        "test.pytest",
-        "--chroot",
-      ] + PYTEST_PASSTHRU_ARGS, check=True)
+      subprocess.run(
+        ["./pants.pex", "--test-pytest-chroot", "test.pytest"] + sorted(chrooted_targets) + PYTEST_PASSTHRU_ARGS,
+        check=True
+      )
+      subprocess.run(
+        ["./pants.pex", "test.pytest"] + sorted(blacklisted_chroot_targets) + PYTEST_PASSTHRU_ARGS,
+        check=True
+      )
     except subprocess.CalledProcessError:
       die("Python unit test failure (V1 test runner")
     else:
       green("V1 unit tests passed.")
 
-    try:
-      subprocess.run([
-        "./pants.pex",
-        "--tag=-integration",
-        "--exclude-target-regexp=./*testprojects/.*",
-        "test.pytest",
-        "contrib::",
-      ] + PYTEST_PASSTHRU_ARGS, check=True)
-    except subprocess.CalledProcessError:
-      die("Contrib Python test failure")
-    else:
-      green("Contrib unit tests passed.")
-
 
 def run_python_tests_v2(*, remote_execution_enabled: bool) -> None:
+  check_pants_pex_exists()
 
-  def get_blacklisted_targets(path: str) -> Set[str]:
-    return {line.strip() for line in Path(path).read_text().splitlines()}
-
-  blacklisted_v2_targets = get_blacklisted_targets("build-support/unit_test_v2_blacklist.txt")
-  blacklisted_remote_targets = get_blacklisted_targets("build-support/unit_test_remote_blacklist.txt")
-
-  with travis_section("PythonTestsV2Setup", "Setting up Python unit tests with V2 test runner"):
-    all_targets = subprocess.run([
-      "./pants.pex",
-      "--tag=-integration",
-      "--filter-type=python_tests",
-      "filter",
-      "src/python::",
-      "tests/python::",
-    ], stdout=subprocess.PIPE, encoding="utf-8", check=True).stdout.strip().split("\n")
-    v2_compatible_targets = set(all_targets) - blacklisted_v2_targets
-    if remote_execution_enabled:
-      remote_execution_targets = v2_compatible_targets - blacklisted_remote_targets
-      local_execution_targets = blacklisted_remote_targets
-    else:
-      remote_execution_targets = set()
-      local_execution_targets = v2_compatible_targets
-    check_pants_pex_exists()
+  blacklisted_v2_targets = get_blacklisted_targets("unit_test_v2_blacklist.txt")
+  blacklisted_remote_targets = get_blacklisted_targets("unit_test_remote_blacklist.txt")
+  all_targets = get_all_python_tests(tag="-integration")
+  v2_compatible_targets = all_targets - blacklisted_v2_targets
+  if remote_execution_enabled:
+    remote_execution_targets = v2_compatible_targets - blacklisted_remote_targets
+    local_execution_targets = blacklisted_remote_targets
+  else:
+    remote_execution_targets = set()
+    local_execution_targets = v2_compatible_targets
 
   def run_v2_tests(
     *, targets: Set[str], execution_strategy: str, oauth_token_path: Optional[str] = None
@@ -441,37 +449,16 @@ def run_jvm_tests() -> None:
 
 
 def run_integration_tests(*, shard: Optional[str]) -> None:
-  main_command = [
-    "./pants.pex",
-    "--tag=+integration",
-    "test.pytest",
-    "src/python::",
-    "tests/python::",
-  ]
-  contrib_command = [
-    "./pants.pex",
-    "--tag=+integration",
-    "--exclude-target-regexp=.*/testprojects/.*",
-    "test.pytest",
-    "contrib::",
-  ]
+  check_pants_pex_exists()
+  all_targets = get_all_python_tests(tag="+integration")
+  command = ["./pants.pex", "test.pytest"]
   if shard is not None:
-    shard_arg = f"--test-pytest-test-shard={shard}"
-    main_command.append(shard_arg)
-    contrib_command.append(shard_arg)
-  main_command.extend(PYTEST_PASSTHRU_ARGS)
-  contrib_command.extend(PYTEST_PASSTHRU_ARGS)
-  with travis_section("IntegrationTests", f"Running Pants Integration tests{shard if shard is not None else ''}"):
-    check_pants_pex_exists()
+    command.append(f"--test-pytest-test-shard={shard}")
+  with travis_section("IntegrationTests", f"Running Pants Integration tests {shard if shard is not None else ''}"):
     try:
-      subprocess.run(main_command, check=True)
+      subprocess.run(command + sorted(all_targets) + PYTEST_PASSTHRU_ARGS, check=True)
     except subprocess.CalledProcessError:
       die("Integration test failure.")
-
-    try:
-      subprocess.run(contrib_command, check=True)
-    except subprocess.CalledProcessError:
-      die("Contrib integration test failure.")
 
 
 def run_plugin_tests() -> None:
