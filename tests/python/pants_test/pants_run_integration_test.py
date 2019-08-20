@@ -21,9 +21,8 @@ from pants.base.build_file import BuildFile
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.fs.archive import ZIP
 from pants.subsystem.subsystem import Subsystem
-from pants.util.contextutil import (environment_as, pushd, temporary_dir, temporary_file,
-                                    temporary_file_path)
-from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_mkdir_for, safe_rmtree
+from pants.util.contextutil import environment_as, pushd, temporary_dir
+from pants.util.dirutil import fast_relpath, safe_mkdir, safe_mkdir_for, safe_open
 from pants.util.objects import datatype
 from pants.util.osutil import Pid
 from pants.util.process_handler import SubprocessProcessHandler
