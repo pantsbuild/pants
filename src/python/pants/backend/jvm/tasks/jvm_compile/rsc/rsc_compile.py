@@ -289,6 +289,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       'rsc-and-zinc': lambda: 'zinc[rsc-and-zinc]({})'.format(target.address.spec),
     })()
 
+  def _cachewrite_key_for_target(self, target):
+    return 'cachewrite({})'.format(target.address.spec)
+
   def create_compile_jobs(self,
                           compile_target,
                           compile_contexts,
@@ -386,6 +389,24 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       # Update the products with the latest classes.
       self.register_extra_products_from_contexts([ctx.target], compile_contexts)
 
+    def work_for_vts_cachewrite(vts, ctx):
+      # Double check the cache before beginning compilation
+      hit_cache = self.check_cache(vts, counter)
+      target = ctx.target
+
+      if not hit_cache:
+        counter_val = str(counter()).rjust(counter.format_length(), ' ')
+        counter_str = '[{}/{}] '.format(counter_val, counter.size)
+        self.context.log.info(
+          counter_str,
+          'Writing to cache for ',
+          items_to_report_element(ctx.sources, '{} source'.format(self.name())),
+          ' in ',
+          items_to_report_element([t.address.reference() for t in vts.targets], 'target'),
+          ' (',
+          ctx.target.address.spec,
+          ').')
+
     ### Create Jobs for ExecutionGraph
     rsc_jobs = []
     zinc_jobs = []
@@ -420,7 +441,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         # processed by rsc.
         dependencies=list(all_zinc_rsc_invalid_dep_keys(dep_targets)),
         size=self._size_estimator(rsc_compile_context.sources),
-        on_success=ivts.update,
       )
 
     def only_zinc_invalid_dep_keys(invalid_deps):
@@ -442,10 +462,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
           CompositeProductAdder(*output_products)),
         dependencies=list(dep_keys),
         size=self._size_estimator(zinc_compile_context.sources),
-        # If compilation and analysis work succeeds, validate the vts.
-        # Otherwise, fail it.
-        on_success=ivts.update,
-        on_failure=ivts.force_invalidate)
+      )
 
     workflow = rsc_compile_context.workflow
 
@@ -509,7 +526,24 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         )),
     })()
 
-    return rsc_jobs + zinc_jobs
+    all_jobs = rsc_jobs + zinc_jobs
+
+    if all_jobs:
+      cachewrite_job = Job(
+          key=self._cachewrite_key_for_target(compile_target),
+          fn=functools.partial(
+            work_for_vts_cachewrite,
+            ivts,
+            rsc_compile_context,
+          ),
+          dependencies=[job.key for job in all_jobs],
+          # If compilation and analysis work succeeds, validate the vts.
+          # Otherwise, fail it.
+          on_success=ivts.update,
+          on_failure=ivts.force_invalidate)
+      all_jobs.append(cachewrite_job)
+
+    return all_jobs
 
   class RscZincMergedCompileContexts(datatype([
       ('rsc_cc', RscCompileContext),
