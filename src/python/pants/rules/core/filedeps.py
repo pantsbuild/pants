@@ -17,15 +17,18 @@ class Filedeps(LineOriented, Goal):
   closure of targets are also included.
   """
 
-  # TODO: Until this implements `--globs`, this can't claim the name `filedeps`!
-  name = 'fast-filedeps'
+  name = 'filedeps'
 
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
     register(
       '--absolute', type=bool, default=True,
-      help='If True, output with absolute path; else, output with path relative to the build root.'
+      help='If True, output with absolute path; else, output with path relative to the build root'
+    )
+    register(
+      '--globs', type=bool,
+      help='Instead of outputting filenames, output globs (ignoring excludes)'
     )
 
 
@@ -37,6 +40,7 @@ def file_deps(
 ) -> Filedeps:
 
   absolute = filedeps_options.values.absolute
+  globs = filedeps_options.values.globs
 
   unique_rel_paths = set()
   build_root = get_buildroot()
@@ -45,7 +49,10 @@ def file_deps(
     if hydrated_target.address.rel_path:
       unique_rel_paths.add(hydrated_target.address.rel_path)
     if hasattr(hydrated_target.adaptor, "sources"):
-      unique_rel_paths.update(hydrated_target.adaptor.sources.snapshot.files)
+      target_sources = hydrated_target.adaptor.sources
+      unique_rel_paths.update(
+        target_sources.snapshot.files if not globs else target_sources.filespec["globs"]
+      )
 
   with Filedeps.line_oriented(filedeps_options, console) as print_stdout:
     for rel_path in sorted(unique_rel_paths):

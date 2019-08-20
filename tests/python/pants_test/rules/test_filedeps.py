@@ -42,7 +42,7 @@ class FileDepsTest(ConsoleRuleTestBase):
     )
 
   def assert_filedeps(self, *, targets: List[str], expected: Set[str]):
-    self.assert_console_output(*expected, args=["--no-fast-filedeps-absolute"] + targets)
+    self.assert_console_output(*expected, args=["--no-filedeps-absolute"] + targets)
 
   def test_no_target(self) -> None:
     self.assert_filedeps(targets=[], expected=set())
