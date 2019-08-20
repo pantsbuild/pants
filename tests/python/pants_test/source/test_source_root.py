@@ -79,6 +79,10 @@ class SourceRootTest(TestBase):
     self.assertEqual(root('src/py', ('python',)),
                       trie.find('src/py/pantsbuild/foo/foo.py'))
 
+    # Non-canonicalized language names should also be detected.
+    self.assertEqual(root('src/kotlin', ('kotlin',)),
+                      trie.find('src/kotlin/org/pantsbuild/foo/Foo.kotlin'))
+
     # Test fixed roots.
     trie.add_fixed('mysrc/scalastuff', ('scala',))
     self.assertEqual(('mysrc/scalastuff', ('scala',), UNKNOWN),
@@ -155,6 +159,7 @@ class SourceRootTest(TestBase):
     self.create_dir('contrib/go/examples/src/go/src')
     self.create_dir('src/java')
     self.create_dir('src/python')
+    self.create_dir('src/kotlin')
     self.create_dir('src/example/java')
     self.create_dir('src/example/python')
     self.create_dir('my/project/src/java')
@@ -186,6 +191,7 @@ class SourceRootTest(TestBase):
                        SourceRoot('contrib/go/examples/src/go/src', ('go',), SOURCE),
                        SourceRoot('src/java', ('java',), SOURCE),
                        SourceRoot('src/python', ('python',), SOURCE),
+                       SourceRoot('src/kotlin', ('kotlin',), SOURCE),
                        SourceRoot('src/example/java', ('java',), SOURCE),
                        SourceRoot('src/example/python', ('python',), SOURCE),
                        SourceRoot('my/project/src/java', ('java',), SOURCE),
