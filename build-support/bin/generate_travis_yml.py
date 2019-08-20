@@ -55,14 +55,15 @@ GLOBAL_ENV_VARS = [
   'PYENV_PY27_VERSION=2.7.15',
   'PYENV_PY36_VERSION=3.6.8',
   'PYENV_PY37_VERSION=3.7.2',
-  # NB: Linux shards use Pyenv to pre-install Python. We must not override PYENV_ROOT on those
-  # shards, or their Python will no longer work.
+  # NB: We must set `PYENV_ROOT` on macOS for Pyenv to work properly. However, on Linux, we must not
+  # override the default value because Linux pre-installs Python via Pyenv and we must keep their
+  # $PYENV_ROOT for this to still work.
   'PYENV_ROOT="${PYENV_ROOT:-${HOME}/.pants_pyenv}"',
   'PATH="${PYENV_ROOT}/shims:${PATH}"',
   'AWS_CLI_ROOT="${HOME}/.aws_cli"',
   # NB: We use this verbose name so that AWS does not pick up the env var $AWS_ACCESS_KEY_ID on
   # pull request builds. We only want this value to be populated on branch builds. Users of this
-  # env var (e.g. `deploy_to_s3.py`) are expected to re-export the env var as $AWS_ACCESS_KEY_ID.
+  # env var (i.e. `deploy_to_s3.py`) are expected to re-export the env var as $AWS_ACCESS_KEY_ID.
   'AWS_ACCESS_KEY_ID__TO_BE_REEXPORTED_ON_DEPLOYS=AKIAV6A6G7RQWPRUWIXR',
   # This stores the encrypted AWS secret access key with the env var AWS_SECRET_ACCESS_KEY.
   # Travis converts it back into its original decrypted value when ran in CI, per
@@ -516,15 +517,13 @@ def build_wheels_osx() -> Dict:
   ]
   return shard
 
-
 # -------------------------------------------------------------------------
 # Integration tests
 # -------------------------------------------------------------------------
 
-NUM_INTEGRATION_SHARDS = 20
-
-
 def integration_tests(python_version: PythonVersion, *, use_pantsd: bool = False) -> List[Dict]:
+  num_integration_shards = 20
+
   def make_shard(*, shard_num: int) -> Dict:
     shard = {
       **linux_shard(python_version=python_version),
@@ -532,7 +531,7 @@ def integration_tests(python_version: PythonVersion, *, use_pantsd: bool = False
       "script": [
         (
           f"./build-support/bin/ci.py --integration-tests --integration-shard "
-          f"{shard_num}/{NUM_INTEGRATION_SHARDS} --python-version {python_version.decimal}"
+          f"{shard_num}/{num_integration_shards} --python-version {python_version.decimal}"
         ),
       ]
     }
@@ -543,7 +542,7 @@ def integration_tests(python_version: PythonVersion, *, use_pantsd: bool = False
       shard["stage"] = Stage.test_cron.value
       shard["env"].append('USE_PANTSD_FOR_INTEGRATION_TESTS="true"')
     return shard
-  return [make_shard(shard_num=i) for i in range(NUM_INTEGRATION_SHARDS)]
+  return [make_shard(shard_num=i) for i in range(num_integration_shards)]
 
 # -------------------------------------------------------------------------
 # Rust tests
