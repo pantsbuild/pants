@@ -67,12 +67,12 @@ class RscCompileIntegration(BaseCompileIT, AbstractTestGenerator):
         pants_run.workdir,
         'compile/rsc/current/testprojects.src.scala.org.pantsbuild.testproject.mutual.mutual/current/zinc',
         'classes/org/pantsbuild/testproject/mutual/A.class')
-      self.assertIsFile(zinc_compiled_classfile)
+      self.assert_is_file(zinc_compiled_classfile)
       rsc_header_jar = os.path.join(
         pants_run.workdir,
         'compile/rsc/current/testprojects.src.scala.org.pantsbuild.testproject.mutual.mutual/current/rsc',
         'm.jar')
-      self.assertIsFile(rsc_header_jar)
+      self.assert_is_file(rsc_header_jar)
 
   @_for_all_supported_execution_environments
   def executing_multi_target_binary(self, config):

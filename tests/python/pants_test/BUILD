@@ -29,16 +29,20 @@ python_library(
   ],
   dependencies = [
     '3rdparty/python:ansicolors',
+    '3rdparty/python:dataclasses',
     'build-support/regexes',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
+    'src/python/pants/base:exiter',
     'src/python/pants/fs',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:objects',
+    'src/python/pants/util:osutil',
     'src/python/pants/util:process_handler',
+    'src/python/pants/util:strutil',
     'tests/python/pants_test/testutils:file_test_util',
-    'tests/python/pants_test/testutils:pexrc_util',
   ]
 )
 
