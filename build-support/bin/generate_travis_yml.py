@@ -157,11 +157,12 @@ def docker_run_travis_ci_image(command: str) -> str:
 # TODO: Figure out why we have such large caches (2-7GB) and try to trim them.
 _cache_timeout = 500
 _cache_common_directories = ['${AWS_CLI_ROOT}', '${PYENV_ROOT}']
+# Ensure permissions to do the below removals, which happen with or without caching enabled.
+_cache_set_required_permissions = 'sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"'
 
 CACHE_NATIVE_ENGINE = {
   "before_cache": [
-    # Ensure permissions to do the below removals, which happen with or without caching enabled.
-    'sudo chown - R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"',
+    _cache_set_required_permissions,
     # Kill all Python bytecode in our cached venvs. Some files appear to
     # get bytecode compiled in non-yet-understood circumstances leading to
     # a full cache re-pack due to new bytecode files.
@@ -180,8 +181,7 @@ CACHE_NATIVE_ENGINE = {
 
 CACHE_PANTS_RUN = {
   "before_cache": [
-    # Ensure permissions to do the below removals, which happen with or without caching enabled.
-    'sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"',
+    _cache_set_required_permissions,
     # The `ivydata-*.properties` & root level `*.{properties,xml}` files'
     # effect on resolution time is in the noise, but they are
     # re-timestamped in internal comments and fields on each run and this
@@ -234,11 +234,11 @@ def _linux_before_install(include_test_config: bool = True) -> List[str]:
     "pyenv global 2.7.15 3.6.7 3.7.1"
   ]
   if include_test_config:
-    commands.extend([
+    return [
       'PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH',
       'JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64',
       'sudo sysctl fs.inotify.max_user_watches=524288',
-    ])
+    ] + commands
   return commands
 
 
@@ -268,9 +268,9 @@ def linux_shard(
       "shellcheck",
     ]}},
     "language": "python",
+    "before_install": _linux_before_install(include_test_config=load_test_config),
     "after_failure": ["./build-support/bin/ci-failure.sh"],
     "stage": python_version.default_stage().value,
-    "before_install": _linux_before_install(include_test_config=load_test_config),
     "env": [],
   }
   if load_test_config:
