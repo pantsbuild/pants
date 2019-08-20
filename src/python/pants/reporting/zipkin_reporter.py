@@ -2,8 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import os
+import subprocess
 
-import requests
 from py_zipkin import Encoding, get_default_tracer
 from py_zipkin.transport import BaseTransportHandler
 from py_zipkin.util import generate_random_64bit_string
@@ -11,6 +12,7 @@ from py_zipkin.zipkin import ZipkinAttrs, create_attrs_for_span
 
 from pants.base.workunit import WorkUnitLabel
 from pants.reporting.reporter import Reporter
+from pants.util.dirutil import safe_mkdir
 
 
 logger = logging.getLogger(__name__)
@@ -18,20 +20,49 @@ logger = logging.getLogger(__name__)
 NANOSECONDS_PER_SECOND = 1000000000.0
 
 
-class HTTPTransportHandler(BaseTransportHandler):
-  def __init__(self, endpoint):
+class AsyncHTTPTransportHandler(BaseTransportHandler):
+  def __init__(self, endpoint, zipkin_spans_dir, encoding):
     self.endpoint = endpoint
+    self.zipkin_spans_dir = zipkin_spans_dir
+    self.file_count = 0
+    self.encoding = encoding
 
   def get_max_payload_bytes(self):
     return None
 
   def send(self, payload):
     try:
-      requests.post(
-        self.endpoint,
-        data=payload,
-        headers={'Content-Type': 'application/x-thrift'},
+      if not os.path.exists(self.zipkin_spans_dir):
+        logger.error(
+          "Not uploading Zipkin spans because directory {} got deleted".format(self.zipkin_spans_dir)
+        )
+        return
+
+      self.file_count += 1
+      file_path_to_store_spans = os.path.join(
+        self.zipkin_spans_dir, 'spans-{}-{}'.format(self.file_count, self.encoding)
       )
+
+      with open(file_path_to_store_spans, 'w') as f:
+        f.write(payload)
+
+      args = ['curl', '-v',
+              '-X', 'POST',
+              '-H', 'Content-Type: application/json',
+              '--data', '@' + file_path_to_store_spans,
+              self.endpoint]
+      file_path_to_stdout_stderr = os.path.join(self.zipkin_spans_dir,
+                                                'stdout_stderr_output_{}'.format(self.file_count))
+      p = subprocess.Popen(args, stdin=subprocess.DEVNULL,
+                           stdout=open(file_path_to_stdout_stderr, 'w'),
+                           stderr=subprocess.STDOUT, close_fds=False)
+
+      logger.debug("Sending spans to Zipkin server from pid: {}".format(p.pid))
+      logger.debug("stdout and stderr for pid {} are located at '{}'".format(
+        p.pid,
+        file_path_to_stdout_stderr)
+      )
+
     except Exception as err:
       logger.error("Failed to post the payload to zipkin server. Error {}".format(err))
 
@@ -61,15 +92,20 @@ class ZipkinReporter(Reporter):
     """
     super().__init__(run_tracker, settings)
     # Create a transport handler
-    self.handler = HTTPTransportHandler(endpoint)
     self.trace_id = trace_id
     self.parent_id = parent_id
     self.sample_rate = float(sample_rate)
     self.endpoint = endpoint
+    self.encoding = Encoding.V1_JSON
     self.tracer = get_default_tracer()
     self.run_tracker = run_tracker
     self.service_name_prefix = service_name_prefix
     self.max_span_batch_size = max_span_batch_size
+    self.zipkin_spans_dir = os.path.join(self.run_tracker.run_info_dir, 'zipkin')
+    self.handler = AsyncHTTPTransportHandler(endpoint, self.zipkin_spans_dir, self.encoding)
+
+    # Directory to store encoded spans.
+    safe_mkdir(self.zipkin_spans_dir)
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
@@ -116,7 +152,7 @@ class ZipkinReporter(Reporter):
         service_name=self.service_name_prefix.format("main"),
         span_name=workunit.name,
         transport_handler=self.handler,
-        encoding=Encoding.V1_THRIFT,
+        encoding=self.encoding,
         zipkin_attrs=zipkin_attrs,
         max_span_batch_size=self.max_span_batch_size,
       )
