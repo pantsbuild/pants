@@ -447,28 +447,18 @@ def cargo_audit() -> Dict:
 # Unit tests
 # -------------------------------------------------------------------------
 
-def unit_tests_v2(python_version: PythonVersion) -> Dict:
+def unit_tests(python_version: PythonVersion) -> Dict:
   shard = {
     **linux_shard(python_version=python_version),
-    "name": f"Unit tests - V2 test runner (Python {python_version.decimal})",
+    "name": f"Unit tests (Python {python_version.decimal})",
     "script": [
-      f"travis_wait 50 ./build-support/bin/ci.py --python-tests-v2 --remote-execution-enabled --python-version {python_version.decimal}",
+      (
+        "travis_wait 50 ./build-support/bin/ci.py --unit-tests --remote-execution-enabled "
+        f"--plugin-tests --python-version {python_version.decimal}"
+      )
     ],
   }
-  shard["env"] = shard.get("env", []) + [f"CACHE_NAME=unit_tests.v2.py{python_version.number}"]
-  return shard
-
-
-def unit_tests_v1(python_version: PythonVersion) -> Dict:
-  shard = {
-    **linux_shard(python_version=python_version),
-    "name": f"Unit tests - V1 test runner (Python {python_version.decimal})",
-    "script": [
-      f"./build-support/bin/ci.py --python-tests-v1 --python-version {python_version.decimal}",
-      f"./build-support/bin/ci.py --plugin-tests --python-version {python_version.decimal}",
-    ],
-  }
-  shard["env"] = shard.get("env", []) + [f"CACHE_NAME=unit_tests.v1.py{python_version.number}"]
+  shard["env"] = shard.get("env", []) + [f"CACHE_NAME=unit_tests.py{python_version.number}"]
   return shard
 
 # ----------------------------------------------------------------------
@@ -747,12 +737,11 @@ def main() -> None:
       # https://docs.google.com/document/d/1gL3D1f-AzL_LzRxWLskCpVQ2ZlB_26GTETgXkXsrpDY/edit#heading=h.akhkfdtqfpw,
       # the RBE token server will only give tokens to job number #5, so we must do this for the cron
       # job to work with remoting.
-      unit_tests_v2(PythonVersion.py37),
+      unit_tests(PythonVersion.py37),
       *[lint(v) for v in PythonVersion],
       clippy(),
       cargo_audit(),
-      unit_tests_v2(PythonVersion.py36),
-      *[unit_tests_v1(v) for v in PythonVersion],
+      unit_tests(PythonVersion.py36),
       build_wheels_linux(),
       build_wheels_osx(),
       *integration_tests(PythonVersion.py36),

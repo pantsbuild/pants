@@ -37,10 +37,8 @@ def main() -> None:
     run_clippy()
   if args.cargo_audit:
     run_cargo_audit()
-  if args.python_tests_v1:
-    run_python_tests_v1()
-  if args.python_tests_v2:
-    run_python_tests_v2(remote_execution_enabled=args.remote_execution_enabled)
+  if args.unit_tests:
+    run_unit_tests(remote_execution_enabled=args.remote_execution_enabled)
   if args.rust_tests:
     run_rust_tests()
   if args.jvm_tests:
@@ -102,14 +100,9 @@ def create_parser() -> argparse.ArgumentParser:
   parser.add_argument(
     "--cargo-audit", action="store_true", help="Run Cargo audit of Rust dependencies."
   )
-  # TODO(#7772): Simplify below to always use V2 and drop the blacklist.
   parser.add_argument(
-    "--python-tests-v1", action="store_true",
-    help="Run Python unit tests with V1 test runner over the blacklist and contrib tests."
-  )
-  parser.add_argument(
-    "--python-tests-v2", action="store_true",
-    help="Run Python unit tests with V2 test runner."
+    "--unit-tests", action="store_true",
+    help="Run Python unit tests."
   )
   parser.add_argument("--rust-tests", action="store_true", help="Run Rust tests.")
   parser.add_argument("--jvm-tests", action="store_true", help="Run JVM tests.")
@@ -341,78 +334,56 @@ def run_cargo_audit() -> None:
       die("Cargo audit failure")
 
 
-def run_python_tests_v1() -> None:
+def run_unit_tests(*, remote_execution_enabled: bool) -> None:
   check_pants_pex_exists()
 
-  blacklisted_v2_targets = get_blacklisted_targets("unit_test_v2_blacklist.txt")
+  all_targets = get_all_python_tests(tag="-integration")
   blacklisted_chroot_targets = get_blacklisted_targets("unit_test_chroot_blacklist.txt")
-  chrooted_targets = blacklisted_v2_targets - blacklisted_chroot_targets
-
-  with travis_section("PythonTestsV1", "Running Python unit tests with V1 test runner"):
-
-    try:
-      subprocess.run(
-        ["./pants.pex", "--test-pytest-chroot", "test.pytest"] + sorted(chrooted_targets) + PYTEST_PASSTHRU_ARGS,
-        check=True
-      )
-      subprocess.run(
-        ["./pants.pex", "test.pytest"] + sorted(blacklisted_chroot_targets) + PYTEST_PASSTHRU_ARGS,
-        check=True
-      )
-    except subprocess.CalledProcessError:
-      die("Python unit test failure (V1 test runner")
-    else:
-      green("V1 unit tests passed.")
-
-
-def run_python_tests_v2(*, remote_execution_enabled: bool) -> None:
-  check_pants_pex_exists()
-
   blacklisted_v2_targets = get_blacklisted_targets("unit_test_v2_blacklist.txt")
   blacklisted_remote_targets = get_blacklisted_targets("unit_test_remote_blacklist.txt")
-  all_targets = get_all_python_tests(tag="-integration")
-  v2_compatible_targets = all_targets - blacklisted_v2_targets
-  if remote_execution_enabled:
-    remote_execution_targets = v2_compatible_targets - blacklisted_remote_targets
-    local_execution_targets = blacklisted_remote_targets
-  else:
-    remote_execution_targets = set()
-    local_execution_targets = v2_compatible_targets
 
-  def run_v2_tests(
-    *, targets: Set[str], execution_strategy: str, oauth_token_path: Optional[str] = None
-  ) -> None:
-    try:
-      command = (
-        ["./pants.pex", "--no-v1", "--v2", "test.pytest"] + sorted(targets) + PYTEST_PASSTHRU_ARGS
-      )
-      if oauth_token_path is not None:
-        command[3:3] = [
+  v1_no_chroot_targets = blacklisted_chroot_targets
+  v1_chroot_targets = blacklisted_v2_targets
+  v2_local_targets = blacklisted_remote_targets
+  v2_remote_targets = all_targets - v2_local_targets - v1_chroot_targets - v1_no_chroot_targets
+
+  basic_command = ["./pants.pex", "test.pytest"]
+  v2_command = ["./pants.pex", "--no-v1", "--v2", "test.pytest"]
+  v1_no_chroot_command = basic_command + sorted(v1_no_chroot_targets) + PYTEST_PASSTHRU_ARGS
+  v1_chroot_command = basic_command + ["--test-pytest-chroot"] + sorted(v1_chroot_targets) + PYTEST_PASSTHRU_ARGS
+  v2_local_command = v2_command + sorted(v2_local_targets)
+
+  if not remote_execution_enabled:
+    v2_local_targets = v2_local_targets | v2_remote_targets
+    v2_local_command = v2_command + sorted(v2_local_targets)
+  else:
+    with travis_section(
+      "UnitTestsRemote", "Running unit tests via remote execution"
+    ), get_remote_execution_oauth_token_path() as oauth_token_path:
+      v2_remote_command = v2_command[:-1] + [
           "--pants-config-files=pants.remote.ini",
           # We turn off speculation to reduce the risk of flakiness, where a test passes locally but
           # fails remoting and we have a race condition for which environment executes first.
           "--process-execution-speculation-strategy=none",
-          f"--remote-oauth-bearer-token-path={oauth_token_path}"
-        ]
-      subprocess.run(command, check=True)
-    except subprocess.CalledProcessError:
-      die(f"V2 unit tests failure ({execution_strategy} build execution).")
-    else:
-      green(f"V2 unit tests passed ({execution_strategy} build execution).")
+          f"--remote-oauth-bearer-token-path={oauth_token_path}",
+          "test.pytest",
+        ] + sorted(v2_remote_targets)
+      try:
+        subprocess.run(v2_remote_command, check=True)
+      except subprocess.CalledProcessError:
+        die("Unit test failure (remote execution)")
+      else:
+        green("Unit tests passed (remote execution)")
 
-  if remote_execution_enabled:
-    with travis_section(
-      "PythonTestsV2Remote", "Running Python unit tests with V2 test runner and remote build execution"
-    ), get_remote_execution_oauth_token_path() as oauth_token_path:
-      run_v2_tests(
-        targets=remote_execution_targets,
-        execution_strategy="remote",
-        oauth_token_path=oauth_token_path
-      )
-  with travis_section(
-    "PythonTestsV2Local", "Running Python unit tests with V2 test runner and local build execution"
-  ):
-    run_v2_tests(targets=local_execution_targets, execution_strategy="local")
+  with travis_section("UnitTestsLocal", "Running unit tests via local execution"):
+    try:
+      subprocess.run(v2_local_command, check=True)
+      subprocess.run(v1_chroot_command, check=True)
+      subprocess.run(v1_no_chroot_command, check=True)
+    except subprocess.CalledProcessError:
+      die("Unit test failure (local execution)")
+    else:
+      green("Unit tests passed (local execution)")
 
 
 def run_rust_tests() -> None:
