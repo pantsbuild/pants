@@ -16,7 +16,6 @@ from pants.engine.scheduler import Scheduler
 from pants.engine.selectors import Get
 from pants.engine.struct import Struct
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
-from pants.util.dirutil import safe_mkdtemp
 from pants.util.objects import SubclassesOf
 
 
@@ -92,7 +91,6 @@ def create_scheduler(rules, union_rules=None, validate=True, native=None):
     native,
     FileSystemProjectTree(os.getcwd()),
     './.pants.d',
-    safe_mkdtemp(),
     rules,
     union_rules,
     execution_options=DEFAULT_EXECUTION_OPTIONS,

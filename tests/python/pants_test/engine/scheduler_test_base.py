@@ -53,7 +53,6 @@ class SchedulerTestBase:
     local_store_dir = os.path.realpath(safe_mkdtemp())
     scheduler = Scheduler(self._native,
                           project_tree,
-                          work_dir,
                           local_store_dir,
                           rules,
                           union_rules,

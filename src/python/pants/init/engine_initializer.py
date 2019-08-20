@@ -241,7 +241,6 @@ class EngineInitializer:
     bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
     return EngineInitializer.setup_legacy_graph_extended(
       bootstrap_options.pants_ignore,
-      bootstrap_options.pants_workdir,
       bootstrap_options.local_store_dir,
       bootstrap_options.build_file_imports,
       options_bootstrapper,
@@ -258,7 +257,6 @@ class EngineInitializer:
   @staticmethod
   def setup_legacy_graph_extended(
     pants_ignore_patterns,
-    workdir,
     local_store_dir,
     build_file_imports_behavior,
     options_bootstrapper,
@@ -276,7 +274,6 @@ class EngineInitializer:
 
     :param list pants_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
                                        usually taken from the '--pants-ignore' global option.
-    :param str workdir: The pants workdir.
     :param local_store_dir: The directory to use for storing the engine's LMDB store in.
     :param build_file_imports_behavior: How to behave if a BUILD file being parsed tries to use
       import statements. Valid values: "allow", "warn", "error".
@@ -363,7 +360,6 @@ class EngineInitializer:
     scheduler = Scheduler(
       native,
       project_tree,
-      workdir,
       local_store_dir,
       rules,
       union_rules,
