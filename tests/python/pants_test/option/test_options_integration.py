@@ -282,14 +282,15 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
     with temporary_dir('/tmp') as tmp_dir:
       symlink_workdir = f'{get_buildroot()}/.pants.d'
       physical_workdir_base = f'{tmp_dir}/workdirs'
+      physical_workdir = f'{physical_workdir_base}/{safe_filename_from_path(symlink_workdir)}'
 
       pants_run = self.run_pants_with_workdir(
         [f'--pants-physical-workdir-base={physical_workdir_base}', 'help'], symlink_workdir)
       self.assert_success(pants_run)
+      # Make sure symlink workdir is pointing to physical workdir
+      self.assertTrue(os.readlink(symlink_workdir) == physical_workdir)
 
       pants_run = self.run_pants_with_workdir(
         [f'--pants-physical-workdir-base={physical_workdir_base}', 'clean-all'], symlink_workdir)
-
-      physical_workdir = f'{physical_workdir_base}/{safe_filename_from_path(symlink_workdir)}'
       # Make sure both physical_workdir and symlink_workdir are empty after running clean-all
       self.assertTrue(not os.listdir(symlink_workdir) and not os.listdir(physical_workdir))
