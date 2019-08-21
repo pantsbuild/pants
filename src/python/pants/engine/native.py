@@ -840,6 +840,7 @@ class Native(Singleton):
         self.context.utf8_buf(execution_options.remote_oauth_bearer_token_path or ""),
         execution_options.remote_store_thread_count,
         execution_options.remote_store_chunk_bytes,
+        execution_options.remote_store_connection_limit,
         execution_options.remote_store_chunk_upload_timeout_seconds,
         execution_options.remote_store_rpc_retries,
         self.context.utf8_buf_buf(execution_options.remote_execution_extra_platform_properties),

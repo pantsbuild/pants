@@ -247,6 +247,14 @@ to this directory.",
               .required(false)
               .default_value("3")
         )
+        .arg(
+          Arg::with_name("connection-limit")
+              .help("Number of concurrent servers to allow connections to.")
+              .takes_value(true)
+              .long("connection-limit")
+              .required(false)
+              .default_value("3")
+        )
       .get_matches(),
   ) {
     Ok(_) => {}
@@ -299,7 +307,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             top_match
               .value_of("remote-instance-name")
               .map(str::to_owned),
-            &root_ca_certs,
+            root_ca_certs,
             oauth_bearer_token,
             value_t!(top_match.value_of("thread-count"), usize).expect("Invalid thread count"),
             chunk_size,
@@ -319,6 +327,8 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
               std::time::Duration::from_secs(20),
             )?,
             value_t!(top_match.value_of("rpc-attempts"), usize).expect("Bad rpc-attempts flag"),
+            value_t!(top_match.value_of("connection-limit"), usize)
+              .expect("Bad connection-limit flag"),
           ),
           true,
         )

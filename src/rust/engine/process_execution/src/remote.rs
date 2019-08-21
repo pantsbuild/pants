@@ -1571,12 +1571,13 @@ pub mod tests {
       &store_dir_path,
       vec![cas.address()],
       None,
-      &None,
+      None,
       None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
       store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      1,
       1,
     )
     .expect("Failed to make store");
@@ -1945,12 +1946,13 @@ pub mod tests {
       store_dir,
       vec![cas.address()],
       None,
-      &None,
+      None,
       None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
       store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      1,
       1,
     )
     .expect("Failed to make store");
@@ -2038,12 +2040,13 @@ pub mod tests {
       store_dir,
       vec![cas.address()],
       None,
-      &None,
+      None,
       None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
       store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      1,
       1,
     )
     .expect("Failed to make store");
@@ -2106,12 +2109,13 @@ pub mod tests {
       store_dir,
       vec![cas.address()],
       None,
-      &None,
+      None,
       None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
       store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      1,
       1,
     )
     .expect("Failed to make store");
@@ -2860,12 +2864,13 @@ pub mod tests {
       store_dir,
       vec![cas.address()],
       None,
-      &None,
+      None,
       None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
       store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      1,
       1,
     )
     .expect("Failed to make store");
