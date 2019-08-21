@@ -292,6 +292,25 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   def _write_to_cache_key_for_target(self, target):
     return 'write_to_cache({})'.format(target.address.spec)
 
+  def _check_cache_before_work(self, work_str, vts, ctx, counter, debug = False, work_fn = lambda: None):
+    hit_cache = self.check_cache(vts, counter)
+
+    if not hit_cache:
+      counter_val = str(counter()).rjust(counter.format_length(), ' ')
+      counter_str = '[{}/{}] '.format(counter_val, counter.size)
+      log_fn = self.context.log.debug if debug else self.context.log.info
+      log_fn(
+        counter_str,
+        f'{work_str} ',
+        items_to_report_element(ctx.sources, '{} source'.format(self.name())),
+        ' in ',
+        items_to_report_element([t.address.reference() for t in vts.targets], 'target'),
+        ' (',
+        ctx.target.address.spec,
+        ').')
+
+      work_fn()
+
   def create_compile_jobs(self,
                           compile_target,
                           compile_contexts,
@@ -301,24 +320,10 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
                           runtime_classpath_product):
 
     def work_for_vts_rsc(vts, ctx):
-      # Double check the cache before beginning compilation
-      hit_cache = self.check_cache(vts, counter)
       target = ctx.target
       tgt, = vts.targets
 
-      if not hit_cache:
-        counter_val = str(counter()).rjust(counter.format_length(), ' ')
-        counter_str = '[{}/{}] '.format(counter_val, counter.size)
-        self.context.log.info(
-          counter_str,
-          'Rsc-ing ',
-          items_to_report_element(ctx.sources, '{} source'.format(self.name())),
-          ' in ',
-          items_to_report_element([t.address.reference() for t in vts.targets], 'target'),
-          ' (',
-          ctx.target.address.spec,
-          ').')
-
+      def work_fn():
         # This does the following
         # - Collect the rsc classpath elements, including zinc compiles of rsc incompatible targets
         #   and rsc compiles of rsc compatible targets.
@@ -386,25 +391,14 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
           'rsc'
         )
 
+      # Double check the cache before beginning compilation
+      self._check_cache_before_work('Rsc-ing', vts, ctx, counter, work_fn=work_fn)
+
       # Update the products with the latest classes.
       self.register_extra_products_from_contexts([ctx.target], compile_contexts)
 
     def work_for_vts_write_to_cache(vts, ctx):
-      # Double check the cache before beginning compilation
-      hit_cache = self.check_cache(vts, counter)
-
-      if not hit_cache:
-        counter_val = str(counter()).rjust(counter.format_length(), ' ')
-        counter_str = '[{}/{}] '.format(counter_val, counter.size)
-        self.context.log.debug(
-          counter_str,
-          'Writing to cache for ',
-          items_to_report_element(ctx.sources, '{} source'.format(self.name())),
-          ' in ',
-          items_to_report_element([t.address.reference() for t in vts.targets], 'target'),
-          ' (',
-          ctx.target.address.spec,
-          ').')
+      self._check_cache_before_work('Writing to cache for', vts, ctx, counter, debug=True)
 
     ### Create Jobs for ExecutionGraph
     rsc_jobs = []
