@@ -647,6 +647,8 @@ def jvm_tests(python_version: PythonVersion) -> Dict:
 # Deploy
 # -------------------------------------------------------------------------
 
+_DEPLOY_REPO = "pantsbuild/pants"
+
 DEPLOY_SETTINGS = {
   "provider": "script",
   "script": "./build-support/bin/deploy_to_s3.py",
@@ -657,7 +659,7 @@ DEPLOY_SETTINGS = {
     # NB: We mainly want deploys for `master` commits; but we also need new binaries for stable
     # release branches; eg `1.3.x`
     "all_branches": True,
-    "repo": "pantsbuild.pants",
+    "repo": _DEPLOY_REPO,
   }
 }
 
@@ -696,7 +698,7 @@ def deploy_stable() -> Dict:
       "on": {
         # We only release a pex for Pants releases, which are tagged.
         "tags": True,
-        "repo": "pantsbuild/pants"
+        "repo": _DEPLOY_REPO
       }
     }
   }

@@ -8,7 +8,7 @@ deploy:
   'on':
     all_branches: true
     condition: $PREPARE_DEPLOY = 1
-    repo: pantsbuild.pants
+    repo: pantsbuild/pants
   provider: script
   script: ./build-support/bin/deploy_to_s3.py
   skip_cleanup: true
