@@ -2,6 +2,11 @@
 ======================
 This document describes releases leading up to the ``1.19.x`` ``stable`` series.
 
+1.19.0 (08/21/2019)
+-------------------
+
+The first stable release in the ``1.19.x`` series, with no changes since the previous rc!
+
 1.19.0rc1 (08/12/2019)
 ----------------------
 
