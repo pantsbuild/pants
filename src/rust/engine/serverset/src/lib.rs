@@ -92,7 +92,7 @@ struct Inner<T: Clone> {
   // connection will be used.
   next_connection: usize,
 
-  connect: Box<Fn(&str) -> T + 'static + Send>,
+  connect: Box<dyn Fn(&str) -> T + 'static + Send>,
 
   connection_limit: usize,
 
