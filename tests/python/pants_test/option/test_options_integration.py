@@ -278,7 +278,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                     .format(config_path),
                     pants_run.stdout_data)
 
-  def test_pants_workdirs(self):
+  def test_pants_symlink_workdirs(self):
     with temporary_dir('/tmp') as physical_workdir:
       symlink_workdir = f'{get_buildroot()}/.pants.d'
       physical_workdir_base = f'{physical_workdir}/workdirs'
