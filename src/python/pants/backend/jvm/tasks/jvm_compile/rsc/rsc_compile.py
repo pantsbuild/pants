@@ -289,8 +289,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       'rsc-and-zinc': lambda: 'zinc[rsc-and-zinc]({})'.format(target.address.spec),
     })()
 
-  def _cachewrite_key_for_target(self, target):
-    return 'cachewrite({})'.format(target.address.spec)
+  def _write_to_cache_key_for_target(self, target):
+    return 'write_to_cache({})'.format(target.address.spec)
 
   def create_compile_jobs(self,
                           compile_target,
@@ -389,15 +389,14 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       # Update the products with the latest classes.
       self.register_extra_products_from_contexts([ctx.target], compile_contexts)
 
-    def work_for_vts_cachewrite(vts, ctx):
+    def work_for_vts_write_to_cache(vts, ctx):
       # Double check the cache before beginning compilation
       hit_cache = self.check_cache(vts, counter)
-      target = ctx.target
 
       if not hit_cache:
         counter_val = str(counter()).rjust(counter.format_length(), ' ')
         counter_str = '[{}/{}] '.format(counter_val, counter.size)
-        self.context.log.info(
+        self.context.log.debug(
           counter_str,
           'Writing to cache for ',
           items_to_report_element(ctx.sources, '{} source'.format(self.name())),
@@ -529,10 +528,10 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     all_jobs = rsc_jobs + zinc_jobs
 
     if all_jobs:
-      cachewrite_job = Job(
-          key=self._cachewrite_key_for_target(compile_target),
+      write_to_cache_job = Job(
+          key=self._write_to_cache_key_for_target(compile_target),
           fn=functools.partial(
-            work_for_vts_cachewrite,
+            work_for_vts_write_to_cache,
             ivts,
             rsc_compile_context,
           ),
@@ -541,7 +540,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
           # Otherwise, fail it.
           on_success=ivts.update,
           on_failure=ivts.force_invalidate)
-      all_jobs.append(cachewrite_job)
+      all_jobs.append(write_to_cache_job)
 
     return all_jobs
 
