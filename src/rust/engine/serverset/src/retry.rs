@@ -1,7 +1,7 @@
 use crate::{Health, Serverset};
 use futures::{self, Future, IntoFuture};
 
-pub struct Retry<T>(pub Serverset<T>);
+pub struct Retry<T: Clone>(pub Serverset<T>);
 
 impl<T: Clone + Send + Sync + 'static> Retry<T> {
   ///
@@ -66,6 +66,7 @@ mod tests {
           Ok(s.to_owned())
         }
       },
+      3,
       BackoffConfig::new(Duration::from_millis(10), 2.0, Duration::from_millis(100)).unwrap(),
     )
     .unwrap();
@@ -86,6 +87,7 @@ mod tests {
     let s = Serverset::new(
       vec!["bad".to_owned()],
       |s| Err(s.to_owned()),
+      1,
       BackoffConfig::new(Duration::from_millis(1), 1.0, Duration::from_millis(1)).unwrap(),
     )
     .unwrap();

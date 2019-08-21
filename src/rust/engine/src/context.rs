@@ -72,6 +72,7 @@ impl Core {
     remote_store_chunk_bytes: usize,
     remote_store_chunk_upload_timeout: Duration,
     remote_store_rpc_retries: usize,
+    remote_store_connection_limit: usize,
     remote_execution_extra_platform_properties: BTreeMap<String, String>,
     process_execution_local_parallelism: usize,
     process_execution_remote_parallelism: usize,
@@ -117,7 +118,7 @@ impl Core {
             local_store_dir,
             remote_store_servers,
             remote_instance_name.clone(),
-            &root_ca_certs,
+            root_ca_certs.clone(),
             oauth_bearer_token.clone(),
             remote_store_thread_count,
             remote_store_chunk_bytes,
@@ -126,6 +127,7 @@ impl Core {
             store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10))
               .unwrap(),
             remote_store_rpc_retries,
+            remote_store_connection_limit,
           )
         }
       })

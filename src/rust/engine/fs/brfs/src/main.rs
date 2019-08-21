@@ -691,7 +691,7 @@ fn main() {
       &store_path,
       vec![address.to_owned()],
       args.value_of("remote-instance-name").map(str::to_owned),
-      &root_ca_certs,
+      root_ca_certs,
       oauth_bearer_token,
       1,
       4 * 1024 * 1024,
@@ -703,6 +703,7 @@ fn main() {
         std::time::Duration::from_secs(20),
       )
       .expect("Error making BackoffConfig"),
+      1,
       1,
     ),
     None => Store::local_only(runtime.clone(), &store_path),

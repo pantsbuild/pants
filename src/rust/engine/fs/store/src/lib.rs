@@ -199,13 +199,14 @@ impl Store {
     path: P,
     cas_addresses: Vec<String>,
     instance_name: Option<String>,
-    root_ca_certs: &Option<Vec<u8>>,
+    root_ca_certs: Option<Vec<u8>>,
     oauth_bearer_token: Option<String>,
     thread_count: usize,
     chunk_size_bytes: usize,
     upload_timeout: Duration,
     backoff_config: BackoffConfig,
     rpc_retries: usize,
+    connection_limit: usize,
   ) -> Result<Store, String> {
     Ok(Store {
       local: local::ByteStore::new(executor, path)?,
@@ -219,6 +220,7 @@ impl Store {
         upload_timeout,
         backoff_config,
         rpc_retries,
+        connection_limit,
       )?),
     })
   }
@@ -1730,18 +1732,20 @@ mod remote {
     pub fn new(
       cas_addresses: Vec<String>,
       instance_name: Option<String>,
-      root_ca_certs: &Option<Vec<u8>>,
+      root_ca_certs: Option<Vec<u8>>,
       oauth_bearer_token: Option<String>,
       thread_count: usize,
       chunk_size_bytes: usize,
       upload_timeout: Duration,
       backoff_config: BackoffConfig,
       rpc_retries: usize,
+      connection_limit: usize,
     ) -> Result<ByteStore, String> {
       let env = Arc::new(grpcio::Environment::new(thread_count));
+      let env2 = env.clone();
 
-      let connect = |cas_address: &str| {
-        let builder = grpcio::ChannelBuilder::new(env.clone());
+      let connect = move |cas_address: &str| {
+        let builder = grpcio::ChannelBuilder::new(env2.clone());
         if let Some(ref root_ca_certs) = root_ca_certs {
           let creds = grpcio::ChannelCredentialsBuilder::new()
             .root_cert(root_ca_certs.clone())
@@ -1752,7 +1756,7 @@ mod remote {
         }
       };
 
-      let serverset = Serverset::new(cas_addresses, connect, backoff_config)?;
+      let serverset = Serverset::new(cas_addresses, connect, connection_limit, backoff_config)?;
 
       Ok(ByteStore {
         instance_name,
@@ -2182,12 +2186,13 @@ mod remote {
       let store = ByteStore::new(
         vec![cas.address()],
         None,
-        &None,
+        None,
         None,
         1,
         10 * 1024,
         Duration::from_secs(5),
         BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+        1,
         1,
       )
       .unwrap();
@@ -2257,12 +2262,13 @@ mod remote {
       let store = ByteStore::new(
         vec![String::from("doesnotexist.example")],
         None,
-        &None,
+        None,
         None,
         1,
         10 * 1024 * 1024,
         Duration::from_secs(1),
         BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+        1,
         1,
       )
       .unwrap();
@@ -2330,13 +2336,14 @@ mod remote {
       let store = ByteStore::new(
         vec![cas1.address(), cas2.address()],
         None,
-        &None,
+        None,
         None,
         1,
         10 * 1024 * 1024,
         Duration::from_secs(1),
         BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
         1,
+        2,
       )
       .unwrap();
 
@@ -2358,12 +2365,13 @@ mod remote {
       ByteStore::new(
         vec![cas.address()],
         None,
-        &None,
+        None,
         None,
         1,
         10 * MEGABYTES,
         Duration::from_secs(1),
         BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+        1,
         1,
       )
       .unwrap()
@@ -2486,12 +2494,13 @@ mod tests {
       dir,
       vec![cas_address],
       None,
-      &None,
+      None,
       None,
       1,
       10 * MEGABYTES,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      1,
       1,
     )
     .unwrap()
@@ -3167,12 +3176,13 @@ mod tests {
       dir.path(),
       vec![cas.address()],
       Some("dark-tower".to_owned()),
-      &None,
+      None,
       None,
       1,
       10 * MEGABYTES,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      1,
       1,
     )
     .unwrap();
@@ -3194,12 +3204,13 @@ mod tests {
       dir.path(),
       vec![cas.address()],
       Some("dark-tower".to_owned()),
-      &None,
+      None,
       None,
       1,
       10 * MEGABYTES,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      1,
       1,
     )
     .unwrap();
@@ -3235,12 +3246,13 @@ mod tests {
       dir.path(),
       vec![cas.address()],
       None,
-      &None,
+      None,
       Some("Armory.Key".to_owned()),
       1,
       10 * MEGABYTES,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      1,
       1,
     )
     .unwrap();
@@ -3262,12 +3274,13 @@ mod tests {
       dir.path(),
       vec![cas.address()],
       None,
-      &None,
+      None,
       Some("Armory.Key".to_owned()),
       1,
       10 * MEGABYTES,
       Duration::from_secs(1),
       BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      1,
       1,
     )
     .unwrap();

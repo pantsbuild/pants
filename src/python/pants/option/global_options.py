@@ -32,6 +32,7 @@ class ExecutionOptions(datatype([
   'remote_store_chunk_bytes',
   'remote_store_chunk_upload_timeout_seconds',
   'remote_store_rpc_retries',
+  'remote_store_connection_limit',
   'process_execution_local_parallelism',
   'process_execution_remote_parallelism',
   'process_execution_cleanup_local_dirs',
@@ -60,6 +61,7 @@ class ExecutionOptions(datatype([
       remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
       remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
       remote_store_rpc_retries=bootstrap_options.remote_store_rpc_retries,
+      remote_store_connection_limit=bootstrap_options.remote_store_connection_limit,
       process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
       process_execution_remote_parallelism=bootstrap_options.process_execution_remote_parallelism,
       process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
@@ -82,6 +84,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_chunk_bytes=1024*1024,
     remote_store_chunk_upload_timeout_seconds=60,
     remote_store_rpc_retries=2,
+    remote_store_connection_limit=5,
     process_execution_local_parallelism=multiprocessing.cpu_count()*2,
     process_execution_remote_parallelism=128,
     process_execution_cleanup_local_dirs=True,
@@ -347,6 +350,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help="Enables remote workers for increased parallelism. (Alpha)")
     register('--remote-store-server', advanced=True, type=list, default=[],
              help='host:port of grpc server to use as remote execution file store.')
+    # TODO: Infer this from remote-store-connection-limit.
     register('--remote-store-thread-count', type=int, advanced=True,
              default=DEFAULT_EXECUTION_OPTIONS.remote_store_thread_count,
              help='Thread count to use for the pool that interacts with the remote file store.')
@@ -361,6 +365,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--remote-store-rpc-retries', type=int, advanced=True,
              default=DEFAULT_EXECUTION_OPTIONS.remote_store_rpc_retries,
              help='Number of times to retry any RPC to the remote store before giving up.')
+    register('--remote-store-connection-limit', type=int, advanced=True,
+             default=DEFAULT_EXECUTION_OPTIONS.remote_store_connection_limit,
+             help='Number of remote stores to concurrently allow connections to.')
     register('--remote-execution-process-cache-namespace', advanced=True,
              help="The cache namespace for remote process execution. "
                   "Bump this to invalidate every artifact's remote execution. "
