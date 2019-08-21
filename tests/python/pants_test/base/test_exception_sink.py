@@ -26,6 +26,7 @@ class TestExceptionSink(TestBase):
     pants initialization, and when pants runs this test, it won't have been reset to the fake
     buildroot we use for tests.
     """
+    ExceptionSink.reset_log_location(os.path.join(os.getcwd(), '.pants.d'))
     self.assertEqual(ExceptionSink._log_dir, os.path.join(os.getcwd(), '.pants.d'))
 
   def test_reset_log_location(self):

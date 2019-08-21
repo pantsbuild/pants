@@ -5,6 +5,8 @@ import json
 import os
 from textwrap import dedent
 
+from pants.base.build_environment import get_buildroot
+from pants.fs.fs import safe_filename_from_path
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -275,3 +277,19 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
       self.assertIn("pants_ignore = ['.*/', '/dist/', 'some/random/dir'] (from CONFIG in {})"
                     .format(config_path),
                     pants_run.stdout_data)
+
+  def test_pants_workdirs(self):
+    with temporary_dir('/tmp') as physical_workdir:
+      symlink_workdir = f'{get_buildroot()}/.pants.d'
+      physical_workdir_base = f'{physical_workdir}/workdirs'
+
+      pants_run = self.run_pants_with_workdir(
+        [f'--pants-physical-workdir-base={physical_workdir_base}',
+          'clean-all',
+          '--async']
+        , symlink_workdir)
+
+      self.assert_success(pants_run)
+      # Make sure symlink workdir is pointing to physical workdir
+      self.assertTrue(os.readlink(symlink_workdir) ==
+                      f'{physical_workdir_base}/{safe_filename_from_path(symlink_workdir)}')
