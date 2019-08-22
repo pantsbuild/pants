@@ -5,7 +5,6 @@ import json
 import os
 from textwrap import dedent
 
-from pants.base.build_environment import get_buildroot
 from pants.fs.fs import safe_filename_from_path
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -279,7 +278,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                     pants_run.stdout_data)
 
   def test_pants_symlink_workdirs(self):
-    with temporary_dir(cleanup=False) as tmp_dir:
+    with temporary_dir() as tmp_dir:
       symlink_workdir = f'{tmp_dir}/.pants.d'
       physical_workdir_base = f'{tmp_dir}/workdirs'
       physical_workdir = f'{physical_workdir_base}/{safe_filename_from_path(symlink_workdir)}'
