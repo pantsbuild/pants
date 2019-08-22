@@ -54,6 +54,14 @@ def safe_filename(name, extension=None, digest=None, max_length=_MAX_FILENAME_LE
     return safe_name
 
 
+def safe_filename_from_path(path, **kwargs):
+  """As for `safe_filename`, but takes a path.
+
+  First converts it into a name by replacing separator characters, and then calls safe_filename.
+  """
+  return safe_filename(path.strip(os.path.sep).replace(os.path.sep, '.'), **kwargs)
+
+
 def expand_path(path):
   """Returns ``path`` as an absolute path with ~user and env var expansion applied.
 
