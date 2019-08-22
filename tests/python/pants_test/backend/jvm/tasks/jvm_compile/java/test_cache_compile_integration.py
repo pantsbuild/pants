@@ -5,6 +5,7 @@ import os
 import re
 from collections import namedtuple
 from textwrap import dedent
+from typing import Callable, Dict, List
 
 from pants.backend.jvm.tasks.jvm_compile.rsc.rsc_compile import RscCompile
 from pants.base.build_environment import get_buildroot
@@ -260,11 +261,11 @@ class CacheCompileIntegrationTest(BaseCompileIT):
     def descend_subdirs(curdir, descendants):
       if not descendants:
         return curdir
-      nextdir = take_only_subdir(descendants[0])
+      nextdir = take_only_subdir(curdir, descendants[0])
       return descend_subdirs(nextdir, descendants[1:])
 
     def work(compile, cache_test_subdirs):
-      def ensure_classfiles(target_name, classfiles, rsc=True):
+      def ensure_classfiles(target_name, classfiles):
         cache_test_subdir = cache_test_subdirs[target_name]
         cache_dir_entries = os.listdir(cache_test_subdir)
         self.assertEqual(len(cache_dir_entries), 1)
@@ -276,34 +277,35 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
           cache_path = os.path.join(cache_test_subdir, cache_entry)
           TGZ.extract(cache_path, cache_unzip_dir)
-          # assert that the unzip dir has the structure /compile/rsc/{hash}/{x}.cachetestA/{hash2}
+          # assert that the unzip dir has the directory structure
+          # ./compile/rsc/{hash}/{x}.{target_name}/{hash2}
           path = descend_subdirs(cache_unzip_dir, ['compile', 'rsc', None, None])
           self.assertTrue(path.endswith(f".{target_name}"))
           path = take_only_subdir(path)
 
-          rsc_compile_products = ['rsc', 'zinc'] if rsc else ['zinc']
+          # TODO: Surprisingly, rsc/m.jar is created even for dependee-less targets.
+          self.assertEqual(sorted(os.listdir(path)), ['rsc', 'zinc'])
 
-          self.assertEqual(sorted(os.listdir(path)), rsc_compile_products)
+          # Check that zinc/z.jar and rsc/m.jar both exist
+          # and that their contents contain the right classfiles
           zincpath = os.path.join(path, 'zinc')
           zjar = os.path.join(zincpath, 'z.jar')
           self.assertTrue(os.path.exists(zjar))
-
           ZIP.extract(zjar, zinc_dir)
           self.assertEqual(os.listdir(zinc_dir), ['compile_classpath'] + classfiles)
 
-          if rsc:
-            rscpath = os.path.join(path, 'rsc')
-            mjar = os.path.join(rscpath, 'm.jar')
-            self.assertTrue(os.path.exists(mjar))
-            ZIP.extract(mjar, rsc_dir)
-            self.assertEqual(os.listdir(rsc_dir), classfiles)
+          rscpath = os.path.join(path, 'rsc')
+          mjar = os.path.join(rscpath, 'm.jar')
+          self.assertTrue(os.path.exists(mjar))
+          ZIP.extract(mjar, rsc_dir)
+          self.assertEqual(os.listdir(rsc_dir), classfiles)
 
       ensure_classfiles("cachetestA", ["A.class"])
       ensure_classfiles("cachetestB", ["B.class"])
 
     config = {
       'compile.rsc': {
-        'workflow': RscCompile.JvmCompileWorkflowType.rsc_and_zinc
+        'workflow': RscCompile.JvmCompileWorkflowType.rsc_and_zinc.value
       }
     }
     self._compile_spec(
@@ -334,7 +336,9 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         Compile({srcfile: "public final class A {}"}, config, 3),
     )
   
-  def _compile_spec(self, compiles, target_defs, target_names, target_to_compile, cb = lambda cache_test_subdirs: None):
+  def _compile_spec(self, compiles: List[Compile], target_defs: List[str], target_names: List[str], target_to_compile: str, callback: Callable[[Compile, Dict[str, str]], None] = lambda cache_test_subdirs: None) -> None:
+    """Compiles a spec within the same workspace under multiple compilation configs, with a callback function."""
+
     with temporary_dir() as cache_dir, \
         self.temporary_workdir() as workdir, \
         temporary_dir(root_dir=get_buildroot()) as src_dir:
@@ -367,7 +371,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
             f'{os.path.basename(src_dir)}.{t}',
           )
 
-        cb(c, cache_test_subdirs)
+        callback(c, cache_test_subdirs)
 
   def _do_test_caching(self, *compiles):
     """Tests that the given compiles within the same workspace produce the given artifact counts."""
