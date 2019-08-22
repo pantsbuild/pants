@@ -19,15 +19,6 @@ class TestExceptionSink(TestBase):
     class AnonymousSink(ExceptionSink): pass
     return AnonymousSink
 
-  def test_default_log_location(self):
-    """Test that the global singleton ExceptionSink's log dir is relative to the original buildroot.
-
-    Assert that the global singleton ExceptionSink had its log dir set relative to the workdir upon
-    pants initialization, and when pants runs this test, it won't have been reset to the fake
-    buildroot we use for tests.
-    """
-    self.assertEqual(ExceptionSink._log_dir, os.path.join(os.getcwd(), '.pants.d'))
-
   def test_reset_log_location(self):
     sink = self._gen_sink_subclass()
 
