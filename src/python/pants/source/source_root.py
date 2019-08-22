@@ -22,7 +22,9 @@ class SourceRootCategories:
 class SourceRoot(datatype([('path', str), 'langs', ('category', str)])):
   pass
 
-SourceRootsCollection = Collection.of(SourceRoot)
+
+class AllExistingSourceRoots(Collection.of(SourceRoot)):
+  pass
 
 
 class SourceRootFactory:

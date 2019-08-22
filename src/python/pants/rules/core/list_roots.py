@@ -8,7 +8,7 @@ from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.goal import Goal, LineOriented
 from pants.engine.rules import console_rule, optionable_rule, rule
 from pants.engine.selectors import Get
-from pants.source.source_root import SourceRoot, SourceRootConfig, SourceRootsCollection
+from pants.source.source_root import AllExistingSourceRoots, SourceRoot, SourceRootConfig
 
 
 class Roots(LineOriented, Goal):
@@ -16,7 +16,7 @@ class Roots(LineOriented, Goal):
   name = 'roots'
 
 
-@rule(SourceRootsCollection, [SourceRootConfig])
+@rule(AllExistingSourceRoots, [SourceRootConfig])
 def all_roots(source_root_config):
 
   source_roots = source_root_config.get_source_roots()
@@ -35,12 +35,12 @@ def all_roots(source_root_config):
     match: SourceRoot = source_roots.trie_find(directory)
     if match:
       all_source_roots.add(match)
-  yield all_source_roots
+  yield AllExistingSourceRoots(all_source_roots)
 
 
 @console_rule(Roots, [Console, Roots.Options, SourceRootConfig])
 def list_roots(console, options, source_root_config):
-  all_roots = yield Get(SourceRootsCollection, SourceRootConfig, source_root_config)
+  all_roots = yield Get(AllExistingSourceRoots, SourceRootConfig, source_root_config)
 
   with Roots.line_oriented(options, console) as (print_stdout, print_stderr):
     for src_root in sorted(all_roots, key=lambda x: x.path):
