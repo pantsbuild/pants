@@ -627,7 +627,7 @@ impl PosixFS {
       .read_dir()?
       .map(|readdir| {
         let dir_entry = readdir?;
-        let (file_type, compute_metadata): (_, Box<FnOnce() -> Result<_, _>>) =
+        let (file_type, compute_metadata): (_, Box<dyn FnOnce() -> Result<_, _>>) =
           match self.symlink_behavior {
             SymlinkBehavior::Aware => {
               // Use the dir_entry metadata, which is symlink aware.

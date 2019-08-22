@@ -92,7 +92,7 @@ struct Inner<T: Clone> {
   // connection will be used.
   next_connection: usize,
 
-  connect: Box<Fn(&str) -> T + 'static + Send>,
+  connect: Box<dyn Fn(&str) -> T + 'static + Send>,
 
   connection_limit: usize,
 
@@ -532,7 +532,7 @@ mod tests {
     let start = std::time::Instant::now();
 
     // This should take at least 20ms because both servers are marked as unhealthy.
-    runtime.block_on(s.next()).unwrap();
+    let _ = runtime.block_on(s.next()).unwrap();
 
     // Make sure we waited for at least 10ms; we should have waited 20ms, but it may have taken a
     // little time to mark a server as unhealthy, so we have some padding between what we expect

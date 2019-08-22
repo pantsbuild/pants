@@ -155,7 +155,7 @@ mod tests {
     is_err: bool,
     call_counter: Arc<Mutex<u32>>,
   ) -> DelayedCommandRunner {
-    let mut result;
+    let result;
     if is_err {
       result = Err(msg.into());
     } else {

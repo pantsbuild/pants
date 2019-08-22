@@ -407,10 +407,10 @@ impl Snapshot {
               let files: Vec<_> = dir.get_files().iter().map(|file| file.get_name().to_owned()).collect();
 
               match (saw_matching_dir, extra_directories.is_empty() && files.is_empty()) {
-                (false, true) => return futures::future::ok(futures::future::Loop::Break(bazel_protos::remote_execution::Directory::new())).to_boxed(),
+                (false, true) => futures::future::ok(futures::future::Loop::Break(bazel_protos::remote_execution::Directory::new())).to_boxed(),
                 (false, false) => {
                   // Prefer "No subdirectory found" error to "had extra files" error.
-                  return futures::future::err(format!(
+                  futures::future::err(format!(
                     "Cannot strip prefix {} from root directory {:?} - {}directory{} didn't contain a directory named {}{}",
                     already_stripped.join(&prefix).display(),
                     root_digest,
@@ -421,14 +421,14 @@ impl Snapshot {
                   )).to_boxed()
                 },
                 (true, false) => {
-                  return futures::future::err(format!(
+                  futures::future::err(format!(
                     "Cannot strip prefix {} from root directory {:?} - {}directory{} contained non-matching {}",
                     already_stripped.join(&prefix).display(),
                     root_digest,
                     if has_already_stripped_any { "sub" } else { "root " },
                     if has_already_stripped_any { format!(" {}", already_stripped.display()) } else { String::new() },
                     Self::directories_and_files(&extra_directories, &files),
-                  )).to_boxed();
+                  )).to_boxed()
                 },
                 (true, true) => {
                   // Must be 0th index, because we've checked that we saw a matching directory, and no others.
