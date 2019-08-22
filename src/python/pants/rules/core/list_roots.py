@@ -28,16 +28,11 @@ def all_roots(source_root_config):
     else:
       all_paths |= {f"**/{path}/"}
 
-  path_globs = [PathGlobs(include=(glob_text,)) for glob_text in all_paths]
-  snapshots = yield [Get(Snapshot, PathGlobs, glob) for glob in path_globs]
-
-  dirs_from_snapshot: Set[str] = set()
-  for snapshot in snapshots:
-    dirs_from_snapshot |= set(snapshot.dirs)
+  snapshot = yield Get(Snapshot, PathGlobs(include=tuple(all_paths)))
 
   all_source_roots: Set[SourceRoot] = set()
-  for dir in sorted(list(dirs_from_snapshot)):
-    match: SourceRoot = source_roots.trie_find(dir)
+  for directory in sorted(snapshot.dirs):
+    match: SourceRoot = source_roots.trie_find(directory)
     if match:
       all_source_roots.add(match)
   yield all_source_roots

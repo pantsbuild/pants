@@ -41,22 +41,17 @@ class AllRootsTest(TestBase):
 
     # This function mocks out reading real directories off the file system
     def provider_rule(path_globs: PathGlobs) -> Snapshot:
-      path = path_globs.include[0]
-      mapping = {
-          '**/src/test/*/': (),
-          '**/3rdparty/*/': ("contrib/go/examples/3rdparty/go", ),
-          '**/src/*/': ('contrib/go/examples/src/go/src', 'src/java', 'src/python', 'src/kotlin', 'my/project/src/java'),
-          '**/3rd_party/*/': (),
-          '**/test/*/': (),
-          'java/': (),
-          '**/third_party/*/': (),
-          '**/src/example/*/': ('src/example/java', 'src/example/python'),
-          'contrib/go/examples/src/go/src/': (),
-          '**/tests/*/': (),
-          '**/thirdparty/*/': (),
-          'fixed/root/jvm/': ('fixed/root/jvm',),
-      }
-      dirs = mapping[path]
+      dirs = (
+        'contrib/go/examples/3rdparty/go',
+        'contrib/go/examples/src/go/src',
+        'src/java',
+        'src/python',
+        'src/kotlin',
+        'my/project/src/java',
+        'src/example/java',
+        'src/example/python',
+        'fixed/root/jvm'
+      )
       return Snapshot(Digest('abcdef', 10), (), dirs)
 
     output = run_rule(list_roots.all_roots, source_root_config, {
