@@ -421,7 +421,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
           yield self._key_for_target_as_dep(tgt, tgt_rsc_cc.workflow)
 
     def make_rsc_job(target, dep_targets):
-      return Job(
+      j = Job(
         key=self._rsc_key_for_target(target),
         fn=functools.partial(
           # NB: This will output to the 'rsc_mixed_compile_classpath' product via
@@ -435,6 +435,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         dependencies=list(all_zinc_rsc_invalid_dep_keys(dep_targets)),
         size=self._size_estimator(rsc_compile_context.sources),
       )
+      print("rsc job size")
+      print(j.size)
+      return j
 
     def only_zinc_invalid_dep_keys(invalid_deps):
       for tgt in invalid_deps:
@@ -443,7 +446,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
           yield self._zinc_key_for_target(tgt, rsc_cc_tgt.workflow)
 
     def make_zinc_job(target, input_product_key, output_products, dep_keys):
-      return Job(
+      j = Job(
         key=self._zinc_key_for_target(target, rsc_compile_context.workflow),
         fn=functools.partial(
           self._default_work_for_vts,
@@ -456,6 +459,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         dependencies=list(dep_keys),
         size=self._size_estimator(zinc_compile_context.sources),
       )
+      print("zinc job size")
+      print(j.size)
+      return j
 
     workflow = rsc_compile_context.workflow
 
@@ -529,6 +535,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
             ivts,
             rsc_compile_context,
           ),
+          size=99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999,
           dependencies=[job.key for job in all_jobs],
           # If compilation and analysis work succeeds, validate the vts.
           # Otherwise, fail it.
