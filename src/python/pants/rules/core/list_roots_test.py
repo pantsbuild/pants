@@ -50,7 +50,9 @@ class AllRootsTest(TestBase):
         'my/project/src/java',
         'src/example/java',
         'src/example/python',
-        'fixed/root/jvm'
+        'fixed/root/jvm',
+        # subdirectories of source roots should not show up in final output
+        'src/kotlin/additional/directories/that/might/get/matched/src/foo',
       )
       return Snapshot(Digest('abcdef', 10), (), dirs)
 

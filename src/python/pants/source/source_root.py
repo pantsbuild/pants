@@ -23,7 +23,7 @@ class SourceRoot(datatype([('path', str), 'langs', ('category', str)])):
   pass
 
 
-class AllExistingSourceRoots(Collection.of(SourceRoot)):
+class AllSourceRoots(Collection.of(SourceRoot)):
   pass
 
 
@@ -83,7 +83,7 @@ class SourceRoots:
     """
     return self.find_by_path(target.address.spec_path)
 
-  def find_by_path(self, path):
+  def find_by_path(self, path: str) -> SourceRoot:
     """Find the source root for the given path, or None.
 
     :param path: Find the source root for this path, relative to the buildroot.
@@ -98,13 +98,10 @@ class SourceRoots:
     elif self._options.unmatched == 'create':
       # If no source root is found, use the path directly.
       # TODO: Remove this logic. It should be an error to have no matching source root.
-      return SourceRoot(path, [], SourceRootCategories.UNKNOWN)
+      return SourceRoot(path, (), SourceRootCategories.UNKNOWN)
 
   def traverse(self) -> Set[str]:
     return self._trie.traverse()
-
-  def trie_find(self, dir_path: str) -> SourceRoot:
-    return self._trie.find(dir_path)
 
   def all_roots(self):
     """Return all known source roots.
