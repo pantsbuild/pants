@@ -18,7 +18,7 @@ class Job:
   keys of its dependent jobs.
   """
 
-  def __init__(self, key, fn, dependencies, size=0, on_success=None, on_failure=None):
+  def __init__(self, key, fn, dependencies, size=0, on_success=None, on_failure=None, run_immediately=False):
     """
 
     :param key: Key used to reference and look up jobs
@@ -28,13 +28,15 @@ class Job:
     :param on_success: Zero parameter callback to run if job completes successfully. Run on main
                        thread.
     :param on_failure: Zero parameter callback to run if job completes successfully. Run on main
-                       thread."""
+                       thread.
+    :param run_immediately: Boolean indicating whether or not to queue job next once unblocked."""
     self.key = key
     self.fn = fn
     self.dependencies = dependencies
     self.size = size
     self.on_success = on_success
     self.on_failure = on_failure
+    self.run_immediately = run_immediately
 
   def __call__(self):
     self.fn()
@@ -226,6 +228,13 @@ class ExecutionGraph:
         satisfied_dependees_count[dependency_key] += 1
         if satisfied_dependees_count[dependency_key] == len(self._dependees[dependency_key]):
           bfs_queue.append(dependency_key)
+    
+    max_priority = max(job_priority.values())
+    immediate_priority = max_priority + 1
+
+    for job in job_priority.viewkeys():
+      if job.run_immediately:
+        job_priority[job] = immediate_priority
 
     return job_priority
 
