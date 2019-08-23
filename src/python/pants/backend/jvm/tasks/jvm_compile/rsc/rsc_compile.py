@@ -535,8 +535,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
             ivts,
             rsc_compile_context,
           ),
-          size=99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999,
           dependencies=[job.key for job in all_jobs],
+          run_immediately=True,
           # If compilation and analysis work succeeds, validate the vts.
           # Otherwise, fail it.
           on_success=ivts.update,
