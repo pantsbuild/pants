@@ -38,10 +38,8 @@ def all_roots(source_root_config):
   yield AllExistingSourceRoots(all_source_roots)
 
 
-@console_rule(Roots, [Console, Roots.Options, SourceRootConfig])
-def list_roots(console, options, source_root_config):
-  all_roots = yield Get(AllExistingSourceRoots, SourceRootConfig, source_root_config)
-
+@console_rule(Roots, [Console, Roots.Options, AllExistingSourceRoots])
+def list_roots(console, options, all_roots):
   with Roots.line_oriented(options, console) as (print_stdout, print_stderr):
     for src_root in sorted(all_roots, key=lambda x: x.path):
       all_langs = ','.join(sorted(src_root.langs))
