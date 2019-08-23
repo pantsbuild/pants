@@ -13,7 +13,7 @@ python_tests(
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
   ],
   tags = {'integration'},
-  timeout=300,
+  timeout=540,
 )
 
 python_tests(
