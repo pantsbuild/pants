@@ -18,7 +18,7 @@ class Job:
   keys of its dependent jobs.
   """
 
-  def __init__(self, key, fn, dependencies, size=0, on_success=None, on_failure=None, run_immediately=False):
+  def __init__(self, key, fn, dependencies, size=0, on_success=None, on_failure=None, run_asap=False):
     """
 
     :param key: Key used to reference and look up jobs
@@ -29,14 +29,14 @@ class Job:
                        thread.
     :param on_failure: Zero parameter callback to run if job completes successfully. Run on main
                        thread.
-    :param run_immediately: Boolean indicating whether or not to queue job next once unblocked."""
+    :param run_asap: Boolean indicating whether or not to queue job immediately once unblocked."""
     self.key = key
     self.fn = fn
     self.dependencies = dependencies
     self.size = size
     self.on_success = on_success
     self.on_failure = on_failure
-    self.run_immediately = run_immediately
+    self.run_asap = run_asap
 
   def __call__(self):
     self.fn()
@@ -232,9 +232,9 @@ class ExecutionGraph:
     max_priority = max(job_priority.values())
     immediate_priority = max_priority + 1
 
-    for job in job_priority.viewkeys():
-      if job.run_immediately:
-        job_priority[job] = immediate_priority
+    for job in job_list:
+      if job.run_asap:
+        job_priority[job.key] = immediate_priority
 
     return job_priority
 
