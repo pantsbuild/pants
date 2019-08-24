@@ -546,6 +546,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
             rsc_compile_context,
           ),
           dependencies=[job.key for job in all_jobs],
+          run_asap=True,
           # If compilation and analysis work succeeds, validate the vts.
           # Otherwise, fail it.
           on_success=ivts.update,
