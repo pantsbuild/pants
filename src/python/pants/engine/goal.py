@@ -19,7 +19,7 @@ class Goal(datatype([('exit_code', int)]), metaclass=ABCMeta):
   This abstract class should be subclassed and given a `Goal.name` that it will be referred to by
   when invoked from the command line. The `Goal.name` also acts as the options_scope for the `Goal`.
 
-  Since `@console_rules` always run in order to produce sideeffects (generally: console output), they
+  Since `@console_rules` always run in order to produce side effects (generally: console output), they
   are not cacheable, and the `Goal` product of a `@console_rule` contains only a exit_code value to
   indicate whether the rule exited cleanly.
 
