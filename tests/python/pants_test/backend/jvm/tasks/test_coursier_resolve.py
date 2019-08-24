@@ -6,7 +6,7 @@ import re
 from contextlib import contextmanager
 from unittest.mock import MagicMock
 
-from psutil.tests import safe_rmpath
+import psutil
 
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
                                                                     PinnedJarArtifactSet)
@@ -241,7 +241,7 @@ class CoursierResolveTest(NailgunTaskTestBase):
         conf, path = jar_cp[0]
 
         # Remove the hard link under .pants.d/
-        safe_rmpath(path)
+        psutil.tests.safe_rmpath(path)
 
         # Remove coursier's cache
         safe_rmtree(couriser_cache_dir)
