@@ -4,7 +4,133 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
-1.20.0.dev1 (09/08/2019)
+1.20.0.dev2 (08/23/2019)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Upgrade to Pex 1.6.10. (#8187)
+  `Issue #756 <https://github.com/pantsbuild/pex/issues/756>`_
+  `PR #8187 <https://github.com/pantsbuild/pants/pull/8187>`_
+
+* Upgrade to PyYAML 5.1.2 (#8161)
+  `PR #8161 <https://github.com/pantsbuild/pants/pull/8161>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Allow the workdir to be automatically managed as a symlink (#8195)
+  `PR #8195 <https://github.com/pantsbuild/pants/pull/8195>`_
+
+* Serverset: Lazily connect to a limited number of servers (#8165)
+  `PR #8165 <https://github.com/pantsbuild/pants/pull/8165>`_
+
+* Send Zipkin spans in json format in a separate process (#8150)
+  `PR #8150 <https://github.com/pantsbuild/pants/pull/8150>`_
+
+* Add option zipkin-max-span-batch-size (#8075)
+  `PR #8075 <https://github.com/pantsbuild/pants/pull/8075>`_
+
+* Allow for fetching yarn directly via official releases (#8170)
+  `PR #8170 <https://github.com/pantsbuild/pants/pull/8170>`_
+
+* Recognize multiple sentinel files for determining the build root (#8105)
+  `PR #8105 <https://github.com/pantsbuild/pants/pull/8105>`_
+
+Bugfixes
+~~~~~~~~
+
+* Allow jobs to run immediately when they are unblocked (#8203)
+  `PR #8203 <https://github.com/pantsbuild/pants/pull/8203>`_
+
+* Introduce explicit cache writing job in RscCompile task (#8190)
+  `PR #8190 <https://github.com/pantsbuild/pants/pull/8190>`_
+
+* Don't check HTTP response size if gzip'd (#8116)
+  `PR #8116 <https://github.com/pantsbuild/pants/pull/8116>`_
+
+* Fix JVM fingerprinting by adding tags (#8175)
+  `PR #8175 <https://github.com/pantsbuild/pants/pull/8175>`_
+
+* Only add SCM info if scm is available. (#8147)
+  `PR #8147 <https://github.com/pantsbuild/pants/pull/8147>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Bump cache integration test timeout. (#8202)
+  `PR #8202 <https://github.com/pantsbuild/pants/pull/8202>`_
+
+* Switch to rust 1.37.0 (#8192)
+  `PR #8192 <https://github.com/pantsbuild/pants/pull/8192>`_
+
+* Fix wheel deploys under CI. (#8188)
+  `PR #8188 <https://github.com/pantsbuild/pants/pull/8188>`_
+
+* Execute local processes in tempdir (#8069)
+  `PR #8069 <https://github.com/pantsbuild/pants/pull/8069>`_
+
+* Refactor `pants_run_integration_test.py` and `pex_build_util.py` (#8180)
+  `PR #8180 <https://github.com/pantsbuild/pants/pull/8180>`_
+
+* Use PyYAML to generate `.travis.yml` (#8163)
+  `Issue #8112 <https://github.com/pantsbuild/pants/issues/8112>`_
+  `PR #8163 <https://github.com/pantsbuild/pants/pull/8163>`_
+
+* Run contrib unit tests with `--chroot` (#8084)
+  `Issue #7281, <https://github.com/pantsbuild/pants/issues/7281,>`_
+  `PR #8084 <https://github.com/pantsbuild/pants/pull/8084>`_
+
+* Use f-strings in util code (#8178)
+  `PR #8178 <https://github.com/pantsbuild/pants/pull/8178>`_
+
+* Remove 1.20.0dev2 deprecations (#8172)
+  `PR #8172 <https://github.com/pantsbuild/pants/pull/8172>`_
+
+* Bump test timeout for JVM distribution test. (#8174)
+  `PR #8174 <https://github.com/pantsbuild/pants/pull/8174>`_
+
+* Update node.js dependencies. (#8160)
+  `PR #8160 <https://github.com/pantsbuild/pants/pull/8160>`_
+
+* Remove tests from V2 unit test blacklist that were already passing (#8060)
+  `PR #8060 <https://github.com/pantsbuild/pants/pull/8060>`_
+
+* Fix remote execution failure to compile C code (#8117)
+  `PR #8117 <https://github.com/pantsbuild/pants/pull/8117>`_
+
+* serverset: Guard inner with a Mutex (#8164)
+  `PR #8164 <https://github.com/pantsbuild/pants/pull/8164>`_
+
+* Loosen test condition (#8156)
+  `PR #8156 <https://github.com/pantsbuild/pants/pull/8156>`_
+
+* Reduce scope of Runtime.block_on (#8155)
+  `PR #8155 <https://github.com/pantsbuild/pants/pull/8155>`_
+
+* Deflake test (#8154)
+  `PR #8154 <https://github.com/pantsbuild/pants/pull/8154>`_
+
+* Deflake test (#8153)
+  `PR #8153 <https://github.com/pantsbuild/pants/pull/8153>`_
+
+* Use f-strings in several more places (#8157)
+  `PR #8157 <https://github.com/pantsbuild/pants/pull/8157>`_
+
+* Restore remote execution of unit tests by fixing Firewall (#8162)
+  `PR #8162 <https://github.com/pantsbuild/pants/pull/8162>`_
+
+* Use a released version of cargo-audit. (#8148)
+  `PR #8148 <https://github.com/pantsbuild/pants/pull/8148>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Minor grammatical update (#8197)
+  `PR #8197 <https://github.com/pantsbuild/pants/pull/8197>`_
+
+1.20.0.dev1 (08/09/2019)
 ------------------------
 
 API Changes
@@ -44,7 +170,7 @@ Refactoring, Improvements, and Tooling
   `PR #8131 <https://github.com/pantsbuild/pants/pull/8131>`_
 
 
-1.20.0.dev0 (02/08/2019)
+1.20.0.dev0 (08/02/2019)
 ------------------------
 
 Bugfixes
@@ -100,7 +226,7 @@ Testing
   `PR #8126 <https://github.com/pantsbuild/pants/pull/8126>`_
 
 
-1.19.0rc0 (29/07/2019)
+1.19.0rc0 (07/29/2019)
 ----------------------
 
 API Changes
