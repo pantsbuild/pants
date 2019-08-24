@@ -124,6 +124,10 @@ Refactoring, Improvements, and Tooling
 * Use a released version of cargo-audit. (#8148)
   `PR #8148 <https://github.com/pantsbuild/pants/pull/8148>`_
 
+* Porting roots goal to v2 (#8199)
+  `PR #8199 <https://github.com/pantsbuild/pants/pull/8199>`_
+  `PR #8176 <https://github.com/pantsbuild/pants/pull/8176>`_
+
 Documentation
 ~~~~~~~~~~~~~
 
