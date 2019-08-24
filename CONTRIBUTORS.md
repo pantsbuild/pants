@@ -136,6 +136,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Matthew Jeffryes
 + Maxim Khutornenko
 + Michael Doherty
++ Michal Bryc
 + Mike Cripps
 + Mike Lindsey
 + Mike Solomon
