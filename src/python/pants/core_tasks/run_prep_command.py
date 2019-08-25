@@ -9,6 +9,7 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.prep_command import PrepCommand
 from pants.task.task import Task
+from pants.util.strutil import ensure_text
 
 
 class RunPrepCommandBase(Task):
@@ -86,7 +87,7 @@ class RunPrepCommandBase(Task):
                 os.environ[var] = value
           else:
             if workunit:
-              workunit.output('stdout').write(stdout)
+              workunit.output('stdout').write(ensure_text(stdout))
 
           workunit.set_outcome(WorkUnit.FAILURE if process.returncode else WorkUnit.SUCCESS)
           if process.returncode:

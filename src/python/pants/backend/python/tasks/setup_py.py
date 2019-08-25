@@ -482,7 +482,7 @@ class SetupPy(Task):
       # and then writing it out after the process has finished like we do here.
       def write(stream_name, data):
         stream = workunit.output(stream_name)
-        stream.write(ensure_binary(data))
+        stream.write(ensure_text(data))
         stream.flush()
 
       write('stdout', stdout)
