@@ -6,8 +6,6 @@ import re
 from contextlib import contextmanager
 from unittest.mock import MagicMock
 
-import psutil
-
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
                                                                     PinnedJarArtifactSet)
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -23,7 +21,7 @@ from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
 from pants.task.task import Task
 from pants.util.contextutil import temporary_dir, temporary_file_path
-from pants.util.dirutil import safe_rmtree
+from pants.util.dirutil import safe_delete, safe_rmtree
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.task_test_base import TaskTestBase
@@ -236,12 +234,12 @@ class CoursierResolveTest(NailgunTaskTestBase):
         #    └─ org.hamcrest:hamcrest-core:1.3
         self.assertEqual(2, len(jar_cp))
 
-
-        # Take a sample jar path, remove it, then call the task again, it should invoke coursier again
+        # Take a sample jar path, remove it, then call the task again, it should invoke
+        # coursier again
         conf, path = jar_cp[0]
 
         # Remove the hard link under .pants.d/
-        psutil.tests.safe_rmpath(path)
+        safe_delete(path)
 
         # Remove coursier's cache
         safe_rmtree(couriser_cache_dir)
