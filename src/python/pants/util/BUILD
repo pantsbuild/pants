@@ -111,6 +111,9 @@ python_library(
 python_library(
   name = 'rwbuf',
   sources = ['rwbuf.py'],
+    dependencies = [
+    ':strutil'
+  ]
 )
 
 python_library(

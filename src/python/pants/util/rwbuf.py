@@ -3,7 +3,7 @@
 
 import threading
 from io import BytesIO
-
+from pants.util.strutil import ensure_binary, ensure_text
 
 class _RWBuf(object):
   """An unbounded read-write buffer.
@@ -29,10 +29,10 @@ class _RWBuf(object):
       return self._io.read() if size == -1 else self._io.read(size)
 
   def write(self, s):
-    if not isinstance(s, bytes):
-      raise ValueError('Expected bytes, not {}, for argument {}'.format(type(s), s))
+    #if not isinstance(s, bytes):
+    #  raise ValueError('Expected bytes, not {}, for argument {}'.format(type(s), s))
     with self._lock:
-      self.do_write(s)
+      self.do_write(ensure_binary(s))
       self._io.flush()
 
   def flush(self):
@@ -95,9 +95,9 @@ class StringWriter:
     self.buffer = underlying
 
   def write(self, s):
-    if not isinstance(s, str):
-      raise ValueError('Expected unicode str, not {}, for argument {}'.format(type(s), s))
-    self.buffer.write(s.encode())
+    #if not isinstance(s, str):
+    #  raise ValueError('Expected unicode str, not {}, for argument {}'.format(type(s), s))
+    self.buffer.write(ensure_binary(s)
 
   def flush(self):
     self.buffer.flush()

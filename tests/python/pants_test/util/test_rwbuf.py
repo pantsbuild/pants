@@ -26,10 +26,12 @@ class StringWriterTest(unittest.TestCase):
       fb = FileBackedRWBuf(p)
       sw = StringWriter(fb)
       try:
-        with self.assertRaises(ValueError):
-          sw.write(b"Curious Zelda")
+        sw.write(b"Curious Zelda")
       finally:
         fb.close()
+      with open(p, 'rb') as f:
+        contents = f.read()
+        self.assertEquals(contents, b'Curious Zelda')
 
   def test_can_write_binary_to_buffer(self):
     with temporary_file_path() as p:
