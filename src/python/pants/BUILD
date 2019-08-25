@@ -35,7 +35,8 @@ python_library(
   )
 )
 
-page(name='readme',
+page(
+  name='readme',
   source='README.md',
 )
 
@@ -53,7 +54,8 @@ resources(
   sources=['VERSION'],
 )
 
-page(name='changelog',
+page(
+  name='changelog',
   source='CHANGELOG.md',
   links=[
     'src/python/pants/notes:notes-1.0.x',
