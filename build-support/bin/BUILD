@@ -6,6 +6,14 @@ files(
   sources = globs('*.sh'),
 )
 
+# We include this entry, even though the scripts are already covered by individual `python_binary`
+# targets, to ensure that tests are able to treat these files as loose source files, i.e. to avoid
+# stripping the source root from the files.
+files(
+  name = 'python_scripts',
+  sources = globs('*.py'),
+)
+
 python_binary(
   name = 'check_banned_imports',
   source = 'check_banned_imports.py',

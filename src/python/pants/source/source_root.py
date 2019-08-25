@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from typing import Sequence, Set
+from typing import Optional, Sequence, Set
 
 from pants.base.project_tree_factory import get_project_tree
 from pants.engine.objects import Collection
@@ -75,15 +75,14 @@ class SourceRoots:
     """
     self._trie.add_fixed(path, langs, category)
 
-  def find(self, target):
+  def find(self, target) -> Optional[SourceRoot]:
     """Find the source root for the given target, or None.
 
     :param target: Find the source root for this target.
-    :return: A SourceRoot instance.
     """
     return self.find_by_path(target.address.spec_path)
 
-  def find_by_path(self, path: str) -> SourceRoot:
+  def find_by_path(self, path: str) -> Optional[SourceRoot]:
     """Find the source root for the given path, or None.
 
     :param path: Find the source root for this path, relative to the buildroot.

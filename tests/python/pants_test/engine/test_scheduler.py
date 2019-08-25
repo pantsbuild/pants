@@ -338,8 +338,8 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
 
     trace = remove_locations_from_traceback('\n'.join(self.scheduler.trace(request)))
     assert_equal_with_printing(self, dedent('''
-                     Computing Select(<tests.python.pants_test.engine.test_scheduler.B object at 0xEEEEEEEEE>, A)
-                       Computing Task(nested_raise(), <tests.python.pants_test.engine.test_scheduler.B object at 0xEEEEEEEEE>, A, true)
+                     Computing Select(<pants_test.engine.test_scheduler.B object at 0xEEEEEEEEE>, A)
+                       Computing Task(nested_raise(), <pants_test.engine.test_scheduler.B object at 0xEEEEEEEEE>, A, true)
                          Throw(An exception for B)
                            Traceback (most recent call last):
                              File LOCATION-INFO, in call
