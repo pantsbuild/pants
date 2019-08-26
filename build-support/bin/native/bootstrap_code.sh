@@ -47,14 +47,14 @@ function calculate_current_hash() {
     echo "${RUST_TOOLCHAIN}"
     uname
     python --version 2>&1
-    git ls-files -c -o --exclude-standard \
+    git ls-files --cached --others --exclude-standard \
      "${NATIVE_ROOT}" \
      "${REPO_ROOT}/rust-toolchain" \
      "${REPO_ROOT}/src/python/pants/engine/native.py" \
      "${REPO_ROOT}/build-support/bin/native" \
      "${REPO_ROOT}/3rdparty/python/requirements.txt" \
    | grep -v -E -e "/BUILD$" -e "/[^/]*\.md$" \
-   | git hash-object -t blob --stdin-paths) | fingerprint_data
+   | git hash-object --stdin-paths) | fingerprint_data
   )
 }
 

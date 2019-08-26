@@ -204,9 +204,7 @@ def bootstrap(*, clean: bool, python_version: PythonVersion) -> None:
         die("Failed to clean before bootstrapping Pants.")
 
     try:
-      subprocess.run(["./pants", "binary", "src/python/pants/bin:pants_local_binary"], check=True)
-      Path("dist/pants_local_binary.pex").rename("pants.pex")
-      subprocess.run(["./pants.pex", "--version"], check=True)
+      subprocess.run(["./build-support/bin/bootstrap_pants_pex.sh"], check=True)
     except subprocess.CalledProcessError:
       die("Failed to bootstrap Pants.")
 
