@@ -17,7 +17,7 @@ function bootstrap_pants_pex() {
   local target_binary="${PANTS_PEX_CACHE_DIR}/pants.${pants_pex_version}.pex"
 
   if [[ ! -f "${target_binary}" ]]; then
-    log "pants.pex does not yet exist or is outdated. Bootstrapping..."
+    log "pants.pex is outdated or does not yet exist. Bootstrapping..."
     ./pants --quiet binary src/python/pants/bin:pants_local_binary || exit 1
 
     mkdir -p "$(dirname "${target_binary}")"

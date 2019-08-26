@@ -23,9 +23,8 @@ files(
   source = 'pants.ini',
 )
 
-# NB: This is used for integration tests. This is a generated file not tracked by VCS, and it is
-# easy to fall out of sync. To generate, run `build-support/bin/ci.py --bootstrap`. Ideally
-# we will be able to design a mechanism to ensure that the PEX is up-to-date.
+# NB: This is used for integration tests. This is generated automatically via `./pants` and
+# `build-support/bin/bootstrap_pants_pex.sh`.
 files(
   name = 'pants_pex',
   source = 'pants.pex',
