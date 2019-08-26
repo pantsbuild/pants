@@ -172,7 +172,7 @@ def get_remote_execution_oauth_token_path() -> Iterator[str]:
 def get_listed_targets(filename: str) -> Set[str]:
   return {
     line.strip()
-    for line in Path(f"build-support/ci_lists/{filename}").read_text().splitlines()
+    for line in Path(f"build-support/ci_blacklists/{filename}").read_text().splitlines()
   }
 
 
