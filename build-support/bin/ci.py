@@ -166,10 +166,10 @@ def get_remote_execution_oauth_token_path() -> Iterator[str]:
     yield tf.name
 
 # -------------------------------------------------------------------------
-# Blacklists and whitelists
+# Blacklists
 # -------------------------------------------------------------------------
 
-def get_listed_targets(filename: str) -> Set[str]:
+def get_blacklisted_targets(filename: str) -> Set[str]:
   return {
     line.strip()
     for line in Path(f"build-support/ci_blacklists/{filename}").read_text().splitlines()
@@ -327,9 +327,9 @@ def run_unit_tests(*, remote_execution_enabled: bool) -> None:
   check_pants_pex_exists()
 
   all_targets = get_all_python_tests(tag="-integration")
-  blacklisted_chroot_targets = get_listed_targets("unit_test_chroot_blacklist.txt")
-  blacklisted_v2_targets = get_listed_targets("unit_test_v2_blacklist.txt")
-  blacklisted_remote_targets = get_listed_targets("unit_test_remote_blacklist.txt")
+  blacklisted_chroot_targets = get_blacklisted_targets("unit_test_chroot_blacklist.txt")
+  blacklisted_v2_targets = get_blacklisted_targets("unit_test_v2_blacklist.txt")
+  blacklisted_remote_targets = get_blacklisted_targets("unit_test_remote_blacklist.txt")
 
   v1_no_chroot_targets = blacklisted_chroot_targets
   v1_chroot_targets = blacklisted_v2_targets
@@ -410,21 +410,13 @@ def run_jvm_tests() -> None:
 
 def run_integration_tests(*, shard: Optional[str]) -> None:
   check_pants_pex_exists()
-
-  whitelisted_chroot_targets = get_listed_targets("integration_tests_chroot_whitelist.txt")
   all_targets = get_all_python_tests(tag="+integration")
-  non_chrooted_targets = all_targets - whitelisted_chroot_targets
-
   command = ["./pants.pex", "test.pytest"]
   if shard is not None:
     command.append(f"--test-pytest-test-shard={shard}")
   with travis_section("IntegrationTests", f"Running Pants Integration tests {shard if shard is not None else ''}"):
     try:
-      subprocess.run(
-        command + ["--test-pytest-chroot"] + sorted(whitelisted_chroot_targets) + PYTEST_PASSTHRU_ARGS,
-        check=True
-      )
-      subprocess.run(command + sorted(non_chrooted_targets) + PYTEST_PASSTHRU_ARGS, check=True)
+      subprocess.run(command + sorted(all_targets) + PYTEST_PASSTHRU_ARGS, check=True)
     except subprocess.CalledProcessError:
       die("Integration test failure.")
 
