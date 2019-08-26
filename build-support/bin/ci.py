@@ -43,8 +43,10 @@ def main() -> None:
     run_rust_tests()
   if args.jvm_tests:
     run_jvm_tests()
-  if args.integration_tests:
-    run_integration_tests(shard=args.integration_shard)
+  if args.integration_tests_v1:
+    run_integration_tests_v1(shard=args.integration_shard)
+  if args.integration_tests_v2:
+    run_integration_tests_v2(remote_execution_enabled=args.remote_execution_enabled)
   if args.plugin_tests:
     run_plugin_tests()
   if args.platform_specific_tests:
@@ -107,7 +109,12 @@ def create_parser() -> argparse.ArgumentParser:
   parser.add_argument("--rust-tests", action="store_true", help="Run Rust tests.")
   parser.add_argument("--jvm-tests", action="store_true", help="Run JVM tests.")
   parser.add_argument(
-    "--integration-tests", action="store_true", help="Run Python integration tests."
+    "--integration-tests-v1", action="store_true",
+    help="Run Python integration tests w/ V1 runner."
+  )
+  parser.add_argument(
+    "--integration-tests-v2", action="store_true",
+    help="Run Python integration tests w/ V2 runner (and possible remoting)."
   )
   parser.add_argument(
     "--integration-shard", metavar="SHARD_NUMBER/TOTAL_SHARDS", default=None,
@@ -157,6 +164,20 @@ def set_run_from_pex() -> None:
   os.environ["RUN_PANTS_FROM_PEX"] = "1"
 
 
+def remote_execution_command(*, oauth_token_path: str) -> List[str]:
+  return [
+    "./pants.pex",
+    "--no-v1",
+    "--v2",
+    "--pants-config-files=pants.remote.ini",
+    # We turn off speculation to reduce the risk of flakiness, where a test passes locally but
+    # fails remoting and we have a race condition for which environment executes first.
+    "--process-execution-speculation-strategy=none",
+    f"--remote-oauth-bearer-token-path={oauth_token_path}",
+    "test.pytest",
+  ]
+
+
 @contextmanager
 def get_remote_execution_oauth_token_path() -> Iterator[str]:
   command = (
@@ -190,6 +211,9 @@ class DefaultTestBehavior(Enum):
 class TestType(Enum):
   unit = "unit"
   integration = "integration"
+
+  def __str__(self):
+    return str(self.value)
 
 
 class TestTargetSets(NamedTuple):
@@ -392,25 +416,19 @@ def run_unit_tests(*, remote_execution_enabled: bool) -> None:
     remote_execution_enabled=remote_execution_enabled
   )
   basic_command = ["./pants.pex", "test.pytest"]
-  v2_command = ["./pants.pex", "--no-v1", "--v2", "test.pytest"]
   v1_no_chroot_command = basic_command + sorted(target_sets.v1_no_chroot) + PYTEST_PASSTHRU_ARGS
   v1_chroot_command = basic_command + ["--test-pytest-chroot"] + sorted(target_sets.v1_chroot) + PYTEST_PASSTHRU_ARGS
-  v2_local_command = v2_command + sorted(target_sets.v2_local)
+  v2_local_command = ["./pants.pex", "--no-v1", "--v2", "test.pytest"] + sorted(target_sets.v2_local)
 
   if remote_execution_enabled:
     with travis_section(
       "UnitTestsRemote", "Running unit tests via remote execution"
     ), get_remote_execution_oauth_token_path() as oauth_token_path:
-      v2_remote_command = v2_command[:-1] + [
-          "--pants-config-files=pants.remote.ini",
-          # We turn off speculation to reduce the risk of flakiness, where a test passes locally but
-          # fails remoting and we have a race condition for which environment executes first.
-          "--process-execution-speculation-strategy=none",
-          f"--remote-oauth-bearer-token-path={oauth_token_path}",
-          "test.pytest",
-        ] + sorted(target_sets.v2_remote)
       try:
-        subprocess.run(v2_remote_command, check=True)
+        subprocess.run(
+          remote_execution_command(oauth_token_path=oauth_token_path) + sorted(target_sets.v2_remote),
+          check=True
+        )
       except subprocess.CalledProcessError:
         die("Unit test failure (remote execution)")
       else:
@@ -460,7 +478,7 @@ def run_jvm_tests() -> None:
   )
 
 
-def run_integration_tests(*, shard: Optional[str]) -> None:
+def run_integration_tests_v1(*, shard: Optional[str]) -> None:
   check_pants_pex_exists()
   target_sets = TestTargetSets.calculate(
     test_type=TestType.integration,
@@ -479,6 +497,39 @@ def run_integration_tests(*, shard: Optional[str]) -> None:
       subprocess.run(command + sorted(target_sets.v1_no_chroot) + PYTEST_PASSTHRU_ARGS, check=True)
     except subprocess.CalledProcessError:
       die("Integration test failure.")
+
+
+def run_integration_tests_v2(*, remote_execution_enabled: bool) -> None:
+  check_pants_pex_exists()
+  target_sets = TestTargetSets.calculate(
+    test_type=TestType.integration,
+    default_behavior=DefaultTestBehavior.v1_no_chroot,
+    remote_execution_enabled=remote_execution_enabled
+  )
+  if remote_execution_enabled:
+    with travis_section(
+      "IntegrationTestsRemote", "Running integration tests via remote execution"
+    ), get_remote_execution_oauth_token_path() as oauth_token_path:
+      try:
+        subprocess.run(
+          remote_execution_command(oauth_token_path=oauth_token_path) + sorted(target_sets.v2_remote),
+          check=True
+        )
+      except subprocess.CalledProcessError:
+        die("Integration test failure (remote execution)")
+      else:
+        green("Integration tests passed (remote execution)")
+
+  with travis_section("IntegrationTestsLocal", "Running integration tests via local execution"):
+    try:
+      subprocess.run(
+        ["./pants.pex", "--no-v1", "--v2", "test.pytest"] + sorted(target_sets.v2_local),
+        check=True
+      )
+    except subprocess.CalledProcessError:
+      die("Integration test failure (local execution)")
+    else:
+      green("Integration tests passed (local execution)")
 
 
 def run_plugin_tests() -> None:
