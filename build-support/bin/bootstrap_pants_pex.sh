@@ -6,8 +6,14 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../.. && pwd -P)"
 # the CACHE_ROOT, with the current one symlinked into the build root. This allows us to quickly
 # change the specific pants.pex being used. This mechanism is similar to bootstrap_code.sh.
 
+export PY="${PY:-python3}"
+
 # shellcheck source=build-support/common.sh
 source "${REPO_ROOT}/build-support/common.sh"
+# shellcheck source=build-support/pants_venv
+source "${REPO_ROOT}/build-support/pants_venv"
+# shellcheck source=build-support/bin/native/bootstrap_code.sh
+source "${REPO_ROOT}/build-support/bin/native/bootstrap_code.sh"
 
 readonly PANTS_PEX_CACHE_DIR="${CACHE_ROOT}/bin/pants-pex"
 
@@ -32,8 +38,6 @@ function bootstrap_pants_pex() {
 function calculate_pants_pex_current_hash() {
   # NB: We fork a subshell because one or both of `ls-files`/`hash-object` are
   # sensitive to the CWD, and the `--work-tree` option doesn't seem to resolve that.
-  #
-  # Assumes we're in the venv that will be used to build the native engine.
   (
    cd "${REPO_ROOT}" || exit 1
    (uname
@@ -51,4 +55,7 @@ function calculate_pants_pex_current_hash() {
   )
 }
 
-bootstrap_pants_pex
+# Redirect to ensure that we don't interfere with stdout.
+activate_pants_venv 1>&2
+bootstrap_native_code 1>&2
+bootstrap_pants_pex 1>&2
