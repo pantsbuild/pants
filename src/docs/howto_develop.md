@@ -167,7 +167,14 @@ To run tests for a specific target, run the below, substituting the target(s) wi
     :::bash
     $ ./pants test tests/python/pants_test/util:strutil
 
-You may filter out the often slow integration tests like this;
+Before running integration tests, you must first bootstrap `pants.pex` as below. Note that this
+command should be re-run anytime you change Pants to ensure integration tests are using the most
+up-to-date version.
+
+    :::bash
+    $ ./build-support/bin/ci.py --bootstrap
+
+You may filter out the often-slow integration tests like this;
 
     :::bash
     $ ./pants --tag=-integration test tests/python/pants_test/goal::
