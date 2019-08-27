@@ -1,4 +1,4 @@
-use crate::{ExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecuteProcessResult};
+use crate::{Platform, ExecuteProcessRequest, MultiPlatformExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecuteProcessResult};
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use futures::Future;
@@ -19,13 +19,26 @@ pub struct CommandRunner {
 }
 
 impl crate::CommandRunner for CommandRunner {
+  fn is_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> bool {
+    self.underlying.is_compatible_request(req)
+  }
+
+  fn get_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> ExecuteProcessRequest {
+    self.underlying.get_compatible_request(req)
+  }
+
+  fn get_platform(&self) -> Platform {
+    self.underlying.get_platform()
+  }
+
   // TODO: Maybe record WorkUnits for local cache checks.
   fn run(
     &self,
-    req: ExecuteProcessRequest,
+    req: MultiPlatformExecuteProcessRequest,
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
-    let digest = try_future!(self.digest(&req));
+    let compatible_req = self.get_compatible_request(&req);
+    let digest = try_future!(self.digest(compatible_req));
     let key = digest.0;
 
     let command_runner = self.clone();
@@ -57,12 +70,13 @@ impl crate::CommandRunner for CommandRunner {
       })
       .to_boxed()
   }
+
 }
 
 impl CommandRunner {
-  fn digest(&self, req: &ExecuteProcessRequest) -> Result<Digest, String> {
+  fn digest(&self, req: ExecuteProcessRequest) -> Result<Digest, String> {
     let (_action, _command, execute_request) =
-      crate::remote::make_execute_request(req, self.metadata.clone())?;
+      crate::remote::make_execute_request(&req, self.metadata.clone())?;
     execute_request.get_action_digest().into()
   }
 
@@ -140,7 +154,7 @@ impl CommandRunner {
 #[cfg(test)]
 mod test {
   use crate::ExecuteProcessRequest;
-  use crate::{CommandRunner as CommandRunnerTrait, ExecuteProcessRequestMetadata};
+  use crate::{CommandRunner as CommandRunnerTrait, Platform, ExecuteProcessRequestMetadata};
   use hashing::EMPTY_DIGEST;
   use sharded_lmdb::ShardedLmdb;
   use std::collections::{BTreeMap, BTreeSet};
@@ -164,6 +178,7 @@ mod test {
       runtime.clone(),
       work_dir.path().to_owned(),
       true,
+      Platform::current_platform().unwrap()
     );
 
     let script_dir = TempDir::new().unwrap();
@@ -192,7 +207,7 @@ mod test {
       jdk_home: None,
     };
 
-    let local_result = runtime.block_on(local.run(request.clone(), WorkUnitStore::new()));
+    let local_result = runtime.block_on(local.run(request.clone().into(), WorkUnitStore::new()));
 
     let cache_dir = TempDir::new().unwrap();
     let caching = crate::cache::CommandRunner {
@@ -211,12 +226,12 @@ mod test {
       },
     };
 
-    let uncached_result = runtime.block_on(caching.run(request.clone(), WorkUnitStore::new()));
+    let uncached_result = runtime.block_on(caching.run(request.clone().into(), WorkUnitStore::new()));
 
     assert_eq!(local_result, uncached_result);
 
     std::fs::remove_file(&script_path).unwrap();
-    let cached_result = runtime.block_on(caching.run(request, WorkUnitStore::new()));
+    let cached_result = runtime.block_on(caching.run(request.into(), WorkUnitStore::new()));
 
     assert_eq!(uncached_result, cached_result);
   }

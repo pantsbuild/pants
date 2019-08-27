@@ -1,4 +1,4 @@
-use super::{CommandRunner, ExecuteProcessRequest, FallibleExecuteProcessResult};
+use super::{CommandRunner, ExecuteProcessRequest, MultiPlatformExecuteProcessRequest, FallibleExecuteProcessResult};
 use boxfuture::{BoxFuture, Boxable};
 use futures::future::{err, ok, Future};
 use std::sync::Arc;
@@ -25,12 +25,10 @@ impl SpeculatingCommandRunner {
       speculation_timeout: speculation_timeout,
     }
   }
-}
 
-impl CommandRunner for SpeculatingCommandRunner {
-  fn run(
+  fn speculate(
     &self,
-    req: ExecuteProcessRequest,
+    req: MultiPlatformExecuteProcessRequest,
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let command_runner = self.clone();
@@ -53,6 +51,34 @@ impl CommandRunner for SpeculatingCommandRunner {
   }
 }
 
+impl CommandRunner for SpeculatingCommandRunner {
+  fn is_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> bool {
+    self.primary.is_compatible_request(req) || self.secondary.is_compatible_request(req)
+  }
+
+  fn get_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> ExecuteProcessRequest {
+    match (self.primary.is_compatible_request(req), self.secondary.is_compatible_request(req)) {
+      (true, _) => self.primary.get_compatible_request(req),
+      (_, true) => self.secondary.get_compatible_request(req),
+      _ => panic!("No compatible requests found"),
+    }
+  }
+
+  fn run(
+    &self,
+    req: MultiPlatformExecuteProcessRequest,
+    workunit_store: WorkUnitStore,
+  ) -> BoxFuture<FallibleExecuteProcessResult, String> {
+    match (self.primary.is_compatible_request(&req), self.secondary.is_compatible_request(&req)) {
+      (true, true) => self.speculate(req, workunit_store),
+      (true, false) => self.primary.run(req, workunit_store),
+      (false, true) => self.secondary.run(req, workunit_store),
+      (false, false) => panic!("No platforms found to run the request"),
+    }
+  }
+}
+
+
 #[cfg(test)]
 mod tests {
   use crate::remote::tests::echo_foo_request;
@@ -67,8 +93,9 @@ mod tests {
   use workunit_store::WorkUnitStore;
 
   use super::{
-    CommandRunner, ExecuteProcessRequest, FallibleExecuteProcessResult, SpeculatingCommandRunner,
+    CommandRunner, MultiPlatformExecuteProcessRequest, ExecuteProcessRequest, FallibleExecuteProcessResult, SpeculatingCommandRunner
   };
+  use crate::Platform;
 
   #[test]
   fn test_no_speculation() {
@@ -197,7 +224,7 @@ mod tests {
   impl CommandRunner for DelayedCommandRunner {
     fn run(
       &self,
-      _req: ExecuteProcessRequest,
+      _req: MultiPlatformExecuteProcessRequest,
       _workunit_store: WorkUnitStore,
     ) -> BoxFuture<FallibleExecuteProcessResult, String> {
       let delay = Delay::new(Instant::now() + self.delay);
@@ -212,6 +239,13 @@ mod tests {
           Err(_) => Err(String::from("Timer failed during testing")),
         })
         .to_boxed()
+    }
+
+    fn is_compatible_request(&self, _req: &MultiPlatformExecuteProcessRequest) -> bool {
+      true
+    }
+    fn get_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> ExecuteProcessRequest {
+      req.0.get(&(Platform::None, Platform::None)).unwrap().clone()
     }
   }
 }

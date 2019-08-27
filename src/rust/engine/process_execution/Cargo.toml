@@ -24,11 +24,12 @@ store = { path = "../fs/store" }
 task_executor = { path = "../task_executor" }
 tempfile = "3"
 concrete_time = { path = "../concrete_time" }
+tokio = "0.1"
 tokio-codec = "0.1"
 tokio-process = "0.2.1"
 tokio-timer = "0.2"
+uname = "0.1.1"
 workunit_store = { path = "../workunit_store" }
-tokio = "0.1"
 
 [dev-dependencies]
 maplit = "1.0.1"

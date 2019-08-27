@@ -5,7 +5,9 @@ import logging
 
 from pants.engine.fs import Digest
 from pants.engine.rules import RootRule, rule
-from pants.util.objects import Exactly, datatype, hashable_string_list, string_optional, string_type
+from pants.util.objects import (
+  Exactly, datatype, hashable_string_list, string_optional, string_type, enum, TypedCollection
+)
 
 
 logger = logging.getLogger(__name__)
@@ -57,6 +59,26 @@ class ExecuteProcessRequest(datatype([
       output_directories=output_directories,
       timeout_seconds=timeout_seconds,
       jdk_home=jdk_home,
+    )
+
+
+class MultiPlatformExecuteProcessRequest(datatype([
+  ('platform_constraints', hashable_string_list),
+  ('execute_process_requests', TypedCollection(Exactly(ExecuteProcessRequest))),
+])):
+  # args collects a set of tuples representing platform constraints mapped to a req, just like a dict constructor can.
+  ALLOWED_PLATFORM_CONSTRAINTS = enum(['darwin', 'linux', 'none'])
+
+  def __new__(cls, *args):
+    d = dict(args)
+    # validate the platform constraints using the platforms enum an flatten the keys.
+    validated_constraints = tuple(
+      cls.ALLOWED_PLATFORM_CONSTRAINTS(constraint).value for pair in d.keys() for constraint in pair
+    )
+    return super().__new__(
+      cls,
+      validated_constraints,
+      tuple(d.values())
     )
 
 

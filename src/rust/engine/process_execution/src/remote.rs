@@ -20,8 +20,8 @@ use store::{Snapshot, Store, StoreFileByDigest};
 use tokio_timer::Delay;
 
 use super::{
-  ExecuteProcessRequest, ExecuteProcessRequestMetadata, ExecutionStats,
-  FallibleExecuteProcessResult,
+  ExecuteProcessRequest, MultiPlatformExecuteProcessRequest, ExecuteProcessRequestMetadata, ExecutionStats,
+  FallibleExecuteProcessResult, Platform
 };
 use std;
 use std::cmp::min;
@@ -47,6 +47,7 @@ pub struct CommandRunner {
   execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
   operations_client: Arc<bazel_protos::operations_grpc::OperationsClient>,
   store: Store,
+  platform: Platform,
 }
 
 #[derive(Debug, PartialEq)]
@@ -73,6 +74,7 @@ impl CommandRunner {
   // our own polling rates.
   // In the future, we may want to remove this behavior if servers reliably support the full stream
   // behavior.
+
   fn oneshot_execute(
     &self,
     execute_request: &Arc<bazel_protos::remote_execution::ExecuteRequest>,
@@ -130,22 +132,42 @@ impl super::CommandRunner for CommandRunner {
   ///
   /// TODO: Request jdk_home be created if set.
   ///
+  fn is_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> bool {
+    req.0.contains_key(&(Platform::None, Platform::None)) || req.0.contains_key(&(self.platform.clone(), Platform::current_platform().unwrap()))
+  }
+
+  fn get_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> ExecuteProcessRequest {
+    match req.0.get(&(Platform::None, Platform::None)) {
+      Some(req) => req.clone(),
+      None => {
+        match req.0.get(&(self.platform.clone(), Platform::current_platform().unwrap())) {
+          Some(req) => req.clone(),
+          None => panic!("No compatible request found!")
+        }
+      }
+    }
+  }
+
+  fn get_platform(&self) -> Platform {
+    self.platform.clone()
+  }
+
   fn run(
     &self,
-    req: ExecuteProcessRequest,
+    req: MultiPlatformExecuteProcessRequest,
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
+    let compatible_underlying_request = self.get_compatible_request(&req);
     let operations_client = self.operations_client.clone();
-
     let store = self.store.clone();
-    let execute_request_result = make_execute_request(&req, self.metadata.clone());
+    let execute_request_result = make_execute_request(&compatible_underlying_request, self.metadata.clone());
 
     let ExecuteProcessRequest {
       description,
       timeout,
       input_files,
       ..
-    } = req;
+    } = compatible_underlying_request;
 
     let description2 = description.clone();
 
@@ -320,6 +342,7 @@ impl CommandRunner {
     root_ca_certs: Option<Vec<u8>>,
     oauth_bearer_token: Option<String>,
     store: Store,
+    platform: Platform,
   ) -> CommandRunner {
     let env = Arc::new(grpcio::EnvBuilder::new().build());
     let channel = {
@@ -348,6 +371,7 @@ impl CommandRunner {
       execution_client,
       operations_client,
       store,
+      platform
     }
   }
 
@@ -994,6 +1018,7 @@ fn digest(message: &dyn Message) -> Result<Digest, String> {
 
 #[cfg(test)]
 pub mod tests {
+  use std::convert::TryInto;
   use bazel_protos;
   use bazel_protos::operations::Operation;
   use bazel_protos::remote_execution::ExecutedActionMetadata;
@@ -1009,10 +1034,10 @@ pub mod tests {
   use testutil::data::{TestData, TestDirectory};
   use testutil::{as_bytes, owned_string_vec};
 
-  use super::super::CommandRunner as CommandRunnerTrait;
+  use crate::{Platform, CommandRunner as CommandRunnerTrait};
   use super::{
-    CommandRunner, ExecuteProcessRequest, ExecuteProcessRequestMetadata, ExecutionError,
-    ExecutionHistory, FallibleExecuteProcessResult,
+    CommandRunner, ExecuteProcessRequest, MultiPlatformExecuteProcessRequest, ExecuteProcessRequestMetadata, ExecutionError,
+    ExecutionHistory, FallibleExecuteProcessResult
   };
   use maplit::hashset;
   use mock::execution_server::MockOperation;
@@ -1454,7 +1479,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, empty_request_metadata())
+          super::make_execute_request(&execute_request.clone().try_into(), empty_request_metadata())
             .unwrap()
             .2,
           vec![
@@ -1556,7 +1581,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&echo_roland_request(), empty_request_metadata())
+          super::make_execute_request(&echo_roland_request().try_into().unwrap(), empty_request_metadata())
             .unwrap()
             .2,
           vec![make_successful_operation(
@@ -1596,6 +1621,7 @@ pub mod tests {
       None,
       None,
       store,
+      Platform::Linux,
     );
     let result = runtime
       .block_on(cmd_runner.run(echo_roland_request(), WorkUnitStore::new()))
@@ -1651,7 +1677,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, empty_request_metadata())
+          super::make_execute_request(&execute_request.clone().try_into().unwrap(), empty_request_metadata())
             .unwrap()
             .2,
           Vec::from_iter(
@@ -1717,7 +1743,7 @@ pub mod tests {
       )
     };
 
-    let error_msg = run_command_remote(mock_server.address(), execute_request)
+    let error_msg = run_command_remote(mock_server.address(), execute_request.into())
       .expect_err("Timeout did not cause failure.");
     assert_contains(&error_msg, "Exceeded time out");
     assert_contains(&error_msg, "echo-a-foo");
@@ -1733,7 +1759,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, empty_request_metadata())
+          super::make_execute_request(&execute_request.clone().try_into().unwrap(), empty_request_metadata())
             .unwrap()
             .2,
           vec![
@@ -1775,7 +1801,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, empty_request_metadata())
+          super::make_execute_request(&execute_request.clone().try_into().unwrap(), empty_request_metadata())
             .unwrap()
             .2,
           vec![
@@ -1816,7 +1842,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, empty_request_metadata())
+          super::make_execute_request(&execute_request.clone().try_into().unwrap(), empty_request_metadata())
             .unwrap()
             .2,
           vec![MockOperation::new({
@@ -1851,7 +1877,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, empty_request_metadata())
+          super::make_execute_request(&execute_request.clone().try_into().unwrap(), empty_request_metadata())
             .unwrap()
             .2,
           vec![
@@ -1889,7 +1915,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, empty_request_metadata())
+          super::make_execute_request(&execute_request.clone().try_into().unwrap(), empty_request_metadata())
             .unwrap()
             .2,
           vec![MockOperation::new({
@@ -1918,7 +1944,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, empty_request_metadata())
+          super::make_execute_request(&execute_request.clone().try_into().unwrap(), empty_request_metadata())
             .unwrap()
             .2,
           vec![
@@ -1952,7 +1978,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&cat_roland_request(), empty_request_metadata())
+          super::make_execute_request(&cat_roland_request().try_into().unwrap(), empty_request_metadata())
             .unwrap()
             .2,
           vec![
@@ -2003,6 +2029,7 @@ pub mod tests {
       None,
       None,
       store,
+      Platform::Linux,
     );
 
     let result = runtime
@@ -2048,7 +2075,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&cat_roland_request(), empty_request_metadata())
+          super::make_execute_request(&cat_roland_request().try_into().unwrap(), empty_request_metadata())
             .unwrap()
             .2,
           vec![
@@ -2099,6 +2126,7 @@ pub mod tests {
       None,
       None,
       store,
+      Platform::Linux,
     )
     .run(cat_roland_request(), WorkUnitStore::new())
     .wait();
@@ -2128,7 +2156,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&cat_roland_request(), empty_request_metadata())
+          super::make_execute_request(&cat_roland_request().try_into().unwrap(), empty_request_metadata())
             .unwrap()
             .2,
           // We won't get as far as trying to run the operation, so don't expect any requests whose
@@ -2167,6 +2195,7 @@ pub mod tests {
       None,
       None,
       store,
+      Platform::Linux,
     );
 
     let error = runtime
@@ -2387,7 +2416,7 @@ pub mod tests {
         mock::execution_server::TestServer::new(
           mock::execution_server::MockExecution::new(
             op_name.clone(),
-            super::make_execute_request(&execute_request, empty_request_metadata())
+            super::make_execute_request(&execute_request.clone().try_into().unwrap(), empty_request_metadata())
               .unwrap()
               .2,
             vec![
@@ -2428,7 +2457,7 @@ pub mod tests {
         mock::execution_server::TestServer::new(
           mock::execution_server::MockExecution::new(
             op_name.clone(),
-            super::make_execute_request(&execute_request, empty_request_metadata())
+            super::make_execute_request(&execute_request.clone().try_into().unwrap(), empty_request_metadata())
               .unwrap()
               .2,
             vec![
@@ -2728,8 +2757,8 @@ pub mod tests {
     assert!(got_workunits.is_superset(&want_workunits));
   }
 
-  pub fn echo_foo_request() -> ExecuteProcessRequest {
-    ExecuteProcessRequest {
+  pub fn echo_foo_request() -> MultiPlatformExecuteProcessRequest {
+    let req = ExecuteProcessRequest {
       argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
       env: BTreeMap::new(),
       input_files: EMPTY_DIGEST,
@@ -2738,7 +2767,8 @@ pub mod tests {
       timeout: Duration::from_millis(5000),
       description: "echo a foo".to_string(),
       jdk_home: None,
-    }
+    };
+    req.into()
   }
 
   fn make_canceled_operation(duration: Option<Duration>) -> MockOperation {
@@ -2893,7 +2923,7 @@ pub mod tests {
 
   fn run_command_remote(
     address: String,
-    request: ExecuteProcessRequest,
+    request: MultiPlatformExecuteProcessRequest,
   ) -> Result<FallibleExecuteProcessResult, String> {
     let cas = mock::StubCAS::builder()
       .file(&TestData::roland())
@@ -2922,7 +2952,7 @@ pub mod tests {
     )
     .expect("Failed to make store");
 
-    CommandRunner::new(&address, empty_request_metadata(), None, None, store)
+    CommandRunner::new(&address, empty_request_metadata(), None, None, store, Platform::Linux)
   }
 
   fn extract_execute_response(
@@ -2990,8 +3020,8 @@ pub mod tests {
     )
   }
 
-  fn cat_roland_request() -> ExecuteProcessRequest {
-    ExecuteProcessRequest {
+  fn cat_roland_request() -> MultiPlatformExecuteProcessRequest {
+    let req = ExecuteProcessRequest {
       argv: owned_string_vec(&["/bin/cat", "roland"]),
       env: BTreeMap::new(),
       input_files: TestDirectory::containing_roland().digest(),
@@ -3000,11 +3030,12 @@ pub mod tests {
       timeout: Duration::from_millis(1000),
       description: "cat a roland".to_string(),
       jdk_home: None,
-    }
+    };
+    req.into()
   }
 
-  fn echo_roland_request() -> ExecuteProcessRequest {
-    ExecuteProcessRequest {
+  fn echo_roland_request() -> MultiPlatformExecuteProcessRequest {
+    let req = ExecuteProcessRequest {
       argv: owned_string_vec(&["/bin/echo", "meoooow"]),
       env: BTreeMap::new(),
       input_files: EMPTY_DIGEST,
@@ -3013,7 +3044,8 @@ pub mod tests {
       timeout: Duration::from_millis(1000),
       description: "unleash a roaring meow".to_string(),
       jdk_home: None,
-    }
+    };
+    req.into()
   }
 
   fn empty_request_metadata() -> ExecuteProcessRequestMetadata {

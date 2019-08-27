@@ -33,7 +33,7 @@ use process_execution;
 
 use clap::{value_t, App, AppSettings, Arg};
 use hashing::{Digest, Fingerprint};
-use process_execution::ExecuteProcessRequestMetadata;
+use process_execution::{Platform, ExecuteProcessRequestMetadata};
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter::Iterator;
 use std::path::PathBuf;
@@ -322,6 +322,7 @@ fn main() {
         root_ca_certs,
         oauth_bearer_token,
         store.clone(),
+        Platform::Linux,
       )) as Box<dyn process_execution::CommandRunner>
     }
     None => Box::new(process_execution::local::CommandRunner::new(
@@ -329,13 +330,14 @@ fn main() {
       executor,
       work_dir,
       true,
+      Platform::current_platform().unwrap(),
     )) as Box<dyn process_execution::CommandRunner>,
   };
 
   let mut runtime = Runtime::new().unwrap();
 
   let result = runtime
-    .block_on(runner.run(request, WorkUnitStore::new()))
+    .block_on(runner.run(request.into(), WorkUnitStore::new()))
     .expect("Error executing");
 
   if let Some(output) = args.value_of("materialize-output-to").map(PathBuf::from) {

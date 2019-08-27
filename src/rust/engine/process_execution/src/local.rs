@@ -18,7 +18,7 @@ use store::{OneOffStoreFileByDigest, Snapshot, Store};
 use tokio_codec::{BytesCodec, FramedRead};
 use tokio_process::CommandExt;
 
-use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
+use super::{Platform, MultiPlatformExecuteProcessRequest, ExecuteProcessRequest, FallibleExecuteProcessResult};
 
 use bytes::{Bytes, BytesMut};
 use workunit_store::WorkUnitStore;
@@ -28,6 +28,7 @@ pub struct CommandRunner {
   executor: task_executor::Executor,
   work_dir: PathBuf,
   cleanup_local_dirs: bool,
+  platform: Platform,
 }
 
 impl CommandRunner {
@@ -36,12 +37,14 @@ impl CommandRunner {
     executor: task_executor::Executor,
     work_dir: PathBuf,
     cleanup_local_dirs: bool,
+    platform: Platform,
   ) -> CommandRunner {
     CommandRunner {
       store,
       executor,
       work_dir,
       cleanup_local_dirs,
+      platform,
     }
   }
 
@@ -216,9 +219,30 @@ impl super::CommandRunner for CommandRunner {
   ///
   /// TODO: start to create workunits for local process execution
   ///
+
+  fn get_platform(&self) -> Platform {
+    self.platform.clone()
+  }
+
+  fn is_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> bool {
+    req.0.contains_key(&(Platform::None, Platform::None)) || req.0.contains_key(&(self.platform.clone(), Platform::current_platform().unwrap()))
+  }
+
+  fn get_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> ExecuteProcessRequest {
+    match req.0.get(&(Platform::None, Platform::None)) {
+      Some(req) => req.clone(),
+      None => {
+        match req.0.get(&(self.platform.clone(), Platform::current_platform().unwrap())) {
+          Some(req) => req.clone(),
+          None => panic!("No compatible request found!")
+        }
+      }
+    }
+  }
+
   fn run(
     &self,
-    req: ExecuteProcessRequest,
+    req: MultiPlatformExecuteProcessRequest,
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let workdir = try_future!(tempfile::Builder::new()
@@ -228,6 +252,7 @@ impl super::CommandRunner for CommandRunner {
         "Error making tempdir for local process execution: {:?}",
         err
       )));
+    let req = self.get_compatible_request(&req);
     let workdir_path = workdir.path().to_owned();
     let workdir_path2 = workdir_path.clone();
     let workdir_path3 = workdir_path.clone();
@@ -344,7 +369,8 @@ mod tests {
   use tempfile;
   use testutil;
 
-  use super::super::CommandRunner as CommandRunnerTrait;
+  use crate::Platform;
+  use super::super::{CommandRunner as CommandRunnerTrait};
   use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
   use hashing::EMPTY_DIGEST;
   use std;
@@ -734,7 +760,6 @@ mod tests {
     let roland = TestData::roland().bytes();
     std::fs::write(preserved_work_tmpdir.path().join("roland"), roland.clone())
       .expect("Writing temporary file");
-
     let result = run_command_locally(ExecuteProcessRequest {
       argv: vec!["/bin/cat".to_owned(), ".jdk/roland".to_owned()],
       env: BTreeMap::new(),
@@ -913,7 +938,8 @@ mod tests {
       executor: executor.clone(),
       work_dir: dir,
       cleanup_local_dirs: cleanup,
+      platform: Platform::current_platform().unwrap()
     };
-    executor.block_on(runner.run(req, WorkUnitStore::new()))
+    executor.block_on(runner.run(req.into(), WorkUnitStore::new()))
   }
 }

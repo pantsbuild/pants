@@ -16,6 +16,7 @@ pub struct Types {
   pub dir: TypeId,
   pub file: TypeId,
   pub link: TypeId,
+  pub multi_platform_process_request: TypeId,
   pub process_request: TypeId,
   pub process_result: TypeId,
   pub generator: TypeId,

@@ -27,7 +27,7 @@ use fs::{
   PathGlobs, PathStat, StrictGlobMatching, VFS,
 };
 use hashing;
-use process_execution;
+use process_execution::{self, Platform, ExecuteProcessRequest, MultiPlatformExecuteProcessRequest};
 use rule_graph;
 
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
@@ -307,8 +307,34 @@ impl WrappedNode for Select {
               )
             })
             .to_boxed()
-        }
-        &tasks::Rule::Intrinsic(i) => panic!("Unrecognized intrinsic: {:?}", i),
+        },
+        &tasks::Rule::Intrinsic(Intrinsic { product, input })
+          if product == context.core.types.process_result
+            && input == context.core.types.multi_platform_process_request =>
+        {
+          let context = context.clone();
+          let core = context.core.clone();
+          self
+            .select_product(&context, context.core.types.multi_platform_process_request, "intrinsic")
+            .and_then(|request| {
+              MultiPlatformExecuteProcess::lift(&request)
+                .map_err(|str| throw(&format!("Error lifting MultiPlatformExecuteProcess: {}", str)))
+            })
+            .and_then(move |process_request| context.get(process_request))
+            .map(move |result| {
+              externs::unsafe_call(
+                &core.types.construct_process_result,
+                &[
+                  externs::store_bytes(&result.0.stdout),
+                  externs::store_bytes(&result.0.stderr),
+                  externs::store_i64(result.0.exit_code.into()),
+                  Snapshot::store_directory(&core, &result.0.output_directory),
+                ],
+              )
+            })
+            .to_boxed()
+        },
+        &tasks::Rule::Intrinsic(i) => panic!("Unrecognized intrinsic: {:?}", i)
       },
       &rule_graph::Entry::Param(type_id) => {
         if let Some(key) = self.params.find(type_id) {
@@ -399,7 +425,6 @@ impl ExecuteProcess {
         Some(PathBuf::from(val))
       }
     };
-
     Ok(ExecuteProcess(process_execution::ExecuteProcessRequest {
       argv: externs::project_multi_strs(&value, "argv"),
       env: env,
@@ -413,6 +438,73 @@ impl ExecuteProcess {
   }
 }
 
+///
+/// A Node that represents a set of processes to execute on specific platforms.
+///
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct MultiPlatformExecuteProcess(MultiPlatformExecuteProcessRequest);
+
+impl MultiPlatformExecuteProcess {
+  fn get_platform_variant(variant_candidate: String) -> Platform {
+    match variant_candidate.as_ref() {
+      "darwin" => Platform::Darwin,
+      "linux" => Platform::Linux,
+      "none" => Platform::None,
+      _ => unreachable!()
+    }
+  }
+
+  fn lift(value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
+    let mut request_by_constraint: BTreeMap<(Platform, Platform), ExecuteProcessRequest> = BTreeMap::new();
+    let constraint_parts = externs::project_multi_strs(&value, "platform_constraints");
+    let requests: Vec<ExecuteProcessRequest> = externs::project_multi(&value, "execute_process_requests").iter().map(|r| ExecuteProcess::lift(r).unwrap().0).collect();
+    if constraint_parts.len() % 2 != 0 {
+      return Err("Error parsing platform_constraints: odd number of parts".to_owned());
+    }
+    if constraint_parts.len() / 2 != requests.len() {
+      return Err(format!("Size of constraint keys and requests does not match: {} vs. {}", constraint_parts.len() / 2, requests.len()))
+    }
+    for (constraint_key_pair, request) in constraint_parts.chunks_exact(2).zip(requests.iter()) {
+      let mut platform_constaint: Vec<Platform> = constraint_key_pair
+        .iter()
+        .map(|c| MultiPlatformExecuteProcess::get_platform_variant(c.to_string()))
+        .collect();
+      request_by_constraint.insert(
+        (platform_constaint.remove(0), platform_constaint.remove(1)),
+        request.clone()
+      );
+    }
+    return Ok(MultiPlatformExecuteProcess(MultiPlatformExecuteProcessRequest(request_by_constraint)));
+  }
+}
+
+impl From<MultiPlatformExecuteProcess> for NodeKey {
+  fn from(n: MultiPlatformExecuteProcess) -> Self {
+    NodeKey::MultiPlatformExecuteProcess(Box::new(n))
+  }
+}
+
+impl WrappedNode for MultiPlatformExecuteProcess {
+  type Item = ProcessResult;
+
+  fn run(self, context: Context) -> NodeFuture<ProcessResult> {
+    let request = self.0;
+    let workunit_store = context.session.workunit_store();
+    match context.core.command_runner.is_compatible_request(&request) {
+      true => {
+        context
+          .core
+          .command_runner
+          .run(request, workunit_store)
+          .map(ProcessResult)
+          .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
+          .to_boxed()
+      },
+      false => err(throw(&format!("No compatible platform found for request: {:?}", request)))
+    }
+  }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProcessResult(process_execution::FallibleExecuteProcessResult);
 
@@ -420,15 +512,20 @@ impl WrappedNode for ExecuteProcess {
   type Item = ProcessResult;
 
   fn run(self, context: Context) -> NodeFuture<ProcessResult> {
-    let request = self.0;
+    let request: process_execution::MultiPlatformExecuteProcessRequest = self.0.into();
     let workunit_store = context.session.workunit_store();
-    context
-      .core
-      .command_runner
-      .run(request, workunit_store)
-      .map(ProcessResult)
-      .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
-      .to_boxed()
+    match context.core.command_runner.is_compatible_request(&request) {
+      true => {
+        context
+          .core
+          .command_runner
+          .run(request, workunit_store)
+          .map(ProcessResult)
+          .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
+          .to_boxed()
+      },
+      false => err(throw(&format!("No compatible platform found for request: {:?}", request)))
+    }
   }
 }
 
@@ -1072,6 +1169,7 @@ pub enum NodeKey {
   DigestFile(DigestFile),
   DownloadedFile(DownloadedFile),
   ExecuteProcess(Box<ExecuteProcess>),
+  MultiPlatformExecuteProcess(Box<MultiPlatformExecuteProcess>),
   ReadLink(ReadLink),
   Scandir(Scandir),
   Select(Box<Select>),
@@ -1083,6 +1181,7 @@ impl NodeKey {
   fn product_str(&self) -> String {
     match self {
       &NodeKey::ExecuteProcess(..) => "ProcessResult".to_string(),
+      &NodeKey::MultiPlatformExecuteProcess(..) => "ProcessResult".to_string(),
       &NodeKey::DownloadedFile(..) => "DownloadedFile".to_string(),
       &NodeKey::Select(ref s) => format!("{}", s.product),
       &NodeKey::Task(ref s) => format!("{}", s.product),
@@ -1104,6 +1203,7 @@ impl NodeKey {
       // NodeKey represents an FS operation, and accordingly whether they need to add it to the
       // above list or the below list.
       &NodeKey::ExecuteProcess { .. }
+      | &NodeKey::MultiPlatformExecuteProcess { .. }
       | &NodeKey::Select { .. }
       | &NodeKey::Snapshot { .. }
       | &NodeKey::Task { .. }
@@ -1134,6 +1234,7 @@ impl Node for NodeKey {
         NodeKey::DigestFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
         NodeKey::DownloadedFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
         NodeKey::ExecuteProcess(n) => n.run(context).map(NodeResult::from).to_boxed(),
+        NodeKey::MultiPlatformExecuteProcess(n) => n.run(context).map(NodeResult::from).to_boxed(),
         NodeKey::ReadLink(n) => n.run(context).map(NodeResult::from).to_boxed(),
         NodeKey::Scandir(n) => n.run(context).map(NodeResult::from).to_boxed(),
         NodeKey::Select(n) => n.run(context).map(NodeResult::from).to_boxed(),
@@ -1183,6 +1284,7 @@ impl Display for NodeKey {
       &NodeKey::DigestFile(ref s) => write!(f, "DigestFile({:?})", s.0),
       &NodeKey::DownloadedFile(ref s) => write!(f, "DownloadedFile({:?})", s.0),
       &NodeKey::ExecuteProcess(ref s) => write!(f, "ExecuteProcess({:?}", s.0),
+      &NodeKey::MultiPlatformExecuteProcess(ref s) => write!(f, "MultiPlatformExecuteProcess({:?}", s.0),
       &NodeKey::ReadLink(ref s) => write!(f, "ReadLink({:?})", s.0),
       &NodeKey::Scandir(ref s) => write!(f, "Scandir({:?})", s.0),
       &NodeKey::Select(ref s) => write!(f, "Select({}, {})", s.params, s.product,),

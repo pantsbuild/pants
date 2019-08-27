@@ -5,7 +5,12 @@ from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment, PythonNativeCode
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.engine.fs import Digest
-from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
+from pants.engine.isolated_process import (
+  MultiPlatformExecuteProcessRequest,
+  ExecuteProcessRequest,
+  ExecuteProcessResult
+)
+from pants.engine.platform import Platform
 from pants.engine.rules import optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.util.objects import datatype, hashable_string_list, string_optional, string_type
