@@ -156,6 +156,7 @@ impl WrappedNode for Select {
 
   fn run(self, context: Context) -> NodeFuture<Value> {
     let workunit_store = context.session.workunit_store();
+    let types = &context.core.types;
     match &self.entry {
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => match inner
         .rule()
@@ -167,36 +168,31 @@ impl WrappedNode for Select {
           entry: Arc::new(self.entry.clone()),
         }),
         &Rule::Intrinsic(Intrinsic { product, input })
-          if product == context.core.types.snapshot && input == context.core.types.path_globs =>
+          if product == types.snapshot && input == types.path_globs =>
         {
           let context = context.clone();
           let core = context.core.clone();
           self
-            .select_product(&context, context.core.types.path_globs, "intrinsic")
+            .select_product(&context, types.path_globs, "intrinsic")
             .and_then(move |val| context.get(Snapshot(externs::key_for(val))))
             .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
             .to_boxed()
         }
         &Rule::Intrinsic(Intrinsic { product, input })
-          if product == context.core.types.snapshot && input == context.core.types.url_to_fetch =>
+          if product == types.snapshot && input == types.url_to_fetch =>
         {
           let context = context.clone();
           let core = context.core.clone();
           self
-            .select_product(&context, context.core.types.url_to_fetch, "intrinsic")
+            .select_product(&context, types.url_to_fetch, "intrinsic")
             .and_then(move |val| context.get(DownloadedFile(externs::key_for(val))))
             .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
             .to_boxed()
         }
         &Rule::Intrinsic(Intrinsic { product, input })
-          if product == context.core.types.directory_digest
-            && input == context.core.types.directories_to_merge =>
+          if product == types.directory_digest && input == types.directories_to_merge =>
         {
-          let request = self.select_product(
-            &context,
-            context.core.types.directories_to_merge,
-            "intrinsic",
-          );
+          let request = self.select_product(&context, types.directories_to_merge, "intrinsic");
           let core = context.core.clone();
           request
             .and_then(move |request| {
@@ -213,12 +209,11 @@ impl WrappedNode for Select {
             .to_boxed()
         }
         &Rule::Intrinsic(Intrinsic { product, input })
-          if product == context.core.types.snapshot
-            && input == context.core.types.directory_digest =>
+          if product == types.snapshot && input == types.directory_digest =>
         {
           let core = context.core.clone();
           self
-            .select_product(&context, context.core.types.directory_digest, "intrinsic")
+            .select_product(&context, types.directory_digest, "intrinsic")
             .and_then(|directory_digest_val| {
               lift_digest(&directory_digest_val).map_err(|str| throw(&str))
             })
@@ -231,14 +226,10 @@ impl WrappedNode for Select {
         }
 
         &Rule::Intrinsic(Intrinsic { product, input })
-          if product == context.core.types.directory_digest
-            && input == context.core.types.directory_with_prefix_to_strip =>
+          if product == types.directory_digest && input == types.directory_with_prefix_to_strip =>
         {
-          let request = self.select_product(
-            &context,
-            context.core.types.directory_with_prefix_to_strip,
-            "intrinsic",
-          );
+          let request =
+            self.select_product(&context, types.directory_with_prefix_to_strip, "intrinsic");
           let core = context.core.clone();
           request
             .and_then(move |request| {
@@ -263,12 +254,11 @@ impl WrappedNode for Select {
             .to_boxed()
         }
         &Rule::Intrinsic(Intrinsic { product, input })
-          if product == context.core.types.files_content
-            && input == context.core.types.directory_digest =>
+          if product == types.files_content && input == types.directory_digest =>
         {
           let context = context.clone();
           self
-            .select_product(&context, context.core.types.directory_digest, "intrinsic")
+            .select_product(&context, types.directory_digest, "intrinsic")
             .and_then(|directory_digest_val| {
               lift_digest(&directory_digest_val).map_err(|str| throw(&str))
             })
@@ -283,13 +273,12 @@ impl WrappedNode for Select {
             .to_boxed()
         }
         &Rule::Intrinsic(Intrinsic { product, input })
-          if product == context.core.types.process_result
-            && input == context.core.types.process_request =>
+          if product == types.process_result && input == types.process_request =>
         {
           let context = context.clone();
           let core = context.core.clone();
           self
-            .select_product(&context, context.core.types.process_request, "intrinsic")
+            .select_product(&context, types.process_request, "intrinsic")
             .and_then(|request| {
               ExecuteProcess::lift(&request)
                 .map_err(|str| throw(&format!("Error lifting ExecuteProcess: {}", str)))
