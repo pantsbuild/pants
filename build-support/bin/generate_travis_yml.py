@@ -453,7 +453,7 @@ def unit_tests(python_version: PythonVersion) -> Dict:
     "name": f"Unit tests (Python {python_version.decimal})",
     "script": [
       (
-        "travis_wait 50 ./build-support/bin/ci.py --unit-tests --remote-execution-enabled "
+        "./build-support/bin/ci.py --unit-tests --remote-execution-enabled "
         f"--plugin-tests --python-version {python_version.decimal}"
       )
     ],
