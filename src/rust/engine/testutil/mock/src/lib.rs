@@ -29,3 +29,4 @@
 mod cas;
 pub use crate::cas::StubCAS;
 pub mod execution_server;
+pub use crate::execution_server::MockExecution;

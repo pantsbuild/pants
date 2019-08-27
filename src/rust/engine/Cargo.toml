@@ -40,6 +40,7 @@ members = [
   "testutil",
   "testutil/mock",
   "testutil/local_cas",
+  "testutil/local_execution_server",
   "ui",
   "workunit_store"
 ]
@@ -74,6 +75,7 @@ default-members = [
   "testutil",
   "testutil/mock",
   "testutil/local_cas",
+  "testutil/local_execution_server",
   "ui",
   "workunit_store"
 ]
