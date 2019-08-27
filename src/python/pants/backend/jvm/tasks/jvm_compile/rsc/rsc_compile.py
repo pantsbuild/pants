@@ -455,6 +455,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
           CompositeProductAdder(*output_products)),
         dependencies=list(dep_keys),
         size=self._size_estimator(zinc_compile_context.sources),
+        on_failure=ivts.force_invalidate,
       )
 
     workflow = rsc_compile_context.workflow
@@ -523,18 +524,17 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
     if all_jobs:
       write_to_cache_job = Job(
-          key=self._write_to_cache_key_for_target(compile_target),
-          fn=functools.partial(
-            work_for_vts_write_to_cache,
-            ivts,
-            rsc_compile_context,
-          ),
-          dependencies=[job.key for job in all_jobs],
-          run_asap=True,
-          # If compilation and analysis work succeeds, validate the vts.
-          # Otherwise, fail it.
-          on_success=ivts.update,
-          on_failure=ivts.force_invalidate)
+        key=self._write_to_cache_key_for_target(compile_target),
+        fn=functools.partial(
+          work_for_vts_write_to_cache,
+          ivts,
+          rsc_compile_context,
+        ),
+        dependencies=[job.key for job in all_jobs],
+        run_asap=True,
+        # If rsc outlining, and zinc compilation and analysis work succeeds, validate the vts.
+        on_success=ivts.update,
+      )
       all_jobs.append(write_to_cache_job)
 
     return all_jobs
