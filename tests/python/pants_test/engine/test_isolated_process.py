@@ -5,7 +5,7 @@ import os
 import unittest
 
 from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, FileContent, FilesContent,
-                             InputFileContent, PathGlobs, Snapshot)
+                             InputFilesContent, PathGlobs, Snapshot)
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
                                            FallibleExecuteProcessResult, ProcessExecutionFailure)
 from pants.engine.rules import RootRule, rule
@@ -253,12 +253,12 @@ class ExecuteProcessRequestTest(unittest.TestCase):
     self.assertEqual(req.env, ('VAR', 'VAL'))
 
 
-class TestInputFileCreation(TestBase):
+class TestInputFilesCreation(TestBase):
   def test_input_file_creation(self):
     file_name = 'some.filename'
     file_contents = b'some file contents'
 
-    input_file = InputFileContent(path=file_name, content=file_contents)
+    input_file = InputFilesContent((FileContent(path=file_name, content=file_contents),))
     digest, = self.scheduler.product_request(Digest, [input_file])
 
     req = ExecuteProcessRequest(
@@ -274,7 +274,7 @@ class TestInputFileCreation(TestBase):
     path = 'somedir/filename'
     content = b'file contents'
 
-    input_file = InputFileContent(path=path, content=content)
+    input_file = InputFilesContent((FileContent(path=path, content=content),))
     digest, = self.scheduler.product_request(Digest, [input_file])
 
     req = ExecuteProcessRequest(
@@ -285,6 +285,26 @@ class TestInputFileCreation(TestBase):
 
     result, = self.scheduler.product_request(ExecuteProcessResult, [req])
     self.assertEqual(result.stdout, content)
+
+  def test_multiple_files(self):
+    path1 = 'dir/a'
+    content1 = b'a'
+    path2 = 'dir/b'
+    content2 = b'b'
+    input_files = InputFilesContent((
+      FileContent(path=path1, content=content1),
+      FileContent(path=path2, content=content2),
+    ))
+    digest, = self.scheduler.product_request(Digest, [input_files])
+
+    req = ExecuteProcessRequest(
+      argv=('/bin/cat', 'dir/a', 'dir/b'),
+      input_files=digest,
+      description="Cat some files",
+    )
+
+    result, = self.scheduler.product_request(ExecuteProcessResult, [req])
+    self.assertEqual(result.stdout, content1 + content2)
 
 
 class IsolatedProcessTest(TestBase, unittest.TestCase):
