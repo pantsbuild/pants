@@ -1,18 +1,25 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+<<<<<<< HEAD
 import json
 import re
 import unittest
 from collections import defaultdict
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
+=======
+import os.path
+import re
+import unittest
+>>>>>>> Test reporting with remote execution
 
-import psutil
 from parameterized import parameterized
 
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import http_server
+from pants.util.reporting_util import (find_child_processes_that_send_spans, wait_spans_to_be_sent,
+                                       zipkin_handler)
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -185,10 +192,10 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       pants_run = self.run_pants(command)
       self.assert_success(pants_run)
 
-      child_processes = self.find_child_processes_that_send_spans(pants_run.stderr_data)
+      child_processes = find_child_processes_that_send_spans(pants_run.stderr_data)
       self.assertTrue(child_processes)
 
-      self.wait_spans_to_be_sent(child_processes)
+      wait_spans_to_be_sent(child_processes)
 
       trace = assert_single_element(ZipkinHandler.traces.values())
 
@@ -218,10 +225,10 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       pants_run = self.run_pants(command)
       self.assert_success(pants_run)
 
-      child_processes = self.find_child_processes_that_send_spans(pants_run.stderr_data)
+      child_processes = find_child_processes_that_send_spans(pants_run.stderr_data)
       self.assertTrue(child_processes)
 
-      self.wait_spans_to_be_sent(child_processes)
+      wait_spans_to_be_sent(child_processes)
 
       trace = assert_single_element(ZipkinHandler.traces.values())
 
@@ -253,7 +260,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       pants_run = self.run_pants(command)
       self.assert_success(pants_run)
 
-      child_processes = self.find_child_processes_that_send_spans(pants_run.stderr_data)
+      child_processes = find_child_processes_that_send_spans(pants_run.stderr_data)
       self.assertFalse(child_processes)
 
       num_of_traces = len(ZipkinHandler.traces)
@@ -274,16 +281,16 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       pants_run = self.run_pants(command)
       self.assert_success(pants_run)
 
-      child_processes = self.find_child_processes_that_send_spans(pants_run.stderr_data)
+      child_processes = find_child_processes_that_send_spans(pants_run.stderr_data)
       self.assertTrue(child_processes)
 
-      self.wait_spans_to_be_sent(child_processes)
+      wait_spans_to_be_sent(child_processes)
 
       trace = assert_single_element(ZipkinHandler.traces.values())
 
       v2_span_name_part = "Scandir"
       self.assertTrue(any(v2_span_name_part in span['name'] for span in trace),
-        "There is no span that contains '{}' in it's name. The trace:{}".format(
+        "There is no span that contains '{}' in its name. The trace:{}".format(
         v2_span_name_part, trace
         ))
 
@@ -304,10 +311,10 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       pants_run = self.run_pants(command)
       self.assert_success(pants_run)
 
-      child_processes = self.find_child_processes_that_send_spans(pants_run.stderr_data)
+      child_processes = find_child_processes_that_send_spans(pants_run.stderr_data)
       self.assertTrue(child_processes)
 
-      self.wait_spans_to_be_sent(child_processes)
+      wait_spans_to_be_sent(child_processes)
 
       trace = assert_single_element(ZipkinHandler.traces.values())
 
@@ -331,10 +338,10 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       pants_run = self.run_pants(command)
       self.assert_success(pants_run)
 
-      child_processes = self.find_child_processes_that_send_spans(pants_run.stderr_data)
+      child_processes = find_child_processes_that_send_spans(pants_run.stderr_data)
       self.assertTrue(child_processes)
 
-      self.wait_spans_to_be_sent(child_processes)
+      wait_spans_to_be_sent(child_processes)
 
       trace = assert_single_element(ZipkinHandler.traces.values())
 
@@ -361,36 +368,3 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   @staticmethod
   def find_spans_by_parentId(trace, parent_id):
     return [span for span in trace if span.get('parentId') == parent_id]
-
-  @staticmethod
-  def find_child_processes_that_send_spans(pants_result_stderr):
-    child_processes = set()
-    for line in pants_result_stderr.split('\n'):
-      if "Sending spans to Zipkin server from pid:" in line:
-        i = line.rindex(':')
-        child_process_pid = line[i+1:]
-        child_processes.add(int(child_process_pid))
-    return child_processes
-
-  @staticmethod
-  def wait_spans_to_be_sent(child_processes):
-    existing_child_processes = child_processes.copy()
-    while existing_child_processes:
-      for child_pid in child_processes:
-        if child_pid in existing_child_processes and not psutil.pid_exists(child_pid):
-          existing_child_processes.remove(child_pid)
-
-
-def zipkin_handler():
-  class ZipkinHandler(BaseHTTPRequestHandler):
-    traces = defaultdict(list)
-
-    def do_POST(self):
-      content_length = self.headers.get('content-length')
-      json_trace = self.rfile.read(int(content_length))
-      trace = json.loads(json_trace)
-      for span in trace:
-        trace_id = span["traceId"]
-        self.__class__.traces[trace_id].append(span)
-      self.send_response(200)
-  return ZipkinHandler

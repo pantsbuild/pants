@@ -12,17 +12,18 @@ python_tests(
 
 python_tests(
   name = 'reporting_integration',
-  sources = ['test_reporting_integration.py'],
+  sources = ['test_reporting_integration.py', 'test_reporting_remote_integration.py'],
   dependencies = [
     '3rdparty/python:parameterized',
     '3rdparty/python:py-zipkin',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:reporting_util',
     'tests/python/pants_test:int-test',
     'examples/src/java/org/pantsbuild/example:hello_directory',
     'examples/src/scala/org/pantsbuild/example:several_scala_targets_directory',
   ],
   tags = {'integration'},
-  timeout = 600,
+  timeout = 540,
 )
 
 python_tests(

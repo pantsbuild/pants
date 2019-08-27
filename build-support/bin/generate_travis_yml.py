@@ -49,9 +49,14 @@ class Stage(Enum):
 GLOBAL_ENV_VARS = [
   'PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.ini"',
   'LC_ALL="en_US.UTF-8"',
-  'BOOTSTRAPPED_PEX_BUCKET=ci-public.pantsbuild.org',
-  'BOOTSTRAPPED_PEX_KEY_PREFIX=${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex',
-  'BOOTSTRAPPED_PEX_URL_PREFIX=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY_PREFIX}',
+  'BOOTSTRAP_BUCKET=ci-public.pantsbuild.org',
+  'BOOTSTRAP_KEY_DIRECTORY=${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}',
+  'BOOTSTRAPPED_PEX_KEY_PREFIX=${BOOTSTRAP_KEY_DIRECTORY}/pants.pex',
+  'BOOTSTRAPPED_PEX_URL_PREFIX=s3://${BOOTSTRAP_BUCKET}/${BOOTSTRAPPED_PEX_KEY_PREFIX}',
+  'BOOTSTRAPPED_MOCK_CAS_KEY=${BOOTSTRAP_KEY_DIRECTORY}/local_cas',
+  'BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY=${BOOTSTRAP_KEY_DIRECTORY}/local_execution_server',
+  'BOOTSTRAPPED_MOCK_CAS_URL=s3://${BOOTSTRAP_BUCKET}/${BOOTSTRAPPED_MOCK_CAS_KEY}',
+  'BOOTSTRAPPED_MOCK_EXECUTION_SERVER_URL=s3://${BOOTSTRAP_BUCKET}/${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}',
   'PYENV_PY27_VERSION=2.7.15',
   'PYENV_PY36_VERSION=3.6.8',
   'PYENV_PY37_VERSION=3.7.2',
@@ -115,13 +120,37 @@ class PythonVersion(Enum):
 
 AWS_GET_PANTS_PEX_COMMAND = ' '.join([
   "./build-support/bin/get_ci_bootstrapped_pants_pex.sh",
-  '${BOOTSTRAPPED_PEX_BUCKET}',
+  "${BOOTSTRAP_BUCKET}",
   "${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}",
+])
+
+AWS_GET_MOCK_CAS = ' '.join([
+  "./build-support/bin/get_aws_artifact.sh",
+  "${BOOTSTRAP_BUCKET}",
+  "${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}",
+  "./local_cas",
+])
+
+AWS_GET_MOCK_EXECUTION_SERVER = ' '.join([
+  "./build-support/bin/get_aws_artifact.sh",
+  "${BOOTSTRAP_BUCKET}",
+  "${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}",
+  "./local_execution_server",
 ])
 
 AWS_DEPLOY_PANTS_PEX_COMMAND = ' '.join([
   "aws", "--no-sign-request", "--region", "us-east-1", "s3", "cp",
   "${TRAVIS_BUILD_DIR}/pants.pex", "${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"
+])
+
+AWS_DEPLOY_MOCK_CAS = ' '.join([
+  "aws", "--no-sign-request", "--region", "us-east-1", "s3", "cp",
+  "${TRAVIS_BUILD_DIR}/local_cas", "${BOOTSTRAPPED_MOCK_CAS_URL}.${PLATFORM}"
+])
+
+AWS_DEPLOY_MOCK_EXECUTION_SERVER = ' '.join([
+  "aws", "--no-sign-request", "--region", "us-east-1", "s3", "cp",
+  "${TRAVIS_BUILD_DIR}/local_execution_server", "${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_URL}.${PLATFORM}"
 ])
 
 # ----------------------------------------------------------------------
@@ -273,8 +302,9 @@ def linux_shard(
     "env": [],
   }
   if load_test_config:
-    setup["before_script"] = [AWS_GET_PANTS_PEX_COMMAND]
+    setup["before_script"] = [AWS_GET_PANTS_PEX_COMMAND, AWS_GET_MOCK_CAS, AWS_GET_MOCK_EXECUTION_SERVER]
     setup["env"] = [
+      "PLATFORM=linux",
       f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.linux",
       "PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem",
     ]
@@ -339,8 +369,8 @@ def osx_shard(
   if osx_image is not None:
     setup["osx_image"] = osx_image
   if load_test_config:
-    setup["before_script"].append(AWS_GET_PANTS_PEX_COMMAND)
-    setup["env"].append(f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.osx")
+    setup["before_script"].extend([AWS_GET_PANTS_PEX_COMMAND, AWS_GET_MOCK_CAS, AWS_GET_MOCK_EXECUTION_SERVER])
+    setup["env"].append(["PLATFORM=osx", f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.osx"])
   return setup
 
 # ----------------------------------------------------------------------
@@ -352,6 +382,7 @@ def _bootstrap_command(*, python_version: PythonVersion) -> List[str]:
   # to take advantage of the Rust code built during bootstrapping. We use the Python 3.6 shard, as
   # it runs during both daily and nightly CI. This requires setting PREPARE_DEPLOY=1.
   command = [f'./build-support/bin/ci.py --bootstrap --python-version {python_version.decimal}']
+  command.append(f'./build-support/bin/ci.py --bootstrap-mock-remote')
   if python_version.is_py36:
     command.append('./build-support/bin/release.sh -f')
   return command
@@ -360,6 +391,7 @@ def _bootstrap_command(*, python_version: PythonVersion) -> List[str]:
 def _bootstrap_env(*, python_version: PythonVersion, platform: Platform) -> List[str]:
   env = [
     f'CACHE_NAME=bootstrap.{platform}.py{python_version.number}',
+    f'PLATFORM={platform}',
     f'BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.{platform}'
   ]
   if python_version.is_py36:
@@ -378,6 +410,8 @@ def bootstrap_linux(python_version: PythonVersion) -> Dict:
       docker_build_travis_ci_image(python_version=python_version),
       docker_run_travis_ci_image(command),
       AWS_DEPLOY_PANTS_PEX_COMMAND,
+      AWS_DEPLOY_MOCK_CAS,
+      AWS_DEPLOY_MOCK_EXECUTION_SERVER,
     ]
   }
   shard["env"] = shard.get("env", []) + _bootstrap_env(python_version=python_version, platform=Platform.linux)
@@ -394,7 +428,7 @@ def bootstrap_osx(python_version: PythonVersion) -> Dict:
     "name": f"Build OSX native engine and pants.pex (Python {python_version.decimal})",
     "after_failure": ["./build-support/bin/ci-failure.sh"],
     "stage": python_version.default_stage(is_bootstrap=True).value,
-    "script": _bootstrap_command(python_version=python_version) + [AWS_DEPLOY_PANTS_PEX_COMMAND]
+    "script": _bootstrap_command(python_version=python_version) + [AWS_DEPLOY_PANTS_PEX_COMMAND, AWS_DEPLOY_MOCK_CAS, AWS_DEPLOY_MOCK_EXECUTION_SERVER]
   }
   shard["env"] = shard.get("env", []) + _bootstrap_env(python_version=python_version, platform=Platform.osx)
   return shard

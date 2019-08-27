@@ -21,6 +21,7 @@ def main() -> None:
   args = create_parser().parse_args()
   setup_environment(python_version=args.python_version)
 
+<<<<<<< HEAD
   with maybe_get_remote_execution_oauth_token_path(
     remote_execution_enabled=args.remote_execution_enabled
   ) as remote_execution_oauth_token_path:
@@ -55,6 +56,38 @@ def main() -> None:
       run_plugin_tests()
     if args.platform_specific_tests:
       run_platform_specific_tests()
+=======
+  if args.bootstrap:
+    bootstrap(clean=args.bootstrap_clean, python_version=args.python_version)
+  set_run_from_pex()
+
+  if args.bootstrap_mock_remote:
+    bootstrap_mock_remote()
+  if args.githooks:
+    run_githooks()
+  if args.sanity_checks:
+    run_sanity_checks()
+  if args.lint:
+    run_lint()
+  if args.doc_gen:
+    run_doc_gen_tests()
+  if args.clippy:
+    run_clippy()
+  if args.cargo_audit:
+    run_cargo_audit()
+  if args.unit_tests:
+    run_unit_tests(remote_execution_enabled=args.remote_execution_enabled)
+  if args.rust_tests:
+    run_rust_tests()
+  if args.jvm_tests:
+    run_jvm_tests()
+  if args.integration_tests:
+    run_integration_tests(shard=args.integration_shard)
+  if args.plugin_tests:
+    run_plugin_tests()
+  if args.platform_specific_tests:
+    run_platform_specific_tests()
+>>>>>>> Test reporting with remote execution
 
   banner("CI ENDS")
   print()
@@ -94,6 +127,10 @@ def create_parser() -> argparse.ArgumentParser:
   parser.add_argument(
     "--bootstrap-clean", action="store_true",
     help="Before bootstrapping, clean the environment so that it's like a fresh git clone."
+  )
+  parser.add_argument(
+    "--bootstrap-mock-remote", action="store_true",
+    help="Bootstrap the mock remote stack by compiling local_cas and local_execution_server."
   )
   parser.add_argument("--githooks", action="store_true", help="Run pre-commit githook.")
   parser.add_argument(
@@ -325,6 +362,32 @@ def check_pants_pex_exists() -> None:
         "AWS is properly downloading the uploaded `pants.pex`.")
 
 # -------------------------------------------------------------------------
+# Bootstrap mock remoting stack
+# -------------------------------------------------------------------------
+
+def bootstrap_mock_remote() -> None:
+  with travis_section("Bootstrap mock remoting stack", "Compiling mock remoting executables"):
+    try:
+      subprocess.run(
+        ["./build-support/bin/native/cargo.sh", "build", "--manifest-path",
+         "src/rust/engine/Cargo.toml", "--release", "--bin", "local_cas",
+         "--bin", "local_execution_server"],
+        check=True)
+      Path("./src/rust/engine/target/release/local_cas").rename("./local_cas")
+      Path("./src/rust/engine/target/release/local_execution_server").rename("./local_execution_server")
+      subprocess.run(["./local_cas", "--version"], check=True)
+      subprocess.run(["./local_execution_server", "--version"], check=True)
+    except subprocess.CalledProcessError:
+      die("Failed to compile local_cas and local_execution_server")
+
+
+def check_mock_remote_servers_exist() -> None:
+  if not Path("local_cas").is_file() or not Path("local_execution_server").is_file():
+    die("local_cas or local_execution_server not found! "
+        "Either run `./build-support/bin/ci.py --bootstrap-mock-remote` or check that "
+        "AWS is properly downloading the uploaded mock remote servers.")
+
+# -------------------------------------------------------------------------
 # Test commands
 # -------------------------------------------------------------------------
 
@@ -505,6 +568,7 @@ def run_jvm_tests() -> None:
   )
 
 
+<<<<<<< HEAD
 def run_integration_tests_v1(*, shard: Optional[str]) -> None:
   target_sets = TestTargetSets.calculate(
     test_type=TestType.integration,
@@ -549,6 +613,20 @@ def run_integration_tests_v2(*, oauth_token_path: Optional[str] = None) -> None:
       start_message="Running integration tests via V2 local strategy.",
       die_message="Integration test failure (V2 local)",
     )
+=======
+def run_integration_tests(*, shard: Optional[str]) -> None:
+  check_pants_pex_exists()
+  check_mock_remote_servers_exist()
+  all_targets = get_all_python_tests(tag="+integration")
+  command = ["./pants.pex", "test.pytest"]
+  if shard is not None:
+    command.append(f"--test-pytest-test-shard={shard}")
+  with travis_section("IntegrationTests", f"Running Pants Integration tests {shard if shard is not None else ''}"):
+    try:
+      subprocess.run(command + sorted(all_targets) + PYTEST_PASSTHRU_ARGS, check=True)
+    except subprocess.CalledProcessError:
+      die("Integration test failure.")
+>>>>>>> Test reporting with remote execution
 
 
 def run_plugin_tests() -> None:

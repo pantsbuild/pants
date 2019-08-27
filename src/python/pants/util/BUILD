@@ -130,6 +130,11 @@ python_binary(
 )
 
 python_library(
+  name = 'reporting_util',
+  sources = ['reporting_util.py'],
+)
+
+python_library(
   name = 'socket',
   sources = ['socket.py'],
 )
