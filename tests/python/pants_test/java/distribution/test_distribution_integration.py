@@ -7,7 +7,7 @@ from unittest import skipIf
 
 from pants.java.distribution.distribution import Distribution, DistributionLocator
 from pants.util.osutil import OS_ALIASES, get_os_name
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 
@@ -29,7 +29,7 @@ def _get_two_distributions():
       return None
 
 
-class DistributionIntegrationTest(PantsRunIntegrationTest):
+class DistributionIntegrationTest(SafePantsRunIntegrationTest):
   def _test_two_distributions(self, os_name=None):
     java7, java8 = _get_two_distributions()
     os_name = os_name or get_os_name()

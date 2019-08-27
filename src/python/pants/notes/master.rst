@@ -1657,7 +1657,7 @@ Bugfixes
 * fix for pantsrc-files option (#7427)
   `PR #7427 <https://github.com/pantsbuild/pants/pull/7427>`_
 
-* Move with_overwritten_file_context to PantsRunIntegrationTest (#7408)
+* Move with_overwritten_file_context to SafePantsRunIntegrationTest (#7408)
   `PR #7408 <https://github.com/pantsbuild/pants/pull/7408>`_
 
 * Fix locale test failing on Python 3.7 due to forced UTF-8 mode (#7412)
@@ -5471,7 +5471,7 @@ Refactoring, Improvements, and Tooling
 * Set thrifty build_file_aliases (#5559)
   `PR #5559 <https://github.com/pantsbuild/pants/pull/5559>`_
 
-* Better `PantsRunIntegrationTest` invalidation. (#5547)
+* Better `SafePantsRunIntegrationTest` invalidation. (#5547)
   `PR #5547 <https://github.com/pantsbuild/pants/pull/5547>`_
 
 * Support coverage of pants coverage tests. (#5544)
@@ -16153,7 +16153,7 @@ API Changes
   `RB #1179 <https://rbcommons.com/s/twitter/r/1179>`_
   `RB #1177 <https://rbcommons.com/s/twitter/r/1177>`_
 
-* Add `PantsRunIntegrationTest` into `pantsbuild.pants.testinfra` package
+* Add `SafePantsRunIntegrationTest` into `pantsbuild.pants.testinfra` package
   `RB #1185 <https://rbcommons.com/s/twitter/r/1185>`_
 
 * Refactor `jar_library` to be able to unwrap its list of jar_dependency objects

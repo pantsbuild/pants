@@ -7,10 +7,10 @@ from textwrap import dedent
 
 from pants.fs.fs import safe_filename_from_path
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class TestOptionsIntegration(PantsRunIntegrationTest):
+class TestOptionsIntegration(SafePantsRunIntegrationTest):
 
   @classmethod
   def hermetic(cls):

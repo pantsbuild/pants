@@ -4,10 +4,10 @@
 import os
 from textwrap import dedent
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class NodeResolveIntegrationTest(PantsRunIntegrationTest):
+class NodeResolveIntegrationTest(SafePantsRunIntegrationTest):
 
   def test_resolve_with_prepublish(self):
     command = ['resolve',

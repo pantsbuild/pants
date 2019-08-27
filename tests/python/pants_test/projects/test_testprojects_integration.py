@@ -4,11 +4,11 @@
 import math
 
 from pants.util.memo import memoized_property
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 from pants_test.test_base import AbstractTestGenerator
 
 
-class TestProjectsIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
+class TestProjectsIntegrationTest(SafePantsRunIntegrationTest, AbstractTestGenerator):
   # To avoid having a single test method which covers all of `testprojects` (which
   # would run for a very long time with no output, and be more difficult to iterate
   # on), we shard all of the targets under `testprojects` into _SHARDS test methods.

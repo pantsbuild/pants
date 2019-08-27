@@ -8,10 +8,10 @@ import requests
 from pex.bin import pex as pex_main
 
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class ReversionTest(PantsRunIntegrationTest):
+class ReversionTest(SafePantsRunIntegrationTest):
 
   def test_run(self):
     with temporary_dir() as dest_dir:

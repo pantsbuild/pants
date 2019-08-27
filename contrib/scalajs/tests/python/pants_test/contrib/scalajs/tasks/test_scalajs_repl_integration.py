@@ -3,10 +3,10 @@
 
 from textwrap import dedent
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class ScalaJSReplIntegrationTest(PantsRunIntegrationTest):
+class ScalaJSReplIntegrationTest(SafePantsRunIntegrationTest):
 
   def setUp(self):
     self.maxDiff = None

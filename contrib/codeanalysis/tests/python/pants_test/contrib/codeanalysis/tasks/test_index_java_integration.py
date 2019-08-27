@@ -4,10 +4,10 @@
 import glob
 import os
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class TestIndexJavaIntegration(PantsRunIntegrationTest):
+class TestIndexJavaIntegration(SafePantsRunIntegrationTest):
   def test_index_simple_java_code(self):
     # Very simple test that we can run the extractor and indexer on some
     # fairly trivial code without crashing, and that we produce something.

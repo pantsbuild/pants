@@ -10,11 +10,11 @@ from pants_test.interpreter_selection_utils import (PY_3, PY_27, python_interpre
                                                     skip_unless_python3_present,
                                                     skip_unless_python27_and_python3_present,
                                                     skip_unless_python27_present)
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest, ensure_daemon
 from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
 
-class PythonRunIntegrationTest(PantsRunIntegrationTest):
+class PythonRunIntegrationTest(SafePantsRunIntegrationTest):
   testproject = 'testprojects/src/python/interpreter_selection'
   py2_interpreter_constraint = 'CPython>=2.7,<3'
   py3_interpreter_constraint = 'CPython>=3.6,<4'

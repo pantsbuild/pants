@@ -1,10 +1,10 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class ClassmapTaskIntegrationTest(PantsRunIntegrationTest):
+class ClassmapTaskIntegrationTest(SafePantsRunIntegrationTest):
   # A test target with both transitive internal dependency as well as external dependency
   TEST_JVM_TARGET = 'testprojects/tests/java/org/pantsbuild/testproject/testjvms:seven'
   INTERNAL_MAPPING = ('org.pantsbuild.testproject.testjvms.TestSeven '

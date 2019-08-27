@@ -5,10 +5,10 @@ import os
 from textwrap import dedent
 
 from pants.util.dirutil import safe_open
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class GoTestIntegrationTest(PantsRunIntegrationTest):
+class GoTestIntegrationTest(SafePantsRunIntegrationTest):
   def test_go_test_simple(self):
     args = ['test',
             'contrib/go/examples/src/go/libA']

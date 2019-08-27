@@ -1,10 +1,10 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_resolver
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest, ensure_resolver
 
 
-class BootstrapJvmToolsIntegrationTest(PantsRunIntegrationTest):
+class BootstrapJvmToolsIntegrationTest(SafePantsRunIntegrationTest):
 
   @ensure_resolver
   def test_bootstrap_jarjar_succeeds_normally(self):

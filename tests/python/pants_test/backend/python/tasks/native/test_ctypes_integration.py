@@ -17,7 +17,7 @@ from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import is_executable, read_file, safe_file_dump
 from pants_test.backend.python.tasks.python_task_test_base import name_and_platform
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
 def invoke_pex_for_output(pex_file_to_run):
@@ -36,7 +36,7 @@ _IS_OSX = Platform.current == Platform.darwin
 _PYTHON_MAJOR_MINOR = sys.version_info[:2]
 
 
-class CTypesIntegrationTest(PantsRunIntegrationTest):
+class CTypesIntegrationTest(SafePantsRunIntegrationTest):
 
   @classmethod
   def use_pantsd_env_var(cls):
@@ -131,7 +131,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
   @_toolchain_variants
   def test_ctypes_native_language_interop(self, toolchain_variant):
     # TODO: consider making this mock_buildroot/run_pants_with_workdir into a
-    # PantsRunIntegrationTest method!
+    # SafePantsRunIntegrationTest method!
     with self.mock_buildroot(
         dirs_to_copy=[self._binary_interop_target_dir]) as buildroot, buildroot.pushd():
 

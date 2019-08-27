@@ -6,10 +6,10 @@ import subprocess
 
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import open_zip, temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
+class BinaryCreateIntegrationTest(SafePantsRunIntegrationTest):
 
   def test_autovalue_classfiles(self):
     self.build_and_run(

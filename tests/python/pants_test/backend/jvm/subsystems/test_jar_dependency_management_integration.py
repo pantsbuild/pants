@@ -7,10 +7,10 @@ from contextlib import contextmanager
 from unittest import expectedFailure
 
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
+class JarDependencyManagementIntegrationTest(SafePantsRunIntegrationTest):
 
   JarSet = namedtuple('JarSet', ['jersey', 'jsr311'])
 

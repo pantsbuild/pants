@@ -3,10 +3,10 @@
 
 from textwrap import dedent
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class TestPythonTestRunnerIntegration(PantsRunIntegrationTest):
+class TestPythonTestRunnerIntegration(SafePantsRunIntegrationTest):
 
   def run_pants(self, trailing_args):
     args = [

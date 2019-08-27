@@ -1,10 +1,10 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class NodeRunIntegrationTest(PantsRunIntegrationTest):
+class NodeRunIntegrationTest(SafePantsRunIntegrationTest):
 
   def test_run_simple(self):
     command = ['run',

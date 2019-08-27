@@ -3,7 +3,7 @@
 
 from unittest import skipUnless
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 from pants.contrib.cpp.toolchain.cpp_toolchain import CppToolchain
 
@@ -16,7 +16,7 @@ def have_compiler():
     return False
 
 
-class CppIntegrationTest(PantsRunIntegrationTest):
+class CppIntegrationTest(SafePantsRunIntegrationTest):
   """Integration test for cpp which builds libraries and builds and runs binaries."""
 
   # TODO(dhamon): Move these to the test folder and keep the example folder for more

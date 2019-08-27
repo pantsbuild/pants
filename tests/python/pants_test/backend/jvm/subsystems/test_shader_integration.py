@@ -9,11 +9,11 @@ from pants.base.build_environment import get_buildroot
 from pants.fs.archive import ZIP
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 from pants_test.subsystem.subsystem_util import init_subsystem
 
 
-class ShaderIntegrationTest(PantsRunIntegrationTest):
+class ShaderIntegrationTest(SafePantsRunIntegrationTest):
   def test_shader_project(self):
     """Test that the binary target at the ``shading_project`` can be built and run.
 

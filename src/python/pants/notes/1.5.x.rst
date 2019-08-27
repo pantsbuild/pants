@@ -119,7 +119,7 @@ Refactoring, Improvements, and Tooling
 * Set thrifty build_file_aliases (#5559)
   `PR #5559 <https://github.com/pantsbuild/pants/pull/5559>`_
 
-* Better `PantsRunIntegrationTest` invalidation. (#5547)
+* Better `SafePantsRunIntegrationTest` invalidation. (#5547)
   `PR #5547 <https://github.com/pantsbuild/pants/pull/5547>`_
 
 * Support coverage of pants coverage tests. (#5544)

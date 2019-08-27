@@ -7,10 +7,10 @@ from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
 from pants.util.dirutil import safe_open
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
+class DeferredSourcesMapperIntegration(SafePantsRunIntegrationTest):
 
   @classmethod
   def _emit_targets(cls, workdir):

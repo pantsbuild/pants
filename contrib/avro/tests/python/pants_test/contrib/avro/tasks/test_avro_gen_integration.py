@@ -3,10 +3,10 @@
 
 import os
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class AvroJavaGenTest(PantsRunIntegrationTest):
+class AvroJavaGenTest(SafePantsRunIntegrationTest):
   @classmethod
   def hermetic(cls):
     return True

@@ -1,10 +1,10 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class ProtocGenGoTest(PantsRunIntegrationTest):
+class ProtocGenGoTest(SafePantsRunIntegrationTest):
 
   def test_go_compile_distance(self):
     args = ['compile', 'contrib/go/examples/src/go/distance']

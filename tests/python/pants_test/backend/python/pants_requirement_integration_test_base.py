@@ -8,10 +8,10 @@ from contextlib import contextmanager
 
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_walk
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class PantsRequirementIntegrationTestBase(PantsRunIntegrationTest):
+class PantsRequirementIntegrationTestBase(SafePantsRunIntegrationTest):
   @contextmanager
   def _unstable_pants_version(self):
     # The earliest pantsbuild.pants release on pypi is 0.0.17 so we grab a lower version and tack

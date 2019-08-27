@@ -7,10 +7,10 @@ import time
 
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_delete, safe_mkdir, touch
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
+class CacheCleanupIntegrationTest(SafePantsRunIntegrationTest):
 
   def _create_platform_args(self, version):
     return [("""--jvm-platform-platforms={{'default': {{'target': '{version}'}}}}"""

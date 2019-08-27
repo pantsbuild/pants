@@ -8,10 +8,10 @@ import subprocess
 
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class BuildLocalPythonDistributionsIntegrationTest(PantsRunIntegrationTest):
+class BuildLocalPythonDistributionsIntegrationTest(SafePantsRunIntegrationTest):
 
   @classmethod
   def use_pantsd_env_var(cls):

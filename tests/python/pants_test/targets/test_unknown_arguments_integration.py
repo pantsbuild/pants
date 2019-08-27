@@ -6,10 +6,10 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class TestUnknownArgumentsIntegration(PantsRunIntegrationTest):
+class TestUnknownArgumentsIntegration(SafePantsRunIntegrationTest):
 
   @contextmanager
   def temp_target_spec(self, **kwargs):

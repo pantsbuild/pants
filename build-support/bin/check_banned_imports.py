@@ -10,8 +10,16 @@ from common import die
 
 
 def main() -> None:
+  python_files = find_files(
+      "src", "tests", "pants-plugins", "examples", "contrib", extension=".py"
+  )
   rust_files = find_files("src/rust/engine", extension=".rs")
 
+  check_banned_import(
+    python_files,
+    bad_import_regex=r"from pants_test.pants_run_integration_test import PantsRunIntegrationTest",
+    correct_import_message=r"from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest"
+  )
   check_banned_import(
     rust_files,
     bad_import_regex=r"^use std::sync::.*(Mutex|RwLock)",

@@ -5,10 +5,10 @@ import json
 import os
 
 from pants.util.contextutil import temporary_file_path
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class RunTrackerIntegrationTest(PantsRunIntegrationTest):
+class RunTrackerIntegrationTest(SafePantsRunIntegrationTest):
   def test_stats_local_json_file_v1(self):
     with temporary_file_path() as tmpfile:
       pants_run = self.run_pants([

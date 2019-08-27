@@ -5,10 +5,10 @@ import os
 import subprocess
 
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class PythonAWSLambdaIntegrationTest(PantsRunIntegrationTest):
+class PythonAWSLambdaIntegrationTest(SafePantsRunIntegrationTest):
   @classmethod
   def hermetic(cls):
     return True

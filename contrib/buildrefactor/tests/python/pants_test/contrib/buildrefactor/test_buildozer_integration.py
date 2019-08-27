@@ -1,10 +1,10 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class BuildozerIntegrationTest(PantsRunIntegrationTest):
+class BuildozerIntegrationTest(SafePantsRunIntegrationTest):
   def test_buildozer_warn(self):
     buildozer_print_run = self.run_pants(['buildozer',
       '--command=print name',

@@ -5,10 +5,10 @@ from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_file
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class FindBugsTest(PantsRunIntegrationTest):
+class FindBugsTest(SafePantsRunIntegrationTest):
 
   @classmethod
   def hermetic(cls):

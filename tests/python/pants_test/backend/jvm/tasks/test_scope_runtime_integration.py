@@ -9,10 +9,10 @@ from zipfile import ZipFile
 
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class ScopeRuntimeIntegrationTest(PantsRunIntegrationTest):
+class ScopeRuntimeIntegrationTest(SafePantsRunIntegrationTest):
 
   @classmethod
   def _spec(cls, name):
@@ -110,7 +110,7 @@ class ScopeRuntimeIntegrationTest(PantsRunIntegrationTest):
                              for name in os.listdir(os.path.join(bundle_dir, 'libs'))))
 
 
-class ScopeChangesCacheInvalidationIntegrationTest(PantsRunIntegrationTest):
+class ScopeChangesCacheInvalidationIntegrationTest(SafePantsRunIntegrationTest):
 
   def test_invalidate_compiles_when_scopes_change(self):
     with temporary_dir(root_dir=get_buildroot()) as workdir_parent:

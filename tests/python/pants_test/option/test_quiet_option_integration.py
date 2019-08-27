@@ -4,10 +4,10 @@
 import json
 
 from pants.util.contextutil import temporary_file
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class TestOptionsQuietIntegration(PantsRunIntegrationTest):
+class TestOptionsQuietIntegration(SafePantsRunIntegrationTest):
   def test_pants_default_quietness(self):
     pants_run = self.run_pants(['export'])
     self.assert_success(pants_run)

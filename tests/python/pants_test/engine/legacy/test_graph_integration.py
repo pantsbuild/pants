@@ -5,10 +5,10 @@ import os
 import unittest
 
 from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class GraphIntegrationTest(PantsRunIntegrationTest):
+class GraphIntegrationTest(SafePantsRunIntegrationTest):
 
   @classmethod
   def use_pantsd_env_var(cls):

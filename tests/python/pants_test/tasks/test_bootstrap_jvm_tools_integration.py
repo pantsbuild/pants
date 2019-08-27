@@ -2,10 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_resolver
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest, ensure_resolver
 
 
-class BootstrapJvmToolsIntegrationTest(PantsRunIntegrationTest):
+class BootstrapJvmToolsIntegrationTest(SafePantsRunIntegrationTest):
 
   @ensure_resolver
   def test_zinc_tool_reuse_between_scala_and_java(self):

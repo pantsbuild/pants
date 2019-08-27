@@ -11,10 +11,10 @@ from twitter.common.collections import maybe_list
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.intermediate_target_factory import hash_target
 from pants_test.backend.project_info.tasks.resolve_jars_test_mixin import ResolveJarsTestMixin
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_resolver
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest, ensure_resolver
 
 
-class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
+class ExportIntegrationTest(ResolveJarsTestMixin, SafePantsRunIntegrationTest):
   _confs_args = [
     '--export-libraries-sources',
     '--export-libraries-javadocs',

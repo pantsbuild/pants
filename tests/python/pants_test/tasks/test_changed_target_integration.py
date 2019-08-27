@@ -8,11 +8,11 @@ from textwrap import dedent
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 from pants_test.testutils.git_util import initialize_repo
 
 
-class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
+class ChangedTargetGoalsIntegrationTest(SafePantsRunIntegrationTest):
   @contextmanager
   def known_commits(self):
     with temporary_dir(root_dir=get_buildroot()) as worktree:

@@ -9,10 +9,10 @@ from pants.backend.project_info.tasks.idea_plugin_gen import IDEA_PLUGIN_VERSION
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.util.contextutil import temporary_file
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
+class IdeaPluginIntegrationTest(SafePantsRunIntegrationTest):
   def _do_check(self, project_dir_path, expected_project_path, expected_targets,
                 incremental_import=None):
     """Check to see that the project contains the expected source folders."""

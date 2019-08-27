@@ -5,10 +5,10 @@ import os
 import shutil
 
 from pants.base.build_environment import get_buildroot
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class StrictDepsInvalidationIntegrationTest(PantsRunIntegrationTest):
+class StrictDepsInvalidationIntegrationTest(SafePantsRunIntegrationTest):
 
   TEST_SRC = 'testprojects/tests/java/org/pantsbuild/testproject/strictdeps'
 

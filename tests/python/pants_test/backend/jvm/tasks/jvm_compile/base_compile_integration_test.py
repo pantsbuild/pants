@@ -6,10 +6,10 @@ from collections import defaultdict
 from contextlib import contextmanager
 
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class BaseCompileIT(PantsRunIntegrationTest):
+class BaseCompileIT(SafePantsRunIntegrationTest):
   """
   :API: public
   """

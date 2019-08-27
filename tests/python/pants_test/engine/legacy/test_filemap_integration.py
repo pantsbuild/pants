@@ -4,10 +4,10 @@
 import os
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
-class FilemapIntegrationTest(PantsRunIntegrationTest):
+class FilemapIntegrationTest(SafePantsRunIntegrationTest):
   PATH_PREFIX = 'testprojects/tests/python/pants/file_sets/'
   TEST_EXCLUDE_FILES = {
     'a.py', 'aa.py', 'aaa.py', 'ab.py', 'aabb.py', 'test_a.py',

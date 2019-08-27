@@ -1,7 +1,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
 
 
 def ensure_experimental(test_fn):
@@ -16,7 +16,7 @@ def ensure_experimental(test_fn):
   return wrapper
 
 
-class JunitTestsConcurrencyIntegrationTest(PantsRunIntegrationTest):
+class JunitTestsConcurrencyIntegrationTest(SafePantsRunIntegrationTest):
   """Run tests with different concurrency settings.
 
   Note that each of these tests is intended to be annotated with @ensure_experimental and run twice,
@@ -140,7 +140,7 @@ class JunitTestsConcurrencyIntegrationTest(PantsRunIntegrationTest):
       self.assertIn("Tests run: 4,  Failures: 3", pants_run.stdout_data)
 
 
-class ExperimentalOnlyJunitTestsConcurrencyIntegrationTest(PantsRunIntegrationTest):
+class ExperimentalOnlyJunitTestsConcurrencyIntegrationTest(SafePantsRunIntegrationTest):
   """The following tests only work with the experimental runner."""
 
   def test_concurrency_annotated_test_serial_parallel_both(self):
