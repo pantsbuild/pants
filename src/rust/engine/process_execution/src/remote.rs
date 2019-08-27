@@ -1003,6 +1003,7 @@ pub mod tests {
   use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
   use mock;
   use protobuf::{self, Message, ProtobufEnum};
+  use spectral::{assert_that, string::StrAssertions};
   use store::Store;
   use tempfile::TempDir;
   use testutil::data::{TestData, TestDirectory};
@@ -1414,32 +1415,33 @@ pub mod tests {
     let execute_request = echo_foo_request();
 
     let mock_server = {
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        "wrong-command".to_string(),
-        super::make_execute_request(
-          &ExecuteProcessRequest {
-            argv: owned_string_vec(&["/bin/echo", "-n", "bar"]),
-            env: BTreeMap::new(),
-            input_files: EMPTY_DIGEST,
-            output_files: BTreeSet::new(),
-            output_directories: BTreeSet::new(),
-            timeout: Duration::from_millis(1000),
-            description: "wrong command".to_string(),
-            jdk_home: None,
-          },
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          "wrong-command".to_string(),
+          super::make_execute_request(
+            &ExecuteProcessRequest {
+              argv: owned_string_vec(&["/bin/echo", "-n", "bar"]),
+              env: BTreeMap::new(),
+              input_files: EMPTY_DIGEST,
+              output_files: BTreeSet::new(),
+              output_directories: BTreeSet::new(),
+              timeout: Duration::from_millis(1000),
+              description: "wrong command".to_string(),
+              jdk_home: None,
+            },
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          vec![],
+        ),
+        None,
+      )
     };
 
     let error = run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
-    assert_eq!(
-      error,
-      "InvalidArgument: \"Did not expect this request\"".to_string()
-    );
+    assert_that(&error).contains("InvalidArgument");
+    assert_that(&error).contains("Did not expect this request");
   }
 
   #[test]
@@ -1449,21 +1451,24 @@ pub mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&execute_request, empty_request_metadata())
-          .unwrap()
-          .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_successful_operation(
-            &op_name,
-            StdoutType::Raw("foo".to_owned()),
-            StderrType::Raw("".to_owned()),
-            0,
-          ),
-        ],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request, empty_request_metadata())
+            .unwrap()
+            .2,
+          vec![
+            make_incomplete_operation(&op_name),
+            make_successful_operation(
+              &op_name,
+              StdoutType::Raw("foo".to_owned()),
+              StderrType::Raw("".to_owned()),
+              0,
+            ),
+          ],
+        ),
+        None,
+      )
     };
 
     let result = run_command_remote(mock_server.address(), execute_request).unwrap();
@@ -1548,18 +1553,21 @@ pub mod tests {
     let mock_server = {
       let op_name = "cat".to_owned();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&echo_roland_request(), empty_request_metadata())
-          .unwrap()
-          .2,
-        vec![make_successful_operation(
-          &op_name.clone(),
-          StdoutType::Raw(test_stdout.string()),
-          StderrType::Raw(test_stderr.string()),
-          0,
-        )],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&echo_roland_request(), empty_request_metadata())
+            .unwrap()
+            .2,
+          vec![make_successful_operation(
+            &op_name.clone(),
+            StdoutType::Raw(test_stdout.string()),
+            StderrType::Raw(test_stderr.string()),
+            0,
+          )],
+        ),
+        None,
+      )
     };
 
     let store_dir = TempDir::new().unwrap();
@@ -1640,22 +1648,25 @@ pub mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&execute_request, empty_request_metadata())
-          .unwrap()
-          .2,
-        Vec::from_iter(
-          iter::repeat(make_incomplete_operation(&op_name))
-            .take(4)
-            .chain(iter::once(make_successful_operation(
-              &op_name,
-              StdoutType::Raw("foo".to_owned()),
-              StderrType::Raw("".to_owned()),
-              0,
-            ))),
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request, empty_request_metadata())
+            .unwrap()
+            .2,
+          Vec::from_iter(
+            iter::repeat(make_incomplete_operation(&op_name))
+              .take(4)
+              .chain(iter::once(make_successful_operation(
+                &op_name,
+                StdoutType::Raw("foo".to_owned()),
+                StderrType::Raw("".to_owned()),
+                0,
+              ))),
+          ),
         ),
-      ))
+        None,
+      )
     };
 
     let result = run_command_remote(mock_server.address(), execute_request).unwrap();
@@ -1691,16 +1702,19 @@ pub mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&execute_request, empty_request_metadata())
-          .unwrap()
-          .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_delayed_incomplete_operation(&op_name, delayed_operation_time),
-        ],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request, empty_request_metadata())
+            .unwrap()
+            .2,
+          vec![
+            make_incomplete_operation(&op_name),
+            make_delayed_incomplete_operation(&op_name, delayed_operation_time),
+          ],
+        ),
+        None,
+      )
     };
 
     let error_msg = run_command_remote(mock_server.address(), execute_request)
@@ -1716,22 +1730,25 @@ pub mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&execute_request, empty_request_metadata())
-          .unwrap()
-          .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_canceled_operation(Some(Duration::from_millis(100))),
-          make_successful_operation(
-            &op_name,
-            StdoutType::Raw("foo".to_owned()),
-            StderrType::Raw("".to_owned()),
-            0,
-          ),
-        ],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request, empty_request_metadata())
+            .unwrap()
+            .2,
+          vec![
+            make_incomplete_operation(&op_name),
+            make_canceled_operation(Some(Duration::from_millis(100))),
+            make_successful_operation(
+              &op_name,
+              StdoutType::Raw("foo".to_owned()),
+              StderrType::Raw("".to_owned()),
+              0,
+            ),
+          ],
+        ),
+        None,
+      )
     };
 
     let result = run_command_remote(mock_server.address(), execute_request).unwrap();
@@ -1755,32 +1772,35 @@ pub mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&execute_request, empty_request_metadata())
-          .unwrap()
-          .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          MockOperation::new({
-            let mut op = bazel_protos::operations::Operation::new();
-            op.set_name(op_name.clone());
-            op.set_done(true);
-            op.set_response({
-              let mut response_wrapper = protobuf::well_known_types::Any::new();
-              response_wrapper.set_type_url(format!(
-                "type.googleapis.com/{}",
-                bazel_protos::remote_execution::ExecuteResponse::new()
-                  .descriptor()
-                  .full_name()
-              ));
-              response_wrapper.set_value(vec![0x00, 0x00, 0x00]);
-              response_wrapper
-            });
-            op
-          }),
-        ],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request, empty_request_metadata())
+            .unwrap()
+            .2,
+          vec![
+            make_incomplete_operation(&op_name),
+            MockOperation::new({
+              let mut op = bazel_protos::operations::Operation::new();
+              op.set_name(op_name.clone());
+              op.set_done(true);
+              op.set_response({
+                let mut response_wrapper = protobuf::well_known_types::Any::new();
+                response_wrapper.set_type_url(format!(
+                  "type.googleapis.com/{}",
+                  bazel_protos::remote_execution::ExecuteResponse::new()
+                    .descriptor()
+                    .full_name()
+                ));
+                response_wrapper.set_value(vec![0x00, 0x00, 0x00]);
+                response_wrapper
+              });
+              op
+            }),
+          ],
+        ),
+        None,
+      )
     };
 
     run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
@@ -1793,24 +1813,27 @@ pub mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&execute_request, empty_request_metadata())
-          .unwrap()
-          .2,
-        vec![MockOperation::new({
-          let mut op = bazel_protos::operations::Operation::new();
-          op.set_name(op_name.to_string());
-          op.set_done(true);
-          op.set_error({
-            let mut error = bazel_protos::status::Status::new();
-            error.set_code(bazel_protos::code::Code::INTERNAL.value());
-            error.set_message("Something went wrong".to_string());
-            error
-          });
-          op
-        })],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request, empty_request_metadata())
+            .unwrap()
+            .2,
+          vec![MockOperation::new({
+            let mut op = bazel_protos::operations::Operation::new();
+            op.set_name(op_name.to_string());
+            op.set_done(true);
+            op.set_error({
+              let mut error = bazel_protos::status::Status::new();
+              error.set_code(bazel_protos::code::Code::INTERNAL.value());
+              error.set_message("Something went wrong".to_string());
+              error
+            });
+            op
+          })],
+        ),
+        None,
+      )
     };
 
     let result = run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
@@ -1825,27 +1848,30 @@ pub mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&execute_request, empty_request_metadata())
-          .unwrap()
-          .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          MockOperation::new({
-            let mut op = bazel_protos::operations::Operation::new();
-            op.set_name(op_name.to_string());
-            op.set_done(true);
-            op.set_error({
-              let mut error = bazel_protos::status::Status::new();
-              error.set_code(bazel_protos::code::Code::INTERNAL.value());
-              error.set_message("Something went wrong".to_string());
-              error
-            });
-            op
-          }),
-        ],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request, empty_request_metadata())
+            .unwrap()
+            .2,
+          vec![
+            make_incomplete_operation(&op_name),
+            MockOperation::new({
+              let mut op = bazel_protos::operations::Operation::new();
+              op.set_name(op_name.to_string());
+              op.set_done(true);
+              op.set_error({
+                let mut error = bazel_protos::status::Status::new();
+                error.set_code(bazel_protos::code::Code::INTERNAL.value());
+                error.set_message("Something went wrong".to_string());
+                error
+              });
+              op
+            }),
+          ],
+        ),
+        None,
+      )
     };
 
     let result = run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
@@ -1860,18 +1886,21 @@ pub mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&execute_request, empty_request_metadata())
-          .unwrap()
-          .2,
-        vec![MockOperation::new({
-          let mut op = bazel_protos::operations::Operation::new();
-          op.set_name(op_name.to_string());
-          op.set_done(true);
-          op
-        })],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request, empty_request_metadata())
+            .unwrap()
+            .2,
+          vec![MockOperation::new({
+            let mut op = bazel_protos::operations::Operation::new();
+            op.set_name(op_name.to_string());
+            op.set_done(true);
+            op
+          })],
+        ),
+        None,
+      )
     };
 
     let result = run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
@@ -1886,21 +1915,24 @@ pub mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&execute_request, empty_request_metadata())
-          .unwrap()
-          .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          MockOperation::new({
-            let mut op = bazel_protos::operations::Operation::new();
-            op.set_name(op_name.to_string());
-            op.set_done(true);
-            op
-          }),
-        ],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request, empty_request_metadata())
+            .unwrap()
+            .2,
+          vec![
+            make_incomplete_operation(&op_name),
+            MockOperation::new({
+              let mut op = bazel_protos::operations::Operation::new();
+              op.set_name(op_name.to_string());
+              op.set_done(true);
+              op
+            }),
+          ],
+        ),
+        None,
+      )
     };
 
     let result = run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
@@ -1917,24 +1949,27 @@ pub mod tests {
     let mock_server = {
       let op_name = "cat".to_owned();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&cat_roland_request(), empty_request_metadata())
-          .unwrap()
-          .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_precondition_failure_operation(vec![missing_preconditionfailure_violation(
-            &roland.digest(),
-          )]),
-          make_successful_operation(
-            "cat2",
-            StdoutType::Raw(roland.string()),
-            StderrType::Raw("".to_owned()),
-            0,
-          ),
-        ],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&cat_roland_request(), empty_request_metadata())
+            .unwrap()
+            .2,
+          vec![
+            make_incomplete_operation(&op_name),
+            make_precondition_failure_operation(vec![missing_preconditionfailure_violation(
+              &roland.digest(),
+            )]),
+            make_successful_operation(
+              "cat2",
+              StdoutType::Raw(roland.string()),
+              StderrType::Raw("".to_owned()),
+              0,
+            ),
+          ],
+        ),
+        None,
+      )
     };
 
     let store_dir = TempDir::new().unwrap();
@@ -2010,25 +2045,28 @@ pub mod tests {
         ),
       };
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&cat_roland_request(), empty_request_metadata())
-          .unwrap()
-          .2,
-        vec![
-          //make_incomplete_operation(&op_name),
-          MockOperation {
-            op: Err(status),
-            duration: None,
-          },
-          make_successful_operation(
-            "cat2",
-            StdoutType::Raw(roland.string()),
-            StderrType::Raw("".to_owned()),
-            0,
-          ),
-        ],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&cat_roland_request(), empty_request_metadata())
+            .unwrap()
+            .2,
+          vec![
+            //make_incomplete_operation(&op_name),
+            MockOperation {
+              op: Err(status),
+              duration: None,
+            },
+            make_successful_operation(
+              "cat2",
+              StdoutType::Raw(roland.string()),
+              StderrType::Raw("".to_owned()),
+              0,
+            ),
+          ],
+        ),
+        None,
+      )
     };
 
     let store_dir = TempDir::new().unwrap();
@@ -2087,15 +2125,18 @@ pub mod tests {
     let mock_server = {
       let op_name = "cat".to_owned();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&cat_roland_request(), empty_request_metadata())
-          .unwrap()
-          .2,
-        // We won't get as far as trying to run the operation, so don't expect any requests whose
-        // responses we would need to stub.
-        vec![],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&cat_roland_request(), empty_request_metadata())
+            .unwrap()
+            .2,
+          // We won't get as far as trying to run the operation, so don't expect any requests whose
+          // responses we would need to stub.
+          vec![],
+        ),
+        None,
+      )
     };
 
     let store_dir = TempDir::new().unwrap();
@@ -2343,21 +2384,24 @@ pub mod tests {
       let execute_request = echo_foo_request();
       let mock_server = {
         let op_name = "gimme-foo".to_string();
-        mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-          op_name.clone(),
-          super::make_execute_request(&execute_request, empty_request_metadata())
-            .unwrap()
-            .2,
-          vec![
-            make_incomplete_operation(&op_name),
-            make_successful_operation(
-              &op_name,
-              StdoutType::Raw("foo".to_owned()),
-              StderrType::Raw("".to_owned()),
-              0,
-            ),
-          ],
-        ))
+        mock::execution_server::TestServer::new(
+          mock::execution_server::MockExecution::new(
+            op_name.clone(),
+            super::make_execute_request(&execute_request, empty_request_metadata())
+              .unwrap()
+              .2,
+            vec![
+              make_incomplete_operation(&op_name),
+              make_successful_operation(
+                &op_name,
+                StdoutType::Raw("foo".to_owned()),
+                StderrType::Raw("".to_owned()),
+                0,
+              ),
+            ],
+          ),
+          None,
+        )
       };
       run_command_remote(mock_server.address(), execute_request).unwrap();
 
@@ -2381,23 +2425,26 @@ pub mod tests {
       let execute_request = echo_foo_request();
       let mock_server = {
         let op_name = "gimme-foo".to_string();
-        mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-          op_name.clone(),
-          super::make_execute_request(&execute_request, empty_request_metadata())
-            .unwrap()
-            .2,
-          vec![
-            make_incomplete_operation(&op_name),
-            make_incomplete_operation(&op_name),
-            make_incomplete_operation(&op_name),
-            make_successful_operation(
-              &op_name,
-              StdoutType::Raw("foo".to_owned()),
-              StderrType::Raw("".to_owned()),
-              0,
-            ),
-          ],
-        ))
+        mock::execution_server::TestServer::new(
+          mock::execution_server::MockExecution::new(
+            op_name.clone(),
+            super::make_execute_request(&execute_request, empty_request_metadata())
+              .unwrap()
+              .2,
+            vec![
+              make_incomplete_operation(&op_name),
+              make_incomplete_operation(&op_name),
+              make_incomplete_operation(&op_name),
+              make_successful_operation(
+                &op_name,
+                StdoutType::Raw("foo".to_owned()),
+                StderrType::Raw("".to_owned()),
+                0,
+              ),
+            ],
+          ),
+          None,
+        )
       };
       run_command_remote(mock_server.address(), execute_request).unwrap();
 

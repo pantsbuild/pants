@@ -33,5 +33,6 @@ tokio = "0.1"
 [dev-dependencies]
 maplit = "1.0.1"
 mock = { path = "../testutil/mock" }
+spectral = "0.6.0"
 tempfile = "3"
 testutil = { path = "../testutil" }
