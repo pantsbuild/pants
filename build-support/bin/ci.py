@@ -196,9 +196,12 @@ def get_all_python_tests(*, tag: Optional[str] = None) -> Set[str]:
   ]
   if tag is not None:
     command.insert(1, f"--tag={tag}")
-  return set(subprocess.run(
-    command, stdout=subprocess.PIPE, encoding="utf-8", check=True
-  ).stdout.strip().split("\n"))
+  try:
+    process = subprocess.run(command, stdout=subprocess.PIPE, encoding="utf-8", check=True)
+  except CalledProcessError as error:
+    print(f"get_all_python_tests failed {error.stderr}")
+    raise
+  return set(process.stdout.strip().split("\n"))
 
 # -------------------------------------------------------------------------
 # Bootstrap pants.pex
