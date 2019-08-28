@@ -1,4 +1,11 @@
 scala_library(
+  name='macro-extractor',
+  provides=scala_artifact(
+    org='org.pantsbuild',
+    name='macro-extractor',
+    repo=public,
+    publication_metadata=pants_library('???'),
+  ),
   dependencies=[
     '3rdparty/jvm/org/scalameta:scalameta',
     '3rdparty/jvm/org/scala-lang:scala-compiler',
