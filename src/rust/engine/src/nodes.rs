@@ -511,18 +511,19 @@ impl WrappedNode for MultiPlatformExecuteProcess {
   fn run(self, context: Context) -> NodeFuture<ProcessResult> {
     let request = self.0;
     let workunit_store = context.session.workunit_store();
-    match context.core.command_runner.is_compatible_request(&request) {
-      true => context
+    if context.core.command_runner.is_compatible_request(&request) {
+      context
         .core
         .command_runner
         .run(request, workunit_store)
         .map(ProcessResult)
         .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
-        .to_boxed(),
-      false => err(throw(&format!(
+        .to_boxed()
+    } else {
+      err(throw(&format!(
         "No compatible platform found for request: {:?}",
         request
-      ))),
+      )))
     }
   }
 }
@@ -536,18 +537,19 @@ impl WrappedNode for ExecuteProcess {
   fn run(self, context: Context) -> NodeFuture<ProcessResult> {
     let request: process_execution::MultiPlatformExecuteProcessRequest = self.0.into();
     let workunit_store = context.session.workunit_store();
-    match context.core.command_runner.is_compatible_request(&request) {
-      true => context
+    if context.core.command_runner.is_compatible_request(&request) {
+      context
         .core
         .command_runner
         .run(request, workunit_store)
         .map(ProcessResult)
         .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
-        .to_boxed(),
-      false => err(throw(&format!(
+        .to_boxed()
+    } else {
+      err(throw(&format!(
         "No compatible platform found for request: {:?}",
         request
-      ))),
+      )))
     }
   }
 }
