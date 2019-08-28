@@ -7,6 +7,7 @@ target(
     ':node_preinstalled_module',
     ':node_remote_module',
     ':node_test',
+    ':node_thrift_library',
   ]
 )
 
