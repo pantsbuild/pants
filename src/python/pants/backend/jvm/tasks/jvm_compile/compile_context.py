@@ -15,7 +15,8 @@ class CompileContext:
   """
 
   def __init__(self, target, analysis_file, classes_dir, jar_file,
-               log_dir, args_file, post_compile_merge_dir, sources):
+               log_dir, args_file, post_compile_merge_dir, sources,
+               macros_in_dependency_classpath_file):
     self.target = target
     self.analysis_file = analysis_file
     self.classes_dir = classes_dir
@@ -24,6 +25,7 @@ class CompileContext:
     self.args_file = args_file
     self.post_compile_merge_dir = post_compile_merge_dir
     self.sources = sources
+    self.macros_in_dependency_classpath_file = macros_in_dependency_classpath_file
 
   @contextmanager
   def open_jar(self, mode):

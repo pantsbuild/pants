@@ -389,7 +389,9 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                           args_file=os.path.join(target_workdir, 'zinc_args'),
                           post_compile_merge_dir=os.path.join(target_workdir,
                                                               'post_compile_merge_dir'),
-                          sources=self._compute_sources_for_target(target))
+                          sources=self._compute_sources_for_target(target),
+                          macros_in_dependency_classpath_file=os.path.join(target_workdir,
+                                                                           'macros-in-classpath'))
 
   def execute(self):
     requested_compiler = JvmPlatform.global_instance().get_options().compiler

@@ -92,8 +92,9 @@ class RscCompileContext(CompileContext):
                args_file,
                post_compile_merge_dir,
                sources,
-               workflow):
-    super().__init__(target, analysis_file, classes_dir, jar_file, log_dir, args_file, post_compile_merge_dir, sources)
+               workflow,
+               macros_in_dependency_classpath_file):
+    super().__init__(target, analysis_file, classes_dir, jar_file, log_dir, args_file, post_compile_merge_dir, sources, macros_in_dependency_classpath_file)
     self.workflow = workflow
     self.rsc_jar_file = rsc_jar_file
 
@@ -571,6 +572,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         post_compile_merge_dir=os.path.join(rsc_dir, 'post_compile_merge_dir'),
         sources=sources,
         workflow=self._classify_target_compile_workflow(target),
+        macros_in_dependency_classpath_file=None,
       ),
       zinc_cc=CompileContext(
         target=target,
@@ -581,6 +583,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         args_file=os.path.join(zinc_dir, 'zinc_args'),
         post_compile_merge_dir=os.path.join(zinc_dir, 'post_compile_merge_dir'),
         sources=sources,
+        macros_in_dependency_classpath_file=os.path.join(target_workdir, 'macros-in-classpath'),
       ))
 
   def _runtool_hermetic(self, main, tool_name, distribution, input_digest, ctx):
