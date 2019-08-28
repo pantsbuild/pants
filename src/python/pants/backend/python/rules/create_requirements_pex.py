@@ -5,11 +5,8 @@ from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment, PythonNativeCode
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.engine.fs import Digest
-from pants.engine.isolated_process import (
-  MultiPlatformExecuteProcessRequest,
-  ExecuteProcessRequest,
-  ExecuteProcessResult
-)
+from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
+                                           MultiPlatformExecuteProcessRequest)
 from pants.engine.platform import Platform
 from pants.engine.rules import optionable_rule, rule
 from pants.engine.selectors import Get
@@ -32,8 +29,8 @@ class RequirementsPex(datatype([('directory_digest', Digest)])):
 
 # TODO: This is non-hermetic because the requirements will be resolved on the fly by
 # pex, where it should be hermetically provided in some way.
-@rule(RequirementsPex, [RequirementsPexRequest, DownloadedPexBin, PythonSetup, PexBuildEnvironment])
-def create_requirements_pex(request, pex_bin, python_setup, pex_build_environment):
+@rule(RequirementsPex, [RequirementsPexRequest, DownloadedPexBin, PythonSetup, PexBuildEnvironment, Platform])
+def create_requirements_pex(request, pex_bin, python_setup, pex_build_environment, platform):
   """Returns a PEX with the given requirements, optional entry point, and optional
   interpreter constraints."""
 
@@ -56,15 +53,20 @@ def create_requirements_pex(request, pex_bin, python_setup, pex_build_environmen
     argv.extend(["--entry-point", request.entry_point])
   argv.extend(interpreter_constraint_args + list(request.requirements))
 
-  execute_process_request = ExecuteProcessRequest(
-    argv=tuple(argv),
-    env=env,
-    input_files=pex_bin.directory_digest,
-    description=f"Create a requirements PEX: {', '.join(request.requirements)}",
-    output_files=(request.output_filename,),
+  execute_process_request = MultiPlatformExecuteProcessRequest(
+    (
+      (Platform.value, Platform.value),
+      ExecuteProcessRequest(
+        argv=tuple(argv),
+        env=env,
+        input_files=pex_bin.directory_digest,
+        description=f"Create a requirements PEX: {', '.join(request.requirements)}",
+        output_files=(request.output_filename,),
+      )
+    )
   )
 
-  result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, execute_process_request)
+  result = yield Get(ExecuteProcessResult, MultiPlatformExecuteProcessRequest, execute_process_request)
   yield RequirementsPex(directory_digest=result.output_directory_digest)
 
 

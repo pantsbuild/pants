@@ -31,8 +31,8 @@ extern crate derivative;
 
 use boxfuture::BoxFuture;
 use bytes::Bytes;
-use std::convert::TryFrom;
 use std::collections::{BTreeMap, BTreeSet};
+use std::convert::TryFrom;
 use std::ops::AddAssign;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -60,9 +60,9 @@ impl Platform {
   pub fn current_platform() -> Result<Platform, String> {
     let platform_info = uname::uname().expect("Failed to get local platform info!");
     match platform_info {
-      uname::Info {ref sysname, ..} if sysname.to_lowercase() == String::from("darwin") => Ok(Platform::Darwin),
-      uname::Info {ref sysname, ..} if sysname.to_lowercase() == String::from("linux") => Ok(Platform::Linux),
-      uname::Info {ref sysname, ..} => Err(format!("Found unknown system name {}", sysname))
+      uname::Info { ref sysname, .. } if sysname.to_lowercase() == "darwin" => Ok(Platform::Darwin),
+      uname::Info { ref sysname, .. } if sysname.to_lowercase() == "linux" => Ok(Platform::Linux),
+      uname::Info { ref sysname, .. } => Err(format!("Found unknown system name {}", sysname)),
     }
   }
 }
@@ -118,7 +118,9 @@ impl TryFrom<MultiPlatformExecuteProcessRequest> for ExecuteProcessRequest {
   fn try_from(req: MultiPlatformExecuteProcessRequest) -> Result<Self, Self::Error> {
     match req.0.get(&(Platform::None, Platform::None)) {
       Some(crossplatform_req) => Ok(crossplatform_req.clone()),
-      None => Err(String::from("Cannot coerce to a simple ExecuteProcessRequest, no cross platform request exists."))
+      None => Err(String::from(
+        "Cannot coerce to a simple ExecuteProcessRequest, no cross platform request exists.",
+      )),
     }
   }
 }
@@ -128,11 +130,17 @@ impl TryFrom<MultiPlatformExecuteProcessRequest> for ExecuteProcessRequest {
 ///
 #[derive(Derivative, Clone, Debug, Eq)]
 #[derivative(PartialEq, Hash)]
-pub struct MultiPlatformExecuteProcessRequest(pub BTreeMap<(Platform, Platform), ExecuteProcessRequest>);
+pub struct MultiPlatformExecuteProcessRequest(
+  pub BTreeMap<(Platform, Platform), ExecuteProcessRequest>,
+);
 
 impl From<ExecuteProcessRequest> for MultiPlatformExecuteProcessRequest {
   fn from(req: ExecuteProcessRequest) -> Self {
-    MultiPlatformExecuteProcessRequest(vec![((Platform::None, Platform::None), req)].into_iter().collect())
+    MultiPlatformExecuteProcessRequest(
+      vec![((Platform::None, Platform::None), req)]
+        .into_iter()
+        .collect(),
+    )
   }
 }
 
@@ -199,7 +207,10 @@ pub trait CommandRunner: Send + Sync {
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<FallibleExecuteProcessResult, String>;
   fn is_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> bool;
-  fn get_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> ExecuteProcessRequest;
+  fn get_compatible_request(
+    &self,
+    req: &MultiPlatformExecuteProcessRequest,
+  ) -> ExecuteProcessRequest;
   fn get_platform(&self) -> Platform {
     Platform::None
   }
@@ -232,13 +243,16 @@ impl CommandRunner for BoundedCommandRunner {
       .inner
       .1
       .with_acquired(move || inner.0.run(req, workunit_store))
-    }
+  }
 
   fn is_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> bool {
     self.inner.0.is_compatible_request(&req)
   }
 
-  fn get_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> ExecuteProcessRequest{
+  fn get_compatible_request(
+    &self,
+    req: &MultiPlatformExecuteProcessRequest,
+  ) -> ExecuteProcessRequest {
     self.inner.0.get_compatible_request(&req)
   }
 
@@ -253,11 +267,9 @@ impl From<Box<BoundedCommandRunner>> for Arc<dyn CommandRunner> {
   }
 }
 
-
-
 #[cfg(test)]
 mod tests {
-  use super::{ExecuteProcessRequest};
+  use super::ExecuteProcessRequest;
   use std::collections::hash_map::DefaultHasher;
   use std::collections::{BTreeMap, BTreeSet};
   use std::hash::{Hash, Hasher};

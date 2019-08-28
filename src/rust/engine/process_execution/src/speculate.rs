@@ -1,4 +1,7 @@
-use super::{CommandRunner, ExecuteProcessRequest, MultiPlatformExecuteProcessRequest, FallibleExecuteProcessResult};
+use super::{
+  CommandRunner, ExecuteProcessRequest, FallibleExecuteProcessResult,
+  MultiPlatformExecuteProcessRequest,
+};
 use boxfuture::{BoxFuture, Boxable};
 use futures::future::{err, ok, Future};
 use std::sync::Arc;
@@ -56,8 +59,14 @@ impl CommandRunner for SpeculatingCommandRunner {
     self.primary.is_compatible_request(req) || self.secondary.is_compatible_request(req)
   }
 
-  fn get_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> ExecuteProcessRequest {
-    match (self.primary.is_compatible_request(req), self.secondary.is_compatible_request(req)) {
+  fn get_compatible_request(
+    &self,
+    req: &MultiPlatformExecuteProcessRequest,
+  ) -> ExecuteProcessRequest {
+    match (
+      self.primary.is_compatible_request(req),
+      self.secondary.is_compatible_request(req),
+    ) {
       (true, _) => self.primary.get_compatible_request(req),
       (_, true) => self.secondary.get_compatible_request(req),
       _ => panic!("No compatible requests found"),
@@ -69,7 +78,10 @@ impl CommandRunner for SpeculatingCommandRunner {
     req: MultiPlatformExecuteProcessRequest,
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
-    match (self.primary.is_compatible_request(&req), self.secondary.is_compatible_request(&req)) {
+    match (
+      self.primary.is_compatible_request(&req),
+      self.secondary.is_compatible_request(&req),
+    ) {
       (true, true) => self.speculate(req, workunit_store),
       (true, false) => self.primary.run(req, workunit_store),
       (false, true) => self.secondary.run(req, workunit_store),
@@ -77,7 +89,6 @@ impl CommandRunner for SpeculatingCommandRunner {
     }
   }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -93,7 +104,8 @@ mod tests {
   use workunit_store::WorkUnitStore;
 
   use super::{
-    CommandRunner, MultiPlatformExecuteProcessRequest, ExecuteProcessRequest, FallibleExecuteProcessResult, SpeculatingCommandRunner
+    CommandRunner, ExecuteProcessRequest, FallibleExecuteProcessResult,
+    MultiPlatformExecuteProcessRequest, SpeculatingCommandRunner,
   };
   use crate::Platform;
 
@@ -244,8 +256,15 @@ mod tests {
     fn is_compatible_request(&self, _req: &MultiPlatformExecuteProcessRequest) -> bool {
       true
     }
-    fn get_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> ExecuteProcessRequest {
-      req.0.get(&(Platform::None, Platform::None)).unwrap().clone()
+    fn get_compatible_request(
+      &self,
+      req: &MultiPlatformExecuteProcessRequest,
+    ) -> ExecuteProcessRequest {
+      req
+        .0
+        .get(&(Platform::None, Platform::None))
+        .unwrap()
+        .clone()
     }
   }
 }

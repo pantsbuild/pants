@@ -33,7 +33,7 @@ use process_execution;
 
 use clap::{value_t, App, AppSettings, Arg};
 use hashing::{Digest, Fingerprint};
-use process_execution::{Platform, ExecuteProcessRequestMetadata};
+use process_execution::{ExecuteProcessRequestMetadata, Platform};
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter::Iterator;
 use std::path::PathBuf;

@@ -18,7 +18,9 @@ use store::{OneOffStoreFileByDigest, Snapshot, Store};
 use tokio_codec::{BytesCodec, FramedRead};
 use tokio_process::CommandExt;
 
-use super::{Platform, MultiPlatformExecuteProcessRequest, ExecuteProcessRequest, FallibleExecuteProcessResult};
+use super::{
+  ExecuteProcessRequest, FallibleExecuteProcessResult, MultiPlatformExecuteProcessRequest, Platform,
+};
 
 use bytes::{Bytes, BytesMut};
 use workunit_store::WorkUnitStore;
@@ -225,16 +227,25 @@ impl super::CommandRunner for CommandRunner {
   }
 
   fn is_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> bool {
-    req.0.contains_key(&(Platform::None, Platform::None)) || req.0.contains_key(&(self.platform.clone(), Platform::current_platform().unwrap()))
+    req.0.contains_key(&(Platform::None, Platform::None))
+      || req
+        .0
+        .contains_key(&(self.platform.clone(), Platform::current_platform().unwrap()))
   }
 
-  fn get_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> ExecuteProcessRequest {
+  fn get_compatible_request(
+    &self,
+    req: &MultiPlatformExecuteProcessRequest,
+  ) -> ExecuteProcessRequest {
     match req.0.get(&(Platform::None, Platform::None)) {
       Some(req) => req.clone(),
       None => {
-        match req.0.get(&(self.platform.clone(), Platform::current_platform().unwrap())) {
+        match req
+          .0
+          .get(&(self.platform.clone(), Platform::current_platform().unwrap()))
+        {
           Some(req) => req.clone(),
-          None => panic!("No compatible request found!")
+          None => panic!("No compatible request found!"),
         }
       }
     }
@@ -369,9 +380,9 @@ mod tests {
   use tempfile;
   use testutil;
 
-  use crate::Platform;
-  use super::super::{CommandRunner as CommandRunnerTrait};
+  use super::super::CommandRunner as CommandRunnerTrait;
   use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
+  use crate::Platform;
   use hashing::EMPTY_DIGEST;
   use std;
   use std::collections::{BTreeMap, BTreeSet};
@@ -938,7 +949,7 @@ mod tests {
       executor: executor.clone(),
       work_dir: dir,
       cleanup_local_dirs: cleanup,
-      platform: Platform::current_platform().unwrap()
+      platform: Platform::current_platform().unwrap(),
     };
     executor.block_on(runner.run(req.into(), WorkUnitStore::new()))
   }

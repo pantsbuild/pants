@@ -27,7 +27,9 @@ use fs::{
   PathGlobs, PathStat, StrictGlobMatching, VFS,
 };
 use hashing;
-use process_execution::{self, Platform, ExecuteProcessRequest, MultiPlatformExecuteProcessRequest};
+use process_execution::{
+  self, ExecuteProcessRequest, MultiPlatformExecuteProcessRequest, Platform,
+};
 use rule_graph;
 
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
@@ -307,7 +309,7 @@ impl WrappedNode for Select {
               )
             })
             .to_boxed()
-        },
+        }
         &tasks::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.process_result
             && input == context.core.types.multi_platform_process_request =>
@@ -315,10 +317,18 @@ impl WrappedNode for Select {
           let context = context.clone();
           let core = context.core.clone();
           self
-            .select_product(&context, context.core.types.multi_platform_process_request, "intrinsic")
+            .select_product(
+              &context,
+              context.core.types.multi_platform_process_request,
+              "intrinsic",
+            )
             .and_then(|request| {
-              MultiPlatformExecuteProcess::lift(&request)
-                .map_err(|str| throw(&format!("Error lifting MultiPlatformExecuteProcess: {}", str)))
+              MultiPlatformExecuteProcess::lift(&request).map_err(|str| {
+                throw(&format!(
+                  "Error lifting MultiPlatformExecuteProcess: {}",
+                  str
+                ))
+              })
             })
             .and_then(move |process_request| context.get(process_request))
             .map(move |result| {
@@ -333,8 +343,8 @@ impl WrappedNode for Select {
               )
             })
             .to_boxed()
-        },
-        &tasks::Rule::Intrinsic(i) => panic!("Unrecognized intrinsic: {:?}", i)
+        }
+        &tasks::Rule::Intrinsic(i) => panic!("Unrecognized intrinsic: {:?}", i),
       },
       &rule_graph::Entry::Param(type_id) => {
         if let Some(key) = self.params.find(type_id) {
@@ -450,19 +460,28 @@ impl MultiPlatformExecuteProcess {
       "darwin" => Platform::Darwin,
       "linux" => Platform::Linux,
       "none" => Platform::None,
-      _ => unreachable!()
+      _ => unreachable!(),
     }
   }
 
   fn lift(value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
-    let mut request_by_constraint: BTreeMap<(Platform, Platform), ExecuteProcessRequest> = BTreeMap::new();
+    let mut request_by_constraint: BTreeMap<(Platform, Platform), ExecuteProcessRequest> =
+      BTreeMap::new();
     let constraint_parts = externs::project_multi_strs(&value, "platform_constraints");
-    let requests: Vec<ExecuteProcessRequest> = externs::project_multi(&value, "execute_process_requests").iter().map(|r| ExecuteProcess::lift(r).unwrap().0).collect();
+    let requests: Vec<ExecuteProcessRequest> =
+      externs::project_multi(&value, "execute_process_requests")
+        .iter()
+        .map(|r| ExecuteProcess::lift(r).unwrap().0)
+        .collect();
     if constraint_parts.len() % 2 != 0 {
       return Err("Error parsing platform_constraints: odd number of parts".to_owned());
     }
     if constraint_parts.len() / 2 != requests.len() {
-      return Err(format!("Size of constraint keys and requests does not match: {} vs. {}", constraint_parts.len() / 2, requests.len()))
+      return Err(format!(
+        "Size of constraint keys and requests does not match: {} vs. {}",
+        constraint_parts.len() / 2,
+        requests.len()
+      ));
     }
     for (constraint_key_pair, request) in constraint_parts.chunks_exact(2).zip(requests.iter()) {
       let mut platform_constaint: Vec<Platform> = constraint_key_pair
@@ -471,10 +490,12 @@ impl MultiPlatformExecuteProcess {
         .collect();
       request_by_constraint.insert(
         (platform_constaint.remove(0), platform_constaint.remove(1)),
-        request.clone()
+        request.clone(),
       );
     }
-    return Ok(MultiPlatformExecuteProcess(MultiPlatformExecuteProcessRequest(request_by_constraint)));
+    Ok(MultiPlatformExecuteProcess(
+      MultiPlatformExecuteProcessRequest(request_by_constraint),
+    ))
   }
 }
 
@@ -491,16 +512,17 @@ impl WrappedNode for MultiPlatformExecuteProcess {
     let request = self.0;
     let workunit_store = context.session.workunit_store();
     match context.core.command_runner.is_compatible_request(&request) {
-      true => {
-        context
-          .core
-          .command_runner
-          .run(request, workunit_store)
-          .map(ProcessResult)
-          .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
-          .to_boxed()
-      },
-      false => err(throw(&format!("No compatible platform found for request: {:?}", request)))
+      true => context
+        .core
+        .command_runner
+        .run(request, workunit_store)
+        .map(ProcessResult)
+        .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
+        .to_boxed(),
+      false => err(throw(&format!(
+        "No compatible platform found for request: {:?}",
+        request
+      ))),
     }
   }
 }
@@ -515,16 +537,17 @@ impl WrappedNode for ExecuteProcess {
     let request: process_execution::MultiPlatformExecuteProcessRequest = self.0.into();
     let workunit_store = context.session.workunit_store();
     match context.core.command_runner.is_compatible_request(&request) {
-      true => {
-        context
-          .core
-          .command_runner
-          .run(request, workunit_store)
-          .map(ProcessResult)
-          .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
-          .to_boxed()
-      },
-      false => err(throw(&format!("No compatible platform found for request: {:?}", request)))
+      true => context
+        .core
+        .command_runner
+        .run(request, workunit_store)
+        .map(ProcessResult)
+        .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
+        .to_boxed(),
+      false => err(throw(&format!(
+        "No compatible platform found for request: {:?}",
+        request
+      ))),
     }
   }
 }
@@ -1284,7 +1307,9 @@ impl Display for NodeKey {
       &NodeKey::DigestFile(ref s) => write!(f, "DigestFile({:?})", s.0),
       &NodeKey::DownloadedFile(ref s) => write!(f, "DownloadedFile({:?})", s.0),
       &NodeKey::ExecuteProcess(ref s) => write!(f, "ExecuteProcess({:?}", s.0),
-      &NodeKey::MultiPlatformExecuteProcess(ref s) => write!(f, "MultiPlatformExecuteProcess({:?}", s.0),
+      &NodeKey::MultiPlatformExecuteProcess(ref s) => {
+        write!(f, "MultiPlatformExecuteProcess({:?}", s.0)
+      }
       &NodeKey::ReadLink(ref s) => write!(f, "ReadLink({:?})", s.0),
       &NodeKey::Scandir(ref s) => write!(f, "Scandir({:?})", s.0),
       &NodeKey::Select(ref s) => write!(f, "Select({}, {})", s.params, s.product,),

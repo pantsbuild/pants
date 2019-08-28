@@ -143,6 +143,17 @@ python_library(
 )
 
 python_library(
+  name='platform',
+  sources=['platform.py'],
+  dependencies=[
+      ':rules',
+      'src/python/pants/util:objects',
+      'src/python/pants/util:memo',
+      'src/python/pants/util:osutil',
+  ]
+)
+
+python_library(
   name='rules',
   sources=['rules.py'],
   dependencies=[

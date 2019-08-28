@@ -2,10 +2,10 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std;
+use std::convert::{Into, TryInto};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use std::convert::{TryInto, Into};
 
 use futures::Future;
 
@@ -20,7 +20,8 @@ use core::clone::Clone;
 use fs::{safe_create_dir_all_ioerror, PosixFS};
 use graph::{EntryId, Graph, NodeContext};
 use process_execution::{
-  self, Platform, speculate::SpeculatingCommandRunner, BoundedCommandRunner, ExecuteProcessRequestMetadata,
+  self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, ExecuteProcessRequestMetadata,
+  Platform,
 };
 use rand::seq::SliceRandom;
 use reqwest;
@@ -138,8 +139,8 @@ impl Core {
       platform_properties: remote_execution_extra_platform_properties.clone(),
     };
 
-    let mut command_runner: Box<dyn process_execution::CommandRunner> = Box::new(
-      BoundedCommandRunner::new(
+    let mut command_runner: Box<dyn process_execution::CommandRunner> =
+      Box::new(BoundedCommandRunner::new(
         Box::new(process_execution::local::CommandRunner::new(
           store.clone(),
           executor.clone(),
@@ -148,11 +149,11 @@ impl Core {
           Platform::current_platform().unwrap(),
         )),
         process_execution_local_parallelism,
-      )
-    );
+      ));
 
     if remote_execution {
-      let remote_command_runner: Box<dyn process_execution::CommandRunner> = Box::new(BoundedCommandRunner::new(
+      let remote_command_runner: Box<dyn process_execution::CommandRunner> =
+        Box::new(BoundedCommandRunner::new(
           Box::new(process_execution::remote::CommandRunner::new(
             // No problem unwrapping here because the global options validation
             // requires the remote_execution_server be present when remote_execution is set.
@@ -163,7 +164,7 @@ impl Core {
             store.clone(),
             // TODO if we ever want to configure the remote platform to be something else we
             // need to take an option all the way down here and into the remote::CommandRunner struct.
-            Platform::Linux
+            Platform::Linux,
           )),
           process_execution_remote_parallelism,
         ));
@@ -198,7 +199,6 @@ impl Core {
         metadata: process_execution_metadata,
       })
     }
-
 
     let http_client = reqwest::r#async::Client::new();
     let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);

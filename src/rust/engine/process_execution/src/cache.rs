@@ -1,4 +1,7 @@
-use crate::{Platform, ExecuteProcessRequest, MultiPlatformExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecuteProcessResult};
+use crate::{
+  ExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecuteProcessResult,
+  MultiPlatformExecuteProcessRequest, Platform,
+};
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use futures::Future;
@@ -23,7 +26,10 @@ impl crate::CommandRunner for CommandRunner {
     self.underlying.is_compatible_request(req)
   }
 
-  fn get_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> ExecuteProcessRequest {
+  fn get_compatible_request(
+    &self,
+    req: &MultiPlatformExecuteProcessRequest,
+  ) -> ExecuteProcessRequest {
     self.underlying.get_compatible_request(req)
   }
 
@@ -70,7 +76,6 @@ impl crate::CommandRunner for CommandRunner {
       })
       .to_boxed()
   }
-
 }
 
 impl CommandRunner {
@@ -154,7 +159,7 @@ impl CommandRunner {
 #[cfg(test)]
 mod test {
   use crate::ExecuteProcessRequest;
-  use crate::{CommandRunner as CommandRunnerTrait, Platform, ExecuteProcessRequestMetadata};
+  use crate::{CommandRunner as CommandRunnerTrait, ExecuteProcessRequestMetadata, Platform};
   use hashing::EMPTY_DIGEST;
   use sharded_lmdb::ShardedLmdb;
   use std::collections::{BTreeMap, BTreeSet};
@@ -178,7 +183,7 @@ mod test {
       runtime.clone(),
       work_dir.path().to_owned(),
       true,
-      Platform::current_platform().unwrap()
+      Platform::current_platform().unwrap(),
     );
 
     let script_dir = TempDir::new().unwrap();
@@ -226,7 +231,8 @@ mod test {
       },
     };
 
-    let uncached_result = runtime.block_on(caching.run(request.clone().into(), WorkUnitStore::new()));
+    let uncached_result =
+      runtime.block_on(caching.run(request.clone().into(), WorkUnitStore::new()));
 
     assert_eq!(local_result, uncached_result);
 

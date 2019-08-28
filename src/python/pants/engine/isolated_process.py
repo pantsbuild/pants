@@ -5,14 +5,16 @@ import logging
 
 from pants.engine.fs import Digest
 from pants.engine.rules import RootRule, rule
-from pants.util.objects import (
-  Exactly, datatype, hashable_string_list, string_optional, string_type, enum, TypedCollection
-)
+from pants.util.objects import (Exactly, TypedCollection, datatype, enum, hashable_string_list,
+                                string_optional, string_type)
 
 
 logger = logging.getLogger(__name__)
 
 _default_timeout_seconds = 15 * 60
+
+
+class ProductDescription(datatype([('value', string_type)])): pass
 
 
 class ExecuteProcessRequest(datatype([
@@ -70,11 +72,17 @@ class MultiPlatformExecuteProcessRequest(datatype([
   ALLOWED_PLATFORM_CONSTRAINTS = enum(['darwin', 'linux', 'none'])
 
   def __new__(cls, *args):
+    if len(args) == 0:
+      raise cls.make_type_error("At least one platform constrained ExecuteProcessRequest must be passed.")
+
     d = dict(args)
     # validate the platform constraints using the platforms enum an flatten the keys.
     validated_constraints = tuple(
       cls.ALLOWED_PLATFORM_CONSTRAINTS(constraint).value for pair in d.keys() for constraint in pair
     )
+    if len({req.description for req in d.values()}) != 1:
+      raise ValueError(f"The `description` of all execute_process_requests in a {cls.__name__} must be identical.")
+
     return super().__new__(
       cls,
       validated_constraints,
@@ -130,8 +138,20 @@ stderr:
     super().__init__(msg)
 
 
-@rule(ExecuteProcessResult, [FallibleExecuteProcessResult, ExecuteProcessRequest])
-def fallible_to_exec_result_or_raise(fallible_result, request):
+@rule(ProductDescription, [ExecuteProcessRequest])
+def get_request_description(req):
+  return ProductDescription(req.description)
+
+
+@rule(ProductDescription, [MultiPlatformExecuteProcessRequest])
+def get_multi_platform_request_description(req):
+  # we can safely extract the first description because we guarantee that at
+  # least one request exists and that all of their descriptions are the same.
+  return ProductDescription(req.execute_process_requests[0].description)
+
+
+@rule(ExecuteProcessResult, [FallibleExecuteProcessResult, ProductDescription])
+def fallible_to_exec_result_or_raise(fallible_result, description):
   """Converts a FallibleExecuteProcessResult to a ExecuteProcessResult or raises an error."""
 
   if fallible_result.exit_code == 0:
@@ -145,7 +165,7 @@ def fallible_to_exec_result_or_raise(fallible_result, request):
       fallible_result.exit_code,
       fallible_result.stdout,
       fallible_result.stderr,
-      request.description
+      description.value
     )
 
 
@@ -153,5 +173,7 @@ def create_process_rules():
   """Creates rules that consume the intrinsic filesystem types."""
   return [
     RootRule(ExecuteProcessRequest),
-    fallible_to_exec_result_or_raise
+    fallible_to_exec_result_or_raise,
+    get_request_description,
+    get_multi_platform_request_description,
   ]
