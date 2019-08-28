@@ -50,6 +50,7 @@ use log::{error, Log};
 use logging::logger::LOGGER;
 use logging::{Destination, Logger};
 use rule_graph::{GraphMaker, RuleGraph};
+use std::any::Any;
 use std::borrow::Borrow;
 use std::collections::BTreeMap;
 use std::ffi::CStr;
@@ -649,15 +650,22 @@ pub extern "C" fn rule_subgraph_visualize(
   })
 }
 
-// TODO(#4884): This produces "thread panicked while processing panic. aborting." on my linux
-// laptop, requiring me to set RUST_BACKTRACE=1 (or "full") to get the panic message.
+fn generate_panic_string(payload: &(dyn Any + Send)) -> String {
+  match payload
+    .downcast_ref::<String>()
+    .cloned()
+    .or_else(|| payload.downcast_ref::<&str>().map(|s| s.to_string()))
+  {
+    Some(ref s) => format!("panic at '{}'", s),
+    None => format!("Non-string panic payload at {:p}", payload),
+  }
+}
+
 #[no_mangle]
 pub extern "C" fn set_panic_handler() {
   panic::set_hook(Box::new(|panic_info| {
-    let mut panic_str = format!(
-      "panic at '{}'",
-      panic_info.payload().downcast_ref::<&str>().unwrap()
-    );
+    let payload = panic_info.payload();
+    let mut panic_str = generate_panic_string(payload);
 
     if let Some(location) = panic_info.location() {
       let panic_location_str = format!(", {}:{}", location.file(), location.line());
@@ -669,6 +677,26 @@ pub extern "C" fn set_panic_handler() {
     let panic_file_bug_str = "Please file a bug at https://github.com/pantsbuild/pants/issues.";
     error!("{}", panic_file_bug_str);
   }));
+}
+
+#[cfg(test)]
+#[test]
+fn test_panic_string() {
+  let a: &str = "a str panic payload";
+  assert_eq!(
+    generate_panic_string(&a as &(dyn Any + Send)),
+    "panic at 'a str panic payload'"
+  );
+
+  let b: String = "a String panic payload".to_string();
+  assert_eq!(
+    generate_panic_string(&b as &(dyn Any + Send)),
+    "panic at 'a String panic payload'"
+  );
+
+  let c: u32 = 18;
+  let output = generate_panic_string(&c as &(dyn Any + Send));
+  assert!(output.contains("Non-string panic payload at"));
 }
 
 #[no_mangle]
