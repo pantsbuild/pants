@@ -94,7 +94,7 @@ class TestReportingRemoteIntegration(PantsRunIntegrationTest, unittest.TestCase)
         '--local-store-dir={}'.format(store_dir)
       ]
 
-      pants_run = self.run_pants(command)
+      pants_run = self.run_pants(command, extra_env={"RUST_BACKTRACE": "FULL"})
       self.assert_success(pants_run)
 
       child_processes = find_child_processes_that_send_spans(pants_run.stderr_data)
