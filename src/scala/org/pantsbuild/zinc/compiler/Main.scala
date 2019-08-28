@@ -7,6 +7,8 @@ package org.pantsbuild.zinc.compiler
 import java.io.File
 import java.nio.file.Paths
 import scala.collection.JavaConverters._
+import scala.concurrent.{Await, Future}
+import scala.concurrent.duration.Duration
 
 import sbt.internal.inc.IncrementalCompilerImpl
 import sbt.internal.util.{ BasicLogger, ConsoleLogger, ConsoleOut, StackTrace }
@@ -18,13 +20,14 @@ import com.martiansoftware.nailgun.NGContext
 import com.google.common.base.Charsets
 import com.google.common.io.Files
 
+import org.pantsbuild.native_image.FindMacros
 import org.pantsbuild.zinc.analysis.AnalysisMap
 import org.pantsbuild.zinc.util.Util
 
-// TODO: why does the default logger take so long? Is it scanning the filesystem or doing something
-// else pathological?
 // The normal sbt logger takes 5 seconds to start up in a native image. This is intended to be
 // equivalent, while allowing the native image to run immediately.
+// TODO: why does the default logger take so long? Is it scanning the filesystem or doing something
+// else pathological?
 case class BareBonesLogger(thisLevel: Level.Value) extends BasicLogger {
   import scala.Console.{ CYAN, GREEN, RED, YELLOW, RESET }
 
@@ -145,6 +148,23 @@ object Main {
     fixedArgs
   }
 
+  implicit val ec = scala.concurrent.ExecutionContext.global
+
+  def maybeWriteMacroOutput(settings: Settings): Unit = {
+    import java.nio.file.StandardOpenOption._
+    settings.dependencyClasspathMacrosAnalysis match {
+      case Some(macroOutputFile) =>
+        val mergedCompileClasspathString = settings.classpath.map(_.toString).mkString(":")
+        val macroClassNames = FindMacros.run(mergedCompileClasspathString)
+        // Writes iterable of String as lines to the specified file!
+        java.nio.file.Files.write(
+          macroOutputFile.toPath,
+          macroClassNames.asJava,
+          CREATE, WRITE)
+      case None => ()
+    }
+  }
+
   /**
    * Run a compile.
    */
@@ -192,6 +212,8 @@ object Main {
       InputUtils.loadDestinationAnalysis(settings, analysisMap, log)
     val inputs = InputUtils.create(settings, analysisMap, previousResult, log)
 
+    val macroFileOutput = Future(maybeWriteMacroOutput(settings))
+
     if (isDebug) {
       log.debug(s"Inputs: $inputs")
     }
@@ -222,6 +244,9 @@ object Main {
         log.debug("Creating JAR at %s, for files at %s" format (outputJarPath, classesDirectory))
         OutputUtils.createClassesJar(classesDirectory, outputJarPath, settings.creationTime)
       }
+
+      // Wait for the macro scanning to complete.
+      Await.result(macroFileOutput, Duration(1, "second"))
     } catch {
       case e: CompileFailed =>
         log.error("Compile failed " + Util.timing(startTime))

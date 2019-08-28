@@ -25,6 +25,7 @@ scala_library(
     'src/scala/org/pantsbuild/zinc/scalautil',
     'src/scala/org/pantsbuild/zinc/util',
     'src/scala/META-INF/native-image/org/pantsbuild/zinc/compiler:zinc-native-image-configuration',
+    'src/scala/org/pantsbuild/native_image:macro-extractor',
     'src/scala/org/pantsbuild/zinc/compiler/native-image-substitutions',
     'src/scala/org/pantsbuild/zinc/compiler/native-image-substitutions:statics',
   ],

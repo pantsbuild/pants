@@ -39,7 +39,8 @@ case class Settings(
   _incOptions: IncOptions           = IncOptions(),
   analysis: AnalysisOptions         = AnalysisOptions(),
   creationTime: Long                = 0,
-  compiledBridgeJar: Option[File]   = None
+  compiledBridgeJar: Option[File]   = None,
+  dependencyClasspathMacrosAnalysis: Option[File] = None
 ) {
   import Settings._
 
@@ -78,7 +79,8 @@ case class Settings(
       javaHome = normaliseOpt(javaHome),
       _incOptions = _incOptions.withAbsolutePaths(relativeTo),
       analysis = analysis.withAbsolutePaths(relativeTo),
-      compiledBridgeJar = normaliseOpt(compiledBridgeJar)
+      compiledBridgeJar = normaliseOpt(compiledBridgeJar),
+      dependencyClasspathMacrosAnalysis = normaliseOpt(dependencyClasspathMacrosAnalysis)
     )
   }
 }
@@ -429,6 +431,10 @@ object Settings {
       .unbounded()
       .action((x, c) => c.copy(javacOptions = c.javacOptions :+ x))
       .text("Pass option to javac")
+
+    opt[File]("dependency-classpath-macros-analysis")
+      .action((x, c) => c.copy(dependencyClasspathMacrosAnalysis = Some(x)))
+      .text("File path to output a listing of macro names in the compile classpath.")
 
     arg[File]("<file>...")
       .unbounded()
