@@ -34,14 +34,13 @@ class Dependencies(ConsoleTask):
 
     self.is_internal_only = self.get_options().internal_only
     self.is_external_only = self.get_options().external_only
-    self._transitive = self.get_options().transitive
     if self.is_internal_only and self.is_external_only:
       raise TaskError('At most one of --internal-only or --external-only can be selected.')
 
   def console_output(self, unused_method_argument):
     ordered_closure = OrderedSet()
     for target in self.context.target_roots:
-      if self._transitive:
+      if self.act_transitively:
         target.walk(ordered_closure.add)
       else:
         ordered_closure.update(target.dependencies)

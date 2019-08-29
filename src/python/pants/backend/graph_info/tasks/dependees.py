@@ -23,7 +23,6 @@ class ReverseDepmap(ConsoleTask):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
 
-    self._transitive = self.get_options().transitive
     self._closed = self.get_options().closed
 
   def console_output(self, _):
@@ -68,7 +67,7 @@ class ReverseDepmap(ConsoleTask):
       for target in check:
         dependents.update(dependees_by_target[target])
       check = dependents - known_dependents
-      if not check or not self._transitive:
+      if not check or not self.act_transitively:
         return dependents - set(roots)
       known_dependents = dependents
 

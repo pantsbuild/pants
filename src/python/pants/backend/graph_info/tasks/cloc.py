@@ -25,9 +25,6 @@ class CountLinesOfCode(ConsoleTask):
              help='Show information about files ignored by cloc.')
 
   def console_output(self, targets):
-    if not self.get_options().transitive:
-      targets = self.context.target_roots
-
     input_snapshots = tuple(
       target.sources_snapshot(scheduler=self.context._scheduler) for target in targets
     )

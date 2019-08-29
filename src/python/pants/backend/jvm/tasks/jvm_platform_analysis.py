@@ -315,7 +315,7 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
 
   @memoized_property
   def dependency_map(self):
-    if not self.get_options().transitive:
+    if not (self.get_options().transitive or self.get_options().list_transitive_deps):
       return self.jvm_dependency_map
     full_map = self._unfiltered_jvm_dependency_map(fully_transitive=True)
     return {target: deps for target, deps in full_map.items()
