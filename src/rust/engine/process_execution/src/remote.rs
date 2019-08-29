@@ -33,6 +33,47 @@ use workunit_store::{generate_random_64bit_string, get_parent_id, WorkUnit, Work
 // CommandRunner.
 const CACHE_KEY_GEN_VERSION_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_GEN_VERSION";
 
+struct CancelRemoteExecutionToken {
+  operations_client: Arc<bazel_protos::operations_grpc::OperationsClient>,
+  cancel_op_req: bazel_protos::operations::CancelOperationRequest,
+}
+
+impl CancelRemoteExecutionToken {
+
+  fn new(
+    operations_client: Arc<bazel_protos::operations_grpc::OperationsClient>,
+    operation_name: ::std::string::String,
+  ) -> CancelRemoteExecutionToken {
+    let mut cancel_op_req = bazel_protos::operations::CancelOperationRequest::new();
+    cancel_op_req.set_name(operation_name);
+    CancelRemoteExecutionToken {
+      operations_client,
+      cancel_op_req,
+    }
+  }
+}
+
+impl Drop for CancelRemoteExecutionToken {
+  fn drop(&mut self) {
+    let operation_name = self.cancel_op_req.name.clone();
+    match self.operations_client.cancel_operation_async(&self.cancel_op_req) {
+      Ok(receiver) => { tokio::spawn(receiver.then(move |res| {
+        match res {
+          Ok(_) => debug!("Canceled operation {} successfully", operation_name),
+          Err(err) => debug!("Failed to cancel operation {}, err {}", operation_name, err),
+        }
+        future::ok(())
+        },
+      ));},
+      Err(err) => debug!(
+        "Failed to schedule cancel operation: {}, err {}",
+        self.cancel_op_req.name,
+        err
+      ),
+    };
+  }
+}
+
 #[derive(Debug)]
 enum OperationOrStatus {
   Operation(bazel_protos::operations::Operation),
@@ -188,9 +229,16 @@ impl super::CommandRunner for CommandRunner {
           .and_then(move |(operation, history)| {
             let start_time = Instant::now();
 
+            let maybe_cancel_remote_exec_token = match &operation {
+              OperationOrStatus::Operation(ops) => Some(CancelRemoteExecutionToken::new(
+              operations_client.clone(),
+              ops.name.clone()
+              )),
+              _ => None,
+            };
             future::loop_fn(
-              (history, operation, 0),
-              move |(mut history, operation, iter_num)| {
+              (history, operation, maybe_cancel_remote_exec_token, 0),
+              move |(mut history, operation, _maybe_cancel_remote_exec_token, iter_num)| {
                 let description = description.clone();
 
                 let execute_request = execute_request.clone();
@@ -238,7 +286,16 @@ impl super::CommandRunner for CommandRunner {
                           }
                         })
                         // Reset `iter_num` on `MissingDigests`
-                        .map(|(operation, history)| future::Loop::Continue((history, operation, 0)))
+                        .map(|(operation, history)| {
+                          let maybe_cancel_remote_exec_token = match &operation {
+                            OperationOrStatus::Operation(ops) => Some(CancelRemoteExecutionToken::new(
+                              operations_client2,
+                              ops.name.clone()
+                            )),
+                            _ => None,
+                          };
+                          future::Loop::Continue((history, operation, maybe_cancel_remote_exec_token, 0))
+                        })
                         .to_boxed()
                     }
                     ExecutionError::NotFinished(operation_name) => {
@@ -292,7 +349,14 @@ impl super::CommandRunner for CommandRunner {
                                 .map_err(rpcerror_to_string),
                             )
                             .map(move |operation| {
-                              future::Loop::Continue((history, operation, iter_num + 1))
+                              let maybe_cancel_remote_exec_token = match &operation {
+                                OperationOrStatus::Operation(ops) => Some(CancelRemoteExecutionToken::new(
+                                  operations_client.clone(),
+                                  ops.name.clone()
+                                )),
+                                _ => None,
+                              };
+                              future::Loop::Continue((history, operation, maybe_cancel_remote_exec_token, iter_num + 1))
                             })
                             .to_boxed()
                           })
