@@ -1051,6 +1051,13 @@ pub mod tests {
     Digest(Digest),
   }
 
+  fn make_some_execute_request(
+    req: &ExecuteProcessRequest,
+    metadata: ExecuteProcessRequestMetadata,
+  ) -> Result<Option<bazel_protos::remote_execution::ExecuteRequest>, String> {
+    Ok(Some(super::make_execute_request(req, metadata)?.2))
+  }
+
   #[test]
   fn make_execute_request() {
     let input_directory = TestDirectory::containing_roland();
@@ -1433,7 +1440,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           "wrong-command".to_string(),
-          super::make_execute_request(
+          make_some_execute_request(
             &ExecuteProcessRequest {
               argv: owned_string_vec(&["/bin/echo", "-n", "bar"]),
               env: BTreeMap::new(),
@@ -1446,8 +1453,7 @@ pub mod tests {
             },
             empty_request_metadata(),
           )
-          .unwrap()
-          .2,
+          .unwrap(),
           vec![],
         ),
         None,
@@ -1469,9 +1475,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, empty_request_metadata())
-            .unwrap()
-            .2,
+          make_some_execute_request(&execute_request, empty_request_metadata()).unwrap(),
           vec![
             make_incomplete_operation(&op_name),
             make_successful_operation(
@@ -1571,9 +1575,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&echo_roland_request(), empty_request_metadata())
-            .unwrap()
-            .2,
+          make_some_execute_request(&echo_roland_request(), empty_request_metadata()).unwrap(),
           vec![make_successful_operation(
             &op_name.clone(),
             StdoutType::Raw(test_stdout.string()),
@@ -1666,9 +1668,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, empty_request_metadata())
-            .unwrap()
-            .2,
+          make_some_execute_request(&execute_request, empty_request_metadata()).unwrap(),
           Vec::from_iter(
             iter::repeat(make_incomplete_operation(&op_name))
               .take(4)
@@ -1720,9 +1720,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, empty_request_metadata())
-            .unwrap()
-            .2,
+          make_some_execute_request(&execute_request, empty_request_metadata()).unwrap(),
           vec![
             make_incomplete_operation(&op_name),
             make_delayed_incomplete_operation(&op_name, delayed_operation_time),
@@ -1753,9 +1751,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, empty_request_metadata())
-            .unwrap()
-            .2,
+          make_some_execute_request(&execute_request, empty_request_metadata()).unwrap(),
           vec![
             make_incomplete_operation(&op_name),
             make_canceled_operation(Some(Duration::from_millis(100))),
@@ -1795,9 +1791,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, empty_request_metadata())
-            .unwrap()
-            .2,
+          make_some_execute_request(&execute_request, empty_request_metadata()).unwrap(),
           vec![
             make_incomplete_operation(&op_name),
             MockOperation::new({
@@ -1836,9 +1830,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, empty_request_metadata())
-            .unwrap()
-            .2,
+          make_some_execute_request(&execute_request, empty_request_metadata()).unwrap(),
           vec![MockOperation::new({
             let mut op = bazel_protos::operations::Operation::new();
             op.set_name(op_name.to_string());
@@ -1871,9 +1863,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, empty_request_metadata())
-            .unwrap()
-            .2,
+          make_some_execute_request(&execute_request, empty_request_metadata()).unwrap(),
           vec![
             make_incomplete_operation(&op_name),
             MockOperation::new({
@@ -1909,9 +1899,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, empty_request_metadata())
-            .unwrap()
-            .2,
+          make_some_execute_request(&execute_request, empty_request_metadata()).unwrap(),
           vec![MockOperation::new({
             let mut op = bazel_protos::operations::Operation::new();
             op.set_name(op_name.to_string());
@@ -1938,9 +1926,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&execute_request, empty_request_metadata())
-            .unwrap()
-            .2,
+          make_some_execute_request(&execute_request, empty_request_metadata()).unwrap(),
           vec![
             make_incomplete_operation(&op_name),
             MockOperation::new({
@@ -1972,9 +1958,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&cat_roland_request(), empty_request_metadata())
-            .unwrap()
-            .2,
+          make_some_execute_request(&cat_roland_request(), empty_request_metadata()).unwrap(),
           vec![
             make_incomplete_operation(&op_name),
             make_precondition_failure_operation(vec![missing_preconditionfailure_violation(
@@ -2068,9 +2052,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&cat_roland_request(), empty_request_metadata())
-            .unwrap()
-            .2,
+          make_some_execute_request(&cat_roland_request(), empty_request_metadata()).unwrap(),
           vec![
             //make_incomplete_operation(&op_name),
             MockOperation {
@@ -2148,9 +2130,7 @@ pub mod tests {
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
-          super::make_execute_request(&cat_roland_request(), empty_request_metadata())
-            .unwrap()
-            .2,
+          make_some_execute_request(&cat_roland_request(), empty_request_metadata()).unwrap(),
           // We won't get as far as trying to run the operation, so don't expect any requests whose
           // responses we would need to stub.
           vec![],
@@ -2407,9 +2387,7 @@ pub mod tests {
         mock::execution_server::TestServer::new(
           mock::execution_server::MockExecution::new(
             op_name.clone(),
-            super::make_execute_request(&execute_request, empty_request_metadata())
-              .unwrap()
-              .2,
+            make_some_execute_request(&execute_request, empty_request_metadata()).unwrap(),
             vec![
               make_incomplete_operation(&op_name),
               make_successful_operation(
@@ -2448,9 +2426,7 @@ pub mod tests {
         mock::execution_server::TestServer::new(
           mock::execution_server::MockExecution::new(
             op_name.clone(),
-            super::make_execute_request(&execute_request, empty_request_metadata())
-              .unwrap()
-              .2,
+            make_some_execute_request(&execute_request, empty_request_metadata()).unwrap(),
             vec![
               make_incomplete_operation(&op_name),
               make_incomplete_operation(&op_name),

@@ -38,7 +38,8 @@ impl MockOperation {
 #[derive(Clone, Debug)]
 pub struct MockExecution {
   name: String,
-  execute_request: bazel_protos::remote_execution::ExecuteRequest,
+  /// If this is some, we will panic if we receive any request that doesn't match it
+  execute_request: Option<bazel_protos::remote_execution::ExecuteRequest>,
   operation_responses: Arc<Mutex<VecDeque<MockOperation>>>,
 }
 
@@ -53,7 +54,7 @@ impl MockExecution {
   ///
   pub fn new(
     name: String,
-    execute_request: bazel_protos::remote_execution::ExecuteRequest,
+    execute_request: Option<bazel_protos::remote_execution::ExecuteRequest>,
     operation_responses: Vec<MockOperation>,
   ) -> MockExecution {
     MockExecution {
@@ -262,19 +263,21 @@ impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
   ) {
     self.log(req.clone());
 
-    if self.mock_execution.execute_request != req {
-      ctx.spawn(
-        sink
-          .fail(grpcio::RpcStatus::new(
-            grpcio::RpcStatusCode::InvalidArgument,
-            Some(format!(
-              "Did not expect this request. Expected: {:?}, Got: {:?}",
-              self.mock_execution.execute_request, req
-            )),
-          ))
-          .map_err(|_| ()),
-      );
-      return;
+    if let Some(execute_request) = &self.mock_execution.execute_request {
+      if execute_request != &req {
+        ctx.spawn(
+          sink
+            .fail(grpcio::RpcStatus::new(
+              grpcio::RpcStatusCode::InvalidArgument,
+              Some(format!(
+                "Did not expect this request. Expected: {:?}, Got: {:?}",
+                self.mock_execution.execute_request, req
+              )),
+            ))
+            .map_err(|_| ()),
+        );
+        return;
+      }
     }
 
     self.send_next_operation_stream(&ctx, sink);

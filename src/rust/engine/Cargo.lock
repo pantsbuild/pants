@@ -1315,7 +1315,9 @@ version = "0.1.0"
 dependencies = [
  "bazel_protos 0.0.1",
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hashing 0.0.1",
  "mock 0.0.1",
+ "protobuf 2.0.6 (git+https://github.com/pantsbuild/rust-protobuf?rev=171611c33ec92f07e1b7107327f6d0139a7afebf)",
  "structopt 0.2.18 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

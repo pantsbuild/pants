@@ -28,11 +28,11 @@
 
 use bazel_protos::{
   operations::Operation,
-  remote_execution::{Digest, ExecuteRequest},
+  remote_execution::{Digest, OutputFile},
 };
 use mock::execution_server::{MockExecution, MockOperation, TestServer};
+use protobuf::{self, Message};
 use std::io::Read;
-
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -44,34 +44,73 @@ struct Options {
   #[structopt(short = "p", long = "port")]
   port: Option<u16>,
   #[structopt(
-    long = "request_hash",
-    help = "The hash of the digest from the request the server should expect to receive"
+    long = "output_paths",
+    help = "The paths that the client expects to be returned in the ExecuteResponse."
   )]
-  request_hash: String,
-  #[structopt(
-    long = "request_size",
-    help = "The size (in bytes) of the digest from the request the server should expect to receive"
-  )]
-  request_size: i64,
+  output_paths: Vec<String>,
+}
+
+/// The digest of an empty string
+/// It has the interesting property that the CAS server will always have it even without having to
+/// upload anything, which can make up for the absence of actual work being done and uploading
+/// actual files to it in a test configuration
+fn empty_digest() -> Digest {
+  let mut digest = Digest::new();
+  digest.set_hash("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".into());
+  digest
+}
+
+/// Generate the protobuf types for a list of empty files at these paths.
+fn output_files(paths: &[String]) -> protobuf::RepeatedField<OutputFile> {
+  protobuf::RepeatedField::from_vec(
+    paths
+      .iter()
+      .map(|path| {
+        let mut output_file = OutputFile::new();
+        output_file.set_path(path.into());
+        output_file.set_digest(empty_digest());
+        output_file
+      })
+      .collect(),
+  )
+}
+
+/// Generate a dumb operation that exits with 0 (success) and contains empty files for all the
+/// output_paths requested.
+fn mock_operation(output_paths: &[String]) -> MockOperation {
+  let mut op = Operation::new();
+  op.set_name(String::new());
+  op.set_done(true);
+  let mut exec_response = bazel_protos::remote_execution::ExecuteResponse::new();
+  exec_response.set_result({
+    let mut action_result = bazel_protos::remote_execution::ActionResult::new();
+    action_result.set_output_files(output_files(output_paths));
+    action_result.set_exit_code(0);
+    action_result
+  });
+  let mut response = protobuf::well_known_types::Any::new();
+  response.set_type_url(
+    "type.googleapis.com/build.bazel.remote.execution.v2.ExecuteResponse".to_string(),
+  );
+  let response_bytes = exec_response.write_to_bytes().unwrap();
+  response.set_value(response_bytes);
+  op.set_response(response);
+
+  MockOperation {
+    op: Ok(Some(op)),
+    duration: None,
+  }
 }
 
 fn main() {
   let options = Options::from_args();
 
-  // When the request is executed, perform this operation
-  let operation = MockOperation {
-    op: Ok(Some(Operation::new())),
-    duration: None,
-  };
-
-  // The request our server expects to receive
-  let mut request = ExecuteRequest::new();
-  let mut digest = Digest::new();
-  digest.set_hash(options.request_hash);
-  digest.set_size_bytes(options.request_size);
-  request.set_action_digest(digest);
-
-  let execution = MockExecution::new("Mock execution".to_string(), request, vec![operation]);
+  // When the request is executed, perform this operation.
+  // If any more request is sent, the server will fail.
+  let operations = vec![mock_operation(&options.output_paths)];
+  // We will accept any request
+  let request = None;
+  let execution = MockExecution::new("Mock execution".to_string(), request, operations);
 
   // Start the server
   let server = TestServer::new(execution, options.port);
