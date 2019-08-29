@@ -49,6 +49,7 @@ class AsyncHTTPTransportHandler(BaseTransportHandler):
       args = ['curl', '-v',
               '-X', 'POST',
               '-H', 'Content-Type: application/json',
+              # It is a debug flag that ensures that the trace will be retained on the server side.
               '-H', 'X-B3-Flags: 1',
               '--data', '@' + file_path_to_store_spans,
               self.endpoint]
