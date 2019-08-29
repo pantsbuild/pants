@@ -55,7 +55,7 @@ def create_requirements_pex(request, pex_bin, python_setup, pex_build_environmen
 
   execute_process_request = MultiPlatformExecuteProcessRequest(
     (
-      (Platform.value, Platform.value),
+      (Platform.current, Platform.current),
       ExecuteProcessRequest(
         argv=tuple(argv),
         env=env,

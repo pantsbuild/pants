@@ -1490,7 +1490,7 @@ pub mod tests {
         mock::execution_server::MockExecution::new(
           op_name.clone(),
           super::make_execute_request(
-            &execute_request.clone().try_into(),
+            &execute_request.clone().try_into().unwrap(),
             empty_request_metadata(),
           )
           .unwrap()
