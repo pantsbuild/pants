@@ -15,8 +15,6 @@ class ClassmapTask(ConsoleTask):
 
     register('--internal-only', default=False, type=bool, fingerprint=True,
              help='Specifies that only class names of internal dependencies should be included.')
-    register('--transitive', default=True, type=bool,
-             help='Outputs all targets in the build graph transitively.')
 
   def classname_for_classfile(self, target, classpath_products):
     contents = ClasspathUtil.classpath_contents((target,), classpath_products)

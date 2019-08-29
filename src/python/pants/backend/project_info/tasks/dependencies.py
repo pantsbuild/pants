@@ -28,9 +28,6 @@ class Dependencies(ConsoleTask):
     register('--external-only', type=bool,
              help='Specifies that only external dependencies should be included in the graph '
                   'output (only external jars).')
-    register('--transitive', default=True, type=bool,
-             help='List transitive dependencies. Disable to only list dependencies defined '
-                  'in target BUILD file(s).')
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)

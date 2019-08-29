@@ -14,8 +14,6 @@ class ReverseDepmap(ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--transitive', type=bool,
-             help='List transitive dependees.')
     register('--closed', type=bool,
              help='Include the input targets in the output along with the dependees.')
     # TODO: consider refactoring out common output format methods into MultiFormatConsoleTask.
