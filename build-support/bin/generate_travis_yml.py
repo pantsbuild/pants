@@ -172,8 +172,7 @@ CACHE_NATIVE_ENGINE = {
     "timeout": _cache_timeout,
     "directories": _cache_common_directories + [
       '${HOME}/.cache/pants/rust/cargo',
-      'build-support/pants_dev_deps.py36.venv',
-      'build-support/pants_dev_deps.py37.venv',
+      'build-support/virtualenvs',
       'src/rust/engine/target',
     ]
   }
