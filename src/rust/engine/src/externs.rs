@@ -180,6 +180,19 @@ pub fn project_str(value: &Value, field: &str) -> String {
   val_to_str(&name_val)
 }
 
+pub fn project_bytes(value: &Value, field: &str) -> Vec<u8> {
+  let name_val = with_externs(|e| {
+    (e.project_ignoring_type)(
+      e.context,
+      value as &Handle,
+      field.as_ptr(),
+      field.len() as u64,
+    )
+    .into()
+  });
+  val_to_bytes(&name_val)
+}
+
 pub fn key_to_str(key: &Key) -> String {
   val_to_str(&val_for(key))
 }
@@ -189,6 +202,13 @@ pub fn type_to_str(type_id: TypeId) -> String {
     (e.type_to_str)(e.context, type_id)
       .to_string()
       .unwrap_or_else(|e| format!("<failed to decode unicode for {:?}: {}>", type_id, e))
+  })
+}
+
+pub fn val_to_bytes(val: &Value) -> Vec<u8> {
+  with_externs(|e| {
+    (e.val_to_bytes)(e.context, val as &Handle)
+      .to_bytes()
   })
 }
 
@@ -352,6 +372,7 @@ pub struct Externs {
   pub project_ignoring_type: ProjectIgnoringTypeExtern,
   pub project_multi: ProjectMultiExtern,
   pub type_to_str: TypeToStrExtern,
+  pub val_to_bytes: ValToBytesExtern,
   pub val_to_str: ValToStrExtern,
   pub create_exception: CreateExceptionExtern,
 }
@@ -689,6 +710,7 @@ impl BufferBuffer {
 pub type TypeToStrExtern = extern "C" fn(*const ExternContext, TypeId) -> Buffer;
 
 pub type ValToStrExtern = extern "C" fn(*const ExternContext, *const Handle) -> Buffer;
+pub type ValToBytesExtern = extern "C" fn(*const ExternContext, *const Handle) -> Buffer;
 
 pub type CreateExceptionExtern =
   extern "C" fn(*const ExternContext, str_ptr: *const u8, str_len: u64) -> Handle;

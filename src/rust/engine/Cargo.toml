@@ -81,6 +81,7 @@ default-members = [
 ]
 
 [dependencies]
+bazel_protos = { path = "process_execution/bazel_protos" }
 boxfuture = { path = "boxfuture" }
 bytes = "0.4.5"
 concrete_time = { path = "concrete_time" }

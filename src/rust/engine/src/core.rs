@@ -234,7 +234,7 @@ impl Key {
 }
 
 ///
-/// A wrapper around a handle: soon to contain an Arc.
+/// A wrapper around a Arc<Handle>
 ///
 #[derive(Clone, Eq, PartialEq)]
 pub struct Value(Arc<Handle>);

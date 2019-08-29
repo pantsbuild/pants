@@ -131,6 +131,10 @@ impl Tasks {
   pub fn intrinsics_set(&mut self, types: &Types) {
     let intrinsics = vec![
       Intrinsic {
+        product: types.directory_digest,
+        input: types.input_file_content,
+      },
+      Intrinsic {
         product: types.snapshot,
         input: types.path_globs,
       },
