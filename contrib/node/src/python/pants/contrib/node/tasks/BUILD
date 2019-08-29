@@ -3,6 +3,7 @@
 
 target(
   dependencies=[
+    ':apache_thrift_node_gen',
     ':node_build',
     ':node_bundle',
     ':node_repl',
