@@ -57,19 +57,19 @@ class TestReportingRemoteIntegration(PantsRunIntegrationTest, unittest.TestCase)
     # the digest of the request that was expected and this can be manually updated.
     ZipkinHandler = zipkin_handler()
     with self.run_cas_server() as cas_port, self.run_execution_server() as execution_port, http_server(ZipkinHandler) as zipkin_port, temporary_dir() as store_dir:
-      endpoint = "http://localhost:{}".format(zipkin_port)
+      zipkin_endpoint = f"http://localhost:{zipkin_port}"
       command = [
         'cloc',
         'src/python/pants:version',
         '-ldebug',
         '--process-execution-speculation-strategy=none',
         '--reporting-zipkin-trace-v2',
-        '--reporting-zipkin-endpoint={}'.format(endpoint),
+        f'--reporting-zipkin-endpoint={zipkin_endpoint}',
         '--remote-execution',
-        '--remote-execution-server=localhost:{}'.format(execution_port),
-        '--remote-store-server=localhost:{}'.format(cas_port),
+        f'--remote-execution-server=localhost:{execution_port}',
+        f'--remote-store-server=localhost:{cas_port}',
         '--cache-cloc-ignore',
-        '--local-store-dir={}'.format(store_dir)
+        f'--local-store-dir={store_dir}'
       ]
 
       pants_run = self.run_pants(command, extra_env={"RUST_BACKTRACE": "FULL"})
