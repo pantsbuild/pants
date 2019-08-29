@@ -49,6 +49,7 @@ class AsyncHTTPTransportHandler(BaseTransportHandler):
       args = ['curl', '-v',
               '-X', 'POST',
               '-H', 'Content-Type: application/json',
+              '-H', 'X-B3-Flags: 1',
               '--data', '@' + file_path_to_store_spans,
               self.endpoint]
       file_path_to_stdout_stderr = os.path.join(self.zipkin_spans_dir,
