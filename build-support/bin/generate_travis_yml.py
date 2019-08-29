@@ -382,7 +382,7 @@ def _bootstrap_command(*, python_version: PythonVersion) -> List[str]:
   # to take advantage of the Rust code built during bootstrapping. We use the Python 3.6 shard, as
   # it runs during both daily and nightly CI. This requires setting PREPARE_DEPLOY=1.
   command = [f'./build-support/bin/ci.py --bootstrap --python-version {python_version.decimal}']
-  command.append(f'./build-support/bin/ci.py --bootstrap-mock-remote')
+  command.append('./build-support/bin/ci.py --bootstrap-mock-remote')
   if python_version.is_py36:
     command.append('./build-support/bin/release.sh -f')
   return command

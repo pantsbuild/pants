@@ -38,7 +38,7 @@ impl MockOperation {
 #[derive(Clone, Debug)]
 pub struct MockExecution {
   name: String,
-  /// If this is some, we will panic if we receive any request that doesn't match it
+  /// If this is some, we will send a failure response to any other ExecuteRequest RPC
   execute_request: Option<bazel_protos::remote_execution::ExecuteRequest>,
   operation_responses: Arc<Mutex<VecDeque<MockOperation>>>,
 }

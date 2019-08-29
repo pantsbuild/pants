@@ -55,9 +55,7 @@ struct Options {
 /// upload anything, which can make up for the absence of actual work being done and uploading
 /// actual files to it in a test configuration
 fn empty_digest() -> Digest {
-  let mut digest = Digest::new();
-  digest.set_hash("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".into());
-  digest
+  (&hashing::EMPTY_DIGEST).into()
 }
 
 /// Generate the protobuf types for a list of empty files at these paths.

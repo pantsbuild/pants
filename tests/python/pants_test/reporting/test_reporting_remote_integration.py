@@ -52,9 +52,6 @@ class TestReportingRemoteIntegration(PantsRunIntegrationTest, unittest.TestCase)
       yield port
 
   def test_zipkin_reporter_for_remote_execution_with_v2_engine(self):
-    # Hardcode the hash and size of the request we know our call to cloc will trigger
-    # If this changes for some reason, the local mock execution server will print out
-    # the digest of the request that was expected and this can be manually updated.
     ZipkinHandler = zipkin_handler()
     with self.run_cas_server() as cas_port, self.run_execution_server() as execution_port, http_server(ZipkinHandler) as zipkin_port, temporary_dir() as store_dir:
       zipkin_endpoint = f"http://localhost:{zipkin_port}"
