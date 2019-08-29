@@ -6,11 +6,12 @@ import os
 from contextlib import contextmanager
 
 from pants.base.exceptions import TaskError
+from pants.task.target_restriction_mixins import HasTransitiveOptionMixin
 from pants.task.task import QuietTaskMixin, Task
 from pants.util.dirutil import safe_open
 
 
-class ConsoleTask(QuietTaskMixin, Task):
+class ConsoleTask(QuietTaskMixin, HasTransitiveOptionMixin, Task):
   """A task whose only job is to print information to the console.
 
   ConsoleTasks are not intended to modify build state.
@@ -23,6 +24,8 @@ class ConsoleTask(QuietTaskMixin, Task):
              help='String to use to separate results.')
     register('--output-file', metavar='<path>',
              help='Write the console output to this file instead.')
+    register('--transitive', type=bool, default=True,
+             help='If True, use all targets in the build graph, else use only target roots.')
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
@@ -49,7 +52,7 @@ class ConsoleTask(QuietTaskMixin, Task):
   def execute(self):
     with self._guard_sigpipe():
       try:
-        targets = self.context.targets()
+        targets = self.get_targets() if self.act_transitively else self.context.target_roots
         for value in self.console_output(targets) or tuple():
           self._outstream.write(value.encode())
           self._outstream.write(self._console_separator.encode())

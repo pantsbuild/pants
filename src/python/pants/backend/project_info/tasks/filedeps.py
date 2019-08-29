@@ -23,15 +23,11 @@ class FileDeps(ConsoleTask):
              help='Instead of outputting filenames, output globs (ignoring excludes)')
     register('--absolute', type=bool, default=True,
              help='If True output with absolute path, else output with path relative to the build root')
-    register('--transitive', type=bool, default=True,
-             help='If True, use all targets in the build graph, else use only target roots.')
 
   def _file_path(self, path):
     return os.path.join(get_buildroot(), path) if self.get_options().absolute else path
 
   def console_output(self, targets):
-    if not self.get_options().transitive:
-      targets = self.context.target_roots
     concrete_targets = set()
     for target in targets:
       concrete_target = target.concrete_derived_from
