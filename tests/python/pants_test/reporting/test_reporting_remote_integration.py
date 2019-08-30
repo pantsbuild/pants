@@ -9,6 +9,7 @@ from typing import List
 
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import http_server, temporary_dir
+from pants.util.process_handler import SubprocessProcessHandler
 from pants.util.reporting_util import (find_child_processes_that_send_spans, wait_spans_to_be_sent,
                                        zipkin_handler)
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -27,18 +28,18 @@ class TestReportingRemoteIntegration(PantsRunIntegrationTest, unittest.TestCase)
     args = ["./" + bin_name]
     if len(arguments) > 0:
       args = args + arguments
-    process = subprocess.Popen(args, stdin = subprocess.PIPE, stdout = subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines = True)
+    process = subprocess.Popen(args, stdin = subprocess.PIPE, stdout = subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
     try:
       port = None
       while port is None:
-        line = process.stdout.readline()
+        line = process.stdout.readline().decode("utf-8")
         print(f"{line}")
         match = re.search("localhost:([0-9]+)", line)
         if match is not None:
           port = int(match.group(1))
       yield port
     finally:
-      process.terminate()
+      SubprocessProcessHandler(process).communicate_teeing_stdout_and_stderr(b"\n")
 
   @contextmanager
   def run_cas_server(self):
