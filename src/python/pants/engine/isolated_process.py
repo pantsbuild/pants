@@ -78,7 +78,7 @@ class MultiPlatformExecuteProcessRequest(datatype([
     d = dict(args)
     # validate the platform constraints using the platforms enum an flatten the keys.
     validated_constraints = tuple(
-      constraint.value for pair in d.keys() for constraint in pair if cls.ALLOWED_PLATFORM_CONSTRAINTS(constraint)
+      constraint.value for pair in d.keys() for constraint in pair if cls.ALLOWED_PLATFORM_CONSTRAINTS(constraint.value)
     )
     if len({req.description for req in d.values()}) != 1:
       raise ValueError(f"The `description` of all execute_process_requests in a {cls.__name__} must be identical.")
