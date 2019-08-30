@@ -89,9 +89,9 @@ occur in master, while version changes generally only occur in the relevant rele
 Every week we do a release from master.  In most cases we will use the `dev` naming convention
 detailed in [Release Strategy](http://www.pantsbuild.org/release_strategy.html). When we are
 ready to create a new stable branch we will release under the `rc` naming convention instead of
-`dev`.  For example releases in master should look similar to the following: 1.1.0dev0, 1.1.0dev1,
-1.1.0dev2, 1.1.0rc0, 1.2.0dev0, 1.2.0dev1, 1.2.0rc0, 1.3.0dev0. *In addition to a release from master
-the release manager may also need to do a release from a stable branch.*
+`dev`.  For example releases in master should look similar to the following: `1.1.0.dev0`, `1.1.0.dev1`,
+`1.1.0.dev2`, `1.1.0rc0`, `1.2.0.dev0`, `1.2.0.dev1`, `1.2.0rc0`, `1.3.0.dev0`. *In addition to a release
+from master the release manager may also need to do a release from a stable branch.*
 
 #### Preparing a release from the master branch
 
@@ -102,12 +102,12 @@ the release manager may also need to do a release from a stable branch.*
      * Create the corresponding notes file for that release, initialized with notes for all
        `dev` releases in the series. <br/>
        _For example if you were releasing `1.2.0rc0` you would need to
-       create `src/python/pants/notes/1.2.x.rst` and include all `1.2.0devX` release notes._
+       create `src/python/pants/notes/1.2.x.rst` and include all `1.2.0.devX` release notes._
+     * Create a new page() in `src/python/pants/notes/BUILD` corresponding to the new notes.
      * Add the file to pants.ini in the branch_notes section.
-     * Add the new notes file to `src/docs/docsite.json`.
-     * Create a new page() in `src/python/pants/notes/BUILD` corresponding to the new notes. <br/>
-   For additional information on generating documentation see the
-   [docs reference](http://www.pantsbuild.org/docs#generating-the-site)
+     * Add the new notes file to `src/docs/docsite.json` in a few places.
+     * Check that the new notes are visible on the docsite by previewing it using
+       the [docs reference](http://www.pantsbuild.org/docs#generating-the-site) instructions.
 4. Bring the CONTRIBUTORS roster in
    [CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
    up to date by running `./build-support/bin/contributors.sh`.
