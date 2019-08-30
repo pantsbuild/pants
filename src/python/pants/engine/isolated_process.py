@@ -173,6 +173,7 @@ def create_process_rules():
   """Creates rules that consume the intrinsic filesystem types."""
   return [
     RootRule(ExecuteProcessRequest),
+    RootRule(MultiPlatformExecuteProcessRequest),
     fallible_to_exec_result_or_raise,
     get_request_description,
     get_multi_platform_request_description,

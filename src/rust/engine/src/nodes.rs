@@ -489,7 +489,7 @@ impl MultiPlatformExecuteProcess {
         .map(|c| MultiPlatformExecuteProcess::get_platform_variant(c.to_string()))
         .collect();
       request_by_constraint.insert(
-        (platform_constaint.remove(0), platform_constaint.remove(1)),
+        (platform_constaint.remove(0), platform_constaint.remove(0)),
         request.clone(),
       );
     }
