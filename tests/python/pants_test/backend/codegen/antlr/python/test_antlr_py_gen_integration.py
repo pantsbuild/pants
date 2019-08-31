@@ -2,10 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants_test.interpreter_selection_utils import skip_unless_python27_present
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class AntlrPyGenIntegrationTest(SafePantsRunIntegrationTest):
+class AntlrPyGenIntegrationTest(PantsRunIntegrationTest):
 
   @skip_unless_python27_present
   def test_antlr_py_gen_integration(self):

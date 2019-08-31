@@ -6,11 +6,11 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.util.dirutil import safe_open
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.file_test_util import exact_files
 
 
-class JaxWsGenTest(SafePantsRunIntegrationTest):
+class JaxWsGenTest(PantsRunIntegrationTest):
 
   @classmethod
   def hermetic(cls):

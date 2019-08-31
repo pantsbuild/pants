@@ -6,10 +6,10 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.util.dirutil import safe_open
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class PrepCommandIntegrationTest(SafePantsRunIntegrationTest):
+class PrepCommandIntegrationTest(PantsRunIntegrationTest):
 
   _SENTINELS = {
     'test': 'running-prep-in-goal-test.txt',

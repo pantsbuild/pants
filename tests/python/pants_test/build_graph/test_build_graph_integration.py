@@ -3,10 +3,10 @@
 
 import os
 
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class BuildGraphIntegrationTest(SafePantsRunIntegrationTest):
+class BuildGraphIntegrationTest(PantsRunIntegrationTest):
 
   @classmethod
   def use_pantsd_env_var(cls):

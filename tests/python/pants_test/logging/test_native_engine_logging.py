@@ -1,11 +1,11 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest, read_pantsd_log
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, read_pantsd_log
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 
 
-class NativeEngineLoggingTest(SafePantsRunIntegrationTest):
+class NativeEngineLoggingTest(PantsRunIntegrationTest):
 
   @classmethod
   def use_pantsd_env_var(cls):

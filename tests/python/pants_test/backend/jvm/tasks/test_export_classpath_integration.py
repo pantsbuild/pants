@@ -6,10 +6,10 @@ import time
 
 from pants.java.jar.manifest import Manifest
 from pants.util.contextutil import open_zip
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class ExportClasspathIntegrationTest(SafePantsRunIntegrationTest):
+class ExportClasspathIntegrationTest(PantsRunIntegrationTest):
   def test_export_manifest_jar(self):
     ctimes = []
     manifest_jar_path = "dist/export-classpath/manifest.jar"

@@ -3,10 +3,10 @@
 
 from functools import wraps
 
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class ThriftLinterTest(SafePantsRunIntegrationTest):
+class ThriftLinterTest(PantsRunIntegrationTest):
 
   lint_error_token = "LINT-ERROR"
   thrift_folder_root = 'contrib/scrooge/tests/thrift/org/pantsbuild/contrib/scrooge/thrift_linter'

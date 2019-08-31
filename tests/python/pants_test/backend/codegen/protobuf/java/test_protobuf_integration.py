@@ -7,10 +7,10 @@ import subprocess
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class ProtobufIntegrationTest(SafePantsRunIntegrationTest):
+class ProtobufIntegrationTest(PantsRunIntegrationTest):
 
   def test_import_from_buildroot(self):
     pants_run = self.run_pants(

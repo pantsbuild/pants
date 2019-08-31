@@ -2,10 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.build_graph.intermediate_target_factory import hash_target
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class IntermediateTargetIntegrationTest(SafePantsRunIntegrationTest):
+class IntermediateTargetIntegrationTest(PantsRunIntegrationTest):
 
   def test_scoped(self):
     test_path = 'testprojects/src/java/org/pantsbuild/testproject/runtime'

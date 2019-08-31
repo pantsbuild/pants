@@ -3,10 +3,10 @@
 
 from textwrap import dedent
 
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest, ensure_daemon
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 
 
-class ScalaReplIntegrationTest(SafePantsRunIntegrationTest):
+class ScalaReplIntegrationTest(PantsRunIntegrationTest):
 
   def run_repl(self, target, program, repl_args=None):
     """Run a repl for the given target with the given input, and return stdout_data."""

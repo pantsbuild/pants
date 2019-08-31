@@ -5,10 +5,10 @@ import os
 
 from pants.base.build_environment import get_buildroot
 from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class RunnerIntegrationTest(SafePantsRunIntegrationTest):
+class RunnerIntegrationTest(PantsRunIntegrationTest):
   """Test logic performed in PantsRunner."""
 
   def _deprecation_warning_cmdline(self):

@@ -9,7 +9,7 @@ from textwrap import dedent
 from pex.pex_info import PexInfo
 
 from pants.util.contextutil import open_zip, temporary_dir
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 _LINUX_PLATFORM = "linux-x86_64"
@@ -18,7 +18,7 @@ _OSX_PLATFORM = "macosx-10.13-x86_64"
 _OSX_WHEEL_SUBSTRING = "macosx"
 
 
-class PythonBinaryIntegrationTest(SafePantsRunIntegrationTest):
+class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
 
   @classmethod
   def use_pantsd_env_var(cls):

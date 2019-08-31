@@ -649,7 +649,7 @@ Bugfixes
 * fix for pantsrc-files option (#7427)
   `PR #7427 <https://github.com/pantsbuild/pants/pull/7427>`_
 
-* Move with_overwritten_file_context to SafePantsRunIntegrationTest (#7408)
+* Move with_overwritten_file_context to PantsRunIntegrationTest (#7408)
   `PR #7408 <https://github.com/pantsbuild/pants/pull/7408>`_
 
 * Fix locale test failing on Python 3.7 due to forced UTF-8 mode (#7412)

@@ -1,10 +1,10 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class ScopeProvidedIntegrationTest(SafePantsRunIntegrationTest):
+class ScopeProvidedIntegrationTest(PantsRunIntegrationTest):
   """Tests "provided" emulation (having scope='compile test' and transitive=False)."""
 
   @classmethod
@@ -42,7 +42,7 @@ class ScopeProvidedIntegrationTest(SafePantsRunIntegrationTest):
     ]))
 
 
-class ScopeProvidedShadowingIntegrationTest(SafePantsRunIntegrationTest):
+class ScopeProvidedShadowingIntegrationTest(PantsRunIntegrationTest):
 
   @classmethod
   def _spec(cls, name):

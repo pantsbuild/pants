@@ -9,11 +9,11 @@ from pants_test.interpreter_selection_utils import (PY_3, PY_27, python_interpre
                                                     skip_unless_python3_present,
                                                     skip_unless_python27_and_python3_present,
                                                     skip_unless_python27_present)
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
 
-class PytestRunIntegrationTest(SafePantsRunIntegrationTest):
+class PytestRunIntegrationTest(PantsRunIntegrationTest):
   testproject = 'testprojects/src/python/interpreter_selection'
 
   # NB: Occasionally running a test in CI may take multiple seconds. The tests in this file which

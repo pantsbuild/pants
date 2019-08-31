@@ -1,10 +1,10 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class ListIntegrationTest(SafePantsRunIntegrationTest):
+class ListIntegrationTest(PantsRunIntegrationTest):
 
   def get_target_set(self, std_out):
     return sorted([l for l in std_out.split('\n') if l])

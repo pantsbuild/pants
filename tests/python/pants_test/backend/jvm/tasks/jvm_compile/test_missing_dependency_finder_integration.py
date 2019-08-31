@@ -3,10 +3,10 @@
 
 import re
 
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class MissingDependencyFinderIntegrationTest(SafePantsRunIntegrationTest):
+class MissingDependencyFinderIntegrationTest(PantsRunIntegrationTest):
 
   def test_missing_deps_found(self):
     target = 'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist:missingjardepswhitelist'

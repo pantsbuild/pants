@@ -1,10 +1,10 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class ScroogeGenTest(SafePantsRunIntegrationTest):
+class ScroogeGenTest(PantsRunIntegrationTest):
 
   @classmethod
   def hermetic(cls):

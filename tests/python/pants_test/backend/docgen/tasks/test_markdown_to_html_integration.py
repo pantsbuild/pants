@@ -5,10 +5,10 @@ import os
 
 from pants.base.build_environment import get_buildroot
 from pants.util.dirutil import safe_open
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class MarkdownIntegrationTest(SafePantsRunIntegrationTest):
+class MarkdownIntegrationTest(PantsRunIntegrationTest):
   def test_markdown_normal(self):
     pants_run = self.run_pants(['markdown',
                                 'testprojects/src/java/org/pantsbuild/testproject/page:readme'])

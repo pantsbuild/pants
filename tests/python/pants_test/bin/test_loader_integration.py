@@ -2,10 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.bin.pants_loader import PantsLoader
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class LoaderIntegrationTest(SafePantsRunIntegrationTest):
+class LoaderIntegrationTest(PantsRunIntegrationTest):
   def test_invalid_locale(self):
     bypass_env = PantsLoader.ENCODING_IGNORE_ENV_VAR
     pants_run = self.run_pants(

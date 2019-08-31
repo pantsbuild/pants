@@ -4,10 +4,10 @@
 from pathlib import Path
 
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest, ensure_daemon
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 
 
-class SchedulerIntegrationTest(SafePantsRunIntegrationTest):
+class SchedulerIntegrationTest(PantsRunIntegrationTest):
 
   def test_visualize_to(self):
     # Tests usage of the `--native-engine-visualize-to=` option, which triggers background

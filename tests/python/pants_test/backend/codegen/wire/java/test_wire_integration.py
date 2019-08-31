@@ -7,11 +7,11 @@ import subprocess
 
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import open_zip
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.file_test_util import exact_files
 
 
-class WireIntegrationTest(SafePantsRunIntegrationTest):
+class WireIntegrationTest(PantsRunIntegrationTest):
 
   def test_good(self):
     # wire example should compile without warnings with correct wire files.

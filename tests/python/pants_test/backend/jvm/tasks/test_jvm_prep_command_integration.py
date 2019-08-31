@@ -5,10 +5,10 @@ import os
 
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_delete
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class JvmPrepCommandIntegration(SafePantsRunIntegrationTest):
+class JvmPrepCommandIntegration(PantsRunIntegrationTest):
 
   def setUp(self):
     safe_delete('/tmp/running-in-goal-test')

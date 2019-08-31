@@ -1,10 +1,10 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class DependenciesIntegrationTest(SafePantsRunIntegrationTest):
+class DependenciesIntegrationTest(PantsRunIntegrationTest):
   def assert_deps(self, success, spec, *expected_deps):
     args = ['-q', 'dependencies'] + [spec]
     pants_run = self.run_pants(args)

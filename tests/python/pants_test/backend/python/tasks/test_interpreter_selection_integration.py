@@ -12,10 +12,10 @@ from pants.util.contextutil import temporary_dir
 from pants_test.interpreter_selection_utils import (PY_3, PY_27, skip_unless_python3_present,
                                                     skip_unless_python27_and_python3_present,
                                                     skip_unless_python27_present)
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class InterpreterSelectionIntegrationTest(SafePantsRunIntegrationTest):
+class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
 
   testproject = 'testprojects/src/python/interpreter_selection'
 

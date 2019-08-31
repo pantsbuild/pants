@@ -5,10 +5,10 @@ import os
 from contextlib import contextmanager
 
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class BundleIntegrationTest(SafePantsRunIntegrationTest):
+class BundleIntegrationTest(PantsRunIntegrationTest):
 
   TARGET_PATH = 'testprojects/src/java/org/pantsbuild/testproject/bundle'
 

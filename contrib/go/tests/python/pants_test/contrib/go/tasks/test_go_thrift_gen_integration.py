@@ -7,7 +7,7 @@ from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
 from pants.util.dirutil import safe_open
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.file_test_util import exact_files
 
 
@@ -29,7 +29,7 @@ _FEEDER_STRUCT_TEMPLATE =  dedent(
     """)
 
 
-class GoThriftGenIntegrationTest(SafePantsRunIntegrationTest):
+class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
 
   @contextmanager
   def _create_thrift_project(self, thrift_files):

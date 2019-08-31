@@ -1,10 +1,10 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class AntlrJavaGenIntegrationTest(SafePantsRunIntegrationTest):
+class AntlrJavaGenIntegrationTest(PantsRunIntegrationTest):
 
   def test_run_antlr3(self):
     stdout_data = self.bundle_and_run('examples/src/java/org/pantsbuild/example/antlr3',

@@ -4,10 +4,10 @@
 import os
 
 from pants.base.build_environment import get_buildroot
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class JunitTestsIntegrationTest(SafePantsRunIntegrationTest):
+class JunitTestsIntegrationTest(PantsRunIntegrationTest):
 
   def _assert_output_for_class(self, workdir, classname):
     def get_outdir(basedir):

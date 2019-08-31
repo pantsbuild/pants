@@ -3,10 +3,10 @@
 
 from textwrap import dedent
 
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class NodeReplIntegrationTest(SafePantsRunIntegrationTest):
+class NodeReplIntegrationTest(PantsRunIntegrationTest):
 
   def test_run_repl(self):
     command = ['-q',

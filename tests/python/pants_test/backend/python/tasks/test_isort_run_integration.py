@@ -2,10 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.python.tasks.isort_run import IsortRun
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest, ensure_daemon
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 
 
-class IsortRunIntegrationTest(SafePantsRunIntegrationTest):
+class IsortRunIntegrationTest(PantsRunIntegrationTest):
 
   @ensure_daemon
   def test_isort_no_python_sources_should_noop(self):

@@ -13,7 +13,7 @@ from parameterized import parameterized
 
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import http_server
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 _HEADER = 'invocation_id,task_name,targets_hash,target_id,cache_key_id,cache_key_hash,phase,valid\n'
@@ -25,7 +25,7 @@ _POST = re.compile(r'^\d+,RscCompile_compile_rsc,\w+,\S+,post-check,(True|False)
 _PRE = re.compile(r'^\d+,RscCompile_compile_rsc,\w+,\S+,pre-check,(True|False)')
 
 
-class TestReportingIntegrationTest(SafePantsRunIntegrationTest, unittest.TestCase):
+class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
   def test_invalidation_report_output(self):
     with self.temporary_workdir() as workdir:

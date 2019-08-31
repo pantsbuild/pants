@@ -10,10 +10,10 @@ from textwrap import dedent
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class IncompleteCustomScalaIntegrationTest(SafePantsRunIntegrationTest):
+class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
   @contextlib.contextmanager
   def tmp_custom_scala(self, path_suffix):
     """Temporarily create a BUILD file in the root for custom scala testing."""

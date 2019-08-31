@@ -7,7 +7,7 @@ import re
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import safe_rmtree
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 def shared_artifacts(version, extra_jar=None):
@@ -46,7 +46,7 @@ def publish_extra_config(unique_config):
   }
 
 
-class JarPublishIntegrationTest(SafePantsRunIntegrationTest):
+class JarPublishIntegrationTest(PantsRunIntegrationTest):
   GOLDEN_DATA_DIR = 'tests/python/pants_test/tasks/jar_publish_resources/'
 
   # This is where all pushdb properties files will end up.

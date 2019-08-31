@@ -3,11 +3,11 @@
 
 from pants_test.backend.jvm.tasks.jvm_compile.java.jvm_platform_integration_mixin import \
   JvmPlatformIntegrationMixin
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class ZincCompileJvmPlatformIntegrationTest(JvmPlatformIntegrationMixin,
-                                            SafePantsRunIntegrationTest):
+                                            PantsRunIntegrationTest):
 
   def get_pants_compile_args(self):
     return ['compile.rsc']

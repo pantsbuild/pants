@@ -3,10 +3,10 @@
 
 import os
 
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class FiledepsIntegrationTest(SafePantsRunIntegrationTest):
+class FiledepsIntegrationTest(PantsRunIntegrationTest):
 
   TARGET = 'examples/src/scala/org/pantsbuild/example/hello/welcome'
 

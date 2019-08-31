@@ -4,10 +4,10 @@
 import subprocess
 
 from pants.util.dirutil import safe_delete
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class GoBinaryIntegrationTest(SafePantsRunIntegrationTest):
+class GoBinaryIntegrationTest(PantsRunIntegrationTest):
 
   def test_go_crosscompile(self):
     # We assume that targeting windows is cross-compiling.

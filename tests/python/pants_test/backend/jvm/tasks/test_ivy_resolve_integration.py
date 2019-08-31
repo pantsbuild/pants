@@ -5,10 +5,10 @@ import os
 import re
 
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class IvyResolveIntegrationTest(SafePantsRunIntegrationTest):
+class IvyResolveIntegrationTest(PantsRunIntegrationTest):
 
   # Override parent method so we can inject resolver config since there is also
   # the option to select coursier as the resolver, so we want to be explicit.

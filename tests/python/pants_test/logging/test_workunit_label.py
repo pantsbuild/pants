@@ -3,10 +3,10 @@
 
 import os
 
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class WorkUnitLabelTest(SafePantsRunIntegrationTest):
+class WorkUnitLabelTest(PantsRunIntegrationTest):
   """
   This tests whether workunit label will appear in the log.
   The pants run itself is going to fail due to non existent main class when invoking java,

@@ -5,10 +5,10 @@ import json
 import os
 
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class TestJvmDependencyUsageIntegration(SafePantsRunIntegrationTest):
+class TestJvmDependencyUsageIntegration(PantsRunIntegrationTest):
 
   def _run_dep_usage(self, workdir, target, clean_all=False, extra_args=None, cachedir=None):
     if cachedir:

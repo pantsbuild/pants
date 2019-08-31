@@ -10,10 +10,10 @@ from unittest import skipIf
 
 from pants.base.build_environment import get_buildroot
 from pants_test.backend.jvm.tasks.missing_jvm_check import is_missing_jvm
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class JunitRunIntegrationTest(SafePantsRunIntegrationTest):
+class JunitRunIntegrationTest(PantsRunIntegrationTest):
 
   def _testjvms(self, spec_name):
     spec = 'testprojects/tests/java/org/pantsbuild/testproject/testjvms:{}'.format(spec_name)

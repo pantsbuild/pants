@@ -35,6 +35,7 @@ python_library(
     'build-support/regexes',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
+    'src/python/pants/base:deprecated',
     'src/python/pants/base:exiter',
     'src/python/pants/fs',
     'src/python/pants/subsystem',

@@ -5,10 +5,10 @@ import os
 import subprocess
 
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class CleanAllTest(SafePantsRunIntegrationTest):
+class CleanAllTest(PantsRunIntegrationTest):
   def test_clean_all_on_wrong_dir(self):
     with temporary_dir() as workdir:
       self.assert_failure(self.run_pants_with_workdir(["clean-all"], workdir))

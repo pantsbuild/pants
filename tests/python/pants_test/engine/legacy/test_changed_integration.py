@@ -9,7 +9,7 @@ from textwrap import dedent
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_open, touch
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest, ensure_daemon
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 from pants_test.test_base import AbstractTestGenerator
 from pants_test.testutils.git_util import initialize_repo
 
@@ -186,7 +186,7 @@ def create_isolated_git_repo():
         yield worktree
 
 
-class ChangedIntegrationTest(SafePantsRunIntegrationTest, AbstractTestGenerator):
+class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
 
   TEST_MAPPING = {
     # A `jvm_binary` with `source='file.name'`.

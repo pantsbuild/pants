@@ -10,10 +10,10 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file, safe_file_dump, safe_mkdir, touch
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class ExceptionSinkIntegrationTest(SafePantsRunIntegrationTest):
+class ExceptionSinkIntegrationTest(PantsRunIntegrationTest):
 
   def _assert_unhandled_exception_log_matches(self, pid, file_contents):
     self.assertRegex(file_contents, """\

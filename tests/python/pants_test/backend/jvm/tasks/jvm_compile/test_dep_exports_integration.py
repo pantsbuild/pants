@@ -6,10 +6,10 @@ import re
 import shutil
 
 from pants.base.build_environment import get_buildroot
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class DepExportsIntegrationTest(SafePantsRunIntegrationTest):
+class DepExportsIntegrationTest(PantsRunIntegrationTest):
 
   SRC_PREFIX = 'testprojects/tests'
   SRC_TYPES = ['java', 'scala']
@@ -55,7 +55,7 @@ class DepExportsIntegrationTest(SafePantsRunIntegrationTest):
     )
 
 
-class DepExportsThriftTargets(SafePantsRunIntegrationTest):
+class DepExportsThriftTargets(PantsRunIntegrationTest):
 
   def test_exports_for_thrift_targets(self):
     pants_run = self.run_pants(['compile', 'testprojects/src/thrift/org/pantsbuild/thrift_exports:C-with-exports'])

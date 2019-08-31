@@ -2,10 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants_test.interpreter_selection_utils import has_python_version
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class MypyIntegrationTest(SafePantsRunIntegrationTest):
+class MypyIntegrationTest(PantsRunIntegrationTest):
   def test_mypy(self):
     cmd = [
       '--backend-packages=pants.contrib.mypy',

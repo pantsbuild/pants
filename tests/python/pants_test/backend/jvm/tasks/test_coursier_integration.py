@@ -2,10 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class CouriserIntegrationTest(SafePantsRunIntegrationTest):
+class CouriserIntegrationTest(PantsRunIntegrationTest):
   def test_coursier_show_report(self):
     with self.temporary_workdir() as workdir:
       # Run the coursier report twice in a row with the same workdir to check that

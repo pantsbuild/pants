@@ -4,13 +4,13 @@
 import re
 
 from pants.util.dirutil import read_file
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 TEST_DIR = 'testprojects/src/scala/org/pantsbuild/testproject'
 
 
-class ScalaFixIntegrationTest(SafePantsRunIntegrationTest):
+class ScalaFixIntegrationTest(PantsRunIntegrationTest):
 
   @classmethod
   def hermetic(cls):

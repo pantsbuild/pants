@@ -9,10 +9,10 @@ from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import SafePantsRunIntegrationTest, ensure_cached
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_cached
 
 
-class CheckstyleIntegrationTest(SafePantsRunIntegrationTest):
+class CheckstyleIntegrationTest(PantsRunIntegrationTest):
 
   def _create_config_file(self, filepath, rules_xml=''):
     with open(filepath, 'w') as f:
