@@ -448,7 +448,14 @@ class _FFISpecification(object):
     c = self._ffi.from_handle(context_handle)
     response = self._ffi.new('PyGeneratorResponse*')
     try:
-      res = c.from_value(func[0]).send(c.from_value(arg[0]))
+      cur_val = c.from_value(arg[0])
+      try:
+        res = c.from_value(func[0]).send(cur_val)
+      except StopIteration:
+        # This occurs when a @rule body ends with a `yield Get(...)` statement (without any
+        # assignment).
+        res = cur_val
+
       if isinstance(res, Get):
         # Get.
         response.tag = self._lib.Get

@@ -5,6 +5,7 @@ import re
 import sys
 import unittest.mock
 from contextlib import contextmanager
+from dataclasses import dataclass
 from textwrap import dedent
 
 from pants.engine.native import Native
@@ -31,6 +32,26 @@ def fn_raises(x):
 @rule(A, [B])
 def nested_raise(x):
   fn_raises(x)
+
+
+@dataclass(frozen=True)
+class Y:
+  none_value: type(None)
+
+
+@dataclass(frozen=True)
+class X:
+  y_value: Y
+
+
+@rule(X, [type(None)])
+def final_yield(n):
+  yield Get(X, Y(n))
+
+
+@rule(X, [Y])
+def y_to_x(y):
+  return X(y)
 
 
 @rule(str, [A, B])
@@ -169,6 +190,9 @@ class SchedulerTest(TestBase):
       RootRule(UnionX),
       no_docstring_test_rule,
       consumes_a_and_b,
+      final_yield,
+      y_to_x,
+      RootRule(type(None)),
       transitive_b_c,
       transitive_coroutine_rule,
       RootRule(UnionWrapper),
@@ -181,6 +205,10 @@ class SchedulerTest(TestBase):
       select_union_b,
       a_union_test,
     ]
+
+  def test_final_yield(self):
+    x, = self.scheduler.product_request(X, [Params(None)])
+    self.assertIsNone(x.y_value.none_value)
 
   def test_use_params(self):
     # Confirm that we can pass in Params in order to provide multiple inputs to an execution.

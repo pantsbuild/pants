@@ -151,9 +151,8 @@ The rule defined by function `{func_name}` begins at:
     self.generic_visit(node)
 
   def visit_Yield(self, node):
-    if node in self._yields_in_assignments:
-      self.generic_visit(node)
-    else:
+    self.generic_visit(node)
+    if node not in self._yields_in_assignments:
       # The current yield "expr" is the child of an "Expr" "stmt".
       expr_for_yield = self._parents_table[node]
 
