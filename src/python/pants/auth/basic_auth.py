@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from collections import namedtuple
+from typing import Optional
 
 import requests
 import www_authenticate
@@ -16,7 +17,7 @@ class BasicAuthException(Exception):
 
 class BasicAuthAttemptFailed(BasicAuthException):
   def __init__(self, url, status_code, reason):
-    msg = 'Failed to auth against {}. Status code: {}. Reason: {}.'.format(url, status_code, reason)
+    msg = f'Failed to auth against {url}. Status code: {status_code}. Reason: {reason}.'
     super().__init__(msg)
     self.url = url
 
@@ -46,7 +47,7 @@ class BasicAuth(Subsystem):
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (Cookies,)
 
-  def authenticate(self, provider, creds=None, cookies=None):
+  def authenticate(self, provider: str, creds: Optional[BasicAuthCreds] = None, cookies: Optional[Cookies] = None) -> None:
     """Authenticate against the specified provider.
 
     :param str provider: Authorize against this provider.
@@ -64,13 +65,13 @@ class BasicAuth(Subsystem):
 
     provider_config = self.get_options().providers.get(provider)
     if not provider_config:
-      raise BasicAuthException('No config found for provider {}.'.format(provider))
+      raise BasicAuthException(f'No config found for provider {provider}.')
 
     url = provider_config.get('url')
     if not url:
-      raise BasicAuthException('No url found in config for provider {}.'.format(provider))
+      raise BasicAuthException(f'No url found in config for provider {provider}.')
     if not self.get_options().allow_insecure_urls and not url.startswith('https://'):
-      raise BasicAuthException('Auth url for provider {} is not secure: {}.'.format(provider, url))
+      raise BasicAuthException(f'Auth url for provider {provider} is not secure: {url}.')
 
     if creds:
       auth = requests.auth.HTTPBasicAuth(creds.username, creds.password)
