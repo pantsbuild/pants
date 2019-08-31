@@ -69,3 +69,28 @@ function git_merge_base() {
   git rev-parse --symbolic-full-name --abbrev-ref HEAD@\{upstream\} 2>/dev/null || echo 'master'
 
 }
+
+function with_shared_cache_dir() {
+  local fingerprint="$1"
+  local target_dir="$2"
+  local fingerprint_file="$3"
+  local maybe_shared_cache_entry="$4"
+  local -a cmd=( "${@:5}" )
+
+  if ! [[ -f "$fingerprint_file" \
+            && "$(cat "$fingerprint_file")" == "$fingerprint" ]]; then
+    if [[ -d "$maybe_shared_cache_entry" ]]; then
+      rm -rf "$target_dir"
+      mkdir -p "$(dirname "$target_dir")"
+      cp -r "$maybe_shared_cache_entry" "$target_dir"
+    fi
+  fi
+
+  "${cmd[@]}" || return "$?"
+
+  echo "$fingerprint" > "$fingerprint_file"
+  if [[ ! -d "$maybe_shared_cache_entry" ]]; then
+    mkdir -p "$(dirname "$maybe_shared_cache_entry")"
+    cp -r "$target_dir" "$maybe_shared_cache_entry"
+  fi
+}

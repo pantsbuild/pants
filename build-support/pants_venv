@@ -57,26 +57,10 @@ MESSAGE
   fi
 }
 
-function activate_pants_venv() {
-  fingerprint=""
-  for req in "${REQUIREMENTS[@]}"; do
-    fingerprint="${fingerprint}$(fingerprint_data < "${req}")"
-  done
-  fingerprint=$(echo "${fingerprint}" | fingerprint_data)
+function _create_or_activate_venv() {
+  local fingerprint_file="$1"
 
-  # The $BOOTSTRAPPED_DIR is in a cache shared across all pants checkouts.
-  BOOTSTRAPPED_FILE="$(venv_dir)/BOOTSTRAPPED.${fingerprint}"
-  BOOTSTRAPPED_DIR="${CACHE_ROOT}/virtualenvs/$(uname)/${fingerprint}"
-
-  if [ -d "${BOOTSTRAPPED_DIR}" ]; then
-    # If this venv was found within the shared cache, but the venv dir in the current pants checkout
-    # is not up to date, delete the venv dir and copy over the venv from the shared cache.
-    if ! [[ -f "${BOOTSTRAPPED_FILE}" ]]; then
-      rm -rf "$(venv_dir)"
-      mkdir -pv "$(dirname "$(venv_dir)")"
-      cp -r "${BOOTSTRAPPED_DIR}" "$(venv_dir)"
-      touch "${BOOTSTRAPPED_FILE}"
-    fi
+  if [[ -f "$fingerprint_file" ]]; then
     activate_venv || die "Failed to activate venv."
   else
     log "Bootstrapping pants_deps with requirements:"
@@ -98,12 +82,20 @@ function activate_pants_venv() {
       pip install ${pip_extra} -r "${req}" || \
         die "Failed to install requirements from ${req}."
     done
-
-    # Write the current venv to the shared cache.
-    touch "${BOOTSTRAPPED_FILE}"
-    if [[ ! -d "${BOOTSTRAPPED_DIR}" ]]; then
-      mkdir -pv "$(dirname "${BOOTSTRAPPED_DIR}")"
-      cp -r "$(venv_dir)" "${BOOTSTRAPPED_DIR}"
-    fi
   fi
+}
+
+function activate_pants_venv() {
+  fingerprint=""
+  for req in "${REQUIREMENTS[@]}"; do
+    fingerprint="${fingerprint}$(fingerprint_data < "${req}")"
+  done
+  fingerprint=$(echo "${fingerprint}" | fingerprint_data)
+
+  # The $BOOTSTRAPPED_DIR is in a cache shared across all pants checkouts.
+  BOOTSTRAPPED_FILE="$(venv_dir)/BOOTSTRAPPED.${fingerprint}"
+  BOOTSTRAPPED_DIR="${CACHE_ROOT}/virtualenvs/$(uname)/${fingerprint}"
+
+  with_shared_cache_dir "$fingerprint" "$(venv_dir)" "$BOOTSTRAPPED_FILE" "$BOOTSTRAPPED_DIR" \
+                        _create_or_activate_venv "$BOOTSTRAPPED_FILE"
 }
