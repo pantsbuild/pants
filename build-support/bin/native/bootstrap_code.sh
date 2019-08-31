@@ -76,6 +76,23 @@ function bootstrap_native_code() {
   # Bootstraps the native code only if needed.
   local native_engine_version
   native_engine_version="$(calculate_current_hash)"
+
+  local target_dir='src/rust/engine/target'
+  local cur_fingerprint_file="${target_dir}/pants-fingerprint"
+
+  # The $maybe_cached_target_dir is in a cache shared across all pants checkouts.
+  local maybe_cached_target_dir="${NATIVE_ENGINE_CACHE_DIR}/${native_engine_version}/target"
+
+  # If the current target dir is out of date, see if there is a matching entry in the shared
+  # cache. If so, delete the target dir and copy over the target dir from the shared cache.
+  if ! [[ -f "$cur_fingerprint_file" \
+          && "$(cat "$cur_fingerprint_file")" == "$native_engine_version" ]]; then
+    if [[ -d "$maybe_cached_target_dir" ]]; then
+      rm -rf "$target_dir"
+      cp -r "$maybe_cached_target_dir" "$target_dir"
+    fi
+  fi
+
   local engine_version_hdr="engine_version: ${native_engine_version}"
   local target_binary="${NATIVE_ENGINE_CACHE_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
   local target_binary_metadata="${target_binary}.metadata"
@@ -103,6 +120,13 @@ function bootstrap_native_code() {
     echo "${engine_version_hdr}" > "${metadata_file}"
     echo "repo_version: $(git describe --dirty)" >> "${metadata_file}"
     mv "${metadata_file}" "${target_binary_metadata}"
+  fi
+
+  # Write the current target dir to the shared cache.
+  echo "$native_engine_version" > "$cur_fingerprint_file"
+  if [[ ! -d "$maybe_cached_target_dir" ]]; then
+    mkdir -pv "$(dirname "$maybe_cached_target_dir")"
+    cp -r "$target_dir" "$maybe_cached_target_dir"
   fi
 
   # Establishes the native engine wheel resource only if needed.
