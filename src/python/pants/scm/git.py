@@ -87,7 +87,7 @@ class Git(Scm):
     except OSError as e:
       # Binary DNE or is not executable
       cmd_str = ' '.join(cmd)
-      raise cls.LocalException(f'Failed to execute command {cmd_str}: {e}')
+      raise cls.LocalException(f'Failed to execute command {cmd_str}: {e!r}')
     out, _ = process.communicate()
     return process, out
 

@@ -415,7 +415,7 @@ class RunTracker(Subsystem):
     try:
       return do_post(stats_url, num_redirects_allowed=6)
     except Exception as e:  # Broad catch - we don't want to fail the build over upload errors.
-      return error(f'Error: {e}')
+      return error(f'Error: {e!r}')
 
   @classmethod
   def _json_dump_options(cls, stats):
@@ -428,7 +428,7 @@ class RunTracker(Subsystem):
     try:
       safe_file_dump(file_name, params, mode='w')
     except Exception as e: # Broad catch - we don't want to fail in stats related failure.
-      print(f'WARNING: Failed to write stats to {file_name} due to Error: {e}',
+      print(f'WARNING: Failed to write stats to {file_name} due to Error: {e!r}',
             file=sys.stderr)
 
   def run_information(self):
@@ -632,7 +632,7 @@ class RunTracker(Subsystem):
         return value[option]
     except (Config.ConfigValidationError, AttributeError) as e:
       option_str = "" if option is None else f" option {option}"
-      raise ValueError(f"Couldn't find option scope {scope}{option_str} for recording ({e})")
+      raise ValueError(f"Couldn't find option scope {scope}{option_str} for recording ({e!r})")
 
   @classmethod
   def _create_dict_with_nested_keys_and_val(cls, keys, value):
