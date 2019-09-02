@@ -7,8 +7,10 @@ junit_tests(
     '3rdparty:guava',
     '3rdparty:jsr305',
     '3rdparty:junit',
+    '//:build_root',
+    '//:pants_pex',
     'src/java/org/pantsbuild/tools/runner:runner-library',
   ],
-  # This test needs to invoke ./pants at the buildroot.
+  # This test needs to invoke ./pants.pex at the buildroot.
   cwd=get_buildroot()
 )

@@ -74,7 +74,8 @@ public class PantsRunnerTest {
 
   @BeforeClass
   public static void setUpClass() throws Exception {
-    String command = "./pants bundle " + TEST_PROJECT;
+    // NB: We use pants.pex, instead of pants, to ensure that this test can be safely chrooted.
+    String command = "./pants.pex bundle " + TEST_PROJECT;
     Process process = Runtime.getRuntime().exec(command);
     StreamReader stdout = StreamReader.start(process.getInputStream());
     StreamReader stderr = StreamReader.start(process.getErrorStream());
