@@ -336,15 +336,18 @@ def run_unit_tests(*, remote_execution_enabled: bool) -> None:
   check_pants_pex_exists()
 
   all_targets = get_all_python_tests(tag="-integration")
+  blacklisted_chroot_targets = get_blacklisted_targets("unit_test_chroot_blacklist.txt")
   blacklisted_v2_targets = get_blacklisted_targets("unit_test_v2_blacklist.txt")
   blacklisted_remote_targets = get_blacklisted_targets("unit_test_remote_blacklist.txt")
 
+  v1_no_chroot_targets = blacklisted_chroot_targets
   v1_chroot_targets = blacklisted_v2_targets
   v2_local_targets = blacklisted_remote_targets
-  v2_remote_targets = all_targets - v2_local_targets - v1_chroot_targets
+  v2_remote_targets = all_targets - v2_local_targets - v1_chroot_targets - v1_no_chroot_targets
 
   basic_command = ["./pants.pex", "test.pytest"]
   v2_command = ["./pants.pex", "--no-v1", "--v2", "test.pytest"]
+  v1_no_chroot_command = basic_command + sorted(v1_no_chroot_targets) + PYTEST_PASSTHRU_ARGS
   v1_chroot_command = basic_command + ["--test-pytest-chroot"] + sorted(v1_chroot_targets) + PYTEST_PASSTHRU_ARGS
   v2_local_command = v2_command + sorted(v2_local_targets)
 
@@ -374,6 +377,7 @@ def run_unit_tests(*, remote_execution_enabled: bool) -> None:
     try:
       subprocess.run(v2_local_command, check=True)
       subprocess.run(v1_chroot_command, check=True)
+      subprocess.run(v1_no_chroot_command, check=True)
     except subprocess.CalledProcessError:
       die("Unit test failure (local execution)")
     else:
