@@ -11,6 +11,6 @@ junit_tests(
     '//:pants_pex',
     'src/java/org/pantsbuild/tools/runner:runner-library',
   ],
-  # This test needs to invoke ./pants.pex at the buildroot.
+  # This test needs to invoke ./pants at the buildroot.
   cwd=get_buildroot()
 )

@@ -23,6 +23,7 @@ def main() -> None:
 
   if args.bootstrap:
     bootstrap(clean=args.bootstrap_clean, python_version=args.python_version)
+  set_run_from_pex()
 
   if args.githooks:
     run_githooks()
@@ -146,6 +147,14 @@ def setup_python_interpreter(version: PythonVersion) -> None:
   if constraints_env_var not in os.environ:
     os.environ[constraints_env_var] = f"['CPython=={version}.*']"
   banner(f"Setting interpreter constraints to {os.environ[constraints_env_var]}")
+
+
+def set_run_from_pex() -> None:
+  # Even though our Python integration tests and commands in this file directly invoke `pants.pex`,
+  # some places like the JVM tests may still directly call the script `./pants`. When this happens,
+  # we want to ensure that the script immediately breaks out to `./pants.pex` to avoid
+  # re-bootstrapping Pants in CI.
+  os.environ["RUN_PANTS_FROM_PEX"] = "1"
 
 
 @contextmanager
