@@ -236,12 +236,12 @@ class TestTargetSets(NamedTuple):
     all_targets = set(subprocess.run(
       [
         "./pants.pex",
-        f"--tag={'-' if test_type == TestType.unit else '+'}integration"
+        f"--tag={'-' if test_type == TestType.unit else '+'}integration",
         "--filter-type=python_tests",
         "filter",
         "src/python::",
         "tests/python::",
-        "contrib::"
+        "contrib::",
       ], stdout=subprocess.PIPE, encoding="utf-8", check=True
     ).stdout.strip().split("\n"))
 
