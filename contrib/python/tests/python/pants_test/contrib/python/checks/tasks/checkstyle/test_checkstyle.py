@@ -11,7 +11,6 @@ from textwrap import dedent
 from pants.backend.python.subsystems.python_repos import PythonRepos
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
@@ -35,7 +34,7 @@ class CheckstyleTest(PythonTaskTestBase):
   def build_checker_wheel(root_dir: str) -> str:
     target = Checkstyle._CHECKER_ADDRESS_SPEC
     command = [
-      os.path.join(get_buildroot(), 'pants'),
+      './pants.pex',
       f'--pants-distdir={root_dir}',
       'setup-py',
       '--run=bdist_wheel --universal',
