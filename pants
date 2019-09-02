@@ -118,7 +118,7 @@ fi
 # shard to try bootstrapping the PEX itself.
 test_goal_used=false
 for arg in "$@"; do
-  if [[ "${arg}" == 'test' || "${arg}" == 'test.pytest' ]]; then
+  if [[ "${arg}" == 'test' || "${arg}" == 'test.*' ]]; then
     test_goal_used=true
   fi
 done
