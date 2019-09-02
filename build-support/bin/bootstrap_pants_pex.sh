@@ -36,21 +36,17 @@ function bootstrap_pants_pex() {
 }
 
 function calculate_pants_pex_current_hash() {
-  # NB: We fork a subshell because one or both of `ls-files`/`hash-object` are
-  # sensitive to the CWD, and the `--work-tree` option doesn't seem to resolve that.
+  # NB: These folder names were found by getting all the dependencies for `pants.pex` by running
+  # `./pants dependencies --transitive src/python/pants/bin:pants_local_binary | sort`.
   (
    cd "${REPO_ROOT}" || exit 1
    (uname
     python --version 2>&1
     git ls-files --cached --others --exclude-standard \
-     "${REPO_ROOT}/3rdparty" \
-     "${REPO_ROOT}/src" \
-     "${REPO_ROOT}/tests" \
-     "${REPO_ROOT}/contrib" \
+     "${REPO_ROOT}/3rdparty/python" \
+     "${REPO_ROOT}/contrib/python/src/python/pants/contrib/python/checks" \
+     "${REPO_ROOT}/src/python" \
      "${REPO_ROOT}/pants-plugins" \
-     "${REPO_ROOT}/pants*.ini" \
-     "${REPO_ROOT}/BUILD" \
-     "${REPO_ROOT}/BUILD.tools" \
    | git hash-object --stdin-paths) | fingerprint_data
   )
 }
