@@ -76,7 +76,7 @@ impl Drop for CancelRemoteExecutionToken {
 
 #[derive(Debug)]
 enum OperationOrStatus {
-  Operation(bazel_protos::operations::Operation),
+  Operation(bazel_protos::operations::Operation, CancelRemoteExecutionToken),
   Status(bazel_protos::status::Status),
 }
 
@@ -119,6 +119,7 @@ impl CommandRunner {
     &self,
     execute_request: &Arc<bazel_protos::remote_execution::ExecuteRequest>,
   ) -> BoxFuture<OperationOrStatus, String> {
+    let operations_client = self.operations_client.clone();
     let stream = try_future!(self
       .execution_client
       .execute_opt(&execute_request, self.call_option())
@@ -138,8 +139,14 @@ impl CommandRunner {
         drop(stream);
         error
       })
-      .then(|maybe_operation_result| match maybe_operation_result {
-        Ok(Some(operation)) => Ok(OperationOrStatus::Operation(operation)),
+      .then( move |maybe_operation_result| match maybe_operation_result {
+        Ok(Some(operation)) => {
+          let cancel_remote_exec_token =  CancelRemoteExecutionToken::new(
+            operations_client,
+              operation.name.clone()
+          );
+          Ok(OperationOrStatus::Operation(operation, cancel_remote_exec_token))
+        },
         Ok(None) => {
           Err("Didn't get proper stream response from server during remote execution".to_owned())
         }
@@ -229,16 +236,9 @@ impl super::CommandRunner for CommandRunner {
           .and_then(move |(operation, history)| {
             let start_time = Instant::now();
 
-            let maybe_cancel_remote_exec_token = match &operation {
-              OperationOrStatus::Operation(ops) => Some(CancelRemoteExecutionToken::new(
-              operations_client.clone(),
-              ops.name.clone()
-              )),
-              _ => None,
-            };
             future::loop_fn(
-              (history, operation, maybe_cancel_remote_exec_token, 0),
-              move |(mut history, operation, _maybe_cancel_remote_exec_token, iter_num)| {
+              (history, operation, 0),
+              move |(mut history, operation, iter_num)| {
                 let description = description.clone();
 
                 let execute_request = execute_request.clone();
@@ -287,14 +287,7 @@ impl super::CommandRunner for CommandRunner {
                         })
                         // Reset `iter_num` on `MissingDigests`
                         .map(|(operation, history)| {
-                          let maybe_cancel_remote_exec_token = match &operation {
-                            OperationOrStatus::Operation(ops) => Some(CancelRemoteExecutionToken::new(
-                              operations_client2,
-                              ops.name.clone()
-                            )),
-                            _ => None,
-                          };
-                          future::Loop::Continue((history, operation, maybe_cancel_remote_exec_token, 0))
+                          future::Loop::Continue((history, operation, 0))
                         })
                         .to_boxed()
                     }
@@ -345,18 +338,17 @@ impl super::CommandRunner for CommandRunner {
                                 .or_else(move |err| {
                                   rpcerror_recover_cancelled(operation_request.take_name(), err)
                                 })
-                                .map(OperationOrStatus::Operation)
+                                .map({ let operations_client = operations_client.clone(); |operation| {
+                                  let cancel_remote_exec_token =  CancelRemoteExecutionToken::new(
+                                    operations_client,
+                                    operation.name.clone()
+                                  );
+                                  OperationOrStatus::Operation(operation, cancel_remote_exec_token)
+                                     }})
                                 .map_err(rpcerror_to_string),
                             )
                             .map(move |operation| {
-                              let maybe_cancel_remote_exec_token = match &operation {
-                                OperationOrStatus::Operation(ops) => Some(CancelRemoteExecutionToken::new(
-                                  operations_client.clone(),
-                                  ops.name.clone()
-                                )),
-                                _ => None,
-                              };
-                              future::Loop::Continue((history, operation, maybe_cancel_remote_exec_token, iter_num + 1))
+                              future::Loop::Continue((history, operation, iter_num + 1))
                             })
                             .to_boxed()
                           })
@@ -464,7 +456,7 @@ impl CommandRunner {
     trace!("Got operation response: {:?}", operation_or_status);
 
     let status = match operation_or_status {
-      OperationOrStatus::Operation(mut operation) => {
+      OperationOrStatus::Operation(mut operation, cancel_remote_exec_token) => {
         if !operation.get_done() {
           return future::err(ExecutionError::NotFinished(operation.take_name())).to_boxed();
         }
