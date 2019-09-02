@@ -35,7 +35,7 @@ class CheckstyleTest(PythonTaskTestBase):
   def build_checker_wheel(root_dir: str) -> str:
     target = Checkstyle._CHECKER_ADDRESS_SPEC
     command = [
-      os.path.join(get_buildroot(), 'pants'),
+      os.path.join(get_buildroot(), 'pants.pex'),
       f'--pants-distdir={root_dir}',
       'setup-py',
       '--run=bdist_wheel --universal',

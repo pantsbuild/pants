@@ -46,6 +46,7 @@ out/
 /logs/
 arc.sh
 BUILD.release*
+/pants.pex
 pants.ini.sitegen
 target
 GPATH

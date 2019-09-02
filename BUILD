@@ -20,5 +20,12 @@ files(
 
 files(
   name = 'pants_ini',
-  source = 'pants.ini'
+  source = 'pants.ini',
+)
+
+# NB: This is used for integration tests. This is generated automatically via `./pants` and
+# `build-support/bin/bootstrap_pants_pex.sh`.
+files(
+  name = 'pants_pex',
+  source = 'pants.pex',
 )
