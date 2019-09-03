@@ -112,10 +112,8 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
              help='Emit coverage information for specified packages or directories (absolute or '
                   'relative to the build root).  The special value "auto" indicates that Pants '
                   'should attempt to deduce which packages to emit coverage for.')
-    # TODO: The default is False for backwards compatiblity. We almost certainly want to change
-    # that after a deprecation cycle.
-    register('--coverage-omit-test-sources', fingerprint=True, type=bool, default=False,
-             help='Whether to omit test source files from coverage reports.')
+    register('--coverage-include-test-sources', fingerprint=True, type=bool,
+             help='Whether to include test source files in coverage measurement.')
     register('--coverage-reports', fingerprint=True, choices=('xml', 'html'), type=list,
              member_type=str, default=('xml', 'html'),
              help='Which coverage reports to emit.')
@@ -286,7 +284,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
     src_to_target_base = {}
     srcs_to_omit = set()
-    if self.get_options().coverage_omit_test_sources:
+    if not self.get_options().coverage_include_test_sources:
       for test_target in test_targets:
         srcs_to_omit.update(test_target.sources_relative_to_source_root())
     for test_target in test_targets:
