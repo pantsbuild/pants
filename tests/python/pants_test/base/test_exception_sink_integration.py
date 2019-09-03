@@ -46,14 +46,14 @@ Exception message:.* 1 Exception encountered:
 
   def test_fails_ctrl_c_during_import(self):
     with temporary_dir() as tmpdir:
-      with environment_as(_KEYBOARDINTERRUPT_ON_IMPORT='True'):
+      with environment_as(_RAISE_KEYBOARDINTERRUPT_IN_CFFI_IDENTIFY='True'):
         pants_run = self.run_pants_with_workdir(
           self._lifecycle_stub_cmdline(),
           workdir=tmpdir)
         self.assert_failure(pants_run)
 
         self.assertIn(dedent("""\
-          KeyboardInterrupt: ctrl-c interrupted on import!
+          KeyboardInterrupt: ctrl-c interrupted execution of a cffi method!
 
 
           The engine execution request raised this error, which is probably due to the errors in the
@@ -63,9 +63,9 @@ Exception message:.* 1 Exception encountered:
 
         pid_specific_log_file, shared_log_file = self._get_log_file_paths(tmpdir, pants_run)
 
-        self.assertIn('KeyboardInterrupt: ctrl-c interrupted on import!',
+        self.assertIn('KeyboardInterrupt: ctrl-c interrupted execution of a cffi method!',
                       read_file(pid_specific_log_file))
-        self.assertIn('KeyboardInterrupt: ctrl-c interrupted on import!',
+        self.assertIn('KeyboardInterrupt: ctrl-c interrupted execution of a cffi method!',
                       read_file(shared_log_file))
 
   def test_logs_unhandled_exception(self):
