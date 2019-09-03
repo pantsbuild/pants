@@ -590,7 +590,9 @@ class Native(Singleton):
 
   class CFFIExternMethodRuntimeErrorInfo(datatype([
       ('exc_type', type),
-      ('exc_value', SubclassesOf(Exception, KeyboardInterrupt)),
+      # See https://docs.python.org/3.6/library/exceptions.html#BaseException -- this is the base
+      # exception type for all built-in exceptions, including `Exception`.
+      ('exc_value', SubclassesOf(BaseException)),
       'traceback',
   ])):
     """Encapsulates an exception raised when a CFFI extern is called so that it can be displayed.
