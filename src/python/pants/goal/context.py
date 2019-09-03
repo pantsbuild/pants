@@ -12,7 +12,7 @@ from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.target import Target
-from pants.engine.isolated_process import (FallibleExecuteProcessResult,
+from pants.engine.isolated_process import (FallibleExecuteProcessResult, ProductDescription,
                                            fallible_to_exec_result_or_raise)
 from pants.goal.products import Products
 from pants.goal.workspace import ScmWorkspace
@@ -407,5 +407,5 @@ class Context:
     fallible_result = self.execute_process_synchronously_without_raising(execute_process_request, name, labels)
     return fallible_to_exec_result_or_raise(
       fallible_result,
-      execute_process_request
+      ProductDescription(execute_process_request.description)
     )
