@@ -26,7 +26,3 @@ def register_goals():
 
 def global_subsystems():
   return (PantsTestInfra,)
-
-
-if os.environ.get('_KEYBOARDINTERRUPT_ON_IMPORT'):
-  raise KeyboardInterrupt('wow')

@@ -305,6 +305,8 @@ class _FFISpecification(object):
     having to make two separate Python calls when interning a Python object in interning.rs, which
     requires both the hash and type.
     """
+    if os.environ.get('_KEYBOARDINTERRUPT_ON_IMPORT'):
+      raise KeyboardInterrupt('ctrl-c interrupted on import!')
     c = self._ffi.from_handle(context_handle)
     obj = self._ffi.from_handle(val[0])
     return c.identify(obj)

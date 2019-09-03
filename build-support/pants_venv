@@ -91,4 +91,3 @@ function activate_pants_venv() {
     activate_venv || die "Failed to activate venv."
   fi
 }
-

@@ -52,15 +52,21 @@ Exception message:.* 1 Exception encountered:
           workdir=tmpdir)
         self.assert_failure(pants_run)
 
-        self.maxDiff = None
-        self.assertEqual('', pants_run.stderr_data)
+        self.assertIn(dedent("""\
+          KeyboardInterrupt: ctrl-c interrupted on import!
+
+
+          The engine execution request raised this error, which is probably due to the errors in the
+          CFFI extern methods listed above, as CFFI externs return None upon error:
+          Traceback (most recent call last):
+          """), pants_run.stderr_data)
 
         pid_specific_log_file, shared_log_file = self._get_log_file_paths(tmpdir, pants_run)
 
-        self.assertRegex(read_file(pid_specific_log_file), dedent("""\
-          wow
-          """))
-        self.assertEqual('', read_file(shared_log_file))
+        self.assertIn('KeyboardInterrupt: ctrl-c interrupted on import!',
+                      read_file(pid_specific_log_file))
+        self.assertIn('KeyboardInterrupt: ctrl-c interrupted on import!',
+                      read_file(shared_log_file))
 
   def test_logs_unhandled_exception(self):
     with temporary_dir() as tmpdir:
