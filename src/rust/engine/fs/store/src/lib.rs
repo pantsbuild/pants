@@ -238,26 +238,27 @@ impl Store {
       .to_boxed()
   }
 
-  /*
   /// Store a file with a filename and contents.
   pub fn store_file_with_name(
     &self,
     filename: String,
-    file_contents: Bytes,
+    contents: Bytes,
   ) -> BoxFuture<Digest, String> {
-    self.store_file_bytes(file_contents, false)
-      .and_then(|digest| {
-      let mut directory = bazel_protos::remote_execution::Directory::new();
-      directory.mut_files().push({
-        let mut file_node = bazel_protos::remote_execution::FileNode::new();
-        file_node.set_name(filename);
-        file_node.set_digest((&digest).into());
-        file_node
-      });
-      self.record_directory(&directory, true).to_boxed()
-    })
+    let store = self.clone();
+    store
+      .store_file_bytes(contents, false)
+      .and_then(move |digest: hashing::Digest| {
+        let mut directory = bazel_protos::remote_execution::Directory::new();
+        directory.mut_files().push({
+          let mut file_node = bazel_protos::remote_execution::FileNode::new();
+          file_node.set_name(filename);
+          file_node.set_digest((&digest).into());
+          file_node
+        });
+        store.record_directory(&directory, true)
+      })
+      .to_boxed()
   }
-  */
 
   ///
   /// Loads the bytes of the file with the passed fingerprint from the local store and back-fill
