@@ -5,10 +5,11 @@ import os
 import signal
 import time
 from contextlib import contextmanager
+from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
-from pants.util.contextutil import temporary_dir
+from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import read_file, safe_file_dump, safe_mkdir, touch
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -42,6 +43,24 @@ Exception message:.* 1 Exception encountered:
     self.assertNotEqual(pid_specific_log_file, shared_log_file)
 
     return (pid_specific_log_file, shared_log_file)
+
+  def test_fails_ctrl_c_during_import(self):
+    with temporary_dir() as tmpdir:
+      with environment_as(_KEYBOARDINTERRUPT_ON_IMPORT='True'):
+        pants_run = self.run_pants_with_workdir(
+          self._lifecycle_stub_cmdline(),
+          workdir=tmpdir)
+        self.assert_failure(pants_run)
+
+        self.maxDiff = None
+        self.assertEqual('', pants_run.stderr_data)
+
+        pid_specific_log_file, shared_log_file = self._get_log_file_paths(tmpdir, pants_run)
+
+        self.assertRegex(read_file(pid_specific_log_file), dedent("""\
+          wow
+          """))
+        self.assertEqual('', read_file(shared_log_file))
 
   def test_logs_unhandled_exception(self):
     with temporary_dir() as tmpdir:
