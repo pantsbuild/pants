@@ -23,12 +23,11 @@ class ApacheThriftGenBase(SimpleCodegenTask):
 
   # The name of the thrift generator to use. Subclasses must set.
   # E.g., java, py (see `thrift -help` for all available generators).
-  @classproperty
   @abstractmethod
   def thrift_generator(cls):
     """Thrift Generator Option for the codegen task"""
 
-  @classproperty
+  @property
   def gen_directory(self, cls=None):
     return self.thrift_generator
 
