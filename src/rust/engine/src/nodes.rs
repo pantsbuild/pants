@@ -20,7 +20,6 @@ use crate::core::{throw, Failure, Key, Params, TypeId, Value};
 use crate::externs;
 use crate::selectors;
 use crate::tasks::{self, Intrinsic, Rule};
-use bazel_protos;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::{self, BufMut};
 use fs::{
@@ -180,24 +179,12 @@ impl WrappedNode for Select {
               let filename = externs::project_str(&files_content, "path");
               let bytes = bytes::Bytes::from(externs::project_bytes(&files_content, "content"));
 
-              let digest = store.store_file_bytes(bytes, false).map_err(|e| throw(&e));
-
-              digest.and_then(move |digest: hashing::Digest| {
-                let mut directory = bazel_protos::remote_execution::Directory::new();
-                directory.mut_files().push({
-                  let mut file_node = bazel_protos::remote_execution::FileNode::new();
-                  file_node.set_name(filename);
-                  file_node.set_digest((&digest).into());
-                  file_node
-                });
-
-                store
-                  .record_directory(&directory, true)
-                  .map_err(|e| throw(&e))
-                  .map(move |digest: hashing::Digest| {
-                    Snapshot::store_directory(&context.core, &digest)
-                  })
-              })
+              store
+                .store_file_with_name(filename, bytes)
+                .map_err(|e| throw(&e))
+                .map(move |digest: hashing::Digest| {
+                  Snapshot::store_directory(&context.core, &digest)
+                })
             })
             .to_boxed()
         }

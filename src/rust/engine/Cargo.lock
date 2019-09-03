@@ -615,7 +615,6 @@ dependencies = [
 name = "engine"
 version = "0.0.1"
 dependencies = [
- "bazel_protos 0.0.1",
  "boxfuture 0.0.1",
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "concrete_time 0.0.1",
