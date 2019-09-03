@@ -2,12 +2,14 @@ use crate::{
   ExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecuteProcessResult,
   MultiPlatformExecuteProcessRequest, Platform,
 };
-use boxfuture::{try_future, BoxFuture, Boxable};
+use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
+use digest::{Digest as DigestTrait, FixedOutput};
 use futures::Future;
 use hashing::{Digest, Fingerprint};
 use log::{debug, warn};
 use protobuf::Message;
+use sha2::Sha256;
 use sharded_lmdb::ShardedLmdb;
 use std::sync::Arc;
 use store::Store;
@@ -43,8 +45,7 @@ impl crate::CommandRunner for CommandRunner {
     req: MultiPlatformExecuteProcessRequest,
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
-    let compatible_req = self.get_compatible_request(&req);
-    let digest = try_future!(self.digest(compatible_req));
+    let digest = self.digest(req.clone());
     let key = digest.0;
 
     let command_runner = self.clone();
@@ -79,10 +80,33 @@ impl crate::CommandRunner for CommandRunner {
 }
 
 impl CommandRunner {
-  fn digest(&self, req: ExecuteProcessRequest) -> Result<Digest, String> {
-    let (_action, _command, execute_request) =
-      crate::remote::make_execute_request(&req, self.metadata.clone())?;
-    execute_request.get_action_digest().into()
+  fn bytes_to_digest(&self, bytes: &[u8]) -> Digest {
+    let mut hasher = Sha256::default();
+    hasher.input(bytes);
+
+    Digest(
+      Fingerprint::from_bytes_unsafe(&hasher.fixed_result()),
+      bytes.len(),
+    )
+  }
+
+  fn digest(&self, req: MultiPlatformExecuteProcessRequest) -> Digest {
+    let mut hashes: Vec<String> = req
+      .0
+      .values()
+      .map(|ref epr| crate::remote::make_execute_request(epr, self.metadata.clone()).unwrap())
+      .map(|(_a, _b, er)| er.get_action_digest().get_hash().to_string())
+      .collect();
+    hashes.sort();
+    self.bytes_to_digest(
+      hashes
+        .iter()
+        .fold(String::new(), |mut acc, hash| {
+          acc.push_str(&hash);
+          acc
+        })
+        .as_bytes(),
+    )
   }
 
   fn lookup(
