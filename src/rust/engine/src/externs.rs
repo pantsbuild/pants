@@ -206,10 +206,7 @@ pub fn type_to_str(type_id: TypeId) -> String {
 }
 
 pub fn val_to_bytes(val: &Value) -> Vec<u8> {
-  with_externs(|e| {
-    (e.val_to_bytes)(e.context, val as &Handle)
-      .to_bytes()
-  })
+  with_externs(|e| (e.val_to_bytes)(e.context, val as &Handle).to_bytes())
 }
 
 pub fn val_to_str(val: &Value) -> String {

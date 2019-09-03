@@ -168,36 +168,39 @@ impl WrappedNode for Select {
           task: task.clone(),
           entry: Arc::new(self.entry.clone()),
         }),
-	&Rule::Intrinsic(Intrinsic { product, input })
-	  if product == types.directory_digest && input == types.input_file_content =>
-          {
-            let context = context.clone();
-            let store = context.core.store();
+        &Rule::Intrinsic(Intrinsic { product, input })
+          if product == types.directory_digest && input == types.input_file_content =>
+        {
+          let context = context.clone();
+          let store = context.core.store();
 
-            self.select_product(&context, types.input_file_content, "intrinsic")
-              .and_then(move |files_content: Value| {
-                let filename = externs::project_str(&files_content, "path");
-                let bytes: bytes::Bytes = externs::project_bytes(&files_content, "content").into();
+          self
+            .select_product(&context, types.input_file_content, "intrinsic")
+            .and_then(move |files_content: Value| {
+              let filename = externs::project_str(&files_content, "path");
+              let bytes = bytes::Bytes::from(externs::project_bytes(&files_content, "content"));
 
-                let digest = store.store_file_bytes(bytes, false)
-                  .map_err(|e| throw(&e));
+              let digest = store.store_file_bytes(bytes, false).map_err(|e| throw(&e));
 
-                digest.and_then(move |digest: hashing::Digest| {
-                  let mut directory = bazel_protos::remote_execution::Directory::new();
-                  directory.mut_files().push({
-                    let mut file_node = bazel_protos::remote_execution::FileNode::new();
-                    file_node.set_name(filename);
-                    file_node.set_digest((&digest).into());
-                    file_node
-                  });
+              digest.and_then(move |digest: hashing::Digest| {
+                let mut directory = bazel_protos::remote_execution::Directory::new();
+                directory.mut_files().push({
+                  let mut file_node = bazel_protos::remote_execution::FileNode::new();
+                  file_node.set_name(filename);
+                  file_node.set_digest((&digest).into());
+                  file_node
+                });
 
-                  store.record_directory(&directory, true)
-                    .map_err(|e| throw(&e))
-                    .map(move |digest: hashing::Digest| Snapshot::store_directory(&context.core, &digest))
-                })
+                store
+                  .record_directory(&directory, true)
+                  .map_err(|e| throw(&e))
+                  .map(move |digest: hashing::Digest| {
+                    Snapshot::store_directory(&context.core, &digest)
+                  })
               })
+            })
             .to_boxed()
-	},
+        }
         &Rule::Intrinsic(Intrinsic { product, input })
           if product == types.snapshot && input == types.path_globs =>
         {
