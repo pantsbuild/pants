@@ -253,13 +253,13 @@ class ExecuteProcessRequestTest(unittest.TestCase):
     self.assertEqual(req.env, ('VAR', 'VAL'))
 
 
-class TestInputFileCreation(TestBase, unittest.TestCase):
+class TestInputFileCreation(TestBase):
   def test_input_file_creation(self):
     file_name = 'some.filename'
     file_contents = b'some file contents'
 
     input_file = InputFileContent(path=file_name, content=file_contents)
-    digest = self.scheduler.product_request(Digest, [input_file])[0]
+    digest, = self.scheduler.product_request(Digest, [input_file])
 
     req = ExecuteProcessRequest(
       argv=('/usr/bin/cat', file_name),
@@ -267,7 +267,7 @@ class TestInputFileCreation(TestBase, unittest.TestCase):
       description='cat the contents of this file',
     )
 
-    result = self.scheduler.product_request(ExecuteProcessResult, [req])[0]
+    result, = self.scheduler.product_request(ExecuteProcessResult, [req])
     self.assertEqual(result.stdout, file_contents)
 
 
