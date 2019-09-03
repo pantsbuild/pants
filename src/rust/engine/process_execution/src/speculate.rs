@@ -148,7 +148,7 @@ mod tests {
   #[test]
   fn first_req_fast_fail() {
     let (result, call_counter, finished_counter) =
-      run_speculation_test(15, 10, 10, true, false, true, true);
+      run_speculation_test(50, 100, 25, true, false, true, true);
     assert_eq![2, *call_counter.lock().unwrap()];
     assert_eq![1, *finished_counter.lock().unwrap()];
     assert_eq![result.unwrap_err(), Bytes::from("m1")]
@@ -184,7 +184,7 @@ mod tests {
   #[test]
   fn platform_compatible_with_both_speculates() {
     let (result, call_counter, finished_counter) =
-      run_speculation_test(10, 10, 5, false, false, true, true);
+      run_speculation_test(50, 50, 25, false, false, true, true);
     assert_eq![2, *call_counter.lock().unwrap()];
     assert_eq![1, *finished_counter.lock().unwrap()];
     assert_eq![result.unwrap().stdout, Bytes::from("m1")]
