@@ -13,4 +13,5 @@ python_tests(
     'tests/python/pants_test/subsystem:subsystem_utils',
   ],
   tags={'platform_specific_behavior'},
+  timeout=120,
 )
