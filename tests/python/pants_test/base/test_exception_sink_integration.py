@@ -44,7 +44,7 @@ Exception message:.* 1 Exception encountered:
 
     return (pid_specific_log_file, shared_log_file)
 
-  def test_fails_ctrl_c_during_import(self):
+  def test_fails_ctrl_c_cffi_extern(self):
     with temporary_dir() as tmpdir:
       with environment_as(_RAISE_KEYBOARDINTERRUPT_IN_CFFI_IDENTIFY='True'):
         pants_run = self.run_pants_with_workdir(
@@ -67,6 +67,23 @@ Exception message:.* 1 Exception encountered:
                       read_file(pid_specific_log_file))
         self.assertIn('KeyboardInterrupt: ctrl-c interrupted execution of a cffi method!',
                       read_file(shared_log_file))
+
+  def test_fails_ctrl_c_on_import(self):
+    with temporary_dir() as tmpdir:
+      with environment_as(_RAISE_KEYBOARDINTERRUPT_ON_IMPORT='True'):
+        # TODO: figure out the cwd of the pants subprocess, not just the "workdir"!
+        pants_run = self.run_pants_with_workdir(self._lifecycle_stub_cmdline(), workdir=tmpdir)
+        self.assert_failure(pants_run)
+
+        self.assertEqual(dedent("""\
+        Interrupted by user:
+        ctrl-c during import!
+        """), pants_run.stderr_data)
+
+        pid_specific_log_file, shared_log_file = self._get_log_file_paths(tmpdir, pants_run)
+
+        self.assertEqual('', read_file(pid_specific_log_file))
+        self.assertEqual('', read_file(shared_log_file))
 
   def test_logs_unhandled_exception(self):
     with temporary_dir() as tmpdir:
