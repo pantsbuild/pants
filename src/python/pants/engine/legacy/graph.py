@@ -20,7 +20,8 @@ from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.engine.legacy.structs import BundleAdaptor, BundlesField, HydrateableField, SourcesField
+from pants.engine.legacy.structs import (BundleAdaptor, BundlesField, EntryPointField,
+                                         HydrateableField, SourcesField)
 from pants.engine.mapper import AddressMapper
 from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct
@@ -502,6 +503,11 @@ def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
                               include_dirs=include_dirs)
 
 
+@rule(HydratedField, [EntryPointField])
+def hydrate_entry_point(entry_point_field):
+  return HydratedField(entry_point_field.key, entry_point_field.entry_point)
+
+
 @rule(HydratedField, [SourcesField, GlobMatchErrorBehavior])
 def hydrate_sources(sources_field, glob_match_error_behavior):
   """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec.
@@ -557,5 +563,6 @@ def create_legacy_graph_tasks():
     find_owners,
     hydrate_sources,
     hydrate_bundles,
+    hydrate_entry_point,
     RootRule(OwnersRequest),
   ]

@@ -5,7 +5,9 @@ import logging
 import os.path
 from abc import ABCMeta, abstractmethod
 from collections.abc import MutableSequence, MutableSet
+from dataclasses import dataclass
 
+from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants.engine.addressable import addressable_list
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
@@ -274,7 +276,25 @@ class PythonTargetAdaptor(TargetAdaptor):
       return field_adaptors + (sources_field,)
 
 
+@dataclass(frozen=True)
+class EntryPointField:
+  address: Address
+  entry_point: str
+
+  @classproperty
+  def key(cls):
+    return 'entry_point'
+
+
 class PythonBinaryAdaptor(PythonTargetAdaptor):
+  @property
+  def field_adaptors(self):
+    field_adaptors = list(super().field_adaptors)
+    maybe_entry_point = getattr(self, 'entry_point', None)
+    if maybe_entry_point is not None:
+      field_adaptors.append(EntryPointField(self.address, maybe_entry_point))
+    return tuple(field_adaptors)
+
   def validate_sources(self, sources):
     if len(sources.files) > 1:
       raise Target.IllegalArgument(self.address.spec,
@@ -430,4 +450,5 @@ def rules():
   return [
     UnionRule(HydrateableField, SourcesField),
     UnionRule(HydrateableField, BundlesField),
+    UnionRule(HydrateableField, EntryPointField),
   ]

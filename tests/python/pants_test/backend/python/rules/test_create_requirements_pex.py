@@ -5,8 +5,7 @@ import json
 import os.path
 import zipfile
 
-from pants.backend.python.rules.create_requirements_pex import (RequirementsPex,
-                                                                RequirementsPexRequest,
+from pants.backend.python.rules.create_requirements_pex import (MakePexRequest, RequirementsPex,
                                                                 create_requirements_pex)
 from pants.backend.python.rules.download_pex_bin import download_pex_bin
 from pants.backend.python.subsystems.python_native_code import (PythonNativeCode,
@@ -29,7 +28,7 @@ class TestResolveRequirements(TestBase):
       create_requirements_pex,
       create_pex_native_build_environment,
       download_pex_bin,
-      RootRule(RequirementsPexRequest),
+      RootRule(MakePexRequest),
       RootRule(PythonSetup),
       RootRule(PythonNativeCode),
     ]
@@ -44,7 +43,7 @@ class TestResolveRequirements(TestBase):
     def hashify_optional_collection(iterable):
       return tuple(sorted(iterable)) if iterable is not None else tuple()
 
-    request = RequirementsPexRequest(
+    request = MakePexRequest(
       output_filename="test.pex",
       requirements=hashify_optional_collection(requirements),
       interpreter_constraints=hashify_optional_collection(interpreter_constraints),

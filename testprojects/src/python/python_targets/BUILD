@@ -4,6 +4,7 @@
 python_binary(
   name='test',
   source='test_binary.py',
+  entry_point='python_targets.test_binary',
   dependencies=[':test_library']
 )
 
