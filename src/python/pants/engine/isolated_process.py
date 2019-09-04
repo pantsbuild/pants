@@ -6,7 +6,7 @@ import logging
 from pants.engine.fs import Digest
 from pants.engine.rules import RootRule, rule
 from pants.util.objects import (Exactly, TypedCollection, datatype, enum, hashable_string_list,
-                                string_optional, string_type)
+                                string_optional)
 
 
 logger = logging.getLogger(__name__)
@@ -14,13 +14,13 @@ logger = logging.getLogger(__name__)
 _default_timeout_seconds = 15 * 60
 
 
-class ProductDescription(datatype([('value', string_type)])): pass
+class ProductDescription(datatype([('value', str)])): pass
 
 
 class ExecuteProcessRequest(datatype([
   ('argv', hashable_string_list),
   ('input_files', Digest),
-  ('description', string_type),
+  ('description', str),
   ('env', hashable_string_list),
   ('output_files', hashable_string_list),
   ('output_directories', hashable_string_list),
