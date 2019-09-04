@@ -179,8 +179,10 @@ impl WrappedNode for Select {
               let filename = externs::project_str(&files_content, "path");
               let bytes = bytes::Bytes::from(externs::project_bytes(&files_content, "content"));
 
+              let path = filename.into();
+
               store
-                .store_file_with_name(filename, bytes)
+                .store_file_with_path(path, bytes)
                 .map_err(|e| throw(&e))
                 .map(move |digest: hashing::Digest| {
                   Snapshot::store_directory(&context.core, &digest)
@@ -687,40 +689,12 @@ impl DownloadedFile {
           .map(|((), _metadata)| future::ok(()).to_boxed())
           .unwrap_or_else(|| DownloadedFile::download(core.clone(), url, file_name.clone(), digest))
           .and_then(move |()| {
-            DownloadedFile::snapshot_of_one_file(core.store(), PathBuf::from(file_name), digest)
+            core
+              .store()
+              .snapshot_of_one_file(PathBuf::from(file_name), digest)
           })
       })
       .to_boxed()
-  }
-
-  fn snapshot_of_one_file(
-    store: store::Store,
-    name: PathBuf,
-    digest: hashing::Digest,
-  ) -> BoxFuture<store::Snapshot, String> {
-    #[derive(Clone)]
-    struct Digester {
-      digest: hashing::Digest,
-    }
-
-    impl StoreFileByDigest<String> for Digester {
-      fn store_by_digest(&self, _: File, _: WorkUnitStore) -> BoxFuture<hashing::Digest, String> {
-        future::ok(self.digest).to_boxed()
-      }
-    }
-
-    store::Snapshot::from_path_stats(
-      store,
-      &Digester { digest },
-      vec![fs::PathStat::File {
-        path: name.clone(),
-        stat: fs::File {
-          path: name,
-          is_executable: true,
-        },
-      }],
-      WorkUnitStore::new(),
-    )
   }
 
   fn download(

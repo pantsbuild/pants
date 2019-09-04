@@ -238,26 +238,51 @@ impl Store {
       .to_boxed()
   }
 
-  /// Store a file with a filename and contents.
-  pub fn store_file_with_name(
-    &self,
-    filename: String,
-    contents: Bytes,
-  ) -> BoxFuture<Digest, String> {
+  /// Store the given bytes buffer as a file at the given path
+  pub fn store_file_with_path(&self, path: PathBuf, contents: Bytes) -> BoxFuture<Digest, String> {
     let store = self.clone();
     store
       .store_file_bytes(contents, false)
-      .and_then(move |digest: hashing::Digest| {
-        let mut directory = bazel_protos::remote_execution::Directory::new();
-        directory.mut_files().push({
-          let mut file_node = bazel_protos::remote_execution::FileNode::new();
-          file_node.set_name(filename);
-          file_node.set_digest((&digest).into());
-          file_node
-        });
-        store.record_directory(&directory, true)
-      })
+      .and_then(move |digest: hashing::Digest| store.snapshot_of_one_file(path, digest))
+      .map(|snapshot| snapshot.digest)
       .to_boxed()
+  }
+
+  /// Store a digest under a given file path, returning a Snapshot
+  pub fn snapshot_of_one_file(
+    &self,
+    name: PathBuf,
+    digest: hashing::Digest,
+  ) -> BoxFuture<Snapshot, String> {
+    let store = self.clone();
+
+    #[derive(Clone)]
+    struct Digester {
+      digest: hashing::Digest,
+    }
+
+    impl StoreFileByDigest<String> for Digester {
+      fn store_by_digest(
+        &self,
+        _: fs::File,
+        _: WorkUnitStore,
+      ) -> BoxFuture<hashing::Digest, String> {
+        future::ok(self.digest).to_boxed()
+      }
+    }
+
+    Snapshot::from_path_stats(
+      store,
+      &Digester { digest },
+      vec![fs::PathStat::File {
+        path: name.clone(),
+        stat: fs::File {
+          path: name,
+          is_executable: true,
+        },
+      }],
+      WorkUnitStore::new(),
+    )
   }
 
   ///
