@@ -576,9 +576,13 @@ python_tests(
                         targets,
                         failed_targets=None,
                         expect_coverage=True,
-                        covered_path=None):
+                        covered_path=None,
+                        include_test_sources=False):
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
-    simple_coverage_kwargs = {'coverage': 'auto'}
+    simple_coverage_kwargs = {
+      'coverage': 'auto',
+      'coverage_include_test_sources': include_test_sources
+    }
     if failed_targets:
       context = self.run_failing_tests(targets=targets,
                                        failed_targets=failed_targets,
@@ -728,9 +732,6 @@ python_tests(
     self.assertEqual([1, 3, 5, 6, 7], all_statements)
     self.assertEqual([], not_run_statements)
 
-
-
-
   @ensure_cached(PytestRun, expected_num_artifacts=1)
   def test_coverage_auto_option_no_explicit_coverage_idiosyncratic_layout(self):
     # The all target has no coverage attribute and the code under test does not follow the
@@ -763,7 +764,8 @@ python_tests(
     test = self.target('test/python/util_tests')
     covered_path = os.path.join(self.build_root, 'src/python/util/math.py')
     all_statements, not_run_statements = self.run_coverage_auto(targets=[test],
-                                                                covered_path=covered_path)
+                                                                covered_path=covered_path,
+                                                                include_test_sources=True)
     self.assertEqual([1, 2], all_statements)
     self.assertEqual([1, 2], not_run_statements)
 
