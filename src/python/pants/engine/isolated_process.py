@@ -71,22 +71,23 @@ class MultiPlatformExecuteProcessRequest(datatype([
   # args collects a set of tuples representing platform constraints mapped to a req, just like a dict constructor can.
   ALLOWED_PLATFORM_CONSTRAINTS = enum(['darwin', 'linux', 'none'])
 
-  def __new__(cls, *args):
-    if len(args) == 0:
+  def __new__(cls, request_dict):
+    if len(request_dict) == 0:
       raise cls.make_type_error("At least one platform constrained ExecuteProcessRequest must be passed.")
 
-    d = dict(args)
     # validate the platform constraints using the platforms enum an flatten the keys.
     validated_constraints = tuple(
-      constraint.value for pair in d.keys() for constraint in pair if cls.ALLOWED_PLATFORM_CONSTRAINTS(constraint.value)
+      constraint.value
+      for pair in request_dict.keys() for constraint in pair
+      if cls.ALLOWED_PLATFORM_CONSTRAINTS(constraint.value)
     )
-    if len({req.description for req in d.values()}) != 1:
+    if len({req.description for req in request_dict.values()}) != 1:
       raise ValueError(f"The `description` of all execute_process_requests in a {cls.__name__} must be identical.")
 
     return super().__new__(
       cls,
       validated_constraints,
-      tuple(d.values())
+      tuple(request_dict.values())
     )
 
 

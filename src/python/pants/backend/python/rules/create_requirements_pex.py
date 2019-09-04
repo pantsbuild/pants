@@ -54,16 +54,14 @@ def create_requirements_pex(request, pex_bin, python_setup, pex_build_environmen
   argv.extend(interpreter_constraint_args + list(request.requirements))
 
   execute_process_request = MultiPlatformExecuteProcessRequest(
-    (
-      (Platform.current, Platform.current),
-      ExecuteProcessRequest(
+    {
+      (Platform.current, Platform.current): ExecuteProcessRequest(
         argv=tuple(argv),
         env=env,
         input_files=pex_bin.directory_digest,
         description=f"Create a requirements PEX: {', '.join(request.requirements)}",
-        output_files=(request.output_filename,),
-      )
-    )
+        output_files=(request.output_filename,))
+    }
   )
 
   result = yield Get(ExecuteProcessResult, MultiPlatformExecuteProcessRequest, execute_process_request)
