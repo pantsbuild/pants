@@ -789,7 +789,6 @@ class Native(Singleton):
                     type_file,
                     type_link,
                     type_multi_platform_process_request,
-                    type_process_request,
                     type_process_result,
                     type_generator,
                     type_url_to_fetch):
@@ -821,7 +820,6 @@ class Native(Singleton):
         ti(type_file),
         ti(type_link),
         ti(type_multi_platform_process_request),
-        ti(type_process_request),
         ti(type_process_result),
         ti(type_generator),
         ti(type_url_to_fetch),

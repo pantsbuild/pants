@@ -65,7 +65,7 @@ impl CommandRunner for SpeculatingCommandRunner {
     ) {
       (Some(req), _) => Some(req.clone()),
       (_, Some(req)) => Some(req.clone()),
-      _ => None
+      _ => None,
     }
   }
 
@@ -81,7 +81,11 @@ impl CommandRunner for SpeculatingCommandRunner {
       (Some(_), Some(_)) => self.speculate(req, workunit_store),
       (Some(_), None) => self.primary.run(req, workunit_store),
       (None, Some(_)) => self.secondary.run(req, workunit_store),
-      (None, None) => err(format!("No compatible requests found for available platforms in {:?}", req)).to_boxed(),
+      (None, None) => err(format!(
+        "No compatible requests found for available platforms in {:?}",
+        req
+      ))
+      .to_boxed(),
     }
   }
 }

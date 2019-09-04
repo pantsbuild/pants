@@ -230,12 +230,14 @@ impl super::CommandRunner for CommandRunner {
       &(Platform::None, Platform::None),
       &(self.platform.clone(), Platform::None),
       &(self.platform.clone(), Platform::current_platform().unwrap()),
-    ].iter() {
+    ]
+    .iter()
+    {
       if let Some(compatible_req) = req.0.get(compatible_constraint) {
-        return Some(compatible_req.clone())
+        return Some(compatible_req.clone());
       }
     }
-    return None
+    None
   }
 
   fn run(

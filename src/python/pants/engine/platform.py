@@ -23,6 +23,8 @@ class Platform(enum(all_normalized_os_names())):
     })
 
 
+# TODO We will want to allow users to specifiy the execution platform for rules,
+# which means replacing this singleton rule with a RootRule populated by an option.
 @rule(Platform, [])
 def materialize_platform():
   return Platform.current

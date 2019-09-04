@@ -16,7 +16,7 @@ from pants.build_graph.address import Address
 from pants.engine.fs import (Digest, DirectoriesToMerge, DirectoryToMaterialize,
                              DirectoryWithPrefixToStrip, FileContent, FilesContent, PathGlobs,
                              PathGlobsAndRoot, Snapshot, UrlToFetch)
-from pants.engine.isolated_process import (ExecuteProcessRequest, FallibleExecuteProcessResult,
+from pants.engine.isolated_process import (FallibleExecuteProcessResult,
                                            MultiPlatformExecuteProcessRequest)
 from pants.engine.native import Function, TypeId
 from pants.engine.nodes import Return, Throw
@@ -110,7 +110,6 @@ class Scheduler:
       type_file=File,
       type_link=Link,
       type_multi_platform_process_request=MultiPlatformExecuteProcessRequest,
-      type_process_request=ExecuteProcessRequest,
       type_process_result=FallibleExecuteProcessResult,
       type_generator=GeneratorType,
       type_url_to_fetch=UrlToFetch,

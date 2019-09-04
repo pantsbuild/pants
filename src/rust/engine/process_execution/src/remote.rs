@@ -129,10 +129,6 @@ impl super::CommandRunner for CommandRunner {
   ///
   /// Loops until the server gives a response, either successful or error. Does not have any
   /// timeout: polls in a tight loop.
-  ///
-  /// TODO: Request jdk_home be created if set.
-  ///
-  ///
   fn get_compatible_request(
     &self,
     req: &MultiPlatformExecuteProcessRequest,
@@ -141,14 +137,19 @@ impl super::CommandRunner for CommandRunner {
       &(Platform::None, Platform::None),
       &(self.platform.clone(), Platform::None),
       &(self.platform.clone(), Platform::current_platform().unwrap()),
-    ].iter() {
+    ]
+    .iter()
+    {
       if let Some(compatible_req) = req.0.get(compatible_constraint) {
-        return Some(compatible_req.clone())
+        return Some(compatible_req.clone());
       }
     }
-    return None
+    None
   }
 
+  ///
+  /// TODO: Request jdk_home be created if set.
+  ///
   fn run(
     &self,
     req: MultiPlatformExecuteProcessRequest,
