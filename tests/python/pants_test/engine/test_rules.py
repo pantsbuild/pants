@@ -4,6 +4,7 @@
 import re
 import sys
 import unittest
+from dataclasses import dataclass
 from textwrap import dedent
 
 from pants.engine.build_files import create_graph_rules
@@ -817,6 +818,36 @@ test_rules.py:{rule_lineno}:{rule_col}
            col=8,
            rule_lineno=(sys._getframe().f_lineno - 27),
            rule_col=6))
+
+  def test_final_yield(self):
+    @dataclass(frozen=True)
+    class Y:
+      none_value: type(None)
+
+    @dataclass(frozen=True)
+    class X:
+      y_value: Y
+
+    with self.assertRaisesWithMessageContaining(_RuleVisitor.YieldVisitError, '`yield Get(...)` in @rule is currently not allowed without an assignment.'):
+      @rule(X, [type(None)])
+      def final_yield(n):
+        yield Get(X, Y(n))
+
+    # Try a more complex example.
+    with self.assertRaises(_RuleVisitor.YieldVisitError) as cm:
+      @rule(X, [type(None)])
+      def final_yield_within_if(n):
+        if n is None:
+          yield Get(X, Y(n))
+    exc_msg = str(cm.exception)
+    exc_msg_trimmed = re.sub(r'^.*?(test_rules\.py)', r'\1', exc_msg, flags=re.MULTILINE)
+    self.assertIn('`yield Get(...)` in @rule is currently not allowed without an assignment.',
+                  exc_msg_trimmed)
+    self.assertIn("""\
+The invalid statement was:
+test_rules.py:842:10
+          yield Get(X, Y(n))
+""", exc_msg_trimmed)
 
   def create_full_graph(self, rules, validate=True):
     scheduler = create_scheduler(rules, validate=validate)

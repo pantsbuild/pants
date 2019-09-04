@@ -9,6 +9,7 @@ import sys
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from collections.abc import Iterable
+from textwrap import dedent
 
 import asttokens
 from twitter.common.collections import OrderedSet
@@ -141,8 +142,11 @@ The rule defined by function `{func_name}` begins at:
       return True
     return False
 
+  def _is_get(self, node):
+    return isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == Get.__name__
+
   def visit_Call(self, node):
-    if isinstance(node.func, ast.Name) and node.func.id == Get.__name__:
+    if self._is_get(node):
       self._gets.append(Get.extract_constraints(node))
 
   def visit_Assign(self, node):
@@ -156,15 +160,31 @@ The rule defined by function `{func_name}` begins at:
       # The current yield "expr" is the child of an "Expr" "stmt".
       expr_for_yield = self._parents_table[node]
 
-      if not self._stmt_is_at_end_of_parent_list(expr_for_yield):
-        raise self.YieldVisitError(
-          self._generate_ast_error_message(node, """\
-yield in @rule without assignment must come at the end of a series of statements.
+      if self._stmt_is_at_end_of_parent_list(expr_for_yield):
+        if self._is_get(node.value):
+          raise self.YieldVisitError(
+            self._generate_ast_error_message(node, dedent("""\
+            `yield Get(...)` in @rule is currently not allowed without an assignment.
 
-A yield in an @rule without an assignment is equivalent to a return, and we
-currently require that no statements follow such a yield at the same level of nesting.
-Use `_ = yield Get(...)` if you wish to yield control to the engine and discard the result.
-"""))
+            Use something like the following instead:
+                x = yield Get(...)
+                yield x
+
+            See https://github.com/pantsbuild/pants/pull/8227 for progress.
+            """)))
+      else:
+        raise self.YieldVisitError(
+          self._generate_ast_error_message(node, dedent("""\
+          yield in @rule without assignment must come at the end of a series of statements.
+
+          A yield in an @rule without an assignment is equivalent to a return, and we
+          currently require that no statements follow such a yield at the same level of nesting.
+          Use `_ = yield Get(...)` if you wish to yield control to the engine and discard the
+          result.
+
+          Note that any `yield Get(...)` in an @rule without assignment is also currently not
+          supported. See https://github.com/pantsbuild/pants/pull/8227 for progress.
+          """)))
 
 
 @memoized
