@@ -270,6 +270,22 @@ class TestInputFileCreation(TestBase):
     result, = self.scheduler.product_request(ExecuteProcessResult, [req])
     self.assertEqual(result.stdout, file_contents)
 
+  def test_file_in_directory_creation(self):
+    path = 'somedir/filename'
+    content = b'file contents'
+
+    input_file = InputFileContent(path=path, content=content)
+    digest, = self.scheduler.product_request(Digest, [input_file])
+
+    req = ExecuteProcessRequest(
+      argv=('/usr/bin/cat', 'somedir/filename'),
+      input_files=digest,
+      description="Cat a file in a directory to make sure that doesn't break",
+    )
+
+    result, = self.scheduler.product_request(ExecuteProcessResult, [req])
+    self.assertEqual(result.stdout, content)
+
 
 class IsolatedProcessTest(TestBase, unittest.TestCase):
 
