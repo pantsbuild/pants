@@ -23,7 +23,7 @@ class FileContent(datatype([('path', str), ('content', bytes)])):
 
 class InputFileContent(FileContent):
   """A newtype wrapper for FileContent.
-  TODO: This class is currently necessary because the engine
+  TODO(7710): This class is currently necessary because the engine
   otherwise finds a cycle between FileContent <=> DirectoryDigest.
   """
 
