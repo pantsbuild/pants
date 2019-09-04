@@ -153,34 +153,36 @@ impl super::CommandRunner for CommandRunner {
     match execute_request_result {
       Ok((action, command, execute_request)) => {
         let command_runner = self.clone();
-        let command_runner2 = self.clone();
-        let command_runner3 = self.clone();
-        let workunit_store2 = workunit_store.clone();
         let execute_request = Arc::new(execute_request);
-        let execute_request2 = execute_request.clone();
 
-        let store2 = store.clone();
         let mut history = ExecutionHistory::default();
 
         self
           .store_proto_locally(&command)
           .join(self.store_proto_locally(&action))
-          .and_then(move |(command_digest, action_digest)| {
-            store2.ensure_remote_has_recursive(
-              vec![command_digest, action_digest, input_files],
-              workunit_store2.clone(),
-            )
-          })
-          .and_then(move |summary| {
-            history.current_attempt += summary;
-            trace!(
-              "Executing remotely request: {:?} (command: {:?})",
-              execute_request,
-              command
-            );
-            command_runner
-              .oneshot_execute(&execute_request)
-              .join(future::ok(history))
+          .and_then({
+            let store = store.clone();
+            let workunit_store = workunit_store.clone();
+            move |(command_digest, action_digest)| {
+              store.ensure_remote_has_recursive(
+                vec![command_digest, action_digest, input_files],
+                workunit_store,
+              )
+            }})
+          .and_then({
+            let execute_request = execute_request.clone();
+            let command_runner = command_runner.clone();
+            move |summary| {
+              history.current_attempt += summary;
+              trace!(
+                "Executing remotely request: {:?} (command: {:?})",
+                execute_request,
+                command
+              );
+              command_runner
+                  .oneshot_execute(&execute_request)
+                  .join(future::ok(history))
+            }
           })
           .and_then(move |(operation, history)| {
             let start_time = Instant::now();
@@ -190,16 +192,15 @@ impl super::CommandRunner for CommandRunner {
               move |(mut history, operation, iter_num)| {
                 let description = description.clone();
 
-                let execute_request2 = execute_request2.clone();
+                let execute_request = execute_request.clone();
                 let store = store.clone();
                 let operations_client = operations_client.clone();
-                let command_runner2 = command_runner2.clone();
-                let command_runner3 = command_runner3.clone();
-                let workunit_store2 = workunit_store.clone();
-                let f = command_runner2.extract_execute_response(
+                let command_runner = command_runner.clone();
+                let workunit_store = workunit_store.clone();
+                let f = command_runner.extract_execute_response(
                   operation,
                   &mut history,
-                  workunit_store2.clone(),
+                  workunit_store.clone(),
                 );
                 f.map(future::Loop::Break).or_else(move |value| {
                   match value {
@@ -222,17 +223,18 @@ impl super::CommandRunner for CommandRunner {
                         current_attempt: ExecutionStats::default(),
                       };
 
-                      let execute_request = execute_request2.clone();
-                      let workunit_store = workunit_store2.clone();
+                      let execute_request = execute_request.clone();
                       store
                         .ensure_remote_has_recursive(missing_digests, workunit_store.clone())
-                        .and_then(move |summary| {
+                        .and_then({
+                          let command_runner = command_runner.clone();
+                          move |summary| {
                           let mut history = history;
                           history.current_attempt += summary;
-                          command_runner2
+                          command_runner
                             .oneshot_execute(&execute_request)
                             .join(future::ok(history))
-                        })
+                        }})
                         // Reset `iter_num` on `MissingDigests`
                         .map(|(operation, history)| future::Loop::Continue((history, operation, 0)))
                         .to_boxed()
@@ -282,7 +284,7 @@ impl super::CommandRunner for CommandRunner {
                               operations_client
                                 .get_operation_opt(
                                   &operation_request,
-                                  command_runner3.call_option(),
+                                  command_runner.call_option(),
                                 )
                                 .or_else(move |err| {
                                   rpcerror_recover_cancelled(operation_request.take_name(), err)
