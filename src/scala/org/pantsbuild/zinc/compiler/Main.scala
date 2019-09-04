@@ -159,31 +159,30 @@ object Main {
       }
     }
 
-    mainImpl(settings.withAbsolutePaths(Paths.get(".").toAbsolutePath.toFile), startTime)
+    mainImpl(settings.withAbsolutePaths(Paths.get(".").toAbsolutePath.toFile), startTime, n => sys.exit(1))
   }
 
   def nailMain(context: NGContext): Unit = {
     val startTime = System.currentTimeMillis
 
-    val settings = Settings.SettingsParser.parse(preprocessArgs(context.getArgs), Settings()) match {
-      case Some(settings) => settings
+    Settings.SettingsParser.parse(preprocessArgs(context.getArgs), Settings()) match {
+      case Some(settings) =>
+        mainImpl(settings.withAbsolutePaths(new File(context.getWorkingDirectory)), startTime, n => context.exit(n))
       case None => {
         println("See zinc-compiler --help for information about options")
-        sys.exit(1)
+        context.exit(1)
       }
     }
-
-    mainImpl(settings.withAbsolutePaths(new File(context.getWorkingDirectory)), startTime)
   }
 
-  def mainImpl(settings: Settings, startTime: Long): Unit = {
+  def mainImpl(settings: Settings, startTime: Long, exit: Int => Unit): Unit = {
     val log = BareBonesLogger(settings.consoleLog.logLevel)
     val isDebug = settings.consoleLog.logLevel <= Level.Debug
 
     // if there are no sources provided, print outputs based on current analysis if requested,
     // else print version and usage by default
     if (settings.sources.isEmpty) {
-      sys.exit(1)
+      exit(1)
     }
 
     // Load the existing analysis for the destination, if any.
@@ -225,12 +224,12 @@ object Main {
     } catch {
       case e: CompileFailed =>
         log.error("Compile failed " + Util.timing(startTime))
-        sys.exit(1)
+        exit(1)
       case e: Exception =>
         if (isDebug) e.printStackTrace
         val message = e.getMessage
         if (message ne null) log.error(message)
-        sys.exit(1)
+        exit(1)
     }
   }
 }
