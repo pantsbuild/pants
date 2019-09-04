@@ -104,6 +104,7 @@ python_library(
     ':fs',
     ':rules',
     ':selectors',
+    ':platform',
     'src/python/pants/util:objects',
   ]
 )

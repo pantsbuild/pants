@@ -82,6 +82,7 @@ class LLVM(NativeTool):
       exe_filename=platform.resolve_for_enum_variant({
         'darwin': 'ld64.lld',
         'linux': 'lld',
+        'none': ''
       }),
       library_dirs=[],
       linking_library_dirs=[],

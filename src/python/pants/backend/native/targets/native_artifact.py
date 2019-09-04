@@ -20,6 +20,7 @@ class NativeArtifact(datatype(['lib_name']), PayloadField):
     return platform.resolve_for_enum_variant({
       'darwin': 'lib{}.dylib'.format(self.lib_name),
       'linux': 'lib{}.so'.format(self.lib_name),
+      'none': '',
     })
 
   def _compute_fingerprint(self):

@@ -156,10 +156,6 @@ impl Tasks {
       },
       Intrinsic {
         product: types.process_result,
-        input: types.process_request,
-      },
-      Intrinsic {
-        product: types.process_result,
         input: types.multi_platform_process_request,
       },
     ];

@@ -43,6 +43,7 @@ class GCC(NativeTool):
     lib64_tuples = platform.resolve_for_enum_variant({
       'darwin': [],
       'linux': [('lib64',)],
+      'none': [],
     })
     return self._filemap(lib64_tuples + [
       ('lib',),

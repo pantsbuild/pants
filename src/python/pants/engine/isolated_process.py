@@ -4,6 +4,7 @@
 import logging
 
 from pants.engine.fs import Digest
+from pants.engine.platform import Platform
 from pants.engine.rules import RootRule, rule
 from pants.util.objects import (Exactly, TypedCollection, datatype, enum, hashable_string_list,
                                 string_optional)
@@ -145,14 +146,16 @@ stderr:
     super().__init__(msg)
 
 
-@rule(ProductDescription, [ExecuteProcessRequest])
-def get_request_description(req):
-  return ProductDescription(req.description)
-
-
 @rule(ProductDescription, [MultiPlatformExecuteProcessRequest])
 def get_multi_platform_request_description(req):
   return req.get_product_description()
+
+
+@rule(MultiPlatformExecuteProcessRequest, [ExecuteProcessRequest])
+def upcast_execute_process_request(req):
+  return MultiPlatformExecuteProcessRequest(
+    {(Platform.none, Platform.none): ExecuteProcessRequest}
+  )
 
 
 @rule(ExecuteProcessResult, [FallibleExecuteProcessResult, ProductDescription])
@@ -179,7 +182,7 @@ def create_process_rules():
   return [
     RootRule(ExecuteProcessRequest),
     RootRule(MultiPlatformExecuteProcessRequest),
+    upcast_execute_process_request,
     fallible_to_exec_result_or_raise,
-    get_request_description,
     get_multi_platform_request_description,
   ]

@@ -261,8 +261,8 @@ impl CommandRunner for BoundedCommandRunner {
 }
 
 impl From<Box<BoundedCommandRunner>> for Arc<dyn CommandRunner> {
-  fn from(cmmd_rnnr: Box<BoundedCommandRunner>) -> Arc<dyn CommandRunner> {
-    Arc::new(*cmmd_rnnr)
+  fn from(command_runner: Box<BoundedCommandRunner>) -> Arc<dyn CommandRunner> {
+    Arc::new(*command_runner)
   }
 }
 

@@ -158,6 +158,7 @@ class LinkSharedLibraries(NativeTask):
            self.platform.resolve_for_enum_variant({
              'darwin': ['-Wl,-dylib'],
              'linux': ['-shared'],
+             'none': [],
            }) +
            linker.extra_args +
            ['-o', os.path.abspath(resulting_shared_lib_path)] +

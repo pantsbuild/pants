@@ -286,32 +286,6 @@ impl WrappedNode for Select {
         }
         &tasks::Rule::Intrinsic(Intrinsic { product, input })
           if product == context.core.types.process_result
-            && input == context.core.types.process_request =>
-        {
-          let context = context.clone();
-          let core = context.core.clone();
-          self
-            .select_product(&context, context.core.types.process_request, "intrinsic")
-            .and_then(|request| {
-              ExecuteProcess::lift(&request)
-                .map_err(|str| throw(&format!("Error lifting ExecuteProcess: {}", str)))
-            })
-            .and_then(move |process_request| context.get(process_request))
-            .map(move |result| {
-              externs::unsafe_call(
-                &core.types.construct_process_result,
-                &[
-                  externs::store_bytes(&result.0.stdout),
-                  externs::store_bytes(&result.0.stderr),
-                  externs::store_i64(result.0.exit_code.into()),
-                  Snapshot::store_directory(&core, &result.0.output_directory),
-                ],
-              )
-            })
-            .to_boxed()
-        }
-        &tasks::Rule::Intrinsic(Intrinsic { product, input })
-          if product == context.core.types.process_result
             && input == context.core.types.multi_platform_process_request =>
         {
           let context = context.clone();
@@ -381,17 +355,22 @@ pub fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
   ))
 }
 
-///
-/// A Node that represents executing a process.
+/// A Node that represents a set of processes to execute on specific platforms.
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct ExecuteProcess(process_execution::ExecuteProcessRequest);
+pub struct MultiPlatformExecuteProcess(MultiPlatformExecuteProcessRequest);
 
-impl ExecuteProcess {
-  ///
-  /// Lifts a Key representing a python ExecuteProcessRequest value into a ExecuteProcess Node.
-  ///
-  fn lift(value: &Value) -> Result<ExecuteProcess, String> {
+impl MultiPlatformExecuteProcess {
+  fn get_platform_variant(variant_candidate: String) -> Platform {
+    match variant_candidate.as_ref() {
+      "darwin" => Platform::Darwin,
+      "linux" => Platform::Linux,
+      "none" => Platform::None,
+      _ => unreachable!(),
+    }
+  }
+
+  fn lift_execute_process(value: &Value) -> Result<ExecuteProcessRequest, String> {
     let mut env: BTreeMap<String, String> = BTreeMap::new();
     let env_var_parts = externs::project_multi_strs(&value, "env");
     if env_var_parts.len() % 2 != 0 {
@@ -435,7 +414,7 @@ impl ExecuteProcess {
         Some(PathBuf::from(val))
       }
     };
-    Ok(ExecuteProcess(process_execution::ExecuteProcessRequest {
+    Ok(process_execution::ExecuteProcessRequest {
       argv: externs::project_multi_strs(&value, "argv"),
       env: env,
       input_files: digest,
@@ -444,35 +423,18 @@ impl ExecuteProcess {
       timeout: Duration::from_millis((timeout_in_seconds * 1000.0) as u64),
       description: description,
       jdk_home: jdk_home,
-    }))
-  }
-}
-
-///
-/// A Node that represents a set of processes to execute on specific platforms.
-///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct MultiPlatformExecuteProcess(MultiPlatformExecuteProcessRequest);
-
-impl MultiPlatformExecuteProcess {
-  fn get_platform_variant(variant_candidate: String) -> Platform {
-    match variant_candidate.as_ref() {
-      "darwin" => Platform::Darwin,
-      "linux" => Platform::Linux,
-      "none" => Platform::None,
-      _ => unreachable!(),
-    }
+    })
   }
 
   fn lift(value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
     let mut request_by_constraint: BTreeMap<(Platform, Platform), ExecuteProcessRequest> =
       BTreeMap::new();
     let constraint_parts = externs::project_multi_strs(&value, "platform_constraints");
-    let requests: Vec<ExecuteProcessRequest> =
-      externs::project_multi(&value, "execute_process_requests")
-        .iter()
-        .map(|r| ExecuteProcess::lift(r).unwrap().0)
-        .collect();
+    let mut requests: Vec<ExecuteProcessRequest> = Vec::new();
+    for execute_process in externs::project_multi(&value, "execute_process_requests").iter() {
+      let underlying_req = MultiPlatformExecuteProcess::lift_execute_process(execute_process)?;
+      requests.push(underlying_req);
+    }
     if constraint_parts.len() % 2 != 0 {
       return Err("Error parsing platform_constraints: odd number of parts".to_owned());
     }
@@ -530,35 +492,6 @@ impl WrappedNode for MultiPlatformExecuteProcess {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProcessResult(process_execution::FallibleExecuteProcessResult);
-
-impl WrappedNode for ExecuteProcess {
-  type Item = ProcessResult;
-
-  fn run(self, context: Context) -> NodeFuture<ProcessResult> {
-    let request: process_execution::MultiPlatformExecuteProcessRequest = self.0.into();
-    let workunit_store = context.session.workunit_store();
-    if context.core.command_runner.is_compatible_request(&request) {
-      context
-        .core
-        .command_runner
-        .run(request, workunit_store)
-        .map(ProcessResult)
-        .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
-        .to_boxed()
-    } else {
-      err(throw(&format!(
-        "No compatible platform found for request: {:?}",
-        request
-      )))
-    }
-  }
-}
-
-impl From<ExecuteProcess> for NodeKey {
-  fn from(n: ExecuteProcess) -> Self {
-    NodeKey::ExecuteProcess(Box::new(n))
-  }
-}
 
 ///
 /// A Node that represents reading the destination of a symlink (non-recursively).
@@ -1193,7 +1126,6 @@ impl NodeTracer<NodeKey> for Tracer {
 pub enum NodeKey {
   DigestFile(DigestFile),
   DownloadedFile(DownloadedFile),
-  ExecuteProcess(Box<ExecuteProcess>),
   MultiPlatformExecuteProcess(Box<MultiPlatformExecuteProcess>),
   ReadLink(ReadLink),
   Scandir(Scandir),
@@ -1205,7 +1137,6 @@ pub enum NodeKey {
 impl NodeKey {
   fn product_str(&self) -> String {
     match self {
-      &NodeKey::ExecuteProcess(..) => "ProcessResult".to_string(),
       &NodeKey::MultiPlatformExecuteProcess(..) => "ProcessResult".to_string(),
       &NodeKey::DownloadedFile(..) => "DownloadedFile".to_string(),
       &NodeKey::Select(ref s) => format!("{}", s.product),
@@ -1227,8 +1158,7 @@ impl NodeKey {
       // Explicitly listed so that if people add new NodeKeys they need to consider whether their
       // NodeKey represents an FS operation, and accordingly whether they need to add it to the
       // above list or the below list.
-      &NodeKey::ExecuteProcess { .. }
-      | &NodeKey::MultiPlatformExecuteProcess { .. }
+      &NodeKey::MultiPlatformExecuteProcess { .. }
       | &NodeKey::Select { .. }
       | &NodeKey::Snapshot { .. }
       | &NodeKey::Task { .. }
@@ -1258,7 +1188,6 @@ impl Node for NodeKey {
       match self {
         NodeKey::DigestFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
         NodeKey::DownloadedFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        NodeKey::ExecuteProcess(n) => n.run(context).map(NodeResult::from).to_boxed(),
         NodeKey::MultiPlatformExecuteProcess(n) => n.run(context).map(NodeResult::from).to_boxed(),
         NodeKey::ReadLink(n) => n.run(context).map(NodeResult::from).to_boxed(),
         NodeKey::Scandir(n) => n.run(context).map(NodeResult::from).to_boxed(),
@@ -1308,7 +1237,6 @@ impl Display for NodeKey {
     match self {
       &NodeKey::DigestFile(ref s) => write!(f, "DigestFile({:?})", s.0),
       &NodeKey::DownloadedFile(ref s) => write!(f, "DownloadedFile({:?})", s.0),
-      &NodeKey::ExecuteProcess(ref s) => write!(f, "ExecuteProcess({:?}", s.0),
       &NodeKey::MultiPlatformExecuteProcess(ref s) => {
         write!(f, "MultiPlatformExecuteProcess({:?}", s.0)
       }

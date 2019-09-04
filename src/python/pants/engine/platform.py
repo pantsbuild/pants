@@ -19,6 +19,7 @@ class Platform(enum(all_normalized_os_names())):
     return self.resolve_for_enum_variant({
       'darwin': 'DYLD_LIBRARY_PATH',
       'linux': 'LD_LIBRARY_PATH',
+      'none': '',
     })
 
 
