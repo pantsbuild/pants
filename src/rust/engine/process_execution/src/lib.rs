@@ -201,19 +201,26 @@ impl AddAssign<UploadSummary> for ExecutionStats {
 }
 
 pub trait CommandRunner: Send + Sync {
+  ///
+  /// Submit a request for execution on the underlying runtime, and return
+  /// a future for it.
+  ///
   fn run(
     &self,
     req: MultiPlatformExecuteProcessRequest,
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<FallibleExecuteProcessResult, String>;
-  fn is_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> bool;
+
+  ///
+  /// Given a multi platform request which may have some platform
+  /// constraints determine if any of the requests contained within are compatible
+  /// with the current command runners platform configuration. If so return the
+  /// first candidate that will be run if the multi platform request is submitted to
+  /// `fn run(..)`
   fn get_compatible_request(
     &self,
     req: &MultiPlatformExecuteProcessRequest,
-  ) -> ExecuteProcessRequest;
-  fn get_platform(&self) -> Platform {
-    Platform::None
-  }
+  ) -> Option<ExecuteProcessRequest>;
 }
 
 ///
@@ -245,19 +252,11 @@ impl CommandRunner for BoundedCommandRunner {
       .with_acquired(move || inner.0.run(req, workunit_store))
   }
 
-  fn is_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> bool {
-    self.inner.0.is_compatible_request(&req)
-  }
-
   fn get_compatible_request(
     &self,
     req: &MultiPlatformExecuteProcessRequest,
-  ) -> ExecuteProcessRequest {
+  ) -> Option<ExecuteProcessRequest> {
     self.inner.0.get_compatible_request(&req)
-  }
-
-  fn get_platform(&self) -> Platform {
-    self.inner.0.get_platform()
   }
 }
 

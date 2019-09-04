@@ -132,33 +132,21 @@ impl super::CommandRunner for CommandRunner {
   ///
   /// TODO: Request jdk_home be created if set.
   ///
-  fn is_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> bool {
-    req.0.contains_key(&(Platform::None, Platform::None))
-      || req
-        .0
-        .contains_key(&(self.platform.clone(), Platform::current_platform().unwrap()))
-  }
-
+  ///
   fn get_compatible_request(
     &self,
     req: &MultiPlatformExecuteProcessRequest,
-  ) -> ExecuteProcessRequest {
-    match req.0.get(&(Platform::None, Platform::None)) {
-      Some(req) => req.clone(),
-      None => {
-        match req
-          .0
-          .get(&(self.platform.clone(), Platform::current_platform().unwrap()))
-        {
-          Some(req) => req.clone(),
-          None => panic!("No compatible request found!"),
-        }
+  ) -> Option<ExecuteProcessRequest> {
+    for compatible_constraint in vec![
+      &(Platform::None, Platform::None),
+      &(self.platform.clone(), Platform::None),
+      &(self.platform.clone(), Platform::current_platform().unwrap()),
+    ].iter() {
+      if let Some(compatible_req) = req.0.get(compatible_constraint) {
+        return Some(compatible_req.clone())
       }
     }
-  }
-
-  fn get_platform(&self) -> Platform {
-    self.platform.clone()
+    return None
   }
 
   fn run(
@@ -166,7 +154,7 @@ impl super::CommandRunner for CommandRunner {
     req: MultiPlatformExecuteProcessRequest,
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
-    let compatible_underlying_request = self.get_compatible_request(&req);
+    let compatible_underlying_request = self.get_compatible_request(&req).unwrap();
     let operations_client = self.operations_client.clone();
     let store = self.store.clone();
     let execute_request_result =

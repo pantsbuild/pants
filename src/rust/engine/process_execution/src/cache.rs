@@ -1,6 +1,6 @@
 use crate::{
   ExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecuteProcessResult,
-  MultiPlatformExecuteProcessRequest, Platform,
+  MultiPlatformExecuteProcessRequest,
 };
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
@@ -24,19 +24,11 @@ pub struct CommandRunner {
 }
 
 impl crate::CommandRunner for CommandRunner {
-  fn is_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> bool {
-    self.underlying.is_compatible_request(req)
-  }
-
   fn get_compatible_request(
     &self,
     req: &MultiPlatformExecuteProcessRequest,
-  ) -> ExecuteProcessRequest {
+  ) -> Option<ExecuteProcessRequest> {
     self.underlying.get_compatible_request(req)
-  }
-
-  fn get_platform(&self) -> Platform {
-    self.underlying.get_platform()
   }
 
   // TODO: Maybe record WorkUnits for local cache checks.

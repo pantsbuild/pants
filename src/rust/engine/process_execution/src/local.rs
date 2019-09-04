@@ -222,33 +222,20 @@ impl super::CommandRunner for CommandRunner {
   /// TODO: start to create workunits for local process execution
   ///
 
-  fn get_platform(&self) -> Platform {
-    self.platform.clone()
-  }
-
-  fn is_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> bool {
-    req.0.contains_key(&(Platform::None, Platform::None))
-      || req
-        .0
-        .contains_key(&(self.platform.clone(), Platform::current_platform().unwrap()))
-  }
-
   fn get_compatible_request(
     &self,
     req: &MultiPlatformExecuteProcessRequest,
-  ) -> ExecuteProcessRequest {
-    match req.0.get(&(Platform::None, Platform::None)) {
-      Some(req) => req.clone(),
-      None => {
-        match req
-          .0
-          .get(&(self.platform.clone(), Platform::current_platform().unwrap()))
-        {
-          Some(req) => req.clone(),
-          None => panic!("No compatible request found!"),
-        }
+  ) -> Option<ExecuteProcessRequest> {
+    for compatible_constraint in vec![
+      &(Platform::None, Platform::None),
+      &(self.platform.clone(), Platform::None),
+      &(self.platform.clone(), Platform::current_platform().unwrap()),
+    ].iter() {
+      if let Some(compatible_req) = req.0.get(compatible_constraint) {
+        return Some(compatible_req.clone())
       }
     }
+    return None
   }
 
   fn run(
@@ -263,7 +250,7 @@ impl super::CommandRunner for CommandRunner {
         "Error making tempdir for local process execution: {:?}",
         err
       )));
-    let req = self.get_compatible_request(&req);
+    let req = self.get_compatible_request(&req).unwrap();
     let workdir_path = workdir.path().to_owned();
     let workdir_path2 = workdir_path.clone();
     let workdir_path3 = workdir_path.clone();

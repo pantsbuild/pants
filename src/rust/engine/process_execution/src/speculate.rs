@@ -55,21 +55,17 @@ impl SpeculatingCommandRunner {
 }
 
 impl CommandRunner for SpeculatingCommandRunner {
-  fn is_compatible_request(&self, req: &MultiPlatformExecuteProcessRequest) -> bool {
-    self.primary.is_compatible_request(req) || self.secondary.is_compatible_request(req)
-  }
-
   fn get_compatible_request(
     &self,
     req: &MultiPlatformExecuteProcessRequest,
-  ) -> ExecuteProcessRequest {
+  ) -> Option<ExecuteProcessRequest> {
     match (
-      self.primary.is_compatible_request(req),
-      self.secondary.is_compatible_request(req),
+      self.primary.get_compatible_request(req),
+      self.secondary.get_compatible_request(req),
     ) {
-      (true, _) => self.primary.get_compatible_request(req),
-      (_, true) => self.secondary.get_compatible_request(req),
-      _ => panic!("No compatible requests found"),
+      (Some(req), _) => Some(req.clone()),
+      (_, Some(req)) => Some(req.clone()),
+      _ => None
     }
   }
 
@@ -79,13 +75,13 @@ impl CommandRunner for SpeculatingCommandRunner {
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     match (
-      self.primary.is_compatible_request(&req),
-      self.secondary.is_compatible_request(&req),
+      self.primary.get_compatible_request(&req),
+      self.secondary.get_compatible_request(&req),
     ) {
-      (true, true) => self.speculate(req, workunit_store),
-      (true, false) => self.primary.run(req, workunit_store),
-      (false, true) => self.secondary.run(req, workunit_store),
-      (false, false) => panic!("No platforms found to run the request"),
+      (Some(_), Some(_)) => self.speculate(req, workunit_store),
+      (Some(_), None) => self.primary.run(req, workunit_store),
+      (None, Some(_)) => self.secondary.run(req, workunit_store),
+      (None, None) => err(format!("No compatible requests found for available platforms in {:?}", req)).to_boxed(),
     }
   }
 }

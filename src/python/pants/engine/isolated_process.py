@@ -90,6 +90,12 @@ class MultiPlatformExecuteProcessRequest(datatype([
       tuple(request_dict.values())
     )
 
+  def get_product_description(self):
+    # we can safely extract the first description because we guarantee that at
+    # least one request exists and that all of their descriptions are the same
+    # in __new__
+    return ProductDescription(self.execute_process_requests[0].description)
+
 
 class ExecuteProcessResult(datatype([('stdout', bytes),
                                      ('stderr', bytes),
@@ -146,9 +152,7 @@ def get_request_description(req):
 
 @rule(ProductDescription, [MultiPlatformExecuteProcessRequest])
 def get_multi_platform_request_description(req):
-  # we can safely extract the first description because we guarantee that at
-  # least one request exists and that all of their descriptions are the same.
-  return ProductDescription(req.execute_process_requests[0].description)
+  return req.get_product_description()
 
 
 @rule(ExecuteProcessResult, [FallibleExecuteProcessResult, ProductDescription])

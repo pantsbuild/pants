@@ -511,7 +511,7 @@ impl WrappedNode for MultiPlatformExecuteProcess {
   fn run(self, context: Context) -> NodeFuture<ProcessResult> {
     let request = self.0;
     let workunit_store = context.session.workunit_store();
-    if context.core.command_runner.is_compatible_request(&request) {
+    if let Some(_) = context.core.command_runner.get_compatible_request(&request) {
       context
         .core
         .command_runner
