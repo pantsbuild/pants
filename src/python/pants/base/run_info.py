@@ -44,16 +44,17 @@ class RunInfo:
   def get_as_dict(self):
     return self._info.copy()
 
-  def add_info(self, key, val, ignore_errors=False):
+  def add_info(self, key, val, ignore_errors=False, stringify=True):
     """Adds the given info and returns a dict composed of just this added info."""
-    self.add_infos((key, val), ignore_errors=ignore_errors)
+    self.add_infos((key, val), ignore_errors=ignore_errors, stringify=stringify)
 
   def add_infos(self, *keyvals, **kwargs):
     """Adds the given info and returns a dict composed of just this added info."""
     kv_pairs = []
     for key, val in keyvals:
       key = key.strip()
-      val = str(val).strip()
+      if kwargs.get('stringify', True):
+        val = str(val).strip()
       if ':' in key:
         raise ValueError(f'info key "{key}" must not contain a colon.')
       kv_pairs.append((key, val))

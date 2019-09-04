@@ -112,6 +112,7 @@ class RunTracker(Subsystem):
     self._run_timestamp = time.time()
     self._cmd_line = ' '.join(['pants'] + sys.argv[1:])
     self._sorted_goal_infos = tuple()
+    self._v2_console_rule_names = tuple()
 
     # Initialized in `initialize()`.
     self.run_info_dir = None
@@ -175,6 +176,9 @@ class RunTracker(Subsystem):
 
   def set_sorted_goal_infos(self, sorted_goal_infos):
     self._sorted_goal_infos = sorted_goal_infos
+
+  def set_v2_console_rule_names(self, v2_console_rule_names):
+    self._v2_console_rule_names = v2_console_rule_names
 
   def register_thread(self, parent_workunit):
     """Register the parent workunit for all work in the calling thread.
@@ -514,6 +518,13 @@ class RunTracker(Subsystem):
 
     if self._target_to_data:
       self.run_info.add_info('target_data', self._target_to_data)
+
+    if self._sorted_goal_infos:
+      self.run_info.add_info(
+        "computed_goals",
+        self._v2_console_rule_names + tuple(goal.goal.name for goal in self._sorted_goal_infos),
+        stringify=False,
+      )
 
     self.report.close()
     self.store_stats()

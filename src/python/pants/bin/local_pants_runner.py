@@ -9,6 +9,7 @@ from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, Exiter
 from pants.base.workunit import WorkUnit
 from pants.bin.goal_runner import GoalRunner
+from pants.build_graph.address import Address
 from pants.engine.native import Native
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
@@ -220,10 +221,21 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     self._run_start_time = start_time
     self._reporting.initialize(self._run_tracker, self._options, start_time=self._run_start_time)
 
+    target_specs = [self.normalise_spec(spec) for spec in self._options.target_specs]
+    self._run_tracker.run_info.add_info("specs", target_specs, stringify=False)
+
     # Capture a repro of the 'before' state for this build, if needed.
     self._repro = Reproducer.global_instance().create_repro()
     if self._repro:
       self._repro.capture(self._run_tracker.run_info.get_as_dict())
+
+  @staticmethod
+  def normalise_spec(spec):
+    if spec.endswith("::"):
+      if spec.startswith("//") and not spec.startswith("//:"):
+        return spec[2:]
+      return spec
+    return Address.parse(spec).spec
 
   def run(self):
     with LocalExiter.wrap_global_exiter(self._run_tracker, self._repro), \
@@ -266,6 +278,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
 
     _, ambiguous_goals, v2_goals = self._options.goals_by_version
     goals = v2_goals + (ambiguous_goals if self._global_options.v2 else tuple())
+    self._run_tracker.set_v2_console_rule_names(goals)
     if not goals:
       return PANTS_SUCCEEDED_EXIT_CODE
 
