@@ -551,13 +551,16 @@ python_tests(
       covered_src_root_relpath = os.path.relpath(covered_path, src_root_abspath)
       chroot_path = os.path.join(src_chroot_path, covered_src_root_relpath)
 
-      cp = configparser.SafeConfigParser()
+      cp = configparser.ConfigParser()
       src_to_target_base = {src: tgt.target_base
                             for tgt in context.targets()
                             for src in tgt.sources_relative_to_source_root()}
 
+      # Note that we use this config only for loading data in tests, so we don't care about
+      # srcs_to_omit, which only applies at the `run` stage of coverage.
       PytestRun._add_plugin_config(cp,
                                    src_chroot_path=src_chroot_path,
+                                   srcs_to_omit=[],
                                    src_to_target_base=src_to_target_base)
       with temporary_file(binary_mode=False) as fp:
         cp.write(fp)
@@ -573,9 +576,13 @@ python_tests(
                         targets,
                         failed_targets=None,
                         expect_coverage=True,
-                        covered_path=None):
+                        covered_path=None,
+                        include_test_sources=False):
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
-    simple_coverage_kwargs = {'coverage': 'auto'}
+    simple_coverage_kwargs = {
+      'coverage': 'auto',
+      'coverage_include_test_sources': include_test_sources
+    }
     if failed_targets:
       context = self.run_failing_tests(targets=targets,
                                        failed_targets=failed_targets,
@@ -650,6 +657,81 @@ python_tests(
     self.assertEqual([1, 2], all_statements)
     self.assertEqual([], not_run_statements)
 
+  def test_coverage_omit_test_sources(self):
+    init_subsystem(Target.Arguments)
+    init_subsystem(SourceRootConfig)
+
+    self.add_to_build_file('src/python/util', 'python_library()\n')
+
+    self.create_file(
+      'src/python/util/math.py',
+      dedent("""
+          from util import THE_LONELIEST_NUMBER  # line 1
+          def one():                             # line 2
+            return THE_LONELIEST_NUMBER          # line 3
+        """).strip())
+
+    self.create_file(
+      'src/python/util/__init__.py',
+      dedent("""
+          THE_LONELIEST_NUMBER = 1  # line 1
+        """).strip())
+
+    self.add_to_build_file('src/python/util',
+                           'python_tests(name="tests", dependencies = [":util"])\n')
+
+    self.create_file(
+      'src/python/util/math_test.py',
+      dedent("""
+          import unittest                                            # line 1
+
+          from util import math                                      # line 3
+
+          class MathTestInSameDirectoryAsSource(unittest.TestCase):  # line 5
+            def test_one(self):                                      # line 6
+              self.assertEqual(1, math.one())                        # line 7
+        """).strip())
+
+    test = self.target('src/python/util:tests')
+
+    src_path = os.path.join(self.build_root, 'src/python/util/math.py')
+    init_path = os.path.join(self.build_root, 'src/python/util/__init__.py')
+    test_path = os.path.join(self.build_root, 'src/python/util/math_test.py')
+
+    # First run omitting the test file.
+    self.assertFalse(os.path.isfile(self.coverage_data_file()))
+    coverage_kwargs = {'coverage': 'auto'}
+    context = self.run_tests(targets=[test], **coverage_kwargs)
+    all_statements, not_run_statements = self.load_coverage_data_for(context, src_path)
+    self.assertEqual([1, 2, 3], all_statements)
+    self.assertEqual([], not_run_statements)
+    all_statements, not_run_statements = self.load_coverage_data_for(context, init_path)
+    self.assertEqual([1], all_statements)
+    self.assertEqual([], not_run_statements)
+    all_statements, not_run_statements = self.load_coverage_data_for(context, test_path)
+    self.assertEqual([1, 3, 5, 6, 7], all_statements)
+    # "not run" means "not traced".
+    self.assertEqual([1, 3, 5, 6, 7], not_run_statements)
+    # TODO: Switch this test to read coverage data from an XML report instead of
+    # directly from the analysis. That way we see what the users sees, instead of the
+    # slightly confusing raw analysis.
+
+    os.unlink(self.coverage_data_file())
+
+    # Now run again, including the test file.
+    self.assertFalse(os.path.isfile(self.coverage_data_file()))
+    coverage_kwargs = {'coverage': 'auto', 'coverage_include_test_sources': True}
+    context = self.run_tests(targets=[test], **coverage_kwargs)
+    all_statements, not_run_statements = self.load_coverage_data_for(context, src_path)
+    self.assertEqual([1, 2, 3], all_statements)
+    self.assertEqual([], not_run_statements)
+    all_statements, not_run_statements = self.load_coverage_data_for(context, init_path)
+    self.assertEqual([1], all_statements)
+    self.assertEqual([], not_run_statements)
+    all_statements, not_run_statements = self.load_coverage_data_for(context, test_path)
+    self.assertEqual([1, 3, 5, 6, 7], all_statements)
+    self.assertEqual([], not_run_statements)
+
   @ensure_cached(PytestRun, expected_num_artifacts=1)
   def test_coverage_auto_option_no_explicit_coverage_idiosyncratic_layout(self):
     # The all target has no coverage attribute and the code under test does not follow the
@@ -682,7 +764,8 @@ python_tests(
     test = self.target('test/python/util_tests')
     covered_path = os.path.join(self.build_root, 'src/python/util/math.py')
     all_statements, not_run_statements = self.run_coverage_auto(targets=[test],
-                                                                covered_path=covered_path)
+                                                                covered_path=covered_path,
+                                                                include_test_sources=True)
     self.assertEqual([1, 2], all_statements)
     self.assertEqual([1, 2], not_run_statements)
 

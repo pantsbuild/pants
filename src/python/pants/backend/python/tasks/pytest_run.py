@@ -112,6 +112,11 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
              help='Emit coverage information for specified packages or directories (absolute or '
                   'relative to the build root).  The special value "auto" indicates that Pants '
                   'should attempt to deduce which packages to emit coverage for.')
+    register('--coverage-include-test-sources', fingerprint=True, type=bool,
+             help='Whether to include test source files in coverage measurement.')
+    register('--coverage-reports', fingerprint=True, choices=('xml', 'html'), type=list,
+             member_type=str, default=('xml', 'html'),
+             help='Which coverage reports to emit.')
     # For a given --coverage specification (which is fingerprinted), we will always copy the
     # associated generated and cached --coverage files to this directory post any interaction with
     # the cache to retrieve the coverage files. As such, this option is not part of the fingerprint.
@@ -182,23 +187,40 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
   # N.B.: Extracted for tests.
   @classmethod
-  def _add_plugin_config(cls, cp, src_chroot_path, src_to_target_base):
+  def _add_plugin_config(cls, cp, src_chroot_path, srcs_to_omit, src_to_target_base):
     # We use a coverage plugin to map PEX chroot source paths back to their original repo paths for
     # report output.
     plugin_module = PytestPrep.PytestBinary.coverage_plugin_module
     cls._ensure_section(cp, 'run')
     cp.set('run', 'plugins', plugin_module)
 
+    if srcs_to_omit:
+      # It would be nice if we could use the `include` setting to specify just the
+      # files we *do* want to trace. But unfortunately that setting is ignored if `sources`
+      # are explicitly specified, which pytest-cov does. And those `sources` must be packages or
+      # directories, not individual files, so we can't use that either (in case there are
+      # tests in the same dirs as the files they test).
+      files_to_omit = [os.path.join(src_chroot_path, relpath) for relpath in sorted(srcs_to_omit)]
+      cp.set('run', 'omit', ','.join(files_to_omit))
+
+    # Fortunately we *can* use the `include` setting at report time. Any omitted files won't
+    # have any data and won't get reported anyway. But setting `include` here allows us to also
+    # exclude synthetic __init__.py files created by pex in the chroot. Reporting on those is just
+    # confusing to the user, since they don't correspond to any file in the source tree.
+    cls._ensure_section(cp, 'report')
+    files_to_report = [os.path.join(src_chroot_path, relpath) for relpath in src_to_target_base]
+    cp.set('report', 'include', ','.join(files_to_report))
+
     cp.add_section(plugin_module)
     cp.set(plugin_module, 'buildroot', get_buildroot())
     cp.set(plugin_module, 'src_chroot_path', src_chroot_path)
     cp.set(plugin_module, 'src_to_target_base', json.dumps(src_to_target_base))
 
-  def _generate_coverage_config(self, src_to_target_base):
+  def _generate_coverage_config(self, srcs_to_omit, src_to_target_base):
     cp = configparser.ConfigParser()
     cp.read_file(StringIO(self.DEFAULT_COVERAGE_CONFIG))
 
-    self._add_plugin_config(cp, self._source_chroot_path, src_to_target_base)
+    self._add_plugin_config(cp, self._source_chroot_path, srcs_to_omit, src_to_target_base)
 
     # See the debug options here: http://nedbatchelder.com/code/coverage/cmd.html#cmd-run-debug
     if self._debug:
@@ -232,8 +254,9 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       yield
 
   @contextmanager
-  def _cov_setup(self, workdirs, coverage_morfs, src_to_target_base):
-    cp = self._generate_coverage_config(src_to_target_base=src_to_target_base)
+  def _cov_setup(self, workdirs, coverage_morfs, srcs_to_omit, src_to_target_base):
+    cp = self._generate_coverage_config(srcs_to_omit=srcs_to_omit,
+                                        src_to_target_base=src_to_target_base)
     # Note that it's important to put the tmpfile under the workdir, because pytest
     # uses all arguments that look like paths to compute its rootdir, and we want
     # it to pick the buildroot.
@@ -260,12 +283,16 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     pex_src_root = os.path.relpath(self._source_chroot_path, get_buildroot())
 
     src_to_target_base = {}
-    for target in test_targets:
-      libs = (tgt for tgt in target.closure()
-              if tgt.has_sources('.py') and not isinstance(tgt, PythonTests))
+    srcs_to_omit = set()
+    if not self.get_options().coverage_include_test_sources:
+      for test_target in test_targets:
+        srcs_to_omit.update(test_target.sources_relative_to_source_root())
+    for test_target in test_targets:
+      libs = (tgt for tgt in test_target.closure() if tgt.has_sources('.py'))
       for lib in libs:
         for src in lib.sources_relative_to_source_root():
-          src_to_target_base[src] = lib.target_base
+          if src not in srcs_to_omit:
+            src_to_target_base[src] = lib.target_base
 
     def ensure_trailing_sep(path):
       return path if path.endswith(os.path.sep) else path + os.path.sep
@@ -275,9 +302,15 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
         if tgt.coverage:
           return tgt.coverage
         else:
-          # This makes the assumption that tests/python/<tgt> will be testing src/python/<tgt>.
-          # Note in particular that this doesn't work for pants' own tests, as those are under
-          # the top level package 'pants_tests', rather than just 'pants'.
+          # Assume that tests in some package test the sources in that package.
+          # This is the case, e.g., if tests live in the same directories as the sources
+          # they test, or if they live in a parallel package structure under a separate
+          # source root, such as tests/python/path/to/package testing src/python/path/to/package.
+
+          # Note in particular that this doesn't work for most of Pants's own tests, as those are
+          # under the top level package 'pants_tests', rather than just 'pants' (although we
+          # are moving towards having tests in the same directories as the sources they test).
+          #
           # TODO(John Sirois): consider failing fast if there is no explicit coverage scheme;
           # but also  consider supporting configuration of a global scheme whether that be parallel
           # dirs/packages or some arbitrary function that can be registered that takes a test target
@@ -323,6 +356,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
     with self._cov_setup(workdirs,
                          coverage_morfs=coverage_morfs,
+                         srcs_to_omit=srcs_to_omit,
                          src_to_target_base=src_to_target_base) as (args, coverage_rc):
       try:
         yield args
@@ -343,13 +377,13 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
           if not os.path.exists('.coverage'):
             self.context.log.warn('No .coverage file was found! Skipping coverage reporting.')
           else:
-            coverage_run('report', ['-i', '--rcfile', coverage_rc])
-
             coverage_workdir = workdirs.coverage_path
-            coverage_run('html', ['-i', '--rcfile', coverage_rc, '-d', coverage_workdir])
-
-            coverage_xml = os.path.join(coverage_workdir, 'coverage.xml')
-            coverage_run('xml', ['-i', '--rcfile', coverage_rc, '-o', coverage_xml])
+            coverage_reports = self.get_options().coverage_reports
+            if 'html' in coverage_reports:
+              coverage_run('html', ['-i', '--rcfile', coverage_rc, '-d', coverage_workdir])
+            if 'xml' in coverage_reports:
+              coverage_xml = os.path.join(coverage_workdir, 'coverage.xml')
+              coverage_run('xml', ['-i', '--rcfile', coverage_rc, '-o', coverage_xml])
 
   def _get_sharding_args(self):
     shard_spec = self.get_options().test_shard
