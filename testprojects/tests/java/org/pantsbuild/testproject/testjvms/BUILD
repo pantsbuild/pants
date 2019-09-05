@@ -31,10 +31,17 @@ junit_tests(name='eight',
   strict_deps=False,
 )
 
-junit_tests(name='eight-test-platform',
-  sources=['TestEight.java'],
-  platform='java7',
-  test_platform='java8',
+junit_tests(name='eleven',
+  sources=['TestEleven.java'],
+  platform='java11',
+  dependencies=[':base'],
+  strict_deps=False,
+)
+
+junit_tests(name='eleven-test-platform',
+  sources=['TestEleven.java'],
+  platform='java8',
+  test_platform='java11',
   dependencies=[':base'],
   strict_deps=False,
 )

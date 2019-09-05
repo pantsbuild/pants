@@ -234,8 +234,7 @@ def _linux_before_install(include_test_config: bool = True) -> List[str]:
   ]
   if include_test_config:
     return [
-      'PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH',
-      'JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64',
+      'PATH="${JAVA_HOME}:bin":${PATH}',
       'sudo sysctl fs.inotify.max_user_watches=524288',
     ] + commands
   return commands
@@ -254,6 +253,7 @@ def linux_shard(
     "dist": "xenial",
     "sudo": "required",
     "python": ["2.7", "3.6", "3.7"],
+    "jdk": ["openjdk11"],
     "addons": {"apt": {"packages": [
       "lib32stdc++6",
       "lib32z1",
