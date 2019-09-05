@@ -27,15 +27,18 @@ use super::{
 use std;
 use std::cmp::min;
 use workunit_store::{generate_random_64bit_string, get_parent_id, WorkUnit, WorkUnitStore};
+use std::fmt;
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an ExecuteProcessRequest, and may be populated only by the
 // CommandRunner.
 const CACHE_KEY_GEN_VERSION_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_GEN_VERSION";
 
+
 struct CancelRemoteExecutionToken {
   operations_client: Arc<bazel_protos::operations_grpc::OperationsClient>,
   cancel_op_req: bazel_protos::operations::CancelOperationRequest,
+  drop_enabled: bool,
 }
 
 impl CancelRemoteExecutionToken {
@@ -49,28 +52,47 @@ impl CancelRemoteExecutionToken {
     CancelRemoteExecutionToken {
       operations_client,
       cancel_op_req,
+      drop_enabled: true,
     }
+  }
+
+  fn dismiss(&mut self) {
+    self.drop_enabled = false;
   }
 }
 
 impl Drop for CancelRemoteExecutionToken {
   fn drop(&mut self) {
-    let operation_name = self.cancel_op_req.name.clone();
-    match self.operations_client.cancel_operation_async(&self.cancel_op_req) {
-      Ok(receiver) => { tokio::spawn(receiver.then(move |res| {
-        match res {
-          Ok(_) => debug!("Canceled operation {} successfully", operation_name),
-          Err(err) => debug!("Failed to cancel operation {}, err {}", operation_name, err),
-        }
-        future::ok(())
+    if self.drop_enabled {
+      let operation_name = self.cancel_op_req.name.clone();
+      match self.operations_client.cancel_operation_async(&self.cancel_op_req) {
+        Ok(receiver) => {
+          tokio::spawn(receiver.then(move |res| {
+            match res {
+              Ok(_) => debug!("Canceled operation {} successfully", operation_name),
+              Err(err) => debug!("Failed to cancel operation {}, err {}", operation_name, err),
+            }
+            future::ok(())
+          },
+          ));
         },
-      ));},
-      Err(err) => debug!(
-        "Failed to schedule cancel operation: {}, err {}",
-        self.cancel_op_req.name,
-        err
-      ),
-    };
+        Err(err) => debug!(
+          "Failed to schedule cancel operation: {}, err {}",
+          self.cancel_op_req.name,
+          err
+        ),
+      };
+    }
+  }
+}
+
+impl fmt::Debug for CancelRemoteExecutionToken {
+  fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fmt.debug_struct("CancelRemoteExecutionToken")
+        .field("operations_client", &"OperationsClient".to_string())
+        .field("cancel_op_req", &self.cancel_op_req)
+        .field("drop_enabled", &self.drop_enabled)
+        .finish()
   }
 }
 
@@ -91,14 +113,15 @@ pub struct CommandRunner {
   store: Store,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 enum ExecutionError {
   // String is the error message.
   Fatal(String),
   // Digests are Files and Directories which have been reported to be missing. May be incomplete.
   MissingDigests(Vec<Digest>),
   // String is the operation name which can be used to poll the GetOperation gRPC API.
-  NotFinished(String),
+  // CancelRemoteExecutionToken can be used to cancel remote execution.
+  NotFinished(String, CancelRemoteExecutionToken),
 }
 
 #[derive(Default)]
@@ -291,7 +314,7 @@ impl super::CommandRunner for CommandRunner {
                         })
                         .to_boxed()
                     }
-                    ExecutionError::NotFinished(operation_name) => {
+                    ExecutionError::NotFinished(operation_name, cancel_remote_exec_token) => {
                       let mut operation_request =
                         bazel_protos::operations::GetOperationRequest::new();
                       operation_request.set_name(operation_name.clone());
@@ -338,13 +361,9 @@ impl super::CommandRunner for CommandRunner {
                                 .or_else(move |err| {
                                   rpcerror_recover_cancelled(operation_request.take_name(), err)
                                 })
-                                .map({ let operations_client = operations_client.clone(); |operation| {
-                                  let cancel_remote_exec_token =  CancelRemoteExecutionToken::new(
-                                    operations_client,
-                                    operation.name.clone()
-                                  );
+                                .map( |operation| {
                                   OperationOrStatus::Operation(operation, cancel_remote_exec_token)
-                                     }})
+                                     })
                                 .map_err(rpcerror_to_string),
                             )
                             .map(move |operation| {
@@ -456,15 +475,17 @@ impl CommandRunner {
     trace!("Got operation response: {:?}", operation_or_status);
 
     let status = match operation_or_status {
-      OperationOrStatus::Operation(mut operation, cancel_remote_exec_token) => {
+      OperationOrStatus::Operation(mut operation, mut cancel_remote_exec_token) => {
         if !operation.get_done() {
-          return future::err(ExecutionError::NotFinished(operation.take_name())).to_boxed();
+          return future::err(ExecutionError::NotFinished(operation.take_name(), cancel_remote_exec_token)).to_boxed();
         }
         if operation.has_error() {
+          &cancel_remote_exec_token.dismiss();
           return future::err(ExecutionError::Fatal(format_error(&operation.get_error())))
             .to_boxed();
         }
         if !operation.has_response() {
+          &cancel_remote_exec_token.dismiss();
           return future::err(ExecutionError::Fatal(
             "Operation finished but no response supplied".to_string(),
           ))
@@ -557,6 +578,8 @@ impl CommandRunner {
 
         let mut execution_attempts = std::mem::replace(&mut attempts.attempts, vec![]);
         execution_attempts.push(attempts.current_attempt);
+
+        &cancel_remote_exec_token.dismiss();
 
         let status = execute_response.take_status();
         if grpcio::RpcStatusCode::from(status.get_code()) == grpcio::RpcStatusCode::Ok {
