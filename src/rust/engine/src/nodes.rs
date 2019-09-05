@@ -361,6 +361,10 @@ pub fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
 pub struct MultiPlatformExecuteProcess(MultiPlatformExecuteProcessRequest);
 
 impl MultiPlatformExecuteProcess {
+  ///
+  /// This is a helper method to convert values from the python/engine/platform.py::Platform enum,
+  /// which have been serialized, into the rust Platform enum.
+  ///
   fn get_platform_variant(variant_candidate: String) -> Platform {
     match variant_candidate.as_ref() {
       "darwin" => Platform::Darwin,
@@ -473,7 +477,12 @@ impl WrappedNode for MultiPlatformExecuteProcess {
   fn run(self, context: Context) -> NodeFuture<ProcessResult> {
     let request = self.0;
     let workunit_store = context.session.workunit_store();
-    if let Some(_) = context.core.command_runner.get_compatible_request(&request) {
+    if context
+      .core
+      .command_runner
+      .get_compatible_request(&request)
+      .is_some()
+    {
       context
         .core
         .command_runner

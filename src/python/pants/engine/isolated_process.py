@@ -154,7 +154,7 @@ def get_multi_platform_request_description(req):
 @rule(MultiPlatformExecuteProcessRequest, [ExecuteProcessRequest])
 def upcast_execute_process_request(req):
   return MultiPlatformExecuteProcessRequest(
-    {(Platform.none, Platform.none): ExecuteProcessRequest}
+    {(Platform.none, Platform.none): req}
   )
 
 

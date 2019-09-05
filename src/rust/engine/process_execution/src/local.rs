@@ -216,12 +216,6 @@ impl ChildResults {
 }
 
 impl super::CommandRunner for CommandRunner {
-  ///
-  /// Runs a command on this machine in the passed working directory.
-  ///
-  /// TODO: start to create workunits for local process execution
-  ///
-
   fn get_compatible_request(
     &self,
     req: &MultiPlatformExecuteProcessRequest,
@@ -240,6 +234,11 @@ impl super::CommandRunner for CommandRunner {
     None
   }
 
+  ///
+  /// Runs a command on this machine in the passed working directory.
+  ///
+  /// TODO: start to create workunits for local process execution
+  ///
   fn run(
     &self,
     req: MultiPlatformExecuteProcessRequest,
