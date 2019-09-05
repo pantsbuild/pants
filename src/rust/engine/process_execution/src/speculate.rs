@@ -320,18 +320,20 @@ mod tests {
         .to_boxed()
     }
 
-    fn is_compatible_request(&self, _req: &MultiPlatformExecuteProcessRequest) -> bool {
-      self.is_compatible
-    }
     fn get_compatible_request(
       &self,
       req: &MultiPlatformExecuteProcessRequest,
-    ) -> ExecuteProcessRequest {
-      req
-        .0
-        .get(&(Platform::None, Platform::None))
-        .unwrap()
-        .clone()
+    ) -> Option<ExecuteProcessRequest> {
+      if self.is_compatible {
+        Some(req
+          .0
+          .get(&(Platform::None, Platform::None))
+          .unwrap()
+          .clone()
+        )
+      } else {
+        None
+      }
     }
   }
 }
