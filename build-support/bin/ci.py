@@ -150,10 +150,10 @@ def setup_python_interpreter(version: PythonVersion) -> None:
 
 
 def set_run_from_pex() -> None:
-  # We want all invocations of ./pants (apart from the bootstrapping one above) to delegate
-  # to ./pants.pex, and not themselves attempt to bootstrap.
-  # In this file we invoke ./pants.pex directly anyway, but some of those invocations will run
-  # integration tests that shell out to `./pants`, so we set this env var for those cases.
+  # Even though our Python integration tests and commands in this file directly invoke `pants.pex`,
+  # some places like the JVM tests may still directly call the script `./pants`. When this happens,
+  # we want to ensure that the script immediately breaks out to `./pants.pex` to avoid
+  # re-bootstrapping Pants in CI.
   os.environ["RUN_PANTS_FROM_PEX"] = "1"
 
 
@@ -213,9 +213,7 @@ def bootstrap(*, clean: bool, python_version: PythonVersion) -> None:
         die("Failed to clean before bootstrapping Pants.")
 
     try:
-      subprocess.run(["./pants", "binary", "src/python/pants/bin:pants_local_binary"], check=True)
-      Path("dist/pants_local_binary.pex").rename("pants.pex")
-      subprocess.run(["./pants.pex", "--version"], check=True)
+      subprocess.run(["./build-support/bin/bootstrap_pants_pex.sh"], check=True)
     except subprocess.CalledProcessError:
       die("Failed to bootstrap Pants.")
 

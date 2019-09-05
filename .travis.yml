@@ -58,8 +58,7 @@ matrix:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
       - ${HOME}/.cache/pants/rust/cargo
-      - build-support/pants_dev_deps.py36.venv
-      - build-support/pants_dev_deps.py37.venv
+      - build-support/virtualenvs
       - src/rust/engine/target
       timeout: 500
     dist: xenial
@@ -115,8 +114,7 @@ matrix:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
       - ${HOME}/.cache/pants/rust/cargo
-      - build-support/pants_dev_deps.py36.venv
-      - build-support/pants_dev_deps.py37.venv
+      - build-support/virtualenvs
       - src/rust/engine/target
       timeout: 500
     dist: xenial
@@ -166,8 +164,7 @@ matrix:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
       - ${HOME}/.cache/pants/rust/cargo
-      - build-support/pants_dev_deps.py36.venv
-      - build-support/pants_dev_deps.py37.venv
+      - build-support/virtualenvs
       - src/rust/engine/target
       timeout: 500
     env:
@@ -212,8 +209,7 @@ matrix:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
       - ${HOME}/.cache/pants/rust/cargo
-      - build-support/pants_dev_deps.py36.venv
-      - build-support/pants_dev_deps.py37.venv
+      - build-support/virtualenvs
       - src/rust/engine/target
       timeout: 500
     env:
@@ -261,8 +257,7 @@ matrix:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
       - ${HOME}/.cache/pants/rust/cargo
-      - build-support/pants_dev_deps.py36.venv
-      - build-support/pants_dev_deps.py37.venv
+      - build-support/virtualenvs
       - src/rust/engine/target
       timeout: 500
     dist: xenial
@@ -313,8 +308,7 @@ matrix:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
       - ${HOME}/.cache/pants/rust/cargo
-      - build-support/pants_dev_deps.py36.venv
-      - build-support/pants_dev_deps.py37.venv
+      - build-support/virtualenvs
       - src/rust/engine/target
       timeout: 500
     env:
@@ -530,8 +524,7 @@ matrix:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
       - ${HOME}/.cache/pants/rust/cargo
-      - build-support/pants_dev_deps.py36.venv
-      - build-support/pants_dev_deps.py37.venv
+      - build-support/virtualenvs
       - src/rust/engine/target
       timeout: 500
     dist: xenial
@@ -4207,8 +4200,7 @@ matrix:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
       - ${HOME}/.cache/pants/rust/cargo
-      - build-support/pants_dev_deps.py36.venv
-      - build-support/pants_dev_deps.py37.venv
+      - build-support/virtualenvs
       - src/rust/engine/target
       timeout: 500
     dist: xenial
@@ -4244,8 +4236,7 @@ matrix:
       - ${AWS_CLI_ROOT}
       - ${PYENV_ROOT}
       - ${HOME}/.cache/pants/rust/cargo
-      - build-support/pants_dev_deps.py36.venv
-      - build-support/pants_dev_deps.py37.venv
+      - build-support/virtualenvs
       - src/rust/engine/target
       timeout: 500
     env:

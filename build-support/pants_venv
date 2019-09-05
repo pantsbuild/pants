@@ -14,7 +14,7 @@ REQUIREMENTS=(
   "${REPO_ROOT}/contrib/python/src/python/pants/contrib/python/checks/checker/3rdparty/requirements.txt"
 )
 
-venv_dir_prefix="${REPO_ROOT}/build-support/pants_dev_deps"
+venv_dir_prefix="${REPO_ROOT}/build-support/virtualenvs/$(uname)/pants_dev_deps"
 
 function venv_dir() {
   py_venv_version=$(${PY} -c 'import sys; print("".join(map(str, sys.version_info[0:2])))')

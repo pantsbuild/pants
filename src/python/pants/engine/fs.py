@@ -21,6 +21,13 @@ class FileContent(datatype([('path', str), ('content', bytes)])):
     return repr(self)
 
 
+class InputFileContent(FileContent):
+  """A newtype wrapper for FileContent.
+  TODO(7710): This class is currently necessary because the engine
+  otherwise finds a cycle between FileContent <=> DirectoryDigest.
+  """
+
+
 class PathGlobs(datatype([
     'include',
     'exclude',
@@ -178,6 +185,7 @@ EMPTY_SNAPSHOT = Snapshot(
 def create_fs_rules():
   """Creates rules that consume the intrinsic filesystem types."""
   return [
+    RootRule(InputFileContent),
     RootRule(Digest),
     RootRule(DirectoriesToMerge),
     RootRule(PathGlobs),

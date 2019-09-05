@@ -4,6 +4,52 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.20.0rc0 (08/30/2019)
+----------------------
+
+The first release candidate in the ``1.20.x`` series!
+
+API Changes
+~~~~~~~~~~~
+
+* Always set -XX:-MaxFDLimit by default (#6863)
+  `PR #6863 <https://github.com/pantsbuild/pants/pull/6863>`_
+
+* Upgraded psutil (#8217)
+  `PR #8217 <https://github.com/pantsbuild/pants/pull/8217>`_
+
+Bugfixes
+~~~~~~~~
+
+* Split out a double-check-cache job for jvm/rsc compile. (#8221)
+  `PR #8221 <https://github.com/pantsbuild/pants/pull/8221>`_
+
+* Properly strip source root prefixes for V2 Pytest runner (#8185)
+  `PR #8185 <https://github.com/pantsbuild/pants/pull/8185>`_
+  `Issue #8113. <https://github.com/pantsbuild/pants/issues/8113.>`_
+  `PR #8063 <https://github.com/pantsbuild/pants/pull/8063>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Add a header `X-B3-Flags: 1` to the request to Zipkin server  (#8223)
+  `PR #8223 <https://github.com/pantsbuild/pants/pull/8223>`_
+
+* Use platform-specific directories for virtualenvs (#8073)
+  `PR #8073 <https://github.com/pantsbuild/pants/pull/8073>`_
+
+* Use more idiomatic assignment (#8215)
+  `PR #8215 <https://github.com/pantsbuild/pants/pull/8215>`_
+
+* Local execution server binary (#8213)
+  `PR #8213 <https://github.com/pantsbuild/pants/pull/8213>`_
+
+* No longer use travis_wait in CI (#8212)
+  `PR #8212 <https://github.com/pantsbuild/pants/pull/8212>`_
+
+* Refactor pants-plugins (#8207)
+  `PR #8207 <https://github.com/pantsbuild/pants/pull/8207>`_
+
 1.20.0.dev2 (08/23/2019)
 ------------------------
 

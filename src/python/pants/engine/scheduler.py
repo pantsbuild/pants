@@ -14,8 +14,8 @@ from pants.base.exiter import PANTS_FAILED_EXIT_CODE
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.fs import (Digest, DirectoriesToMerge, DirectoryToMaterialize,
-                             DirectoryWithPrefixToStrip, FileContent, FilesContent, PathGlobs,
-                             PathGlobsAndRoot, Snapshot, UrlToFetch)
+                             DirectoryWithPrefixToStrip, FileContent, FilesContent,
+                             InputFileContent, PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch)
 from pants.engine.isolated_process import (FallibleExecuteProcessResult,
                                            MultiPlatformExecuteProcessRequest)
 from pants.engine.native import Function, TypeId
@@ -106,6 +106,7 @@ class Scheduler:
       type_merge_snapshots_request=DirectoriesToMerge,
       type_directory_with_prefix_to_strip=DirectoryWithPrefixToStrip,
       type_files_content=FilesContent,
+      type_input_file_content=InputFileContent,
       type_dir=Dir,
       type_file=File,
       type_link=Link,

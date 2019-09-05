@@ -59,6 +59,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Eric Lindvall
 + Eugene Burmako
 + Evan Jones
++ Fatin H
 + Fedor Korotkov
 + Fiona Condone
 + Florian Leibert

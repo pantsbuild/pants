@@ -45,7 +45,7 @@ SDK".
 
 This will be a "local" interpreter and you'll need to select the virtual
 environment bootstrapped above, along with choosing the Python version
-you want IntelliJ to use. For Python 3.6, in `build-support/pants_dev_deps.py36.venv`; and for Python 3.7, in `pants_dev_deps.py37.venv`.
+you want IntelliJ to use. For Python 3.6, in `build-support/virtualenvs/$(uname)/pants_dev_deps.py36.venv`; and for Python 3.7, in `pants_dev_deps.py37.venv`.
 
 ![image](images/intellij-select-venv.png)
 

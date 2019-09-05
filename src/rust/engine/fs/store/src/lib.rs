@@ -238,6 +238,43 @@ impl Store {
       .to_boxed()
   }
 
+  /// Store a digest under a given file path, returning a Snapshot
+  pub fn snapshot_of_one_file(
+    &self,
+    name: PathBuf,
+    digest: hashing::Digest,
+  ) -> BoxFuture<Snapshot, String> {
+    let store = self.clone();
+
+    #[derive(Clone)]
+    struct Digester {
+      digest: hashing::Digest,
+    }
+
+    impl StoreFileByDigest<String> for Digester {
+      fn store_by_digest(
+        &self,
+        _: fs::File,
+        _: WorkUnitStore,
+      ) -> BoxFuture<hashing::Digest, String> {
+        future::ok(self.digest).to_boxed()
+      }
+    }
+
+    Snapshot::from_path_stats(
+      store,
+      &Digester { digest },
+      vec![fs::PathStat::File {
+        path: name.clone(),
+        stat: fs::File {
+          path: name,
+          is_executable: true,
+        },
+      }],
+      WorkUnitStore::new(),
+    )
+  }
+
   ///
   /// Loads the bytes of the file with the passed fingerprint from the local store and back-fill
   /// from remote when necessary and possible (i.e. when remote is configured), and returns the
