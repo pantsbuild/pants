@@ -16,12 +16,3 @@ jvm_binary(
   ],
   description='zinc compiler -- the scala compiler in nailgun',
 )
-
-jvm_binary(
-  name='extractor',
-  main='org.pantsbuild.zinc.extractor.Main',
-  dependencies=[
-    'src/scala/org/pantsbuild/zinc/extractor',
-  ],
-  description='zinc extractor -- extractor for zinc analysis',
-)

@@ -27,7 +27,7 @@ from pants.util.fileutil import safe_hardlink_or_copy
 from pants.util.memo import memoized_method, memoized_property
 
 
-_ZINC_COMPILER_VERSION = '0.0.14'
+_ZINC_COMPILER_VERSION = '0.0.16'
 
 
 class Zinc:
@@ -35,12 +35,10 @@ class Zinc:
 
   ZINC_COMPILE_MAIN = 'org.pantsbuild.zinc.compiler.Main'
   ZINC_BOOTSTRAPER_MAIN = 'org.pantsbuild.zinc.bootstrapper.Main'
-  ZINC_EXTRACT_MAIN = 'org.pantsbuild.zinc.extractor.Main'
   DEFAULT_CONFS = ['default']
 
   ZINC_COMPILER_TOOL_NAME = 'zinc'
   ZINC_BOOTSTRAPPER_TOOL_NAME = 'zinc-bootstrapper'
-  ZINC_EXTRACTOR_TOOL_NAME = 'zinc-extractor'
 
   _lock = Lock()
 
@@ -82,7 +80,7 @@ class Zinc:
       cls.register_jvm_tool(register,
                             Zinc.ZINC_BOOTSTRAPPER_TOOL_NAME,
                             classpath=[
-                              JarDependency('org.pantsbuild', 'zinc-bootstrapper_2.12', '0.0.11'),
+                              JarDependency('org.pantsbuild', 'zinc-bootstrapper_2.12', '0.0.12'),
                             ],
                             main=Zinc.ZINC_BOOTSTRAPER_MAIN,
                             custom_rules=shader_rules,
@@ -118,12 +116,6 @@ class Zinc:
                             # of jars for the interface.
                             main='no.such.main.Main',
                             custom_rules=shader_rules)
-
-      cls.register_jvm_tool(register,
-                            Zinc.ZINC_EXTRACTOR_TOOL_NAME,
-                            classpath=[
-                              JarDependency('org.pantsbuild', 'zinc-extractor_2.12', '0.0.12')
-                            ])
 
       # Register scalac for fixed versions of Scala, 2.10, 2.11 and 2.12.
       # Relies on ScalaPlatform to get the revision version from the major.minor version.
@@ -397,12 +389,6 @@ class Zinc:
     classpaths = (cp(java_options_src, 'javac-plugin-dep') +
                   cp(scala_options_src, 'scalac-plugin-dep'))
     return [(conf, jar) for conf in self.DEFAULT_CONFS for jar in classpaths]
-
-  @memoized_property
-  def extractor(self):
-    return self._zinc_factory.tool_classpath_from_products(self._products,
-                                                           self.ZINC_EXTRACTOR_TOOL_NAME,
-                                                           scope=self._zinc_factory.options_scope)
 
   def compile_classpath_entries(self, classpath_product_key, target, extra_cp_entries=None):
     classpath_product = self._products.get_data(classpath_product_key)
