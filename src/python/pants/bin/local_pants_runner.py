@@ -5,6 +5,7 @@ import logging
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
+from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, Exiter
 from pants.base.workunit import WorkUnit
@@ -221,21 +222,17 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     self._run_start_time = start_time
     self._reporting.initialize(self._run_tracker, self._options, start_time=self._run_start_time)
 
-    target_specs = [self.normalise_spec(spec) for spec in self._options.target_specs]
+    spec_parser = CmdLineSpecParser(get_buildroot())
+    target_specs = [
+      spec_parser.parse_spec(spec).to_spec_string()
+      for spec in self._options.target_specs
+    ]
     self._run_tracker.run_info.add_info("specs", target_specs, stringify=False)
 
     # Capture a repro of the 'before' state for this build, if needed.
     self._repro = Reproducer.global_instance().create_repro()
     if self._repro:
       self._repro.capture(self._run_tracker.run_info.get_as_dict())
-
-  @staticmethod
-  def normalise_spec(spec):
-    if spec.endswith("::"):
-      if spec.startswith("//") and not spec.startswith("//:"):
-        return spec[2:]
-      return spec
-    return Address.parse(spec).spec
 
   def run(self):
     with LocalExiter.wrap_global_exiter(self._run_tracker, self._repro), \
