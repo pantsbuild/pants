@@ -246,8 +246,7 @@ impl WrappedNode for Select {
               lift_digest(&directory_digest_val).map_err(|str| throw(&str))
             })
             .and_then(move |digest| {
-              store::Snapshot::from_digest(store, digest, workunit_store)
-                .map_err(|str| throw(&str))
+              store::Snapshot::from_digest(store, digest, workunit_store).map_err(|str| throw(&str))
             })
             .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
             .to_boxed()
@@ -301,17 +300,12 @@ impl WrappedNode for Select {
             .to_boxed()
         }
         &Rule::Intrinsic(Intrinsic { product, input })
-          if product == types.process_result
-            && input == types.multi_platform_process_request =>
+          if product == types.process_result && input == types.multi_platform_process_request =>
         {
           let context = context.clone();
           let core = context.core.clone();
           self
-            .select_product(
-              &context,
-              types.multi_platform_process_request,
-              "intrinsic",
-            )
+            .select_product(&context, types.multi_platform_process_request, "intrinsic")
             .and_then(|request| {
               MultiPlatformExecuteProcess::lift(&request).map_err(|str| {
                 throw(&format!(

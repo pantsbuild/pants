@@ -130,7 +130,7 @@ mod tests {
   #[test]
   fn first_req_slow_success() {
     let (result, call_counter, finished_counter) =
-      run_speculation_test(15, 10, 10, false, false, true, true);
+      run_speculation_test(50, 100, 25, false, false, true, true);
     assert_eq![2, *call_counter.lock().unwrap()];
     assert_eq![1, *finished_counter.lock().unwrap()];
     assert_eq![result.unwrap().stdout, Bytes::from("m1")]
@@ -325,11 +325,12 @@ mod tests {
       req: &MultiPlatformExecuteProcessRequest,
     ) -> Option<ExecuteProcessRequest> {
       if self.is_compatible {
-        Some(req
-          .0
-          .get(&(Platform::None, Platform::None))
-          .unwrap()
-          .clone()
+        Some(
+          req
+            .0
+            .get(&(Platform::None, Platform::None))
+            .unwrap()
+            .clone(),
         )
       } else {
         None
