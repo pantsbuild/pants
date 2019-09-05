@@ -182,7 +182,9 @@ impl WrappedNode for Select {
               let path = filename.into();
 
               store
-                .store_file_with_path(path, bytes)
+                .store_file_bytes(bytes, true)
+                .and_then(move |digest| store.snapshot_of_one_file(path, digest))
+                .map(|snapshot| snapshot.digest)
                 .map_err(|e| throw(&e))
                 .map(move |digest: hashing::Digest| {
                   Snapshot::store_directory(&context.core, &digest)

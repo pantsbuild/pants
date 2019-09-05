@@ -238,16 +238,6 @@ impl Store {
       .to_boxed()
   }
 
-  /// Store the given bytes buffer as a file at the given path
-  pub fn store_file_with_path(&self, path: PathBuf, contents: Bytes) -> BoxFuture<Digest, String> {
-    let store = self.clone();
-    store
-      .store_file_bytes(contents, false)
-      .and_then(move |digest: hashing::Digest| store.snapshot_of_one_file(path, digest))
-      .map(|snapshot| snapshot.digest)
-      .to_boxed()
-  }
-
   /// Store a digest under a given file path, returning a Snapshot
   pub fn snapshot_of_one_file(
     &self,
