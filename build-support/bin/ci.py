@@ -8,7 +8,7 @@ import platform
 import subprocess
 import tempfile
 from contextlib import contextmanager
-from enum import Enum
+from enum import Enum, auto
 from pathlib import Path
 from typing import Iterator, List, NamedTuple, Optional, Set
 
@@ -114,7 +114,7 @@ def create_parser() -> argparse.ArgumentParser:
   )
   parser.add_argument(
     "--integration-tests-v2", action="store_true",
-    help="Run Python integration tests w/ V2 runner (and possible remoting)."
+    help="Run Python integration tests w/ V2 runner."
   )
   parser.add_argument(
     "--integration-shard", metavar="SHARD_NUMBER/TOTAL_SHARDS", default=None,
@@ -164,20 +164,6 @@ def set_run_from_pex() -> None:
   os.environ["RUN_PANTS_FROM_PEX"] = "1"
 
 
-def remote_execution_command(*, oauth_token_path: str) -> List[str]:
-  return [
-    "./pants.pex",
-    "--no-v1",
-    "--v2",
-    "--pants-config-files=pants.remote.ini",
-    # We turn off speculation to reduce the risk of flakiness, where a test passes locally but
-    # fails remoting and we have a race condition for which environment executes first.
-    "--process-execution-speculation-strategy=none",
-    f"--remote-oauth-bearer-token-path={oauth_token_path}",
-    "test.pytest",
-  ]
-
-
 @contextmanager
 def get_remote_execution_oauth_token_path() -> Iterator[str]:
   command = (
@@ -203,16 +189,40 @@ Target = str
 TargetSet = Set[Target]
 
 
-class DefaultTestBehavior(Enum):
-  v1_no_chroot = 1
-  v2_remote = 2
+class TestStrategy(Enum):
+  v1_no_chroot = auto()
+  v1_chroot = auto()
+  v2_local = auto()
+  v2_remote = auto()
+
+  def pants_command(
+    self, *, targets: TargetSet, shard: Optional[str] = None, oauth_token_path: Optional[str] = None
+  ) -> List[str]:
+    if self == self.v2_remote and oauth_token_path is None:  # type: ignore
+      raise ValueError("Must specify oauth_token_path.")
+    result: List[str] = {  # type: ignore
+      self.v1_no_chroot: ["./pants.pex", "test"] + sorted(targets) + PYTEST_PASSTHRU_ARGS,
+      self.v1_chroot: ["./pants.pex", "--test-pytest-chroot", "test"] + sorted(targets) + PYTEST_PASSTHRU_ARGS,
+      self.v2_local: ["./pants.pex", "--no-v1", "--v2", "test"] + sorted(targets),
+      self.v2_remote: [
+                        "./pants.pex",
+                        "--no-v1",
+                        "--v2",
+                        "--pants-config-files=pants.remote.ini",
+                        f"--remote-oauth-bearer-token-path={oauth_token_path}",
+                        "test"
+                      ] + sorted(targets),
+    }[self]
+    if shard is not None and self in [self.v1_no_chroot, self.v1_chroot]:  # type: ignore
+      result.insert(1, f"--test-pytest-test-shard={shard}")
+    return result
 
 
 class TestType(Enum):
   unit = "unit"
   integration = "integration"
 
-  def __str__(self):
+  def __str__(self) -> str:
     return str(self.value)
 
 
@@ -224,7 +234,10 @@ class TestTargetSets(NamedTuple):
 
   @staticmethod
   def calculate(
-    *, test_type: TestType, default_behavior: DefaultTestBehavior, remote_execution_enabled: bool
+    *,
+    test_type: TestType,
+    default_test_strategy: TestStrategy,
+    remote_execution_enabled: bool = False,
   ) -> 'TestTargetSets':
 
     def get_listed_targets(filename: str) -> TargetSet:
@@ -245,7 +258,7 @@ class TestTargetSets(NamedTuple):
       ], stdout=subprocess.PIPE, encoding="utf-8", check=True
     ).stdout.strip().split("\n"))
 
-    if default_behavior == DefaultTestBehavior.v2_remote:
+    if default_test_strategy == TestStrategy.v2_remote:
       blacklisted_chroot_targets = get_listed_targets(f"{test_type}_chroot_blacklist.txt")
       blacklisted_v2_targets = get_listed_targets(f"{test_type}_v2_blacklist.txt")
       blacklisted_remote_targets = get_listed_targets(f"{test_type}_remote_blacklist.txt")
@@ -409,40 +422,43 @@ def run_cargo_audit() -> None:
 
 
 def run_unit_tests(*, remote_execution_enabled: bool) -> None:
-  check_pants_pex_exists()
   target_sets = TestTargetSets.calculate(
     test_type=TestType.unit,
-    default_behavior=DefaultTestBehavior.v2_remote,
+    default_test_strategy=TestStrategy.v2_remote,
     remote_execution_enabled=remote_execution_enabled
   )
-  basic_command = ["./pants.pex", "test.pytest"]
-  v1_no_chroot_command = basic_command + sorted(target_sets.v1_no_chroot) + PYTEST_PASSTHRU_ARGS
-  v1_chroot_command = basic_command + ["--test-pytest-chroot"] + sorted(target_sets.v1_chroot) + PYTEST_PASSTHRU_ARGS
-  v2_local_command = ["./pants.pex", "--no-v1", "--v2", "test.pytest"] + sorted(target_sets.v2_local)
-
   if remote_execution_enabled:
-    with travis_section(
-      "UnitTestsRemote", "Running unit tests via remote execution"
-    ), get_remote_execution_oauth_token_path() as oauth_token_path:
-      try:
-        subprocess.run(
-          remote_execution_command(oauth_token_path=oauth_token_path) + sorted(target_sets.v2_remote),
-          check=True
-        )
-      except subprocess.CalledProcessError:
-        die("Unit test failure (remote execution)")
-      else:
-        green("Unit tests passed (remote execution)")
+    with get_remote_execution_oauth_token_path() as oauth_token_path:
+      _run_command(
+        command=TestStrategy.v2_remote.pants_command(
+          targets=target_sets.v2_remote, oauth_token_path=oauth_token_path
+        ),
+        slug="UnitTestsV2Remote",
+        start_message="Running unit tests via remote V2 strategy",
+        die_message="Unit test failure (remote V2 strategy)",
+      )
+  if target_sets.v2_local:
+    _run_command(
+      command=TestStrategy.v2_local.pants_command(targets=target_sets.v2_local),
+      slug="UnitTestsV2Local",
+      start_message="Running unit tests via local V2 strategy",
+      die_message="Unit test failure (local V2)",
+    )
+  if target_sets.v1_chroot:
+    _run_command(
+      command=TestStrategy.v1_chroot.pants_command(targets=target_sets.v1_chroot),
+      slug="UnitTestsV1Chroot",
+      start_message="Running unit tests via local V1 chroot strategy",
+      die_message="Unit test failure (V1 chroot)",
+    )
 
-  with travis_section("UnitTestsLocal", "Running unit tests via local execution"):
-    try:
-      subprocess.run(v2_local_command, check=True)
-      subprocess.run(v1_chroot_command, check=True)
-      subprocess.run(v1_no_chroot_command, check=True)
-    except subprocess.CalledProcessError:
-      die("Unit test failure (local execution)")
-    else:
-      green("Unit tests passed (local execution)")
+  if target_sets.v1_no_chroot:
+    _run_command(
+      command=TestStrategy.v1_no_chroot.pants_command(targets=target_sets.v1_no_chroot),
+      slug="UnitTestsV1NoChroot",
+      start_message="Running unit tests via local V1 no-chroot strategy",
+      die_message="Unit test failure (V1 no-chroot)",
+    )
 
 
 def run_rust_tests() -> None:
@@ -479,57 +495,51 @@ def run_jvm_tests() -> None:
 
 
 def run_integration_tests_v1(*, shard: Optional[str]) -> None:
-  check_pants_pex_exists()
   target_sets = TestTargetSets.calculate(
     test_type=TestType.integration,
-    default_behavior=DefaultTestBehavior.v1_no_chroot,
+    default_test_strategy=TestStrategy.v1_no_chroot,
     remote_execution_enabled=False
   )
-  command = ["./pants.pex", "test.pytest"]
-  if shard is not None:
-    command.append(f"--test-pytest-test-shard={shard}")
-  with travis_section("IntegrationTests", f"Running Pants Integration tests {shard if shard is not None else ''}"):
-    try:
-      subprocess.run(
-        command + ["--test-pytest-chroot"] + sorted(target_sets.v1_chroot) + PYTEST_PASSTHRU_ARGS,
-        check=True
-      )
-      subprocess.run(command + sorted(target_sets.v1_no_chroot) + PYTEST_PASSTHRU_ARGS, check=True)
-    except subprocess.CalledProcessError:
-      die("Integration test failure.")
+  if target_sets.v1_no_chroot:
+    _run_command(
+      command=TestStrategy.v1_no_chroot.pants_command(targets=target_sets.v1_no_chroot, shard=shard),
+      slug="IntegrationTestsV1NoChroot",
+      start_message="Running integration tests via V1 no-chroot strategy.",
+      die_message="Integration test failure (V1 no-chroot)",
+    )
+  if target_sets.v1_chroot:
+    _run_command(
+      command=TestStrategy.v1_chroot.pants_command(targets=target_sets.v1_chroot, shard=shard),
+      slug="IntegrationTestsV1Chroot",
+      start_message="Running integration tests via V1 chroot strategy.",
+      die_message="Integration test failure (V1 chroot)",
+    )
 
 
 def run_integration_tests_v2(*, remote_execution_enabled: bool) -> None:
   check_pants_pex_exists()
   target_sets = TestTargetSets.calculate(
     test_type=TestType.integration,
-    default_behavior=DefaultTestBehavior.v1_no_chroot,
+    default_test_strategy=TestStrategy.v1_no_chroot,
     remote_execution_enabled=remote_execution_enabled
   )
   if remote_execution_enabled:
-    with travis_section(
-      "IntegrationTestsRemote", "Running integration tests via remote execution"
-    ), get_remote_execution_oauth_token_path() as oauth_token_path:
-      try:
-        subprocess.run(
-          remote_execution_command(oauth_token_path=oauth_token_path) + sorted(target_sets.v2_remote),
-          check=True
-        )
-      except subprocess.CalledProcessError:
-        die("Integration test failure (remote execution)")
-      else:
-        green("Integration tests passed (remote execution)")
-
-  with travis_section("IntegrationTestsLocal", "Running integration tests via local execution"):
-    try:
-      subprocess.run(
-        ["./pants.pex", "--no-v1", "--v2", "test.pytest"] + sorted(target_sets.v2_local),
-        check=True
+    with get_remote_execution_oauth_token_path() as oauth_token_path:
+      _run_command(
+        command=TestStrategy.v2_remote.pants_command(
+          targets=target_sets.v2_remote, oauth_token_path=oauth_token_path
+        ),
+        slug="IntegrationTestsV2Remote",
+        start_message="Running integration tests via V2 remote strategy.",
+        die_message="Integration test failure (V2 remote)",
       )
-    except subprocess.CalledProcessError:
-      die("Integration test failure (local execution)")
-    else:
-      green("Integration tests passed (local execution)")
+  if target_sets.v2_local:
+    _run_command(
+      command=TestStrategy.v2_local.pants_command(targets=target_sets.v2_local),
+      slug="IntegrationTestsV2Local",
+      start_message="Running integration tests via V2 local strategy.",
+      die_message="Integration test failure (V2 local)",
+    )
 
 
 def run_plugin_tests() -> None:
