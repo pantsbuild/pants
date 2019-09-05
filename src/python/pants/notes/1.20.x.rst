@@ -3,6 +3,18 @@
 
 This document describes releases leading up to the ``1.20.x`` ``stable`` series.
 
+1.20.0rc1 (09/04/2019)
+----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Disable pantsd in inner runs. (#7884)
+  `PR #7884 <https://github.com/pantsbuild/pants/pull/7884>`_
+
+* Fix error when uploading stats to stats storage (#8233)
+  `PR #8233 <https://github.com/pantsbuild/pants/pull/8233>`_
+
 1.20.0rc0 (08/30/2019)
 ----------------------
 
