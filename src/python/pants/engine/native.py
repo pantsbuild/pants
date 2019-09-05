@@ -333,12 +333,23 @@ class _FFISpecification(object):
     c = self._ffi.from_handle(context_handle)
     return c.utf8_buf(str(c.from_id(type_id.tup_0).__name__))
 
+  # If we try to pass a None to the CFFI layer, it will silently fail 
+  # in a weird way. So instead we use the empty string/bytestring as
+  # a de-facto null value, in both `extern_val_to_str` and
+  # `extern_val_to_bytes`.
+  @_extern_decl('Buffer', ['ExternContext*', 'Handle*'])
+  def extern_val_to_bytes(self, context_handle, val):
+    """Given a Handle for `obj`, write bytes(obj) and return it."""
+    c = self._ffi.from_handle(context_handle)
+    v = c.from_value(val[0])
+    v_bytes = b'' if v is None else bytes(v)
+    return c.buf(v_bytes)
+
   @_extern_decl('Buffer', ['ExternContext*', 'Handle*'])
   def extern_val_to_str(self, context_handle, val):
     """Given a Handle for `obj`, write str(obj) and return it."""
     c = self._ffi.from_handle(context_handle)
     v = c.from_value(val[0])
-    # Consistently use the empty string to indicate None.
     v_str = '' if v is None else str(v)
     return c.utf8_buf(v_str)
 
@@ -683,6 +694,7 @@ class Native(Singleton):
                            self.ffi_lib.extern_clone_val,
                            self.ffi_lib.extern_drop_handles,
                            self.ffi_lib.extern_type_to_str,
+                           self.ffi_lib.extern_val_to_bytes,
                            self.ffi_lib.extern_val_to_str,
                            self.ffi_lib.extern_store_tuple,
                            self.ffi_lib.extern_store_set,
@@ -785,6 +797,7 @@ class Native(Singleton):
                     type_merge_snapshots_request,
                     type_directory_with_prefix_to_strip,
                     type_files_content,
+                    type_input_file_content,
                     type_dir,
                     type_file,
                     type_link,
@@ -815,6 +828,7 @@ class Native(Singleton):
         ti(type_merge_snapshots_request),
         ti(type_directory_with_prefix_to_strip),
         ti(type_files_content),
+        ti(type_input_file_content),
         ti(type_dir),
         ti(type_file),
         ti(type_link),
