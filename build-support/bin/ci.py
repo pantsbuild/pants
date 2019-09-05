@@ -21,36 +21,40 @@ def main() -> None:
   args = create_parser().parse_args()
   setup_environment(python_version=args.python_version)
 
-  if args.bootstrap:
-    bootstrap(clean=args.bootstrap_clean, python_version=args.python_version)
-  set_run_from_pex()
+  with maybe_get_remote_execution_oauth_token_path(
+    remote_execution_enabled=args.remote_execution_enabled
+  ) as remote_execution_oauth_token_path:
 
-  if args.githooks:
-    run_githooks()
-  if args.sanity_checks:
-    run_sanity_checks()
-  if args.lint:
-    run_lint()
-  if args.doc_gen:
-    run_doc_gen_tests()
-  if args.clippy:
-    run_clippy()
-  if args.cargo_audit:
-    run_cargo_audit()
-  if args.unit_tests:
-    run_unit_tests(remote_execution_enabled=args.remote_execution_enabled)
-  if args.rust_tests:
-    run_rust_tests()
-  if args.jvm_tests:
-    run_jvm_tests()
-  if args.integration_tests_v1:
-    run_integration_tests_v1(shard=args.integration_shard)
-  if args.integration_tests_v2:
-    run_integration_tests_v2(remote_execution_enabled=args.remote_execution_enabled)
-  if args.plugin_tests:
-    run_plugin_tests()
-  if args.platform_specific_tests:
-    run_platform_specific_tests()
+    if args.bootstrap:
+      bootstrap(clean=args.bootstrap_clean, python_version=args.python_version)
+    set_run_from_pex()
+
+    if args.githooks:
+      run_githooks()
+    if args.sanity_checks:
+      run_sanity_checks()
+    if args.lint:
+      run_lint()
+    if args.doc_gen:
+      run_doc_gen_tests()
+    if args.clippy:
+      run_clippy()
+    if args.cargo_audit:
+      run_cargo_audit()
+    if args.unit_tests:
+      run_unit_tests(oauth_token_path=remote_execution_oauth_token_path)
+    if args.rust_tests:
+      run_rust_tests()
+    if args.jvm_tests:
+      run_jvm_tests()
+    if args.integration_tests_v1:
+      run_integration_tests_v1(shard=args.integration_shard)
+    if args.integration_tests_v2:
+      run_integration_tests_v2(oauth_token_path=remote_execution_oauth_token_path)
+    if args.plugin_tests:
+      run_plugin_tests()
+    if args.platform_specific_tests:
+      run_platform_specific_tests()
 
   banner("CI ENDS")
   print()
@@ -165,7 +169,12 @@ def set_run_from_pex() -> None:
 
 
 @contextmanager
-def get_remote_execution_oauth_token_path() -> Iterator[str]:
+def maybe_get_remote_execution_oauth_token_path(
+  *, remote_execution_enabled: bool
+) -> Iterator[Optional[str]]:
+  if not remote_execution_enabled:
+    yield None
+    return
   command = (
     ["./pants.pex", "--quiet", "run", "build-support/bin:get_rbe_token"]
     if os.getenv("CI")
@@ -421,22 +430,21 @@ def run_cargo_audit() -> None:
       die("Cargo audit failure")
 
 
-def run_unit_tests(*, remote_execution_enabled: bool) -> None:
+def run_unit_tests(*, oauth_token_path: Optional[str] = None) -> None:
   target_sets = TestTargetSets.calculate(
     test_type=TestType.unit,
     default_test_strategy=TestStrategy.v2_remote,
-    remote_execution_enabled=remote_execution_enabled
+    remote_execution_enabled=oauth_token_path is not None
   )
-  if remote_execution_enabled:
-    with get_remote_execution_oauth_token_path() as oauth_token_path:
-      _run_command(
-        command=TestStrategy.v2_remote.pants_command(
-          targets=target_sets.v2_remote, oauth_token_path=oauth_token_path
-        ),
-        slug="UnitTestsV2Remote",
-        start_message="Running unit tests via remote V2 strategy",
-        die_message="Unit test failure (remote V2 strategy)",
-      )
+  if target_sets.v2_remote:
+    _run_command(
+      command=TestStrategy.v2_remote.pants_command(
+        targets=target_sets.v2_remote, oauth_token_path=oauth_token_path
+      ),
+      slug="UnitTestsV2Remote",
+      start_message="Running unit tests via remote V2 strategy",
+      die_message="Unit test failure (remote V2 strategy)",
+    )
   if target_sets.v2_local:
     _run_command(
       command=TestStrategy.v2_local.pants_command(targets=target_sets.v2_local),
@@ -516,23 +524,21 @@ def run_integration_tests_v1(*, shard: Optional[str]) -> None:
     )
 
 
-def run_integration_tests_v2(*, remote_execution_enabled: bool) -> None:
-  check_pants_pex_exists()
+def run_integration_tests_v2(*, oauth_token_path: Optional[str] = None) -> None:
   target_sets = TestTargetSets.calculate(
     test_type=TestType.integration,
     default_test_strategy=TestStrategy.v1_no_chroot,
-    remote_execution_enabled=remote_execution_enabled
+    remote_execution_enabled=oauth_token_path is not None
   )
-  if remote_execution_enabled:
-    with get_remote_execution_oauth_token_path() as oauth_token_path:
-      _run_command(
-        command=TestStrategy.v2_remote.pants_command(
-          targets=target_sets.v2_remote, oauth_token_path=oauth_token_path
-        ),
-        slug="IntegrationTestsV2Remote",
-        start_message="Running integration tests via V2 remote strategy.",
-        die_message="Integration test failure (V2 remote)",
-      )
+  if target_sets.v2_remote:
+    _run_command(
+      command=TestStrategy.v2_remote.pants_command(
+        targets=target_sets.v2_remote, oauth_token_path=oauth_token_path
+      ),
+      slug="IntegrationTestsV2Remote",
+      start_message="Running integration tests via V2 remote strategy.",
+      die_message="Integration test failure (V2 remote)",
+    )
   if target_sets.v2_local:
     _run_command(
       command=TestStrategy.v2_local.pants_command(targets=target_sets.v2_local),
