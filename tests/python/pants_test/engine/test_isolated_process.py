@@ -262,7 +262,7 @@ class TestInputFileCreation(TestBase):
     digest, = self.scheduler.product_request(Digest, [input_file])
 
     req = ExecuteProcessRequest(
-      argv=('/usr/bin/cat', file_name),
+      argv=('/bin/cat', file_name),
       input_files=digest,
       description='cat the contents of this file',
     )
@@ -278,7 +278,7 @@ class TestInputFileCreation(TestBase):
     digest, = self.scheduler.product_request(Digest, [input_file])
 
     req = ExecuteProcessRequest(
-      argv=('/usr/bin/cat', 'somedir/filename'),
+      argv=('/bin/cat', 'somedir/filename'),
       input_files=digest,
       description="Cat a file in a directory to make sure that doesn't break",
     )
