@@ -516,15 +516,17 @@ class RunTracker(Subsystem):
       # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
       self.run_info.add_info('outcome', outcome_str, ignore_errors=True)
 
-    if self._target_to_data:
-      self.run_info.add_info('target_data', self._target_to_data)
-
-    if self._sorted_goal_infos:
+    if self._sorted_goal_infos and self.run_info.get_info("computed_goals") is None:
       self.run_info.add_info(
         "computed_goals",
         self._v2_console_rule_names + tuple(goal.goal.name for goal in self._sorted_goal_infos),
         stringify=False,
+        # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
+        ignore_errors=True,
       )
+
+    if self._target_to_data:
+      self.run_info.add_info('target_data', self._target_to_data)
 
     self.report.close()
     self.store_stats()
