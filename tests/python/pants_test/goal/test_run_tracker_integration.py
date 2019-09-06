@@ -46,7 +46,7 @@ class RunTrackerIntegrationTest(PantsRunIntegrationTest):
             'testprojects/src/java/org/pantsbuild/testproject/extra_jvm_options::',
             'testprojects/src/java/org/pantsbuild/testproject/unicode/main:main',
           ],
-          stats_json['run_info']['specs'],
+          stats_json['run_info']['specs_from_command_line'],
         )
 
         self.assertIn('self_timings', stats_json)

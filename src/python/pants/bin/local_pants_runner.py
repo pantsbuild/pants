@@ -227,7 +227,8 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       spec_parser.parse_spec(spec).to_spec_string()
       for spec in self._options.target_specs
     ]
-    self._run_tracker.run_info.add_info("specs", target_specs, stringify=False)
+    # Note: This will not include values from `--owner-of` or `--changed-*` flags.
+    self._run_tracker.run_info.add_info("specs_from_command_line", target_specs, stringify=False)
 
     # Capture a repro of the 'before' state for this build, if needed.
     self._repro = Reproducer.global_instance().create_repro()
