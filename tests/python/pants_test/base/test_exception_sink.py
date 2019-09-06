@@ -19,6 +19,10 @@ class TestExceptionSink(TestBase):
     class AnonymousSink(ExceptionSink): pass
     return AnonymousSink
 
+  def test_default_log_location(self):
+    sink = self._gen_sink_subclass()
+    self.assertEqual(os.getcwd(), sink._log_dir)
+
   def test_reset_log_location(self):
     sink = self._gen_sink_subclass()
 

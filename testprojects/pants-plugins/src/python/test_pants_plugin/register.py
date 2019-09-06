@@ -1,6 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
+
 from test_pants_plugin.pants_infra_tests import PantsInfraTests
 from test_pants_plugin.subsystems.pants_test_infra import PantsTestInfra
 from test_pants_plugin.tasks.deprecation_warning_task import DeprecationWarningTask
@@ -24,3 +26,7 @@ def register_goals():
 
 def global_subsystems():
   return (PantsTestInfra,)
+
+
+if os.environ.get('_RAISE_KEYBOARDINTERRUPT_ON_IMPORT', False):
+  raise KeyboardInterrupt('ctrl-c during import!')
