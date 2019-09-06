@@ -61,4 +61,4 @@ def assert_single_element(iterable):
   except StopIteration:
     return first_item
 
-  raise ValueError("iterable {!r} has more than one element.".format(iterable))
+  raise ValueError(f"iterable {iterable!r} has more than one element.")

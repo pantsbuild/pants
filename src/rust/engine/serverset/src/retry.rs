@@ -1,7 +1,7 @@
 use crate::{Health, Serverset};
 use futures::{self, Future, IntoFuture};
 
-pub struct Retry<T>(pub Serverset<T>);
+pub struct Retry<T: Clone>(pub Serverset<T>);
 
 impl<T: Clone + Send + Sync + 'static> Retry<T> {
   ///
@@ -51,32 +51,44 @@ impl<T: Clone + Send + Sync + 'static> Retry<T> {
 #[cfg(test)]
 mod tests {
   use crate::{BackoffConfig, Retry, Serverset};
+  use maplit::hashset;
   use std::time::Duration;
+  use testutil::owned_string_vec;
 
   #[test]
   fn retries() {
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
     let s = Serverset::new(
-      vec![Ok("good"), Err("bad".to_owned()), Ok("enough")],
+      owned_string_vec(&["good", "bad", "enough"]),
+      |s| {
+        if s == "bad" {
+          Err(s.to_owned())
+        } else {
+          Ok(s.to_owned())
+        }
+      },
+      3,
       BackoffConfig::new(Duration::from_millis(10), 2.0, Duration::from_millis(100)).unwrap(),
     )
     .unwrap();
-    let mut v = vec![];
+    let mut saw = hashset![];
     for _ in 0..3 {
-      v.push(
+      saw.insert(
         runtime
           .block_on(Retry(s.clone()).all_errors_immediately(|v| v, 1))
           .unwrap(),
       );
     }
-    assert_eq!(vec!["good", "enough", "good"], v);
+    assert_eq!(saw, hashset!["good".to_owned(), "enough".to_owned()]);
   }
 
   #[test]
   fn gives_up_on_enough_bad() {
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
     let s = Serverset::new(
-      vec![Err("bad".to_owned())],
+      vec!["bad".to_owned()],
+      |s| Err(s.to_owned()),
+      1,
       BackoffConfig::new(Duration::from_millis(1), 1.0, Duration::from_millis(1)).unwrap(),
     )
     .unwrap();

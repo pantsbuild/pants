@@ -13,7 +13,7 @@ from pants.util.memo import memoized_method, memoized_property
 MIN_OSX_SUPPORTED_VERSION = '10.11'
 
 
-MIN_OSX_VERSION_ARG = '-mmacosx-version-min={}'.format(MIN_OSX_SUPPORTED_VERSION)
+MIN_OSX_VERSION_ARG = f'-mmacosx-version-min={MIN_OSX_SUPPORTED_VERSION}'
 
 
 class XCodeCLITools(Subsystem):
@@ -70,8 +70,8 @@ class XCodeCLITools(Subsystem):
              fingerprint=True, advanced=True,
              help='Locations to search for resources from the XCode CLI tools, including a '
                   'compiler, linker, header files, and some libraries. '
-                  'Under this directory should be some selection of these subdirectories: {}.'
-                  .format(cls._REQUIRED_FILES.keys()))
+                  'Under this directory should be some selection of these subdirectories: '
+                  f'{cls._REQUIRED_FILES.keys()}.')
 
   @memoized_property
   def _all_existing_install_prefixes(self):
@@ -98,18 +98,16 @@ class XCodeCLITools(Subsystem):
 
         if not found:
           raise self.XCodeToolsUnavailable(
-            "File '{fname}' in subdirectory '{subdir_name}' does not exist at any of the specified "
-            "prefixes. This file is required to build native code on this platform. You may need "
-            "to install the XCode command line developer tools from the Mac App Store.\n\n"
+            f"File '{fname}' in subdirectory '{subdir_name}' does not exist at any of the "
+            "specified prefixes. This file is required to build native code on this platform. You "
+            "may need to install the XCode command line developer tools from the Mac App Store.\n\n"
             "If the XCode tools are installed and you are still seeing this message, please file "
             "an issue at https://github.com/pantsbuild/pants/issues/new describing your "
             "OSX environment and which file could not be found.\n"
-            "The existing install prefixes were: {pfxs}. These can be extended with "
-            "--{scope}-install-prefixes."
-            .format(fname=fname,
-                    subdir_name=subdir_name,
-                    pfxs=self._all_existing_install_prefixes,
-                    scope=self.get_options_scope_equivalent_flag_component()))
+            f"The existing install prefixes were: {self._all_existing_install_prefixes}. These can "
+            f"be extended with --{self.get_options_scope_equivalent_flag_component()}-install-"
+            f"prefixes."
+          )
 
     return existing_dirs
 

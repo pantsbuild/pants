@@ -47,12 +47,12 @@ class PythonAWSLambda(Target):
     """Returns the binary that builds the pex for this lambda."""
     dependencies = self.dependencies
     if len(dependencies) != 1:
-      raise TargetDefinitionException(self, 'An app must define exactly one binary '
-                                            'dependency, have: {}'.format(dependencies))
+      raise TargetDefinitionException(self, f'An app must define exactly one binary '
+                                            'dependency, have: {dependencies}')
     binary = dependencies[0]
     if not isinstance(binary, PythonBinary):
-      raise TargetDefinitionException(self, 'Expected binary dependency to be a python_binary '
-                                            'target, found {}'.format(binary))
+      raise TargetDefinitionException(self, f'Expected binary dependency to be a python_binary '
+                                            'target, found {binary}')
     return binary
 
   @property

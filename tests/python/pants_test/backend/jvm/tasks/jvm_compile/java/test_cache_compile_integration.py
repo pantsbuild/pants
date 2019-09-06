@@ -5,8 +5,11 @@ import os
 import re
 from collections import namedtuple
 from textwrap import dedent
+from typing import Callable, Dict, List
 
+from pants.backend.jvm.tasks.jvm_compile.rsc.rsc_compile import RscCompile
 from pants.base.build_environment import get_buildroot
+from pants.fs.archive import TGZ, ZIP
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import fast_relpath, safe_mkdir, safe_open, safe_rmtree
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
@@ -38,8 +41,8 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       temporary_dir(root_dir=get_buildroot()) as src_dir:
 
       config = {
-        'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
-        'compile.zinc': {'incremental_caching': True},
+        'cache.compile.rsc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
+        'compile.rsc': {'incremental_caching': True},
         'java': {'strict_deps': False},
       }
       target_dir = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest')
@@ -107,8 +110,8 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         temporary_dir(root_dir=get_buildroot()) as src_dir:
 
       config = {
-        'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
-        'compile.zinc': {'incremental_caching': True },
+        'cache.compile.rsc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
+        'compile.rsc': {'incremental_caching': True },
       }
 
       srcfile = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.java')
@@ -144,7 +147,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       # Should cause NotMain.class to be removed
       self.run_compile(cachetest_spec, config, workdir)
 
-      root = os.path.join(workdir, 'compile', 'zinc')
+      root = os.path.join(workdir, 'compile', 'rsc')
 
       task_versions = [p for p in os.listdir(root) if p != 'current']
       self.assertEqual(len(task_versions), 1, 'Expected 1 task version.')
@@ -159,7 +162,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       self.assertIn('current', target_workdirs)
 
       def classfiles(d):
-        cd = os.path.join(target_workdir_root, d, 'classes', 'org', 'pantsbuild', 'cachetest')
+        cd = os.path.join(target_workdir_root, d, 'zinc', 'classes', 'org', 'pantsbuild', 'cachetest')
         return sorted(os.listdir(cd))
 
       # One workdir should contain NotMain, and the other should contain Main.
@@ -172,7 +175,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
     with temporary_dir() as cache_dir, temporary_dir(root_dir=get_buildroot()) as src_dir, \
       temporary_dir(root_dir=get_buildroot(), suffix='.pants.d') as workdir:
       config = {
-        'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
+        'cache.compile.rsc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
       }
 
       dep_src_file = os.path.join(src_dir, 'org', 'pantsbuild', 'dep', 'A.scala')
@@ -207,7 +210,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         run_two = self.run_compile(con_spec, config, new_workdir)
         self.assertTrue(
             re.search(
-              "\[zinc\][^[]*\[cache\][^[]*Using cached artifacts for 2 targets.",
+              "Using cached artifacts for 2 targets.",
               run_two.stdout_data),
             run_two.stdout_data)
 
@@ -223,7 +226,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         run_three = self.run_compile(con_spec, config, new_workdir)
         self.assertTrue(
             re.search(
-              r"/org/pantsbuild/consumer:consumer\)[^[]*\[compile\][^[]*\[zinc\]\W*\[info\] Compile success",
+              r"consumer[\s\S]*Compile success",
               run_three.stdout_data),
             run_three.stdout_data)
 
@@ -232,7 +235,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
     srcfile = 'A.java'
     def config(incremental_caching):
-      return { 'compile.zinc': {'incremental_caching': incremental_caching} }
+      return { 'compile.rsc': {'incremental_caching': incremental_caching} }
 
     self._do_test_caching(
         Compile({srcfile: "class A {}"}, config(False), 1),
@@ -240,20 +243,102 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         Compile({srcfile: "public final class A {}"}, config(True), 2),
     )
 
+  def test_rsc_and_zinc_caching(self):
+    """Tests that with rsc-and-zinc, we write both artifacts."""
+
+    srcfile1 = 'A.scala'
+    srcfile2 = 'B.scala'
+
+    def take_only_subdir(curdir, child_name = None):
+      children = os.listdir(curdir)
+      if child_name:
+        self.assertEqual(children, [child_name])
+      else:
+        self.assertEqual(len(children), 1)
+      child = children[0]
+      return os.path.join(curdir, child)
+
+    def descend_subdirs(curdir, descendants):
+      if not descendants:
+        return curdir
+      nextdir = take_only_subdir(curdir, descendants[0])
+      return descend_subdirs(nextdir, descendants[1:])
+
+    def work(compile, cache_test_subdirs):
+      def ensure_classfiles(target_name, classfiles):
+        cache_test_subdir = cache_test_subdirs[target_name]
+        cache_dir_entries = os.listdir(cache_test_subdir)
+        self.assertEqual(len(cache_dir_entries), 1)
+        cache_entry = cache_dir_entries[0]
+
+        with self.temporary_workdir() as cache_unzip_dir, \
+          self.temporary_workdir() as rsc_dir, \
+            self.temporary_workdir() as zinc_dir:
+
+          cache_path = os.path.join(cache_test_subdir, cache_entry)
+          TGZ.extract(cache_path, cache_unzip_dir)
+          # assert that the unzip dir has the directory structure
+          # ./compile/rsc/{hash}/{x}.{target_name}/{hash2}
+          path = descend_subdirs(cache_unzip_dir, ['compile', 'rsc', None, None])
+          self.assertTrue(path.endswith(f".{target_name}"))
+          path = take_only_subdir(path)
+
+          # TODO: Surprisingly, rsc/m.jar is created even for dependee-less targets.
+          self.assertEqual(sorted(os.listdir(path)), ['rsc', 'zinc'])
+
+          # Check that zinc/z.jar and rsc/m.jar both exist
+          # and that their contents contain the right classfiles
+          zincpath = os.path.join(path, 'zinc')
+          zjar = os.path.join(zincpath, 'z.jar')
+          self.assertTrue(os.path.exists(zjar))
+          ZIP.extract(zjar, zinc_dir)
+          self.assertEqual(os.listdir(zinc_dir), ['compile_classpath'] + classfiles)
+
+          rscpath = os.path.join(path, 'rsc')
+          mjar = os.path.join(rscpath, 'm.jar')
+          self.assertTrue(os.path.exists(mjar))
+          ZIP.extract(mjar, rsc_dir)
+          self.assertEqual(os.listdir(rsc_dir), classfiles)
+
+      ensure_classfiles("cachetestA", ["A.class"])
+      ensure_classfiles("cachetestB", ["B.class"])
+
+    config = {
+      'compile.rsc': {
+        'workflow': RscCompile.JvmCompileWorkflowType.rsc_and_zinc.value
+      }
+    }
+    self._compile_spec(
+      [
+        Compile({srcfile1: "class A {}", srcfile2: "class B {}"}, config, 1)
+      ],
+      [
+        "scala_library(name='cachetestA', sources=['A.scala'])",
+        "scala_library(name='cachetestB', sources=['B.scala'], dependencies=[':cachetestA'])"
+      ],
+      [
+        "cachetestA",
+        "cachetestB"
+      ],
+      "cachetestB",
+      work
+    )
+
   def test_incremental(self):
     """Tests that with --no-incremental and --no-incremental-caching, we always write artifacts."""
 
     srcfile = 'A.java'
-    config = {'compile.zinc': {'incremental': False, 'incremental_caching': False}}
+    config = {'compile.rsc': {'incremental': False, 'incremental_caching': False}}
 
     self._do_test_caching(
         Compile({srcfile: "class A {}"}, config, 1),
         Compile({srcfile: "final class A {}"}, config, 2),
         Compile({srcfile: "public final class A {}"}, config, 3),
     )
+  
+  def _compile_spec(self, compiles: List[Compile], target_defs: List[str], target_names: List[str], target_to_compile: str, callback: Callable[[Compile, Dict[str, str]], None] = lambda cache_test_subdirs: None) -> None:
+    """Compiles a spec within the same workspace under multiple compilation configs, with a callback function."""
 
-  def _do_test_caching(self, *compiles):
-    """Tests that the given compiles within the same workspace produce the given artifact counts."""
     with temporary_dir() as cache_dir, \
         self.temporary_workdir() as workdir, \
         temporary_dir(root_dir=get_buildroot()) as src_dir:
@@ -261,17 +346,16 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       def complete_config(config):
         # Clone the input config and add cache settings.
         cache_settings = {'write_to': [cache_dir], 'read_from': [cache_dir]}
-        return dict(list(config.items()) + [('cache.compile.zinc', cache_settings)])
+        return dict(list(config.items()) + [('cache.compile.rsc', cache_settings)])
 
       buildfile = os.path.join(src_dir, 'BUILD')
-      spec = os.path.join(src_dir, ':cachetest')
+      spec = os.path.join(src_dir, f':{target_to_compile}')
       artifact_dir = None
 
       for c in compiles:
         # Clear the src directory and recreate the files.
         safe_mkdir(src_dir, clean=True)
-        self.create_file(buildfile,
-                        """java_library(name='cachetest', sources=rglobs('*.java', '*.scala'))""")
+        self.create_file(buildfile, "\n".join(target_defs))
         for name, content in c.srcfiles.items():
           self.create_file(os.path.join(src_dir, name), content)
 
@@ -279,12 +363,34 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         self.run_compile(spec, complete_config(c.config), workdir)
 
         artifact_dir = self.get_cache_subdir(cache_dir)
-        cache_test_subdir = os.path.join(
-          artifact_dir,
-          '{}.cachetest'.format(os.path.basename(src_dir)),
-        )
-        self.assertEqual(c.artifact_count, len(os.listdir(cache_test_subdir)))
+
+        cache_test_subdirs = {}
+        for t in target_names:
+          cache_test_subdirs[t] = os.path.join(
+            artifact_dir,
+            f'{os.path.basename(src_dir)}.{t}',
+          )
+
+        callback(c, cache_test_subdirs)
+
+  def _do_test_caching(self, *compiles):
+    """Tests that the given compiles within the same workspace produce the given artifact counts."""
+
+    target_name = 'cachetest'
+
+    def work(compile, cache_test_subdirs):
+      self.assertEqual(len(cache_test_subdirs), 1)
+      cache_test_subdir = cache_test_subdirs[target_name]
+      self.assertEqual(compile.artifact_count, len(os.listdir(cache_test_subdir)))
+
+    self._compile_spec(
+      compiles,
+      [f"java_library(name='{target_name}', sources=rglobs('*.java', '*.scala'))"],
+      [target_name],
+      target_name,
+      work
+    )
 
 
 class CacheCompileIntegrationWithZjarsTest(CacheCompileIntegrationTest):
-  _EXTRA_TASK_ARGS = ['--compile-zinc-use-classpath-jars']
+  _EXTRA_TASK_ARGS = ['--compile-rsc-use-classpath-jars']

@@ -14,8 +14,8 @@ from pants.base.exiter import PANTS_FAILED_EXIT_CODE
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.fs import (Digest, DirectoriesToMerge, DirectoryToMaterialize,
-                             DirectoryWithPrefixToStrip, FileContent, FilesContent, PathGlobs,
-                             PathGlobsAndRoot, Snapshot, UrlToFetch)
+                             DirectoryWithPrefixToStrip, FileContent, FilesContent,
+                             InputFileContent, PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch)
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.native import Function, TypeId
 from pants.engine.nodes import Return, Throw
@@ -52,7 +52,6 @@ class Scheduler:
     self,
     native,
     project_tree,
-    work_dir,
     local_store_dir,
     rules,
     union_rules,
@@ -91,7 +90,6 @@ class Scheduler:
       tasks=self._tasks,
       root_subject_types=self._root_subject_types,
       build_root=project_tree.build_root,
-      work_dir=work_dir,
       local_store_dir=local_store_dir,
       ignore_patterns=project_tree.ignore_patterns,
       execution_options=execution_options,
@@ -107,6 +105,7 @@ class Scheduler:
       type_merge_snapshots_request=DirectoriesToMerge,
       type_directory_with_prefix_to_strip=DirectoryWithPrefixToStrip,
       type_files_content=FilesContent,
+      type_input_file_content=InputFileContent,
       type_dir=Dir,
       type_file=File,
       type_link=Link,
@@ -284,50 +283,6 @@ class Scheduler:
     finally:
       self._native.lib.nodes_destroy(raw_roots)
     return roots
-
-  def capture_snapshots(self, path_globs_and_roots):
-    """Synchronously captures Snapshots for each matching PathGlobs rooted at a its root directory.
-
-    This is a blocking operation, and should be avoided where possible.
-
-    :param path_globs_and_roots tuple<PathGlobsAndRoot>: The PathGlobs to capture, and the root
-           directory relative to which each should be captured.
-    :returns: A tuple of Snapshots.
-    """
-    result = self._native.lib.capture_snapshots(
-      self._scheduler,
-      self._to_value(_PathGlobsAndRootCollection(path_globs_and_roots)),
-    )
-    return self._raise_or_return(result)
-
-  def merge_directories(self, directory_digests):
-    """Merges any number of directories.
-
-    :param directory_digests: Tuple of DirectoryDigests.
-    :return: A Digest.
-    """
-    result = self._native.lib.merge_directories(
-      self._scheduler,
-      self._to_value(_DirectoryDigests(directory_digests)),
-    )
-    return self._raise_or_return(result)
-
-  def materialize_directories(self, directories_paths_and_digests):
-    """Creates the specified directories on the file system.
-
-    :param directories_paths_and_digests tuple<DirectoryToMaterialize>: Tuple of the path and
-           digest of the directories to materialize.
-    :returns: Nothing or an error.
-    """
-    # Ensure there isn't more than one of the same directory paths and paths do not have the same prefix.
-    dir_list = [dpad.path for dpad in directories_paths_and_digests]
-    check_no_overlapping_paths(dir_list)
-
-    result = self._native.lib.materialize_directories(
-      self._scheduler,
-      self._to_value(_DirectoriesToMaterialize(directories_paths_and_digests)),
-    )
-    return self._raise_or_return(result)
 
   def lease_files_in_graph(self):
     self._native.lib.lease_files_in_graph(self._scheduler)
@@ -572,19 +527,42 @@ class SchedulerSession:
            directory relative to which each should be captured.
     :returns: A tuple of Snapshots.
     """
-    return self._scheduler.capture_snapshots(path_globs_and_roots)
+    result = self._scheduler._native.lib.capture_snapshots(
+      self._scheduler._scheduler,
+      self._session,
+      self._scheduler._to_value(_PathGlobsAndRootCollection(path_globs_and_roots)),
+    )
+    return self._scheduler._raise_or_return(result)
 
   def merge_directories(self, directory_digests):
-    return self._scheduler.merge_directories(directory_digests)
+    """Merges any number of directories.
+
+    :param directory_digests: Tuple of DirectoryDigests.
+    :return: A Digest.
+    """
+    result = self._scheduler._native.lib.merge_directories(
+      self._scheduler._scheduler,
+      self._session,
+      self._scheduler._to_value(_DirectoryDigests(directory_digests)),
+    )
+    return self._scheduler._raise_or_return(result)
 
   def materialize_directories(self, directories_paths_and_digests):
     """Creates the specified directories on the file system.
-
     :param directories_paths_and_digests tuple<DirectoryToMaterialize>: Tuple of the path and
            digest of the directories to materialize.
     :returns: Nothing or an error.
     """
-    return self._scheduler.materialize_directories(directories_paths_and_digests)
+    # Ensure there isn't more than one of the same directory paths and paths do not have the same prefix.
+    dir_list = [dpad.path for dpad in directories_paths_and_digests]
+    check_no_overlapping_paths(dir_list)
+
+    result = self._scheduler._native.lib.materialize_directories(
+      self._scheduler._scheduler,
+      self._session,
+      self._scheduler._to_value(_DirectoriesToMaterialize(directories_paths_and_digests)),
+    )
+    return self._scheduler._raise_or_return(result)
 
   def lease_files_in_graph(self):
     self._scheduler.lease_files_in_graph()

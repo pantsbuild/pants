@@ -2,6 +2,30 @@
 ======================
 This document describes releases leading up to the ``1.17.x`` ``stable`` series.
 
+1.17.0 (8/01/2019)
+------------------
+
+The first stable release of `1.17.x`, with no changes since the previous rc.
+
+1.17.0rc2 (7/26/2019)
+---------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Add concurrent flag, which overrides --enable-pantsd (#7944)
+  `PR #7944 <https://github.com/pantsbuild/pants/pull/7944>`_
+
+Bugfixes
+~~~~~~~~
+
+* Add some of the wording from #7913 that wasn't merged in #7924  (#7958)
+  `PR #7958 <https://github.com/pantsbuild/pants/pull/7958>`_
+
+* Crash pailgun client on SIGINT if we haven't received the pid yet (#7924)
+  `Issue #7920 <https://github.com/pantsbuild/pants/issues/7920>`_
+  `PR #7924 <https://github.com/pantsbuild/pants/pull/7924>`_
+
 1.17.0rc1 (6/22/2019)
 ---------------------
 

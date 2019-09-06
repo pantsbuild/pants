@@ -18,7 +18,7 @@ Recommended Installation
 ------------------------
 
 To set up Pants in your repo, we recommend installing our self-contained `pants` bash script
-in the root (i.e. the "buildroot") of your repo:
+in the root (i.e. the "build root") of your repo:
 
     :::bash
     curl -L -O https://pantsbuild.github.io/setup/pants && chmod +x pants
@@ -51,16 +51,12 @@ The ./pants Runner Script
 -------------------------
 
 We highly recommend invoking pants via a checked-in runner script named `pants` in the
-root of your workspace, as demonstrated above.  Pants uses the presence of such a file, in the
-current working directory or in any of its ancestors, to detect the buildroot, e.g., when
+root of your workspace, as demonstrated above. Pants uses the presence of such a file, in the
+current working directory or in any of its ancestors, to detect the build root, e.g., when
 invoked in a subdirectory.
 
-If, for whatever reason, you don't want to run pants that way, you can also just check in an
-empty file named `pants` to act as a sentinel for the buildroot.
-
-Note that you can create whatever symlinks or extra wrapper scripts you like.  There's no absolute
-requirement that pants be invoked directly via `./pants`.  All pants cares about is the existence
-of a file named `pants` in the buildroot, and that file might as well be the runner script!
+If, for whatever reason, you don't want to run Pants that way, you can also just check in an
+empty file named `BUILD_ROOT` to act as the sentinel for determining your project's build root.
 
 PEX-based Installation
 ----------------------

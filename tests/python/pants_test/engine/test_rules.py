@@ -82,8 +82,11 @@ class RuleTest(unittest.TestCase):
 
 class RuleIndexTest(TestBase):
   def test_creation_fails_with_bad_declaration_type(self):
-    with self.assertRaisesWithMessage(TypeError, """\
-Rule entry A() had an unexpected type: <class 'pants_test.engine.test_rules.A'>. Rules either extend Rule or UnionRule, or are static functions decorated with @rule."""):
+    with self.assertRaisesWithMessage(
+      TypeError,
+      "Rule entry A() had an unexpected type: <class "
+      "'pants_test.engine.test_rules.A'>. Rules either extend Rule or UnionRule, or "
+      "are static functions decorated with @rule."""):
       RuleIndex.create([A()])
 
 

@@ -7,6 +7,7 @@ python_tests(
   dependencies=[
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
+    'tests/python/pants_test:test_base',
   ],
   timeout = 600,
   tags = {'integration'},

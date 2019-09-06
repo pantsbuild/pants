@@ -6,6 +6,7 @@ from textwrap import dedent
 
 from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
+from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.junit_tests import JUnitTests
@@ -71,10 +72,22 @@ class RscCompileTest(NailgunTaskTestBase):
         classpath_product=None)
 
       dependee_graph = self.construct_dependee_graph_str(jobs, task)
-      print(dependee_graph)
       self.assertEqual(dedent("""
-                     zinc[zinc-java](java/classpath:java_lib) <- {}
-                     zinc[zinc-only](scala/classpath:scala_lib) <- {}""").strip(),
+                     double_check_cache(java/classpath:java_lib) <- {
+                       zinc[zinc-java](java/classpath:java_lib)
+                     }
+                     zinc[zinc-java](java/classpath:java_lib) <- {
+                       write_to_cache(java/classpath:java_lib)
+                     }
+                     write_to_cache(java/classpath:java_lib) <- {}
+                     double_check_cache(scala/classpath:scala_lib) <- {
+                       zinc[zinc-only](scala/classpath:scala_lib)
+                     }
+                     zinc[zinc-only](scala/classpath:scala_lib) <- {
+                       write_to_cache(scala/classpath:scala_lib)
+                     }
+                     write_to_cache(scala/classpath:scala_lib) <- {}
+                     """).strip(),
         dependee_graph)
 
   def test_no_dependencies_between_scala_and_java_targets(self):
@@ -107,11 +120,22 @@ class RscCompileTest(NailgunTaskTestBase):
         classpath_product=None)
 
       dependee_graph = self.construct_dependee_graph_str(jobs, task)
-      print(dependee_graph)
       self.assertEqual(dedent("""
-                     zinc[zinc-java](java/classpath:java_lib) <- {}
-                     rsc(scala/classpath:scala_lib) <- {}
-                     zinc[rsc-and-zinc](scala/classpath:scala_lib) <- {}""").strip(),
+                     double_check_cache(java/classpath:java_lib) <- {
+                       zinc[zinc-java](java/classpath:java_lib)
+                     }
+                     zinc[zinc-java](java/classpath:java_lib) <- {
+                       write_to_cache(java/classpath:java_lib)
+                     }
+                     write_to_cache(java/classpath:java_lib) <- {}
+                     double_check_cache(scala/classpath:scala_lib) <- {
+                       zinc[zinc-only](scala/classpath:scala_lib)
+                     }
+                     zinc[zinc-only](scala/classpath:scala_lib) <- {
+                       write_to_cache(scala/classpath:scala_lib)
+                     }
+                     write_to_cache(scala/classpath:scala_lib) <- {}
+                     """).strip(),
         dependee_graph)
 
   def test_default_workflow_of_zinc_only_zincs_scala(self):
@@ -138,9 +162,15 @@ class RscCompileTest(NailgunTaskTestBase):
         classpath_product=None)
 
       dependee_graph = self.construct_dependee_graph_str(jobs, task)
-      print(dependee_graph)
       self.assertEqual(dedent("""
-                    zinc[zinc-only](scala/classpath:scala_lib) <- {}""").strip(),
+                    double_check_cache(scala/classpath:scala_lib) <- {
+                      zinc[zinc-only](scala/classpath:scala_lib)
+                    }
+                    zinc[zinc-only](scala/classpath:scala_lib) <- {
+                      write_to_cache(scala/classpath:scala_lib)
+                    }
+                    write_to_cache(scala/classpath:scala_lib) <- {}
+                    """).strip(),
         dependee_graph)
 
   def test_rsc_dep_for_scala_java_and_test_targets(self):
@@ -191,21 +221,54 @@ class RscCompileTest(NailgunTaskTestBase):
 
       dependee_graph = self.construct_dependee_graph_str(jobs, task)
 
+      self.maxDiff = None
       self.assertEqual(dedent("""
-                     zinc[zinc-java](java/classpath:java_lib) <- {}
+                     double_check_cache(java/classpath:java_lib) <- {
+                       zinc[zinc-java](java/classpath:java_lib)
+                     }
+                     zinc[zinc-java](java/classpath:java_lib) <- {
+                       write_to_cache(java/classpath:java_lib)
+                     }
+                     write_to_cache(java/classpath:java_lib) <- {}
+                     double_check_cache(scala/classpath:scala_lib) <- {
+                       rsc(scala/classpath:scala_lib),
+                       zinc[rsc-and-zinc](scala/classpath:scala_lib)
+                     }
                      rsc(scala/classpath:scala_lib) <- {
+                       write_to_cache(scala/classpath:scala_lib),
+                       double_check_cache(scala/classpath:scala_test),
                        zinc[zinc-only](scala/classpath:scala_test)
                      }
-                     zinc[rsc-and-zinc](scala/classpath:scala_lib) <- {}
+                     zinc[rsc-and-zinc](scala/classpath:scala_lib) <- {
+                       write_to_cache(scala/classpath:scala_lib)
+                     }
+                     write_to_cache(scala/classpath:scala_lib) <- {}
+                     double_check_cache(scala/classpath:scala_dep) <- {
+                       rsc(scala/classpath:scala_dep),
+                       zinc[rsc-and-zinc](scala/classpath:scala_dep)
+                     }
                      rsc(scala/classpath:scala_dep) <- {
+                       double_check_cache(scala/classpath:scala_lib),
                        rsc(scala/classpath:scala_lib),
                        zinc[rsc-and-zinc](scala/classpath:scala_lib),
+                       write_to_cache(scala/classpath:scala_dep),
+                       double_check_cache(scala/classpath:scala_test),
                        zinc[zinc-only](scala/classpath:scala_test)
                      }
                      zinc[rsc-and-zinc](scala/classpath:scala_dep) <- {
-                       zinc[zinc-java](java/classpath:java_lib)
+                       double_check_cache(java/classpath:java_lib),
+                       zinc[zinc-java](java/classpath:java_lib),
+                       write_to_cache(scala/classpath:scala_dep)
                      }
-                     zinc[zinc-only](scala/classpath:scala_test) <- {}""").strip(),
+                     write_to_cache(scala/classpath:scala_dep) <- {}
+                     double_check_cache(scala/classpath:scala_test) <- {
+                       zinc[zinc-only](scala/classpath:scala_test)
+                     }
+                     zinc[zinc-only](scala/classpath:scala_test) <- {
+                       write_to_cache(scala/classpath:scala_test)
+                     }
+                     write_to_cache(scala/classpath:scala_test) <- {}
+                     """).strip(),
         dependee_graph)
 
   def test_scala_lib_with_java_sources_not_passed_to_rsc(self):
@@ -249,9 +312,28 @@ class RscCompileTest(NailgunTaskTestBase):
       dependee_graph = self.construct_dependee_graph_str(jobs, task)
 
       self.assertEqual(dedent("""
-                     zinc[zinc-java](java/classpath:java_lib) <- {}
-                     zinc[zinc-java](scala/classpath:scala_with_direct_java_sources) <- {}
-                     zinc[zinc-java](scala/classpath:scala_with_indirect_java_sources) <- {}""").strip(),
+                     double_check_cache(java/classpath:java_lib) <- {
+                       zinc[zinc-java](java/classpath:java_lib)
+                     }
+                     zinc[zinc-java](java/classpath:java_lib) <- {
+                       write_to_cache(java/classpath:java_lib)
+                     }
+                     write_to_cache(java/classpath:java_lib) <- {}
+                     double_check_cache(scala/classpath:scala_with_direct_java_sources) <- {
+                       zinc[zinc-java](scala/classpath:scala_with_direct_java_sources)
+                     }
+                     zinc[zinc-java](scala/classpath:scala_with_direct_java_sources) <- {
+                       write_to_cache(scala/classpath:scala_with_direct_java_sources)
+                     }
+                     write_to_cache(scala/classpath:scala_with_direct_java_sources) <- {}
+                     double_check_cache(scala/classpath:scala_with_indirect_java_sources) <- {
+                       zinc[zinc-java](scala/classpath:scala_with_indirect_java_sources)
+                     }
+                     zinc[zinc-java](scala/classpath:scala_with_indirect_java_sources) <- {
+                       write_to_cache(scala/classpath:scala_with_indirect_java_sources)
+                     }
+                     write_to_cache(scala/classpath:scala_with_indirect_java_sources) <- {}
+                     """).strip(),
         dependee_graph)
 
   def test_desandbox_fn(self):
@@ -294,6 +376,7 @@ class RscCompileTest(NailgunTaskTestBase):
     init_subsystem(
       JUnit,
     )
+    init_subsystem(ScoveragePlatform)
     self.make_target(
       '//:scala-library',
       target_type=JarLibrary,

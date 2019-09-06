@@ -16,7 +16,7 @@ from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.native import Native
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.logging import init_rust_logger, setup_logging
-from pants.init.options_initializer import BuildConfigInitializer
+from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.options_fingerprinter import OptionsFingerprinter
@@ -212,7 +212,7 @@ class PantsDaemon(FingerprintedProcessManager):
         fs_event_service,
         legacy_graph_scheduler,
         build_root,
-        PantsDaemon.compute_invalidation_globs(bootstrap_options),
+        OptionsInitializer.compute_pantsd_invalidation_globs(build_root, bootstrap_options),
         pidfile,
       )
 
@@ -229,30 +229,6 @@ class PantsDaemon(FingerprintedProcessManager):
         services=(fs_event_service, scheduler_service, pailgun_service, store_gc_service),
         port_map=dict(pailgun=pailgun_service.pailgun_port),
       )
-
-  @staticmethod
-  def compute_invalidation_globs(bootstrap_options):
-    """
-    Combine --pythonpath and --pants_config_files(pants.ini) files that are in {buildroot} dir
-    with those invalidation_globs provided by users
-    :param bootstrap_options:
-    :return: A list of invalidation_globs
-    """
-    buildroot = get_buildroot()
-    invalidation_globs = []
-    globs = bootstrap_options.pythonpath + \
-      bootstrap_options.pants_config_files + \
-      bootstrap_options.pantsd_invalidation_globs
-
-    for glob in globs:
-      glob_relpath = os.path.relpath(glob, buildroot)
-      if glob_relpath and (not glob_relpath.startswith("../")):
-        invalidation_globs.extend([glob_relpath, glob_relpath + '/**'])
-      else:
-        logging.getLogger(__name__).warning("Changes to {}, outside of the buildroot"
-                                            ", will not be invalidated.".format(glob))
-
-    return invalidation_globs
 
   def __init__(self, native, build_root, work_dir, log_level, services,
                metadata_base_dir, bootstrap_options=None):
@@ -406,11 +382,10 @@ class PantsDaemon(FingerprintedProcessManager):
   def run_sync(self):
     """Synchronously run pantsd."""
     # Switch log output to the daemon's log stream from here forward.
+    # Also, register an exiter using os._exit to ensure we only close stdio streams once.
     self._close_stdio()
-    with self._pantsd_logging() as (log_stream, log_filename):
-
-      # Register an exiter using os._exit to ensure we only close stdio streams once.
-      ExceptionSink.reset_exiter(Exiter(exiter=os._exit))
+    with self._pantsd_logging() as (log_stream, log_filename), \
+         ExceptionSink.exiter_as(lambda _: Exiter(exiter=os._exit)):
 
       # We don't have any stdio streams to log to anymore, so we log to a file.
       # We don't override the faulthandler destination because the stream we get will proxy things

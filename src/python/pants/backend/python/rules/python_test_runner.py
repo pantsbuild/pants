@@ -1,12 +1,15 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import Dict, Optional
+
 from pants.backend.python.rules.create_requirements_pex import (RequirementsPex,
                                                                 RequirementsPexRequest)
 from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.build_graph.files import Files
 from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryWithPrefixToStrip
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import BuildFileAddresses, TransitiveHydratedTargets
@@ -14,11 +17,10 @@ from pants.engine.legacy.structs import PythonTestsAdaptor
 from pants.engine.rules import UnionRule, optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.core_test_model import Status, TestResult, TestTarget
-from pants.source.source_root import SourceRootConfig
+from pants.source.source_root import SourceRoot, SourceRootConfig
 from pants.util.strutil import create_path_env_var
 
 
-# TODO: Support resources
 # TODO(7697): Use a dedicated rule for removing the source root prefix, so that this rule
 # does not have to depend on SourceRootConfig.
 @rule(TestResult, [PythonTestsAdaptor, PyTest, PythonSetup, SourceRootConfig, SubprocessEncodingEnvironment])
@@ -61,32 +63,30 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
     )
   )
 
-  source_roots = source_root_config.get_source_roots()
-
-  # Gather sources and adjust for the source root.
+  # Gather sources and adjust for source roots.
   # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of raising to
   # simplify the hasattr() checks here!
-  # TODO(7714): restore the full source name for the stdout of the Pytest run.
-  sources_snapshots_and_source_roots = []
+  source_roots = source_root_config.get_source_roots()
+  sources_digest_to_source_roots: Dict[Digest, Optional[SourceRoot]] = {}
   for maybe_source_target in all_targets:
-    if hasattr(maybe_source_target, 'sources'):
-      tgt_snapshot = maybe_source_target.sources.snapshot
-      tgt_source_root = source_roots.find_by_path(maybe_source_target.address.spec_path)
-      sources_snapshots_and_source_roots.append((tgt_snapshot, tgt_source_root))
-  all_sources_digests = yield [
-    Get(
-      Digest,
-      DirectoryWithPrefixToStrip(
-        directory_digest=snapshot.directory_digest,
-        prefix=source_root.path
-      )
-    )
-    for snapshot, source_root
-    in sources_snapshots_and_source_roots
+    if not hasattr(maybe_source_target, 'sources'):
+      continue
+    digest = maybe_source_target.sources.snapshot.directory_digest
+    source_root = source_roots.find_by_path(maybe_source_target.address.spec_path)
+    if maybe_source_target.type_alias == Files.alias():
+      # Loose `Files`, as opposed to `Resources` or `PythonTarget`s, have no (implied) package
+      # structure and so we do not remove their source root like we normally do, so that Python
+      # filesystem APIs may still access the files. See pex_build_util.py's `_create_source_dumper`.
+      source_root = None
+    sources_digest_to_source_roots[digest] = source_root.path if source_root else ""
+
+  stripped_sources_digests = yield [
+    Get(Digest, DirectoryWithPrefixToStrip(directory_digest=digest, prefix=source_root))
+    for digest, source_root in sources_digest_to_source_roots.items()
   ]
 
   sources_digest = yield Get(
-    Digest, DirectoriesToMerge(directories=tuple(all_sources_digests)),
+    Digest, DirectoriesToMerge(directories=tuple(stripped_sources_digests)),
   )
 
   inits_digest = yield Get(InjectedInitDigest, Digest, sources_digest)

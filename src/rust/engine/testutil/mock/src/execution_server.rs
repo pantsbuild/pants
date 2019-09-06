@@ -84,7 +84,7 @@ impl TestServer {
   ///                      If a GetOperation request is received whose name is not equal to this
   ///                      MockExecution's name, or more requests are received than stub responses
   ///                      are available for, an error will be returned.
-  pub fn new(mock_execution: MockExecution) -> TestServer {
+  pub fn new(mock_execution: MockExecution, port: Option<u16>) -> TestServer {
     let mock_responder = MockResponder::new(mock_execution);
 
     let env = Arc::new(grpcio::Environment::new(1));
@@ -95,7 +95,7 @@ impl TestServer {
       .register_service(bazel_protos::operations_grpc::create_operations(
         mock_responder.clone(),
       ))
-      .bind("localhost", 0)
+      .bind("localhost", port.unwrap_or(0))
       .build()
       .unwrap();
     server_transport.start();
@@ -267,7 +267,10 @@ impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
         sink
           .fail(grpcio::RpcStatus::new(
             grpcio::RpcStatusCode::InvalidArgument,
-            Some("Did not expect this request".to_string()),
+            Some(format!(
+              "Did not expect this request. Expected: {:?}, Got: {:?}",
+              self.mock_execution.execute_request, req
+            )),
           ))
           .map_err(|_| ()),
       );

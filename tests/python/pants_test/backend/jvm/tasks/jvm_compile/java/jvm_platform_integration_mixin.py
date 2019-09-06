@@ -16,7 +16,7 @@ class JvmPlatformIntegrationMixin:
   def get_pants_compile_args(self):
     """List of arguments to pants that determine what compiler to use.
 
-    The compiling task must be the last argument (eg, compile.zinc).
+    The compiling task must be the last argument (eg, compile.rsc).
     """
     raise NotImplementedError
 
@@ -60,7 +60,7 @@ class JvmPlatformIntegrationMixin:
     if ':' in jar_name:
       jar_name = jar_name[jar_name.find(':') + 1:]
     with temporary_dir() as cache_dir:
-      config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
+      config = {'cache.compile.rsc': {'write_to': [cache_dir]}}
       with self.temporary_workdir() as workdir:
         pants_run = self.run_pants_with_workdir(
           ['binary'] + self.get_pants_compile_args()

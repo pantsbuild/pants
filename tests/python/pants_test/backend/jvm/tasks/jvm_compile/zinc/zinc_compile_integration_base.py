@@ -50,7 +50,7 @@ class BaseZincCompileIntegrationTest:
         SHAPELESS_TARGET,
         # Flags to enable profiling and statistics on target
         config={
-          'compile.zinc': {
+          'compile.rsc': {
             'default_compiler_option_sets': ['profile'],
             'compiler_option_sets_enabled_args': {
               'profile': [
@@ -208,7 +208,7 @@ class BaseZincCompileIntegrationTest:
     with self.do_test_compile(
         'examples/src/scala/org/pantsbuild/example/scalac/plugin:simple_scalac_plugin',
         expected_files=['SimpleScalacPlugin.class', 'scalac-plugin.xml'],
-        extra_args=['--compile-zinc-debug-symbols']):
+        extra_args=['--compile-rsc-debug-symbols']):
       pass
 
   def test_zinc_unsupported_option(self):
@@ -220,8 +220,8 @@ class BaseZincCompileIntegrationTest:
             cachedir,
             'testprojects/src/scala/org/pantsbuild/testproject/emptyscala',
             extra_args=[
-              '--compile-zinc-args=-recompile-all-fraction',
-              '--compile-zinc-args=0.5',
+              '--compile-rsc-args=-recompile-all-fraction',
+              '--compile-rsc-args=0.5',
             ])
         self.assert_success(pants_run)
 
@@ -247,9 +247,9 @@ class BaseZincCompileIntegrationTest:
     test_combination('nonfatal', expect_success=True)
 
     test_combination('fatal', expect_success=True,
-      extra_args=['--compile-zinc-compiler-option-sets-enabled-args={"fatal_warnings": ["-C-Werror"]}'])
+      extra_args=['--compile-rsc-compiler-option-sets-enabled-args={"fatal_warnings": ["-C-Werror"]}'])
     test_combination('fatal', expect_success=False,
-      extra_args=['--compile-zinc-compiler-option-sets-disabled-args={"fatal_warnings": ["-S-Xfatal-warnings"]}'])
+      extra_args=['--compile-rsc-compiler-option-sets-disabled-args={"fatal_warnings": ["-S-Xfatal-warnings"]}'])
 
   @unittest.expectedFailure
   def test_soft_excludes_at_compiletime(self):
@@ -265,13 +265,13 @@ class BaseZincCompileIntegrationTest:
       first_run = self.run_test_compile(workdir, cachedir,
                             'testprojects/src/scala/org/pantsbuild/testproject/javasources')
 
-      self.assertIn('isolation-zinc-pool-bootstrap', first_run.stdout_data)
+      self.assertIn('isolation-mixed-pool-bootstrap', first_run.stdout_data)
 
       # Run valid compile.
       second_run = self.run_test_compile(workdir, cachedir,
                             'testprojects/src/scala/org/pantsbuild/testproject/javasources')
 
-      self.assertNotIn('isolation-zinc-pool-bootstrap', second_run.stdout_data)
+      self.assertNotIn('isolation-mixed-pool-bootstrap', second_run.stdout_data)
 
   def test_source_compat_binary_incompat_scala_change(self):
     with temporary_dir() as cache_dir, \
@@ -279,7 +279,7 @@ class BaseZincCompileIntegrationTest:
       temporary_dir(root_dir=get_buildroot()) as src_dir:
 
       config = {
-        'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
+        'cache.compile.rsc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
       }
 
       srcfile = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.scala')
@@ -341,8 +341,8 @@ class BaseZincCompileIntegrationTest:
       temporary_dir(root_dir=get_buildroot()) as src_dir:
 
       config = {
-        'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
-        'compile.zinc': {'incremental_caching': True },
+        'cache.compile.rsc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
+        'compile.rsc': {'incremental_caching': True },
       }
 
       srcfile = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.java')
@@ -396,3 +396,12 @@ class BaseZincCompileIntegrationTest:
                                 """))
 
       self.run_run(cachetest_spec, config, workdir)
+
+  def test_hermetic(self):
+    extra_args = [
+        '--compile-rsc-execution-strategy=hermetic',
+        '--compile-rsc-incremental=False',
+      ]
+
+    with self.do_test_compile('examples/src/scala/org/pantsbuild/example/hello/exe', extra_args=extra_args):
+      pass

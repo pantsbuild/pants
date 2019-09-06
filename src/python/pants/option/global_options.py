@@ -32,6 +32,7 @@ class ExecutionOptions(datatype([
   'remote_store_chunk_bytes',
   'remote_store_chunk_upload_timeout_seconds',
   'remote_store_rpc_retries',
+  'remote_store_connection_limit',
   'process_execution_local_parallelism',
   'process_execution_remote_parallelism',
   'process_execution_cleanup_local_dirs',
@@ -60,6 +61,7 @@ class ExecutionOptions(datatype([
       remote_store_chunk_bytes=bootstrap_options.remote_store_chunk_bytes,
       remote_store_chunk_upload_timeout_seconds=bootstrap_options.remote_store_chunk_upload_timeout_seconds,
       remote_store_rpc_retries=bootstrap_options.remote_store_rpc_retries,
+      remote_store_connection_limit=bootstrap_options.remote_store_connection_limit,
       process_execution_local_parallelism=bootstrap_options.process_execution_local_parallelism,
       process_execution_remote_parallelism=bootstrap_options.process_execution_remote_parallelism,
       process_execution_cleanup_local_dirs=bootstrap_options.process_execution_cleanup_local_dirs,
@@ -82,6 +84,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_chunk_bytes=1024*1024,
     remote_store_chunk_upload_timeout_seconds=60,
     remote_store_rpc_retries=2,
+    remote_store_connection_limit=5,
     process_execution_local_parallelism=multiprocessing.cpu_count()*2,
     process_execution_remote_parallelism=128,
     process_execution_cleanup_local_dirs=True,
@@ -116,8 +119,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     """
     buildroot = get_buildroot()
     default_distdir_name = 'dist'
-    default_distdir = os.path.join(buildroot, default_distdir_name)
-    default_rel_distdir = '/{}/'.format(default_distdir_name)
+    default_rel_distdir = f'/{default_distdir_name}/'
 
     register('-l', '--level', choices=['trace', 'debug', 'info', 'warn'], default='info',
              recursive=True, help='Set the logging level.')
@@ -182,14 +184,17 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--pants-workdir', advanced=True, metavar='<dir>',
              default=os.path.join(buildroot, '.pants.d'),
              help='Write intermediate output files to this dir.')
+    register('--pants-physical-workdir-base', advanced=True, metavar='<dir>',
+             default=None,
+             help='When set, a base directory in which to store `--pants-workdir` contents. '
+                  'If this option is a set, the workdir will be created as symlink into a '
+                  'per-workspace subdirectory.')
     register('--pants-supportdir', advanced=True, metavar='<dir>',
              default=os.path.join(buildroot, 'build-support'),
              help='Use support files from this dir.')
     register('--pants-distdir', advanced=True, metavar='<dir>',
-             default=default_distdir,
-             help='Write end-product artifacts to this dir. If you modify this path, you '
-                  'should also update --build-ignore and --pants-ignore to include the '
-                  'custom dist dir path as well.')
+             default=os.path.join(buildroot, 'dist'),
+             help='Write end-product artifacts to this dir.')
     register('--pants-subprocessdir', advanced=True, default=os.path.join(buildroot, '.pids'),
              help='The directory to use for tracking subprocess metadata, if any. This should '
                   'live outside of the dir used by `--pants-workdir` to allow for tracking '
@@ -213,7 +218,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help='Verify that all config file values correspond to known options.')
 
     register('--build-ignore', advanced=True, type=list,
-             default=['.*/', default_rel_distdir, 'bower_components/',
+             default=['.*/', 'bower_components/',
                       'node_modules/', '*.egg-info/'],
              help='Paths to ignore when identifying BUILD files. '
                   'This does not affect any other filesystem operations. '
@@ -222,7 +227,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              default=['.*/', default_rel_distdir],
              help='Paths to ignore for all filesystem operations performed by pants '
                   '(e.g. BUILD file scanning, glob matching, etc). '
-                  'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore).')
+                  'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). '
+                  'The `--pants-distdir` and `--pants-workdir` locations are inherently ignored.')
     register('--glob-expansion-failure', advanced=True,
              default=GlobMatchErrorBehavior.warn, type=GlobMatchErrorBehavior,
              help="Raise an exception if any targets declaring source files "
@@ -313,7 +319,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--pantsd-log-dir', advanced=True, default=None,
              help='The directory to log pantsd output to.')
     register('--pantsd-invalidation-globs', advanced=True, type=list, default=[],
-             help='Filesystem events matching any of these globs will trigger a daemon restart.')
+             help='Filesystem events matching any of these globs will trigger a daemon restart. '
+                  'The `--pythonpath` and `--pants-config-files` are inherently invalidated.')
 
     # Watchman options.
     register('--watchman-version', advanced=True, default='4.9.0-pants1', help='Watchman version.')
@@ -347,6 +354,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              help="Enables remote workers for increased parallelism. (Alpha)")
     register('--remote-store-server', advanced=True, type=list, default=[],
              help='host:port of grpc server to use as remote execution file store.')
+    # TODO: Infer this from remote-store-connection-limit.
     register('--remote-store-thread-count', type=int, advanced=True,
              default=DEFAULT_EXECUTION_OPTIONS.remote_store_thread_count,
              help='Thread count to use for the pool that interacts with the remote file store.')
@@ -361,6 +369,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--remote-store-rpc-retries', type=int, advanced=True,
              default=DEFAULT_EXECUTION_OPTIONS.remote_store_rpc_retries,
              help='Number of times to retry any RPC to the remote store before giving up.')
+    register('--remote-store-connection-limit', type=int, advanced=True,
+             default=DEFAULT_EXECUTION_OPTIONS.remote_store_connection_limit,
+             help='Number of remote stores to concurrently allow connections to.')
     register('--remote-execution-process-cache-namespace', advanced=True,
              help="The cache namespace for remote process execution. "
                   "Bump this to invalidate every artifact's remote execution. "
@@ -382,13 +393,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'Format: property=value. Multiple values should be specified as multiple '
                   'occurrences of this flag. Pants itself may add additional platform properties.',
                    type=list, default=[])
-
-    # This should eventually deprecate the RunTracker worker count, which is used for legacy cache
-    # lookups via CacheSetup in TaskBase.
-    register('--process-execution-parallelism', type=int, dest='local_execution_parallelism',
-             removal_version='1.20.0.dev2', advanced=True,
-             removal_hint='Use --process-execution-local-parallelism, and/or --process-execution-remote-parallelism instead.',
-             help='Number of concurrent processes that may be executed locally.')
     register('--process-execution-local-parallelism', type=int, default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_parallelism,
              advanced=True,
              help='Number of concurrent processes that may be executed locally.')

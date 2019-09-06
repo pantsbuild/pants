@@ -1,11 +1,10 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import enum
 import functools
 import os
 from multiprocessing import cpu_count
-
-from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.java import Java
@@ -32,6 +31,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, PathGlobs, PathGlobsAndRoot
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
+from pants.option.ranked_value import RankedValue
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import Timer, temporary_dir
 from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_file_dump, safe_mkdir,
@@ -55,6 +55,11 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
   """
 
   size_estimators = create_size_estimators()
+
+  class Compiler(enum.Enum):
+    ZINC = 'zinc'
+    RSC = 'rsc'
+    JAVAC = 'javac'
 
   @classmethod
   def size_estimator_by_name(cls, estimation_strategy_name):
@@ -387,9 +392,16 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                           sources=self._compute_sources_for_target(target))
 
   def execute(self):
-    if JvmPlatform.global_instance().get_options().compiler != self.compiler_name:
-      # If the requested compiler is not the one supported by this task,
-      # bail early.
+    requested_compiler = JvmPlatform.global_instance().get_options().compiler
+    if requested_compiler != self.compiler_name:
+      return
+
+    if requested_compiler == self.Compiler.ZINC and self.compiler_name == self.Compiler.RSC:
+      # Issue a deprecation warning (above) and rewrite zinc to rsc, as zinc is being deprecated.
+      JvmPlatform.global_instance().get_options().compiler = RankedValue(0, self.compiler_name)
+    elif requested_compiler != self.compiler_name:
+      # If the requested compiler is not the one supported by this task, log and abort
+      self.context.log.debug('Requested an unsupported compiler [{}], aborting'.format(requested_compiler))
       return
 
     # In case we have no relevant targets and return early, create the requested product maps.
@@ -428,8 +440,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         for ccs in compile_contexts.values():
           cc = self.select_runtime_context(ccs)
           for conf in self._confs:
-            classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir.path)])
-            classpath_product.add_for_target(cc.target, [(conf, cc.jar_file.path)])
+            classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
+            classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
 
   def _classpath_for_context(self, context):
     if self.get_options().use_classpath_jars:
@@ -699,54 +711,64 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
         else:
           yield compile_context.classes_dir.path, compile_context.analysis_file
 
+  def exec_graph_double_check_cache_key_for_target(self, target):
+    return 'double_check_cache({})'.format(target.address.spec)
+
   def exec_graph_key_for_target(self, compile_target):
     return "compile({})".format(compile_target.address.spec)
 
   def _create_compile_jobs(self, compile_contexts, invalid_targets, invalid_vts, classpath_product):
     class Counter:
-      def __init__(self, size, initial=0):
+      def __init__(self, size=0):
         self.size = size
-        self.count = initial
+        self.count = 0
 
       def __call__(self):
         self.count += 1
         return self.count
 
+      def increment_size(self, by=1):
+        self.size += by
+
       def format_length(self):
         return len(str(self.size))
-    counter = Counter(len(invalid_vts))
 
     jobs = []
+    counter = Counter()
 
-    jobs.extend(self.pre_compile_jobs(counter))
     invalid_target_set = set(invalid_targets)
     for ivts in invalid_vts:
       # Invalidated targets are a subset of relevant targets: get the context for this one.
       compile_target = ivts.target
       invalid_dependencies = self._collect_invalid_compile_dependencies(compile_target,
-                                                                        invalid_target_set,
-                                                                        compile_contexts)
+                                                                        invalid_target_set)
 
-      jobs.extend(
-        self.create_compile_jobs(compile_target, compile_contexts, invalid_dependencies, ivts,
-          counter, classpath_product))
+      new_jobs, new_count = self.create_compile_jobs(
+          compile_target, compile_contexts, invalid_dependencies, ivts, counter, classpath_product)
+      jobs.extend(new_jobs)
+      counter.increment_size(by=new_count)
 
-    counter.size = len(jobs)
     return jobs
-
-  def pre_compile_jobs(self, counter):
-    """Override this to provide jobs that are not related to particular targets.
-
-    This is only called when there are invalid targets."""
-    return []
 
   def create_compile_jobs(self, compile_target, all_compile_contexts, invalid_dependencies, ivts,
     counter, classpath_product):
+    """Return a list of jobs, and a count of those jobs that represent meaningful ("countable") work."""
 
     context_for_target = all_compile_contexts[compile_target]
     compile_context = self.select_runtime_context(context_for_target)
 
-    job = Job(self.exec_graph_key_for_target(compile_target),
+    compile_deps = [self.exec_graph_key_for_target(target) for target in invalid_dependencies]
+
+    # The cache checking job doesn't technically have any dependencies, but we want to delay it
+    # until immediately before we would otherwise try compiling, so we indicate that it depends on
+    # all compile dependencies.
+    double_check_cache_job = Job(self.exec_graph_double_check_cache_key_for_target(compile_target),
+              functools.partial(self._default_double_check_cache_for_vts, ivts),
+              compile_deps)
+    # The compile job depends on the cache check job. This decomposition is necessary in order to
+    # support more complex situations where compilation runs multiple jobs in parallel, and wants to
+    # double check the cache before starting any of them.
+    compile_job = Job(self.exec_graph_key_for_target(compile_target),
               functools.partial(
                 self._default_work_for_vts,
                 ivts,
@@ -755,15 +777,15 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
                 counter,
                 all_compile_contexts,
                 classpath_product),
-              [self.exec_graph_key_for_target(target) for target in invalid_dependencies],
+              [double_check_cache_job.key] + compile_deps,
               self._size_estimator(compile_context.sources),
               # If compilation and analysis work succeeds, validate the vts.
               # Otherwise, fail it.
               on_success=ivts.update,
               on_failure=ivts.force_invalidate)
-    return [job]
+    return ([double_check_cache_job, compile_job], 1)
 
-  def check_cache(self, vts, counter):
+  def check_cache(self, vts):
     """Manually checks the artifact cache (usually immediately before compilation.)
 
     Returns true if the cache was hit successfully, indicating that no compilation is necessary.
@@ -779,7 +801,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       'Cache returned unexpected target: {} vs {}'.format(cached_vts, [vts])
     )
     self.context.log.info('Hit cache during double check for {}'.format(vts.target.address.spec))
-    counter()
     return True
 
   def should_compile_incrementally(self, vts, ctx):
@@ -808,34 +829,9 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     record('sources_len', sources_len)
     record('incremental', is_incremental)
 
-  def _collect_invalid_compile_dependencies(self, compile_target, invalid_target_set,
-    compile_contexts):
-    # Collects all invalid dependencies that are not dependencies of other invalid dependencies
-    # within the closure of compile_target.
-    invalid_dependencies = OrderedSet()
-
-    def work(target):
-      pass
-
-    def predicate(target):
-      if target is compile_target:
-        return True
-      if target in invalid_target_set:
-        invalid_dependencies.add(target)
-        return self._on_invalid_compile_dependency(target, compile_target, compile_contexts)
-      return True
-
-    compile_target.walk(work, predicate)
-    return invalid_dependencies
-
-  def _on_invalid_compile_dependency(self, dep, compile_target, compile_contexts):
-    """Decide whether to continue searching for invalid targets to use in the execution graph.
-
-    By default, don't recurse because once we have an invalid dependency, we can rely on its
-    dependencies having been compiled already.
-
-    Override to adjust this behavior."""
-    return False
+  def _collect_invalid_compile_dependencies(self, compile_target, invalid_target_set):
+    all_strict_deps = DependencyContext.global_instance().dependencies_respecting_strict_deps(compile_target)
+    return list(set(invalid_target_set) & set(all_strict_deps) - set([compile_target]))
 
   def _compute_sources_for_target(self, target):
     """Computes and returns the sources (relative to buildroot) for the given target."""
@@ -930,13 +926,18 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       self.HERMETIC: lambda: self._HermeticDistribution('.jdk', local_distribution),
     })()
 
+  def _default_double_check_cache_for_vts(self, vts):
+    # Double check the cache before beginning compilation
+    if self.check_cache(vts):
+      vts.update()
+
   def _default_work_for_vts(self, vts, ctx, input_classpath_product_key, counter, all_compile_contexts, output_classpath_product):
     progress_message = ctx.target.address.spec
 
-    # Double check the cache before beginning compilation
-    hit_cache = self.check_cache(vts, counter)
-
-    if not hit_cache:
+    # See whether the cache-doublecheck job hit the cache: if so, noop: otherwise, compile.
+    if vts.valid:
+      counter()
+    else:
       # Compute the compile classpath for this target.
       dependency_cp_entries = self._zinc.compile_classpath_entries(
         input_classpath_product_key,

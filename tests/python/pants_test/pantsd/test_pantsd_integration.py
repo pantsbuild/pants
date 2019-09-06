@@ -654,7 +654,7 @@ Interrupted by user over pailgun client!
     # This pair of JVM options causes the JVM to always crash, so the command will fail if the env
     # isn't stripped.
     with self.pantsd_successful_run_context(
-      extra_config={'compile.zinc': {'jvm_options': ['-Xmx1g']}},
+      extra_config={'compile.rsc': {'jvm_options': ['-Xmx1g']}},
       extra_env={'_JAVA_OPTIONS': '-Xms2g'},
     ) as (pantsd_run, checker, workdir, _):
       pantsd_run(['help'])
@@ -743,3 +743,53 @@ Interrupted by user over pailgun client!
       # TODO migrate to pathlib when we cut 1.18.x
       pantsd_log_location = os.path.join(workdir, 'pantsd', 'pantsd.log')
       self.assertFalse(os.path.exists(pantsd_log_location))
+
+  def test_unhandled_exceptions_only_log_exceptions_once(self):
+    """
+    Tests that the unhandled exceptions triggered by LocalPantsRunner instances don't manifest
+    as a PantsRunFinishedWithFailureException.
+
+    That is, that we unset the global Exiter override set by LocalPantsRunner before we try to log the exception.
+
+    This is a regression test for the most glaring case of https://github.com/pantsbuild/pants/issues/7597.
+    """
+    with self.pantsd_run_context(success=False) as (pantsd_run, checker, _, _):
+      result = pantsd_run(['run', 'testprojects/src/python/bad_requirements:use_badreq'])
+      checker.assert_running()
+      self.assert_failure(result)
+      # Assert that the desired exception has been triggered once.
+      self.assertIn(
+        """Exception message: Could not satisfy all requirements for badreq==99.99.99:\n    badreq==99.99.99""",
+        result.stderr_data,
+      )
+      # Assert that it has only been triggered once.
+      self.assertNotIn(
+        'During handling of the above exception, another exception occurred:',
+        result.stderr_data,
+      )
+      self.assertNotIn(
+        'pants.bin.daemon_pants_runner._PantsRunFinishedWithFailureException: Terminated with 1',
+        result.stderr_data,
+      )
+
+  def test_inner_runs_dont_deadlock(self):
+    """
+    Create a pantsd run that calls testprojects/src/python/nested_runs with the appropriate
+    bootstrap options to avoid restarting pantsd.
+
+    Regression test for issue https://github.com/pantsbuild/pants/issues/7881
+    When a run under pantsd calls pants with pantsd inside it, the inner run will time out
+    waiting for the outer run to end.
+
+    NB: testprojects/src/python/nested_runs assumes that the pants.ini file is in ${workdir}/pants.ini
+    """
+    config = {
+      'GLOBAL': {
+        'pantsd_timeout_when_multiple_invocations': 1,
+      }
+    }
+    with self.pantsd_successful_run_context(extra_config=config) as (pantsd_run, checker, workdir, _):
+      result = pantsd_run(['run', 'testprojects/src/python/nested_runs', '--', workdir], expected_runs=2)
+      checker.assert_started()
+      self.assert_success(result)
+      self.assertNotIn("Another pants invocation is running", result.stderr_data)

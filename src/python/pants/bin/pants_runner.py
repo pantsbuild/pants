@@ -9,22 +9,21 @@ import warnings
 from pants.base.exception_sink import ExceptionSink
 from pants.bin.remote_pants_runner import RemotePantsRunner
 from pants.init.logging import init_rust_logger, setup_logging_to_stderr
+from pants.init.util import init_workdir
 from pants.option.options_bootstrapper import OptionsBootstrapper
 
 
 logger = logging.getLogger(__name__)
 
 
-class PantsRunner:
+class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
   """A higher-level runner that delegates runs to either a LocalPantsRunner or RemotePantsRunner."""
 
-  def __init__(self, exiter, args=None, env=None, start_time=None):
+  def __init__(self, args=None, env=None, start_time=None):
     """
-    :param Exiter exiter: The Exiter instance to use for this run.
     :param list args: The arguments (sys.argv) for this run. (Optional, default: sys.argv)
     :param dict env: The environment for this run. (Optional, default: os.environ)
     """
-    self._exiter = exiter
     self._args = args or sys.argv
     self._env = env or os.environ
     self._start_time = start_time
@@ -49,13 +48,13 @@ class PantsRunner:
            not global_bootstrap_options.concurrent
 
   def run(self):
-    # Register our exiter at the beginning of the run() method so that any code in this process from
-    # this point onwards will use that exiter in the case of a fatal error.
-    ExceptionSink.reset_exiter(self._exiter)
-
     options_bootstrapper = OptionsBootstrapper.create(env=self._env, args=self._args)
     bootstrap_options = options_bootstrapper.bootstrap_options
     global_bootstrap_options = bootstrap_options.for_global_scope()
+
+    # Initialize the workdir early enough to ensure that logging has a destination.
+    workdir_src = init_workdir(global_bootstrap_options)
+    ExceptionSink.reset_log_location(workdir_src)
 
     # We enable Rust logging here,
     # and everything before it will be routed through regular Python logging.
@@ -81,7 +80,6 @@ class PantsRunner:
       logger.debug("Pantsd terminating goal detected: {}".format(self._args))
 
     runner = LocalPantsRunner.create(
-        self._exiter,
         self._args,
         self._env,
         options_bootstrapper=options_bootstrapper

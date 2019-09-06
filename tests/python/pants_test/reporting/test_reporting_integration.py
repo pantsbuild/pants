@@ -8,9 +8,8 @@ import unittest
 from collections import defaultdict
 from http.server import BaseHTTPRequestHandler
 
+import psutil
 from parameterized import parameterized
-from py_zipkin import Encoding
-from py_zipkin.encoding import convert_spans
 
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import http_server
@@ -21,9 +20,9 @@ _HEADER = 'invocation_id,task_name,targets_hash,target_id,cache_key_id,cache_key
 _REPORT_LOCATION = 'reports/latest/invalidation-report.csv'
 
 _ENTRY = re.compile(r'^\d+,\S+,(init|pre-check|post-check),(True|False)')
-_INIT = re.compile(r'^\d+,ZincCompile_compile_zinc,\w+,\S+,init,(True|False)')
-_POST = re.compile(r'^\d+,ZincCompile_compile_zinc,\w+,\S+,post-check,(True|False)')
-_PRE = re.compile(r'^\d+,ZincCompile_compile_zinc,\w+,\S+,pre-check,(True|False)')
+_INIT = re.compile(r'^\d+,RscCompile_compile_rsc,\w+,\S+,init,(True|False)')
+_POST = re.compile(r'^\d+,RscCompile_compile_rsc,\w+,\S+,post-check,(True|False)')
+_PRE = re.compile(r'^\d+,RscCompile_compile_rsc,\w+,\S+,pre-check,(True|False)')
 
 
 class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
@@ -39,6 +38,9 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       self.assertTrue(os.path.exists(output))
       with open(output, 'r') as f:
         self.assertEqual(_HEADER, f.readline())
+        init = False
+        pre = False
+        post = False
         for line in f.readlines():
           self.assertTrue(_ENTRY.match(line))
           if _INIT.match(line):
@@ -64,13 +66,13 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       output = os.path.join(workdir, 'reports', report_dirs[0], 'invalidation-report.csv')
       self.assertTrue(os.path.exists(output), msg='Missing report file {}'.format(output))
 
-  INFO_LEVEL_COMPILE_MSG='Compiling 1 zinc source in 1 target (examples/src/java/org/pantsbuild/example/hello/simple:simple).'
-  DEBUG_LEVEL_COMPILE_MSG='compile(examples/src/java/org/pantsbuild/example/hello/simple:simple) finished with status Successful'
+  INFO_LEVEL_COMPILE_MSG='Compiling 1 mixed source in 1 target (examples/src/java/org/pantsbuild/example/hello/simple:simple).'
+  DEBUG_LEVEL_COMPILE_MSG='examples/src/java/org/pantsbuild/example/hello/simple:simple) finished with status Successful'
 
   def test_output_level_warn(self):
     command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello/simple',
-               '--compile-zinc-level=warn']
+               '--compile-rsc-level=warn']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
     self.assertFalse(self.INFO_LEVEL_COMPILE_MSG in pants_run.stdout_data)
@@ -79,7 +81,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def test_output_level_info(self):
     command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello/simple',
-               '--compile-zinc-level=info']
+               '--compile-rsc-level=info']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
     self.assertTrue(self.INFO_LEVEL_COMPILE_MSG in pants_run.stdout_data)
@@ -88,7 +90,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def test_output_level_debug(self):
     command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello/simple',
-               '--compile-zinc-level=debug']
+               '--compile-rsc-level=debug']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
     self.assertTrue(self.INFO_LEVEL_COMPILE_MSG in pants_run.stdout_data)
@@ -97,7 +99,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def test_output_color_enabled(self):
     command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello/simple',
-               '--compile-zinc-colors']
+               '--compile-rsc-colors']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
     self.assertTrue(self.INFO_LEVEL_COMPILE_MSG + '\x1b[0m' in pants_run.stdout_data)
@@ -117,10 +119,10 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
                'examples/src/java/org/pantsbuild/example/hello::']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
-    self.assertIn('Compiling 1 zinc source in 1 target (examples/src/java/org/pantsbuild/example/hello/greet:greet)',
+    self.assertIn('Compiling 1 mixed source in 1 target (examples/src/java/org/pantsbuild/example/hello/greet:greet)',
                   pants_run.stdout_data)
-    # Check zinc's label
-    self.assertIn('[zinc]\n', pants_run.stdout_data)
+    # Check rsc's label
+    self.assertIn('[rsc]\n', pants_run.stdout_data)
 
   def test_suppress_compiler_output(self):
     command = ['compile',
@@ -129,13 +131,13 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
                '--reporting-console-tool-output-format={ "COMPILER" : "CHILD_SUPPRESS"}']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
-    self.assertIn('Compiling 1 zinc source in 1 target (examples/src/java/org/pantsbuild/example/hello/greet:greet)',
+    self.assertIn('Compiling 1 mixed source in 1 target (examples/src/java/org/pantsbuild/example/hello/greet:greet)',
                   pants_run.stdout_data)
     for line in pants_run.stdout_data:
-      # zinc's stdout should be suppressed
+      # rsc's stdout should be suppressed
       self.assertNotIn('Compile success at ', line)
-      # zinc's label should be suppressed
-      self.assertNotIn('[zinc]', line)
+      # rsc's label should be suppressed
+      self.assertNotIn('[rsc]', line)
 
   def test_suppress_background_workunits_output(self):
     command = ['compile',
@@ -173,6 +175,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     with http_server(ZipkinHandler) as port:
       endpoint = "http://localhost:{}".format(port)
       command = [
+        '-ldebug',
         '--reporting-zipkin-endpoint={}'.format(endpoint),
         'cloc',
         'src/python/pants:version'
@@ -180,6 +183,11 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
       pants_run = self.run_pants(command)
       self.assert_success(pants_run)
+
+      child_processes = self.find_child_processes_that_send_spans(pants_run.stderr_data)
+      self.assertTrue(child_processes)
+
+      self.wait_spans_to_be_sent(child_processes)
 
       trace = assert_single_element(ZipkinHandler.traces.values())
 
@@ -198,6 +206,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       trace_id = "aaaaaaaaaaaaaaaa"
       parent_span_id = "ffffffffffffffff"
       command = [
+        '-ldebug',
         '--reporting-zipkin-endpoint={}'.format(endpoint),
         '--reporting-zipkin-trace-id={}'.format(trace_id),
         '--reporting-zipkin-parent-id={}'.format(parent_span_id),
@@ -207,6 +216,11 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
       pants_run = self.run_pants(command)
       self.assert_success(pants_run)
+
+      child_processes = self.find_child_processes_that_send_spans(pants_run.stderr_data)
+      self.assertTrue(child_processes)
+
+      self.wait_spans_to_be_sent(child_processes)
 
       trace = assert_single_element(ZipkinHandler.traces.values())
 
@@ -228,6 +242,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     with http_server(ZipkinHandler) as port:
       endpoint = "http://localhost:{}".format(port)
       command = [
+        '-ldebug',
         '--reporting-zipkin-endpoint={}'.format(endpoint),
         '--reporting-zipkin-sample-rate=0.0',
         'cloc',
@@ -237,6 +252,9 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       pants_run = self.run_pants(command)
       self.assert_success(pants_run)
 
+      child_processes = self.find_child_processes_that_send_spans(pants_run.stderr_data)
+      self.assertFalse(child_processes)
+
       num_of_traces = len(ZipkinHandler.traces)
       self.assertEqual(num_of_traces, 0)
 
@@ -245,6 +263,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     with http_server(ZipkinHandler) as port:
       endpoint = "http://localhost:{}".format(port)
       command = [
+        '-ldebug',
         '--reporting-zipkin-endpoint={}'.format(endpoint),
         '--reporting-zipkin-trace-v2',
         'cloc',
@@ -253,6 +272,11 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
       pants_run = self.run_pants(command)
       self.assert_success(pants_run)
+
+      child_processes = self.find_child_processes_that_send_spans(pants_run.stderr_data)
+      self.assertTrue(child_processes)
+
+      self.wait_spans_to_be_sent(child_processes)
 
       trace = assert_single_element(ZipkinHandler.traces.values())
 
@@ -267,6 +291,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     with http_server(ZipkinHandler) as port:
       endpoint = "http://localhost:{}".format(port)
       command = [
+        '-ldebug',
         '--no-v1',
         '--v2',
         '--reporting-zipkin-endpoint={}'.format(endpoint),
@@ -277,6 +302,11 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
       pants_run = self.run_pants(command)
       self.assert_success(pants_run)
+
+      child_processes = self.find_child_processes_that_send_spans(pants_run.stderr_data)
+      self.assertTrue(child_processes)
+
+      self.wait_spans_to_be_sent(child_processes)
 
       trace = assert_single_element(ZipkinHandler.traces.values())
 
@@ -291,6 +321,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     with http_server(ZipkinHandler) as port:
       endpoint = "http://localhost:{}".format(port)
       command = [
+        '-ldebug',
         '--reporting-zipkin-endpoint={}'.format(endpoint),
         'compile',
         'examples/src/scala/org/pantsbuild/example/several_scala_targets::'
@@ -299,17 +330,22 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       pants_run = self.run_pants(command)
       self.assert_success(pants_run)
 
+      child_processes = self.find_child_processes_that_send_spans(pants_run.stderr_data)
+      self.assertTrue(child_processes)
+
+      self.wait_spans_to_be_sent(child_processes)
+
       trace = assert_single_element(ZipkinHandler.traces.values())
 
-      zinc_task_span = self.find_spans_by_name_and_service_name(trace, 'zinc', 'pants/task')
-      self.assertEqual(len(zinc_task_span), 1)
-      zinc_task_span_id = zinc_task_span[0]['id']
+      rsc_task_span = self.find_spans_by_name_and_service_name(trace, 'rsc', 'pants/task')
+      self.assertEqual(len(rsc_task_span), 1)
+      rsc_task_span_id = rsc_task_span[0]['id']
 
       compile_workunit_spans = self.find_spans_by_name_and_service_name(
         trace, 'compile', 'pants/workunit'
       )
       self.assertEqual(len(compile_workunit_spans), 3)
-      self.assertTrue(all(span['parentId'] == zinc_task_span_id for span in compile_workunit_spans))
+      self.assertTrue(all(span['parentId'] == rsc_task_span_id for span in compile_workunit_spans))
 
   @staticmethod
   def find_spans_by_name_and_service_name(trace, name, service_name):
@@ -325,6 +361,24 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def find_spans_by_parentId(trace, parent_id):
     return [span for span in trace if span.get('parentId') == parent_id]
 
+  @staticmethod
+  def find_child_processes_that_send_spans(pants_result_stderr):
+    child_processes = set()
+    for line in pants_result_stderr.split('\n'):
+      if "Sending spans to Zipkin server from pid:" in line:
+        i = line.rindex(':')
+        child_process_pid = line[i+1:]
+        child_processes.add(int(child_process_pid))
+    return child_processes
+
+  @staticmethod
+  def wait_spans_to_be_sent(child_processes):
+    existing_child_processes = child_processes.copy()
+    while existing_child_processes:
+      for child_pid in child_processes:
+        if child_pid in existing_child_processes and not psutil.pid_exists(child_pid):
+          existing_child_processes.remove(child_pid)
+
 
 def zipkin_handler():
   class ZipkinHandler(BaseHTTPRequestHandler):
@@ -332,8 +386,7 @@ def zipkin_handler():
 
     def do_POST(self):
       content_length = self.headers.get('content-length')
-      thrift_trace = self.rfile.read(int(content_length))
-      json_trace = convert_spans(thrift_trace, Encoding.V1_JSON, Encoding.V1_THRIFT)
+      json_trace = self.rfile.read(int(content_length))
       trace = json.loads(json_trace)
       for span in trace:
         trace_id = span["traceId"]

@@ -81,6 +81,7 @@ impl CommandRunner {
           store.clone(),
           &OneOffStoreFileByDigest::new(store, posix_fs),
           path_stats,
+          WorkUnitStore::new(),
         )
       })
       .to_boxed()
@@ -218,7 +219,7 @@ impl super::CommandRunner for CommandRunner {
   fn run(
     &self,
     req: ExecuteProcessRequest,
-    _workunit_store: WorkUnitStore,
+    workunit_store: WorkUnitStore,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let workdir = try_future!(tempfile::Builder::new()
       .prefix("process-execution")
@@ -244,7 +245,7 @@ impl super::CommandRunner for CommandRunner {
     let maybe_jdk_home = req.jdk_home;
     self
       .store
-      .materialize_directory(workdir_path.clone(), req.input_files)
+      .materialize_directory(workdir_path.clone(), req.input_files, workunit_store)
       .and_then(move |_metadata| {
         maybe_jdk_home.map_or(Ok(()), |jdk_home| {
           symlink(jdk_home, workdir_path3.clone().join(".jdk"))

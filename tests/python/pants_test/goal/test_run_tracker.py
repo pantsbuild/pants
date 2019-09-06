@@ -14,7 +14,7 @@ from pants_test.test_base import TestBase
 
 
 class RunTrackerTest(TestBase):
-  def test_upload_stats(self):
+  def assert_upload_stats(self, *, response_code) -> None:
     stats = {'stats': {'foo': 'bar', 'baz': 42}}
 
     class Handler(http.server.BaseHTTPRequestHandler):
@@ -34,7 +34,7 @@ class RunTrackerTest(TestBase):
             self.assertEqual(stats, decoded_post_data)
             self.assertEqual(handler.headers['User-Agent'], f"pants/v{VERSION}")
             self.assertIn(handler.headers['X-Pants-Stats-Version'], {"1", "2"})
-            handler.send_response(200)
+            handler.send_response(response_code)
             handler.end_headers()
         except Exception:
           handler.send_response(400)  # Ensure the main thread knows the test failed.
@@ -58,6 +58,11 @@ class RunTrackerTest(TestBase):
 
     server.shutdown()
     server.server_close()
+
+  def test_upload_stats(self):
+    self.assert_upload_stats(response_code=200)
+    self.assert_upload_stats(response_code=201)
+    self.assert_upload_stats(response_code=204)
 
   def test_invalid_stats_version(self):
     stats = {'stats': {'foo': 'bar', 'baz': 42}}

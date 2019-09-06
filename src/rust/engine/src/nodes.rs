@@ -10,6 +10,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::{self, fmt};
 
+use concrete_time::TimeSpan;
 use futures::future::{self, Future};
 use futures::Stream;
 use url::Url;
@@ -31,7 +32,7 @@ use rule_graph;
 
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
 use store::{self, StoreFileByDigest};
-use workunit_store::{generate_random_64bit_string, set_parent_id, WorkUnit};
+use workunit_store::{generate_random_64bit_string, set_parent_id, WorkUnit, WorkUnitStore};
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
@@ -65,7 +66,7 @@ impl VFS<Failure> for Context {
 }
 
 impl StoreFileByDigest<Failure> for Context {
-  fn store_by_digest(&self, file: File) -> BoxFuture<hashing::Digest, Failure> {
+  fn store_by_digest(&self, file: File, _: WorkUnitStore) -> BoxFuture<hashing::Digest, Failure> {
     self.get(DigestFile(file.clone()))
   }
 }
@@ -154,6 +155,8 @@ impl WrappedNode for Select {
   type Item = Value;
 
   fn run(self, context: Context) -> NodeFuture<Value> {
+    let workunit_store = context.session.workunit_store();
+    let types = &context.core.types;
     match &self.entry {
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => match inner
         .rule()
@@ -164,37 +167,57 @@ impl WrappedNode for Select {
           task: task.clone(),
           entry: Arc::new(self.entry.clone()),
         }),
-        &tasks::Rule::Intrinsic(Intrinsic { product, input })
-          if product == context.core.types.snapshot && input == context.core.types.path_globs =>
+        &Rule::Intrinsic(Intrinsic { product, input })
+          if product == types.directory_digest && input == types.input_file_content =>
+        {
+          let context = context.clone();
+          let store = context.core.store();
+
+          self
+            .select_product(&context, types.input_file_content, "intrinsic")
+            .and_then(move |files_content: Value| {
+              let filename = externs::project_str(&files_content, "path");
+              let bytes = bytes::Bytes::from(externs::project_bytes(&files_content, "content"));
+
+              let path = filename.into();
+
+              store
+                .store_file_bytes(bytes, true)
+                .and_then(move |digest| store.snapshot_of_one_file(path, digest))
+                .map(|snapshot| snapshot.digest)
+                .map_err(|e| throw(&e))
+                .map(move |digest: hashing::Digest| {
+                  Snapshot::store_directory(&context.core, &digest)
+                })
+            })
+            .to_boxed()
+        }
+        &Rule::Intrinsic(Intrinsic { product, input })
+          if product == types.snapshot && input == types.path_globs =>
         {
           let context = context.clone();
           let core = context.core.clone();
           self
-            .select_product(&context, context.core.types.path_globs, "intrinsic")
+            .select_product(&context, types.path_globs, "intrinsic")
             .and_then(move |val| context.get(Snapshot(externs::key_for(val))))
             .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
             .to_boxed()
         }
-        &tasks::Rule::Intrinsic(Intrinsic { product, input })
-          if product == context.core.types.snapshot && input == context.core.types.url_to_fetch =>
+        &Rule::Intrinsic(Intrinsic { product, input })
+          if product == types.snapshot && input == types.url_to_fetch =>
         {
           let context = context.clone();
           let core = context.core.clone();
           self
-            .select_product(&context, context.core.types.url_to_fetch, "intrinsic")
+            .select_product(&context, types.url_to_fetch, "intrinsic")
             .and_then(move |val| context.get(DownloadedFile(externs::key_for(val))))
             .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
             .to_boxed()
         }
-        &tasks::Rule::Intrinsic(Intrinsic { product, input })
-          if product == context.core.types.directory_digest
-            && input == context.core.types.directories_to_merge =>
+        &Rule::Intrinsic(Intrinsic { product, input })
+          if product == types.directory_digest && input == types.directories_to_merge =>
         {
-          let request = self.select_product(
-            &context,
-            context.core.types.directories_to_merge,
-            "intrinsic",
-          );
+          let request = self.select_product(&context, types.directories_to_merge, "intrinsic");
           let core = context.core.clone();
           request
             .and_then(move |request| {
@@ -203,39 +226,35 @@ impl WrappedNode for Select {
                   .into_iter()
                   .map(|val| lift_digest(&val).map_err(|str| throw(&str)))
                   .collect();
-              store::Snapshot::merge_directories(core.store(), try_future!(digests))
+              store::Snapshot::merge_directories(core.store(), try_future!(digests), workunit_store)
                 .map_err(|err| throw(&err))
                 .map(move |digest| Snapshot::store_directory(&core, &digest))
                 .to_boxed()
             })
             .to_boxed()
         }
-        &tasks::Rule::Intrinsic(Intrinsic { product, input })
-          if product == context.core.types.snapshot
-            && input == context.core.types.directory_digest =>
+        &Rule::Intrinsic(Intrinsic { product, input })
+          if product == types.snapshot && input == types.directory_digest =>
         {
           let core = context.core.clone();
           self
-            .select_product(&context, context.core.types.directory_digest, "intrinsic")
+            .select_product(&context, types.directory_digest, "intrinsic")
             .and_then(|directory_digest_val| {
               lift_digest(&directory_digest_val).map_err(|str| throw(&str))
             })
             .and_then(move |digest| {
-              store::Snapshot::from_digest(context.core.store(), digest).map_err(|str| throw(&str))
+              store::Snapshot::from_digest(context.core.store(), digest, workunit_store)
+                .map_err(|str| throw(&str))
             })
             .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
             .to_boxed()
         }
 
-        &tasks::Rule::Intrinsic(Intrinsic { product, input })
-          if product == context.core.types.directory_digest
-            && input == context.core.types.directory_with_prefix_to_strip =>
+        &Rule::Intrinsic(Intrinsic { product, input })
+          if product == types.directory_digest && input == types.directory_with_prefix_to_strip =>
         {
-          let request = self.select_product(
-            &context,
-            context.core.types.directory_with_prefix_to_strip,
-            "intrinsic",
-          );
+          let request =
+            self.select_product(&context, types.directory_with_prefix_to_strip, "intrinsic");
           let core = context.core.clone();
           request
             .and_then(move |request| {
@@ -248,19 +267,23 @@ impl WrappedNode for Select {
               Ok((digest, prefix))
             })
             .and_then(|(digest, prefix)| {
-              store::Snapshot::strip_prefix(core.store(), digest, PathBuf::from(prefix))
-                .map_err(|err| throw(&err))
-                .map(move |digest| Snapshot::store_directory(&core, &digest))
+              store::Snapshot::strip_prefix(
+                core.store(),
+                digest,
+                PathBuf::from(prefix),
+                workunit_store,
+              )
+              .map_err(|err| throw(&err))
+              .map(move |digest| Snapshot::store_directory(&core, &digest))
             })
             .to_boxed()
         }
-        &tasks::Rule::Intrinsic(Intrinsic { product, input })
-          if product == context.core.types.files_content
-            && input == context.core.types.directory_digest =>
+        &Rule::Intrinsic(Intrinsic { product, input })
+          if product == types.files_content && input == types.directory_digest =>
         {
           let context = context.clone();
           self
-            .select_product(&context, context.core.types.directory_digest, "intrinsic")
+            .select_product(&context, types.directory_digest, "intrinsic")
             .and_then(|directory_digest_val| {
               lift_digest(&directory_digest_val).map_err(|str| throw(&str))
             })
@@ -268,20 +291,19 @@ impl WrappedNode for Select {
               context
                 .core
                 .store()
-                .contents_for_directory(digest)
+                .contents_for_directory(digest, workunit_store)
                 .map_err(|str| throw(&str))
                 .map(move |files_content| Snapshot::store_files_content(&context, &files_content))
             })
             .to_boxed()
         }
-        &tasks::Rule::Intrinsic(Intrinsic { product, input })
-          if product == context.core.types.process_result
-            && input == context.core.types.process_request =>
+        &Rule::Intrinsic(Intrinsic { product, input })
+          if product == types.process_result && input == types.process_request =>
         {
           let context = context.clone();
           let core = context.core.clone();
           self
-            .select_product(&context, context.core.types.process_request, "intrinsic")
+            .select_product(&context, types.process_request, "intrinsic")
             .and_then(|request| {
               ExecuteProcess::lift(&request)
                 .map_err(|str| throw(&format!("Error lifting ExecuteProcess: {}", str)))
@@ -300,7 +322,7 @@ impl WrappedNode for Select {
             })
             .to_boxed()
         }
-        &tasks::Rule::Intrinsic(i) => panic!("Unrecognized intrinsic: {:?}", i),
+        &Rule::Intrinsic(i) => panic!("Unrecognized intrinsic: {:?}", i),
       },
       &rule_graph::Entry::Param(type_id) => {
         if let Some(key) = self.params.find(type_id) {
@@ -443,13 +465,12 @@ impl WrappedNode for ReadLink {
   type Item = LinkDest;
 
   fn run(self, context: Context) -> NodeFuture<LinkDest> {
-    let link = self.0.clone();
     context
       .core
       .vfs
       .read_link(&self.0)
       .map(LinkDest)
-      .map_err(move |e| throw(&format!("Failed to read_link for {:?}: {:?}", link, e)))
+      .map_err(|e| throw(&format!("{}", e)))
       .to_boxed()
   }
 }
@@ -470,12 +491,11 @@ impl WrappedNode for DigestFile {
   type Item = hashing::Digest;
 
   fn run(self, context: Context) -> NodeFuture<hashing::Digest> {
-    let file = self.0.clone();
     context
       .core
       .vfs
       .read_file(&self.0)
-      .map_err(move |e| throw(&format!("Error reading file {:?}: {:?}", file, e,)))
+      .map_err(|e| throw(&format!("{}", e)))
       .and_then(move |c| {
         context
           .core
@@ -504,15 +524,12 @@ impl WrappedNode for Scandir {
   type Item = Arc<DirectoryListing>;
 
   fn run(self, context: Context) -> NodeFuture<Arc<DirectoryListing>> {
-    let dir = self.0.clone();
     context
       .core
       .vfs
       .scandir(self.0)
-      .then(move |listing_res| match listing_res {
-        Ok(listing) => Ok(Arc::new(listing)),
-        Err(e) => Err(throw(&format!("Failed to scandir for {:?}: {:?}", dir, e))),
-      })
+      .map(Arc::new)
+      .map_err(|e| throw(&format!("{}", e)))
       .to_boxed()
   }
 }
@@ -538,8 +555,13 @@ impl Snapshot {
       .expand(path_globs)
       .map_err(|e| format!("PathGlobs expansion failed: {}", e))
       .and_then(move |path_stats| {
-        store::Snapshot::from_path_stats(context.core.store(), &context, path_stats)
-          .map_err(move |e| format!("Snapshot failed: {}", e))
+        store::Snapshot::from_path_stats(
+          context.core.store(),
+          &context,
+          path_stats,
+          WorkUnitStore::new(),
+        )
+        .map_err(move |e| format!("Snapshot failed: {}", e))
       })
       .map_err(|e| throw(&e))
       .to_boxed()
@@ -653,6 +675,7 @@ impl DownloadedFile {
     core: Arc<Core>,
     url: Url,
     digest: hashing::Digest,
+    workunit_store: WorkUnitStore,
   ) -> BoxFuture<store::Snapshot, String> {
     let file_name = try_future!(url
       .path_segments()
@@ -662,45 +685,18 @@ impl DownloadedFile {
 
     core
       .store()
-      .load_file_bytes_with(digest, |_| ())
+      .load_file_bytes_with(digest, |_| (), workunit_store)
       .and_then(move |maybe_bytes| {
         maybe_bytes
           .map(|((), _metadata)| future::ok(()).to_boxed())
           .unwrap_or_else(|| DownloadedFile::download(core.clone(), url, file_name.clone(), digest))
           .and_then(move |()| {
-            DownloadedFile::snapshot_of_one_file(core.store(), PathBuf::from(file_name), digest)
+            core
+              .store()
+              .snapshot_of_one_file(PathBuf::from(file_name), digest)
           })
       })
       .to_boxed()
-  }
-
-  fn snapshot_of_one_file(
-    store: store::Store,
-    name: PathBuf,
-    digest: hashing::Digest,
-  ) -> BoxFuture<store::Snapshot, String> {
-    #[derive(Clone)]
-    struct Digester {
-      digest: hashing::Digest,
-    }
-
-    impl StoreFileByDigest<String> for Digester {
-      fn store_by_digest(&self, _: File) -> BoxFuture<hashing::Digest, String> {
-        future::ok(self.digest).to_boxed()
-      }
-    }
-
-    store::Snapshot::from_path_stats(
-      store,
-      &Digester { digest },
-      vec![fs::PathStat::File {
-        path: name.clone(),
-        stat: fs::File {
-          path: name,
-          is_executable: true,
-        },
-      }],
-    )
   }
 
   fn download(
@@ -817,7 +813,12 @@ impl WrappedNode for DownloadedFile {
     .map_err(|str| throw(&str)));
 
     self
-      .load_or_download(context.core.clone(), url, expected_digest)
+      .load_or_download(
+        context.core.clone(),
+        url,
+        expected_digest,
+        context.session.workunit_store(),
+      )
       .map(Arc::new)
       .map_err(|err| throw(&err))
       .to_boxed()
@@ -1107,8 +1108,8 @@ impl Node for NodeKey {
     let span_id = generate_random_64bit_string();
     let node_workunit_params = if context.session.should_record_zipkin_spans() {
       let node_name = format!("{}", self);
-      let start_timestamp = time::get_time();
-      Some((node_name, start_timestamp, span_id.clone()))
+      let start_time = std::time::SystemTime::now();
+      Some((node_name, start_time, span_id.clone()))
     } else {
       None
     };
@@ -1127,14 +1128,12 @@ impl Node for NodeKey {
       }
     })
     .inspect(move |_: &NodeResult| {
-      if let Some((node_name, start_timestamp, span_id)) = node_workunit_params {
-        let end_timestamp = time::get_time();
+      if let Some((node_name, start_time, span_id)) = node_workunit_params {
         let workunit = WorkUnit {
           name: node_name,
-          start_timestamp,
-          end_timestamp,
+          time_span: TimeSpan::since(&start_time),
           span_id,
-          //          TODO: set parent_id with the proper value, issue #7969
+          // TODO: set parent_id with the proper value, issue #7969
           parent_id: None,
         };
         context2.session.workunit_store().add_workunit(workunit)

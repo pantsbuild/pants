@@ -14,3 +14,5 @@ jar_library(name='scrooge-core',
     scala_jar(org='com.twitter', name='scrooge-core', rev=SCROOGE_REV),
   ],
 )
+
+

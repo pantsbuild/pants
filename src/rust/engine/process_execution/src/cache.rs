@@ -30,7 +30,7 @@ impl crate::CommandRunner for CommandRunner {
 
     let command_runner = self.clone();
     self
-      .lookup(key)
+      .lookup(key, workunit_store.clone())
       .then(move |maybe_result| {
         match maybe_result {
           Ok(Some(result)) => return futures::future::ok(result).to_boxed(),
@@ -69,6 +69,7 @@ impl CommandRunner {
   fn lookup(
     &self,
     fingerprint: Fingerprint,
+    workunit_store: WorkUnitStore,
   ) -> impl Future<Item = Option<FallibleExecuteProcessResult>, Error = String> {
     let file_store = self.file_store.clone();
     self
@@ -82,9 +83,14 @@ impl CommandRunner {
       })
       .and_then(move |maybe_execute_response| {
         if let Some(execute_response) = maybe_execute_response {
-          crate::remote::populate_fallible_execution_result(file_store, execute_response, vec![])
-            .map(Some)
-            .to_boxed()
+          crate::remote::populate_fallible_execution_result(
+            file_store,
+            execute_response,
+            vec![],
+            workunit_store,
+          )
+          .map(Some)
+          .to_boxed()
         } else {
           futures::future::ok(None).to_boxed()
         }

@@ -30,10 +30,10 @@ class TestNailgunIntegration(PantsRunIntegrationTest):
       # Override the PANTS_CONFIG_FILES="pants.travis-ci.ini" used within TravisCI to enable
       # nailgun usage for the purpose of exercising that stack in the integration test.
       config={'DEFAULT': {'execution_strategy': 'nailgun'},
-              'compile.zinc': {'nailgun_timeout_seconds': '0.00002'}}
+              'compile.rsc': {'nailgun_timeout_seconds': '0.00002'}}
     )
     self.assert_failure(pants_run)
-    self.assertRegex(pants_run.stdout_data, """\
-compile\\(examples/src/java/org/pantsbuild/example/hello/greet:greet\\) failed: \
-Problem launching via <no nailgun connection> command org\\.pantsbuild\\.zinc\\.compiler\\.Main .*: \
-Failed to read nailgun output after 2e\-05 seconds!""")
+    self.assertRegex(
+      pants_run.stdout_data,
+      """\<no nailgun connection>.* Failed to read nailgun output"""
+    )

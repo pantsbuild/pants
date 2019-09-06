@@ -67,6 +67,7 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
+  timeout = 120,
 )
 
 python_tests(
@@ -78,7 +79,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:int-test',
   ],
-  timeout=180,
+  timeout=360,
   tags = {'integration'},
 )
 
@@ -135,7 +136,7 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
-  timeout = 120,
+  timeout = 240,
 )
 
 python_tests(
@@ -452,7 +453,7 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
-  timeout = 240,
+  timeout = 540,
 )
 
 python_library(
@@ -474,7 +475,7 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
-  timeout = 120,
+  timeout = 240,
 )
 
 python_tests(
@@ -543,6 +544,7 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
+  timeout = 90,
 )
 
 python_tests(
@@ -575,6 +577,7 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
+  timeout = 360,
 )
 
 python_tests(
@@ -648,6 +651,7 @@ python_tests(
   sources = ['test_scalafmt.py'],
   dependencies = [
     'src/python/pants/backend/jvm/subsystems:scala_platform',
+    'src/python/pants/backend/jvm/subsystems:scoverage_platform',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:scalafmt',
@@ -676,6 +680,7 @@ python_tests(
   dependencies = [
     'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
+    'src/python/pants/backend/jvm/subsystems:scoverage_platform',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
@@ -778,6 +783,7 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
+  timeout = 360,
 )
 
 python_tests(

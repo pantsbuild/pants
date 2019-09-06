@@ -73,10 +73,10 @@ class LibcDev(Subsystem):
 
     if not libc_crti_object_file:
       raise self.HostLibcDevResolutionError(
-        "Could not locate {fname} in library search dirs {dirs} from compiler: {compiler!r}. "
-        "You may need to install a libc dev package for the current system. "
-        "For many operating systems, this package is named 'libc-dev' or 'libc6-dev'."
-        .format(fname=self._LIBC_INIT_OBJECT_FILE, dirs=library_dirs, compiler=compiler_exe))
+        f"Could not locate {self._LIBC_INIT_OBJECT_FILE} in library search dirs {library_dirs} from "
+        f"compiler: {compiler_exe!r}. You may need to install a libc dev package for the current "
+        "system. For many operating systems, this package is named 'libc-dev' or 'libc6-dev'."
+      )
 
     return HostLibcDev(crti_object=libc_crti_object_file,
                        fingerprint=hash_file(libc_crti_object_file))
@@ -91,8 +91,9 @@ class LibcDev(Subsystem):
         return HostLibcDev(crti_object=maybe_libc_crti,
                            fingerprint=hash_file(maybe_libc_crti))
       raise self.HostLibcDevResolutionError(
-        "Could not locate {} in directory {} provided by the --libc-dir option."
-        .format(self._LIBC_INIT_OBJECT_FILE, libc_dir_option))
+        f"Could not locate {self._LIBC_INIT_OBJECT_FILE} in directory {libc_dir_option} provided "
+        "by the --libc-dir option."
+      )
 
     return self._get_host_libc_from_host_compiler()
 

@@ -115,6 +115,10 @@ pub fn store_utf8_osstr(utf8: &OsStr) -> Value {
   with_externs(|e| (e.store_utf8)(e.context, bytes.as_ptr(), bytes.len() as u64).into())
 }
 
+pub fn store_u64(val: u64) -> Value {
+  with_externs(|e| (e.store_u64)(e.context, val).into())
+}
+
 pub fn store_i64(val: i64) -> Value {
   with_externs(|e| (e.store_i64)(e.context, val).into())
 }
@@ -176,6 +180,19 @@ pub fn project_str(value: &Value, field: &str) -> String {
   val_to_str(&name_val)
 }
 
+pub fn project_bytes(value: &Value, field: &str) -> Vec<u8> {
+  let name_val = with_externs(|e| {
+    (e.project_ignoring_type)(
+      e.context,
+      value as &Handle,
+      field.as_ptr(),
+      field.len() as u64,
+    )
+    .into()
+  });
+  val_to_bytes(&name_val)
+}
+
 pub fn key_to_str(key: &Key) -> String {
   val_to_str(&val_for(key))
 }
@@ -186,6 +203,10 @@ pub fn type_to_str(type_id: TypeId) -> String {
       .to_string()
       .unwrap_or_else(|e| format!("<failed to decode unicode for {:?}: {}>", type_id, e))
   })
+}
+
+pub fn val_to_bytes(val: &Value) -> Vec<u8> {
+  with_externs(|e| (e.val_to_bytes)(e.context, val as &Handle).to_bytes())
 }
 
 pub fn val_to_str(val: &Value) -> String {
@@ -341,12 +362,14 @@ pub struct Externs {
   pub store_dict: StoreTupleExtern,
   pub store_bytes: StoreBytesExtern,
   pub store_utf8: StoreUtf8Extern,
+  pub store_u64: StoreU64Extern,
   pub store_i64: StoreI64Extern,
   pub store_f64: StoreF64Extern,
   pub store_bool: StoreBoolExtern,
   pub project_ignoring_type: ProjectIgnoringTypeExtern,
   pub project_multi: ProjectMultiExtern,
   pub type_to_str: TypeToStrExtern,
+  pub val_to_bytes: ValToBytesExtern,
   pub val_to_str: ValToStrExtern,
   pub create_exception: CreateExceptionExtern,
 }
@@ -375,6 +398,8 @@ pub type StoreTupleExtern =
 pub type StoreBytesExtern = extern "C" fn(*const ExternContext, *const u8, u64) -> Handle;
 
 pub type StoreUtf8Extern = extern "C" fn(*const ExternContext, *const u8, u64) -> Handle;
+
+pub type StoreU64Extern = extern "C" fn(*const ExternContext, u64) -> Handle;
 
 pub type StoreI64Extern = extern "C" fn(*const ExternContext, i64) -> Handle;
 
@@ -682,6 +707,7 @@ impl BufferBuffer {
 pub type TypeToStrExtern = extern "C" fn(*const ExternContext, TypeId) -> Buffer;
 
 pub type ValToStrExtern = extern "C" fn(*const ExternContext, *const Handle) -> Buffer;
+pub type ValToBytesExtern = extern "C" fn(*const ExternContext, *const Handle) -> Buffer;
 
 pub type CreateExceptionExtern =
   extern "C" fn(*const ExternContext, str_ptr: *const u8, str_len: u64) -> Handle;

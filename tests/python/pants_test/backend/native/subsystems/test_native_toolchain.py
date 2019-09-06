@@ -55,7 +55,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
       [gcc.exe_filename, '--version'],
       env=gcc.invocation_environment_dict)
 
-    gcc_version_regex = re.compile('^gcc.*{}$'.format(re.escape(self.gcc_version)),
+    gcc_version_regex = re.compile(rf'^gcc.*{re.escape(self.gcc_version)}$',
                                    flags=re.MULTILINE)
     self.assertIsNotNone(gcc_version_regex.search(gcc_version_out))
 
@@ -69,7 +69,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
       [gpp.exe_filename, '--version'],
       env=gpp.invocation_environment_dict)
 
-    gpp_version_regex = re.compile(r'^g\+\+.*{}$'.format(re.escape(self.gcc_version)),
+    gpp_version_regex = re.compile(rf'^g\+\+.*{re.escape(self.gcc_version)}$',
                                    flags=re.MULTILINE)
     self.assertIsNotNone(gpp_version_regex.search(gpp_version_out))
 
@@ -83,13 +83,13 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
       [clang.exe_filename, '--version'],
       env=clang.invocation_environment_dict)
 
-    clang_version_regex = re.compile('^clang version {}'.format(re.escape(self.llvm_version)),
+    clang_version_regex = re.compile(rf'^clang version {re.escape(self.llvm_version)}',
                                      flags=re.MULTILINE)
     self.assertIsNotNone(clang_version_regex.search(clang_version_out))
 
   def test_clangpp_version(self):
     scheduler = self._sched()
-    clangpp_version_regex = re.compile('^clang version {}'.format(re.escape(self.llvm_version)),
+    clangpp_version_regex = re.compile(rf'^clang version {re.escape(self.llvm_version)}',
                                        flags=re.MULTILINE)
 
     llvm_cpp_toolchain = self.execute_expecting_one_result(
@@ -137,19 +137,13 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
     except subprocess.CalledProcessError as e:
       raise Exception(
         "Command failed while invoking the native toolchain "
-        "with code '{code}', cwd='{cwd}', cmd='{cmd}', env='{env}'. "
-        "Combined stdout and stderr:\n{out}"
-        .format(code=e.returncode,
-                cwd=os.getcwd(),
-                # safe_shlex_join() is just for pretty-printing.
-                cmd=safe_shlex_join(cmd),
-                env=env,
-                out=e.output),
-        e)
+        f"with code '{e.returncode}', cwd='{os.getcwd()}', cmd='{safe_shlex_join(cmd)}', "
+        f"env='{env}'. Combined stdout and stderr:\n{e.output}"
+      )
 
   def _do_compile_link(self, compiler, linker, source_file, outfile, output):
 
-    intermediate_obj_file_name = '{}.o'.format(outfile)
+    intermediate_obj_file_name = f'{outfile}.o'
     self._invoke_compiler(
       compiler,
       ['-c', source_file, '-o', intermediate_obj_file_name])

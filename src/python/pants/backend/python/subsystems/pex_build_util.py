@@ -4,6 +4,8 @@
 import logging
 import os
 from collections import defaultdict
+from pathlib import Path
+from typing import Callable, Sequence, Set
 
 from pex.fetcher import Fetcher
 from pex.pex_builder import PEXBuilder
@@ -22,39 +24,40 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.files import Files
+from pants.build_graph.target import Target
 from pants.subsystem.subsystem import Subsystem
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_file
 
 
-def is_python_target(tgt):
+def is_python_target(tgt: Target) -> bool:
   # We'd like to take all PythonTarget subclasses, but currently PythonThriftLibrary and
   # PythonAntlrLibrary extend PythonTarget, and until we fix that (which we can't do until
   # we remove the old python pipeline entirely) we want to ignore those target types here.
   return isinstance(tgt, (PythonLibrary, PythonTests, PythonBinary))
 
 
-def has_python_sources(tgt):
+def has_python_sources(tgt: Target) -> bool:
   return is_python_target(tgt) and tgt.has_sources()
 
 
-def is_local_python_dist(tgt):
+def is_local_python_dist(tgt: Target) -> bool:
   return isinstance(tgt, PythonDistribution)
 
 
-def has_resources(tgt):
+def has_resources(tgt: Target) -> bool:
   return isinstance(tgt, Files) and tgt.has_sources()
 
 
-def has_python_requirements(tgt):
+def has_python_requirements(tgt: Target) -> bool:
   return isinstance(tgt, PythonRequirementLibrary)
 
 
-def always_uses_default_python_platform(tgt):
+def always_uses_default_python_platform(tgt: Target) -> bool:
   return isinstance(tgt, PythonTests)
 
 
-def may_have_explicit_python_platform(tgt):
+def may_have_explicit_python_platform(tgt: Target) -> bool:
   return isinstance(tgt, PythonBinary)
 
 
@@ -76,7 +79,7 @@ def targets_by_platform(targets, python_setup):
   return dict(explicit_platform_settings)
 
 
-def identify_missing_init_files(sources):
+def identify_missing_init_files(sources: Sequence[str]) -> Set[str]:
   """Return the list of paths that would need to be added to ensure that every package has
   an __init__.py. """
   packages = set()
@@ -92,39 +95,29 @@ def identify_missing_init_files(sources):
   return {os.path.join(package, '__init__.py') for package in packages} - set(sources)
 
 
-def _create_source_dumper(builder, tgt):
-  if type(tgt) == Files:
-    # Loose `Files` as opposed to `Resources` or `PythonTarget`s have no (implied) package structure
-    # and so we chroot them relative to the build root so that they can be accessed via the normal
-    # python filesystem APIs just as they would be accessed outside the chrooted environment.
-    # NB: This requires we mark the pex as not zip safe so these `Files` can still be accessed in
-    # the context of a built pex distribution.
-    chroot_path = lambda relpath: relpath
-    builder.info.zip_safe = False
-  else:
-    chroot_path = lambda relpath: os.path.relpath(relpath, tgt.target_base)
-
-  dump = builder.add_resource if has_resources(tgt) else builder.add_source
+def _create_source_dumper(builder: PEXBuilder, tgt: Target) -> Callable[[str], None]:
   buildroot = get_buildroot()
-  return lambda relpath: dump(os.path.join(buildroot, relpath), chroot_path(relpath))
 
+  def get_chroot_path(relpath: str) -> str:
+    if type(tgt) == Files:
+      # Loose `Files`, as opposed to `Resources` or `PythonTarget`s, have no (implied) package
+      # structure and so we chroot them relative to the build root so that they can be accessed
+      # via the normal Python filesystem APIs just as they would be accessed outside the
+      # chrooted environment. NB: This requires we mark the pex as not zip safe so
+      # these `Files` can still be accessed in the context of a built pex distribution.
+      builder.info.zip_safe = False
+      return relpath
+    return str(Path(relpath).relative_to(tgt.target_base))
 
-def dump_sources(builder, tgt, log):
-  dump_source = _create_source_dumper(builder, tgt)
-  log.debug('  Dumping sources: {}'.format(tgt))
-  for relpath in tgt.sources_relative_to_buildroot():
-    try:
-      dump_source(relpath)
-    except OSError:
-      log.error('Failed to copy {} for target {}'.format(relpath, tgt.address.spec))
-      raise
+  def dump_source(relpath: str) -> None:
+    source_path = str(Path(buildroot) / relpath)
+    dest_path = get_chroot_path(relpath)
+    if has_resources(tgt):
+      builder.add_resource(filename=source_path, env_filename=dest_path)
+    else:
+      builder.add_source(filename=source_path, env_filename=dest_path)
 
-  if (getattr(tgt, '_resource_target_specs', None) or
-      getattr(tgt, '_synthetic_resources_target', None)):
-    # No one should be on old-style resources any more.  And if they are,
-    # switching to the new python pipeline will be a great opportunity to fix that.
-    raise TaskError('Old-style resources not supported for target {}.  '
-                    'Depend on resources() targets instead.'.format(tgt.address.spec))
+  return dump_source
 
 
 class PexBuilderWrapper:
@@ -150,7 +143,7 @@ class PexBuilderWrapper:
     @classmethod
     def create(cls, builder, log=None):
       options = cls.global_instance().get_options()
-      setuptools_requirement = 'setuptools=={}'.format(options.setuptools_version)
+      setuptools_requirement = f'setuptools=={options.setuptools_version}'
 
       log = log or logging.getLogger(__name__)
 
@@ -216,15 +209,15 @@ class PexBuilderWrapper:
       ))
     except (StopIteration, ValueError) as e:
       raise self.SingleDistExtractionError(
-        "Exactly one dist was expected to match name {} in requirements {}: {}"
-        .format(dist_key, reqs, e))
+        f"Exactly one dist was expected to match name {dist_key} in requirements {reqs}: {e!r}"
+      )
     return matched_dist
 
   def _resolve_distributions_by_platform(self, reqs, platforms):
     deduped_reqs = OrderedSet(reqs)
     find_links = OrderedSet()
     for req in deduped_reqs:
-      self._log.debug('  Dumping requirement: {}'.format(req))
+      self._log.debug(f'  Dumping requirement: {req}')
       self._builder.add_requirement(str(req.requirement))
       if req.repository:
         find_links.add(req.repository)
@@ -249,7 +242,7 @@ class PexBuilderWrapper:
     for platform, dists in distributions.items():
       for dist in dists:
         if dist.location not in locations:
-          self._log.debug('  Dumping distribution: .../{}'.format(os.path.basename(dist.location)))
+          self._log.debug(f'  Dumping distribution: .../{os.path.basename(dist.location)}')
           self.add_distribution(dist)
         locations.add(dist.location)
 
@@ -291,46 +284,49 @@ class PexBuilderWrapper:
 
     return distributions
 
-  def add_sources_from(self, tgt):
+  def add_sources_from(self, tgt: Target) -> None:
     dump_source = _create_source_dumper(self._builder, tgt)
-    self._log.debug('  Dumping sources: {}'.format(tgt))
+    self._log.debug(f'  Dumping sources: {tgt}')
     for relpath in tgt.sources_relative_to_buildroot():
       try:
         dump_source(relpath)
       except OSError:
-        self._log.error('Failed to copy {} for target {}'.format(relpath, tgt.address.spec))
+        self._log.error(f'Failed to copy {relpath} for target {tgt.address.spec}')
         raise
 
     if (getattr(tgt, '_resource_target_specs', None) or
       getattr(tgt, '_synthetic_resources_target', None)):
       # No one should be on old-style resources any more.  And if they are,
       # switching to the new python pipeline will be a great opportunity to fix that.
-      raise TaskError('Old-style resources not supported for target {}.  '
-                      'Depend on resources() targets instead.'.format(tgt.address.spec))
+      raise TaskError(
+        f'Old-style resources not supported for target {tgt.address.spec}. Depend on resources() '
+        'targets instead.'
+      )
 
-  def _prepare_inits(self):
+  def _prepare_inits(self) -> Set[str]:
     chroot = self._builder.chroot()
     sources = chroot.get('source') | chroot.get('resource')
     missing_init_files = identify_missing_init_files(sources)
     if missing_init_files:
-      with temporary_file() as ns_package:
+      with temporary_file(permissions=0o644) as ns_package:
         ns_package.write(b'__import__("pkg_resources").declare_namespace(__name__)')
         ns_package.flush()
         for missing_init_file in missing_init_files:
-          self._builder.add_source(ns_package.name, missing_init_file)
+          self._builder.add_source(filename=ns_package.name, env_filename=missing_init_file)
     return missing_init_files
 
   def set_emit_warnings(self, emit_warnings):
     self._builder.info.emit_warnings = emit_warnings
 
-  def freeze(self):
-    if not self._frozen:
-      if self._prepare_inits():
-        dist = self._distributions.get('setuptools')
-        if not dist:
-          self.add_resolved_requirements([self._setuptools_requirement])
-      self._builder.freeze(bytecode_compile=False)
-      self._frozen = True
+  def freeze(self) -> None:
+    if self._frozen:
+      return
+    if self._prepare_inits():
+      dist = self._distributions.get('setuptools')
+      if not dist:
+        self.add_resolved_requirements([self._setuptools_requirement])
+    self._builder.freeze(bytecode_compile=False)
+    self._frozen = True
 
   def set_entry_point(self, entry_point):
     self._builder.set_entry_point(entry_point)

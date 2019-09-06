@@ -8,6 +8,7 @@ from pants.backend.jvm.repository import Repository as repo
 from pants.backend.jvm.scala_artifact import ScalaArtifact
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagementSetup
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
+from pants.backend.jvm.subsystems.scoverage_platform import ScoveragePlatform
 from pants.backend.jvm.subsystems.shader import Shading
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.benchmark import Benchmark
@@ -48,7 +49,6 @@ from pants.backend.jvm.tasks.junit_run import JUnitRun
 from pants.backend.jvm.tasks.jvm_compile.javac.javac_compile import JavacCompile
 from pants.backend.jvm.tasks.jvm_compile.jvm_classpath_publisher import RuntimeClasspathPublisher
 from pants.backend.jvm.tasks.jvm_compile.rsc.rsc_compile import RscCompile
-from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.backend.jvm.tasks.jvm_dependency_check import JvmDependencyCheck
 from pants.backend.jvm.tasks.jvm_dependency_usage import JvmDependencyUsage
 from pants.backend.jvm.tasks.jvm_platform_analysis import JvmPlatformExplain, JvmPlatformValidate
@@ -138,7 +138,7 @@ def build_file_aliases():
 
 
 def global_subsystems():
-  return (ScalaPlatform,)
+  return (ScalaPlatform, ScoveragePlatform, )
 
 
 # TODO https://github.com/pantsbuild/pants/issues/604 register_goals
@@ -159,7 +159,6 @@ def register_goals():
 
   # Compile
   task(name='rsc', action=RscCompile).install('compile')
-  task(name='zinc', action=ZincCompile).install('compile')
   task(name='javac', action=JavacCompile).install('compile')
 
   # Analysis extraction.

@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 use bazel_protos;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
+use concrete_time::TimeSpan;
 use digest::{Digest as DigestTrait, FixedOutput};
 use fs::{self, File, PathStat};
 use futures::{future, Future, Stream};
@@ -16,8 +17,6 @@ use log::{debug, trace, warn};
 use protobuf::{self, Message, ProtobufEnum};
 use sha2::Sha256;
 use store::{Snapshot, Store, StoreFileByDigest};
-use time;
-use time::Timespec;
 use tokio_timer::Delay;
 
 use super::{
@@ -155,6 +154,7 @@ impl super::CommandRunner for CommandRunner {
         let command_runner = self.clone();
         let command_runner2 = self.clone();
         let command_runner3 = self.clone();
+        let workunit_store2 = workunit_store.clone();
         let execute_request = Arc::new(execute_request);
         let execute_request2 = execute_request.clone();
 
@@ -165,7 +165,10 @@ impl super::CommandRunner for CommandRunner {
           .store_proto_locally(&command)
           .join(self.store_proto_locally(&action))
           .and_then(move |(command_digest, action_digest)| {
-            store2.ensure_remote_has_recursive(vec![command_digest, action_digest, input_files])
+            store2.ensure_remote_has_recursive(
+              vec![command_digest, action_digest, input_files],
+              workunit_store2.clone(),
+            )
           })
           .and_then(move |summary| {
             history.current_attempt += summary;
@@ -191,10 +194,11 @@ impl super::CommandRunner for CommandRunner {
                 let operations_client = operations_client.clone();
                 let command_runner2 = command_runner2.clone();
                 let command_runner3 = command_runner3.clone();
+                let workunit_store2 = workunit_store.clone();
                 let f = command_runner2.extract_execute_response(
                   operation,
                   &mut history,
-                  workunit_store.clone(),
+                  workunit_store2.clone(),
                 );
                 f.map(future::Loop::Break).or_else(move |value| {
                   match value {
@@ -218,8 +222,9 @@ impl super::CommandRunner for CommandRunner {
                       };
 
                       let execute_request = execute_request2.clone();
+                      let workunit_store = workunit_store2.clone();
                       store
-                        .ensure_remote_has_recursive(missing_digests)
+                        .ensure_remote_has_recursive(missing_digests, workunit_store.clone())
                         .and_then(move |summary| {
                           let mut history = history;
                           history.current_attempt += summary;
@@ -403,72 +408,79 @@ impl CommandRunner {
         trace!("Got (nested) execute response: {:?}", execute_response);
         if execute_response.get_result().has_execution_metadata() {
           let metadata = execute_response.get_result().get_execution_metadata();
-          let enqueued = timespec_from(metadata.get_queued_timestamp());
-          let worker_start = timespec_from(metadata.get_worker_start_timestamp());
-          let input_fetch_start = timespec_from(metadata.get_input_fetch_start_timestamp());
-          let input_fetch_completed = timespec_from(metadata.get_input_fetch_completed_timestamp());
-          let execution_start = timespec_from(metadata.get_execution_start_timestamp());
-          let execution_completed = timespec_from(metadata.get_execution_completed_timestamp());
-          let output_upload_start = timespec_from(metadata.get_output_upload_start_timestamp());
-          let output_upload_completed =
-            timespec_from(metadata.get_output_upload_completed_timestamp());
           let parent_id = get_parent_id();
           let result_cached = execute_response.get_cached_result();
-          match (worker_start - enqueued).to_std() {
-            Ok(duration) => {
-              attempts.current_attempt.remote_queue = Some(duration);
+
+          match TimeSpan::from_start_and_end(
+            metadata.get_queued_timestamp(),
+            metadata.get_worker_start_timestamp(),
+            "remote queue",
+          ) {
+            Ok(time_span) => {
+              attempts.current_attempt.remote_queue = Some(time_span.duration.into());
               maybe_add_workunit(
                 result_cached,
                 "remote execution action scheduling",
-                enqueued,
-                worker_start,
+                time_span,
                 parent_id.clone(),
                 &workunit_store,
               );
             }
-            Err(err) => warn!("Got negative remote queue time: {}", err),
-          }
-          match (input_fetch_completed - input_fetch_start).to_std() {
-            Ok(duration) => {
-              attempts.current_attempt.remote_input_fetch = Some(duration);
+            Err(s) => warn!("{}", s),
+          };
+
+          match TimeSpan::from_start_and_end(
+            metadata.get_input_fetch_start_timestamp(),
+            metadata.get_input_fetch_completed_timestamp(),
+            "remote input fetch",
+          ) {
+            Ok(time_span) => {
+              attempts.current_attempt.remote_input_fetch = Some(time_span.duration.into());
               maybe_add_workunit(
                 result_cached,
                 "remote execution worker input fetching",
-                input_fetch_start,
-                input_fetch_completed,
+                time_span,
                 parent_id.clone(),
                 &workunit_store,
               );
             }
-            Err(err) => warn!("Got negative remote input fetch time: {}", err),
+            Err(s) => warn!("{}", s),
           }
-          match (execution_completed - execution_start).to_std() {
-            Ok(duration) => {
-              attempts.current_attempt.remote_execution = Some(duration);
+
+          match TimeSpan::from_start_and_end(
+            metadata.get_execution_start_timestamp(),
+            metadata.get_execution_completed_timestamp(),
+            "remote execution",
+          ) {
+            Ok(time_span) => {
+              attempts.current_attempt.remote_execution = Some(time_span.duration.into());
               maybe_add_workunit(
                 result_cached,
                 "remote execution worker command executing",
-                execution_start,
-                execution_completed,
+                time_span,
                 parent_id.clone(),
                 &workunit_store,
               );
             }
-            Err(err) => warn!("Got negative remote execution time: {}", err),
+            Err(s) => warn!("{}", s),
           }
-          match (output_upload_completed - output_upload_start).to_std() {
-            Ok(duration) => {
-              attempts.current_attempt.remote_output_store = Some(duration);
+
+          match TimeSpan::from_start_and_end(
+            metadata.get_output_upload_start_timestamp(),
+            metadata.get_output_upload_completed_timestamp(),
+            "remote output store",
+          ) {
+            Ok(time_span) => {
+              attempts.current_attempt.remote_output_store = Some(time_span.duration.into());
               maybe_add_workunit(
                 result_cached,
                 "remote execution worker output uploading",
-                output_upload_start,
-                output_upload_completed,
+                time_span,
                 parent_id,
                 &workunit_store,
               );
             }
-            Err(err) => warn!("Got negative remote output store time: {}", err),
+            Err(s) => warn!("{}", s),
           }
           attempts.current_attempt.was_cache_hit = execute_response.cached_result;
         }
@@ -482,6 +494,7 @@ impl CommandRunner {
             self.store.clone(),
             execute_response,
             execution_attempts,
+            workunit_store,
           )
           .map_err(ExecutionError::Fatal)
           .to_boxed();
@@ -577,8 +590,7 @@ impl CommandRunner {
 fn maybe_add_workunit(
   result_cached: bool,
   name: &str,
-  start_time: Timespec,
-  end_time: Timespec,
+  time_span: concrete_time::TimeSpan,
   parent_id: Option<String>,
   workunit_store: &WorkUnitStore,
 ) {
@@ -587,8 +599,7 @@ fn maybe_add_workunit(
   if !result_cached {
     let workunit = WorkUnit {
       name: String::from(name),
-      start_timestamp: start_time,
-      end_timestamp: end_time,
+      time_span,
       span_id: generate_random_64bit_string(),
       parent_id,
     };
@@ -694,10 +705,19 @@ pub fn populate_fallible_execution_result(
   store: Store,
   execute_response: bazel_protos::remote_execution::ExecuteResponse,
   execution_attempts: Vec<ExecutionStats>,
+  workunit_store: WorkUnitStore,
 ) -> impl Future<Item = FallibleExecuteProcessResult, Error = String> {
-  extract_stdout(&store, &execute_response)
-    .join(extract_stderr(&store, &execute_response))
-    .join(extract_output_files(store, &execute_response))
+  extract_stdout(&store, &execute_response, workunit_store.clone())
+    .join(extract_stderr(
+      &store,
+      &execute_response,
+      workunit_store.clone(),
+    ))
+    .join(extract_output_files(
+      store,
+      &execute_response,
+      workunit_store.clone(),
+    ))
     .and_then(move |((stdout, stderr), output_directory)| {
       Ok(FallibleExecuteProcessResult {
         stdout: stdout,
@@ -712,6 +732,7 @@ pub fn populate_fallible_execution_result(
 fn extract_stdout(
   store: &Store,
   execute_response: &bazel_protos::remote_execution::ExecuteResponse,
+  workunit_store: WorkUnitStore,
 ) -> BoxFuture<Bytes, String> {
   if execute_response.get_result().has_stdout_digest() {
     let stdout_digest_result: Result<Digest, String> =
@@ -719,7 +740,7 @@ fn extract_stdout(
     let stdout_digest =
       try_future!(stdout_digest_result.map_err(|err| format!("Error extracting stdout: {}", err)));
     store
-      .load_file_bytes_with(stdout_digest, |v| v)
+      .load_file_bytes_with(stdout_digest, |v| v, workunit_store)
       .map_err(move |error| {
         format!(
           "Error fetching stdout digest ({:?}): {:?}",
@@ -750,6 +771,7 @@ fn extract_stdout(
 fn extract_stderr(
   store: &Store,
   execute_response: &bazel_protos::remote_execution::ExecuteResponse,
+  workunit_store: WorkUnitStore,
 ) -> BoxFuture<Bytes, String> {
   if execute_response.get_result().has_stderr_digest() {
     let stderr_digest_result: Result<Digest, String> =
@@ -757,7 +779,7 @@ fn extract_stderr(
     let stderr_digest =
       try_future!(stderr_digest_result.map_err(|err| format!("Error extracting stderr: {}", err)));
     store
-      .load_file_bytes_with(stderr_digest, |v| v)
+      .load_file_bytes_with(stderr_digest, |v| v, workunit_store)
       .map_err(move |error| {
         format!(
           "Error fetching stderr digest ({:?}): {:?}",
@@ -788,6 +810,7 @@ fn extract_stderr(
 fn extract_output_files(
   store: Store,
   execute_response: &bazel_protos::remote_execution::ExecuteResponse,
+  workunit_store: WorkUnitStore,
 ) -> BoxFuture<Digest, String> {
   // Get Digests of output Directories.
   // Then we'll make a Directory for the output files, and merge them.
@@ -859,7 +882,7 @@ fn extract_output_files(
   }
 
   impl StoreFileByDigest<String> for StoreOneOffRemoteDigest {
-    fn store_by_digest(&self, file: File) -> BoxFuture<Digest, String> {
+    fn store_by_digest(&self, file: File, _: WorkUnitStore) -> BoxFuture<Digest, String> {
       match self.map_of_paths_to_digests.get(&file.path) {
         Some(digest) => future::ok(*digest),
         None => future::err(format!(
@@ -876,6 +899,7 @@ fn extract_output_files(
     store.clone(),
     &StoreOneOffRemoteDigest::new(path_map),
     &path_stats,
+    workunit_store.clone(),
   )
   .map_err(move |error| {
     format!(
@@ -886,7 +910,7 @@ fn extract_output_files(
   .join(future::join_all(directory_digests))
   .and_then(|(files_digest, mut directory_digests)| {
     directory_digests.push(files_digest);
-    Snapshot::merge_directories(store, directory_digests)
+    Snapshot::merge_directories(store, directory_digests, workunit_store)
       .map_err(|err| format!("Error when merging output files and directories: {}", err))
   })
   .to_boxed()
@@ -968,10 +992,6 @@ fn digest(message: &dyn Message) -> Result<Digest, String> {
   ))
 }
 
-fn timespec_from(timestamp: &protobuf::well_known_types::Timestamp) -> time::Timespec {
-  time::Timespec::new(timestamp.seconds, timestamp.nanos)
-}
-
 #[cfg(test)]
 pub mod tests {
   use bazel_protos;
@@ -983,6 +1003,7 @@ pub mod tests {
   use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
   use mock;
   use protobuf::{self, Message, ProtobufEnum};
+  use spectral::{assert_that, string::StrAssertions};
   use store::Store;
   use tempfile::TempDir;
   use testutil::data::{TestData, TestDirectory};
@@ -1001,7 +1022,6 @@ pub mod tests {
   use std::ops::Sub;
   use std::path::PathBuf;
   use std::time::Duration;
-  use time::Timespec;
   use workunit_store::{workunits_with_constant_span_id, WorkUnit, WorkUnitStore};
 
   #[derive(Debug, PartialEq)]
@@ -1395,32 +1415,33 @@ pub mod tests {
     let execute_request = echo_foo_request();
 
     let mock_server = {
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        "wrong-command".to_string(),
-        super::make_execute_request(
-          &ExecuteProcessRequest {
-            argv: owned_string_vec(&["/bin/echo", "-n", "bar"]),
-            env: BTreeMap::new(),
-            input_files: EMPTY_DIGEST,
-            output_files: BTreeSet::new(),
-            output_directories: BTreeSet::new(),
-            timeout: Duration::from_millis(1000),
-            description: "wrong command".to_string(),
-            jdk_home: None,
-          },
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          "wrong-command".to_string(),
+          super::make_execute_request(
+            &ExecuteProcessRequest {
+              argv: owned_string_vec(&["/bin/echo", "-n", "bar"]),
+              env: BTreeMap::new(),
+              input_files: EMPTY_DIGEST,
+              output_files: BTreeSet::new(),
+              output_directories: BTreeSet::new(),
+              timeout: Duration::from_millis(1000),
+              description: "wrong command".to_string(),
+              jdk_home: None,
+            },
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          vec![],
+        ),
+        None,
+      )
     };
 
     let error = run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
-    assert_eq!(
-      error,
-      "InvalidArgument: \"Did not expect this request\"".to_string()
-    );
+    assert_that(&error).contains("InvalidArgument");
+    assert_that(&error).contains("Did not expect this request");
   }
 
   #[test]
@@ -1430,21 +1451,24 @@ pub mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&execute_request, empty_request_metadata())
-          .unwrap()
-          .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_successful_operation(
-            &op_name,
-            StdoutType::Raw("foo".to_owned()),
-            StderrType::Raw("".to_owned()),
-            0,
-          ),
-        ],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request, empty_request_metadata())
+            .unwrap()
+            .2,
+          vec![
+            make_incomplete_operation(&op_name),
+            make_successful_operation(
+              &op_name,
+              StdoutType::Raw("foo".to_owned()),
+              StderrType::Raw("".to_owned()),
+              0,
+            ),
+          ],
+        ),
+        None,
+      )
     };
 
     let result = run_command_remote(mock_server.address(), execute_request).unwrap();
@@ -1529,18 +1553,21 @@ pub mod tests {
     let mock_server = {
       let op_name = "cat".to_owned();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&echo_roland_request(), empty_request_metadata())
-          .unwrap()
-          .2,
-        vec![make_successful_operation(
-          &op_name.clone(),
-          StdoutType::Raw(test_stdout.string()),
-          StderrType::Raw(test_stderr.string()),
-          0,
-        )],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&echo_roland_request(), empty_request_metadata())
+            .unwrap()
+            .2,
+          vec![make_successful_operation(
+            &op_name.clone(),
+            StdoutType::Raw(test_stdout.string()),
+            StderrType::Raw(test_stderr.string()),
+            0,
+          )],
+        ),
+        None,
+      )
     };
 
     let store_dir = TempDir::new().unwrap();
@@ -1550,14 +1577,15 @@ pub mod tests {
     let store = Store::with_remote(
       runtime.clone(),
       &store_dir_path,
-      &[cas.address()],
+      vec![cas.address()],
       None,
-      &None,
+      None,
       None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
       store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      1,
       1,
     )
     .expect("Failed to make store");
@@ -1588,7 +1616,11 @@ pub mod tests {
     {
       assert_eq!(
         runtime
-          .block_on(local_store.load_file_bytes_with(test_stdout.digest(), |v| v))
+          .block_on(local_store.load_file_bytes_with(
+            test_stdout.digest(),
+            |v| v,
+            WorkUnitStore::new()
+          ))
           .unwrap()
           .unwrap()
           .0,
@@ -1596,7 +1628,11 @@ pub mod tests {
       );
       assert_eq!(
         runtime
-          .block_on(local_store.load_file_bytes_with(test_stderr.digest(), |v| v))
+          .block_on(local_store.load_file_bytes_with(
+            test_stderr.digest(),
+            |v| v,
+            WorkUnitStore::new()
+          ))
           .unwrap()
           .unwrap()
           .0,
@@ -1612,22 +1648,25 @@ pub mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&execute_request, empty_request_metadata())
-          .unwrap()
-          .2,
-        Vec::from_iter(
-          iter::repeat(make_incomplete_operation(&op_name))
-            .take(4)
-            .chain(iter::once(make_successful_operation(
-              &op_name,
-              StdoutType::Raw("foo".to_owned()),
-              StderrType::Raw("".to_owned()),
-              0,
-            ))),
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request, empty_request_metadata())
+            .unwrap()
+            .2,
+          Vec::from_iter(
+            iter::repeat(make_incomplete_operation(&op_name))
+              .take(4)
+              .chain(iter::once(make_successful_operation(
+                &op_name,
+                StdoutType::Raw("foo".to_owned()),
+                StderrType::Raw("".to_owned()),
+                0,
+              ))),
+          ),
         ),
-      ))
+        None,
+      )
     };
 
     let result = run_command_remote(mock_server.address(), execute_request).unwrap();
@@ -1663,16 +1702,19 @@ pub mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&execute_request, empty_request_metadata())
-          .unwrap()
-          .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_delayed_incomplete_operation(&op_name, delayed_operation_time),
-        ],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request, empty_request_metadata())
+            .unwrap()
+            .2,
+          vec![
+            make_incomplete_operation(&op_name),
+            make_delayed_incomplete_operation(&op_name, delayed_operation_time),
+          ],
+        ),
+        None,
+      )
     };
 
     let error_msg = run_command_remote(mock_server.address(), execute_request)
@@ -1688,22 +1730,25 @@ pub mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&execute_request, empty_request_metadata())
-          .unwrap()
-          .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_canceled_operation(Some(Duration::from_millis(100))),
-          make_successful_operation(
-            &op_name,
-            StdoutType::Raw("foo".to_owned()),
-            StderrType::Raw("".to_owned()),
-            0,
-          ),
-        ],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request, empty_request_metadata())
+            .unwrap()
+            .2,
+          vec![
+            make_incomplete_operation(&op_name),
+            make_canceled_operation(Some(Duration::from_millis(100))),
+            make_successful_operation(
+              &op_name,
+              StdoutType::Raw("foo".to_owned()),
+              StderrType::Raw("".to_owned()),
+              0,
+            ),
+          ],
+        ),
+        None,
+      )
     };
 
     let result = run_command_remote(mock_server.address(), execute_request).unwrap();
@@ -1727,32 +1772,35 @@ pub mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&execute_request, empty_request_metadata())
-          .unwrap()
-          .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          MockOperation::new({
-            let mut op = bazel_protos::operations::Operation::new();
-            op.set_name(op_name.clone());
-            op.set_done(true);
-            op.set_response({
-              let mut response_wrapper = protobuf::well_known_types::Any::new();
-              response_wrapper.set_type_url(format!(
-                "type.googleapis.com/{}",
-                bazel_protos::remote_execution::ExecuteResponse::new()
-                  .descriptor()
-                  .full_name()
-              ));
-              response_wrapper.set_value(vec![0x00, 0x00, 0x00]);
-              response_wrapper
-            });
-            op
-          }),
-        ],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request, empty_request_metadata())
+            .unwrap()
+            .2,
+          vec![
+            make_incomplete_operation(&op_name),
+            MockOperation::new({
+              let mut op = bazel_protos::operations::Operation::new();
+              op.set_name(op_name.clone());
+              op.set_done(true);
+              op.set_response({
+                let mut response_wrapper = protobuf::well_known_types::Any::new();
+                response_wrapper.set_type_url(format!(
+                  "type.googleapis.com/{}",
+                  bazel_protos::remote_execution::ExecuteResponse::new()
+                    .descriptor()
+                    .full_name()
+                ));
+                response_wrapper.set_value(vec![0x00, 0x00, 0x00]);
+                response_wrapper
+              });
+              op
+            }),
+          ],
+        ),
+        None,
+      )
     };
 
     run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
@@ -1765,24 +1813,27 @@ pub mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&execute_request, empty_request_metadata())
-          .unwrap()
-          .2,
-        vec![MockOperation::new({
-          let mut op = bazel_protos::operations::Operation::new();
-          op.set_name(op_name.to_string());
-          op.set_done(true);
-          op.set_error({
-            let mut error = bazel_protos::status::Status::new();
-            error.set_code(bazel_protos::code::Code::INTERNAL.value());
-            error.set_message("Something went wrong".to_string());
-            error
-          });
-          op
-        })],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request, empty_request_metadata())
+            .unwrap()
+            .2,
+          vec![MockOperation::new({
+            let mut op = bazel_protos::operations::Operation::new();
+            op.set_name(op_name.to_string());
+            op.set_done(true);
+            op.set_error({
+              let mut error = bazel_protos::status::Status::new();
+              error.set_code(bazel_protos::code::Code::INTERNAL.value());
+              error.set_message("Something went wrong".to_string());
+              error
+            });
+            op
+          })],
+        ),
+        None,
+      )
     };
 
     let result = run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
@@ -1797,27 +1848,30 @@ pub mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&execute_request, empty_request_metadata())
-          .unwrap()
-          .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          MockOperation::new({
-            let mut op = bazel_protos::operations::Operation::new();
-            op.set_name(op_name.to_string());
-            op.set_done(true);
-            op.set_error({
-              let mut error = bazel_protos::status::Status::new();
-              error.set_code(bazel_protos::code::Code::INTERNAL.value());
-              error.set_message("Something went wrong".to_string());
-              error
-            });
-            op
-          }),
-        ],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request, empty_request_metadata())
+            .unwrap()
+            .2,
+          vec![
+            make_incomplete_operation(&op_name),
+            MockOperation::new({
+              let mut op = bazel_protos::operations::Operation::new();
+              op.set_name(op_name.to_string());
+              op.set_done(true);
+              op.set_error({
+                let mut error = bazel_protos::status::Status::new();
+                error.set_code(bazel_protos::code::Code::INTERNAL.value());
+                error.set_message("Something went wrong".to_string());
+                error
+              });
+              op
+            }),
+          ],
+        ),
+        None,
+      )
     };
 
     let result = run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
@@ -1832,18 +1886,21 @@ pub mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&execute_request, empty_request_metadata())
-          .unwrap()
-          .2,
-        vec![MockOperation::new({
-          let mut op = bazel_protos::operations::Operation::new();
-          op.set_name(op_name.to_string());
-          op.set_done(true);
-          op
-        })],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request, empty_request_metadata())
+            .unwrap()
+            .2,
+          vec![MockOperation::new({
+            let mut op = bazel_protos::operations::Operation::new();
+            op.set_name(op_name.to_string());
+            op.set_done(true);
+            op
+          })],
+        ),
+        None,
+      )
     };
 
     let result = run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
@@ -1858,21 +1915,24 @@ pub mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&execute_request, empty_request_metadata())
-          .unwrap()
-          .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          MockOperation::new({
-            let mut op = bazel_protos::operations::Operation::new();
-            op.set_name(op_name.to_string());
-            op.set_done(true);
-            op
-          }),
-        ],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&execute_request, empty_request_metadata())
+            .unwrap()
+            .2,
+          vec![
+            make_incomplete_operation(&op_name),
+            MockOperation::new({
+              let mut op = bazel_protos::operations::Operation::new();
+              op.set_name(op_name.to_string());
+              op.set_done(true);
+              op
+            }),
+          ],
+        ),
+        None,
+      )
     };
 
     let result = run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
@@ -1889,24 +1949,27 @@ pub mod tests {
     let mock_server = {
       let op_name = "cat".to_owned();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&cat_roland_request(), empty_request_metadata())
-          .unwrap()
-          .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_precondition_failure_operation(vec![missing_preconditionfailure_violation(
-            &roland.digest(),
-          )]),
-          make_successful_operation(
-            "cat2",
-            StdoutType::Raw(roland.string()),
-            StderrType::Raw("".to_owned()),
-            0,
-          ),
-        ],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&cat_roland_request(), empty_request_metadata())
+            .unwrap()
+            .2,
+          vec![
+            make_incomplete_operation(&op_name),
+            make_precondition_failure_operation(vec![missing_preconditionfailure_violation(
+              &roland.digest(),
+            )]),
+            make_successful_operation(
+              "cat2",
+              StdoutType::Raw(roland.string()),
+              StderrType::Raw("".to_owned()),
+              0,
+            ),
+          ],
+        ),
+        None,
+      )
     };
 
     let store_dir = TempDir::new().unwrap();
@@ -1916,14 +1979,15 @@ pub mod tests {
     let store = Store::with_remote(
       runtime.clone(),
       store_dir,
-      &[cas.address()],
+      vec![cas.address()],
       None,
-      &None,
+      None,
       None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
       store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      1,
       1,
     )
     .expect("Failed to make store");
@@ -1981,25 +2045,28 @@ pub mod tests {
         ),
       };
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&cat_roland_request(), empty_request_metadata())
-          .unwrap()
-          .2,
-        vec![
-          //make_incomplete_operation(&op_name),
-          MockOperation {
-            op: Err(status),
-            duration: None,
-          },
-          make_successful_operation(
-            "cat2",
-            StdoutType::Raw(roland.string()),
-            StderrType::Raw("".to_owned()),
-            0,
-          ),
-        ],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&cat_roland_request(), empty_request_metadata())
+            .unwrap()
+            .2,
+          vec![
+            //make_incomplete_operation(&op_name),
+            MockOperation {
+              op: Err(status),
+              duration: None,
+            },
+            make_successful_operation(
+              "cat2",
+              StdoutType::Raw(roland.string()),
+              StderrType::Raw("".to_owned()),
+              0,
+            ),
+          ],
+        ),
+        None,
+      )
     };
 
     let store_dir = TempDir::new().unwrap();
@@ -2009,14 +2076,15 @@ pub mod tests {
     let store = Store::with_remote(
       task_executor::Executor::new(),
       store_dir,
-      &[cas.address()],
+      vec![cas.address()],
       None,
-      &None,
+      None,
       None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
       store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      1,
       1,
     )
     .expect("Failed to make store");
@@ -2057,15 +2125,18 @@ pub mod tests {
     let mock_server = {
       let op_name = "cat".to_owned();
 
-      mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        super::make_execute_request(&cat_roland_request(), empty_request_metadata())
-          .unwrap()
-          .2,
-        // We won't get as far as trying to run the operation, so don't expect any requests whose
-        // responses we would need to stub.
-        vec![],
-      ))
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(&cat_roland_request(), empty_request_metadata())
+            .unwrap()
+            .2,
+          // We won't get as far as trying to run the operation, so don't expect any requests whose
+          // responses we would need to stub.
+          vec![],
+        ),
+        None,
+      )
     };
 
     let store_dir = TempDir::new().unwrap();
@@ -2077,14 +2148,15 @@ pub mod tests {
     let store = Store::with_remote(
       runtime.clone(),
       store_dir,
-      &[cas.address()],
+      vec![cas.address()],
       None,
-      &None,
+      None,
       None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
       store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      1,
       1,
     )
     .expect("Failed to make store");
@@ -2312,21 +2384,24 @@ pub mod tests {
       let execute_request = echo_foo_request();
       let mock_server = {
         let op_name = "gimme-foo".to_string();
-        mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-          op_name.clone(),
-          super::make_execute_request(&execute_request, empty_request_metadata())
-            .unwrap()
-            .2,
-          vec![
-            make_incomplete_operation(&op_name),
-            make_successful_operation(
-              &op_name,
-              StdoutType::Raw("foo".to_owned()),
-              StderrType::Raw("".to_owned()),
-              0,
-            ),
-          ],
-        ))
+        mock::execution_server::TestServer::new(
+          mock::execution_server::MockExecution::new(
+            op_name.clone(),
+            super::make_execute_request(&execute_request, empty_request_metadata())
+              .unwrap()
+              .2,
+            vec![
+              make_incomplete_operation(&op_name),
+              make_successful_operation(
+                &op_name,
+                StdoutType::Raw("foo".to_owned()),
+                StderrType::Raw("".to_owned()),
+                0,
+              ),
+            ],
+          ),
+          None,
+        )
       };
       run_command_remote(mock_server.address(), execute_request).unwrap();
 
@@ -2350,23 +2425,26 @@ pub mod tests {
       let execute_request = echo_foo_request();
       let mock_server = {
         let op_name = "gimme-foo".to_string();
-        mock::execution_server::TestServer::new(mock::execution_server::MockExecution::new(
-          op_name.clone(),
-          super::make_execute_request(&execute_request, empty_request_metadata())
-            .unwrap()
-            .2,
-          vec![
-            make_incomplete_operation(&op_name),
-            make_incomplete_operation(&op_name),
-            make_incomplete_operation(&op_name),
-            make_successful_operation(
-              &op_name,
-              StdoutType::Raw("foo".to_owned()),
-              StderrType::Raw("".to_owned()),
-              0,
-            ),
-          ],
-        ))
+        mock::execution_server::TestServer::new(
+          mock::execution_server::MockExecution::new(
+            op_name.clone(),
+            super::make_execute_request(&execute_request, empty_request_metadata())
+              .unwrap()
+              .2,
+            vec![
+              make_incomplete_operation(&op_name),
+              make_incomplete_operation(&op_name),
+              make_incomplete_operation(&op_name),
+              make_successful_operation(
+                &op_name,
+                StdoutType::Raw("foo".to_owned()),
+                StderrType::Raw("".to_owned()),
+                0,
+              ),
+            ],
+          ),
+          None,
+        )
       };
       run_command_remote(mock_server.address(), execute_request).unwrap();
 
@@ -2605,38 +2683,49 @@ pub mod tests {
 
     let got_workunits = workunits_with_constant_span_id(&workunit_store);
 
+    use concrete_time::Duration;
+    use concrete_time::TimeSpan;
+
     let want_workunits = hashset! {
       WorkUnit {
         name: String::from("remote execution action scheduling"),
-        start_timestamp: Timespec::new(0, 0),
-        end_timestamp: Timespec::new(1, 0),
+        time_span: TimeSpan {
+            start: Duration::new(0, 0),
+            duration: Duration::new(1, 0),
+        },
         span_id: String::from("ignore"),
         parent_id: None,
       },
       WorkUnit {
         name: String::from("remote execution worker input fetching"),
-        start_timestamp: Timespec::new(2, 0),
-        end_timestamp: Timespec::new(3, 0),
+        time_span: TimeSpan {
+            start: Duration::new(2, 0),
+            duration: Duration::new(1, 0),
+        },
         span_id: String::from("ignore"),
         parent_id: None,
       },
       WorkUnit {
         name: String::from("remote execution worker command executing"),
-        start_timestamp: Timespec::new(4, 0),
-        end_timestamp: Timespec::new(5, 0),
+        time_span: TimeSpan {
+            start: Duration::new(4, 0),
+            duration: Duration::new(1, 0),
+        },
         span_id: String::from("ignore"),
         parent_id: None,
       },
       WorkUnit {
         name: String::from("remote execution worker output uploading"),
-        start_timestamp: Timespec::new(6, 0),
-        end_timestamp: Timespec::new(7, 0),
+        time_span: TimeSpan {
+            start: Duration::new(6, 0),
+            duration: Duration::new(1, 0),
+        },
         span_id: String::from("ignore"),
         parent_id: None,
       }
     };
 
-    assert_eq!(got_workunits, want_workunits);
+    assert!(got_workunits.is_superset(&want_workunits));
   }
 
   pub fn echo_foo_request() -> ExecuteProcessRequest {
@@ -2820,14 +2909,15 @@ pub mod tests {
     let store = Store::with_remote(
       task_executor::Executor::new(),
       store_dir,
-      &[cas.address()],
+      vec![cas.address()],
       None,
-      &None,
+      None,
       None,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
       store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      1,
       1,
     )
     .expect("Failed to make store");
@@ -2866,6 +2956,7 @@ pub mod tests {
     runtime.block_on(super::extract_output_files(
       command_runner.store.clone(),
       &execute_response,
+      WorkUnitStore::new(),
     ))
   }
 

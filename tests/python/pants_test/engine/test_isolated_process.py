@@ -4,8 +4,8 @@
 import os
 import unittest
 
-from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, FileContent, FilesContent, PathGlobs,
-                             Snapshot)
+from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, FileContent, FilesContent,
+                             InputFileContent, PathGlobs, Snapshot)
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
                                            FallibleExecuteProcessResult, ProcessExecutionFailure)
 from pants.engine.rules import RootRule, rule
@@ -251,6 +251,40 @@ class ExecuteProcessRequestTest(unittest.TestCase):
       input_files=EMPTY_DIRECTORY_DIGEST,
     )
     self.assertEqual(req.env, ('VAR', 'VAL'))
+
+
+class TestInputFileCreation(TestBase):
+  def test_input_file_creation(self):
+    file_name = 'some.filename'
+    file_contents = b'some file contents'
+
+    input_file = InputFileContent(path=file_name, content=file_contents)
+    digest, = self.scheduler.product_request(Digest, [input_file])
+
+    req = ExecuteProcessRequest(
+      argv=('/bin/cat', file_name),
+      input_files=digest,
+      description='cat the contents of this file',
+    )
+
+    result, = self.scheduler.product_request(ExecuteProcessResult, [req])
+    self.assertEqual(result.stdout, file_contents)
+
+  def test_file_in_directory_creation(self):
+    path = 'somedir/filename'
+    content = b'file contents'
+
+    input_file = InputFileContent(path=path, content=content)
+    digest, = self.scheduler.product_request(Digest, [input_file])
+
+    req = ExecuteProcessRequest(
+      argv=('/bin/cat', 'somedir/filename'),
+      input_files=digest,
+      description="Cat a file in a directory to make sure that doesn't break",
+    )
+
+    result, = self.scheduler.product_request(ExecuteProcessResult, [req])
+    self.assertEqual(result.stdout, content)
 
 
 class IsolatedProcessTest(TestBase, unittest.TestCase):

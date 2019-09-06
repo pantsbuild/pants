@@ -1,0 +1,1 @@
+tests/python/pants_test/backend/jvm/tasks/jvm_compile:jvm_compile

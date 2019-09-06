@@ -8,5 +8,15 @@ python_tests(
     'tests/python/pants_test:int-test',
     'tests/python/pants_test:interpreter_selection_utils',
   ],
-  tags={'integration'},
+  tags={'integration', 'integration_test'},
+)
+
+python_tests(
+  name='mypy',
+  source = 'test_mypy.py',
+  dependencies=[
+    'tests/python/pants_test:task_test_base',
+    'contrib/mypy/src/python/pants/contrib/mypy/tasks',
+  ],
+  tags = {'integration_test'},
 )

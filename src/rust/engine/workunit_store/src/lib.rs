@@ -26,19 +26,18 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use concrete_time::TimeSpan;
 use futures::task_local;
 use parking_lot::Mutex;
 use rand::thread_rng;
 use rand::Rng;
 use std::collections::HashSet;
 use std::sync::Arc;
-use time::Timespec;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct WorkUnit {
   pub name: String,
-  pub start_timestamp: Timespec,
-  pub end_timestamp: Timespec,
+  pub time_span: TimeSpan,
   pub span_id: String,
   pub parent_id: Option<String>,
 }
@@ -67,7 +66,11 @@ impl WorkUnitStore {
 pub fn generate_random_64bit_string() -> String {
   let mut rng = thread_rng();
   let random_u64: u64 = rng.gen();
-  format!("{:16.x}", random_u64)
+  hex_16_digit_string(random_u64)
+}
+
+fn hex_16_digit_string(number: u64) -> String {
+  format!("{:016.x}", number)
 }
 
 pub fn workunits_with_constant_span_id(workunit_store: &WorkUnitStore) -> HashSet<WorkUnit> {
@@ -99,4 +102,32 @@ pub fn get_parent_id() -> Option<String> {
     let task_parent_id = task_parent_id.lock();
     (*task_parent_id).clone()
   })
+}
+
+#[cfg(test)]
+mod tests {
+  use crate::hex_16_digit_string;
+
+  #[test]
+  fn workunit_span_id_has_16_digits_len_hex_format() {
+    let number: u64 = 1;
+    let hex_string = hex_16_digit_string(number);
+    assert_eq!(16, hex_string.len());
+    for ch in hex_string.chars() {
+      assert!(ch.is_ascii_hexdigit())
+    }
+  }
+
+  #[test]
+  fn hex_16_digit_string_actually_uses_input_number() {
+    assert_eq!(
+      hex_16_digit_string(0x_ffff_ffff_ffff_ffff),
+      "ffffffffffffffff"
+    );
+    assert_eq!(hex_16_digit_string(0x_1), "0000000000000001");
+    assert_eq!(
+      hex_16_digit_string(0x_0123_4567_89ab_cdef),
+      "0123456789abcdef"
+    );
+  }
 }

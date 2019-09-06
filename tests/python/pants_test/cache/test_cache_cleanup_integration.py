@@ -45,10 +45,10 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
     """Ensure that max-old of 1 removes all but one files"""
 
     with temporary_dir() as cache_dir:
-      config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
+      config = {'cache.compile.rsc': {'write_to': [cache_dir]}}
 
       java_6_args = self._create_platform_args(6) + [
-        'compile.zinc',
+        'compile.rsc',
         'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
         '--cache-max-entries-per-target=1',
       ]
@@ -64,7 +64,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
 
       # Rerun for java 7
       java_7_args = self._create_platform_args(7) + [
-        'compile.zinc',
+        'compile.rsc',
         'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
         '--cache-max-entries-per-target=1',
       ]
@@ -88,10 +88,10 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
     """
 
     with temporary_dir() as cache_dir:
-      config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
+      config = {'cache.compile.rsc': {'write_to': [cache_dir]}}
 
       java_6_args = self._create_platform_args(6) + [
-        'compile.zinc',
+        'compile.rsc',
         'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
         '--cache-max-entries-per-target=0',
       ]
@@ -107,7 +107,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
 
       # Rerun for java 7
       java_7_args = self._create_platform_args(7) + [
-        'compile.zinc',
+        'compile.rsc',
         'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
         '--cache-max-entries-per-target=0',
       ]
@@ -139,11 +139,10 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
       # in order to avoid computing hashed task version used in workdir.
       classpath = 'dist/export-classpath/testprojects.src.java.org.pantsbuild.testproject.unicode.main.main-0.jar'
 
-      # <workdir>/compile/zinc/d4600a981d5d/testprojects.src.java.org.pantsbuild.testproject.unicode.main.main/1a317a2504f6/z.jar'
+      # <workdir>/compile/rsc/d4600a981d5d/testprojects.src.java.org.pantsbuild.testproject.unicode.main.main/1a317a2504f6/z.jar'
       jar_path_in_pantsd = os.path.realpath(classpath)
-
-      # <workdir>/compile/zinc/d4600a981d5d/testprojects.src.java.org.pantsbuild.testproject.unicode.main.main/
-      target_dir_in_pantsd = os.path.dirname(os.path.dirname(jar_path_in_pantsd))
+      # <workdir>/compile/rsc/d4600a981d5d/testprojects.src.java.org.pantsbuild.testproject.unicode.main.main/
+      target_dir_in_pantsd = os.path.dirname(os.path.dirname(os.path.dirname(jar_path_in_pantsd)))
 
       old_cache_dirnames = {
         'old_cache_test1_dir/',
@@ -165,7 +164,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
       expected_dirs = {os.path.join(target_dir_in_pantsd, 'current/')} | old_cache_entries | new_cache_entries
 
       # stable symlink, current version directory, and synthetically created directories.
-      remaining_cache_dir_fingerprinted = self.get_cache_subdir(target_dir_in_pantsd, other_dirs=expected_dirs)
+      remaining_cache_dir_fingerprinted = self.get_cache_subdir(cache_dir=target_dir_in_pantsd, other_dirs=expected_dirs)
       fingerprinted_realdir = os.path.realpath(os.path.join(target_dir_in_pantsd, 'current'))
       self.assertEqual(
         fingerprinted_realdir,
@@ -180,7 +179,10 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
       ], workdir))
 
       # stable (same as before), current, and 2 newest dirs
-      self.assertEqual(os.path.dirname(os.path.dirname(os.path.realpath(classpath))), target_dir_in_pantsd)
+      self.assertEqual(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(classpath)))),
+        target_dir_in_pantsd
+      )
       newest_expected_dirs = expected_dirs - old_cache_entries
       other_cache_dir_fingerprinted = self.get_cache_subdir(target_dir_in_pantsd, other_dirs=newest_expected_dirs)
       self.assertEqual(other_cache_dir_fingerprinted, remaining_cache_dir_fingerprinted)
@@ -192,14 +194,17 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
         'compile',
         'export-classpath',
         'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
-        '--compile-zinc-debug-symbols',
+        '--compile-rsc-debug-symbols',
         '--workdir-max-build-entries={}'.format(max_entries_per_target)
       ], workdir))
 
       # stable, current, and 2 newest dirs
-      self.assertEqual(os.path.dirname(os.path.dirname(os.path.realpath(classpath))), target_dir_in_pantsd)
+      self.assertEqual(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(classpath)))),
+        target_dir_in_pantsd
+      )
       new_cache_dir_fingerprinted = self.get_cache_subdir(target_dir_in_pantsd, other_dirs=newest_expected_dirs)
-      # subsequent run with --compile-zinc-debug-symbols will invalidate previous build thus triggering the clean up.
+      # subsequent run with --compile-rsc-debug-symbols will invalidate previous build thus triggering the clean up.
       self.assertNotEqual(new_cache_dir_fingerprinted, remaining_cache_dir_fingerprinted)
       new_fingerprinted_realdir = os.path.realpath(os.path.join(target_dir_in_pantsd, 'current'))
       self.assertEqual(new_fingerprinted_realdir,

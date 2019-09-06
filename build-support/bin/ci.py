@@ -37,10 +37,8 @@ def main() -> None:
     run_clippy()
   if args.cargo_audit:
     run_cargo_audit()
-  if args.python_tests_v1:
-    run_python_tests_v1()
-  if args.python_tests_v2:
-    run_python_tests_v2(remote_execution_enabled=args.remote_execution_enabled)
+  if args.unit_tests:
+    run_unit_tests(remote_execution_enabled=args.remote_execution_enabled)
   if args.rust_tests:
     run_rust_tests()
   if args.jvm_tests:
@@ -102,14 +100,9 @@ def create_parser() -> argparse.ArgumentParser:
   parser.add_argument(
     "--cargo-audit", action="store_true", help="Run Cargo audit of Rust dependencies."
   )
-  # TODO(#7772): Simplify below to always use V2 and drop the blacklist.
   parser.add_argument(
-    "--python-tests-v1", action="store_true",
-    help="Run Python unit tests with V1 test runner over the blacklist and contrib tests."
-  )
-  parser.add_argument(
-    "--python-tests-v2", action="store_true",
-    help="Run Python unit tests with V2 test runner."
+    "--unit-tests", action="store_true",
+    help="Run Python unit tests."
   )
   parser.add_argument("--rust-tests", action="store_true", help="Run Rust tests.")
   parser.add_argument("--jvm-tests", action="store_true", help="Run JVM tests.")
@@ -157,10 +150,10 @@ def setup_python_interpreter(version: PythonVersion) -> None:
 
 
 def set_run_from_pex() -> None:
-  # We want all invocations of ./pants (apart from the bootstrapping one above) to delegate
-  # to ./pants.pex, and not themselves attempt to bootstrap.
-  # In this file we invoke ./pants.pex directly anyway, but some of those invocations will run
-  # integration tests that shell out to `./pants`, so we set this env var for those cases.
+  # Even though our Python integration tests and commands in this file directly invoke `pants.pex`,
+  # some places like the JVM tests may still directly call the script `./pants`. When this happens,
+  # we want to ensure that the script immediately breaks out to `./pants.pex` to avoid
+  # re-bootstrapping Pants in CI.
   os.environ["RUN_PANTS_FROM_PEX"] = "1"
 
 
@@ -182,6 +175,32 @@ def get_remote_execution_oauth_token_path() -> Iterator[str]:
     yield tf.name
 
 # -------------------------------------------------------------------------
+# Blacklists
+# -------------------------------------------------------------------------
+
+def get_blacklisted_targets(filename: str) -> Set[str]:
+  return {
+    line.strip()
+    for line in Path(f"build-support/ci_blacklists/{filename}").read_text().splitlines()
+  }
+
+
+def get_all_python_tests(*, tag: Optional[str] = None) -> Set[str]:
+  command = [
+    "./pants.pex",
+    "--filter-type=python_tests",
+    "filter",
+    "src/python::",
+    "tests/python::",
+    "contrib::"
+  ]
+  if tag is not None:
+    command.insert(1, f"--tag={tag}")
+  return set(subprocess.run(
+    command, stdout=subprocess.PIPE, encoding="utf-8", check=True
+  ).stdout.strip().split("\n"))
+
+# -------------------------------------------------------------------------
 # Bootstrap pants.pex
 # -------------------------------------------------------------------------
 
@@ -194,9 +213,7 @@ def bootstrap(*, clean: bool, python_version: PythonVersion) -> None:
         die("Failed to clean before bootstrapping Pants.")
 
     try:
-      subprocess.run(["./pants", "binary", "src/python/pants/bin:pants_local_binary"], check=True)
-      Path("dist/pants_local_binary.pex").rename("pants.pex")
-      subprocess.run(["./pants.pex", "--version"], check=True)
+      subprocess.run(["./build-support/bin/bootstrap_pants_pex.sh"], check=True)
     except subprocess.CalledProcessError:
       die("Failed to bootstrap Pants.")
 
@@ -300,11 +317,7 @@ def run_cargo_audit() -> None:
         "build-support/bin/native/cargo",
         "ensure-installed",
         "--package=cargo-audit",
-        "--version=0.6.1",
-        # TODO(John Sirois): Kill --git-url/--git-rev when we upgrade to cargo-audit > 0.6.1.
-        # See: https://github.com/pantsbuild/pants/issues/7760 for context.
-        "--git-url=https://github.com/RustSec/cargo-audit",
-        "--git-rev=1c298bcda2c74f4a1bd8f0d8482b3577ee94fbb3",
+        "--version=0.7.0",
       ], check=True)
       subprocess.run([
         "build-support/bin/native/cargo",
@@ -319,96 +332,56 @@ def run_cargo_audit() -> None:
       die("Cargo audit failure")
 
 
-def run_python_tests_v1() -> None:
-  known_v2_failures_file = "build-support/unit_test_v2_blacklist.txt"
-  with travis_section("PythonTestsV1", "Running Python unit tests with V1 test runner"):
-    check_pants_pex_exists()
-    try:
-      subprocess.run([
-        "./pants.pex",
-        f"--target-spec-file={known_v2_failures_file}",
-        "test.pytest",
-        "--chroot",
-      ] + PYTEST_PASSTHRU_ARGS, check=True)
-    except subprocess.CalledProcessError:
-      die("Python unit test failure (V1 test runner")
-    else:
-      green("V1 unit tests passed.")
+def run_unit_tests(*, remote_execution_enabled: bool) -> None:
+  check_pants_pex_exists()
 
-    try:
-      subprocess.run([
-        "./pants.pex",
-        "--tag=-integration",
-        "--exclude-target-regexp=./*testprojects/.*",
-        "test.pytest",
-        "contrib::",
-      ] + PYTEST_PASSTHRU_ARGS, check=True)
-    except subprocess.CalledProcessError:
-      die("Contrib Python test failure")
-    else:
-      green("Contrib unit tests passed.")
+  all_targets = get_all_python_tests(tag="-integration")
+  blacklisted_chroot_targets = get_blacklisted_targets("unit_test_chroot_blacklist.txt")
+  blacklisted_v2_targets = get_blacklisted_targets("unit_test_v2_blacklist.txt")
+  blacklisted_remote_targets = get_blacklisted_targets("unit_test_remote_blacklist.txt")
 
+  v1_no_chroot_targets = blacklisted_chroot_targets
+  v1_chroot_targets = blacklisted_v2_targets
+  v2_local_targets = blacklisted_remote_targets
+  v2_remote_targets = all_targets - v2_local_targets - v1_chroot_targets - v1_no_chroot_targets
 
-def run_python_tests_v2(*, remote_execution_enabled: bool) -> None:
+  basic_command = ["./pants.pex", "test.pytest"]
+  v2_command = ["./pants.pex", "--no-v1", "--v2", "test.pytest"]
+  v1_no_chroot_command = basic_command + sorted(v1_no_chroot_targets) + PYTEST_PASSTHRU_ARGS
+  v1_chroot_command = basic_command + ["--test-pytest-chroot"] + sorted(v1_chroot_targets) + PYTEST_PASSTHRU_ARGS
+  v2_local_command = v2_command + sorted(v2_local_targets)
 
-  def get_blacklisted_targets(path: str) -> Set[str]:
-    return {line.strip() for line in Path(path).read_text().splitlines()}
-
-  blacklisted_v2_targets = get_blacklisted_targets("build-support/unit_test_v2_blacklist.txt")
-  blacklisted_remote_targets = get_blacklisted_targets("build-support/unit_test_remote_blacklist.txt")
-
-  with travis_section("PythonTestsV2Setup", "Setting up Python unit tests with V2 test runner"):
-    all_targets = subprocess.run([
-      "./pants.pex",
-      "--tag=-integration",
-      "--filter-type=python_tests",
-      "filter",
-      "src/python::",
-      "tests/python::",
-    ], stdout=subprocess.PIPE, encoding="utf-8", check=True).stdout.strip().split("\n")
-    v2_compatible_targets = set(all_targets) - blacklisted_v2_targets
-    if remote_execution_enabled:
-      remote_execution_targets = v2_compatible_targets - blacklisted_remote_targets
-      local_execution_targets = blacklisted_remote_targets
-    else:
-      remote_execution_targets = set()
-      local_execution_targets = v2_compatible_targets
-    check_pants_pex_exists()
-
-  def run_v2_tests(
-    *, targets: Set[str], execution_strategy: str, oauth_token_path: Optional[str] = None
-  ) -> None:
-    try:
-      command = (
-        ["./pants.pex", "--no-v1", "--v2", "test.pytest"] + sorted(targets) + PYTEST_PASSTHRU_ARGS
-      )
-      if oauth_token_path is not None:
-        command[3:3] = [
+  if not remote_execution_enabled:
+    v2_local_targets = v2_local_targets | v2_remote_targets
+    v2_local_command = v2_command + sorted(v2_local_targets)
+  else:
+    with travis_section(
+      "UnitTestsRemote", "Running unit tests via remote execution"
+    ), get_remote_execution_oauth_token_path() as oauth_token_path:
+      v2_remote_command = v2_command[:-1] + [
           "--pants-config-files=pants.remote.ini",
           # We turn off speculation to reduce the risk of flakiness, where a test passes locally but
           # fails remoting and we have a race condition for which environment executes first.
           "--process-execution-speculation-strategy=none",
-          f"--remote-oauth-bearer-token-path={oauth_token_path}"
-        ]
-      subprocess.run(command, check=True)
-    except subprocess.CalledProcessError:
-      die(f"V2 unit tests failure ({execution_strategy} build execution).")
-    else:
-      green(f"V2 unit tests passed ({execution_strategy} build execution).")
+          f"--remote-oauth-bearer-token-path={oauth_token_path}",
+          "test.pytest",
+        ] + sorted(v2_remote_targets)
+      try:
+        subprocess.run(v2_remote_command, check=True)
+      except subprocess.CalledProcessError:
+        die("Unit test failure (remote execution)")
+      else:
+        green("Unit tests passed (remote execution)")
 
-  if remote_execution_enabled:
-    with travis_section(
-      "PythonTestsV2Remote", "Running Python unit tests with V2 test runner and remote build execution"
-    ), get_remote_execution_oauth_token_path() as oauth_token_path:
-      run_v2_tests(
-        targets=remote_execution_targets,
-        execution_strategy="remote",
-        oauth_token_path=oauth_token_path
-      )
-  with travis_section(
-    "PythonTestsV2Local", "Running Python unit tests with V2 test runner and local build execution"
-  ):
-    run_v2_tests(targets=local_execution_targets, execution_strategy="local")
+  with travis_section("UnitTestsLocal", "Running unit tests via local execution"):
+    try:
+      subprocess.run(v2_local_command, check=True)
+      subprocess.run(v1_chroot_command, check=True)
+      subprocess.run(v1_no_chroot_command, check=True)
+    except subprocess.CalledProcessError:
+      die("Unit test failure (local execution)")
+    else:
+      green("Unit tests passed (local execution)")
 
 
 def run_rust_tests() -> None:
@@ -445,37 +418,16 @@ def run_jvm_tests() -> None:
 
 
 def run_integration_tests(*, shard: Optional[str]) -> None:
-  main_command = [
-    "./pants.pex",
-    "--tag=+integration",
-    "test.pytest",
-    "src/python::",
-    "tests/python::",
-  ]
-  contrib_command = [
-    "./pants.pex",
-    "--tag=+integration",
-    "--exclude-target-regexp=.*/testprojects/.*",
-    "test.pytest",
-    "contrib::",
-  ]
+  check_pants_pex_exists()
+  all_targets = get_all_python_tests(tag="+integration")
+  command = ["./pants.pex", "test.pytest"]
   if shard is not None:
-    shard_arg = f"--test-pytest-test-shard={shard}"
-    main_command.append(shard_arg)
-    contrib_command.append(shard_arg)
-  main_command.extend(PYTEST_PASSTHRU_ARGS)
-  contrib_command.extend(PYTEST_PASSTHRU_ARGS)
-  with travis_section("IntegrationTests", f"Running Pants Integration tests{shard if shard is not None else ''}"):
-    check_pants_pex_exists()
+    command.append(f"--test-pytest-test-shard={shard}")
+  with travis_section("IntegrationTests", f"Running Pants Integration tests {shard if shard is not None else ''}"):
     try:
-      subprocess.run(main_command, check=True)
+      subprocess.run(command + sorted(all_targets) + PYTEST_PASSTHRU_ARGS, check=True)
     except subprocess.CalledProcessError:
       die("Integration test failure.")
-
-    try:
-      subprocess.run(contrib_command, check=True)
-    except subprocess.CalledProcessError:
-      die("Contrib integration test failure.")
 
 
 def run_plugin_tests() -> None:

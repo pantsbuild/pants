@@ -15,6 +15,7 @@ python_tests(
   name = 'build_root',
   sources = ['test_build_root.py'],
   dependencies = [
+    '//:build_root',
     'src/python/pants/base:build_root',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
@@ -29,7 +30,7 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
-  timeout = 120,
+  timeout = 240,
 )
 
 python_tests(
@@ -212,7 +213,7 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'platform_specific_behavior', 'integration'},
-  timeout = 360,
+  timeout = 540,
 )
 
 python_tests(

@@ -6,6 +6,9 @@ python_tests(
     '3rdparty/python:parameterized',
     '3rdparty/python:pex',
     '3rdparty/python:wheel',
+    '//:build_root',
+    '//:pants_pex',
+    'build-support/regexes',
     'contrib/python/src/python/pants/contrib/python/checks/tasks/checkstyle',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python/targets',
@@ -15,5 +18,5 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/backend/python/tasks:python_task_test_base',
-  ]
+  ],
 )

@@ -2,11 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from collections import namedtuple
+from typing import Optional, Sequence, Set
 
 from pants.base.project_tree_factory import get_project_tree
+from pants.engine.objects import Collection
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
+from pants.util.objects import datatype
 
 
 class SourceRootCategories:
@@ -17,7 +19,12 @@ class SourceRootCategories:
   ALL = [UNKNOWN, SOURCE, TEST, THIRDPARTY]
 
 
-SourceRoot = namedtuple('_SourceRoot', ['path', 'langs', 'category'])
+class SourceRoot(datatype([('path', str), 'langs', ('category', str)])):
+  pass
+
+
+class AllSourceRoots(Collection.of(SourceRoot)):
+  pass
 
 
 class SourceRootFactory:
@@ -42,7 +49,7 @@ class SourceRootFactory:
 
     :returns: :class:`SourceRoot`.
     """
-    return SourceRoot(relpath, tuple(self._canonicalize_langs(langs)), category)
+    return SourceRoot(relpath, tuple(sorted(self._canonicalize_langs(langs))), category)
 
 
 class SourceRoots:
@@ -68,15 +75,14 @@ class SourceRoots:
     """
     self._trie.add_fixed(path, langs, category)
 
-  def find(self, target):
+  def find(self, target) -> Optional[SourceRoot]:
     """Find the source root for the given target, or None.
 
     :param target: Find the source root for this target.
-    :return: A SourceRoot instance.
     """
     return self.find_by_path(target.address.spec_path)
 
-  def find_by_path(self, path):
+  def find_by_path(self, path: str) -> Optional[SourceRoot]:
     """Find the source root for the given path, or None.
 
     :param path: Find the source root for this path, relative to the buildroot.
@@ -91,7 +97,10 @@ class SourceRoots:
     elif self._options.unmatched == 'create':
       # If no source root is found, use the path directly.
       # TODO: Remove this logic. It should be an error to have no matching source root.
-      return SourceRoot(path, [], SourceRootCategories.UNKNOWN)
+      return SourceRoot(path, (), SourceRootCategories.UNKNOWN)
+
+  def traverse(self) -> Set[str]:
+    return self._trie.traverse()
 
   def all_roots(self):
     """Return all known source roots.
@@ -360,6 +369,20 @@ class SourceRootTrie:
     node.langs = langs
     node.category = category
     node.is_terminal = True
+
+  def traverse(self) -> Set[str]:
+    source_roots: Set[str] = set()
+
+    def traverse_helper(node: SourceRootTrie.Node, path_components: Sequence[str]):
+      for name in node.children:
+        child = node.children[name]
+        if child.is_terminal:
+          effective_path = '/'.join([*path_components, name])
+          source_roots.add(effective_path)
+        traverse_helper(node=child, path_components=[*path_components, name])
+
+    traverse_helper(self._root, [])
+    return source_roots
 
   def find(self, path):
     """Find the source root for the given path."""

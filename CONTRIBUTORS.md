@@ -59,6 +59,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Eric Lindvall
 + Eugene Burmako
 + Evan Jones
++ Fatin H
 + Fedor Korotkov
 + Fiona Condone
 + Florian Leibert
@@ -136,10 +137,12 @@ Created by running `./build-support/bin/contributors.sh`.
 + Matthew Jeffryes
 + Maxim Khutornenko
 + Michael Doherty
++ Michal Bryc
 + Mike Cripps
 + Mike Lindsey
 + Mike Solomon
 + Misho Krastev
++ Mohamed Abdi
 + Moses Nakamura
 + Nadav Samet
 + Neil Sanchala
@@ -160,11 +163,13 @@ Created by running `./build-support/bin/contributors.sh`.
 + Paul Yau
 + Peiyu Wang
 + Peter Seibel
++ Pierre Chevalier
 + Qicheng Ma
 + Robert Stapenhurst
 + Roger Jiang
 + Rushal Verma
 + Ryan Williams
++ Sameer Arora
 + Sameer Brenn
 + Sara Solano
 + Senthil Kumaran

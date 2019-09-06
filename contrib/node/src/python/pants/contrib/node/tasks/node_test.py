@@ -39,16 +39,7 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
     command.run immediately. We override here to invoke TestRunnerTaskMixin.spawn_and_wait,
     which ultimately invokes _spawn, which finally calls command.run.
     """
-    return self.spawn_and_wait(command, workunit)
-
-  def _get_test_targets_for_spawn(self):
-    """Overrides TestRunnerTaskMixin._get_test_targets_for_spawn.
-
-    TestRunnerTaskMixin.spawn_and_wait uses this method to know what targets are being run.
-    By default it returns all test targets - here we override it with the list
-    self._currently_executing_test_targets, which _execute sets.
-    """
-    return self._currently_executing_test_targets
+    return self.spawn_and_wait(self._currently_executing_test_targets, command, workunit)
 
   def _execute(self, all_targets):
     """Implements abstract TestRunnerTaskMixin._execute."""

@@ -21,8 +21,7 @@ from pants.engine.fs import create_fs_rules
 from pants.engine.goal import Goal
 from pants.engine.isolated_process import create_process_rules
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.engine.legacy.graph import (LegacyBuildGraph, TransitiveHydratedTargets,
-                                       create_legacy_graph_tasks)
+from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_tasks
 from pants.engine.legacy.options_parsing import create_options_parsing_rules
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (JvmAppAdaptor, JvmBinaryAdaptor, PageAdaptor,
@@ -35,7 +34,7 @@ from pants.engine.parser import SymbolTable
 from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import Scheduler
 from pants.engine.selectors import Params
-from pants.init.options_initializer import BuildConfigInitializer
+from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.global_options import (DEFAULT_EXECUTION_OPTIONS, ExecutionOptions,
                                          GlobMatchErrorBehavior)
 from pants.util.objects import datatype
@@ -168,19 +167,6 @@ class LegacyGraphSession(datatype(['scheduler_session', 'build_file_aliases', 'g
       )
       self.invalid_goals = invalid_goals
 
-  def warm_product_graph(self, target_roots):
-    """Warm the scheduler's `ProductGraph` with `TransitiveHydratedTargets` products.
-
-    This method raises only fatal errors, and does not consider failed roots in the execution
-    graph: in the v1 codepath, failed roots are accounted for post-fork.
-
-    :param TargetRoots target_roots: The targets root of the request.
-    """
-    logger.debug('warming target_roots for: %r', target_roots)
-    subjects = [target_roots.specs]
-    request = self.scheduler_session.execution_request([TransitiveHydratedTargets], subjects)
-    self.scheduler_session.execute(request)
-
   def run_console_rules(self, options_bootstrapper, goals, target_roots):
     """Runs @console_rules sequentially and interactively by requesting their implicit Goal products.
 
@@ -252,14 +238,15 @@ class EngineInitializer:
   @staticmethod
   def setup_legacy_graph(native, options_bootstrapper, build_configuration):
     """Construct and return the components necessary for LegacyBuildGraph construction."""
+    build_root = get_buildroot()
     bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
     return EngineInitializer.setup_legacy_graph_extended(
-      bootstrap_options.pants_ignore,
-      bootstrap_options.pants_workdir,
+      OptionsInitializer.compute_pants_ignore(build_root, bootstrap_options),
       bootstrap_options.local_store_dir,
       bootstrap_options.build_file_imports,
       options_bootstrapper,
       build_configuration,
+      build_root=build_root,
       native=native,
       glob_match_error_behavior=bootstrap_options.glob_expansion_failure,
       build_ignore_patterns=bootstrap_options.build_ignore,
@@ -272,7 +259,6 @@ class EngineInitializer:
   @staticmethod
   def setup_legacy_graph_extended(
     pants_ignore_patterns,
-    workdir,
     local_store_dir,
     build_file_imports_behavior,
     options_bootstrapper,
@@ -290,7 +276,6 @@ class EngineInitializer:
 
     :param list pants_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
                                        usually taken from the '--pants-ignore' global option.
-    :param str workdir: The pants workdir.
     :param local_store_dir: The directory to use for storing the engine's LMDB store in.
     :param build_file_imports_behavior: How to behave if a BUILD file being parsed tries to use
       import statements. Valid values: "allow", "warn", "error".
@@ -377,7 +362,6 @@ class EngineInitializer:
     scheduler = Scheduler(
       native,
       project_tree,
-      workdir,
       local_store_dir,
       rules,
       union_rules,

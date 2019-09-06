@@ -45,6 +45,7 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
+  timeout = 180,
 )
 
 python_tests(
@@ -68,15 +69,6 @@ python_tests(
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/build_graph',
   ]
-)
-
-python_tests(
-  name = 'scala_library_integration',
-  sources = ['test_scala_library_integration.py'],
-  dependencies = [
-    'tests/python/pants_test:int-test',
-  ],
-  tags = {'integration'},
 )
 
 python_tests(

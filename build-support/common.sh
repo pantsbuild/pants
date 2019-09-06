@@ -61,7 +61,7 @@ function end_travis_section() {
 }
 
 function fingerprint_data() {
-  git hash-object -t blob --stdin
+  git hash-object --stdin
 }
 
 function git_merge_base() {

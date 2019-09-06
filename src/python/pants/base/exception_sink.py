@@ -10,6 +10,7 @@ import sys
 import threading
 import traceback
 from contextlib import contextmanager
+from typing import Callable
 
 import setproctitle
 
@@ -174,8 +175,44 @@ class ExceptionSink:
     cls._pid_specific_error_fileobj = pid_specific_error_stream
     cls._shared_error_fileobj = shared_error_stream
 
+  class AccessGlobalExiterMixin:
+    @property
+    def _exiter(self) -> Exiter:
+      return ExceptionSink.get_global_exiter()
+
   @classmethod
-  def reset_exiter(cls, exiter):
+  def get_global_exiter(cls) -> Exiter:
+    return cls._exiter
+
+  @classmethod
+  @contextmanager
+  def exiter_as(cls, new_exiter_fun: Callable[[Exiter], Exiter]) -> None:
+    """Temporarily override the global exiter.
+
+    NB: We don't want to try/finally here, because we want exceptions to propagate
+    with the most recent exiter installed in sys.excepthook.
+    If we wrap this in a try:finally, exceptions will be caught and exiters unset.
+    """
+    previous_exiter = cls._exiter
+    new_exiter = new_exiter_fun(previous_exiter)
+    cls._reset_exiter(new_exiter)
+    yield
+    cls._reset_exiter(previous_exiter)
+
+  @classmethod
+  @contextmanager
+  def exiter_as_until_exception(cls, new_exiter_fun: Callable[[Exiter], Exiter]) -> None:
+    """Temporarily override the global exiter, except this will unset it when an exception happens."""
+    previous_exiter = cls._exiter
+    new_exiter = new_exiter_fun(previous_exiter)
+    try:
+      cls._reset_exiter(new_exiter)
+      yield
+    finally:
+      cls._reset_exiter(previous_exiter)
+
+  @classmethod
+  def _reset_exiter(cls, exiter: Exiter) -> None:
     """
     Class state:
     - Overwrites `cls._exiter`.
@@ -183,6 +220,7 @@ class ExceptionSink:
     - Overwrites sys.excepthook.
     """
     assert(isinstance(exiter, Exiter))
+    logger.debug(f"overriding the global exiter with {exiter} (from {cls._exiter})")
     # NB: mutate the class variables! This is done before mutating the exception hook, because the
     # uncaught exception handler uses cls._exiter to exit.
     cls._exiter = exiter
@@ -480,11 +518,8 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
 
 # Setup global state such as signal handlers and sys.excepthook with probably-safe values at module
 # import time.
-# TODO: add testing for fatal errors at import-time, which may occur if there are errors in plugins.
-# Set the initial log location, for fatal errors during import time.
-ExceptionSink.reset_log_location(os.path.join(os.getcwd(), '.pants.d'))
 # Sets except hook for exceptions at import time.
-ExceptionSink.reset_exiter(Exiter(exiter=sys.exit))
+ExceptionSink._reset_exiter(Exiter(exiter=sys.exit))
 # Sets a SIGUSR2 handler.
 ExceptionSink.reset_interactive_output_stream(sys.stderr.buffer)
 # Sets a handler that logs nonfatal signals to the exception sink before exiting.

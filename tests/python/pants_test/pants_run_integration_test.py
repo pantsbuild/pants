@@ -9,8 +9,11 @@ import shutil
 import subprocess
 import unittest
 from contextlib import contextmanager
+from dataclasses import dataclass
 from operator import eq, ne
+from pathlib import Path
 from threading import Lock
+from typing import List, Optional, Union
 
 from colors import strip_color
 
@@ -21,33 +24,36 @@ from pants.fs.archive import ZIP
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import fast_relpath, safe_mkdir, safe_mkdir_for, safe_open
-from pants.util.objects import Exactly, datatype, string_type
+from pants.util.objects import datatype
 from pants.util.osutil import Pid
 from pants.util.process_handler import SubprocessProcessHandler
 from pants.util.strutil import ensure_binary
 from pants_test.testutils.file_test_util import check_symlinks, contains_exact_files
 
 
-class PantsResult(datatype([
-    # NB: May be either a string list or string (in the case of `shell=True`).
-    'command',
-    ('returncode', int),
-    ('stdout_data', string_type),
-    ('stderr_data', string_type),
-    ('workdir', string_type),
-    ('pid', Exactly(Pid)),
-])):
-  pass
+# NB: If `shell=True`, it's a single `str`.
+Command = Union[str, List[str]]
 
 
-class PantsJoinHandle(datatype([
-    # NB: May be either a string list or string (in the case of `shell=True`).
-    'command',
-    'process',
-    ('workdir', string_type),
-])):
+@dataclass(frozen=True)
+class PantsResult:
+  command: Command
+  returncode: int
+  stdout_data: str
+  stderr_data: str
+  workdir: str
+  pid: Pid
 
-  def join(self, stdin_data=None, tee_output=False):
+
+@dataclass(frozen=True)
+class PantsJoinHandle:
+  command: Command
+  process: subprocess.Popen
+  workdir: str
+
+  def join(
+    self, stdin_data: Optional[Union[bytes, str]] = None, tee_output: bool = False
+  ) -> PantsResult:
     """Wait for the pants process to complete, and return a PantsResult for it."""
 
     communicate_fn = self.process.communicate
@@ -61,12 +67,13 @@ class PantsJoinHandle(datatype([
       render_logs(self.workdir)
 
     return PantsResult(
-      self.command,
-      self.process.returncode,
-      stdout_data.decode(),
-      stderr_data.decode(),
-      self.workdir,
-      self.process.pid)
+      command=self.command,
+      returncode=self.process.returncode,
+      stdout_data=stdout_data.decode(),
+      stderr_data=stderr_data.decode(),
+      workdir=self.workdir,
+      pid=self.process.pid
+    )
 
 
 def ensure_cached(expected_num_artifacts=None):
@@ -80,7 +87,7 @@ def ensure_cached(expected_num_artifacts=None):
   def decorator(test_fn):
     def wrapper(self, *args, **kwargs):
       with temporary_dir() as artifact_cache:
-        cache_args = '--cache-write-to=["{}"]'.format(artifact_cache)
+        cache_args = f'--cache-write-to=["{artifact_cache}"]'
 
         test_fn(self, *args + (cache_args,), **kwargs)
 
@@ -125,7 +132,7 @@ def ensure_daemon(f):
             if enable_daemon:
               self.assert_success(self.run_pants(['kill-pantsd']))
           except Exception:
-            print('Test failed with enable-pantsd={}:'.format(enable_daemon))
+            print(f'Test failed with enable-pantsd={enable_daemon}:')
             if enable_daemon:
               # If we are already raising, do not attempt to confirm that `kill-pantsd` succeeds.
               self.run_pants(['kill-pantsd'])
@@ -144,16 +151,16 @@ def render_logs(workdir):
     )
   for filename in filenames:
     rel_filename = fast_relpath(filename, workdir)
-    print('{} +++ '.format(rel_filename))
+    print(f'{rel_filename} +++ ')
     for line in _read_log(filename):
-      print('{} >>> {}'.format(rel_filename, line))
-    print('{} --- '.format(rel_filename))
+      print(f'{rel_filename} >>> {line}')
+    print(f'{rel_filename} --- ')
 
 
 def read_pantsd_log(workdir):
   """Yields all lines from the pantsd log under the given workdir."""
   # Surface the pantsd log for easy viewing via pytest's `-s` (don't capture stdio) option.
-  for line in _read_log('{}/pantsd/pantsd.log'.format(workdir)):
+  for line in _read_log(f'{workdir}/pantsd/pantsd.log'):
     yield line
 
 
@@ -166,7 +173,35 @@ def _read_log(filename):
 class PantsRunIntegrationTest(unittest.TestCase):
   """A base class useful for integration tests for targets in the same repo."""
 
-  PANTS_SCRIPT_NAME = 'pants'
+  class InvalidTestEnvironmentError(Exception):
+    """Raised when the external environment is not set up properly to run integration tests."""
+
+  @property
+  def PANTS_SCRIPT_NAME(self) -> str:
+    # We first try to depend on `pants.pex`, instead of `pants`. We do this to allow tests to work
+    # with --chroot and the V2 test runner / remoting. For both use cases, all dependencies must be
+    # explicitly declared via BUILD files, including any use of the file `./pants.pex` or `./pants.`
+    # However, we cannot explicitly depend on `./pants` via BUILD files! We strip the prefix of
+    # source roots, so `src/python/pants` becomes the directory `pants`
+    # (https://github.com/pantsbuild/pants/pull/8185). We cannot have a directory named `pants` and
+    # a file named `pants`. So, we can only safely depend explicitly on `pants.pex`.
+    #
+    # Nevertheless, we still use `./pants` as a fallback. Tests that use the fallback won't work
+    # with --chroot or the V2 test runner, but they will at least work with the default V1 test
+    # runner.
+    if Path('pants.pex').exists():
+      # NB: this is a generated file that gets automatically generated by `./pants` and
+      # `build-support/bin/bootstrap_pants_pex.sh`.
+      return 'pants.pex'
+    if Path('pants').is_file():
+      return 'pants'
+    raise self.InvalidTestEnvironmentError(
+      "Missing the file `pants.pex`. Be sure that this file exists at the build root, as "
+      "integration tests depend on it to run properly.\nAlternatively, integration tests will fall "
+      "back to using the script `pants` at the build root. However, using this fallback instead of "
+      "`pants.pex` is discouraged because your tests will not work with `--chroot` or the V2 test "
+      "runner."
+    )
 
   @classmethod
   def use_pantsd_env_var(cls):
@@ -289,9 +324,9 @@ class PantsRunIntegrationTest(unittest.TestCase):
                                              **kwargs):
     args = [
       '--no-pantsrc',
-      '--pants-workdir={}'.format(workdir),
+      f'--pants-workdir={workdir}',
       '--kill-nailguns',
-      '--print-exception-stacktrace={}'.format(print_exception_stacktrace),
+      f'--print-exception-stacktrace={print_exception_stacktrace}',
     ]
 
     if self.hermetic():
@@ -352,15 +387,15 @@ class PantsRunIntegrationTest(unittest.TestCase):
     # Don't overwrite the profile of this process in the called process.
     # Instead, write the profile into a sibling file.
     if env.get('PANTS_PROFILE'):
-      prof = '{}.{}'.format(env['PANTS_PROFILE'], self._get_profile_disambiguator())
+      prof = f"{env['PANTS_PROFILE']}.{self._get_profile_disambiguator()}"
       env['PANTS_PROFILE'] = prof
       # Make a note the subprocess command, so the user can correctly interpret the profile files.
-      with open('{}.cmd'.format(prof), 'w') as fp:
+      with open(f'{prof}.cmd', 'w') as fp:
         fp.write(' '.join(pants_command))
 
     return PantsJoinHandle(
-        pants_command,
-        subprocess.Popen(
+        command=pants_command,
+        process=subprocess.Popen(
           pants_command,
           env=env,
           stdin=subprocess.PIPE,
@@ -368,24 +403,26 @@ class PantsRunIntegrationTest(unittest.TestCase):
           stderr=subprocess.PIPE,
           **kwargs
         ),
-        workdir
+        workdir=workdir
       )
 
-  def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, tee_output=False, **kwargs):
+  def run_pants_with_workdir(
+    self, command, workdir, config=None, stdin_data=None, tee_output=False, **kwargs
+  ) -> PantsResult:
     if config:
       kwargs["config"] = config
     handle = self.run_pants_with_workdir_without_waiting(command, workdir, **kwargs)
     return handle.join(stdin_data=stdin_data, tee_output=tee_output)
 
-  def run_pants(self, command, config=None, stdin_data=None, extra_env=None, cleanup_workdir=True,
-                **kwargs):
+  def run_pants(
+    self, command, config=None, stdin_data=None, extra_env=None, cleanup_workdir=True, **kwargs
+  ) -> PantsResult:
     """Runs pants in a subprocess.
 
     :param list command: A list of command line arguments coming after `./pants`.
     :param config: Optional data for a generated ini file. A map of <section-name> ->
     map of key -> value. If order in the ini file matters, this should be an OrderedDict.
     :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
-    :returns a PantsResult instance.
     """
     with self.temporary_workdir() as workdir:
       return self.run_pants_with_workdir(
@@ -444,8 +481,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     with self.pants_results(bundle_options) as pants_run:
       self.assert_success(pants_run)
 
-      self.assertTrue(check_symlinks('dist/{bundle_name}-bundle/libs'.format(bundle_name=bundle_name),
-                                     library_jars_are_symlinks))
+      self.assertTrue(check_symlinks(f'dist/{bundle_name}-bundle/libs', library_jars_are_symlinks))
       # TODO(John Sirois): We need a zip here to suck in external library classpath elements
       # pointed to by symlinks in the run_pants ephemeral tmpdir.  Switch run_pants to be a
       # contextmanager that yields its results while the tmpdir workdir is still active and change
@@ -456,51 +492,49 @@ class PantsRunIntegrationTest(unittest.TestCase):
           self.assertTrue(contains_exact_files(workdir, expected_bundle_content))
         if expected_bundle_jar_content:
           with temporary_dir() as check_bundle_jar_dir:
-            bundle_jar = os.path.join(workdir, '{bundle_jar_name}.jar'
-                                      .format(bundle_jar_name=bundle_jar_name))
+            bundle_jar = os.path.join(workdir, f'{bundle_jar_name}.jar')
             ZIP.extract(bundle_jar, check_bundle_jar_dir)
             self.assertTrue(contains_exact_files(check_bundle_jar_dir, expected_bundle_jar_content))
 
         optional_args = []
         if args:
           optional_args = args
-        java_run = subprocess.Popen(['java',
-                                     '-jar',
-                                     '{bundle_jar_name}.jar'.format(bundle_jar_name=bundle_jar_name)]
-                                    + optional_args,
-                                    stdout=subprocess.PIPE,
-                                    cwd=workdir)
+        java_run = subprocess.Popen(
+          ['java', '-jar', f'{bundle_jar_name}.jar'] + optional_args,
+          stdout=subprocess.PIPE,
+          cwd=workdir
+        )
 
         stdout, _ = java_run.communicate()
       java_returncode = java_run.returncode
       self.assertEqual(java_returncode, 0)
       return stdout.decode()
 
-  def assert_success(self, pants_run, msg=None):
+  def assert_success(self, pants_run: PantsResult, msg=None):
     self.assert_result(pants_run, PANTS_SUCCEEDED_EXIT_CODE, expected=True, msg=msg)
 
-  def assert_failure(self, pants_run, msg=None):
+  def assert_failure(self, pants_run: PantsResult, msg=None):
     self.assert_result(pants_run, PANTS_SUCCEEDED_EXIT_CODE, expected=False, msg=msg)
 
-  def assert_result(self, pants_run, value, expected=True, msg=None):
+  def assert_result(self, pants_run: PantsResult, value, expected=True, msg=None):
     check, assertion = (eq, self.assertEqual) if expected else (ne, self.assertNotEqual)
     if check(pants_run.returncode, value):
       return
 
     details = [msg] if msg else []
     details.append(' '.join(pants_run.command))
-    details.append('returncode: {returncode}'.format(returncode=pants_run.returncode))
+    details.append(f'returncode: {pants_run.returncode}')
 
     def indent(content):
       return '\n\t'.join(content.splitlines())
 
-    details.append('stdout:\n\t{stdout}'.format(stdout=indent(pants_run.stdout_data)))
-    details.append('stderr:\n\t{stderr}'.format(stderr=indent(pants_run.stderr_data)))
+    details.append(f'stdout:\n\t{indent(pants_run.stdout_data)}')
+    details.append(f'stderr:\n\t{indent(pants_run.stderr_data)}')
     error_msg = '\n'.join(details)
 
     assertion(value, pants_run.returncode, error_msg)
 
-  def assert_run_contains_log(self, msg, level, module, pants_run):
+  def assert_run_contains_log(self, msg, level, module, pants_run: PantsResult):
     """Asserts that the passed run's stderr contained the log message."""
     self.assert_contains_log(msg, level, module, pants_run.stderr_data, pants_run.pid)
 
@@ -511,14 +545,17 @@ class PantsRunIntegrationTest(unittest.TestCase):
     If pid is specified, performs an exact match including the pid of the pants process.
     Otherwise performs a regex match asserting that some pid is present.
     """
-    prefix = "[{}] {}:pid=".format(level, module)
-    suffix = ": {}".format(msg)
+    prefix = f"[{level}] {module}:pid="
+    suffix = f": {msg}"
     if pid is None:
-      self.assertRegex(log, re.escape(prefix) + "\\d+" + re.escape(suffix))
+      self.assertRegex(log, re.escape(prefix) + r"\d+" + re.escape(suffix))
     else:
-      self.assertIn("{}{}{}".format(prefix, pid, suffix), log)
+      self.assertIn(f"{prefix}{pid}{suffix}", log)
 
-  def normalize(self, s):
+  def assert_is_file(self, file_path):
+    self.assertTrue(os.path.isfile(file_path), f'file path {file_path} does not exist!')
+
+  def normalize(self, s: str) -> str:
     """Removes escape sequences (e.g. colored output) and all whitespace from string s."""
     return ''.join(strip_color(s).split())
 
@@ -613,11 +650,10 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
       yield Manager(write_file, dir_context, tmp_dir)
 
-  def do_command(self, *args, **kwargs):
+  def do_command(self, *args, **kwargs) -> PantsResult:
     """Wrapper around run_pants method.
 
     :param args: command line arguments used to run pants
-    :return: a PantsResult object
     """
     cmd = list(args)
     success = kwargs.pop('success', True)
@@ -638,6 +674,3 @@ class PantsRunIntegrationTest(unittest.TestCase):
       else:
         self.assert_failure(pants_run)
       yield pants_run
-
-  def assertIsFile(self, file_path):
-    self.assertTrue(os.path.isfile(file_path), 'file path {} does not exist!'.format(file_path))

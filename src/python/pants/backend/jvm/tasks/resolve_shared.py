@@ -12,18 +12,6 @@ from pants.util.dirutil import fast_relpath
 class JvmResolverBase(TaskBase):
   """Common methods for both Ivy and Coursier resolves."""
 
-  @classmethod
-  def register_options(cls, register):
-    """Register an option to make capturing snapshots optional.
-    This class is intended to be extended by Jvm resolvers (coursier and ivy), and the option name should reflect that.
-    """
-    super().register_options(register)
-    register('--capture-snapshots', type=bool, default=False,
-             removal_version='1.19.0.dev2',
-             removal_hint='Enabled by default.',
-             help='Enable capturing snapshots to add directory digests to dependency jars.'
-                  'Note that this is necessary when hermetic execution is enabled.')
-
   def add_directory_digests_for_jars(self, targets_and_jars):
     """For each target, get DirectoryDigests for its jars and return them zipped with the jars.
 

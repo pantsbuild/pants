@@ -107,12 +107,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   _name = 'mixed' # noqa
   compiler_name = 'rsc'
 
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super().subsystem_dependencies() + (
-      Rsc,
-    )
-
   @memoized_property
   def mirrored_target_option_actions(self):
     return {
@@ -161,8 +155,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       help='Always compile targets marked with this tag with rsc, unless the workflow is '
            'specified on the cli.')
     register('--workflow', type=cls.JvmCompileWorkflowType,
-      default=cls.JvmCompileWorkflowType.rsc_and_zinc, metavar='<workflow>',
-      help='The workflow to use to compile JVM targets.')
+      default=cls.JvmCompileWorkflowType.zinc_only, metavar='<workflow>',
+      help='The workflow to use to compile JVM targets.', fingerprint=True)
 
     register('--extra-rsc-args', type=list, default=[],
              help='Extra arguments to pass to the rsc invocation.')
@@ -213,7 +207,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       self.NAILGUN: lambda: self._nailgunnable_combined_classpath,
     })()
 
-  # NB: Override of ZincCompile/JvmCompile method!
   def register_extra_products_from_contexts(self, targets, compile_contexts):
     super().register_extra_products_from_contexts(targets, compile_contexts)
 
@@ -227,8 +220,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       zinc_cc = merged_cc.zinc_cc
       if rsc_cc.workflow is not None:
         cp_entries = rsc_cc.workflow.resolve_for_enum_variant({
-          'zinc-only': lambda: confify([zinc_cc.jar_file]),
-          'zinc-java': lambda: confify([zinc_cc.jar_file]),
+          'zinc-only': lambda: confify([self._classpath_for_context(zinc_cc)]),
+          'zinc-java': lambda: confify([self._classpath_for_context(zinc_cc)]),
           'rsc-and-zinc': lambda: confify([rsc_cc.rsc_jar_file]),
         })()
         self.context.products.get_data('rsc_mixed_compile_classpath').add_for_target(
@@ -296,6 +289,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       'rsc-and-zinc': lambda: 'zinc[rsc-and-zinc]({})'.format(target.address.spec),
     })()
 
+  def _write_to_cache_key_for_target(self, target):
+    return 'write_to_cache({})'.format(target.address.spec)
+
   def create_compile_jobs(self,
                           compile_target,
                           compile_contexts,
@@ -305,12 +301,11 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
                           runtime_classpath_product):
 
     def work_for_vts_rsc(vts, ctx):
-      # Double check the cache before beginning compilation
-      hit_cache = self.check_cache(vts, counter)
       target = ctx.target
       tgt, = vts.targets
 
-      if not hit_cache:
+      # If we didn't hit the cache in the cache job, run rsc.
+      if not vts.valid:
         counter_val = str(counter()).rjust(counter.format_length(), ' ')
         counter_str = '[{}/{}] '.format(counter_val, counter.size)
         self.context.log.info(
@@ -322,7 +317,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
           ' (',
           ctx.target.address.spec,
           ').')
-
         # This does the following
         # - Collect the rsc classpath elements, including zinc compiles of rsc incompatible targets
         #   and rsc compiles of rsc compatible targets.
@@ -337,13 +331,12 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         classpath_entries = classpath_product.get_classpath_entries_for_targets(dependencies_for_target)
         for _conf, classpath_entry in classpath_entries:
           classpath_paths.append(fast_relpath(classpath_entry.path, get_buildroot()))
-          if classpath_entry.directory_digest:
-            classpath_directory_digests.append(classpath_entry.directory_digest)
-          else:
-            logger.warning(
+          if self.HERMETIC == self.execution_strategy_enum.value and not classpath_entry.directory_digest:
+            raise AssertionError(
               "ClasspathEntry {} didn't have a Digest, so won't be present for hermetic "
               "execution of rsc".format(classpath_entry)
             )
+          classpath_directory_digests.append(classpath_entry.directory_digest)
 
         ctx.ensure_output_dirs_exist()
 
@@ -395,6 +388,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       self.register_extra_products_from_contexts([ctx.target], compile_contexts)
 
     ### Create Jobs for ExecutionGraph
+    cache_doublecheck_jobs = []
     rsc_jobs = []
     zinc_jobs = []
 
@@ -403,6 +397,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     merged_compile_context = compile_contexts[compile_target]
     rsc_compile_context = merged_compile_context.rsc_cc
     zinc_compile_context = merged_compile_context.zinc_cc
+
+    cache_doublecheck_key = self.exec_graph_double_check_cache_key_for_target(compile_target)
 
     def all_zinc_rsc_invalid_dep_keys(invalid_deps):
       """Get the rsc key for an rsc-and-zinc target, or the zinc key for a zinc-only target."""
@@ -413,6 +409,14 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         if tgt_rsc_cc.workflow is not None:
           # Rely on the results of zinc compiles for zinc-compatible targets
           yield self._key_for_target_as_dep(tgt, tgt_rsc_cc.workflow)
+
+    def make_cache_doublecheck_job(dep_keys):
+      # As in JvmCompile.create_compile_jobs, we create a cache-double-check job that all "real" work
+      # depends on. It depends on completion of the same dependencies as the rsc job in order to run
+      # as late as possible, while still running before rsc or zinc.
+      return Job(cache_doublecheck_key,
+                 functools.partial(self._default_double_check_cache_for_vts, ivts),
+                 dependencies=list(dep_keys))
 
     def make_rsc_job(target, dep_targets):
       return Job(
@@ -426,9 +430,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         ),
         # The rsc jobs depend on other rsc jobs, and on zinc jobs for targets that are not
         # processed by rsc.
-        dependencies=list(all_zinc_rsc_invalid_dep_keys(dep_targets)),
+        dependencies=[cache_doublecheck_key] + list(all_zinc_rsc_invalid_dep_keys(dep_targets)),
         size=self._size_estimator(rsc_compile_context.sources),
-        on_success=ivts.update,
       )
 
     def only_zinc_invalid_dep_keys(invalid_deps):
@@ -448,16 +451,38 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
           counter,
           compile_contexts,
           CompositeProductAdder(*output_products)),
-        dependencies=list(dep_keys),
+        dependencies=[cache_doublecheck_key] + list(dep_keys),
         size=self._size_estimator(zinc_compile_context.sources),
-        # If compilation and analysis work succeeds, validate the vts.
-        # Otherwise, fail it.
-        on_success=ivts.update,
-        on_failure=ivts.force_invalidate)
+      )
+
+    workflow = rsc_compile_context.workflow
+
+    # Replica of JvmCompile's _record_target_stats logic
+    def record(k, v):
+      self.context.run_tracker.report_target_info(
+        self.options_scope,
+        compile_target,
+        ['compile', k],
+        v
+      )
+    record('workflow', workflow.value)
+    record('execution_strategy', self.execution_strategy)
+
+    # Create the cache doublecheck job.
+    workflow.resolve_for_enum_variant({
+      'zinc-only': lambda: cache_doublecheck_jobs.append(
+        make_cache_doublecheck_job(list(all_zinc_rsc_invalid_dep_keys(invalid_dependencies)))
+      ),
+      'zinc-java': lambda: cache_doublecheck_jobs.append(
+        make_cache_doublecheck_job(list(only_zinc_invalid_dep_keys(invalid_dependencies)))
+      ),
+      'rsc-and-zinc': lambda: cache_doublecheck_jobs.append(
+        make_cache_doublecheck_job(list(all_zinc_rsc_invalid_dep_keys(invalid_dependencies)))
+      ),
+    })()
 
     # Create the rsc job.
     # Currently, rsc only supports outlining scala.
-    workflow = rsc_compile_context.workflow
     workflow.resolve_for_enum_variant({
       'zinc-only': lambda: None,
       'zinc-java': lambda: None,
@@ -505,7 +530,19 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         )),
     })()
 
-    return rsc_jobs + zinc_jobs
+    compile_jobs = rsc_jobs + zinc_jobs
+
+    # Create a job that depends on all real work having completed that will eagerly write to the
+    # cache by calling `vt.update()`.
+    write_to_cache_job = Job(
+        key=self._write_to_cache_key_for_target(compile_target),
+        fn=ivts.update,
+        dependencies=[job.key for job in compile_jobs],
+        run_asap=True,
+        on_failure=ivts.force_invalidate)
+
+    all_jobs = cache_doublecheck_jobs + rsc_jobs + zinc_jobs + [write_to_cache_job]
+    return (all_jobs, len(compile_jobs))
 
   class RscZincMergedCompileContexts(datatype([
       ('rsc_cc', RscCompileContext),
@@ -685,22 +722,3 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   @memoized_method
   def _jdk_libs_abs(self, nonhermetic_dist):
     return nonhermetic_dist.find_libs(self._JDK_LIB_NAMES)
-
-  # TODO: rename this, make it public, and explain what "searching for invalid targets" refers to!
-  def _on_invalid_compile_dependency(self, dep, compile_target, contexts):
-    """Decide whether to continue searching for invalid targets to use in the execution graph.
-
-    If a necessary dep is a rsc-and-zinc dep and the root is a zinc-only one, continue to recurse
-    because otherwise we'll drop the path between Zinc compile of the zinc-only target and a Zinc
-    compile of a transitive rsc-and-zinc dependency.
-
-    This is only an issue for graphs like J -> S1 -> S2, where J is a zinc-only target,
-    S1/2 are rsc-and-zinc targets and S2 must be on the classpath to compile J successfully.
-    """
-    def dep_has_rsc_compile():
-      return contexts[dep].rsc_cc.workflow == self.JvmCompileWorkflowType.rsc_and_zinc
-    return contexts[compile_target].rsc_cc.workflow.resolve_for_enum_variant({
-      'zinc-java': dep_has_rsc_compile,
-      'zinc-only': dep_has_rsc_compile,
-      'rsc-and-zinc': lambda: False
-    })()

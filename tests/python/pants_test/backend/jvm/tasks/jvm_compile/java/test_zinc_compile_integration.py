@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import re
 from unittest import skipIf
 
 from pants.base.build_environment import get_buildroot
@@ -13,15 +14,6 @@ from pants_test.backend.jvm.tasks.missing_jvm_check import is_missing_jvm
 
 
 class ZincCompileIntegrationTest(BaseCompileIT):
-
-  def test_java_src_zinc_compile(self):
-    with self.do_test_compile('examples/src/java/::'):
-      # run succeeded as expected
-      pass
-    with self.do_test_compile('examples/tests/java/::'):
-      # run succeeded as expected
-      pass
-
   def test_in_process(self):
     with self.temporary_workdir() as workdir:
       with self.temporary_cachedir() as cachedir:
@@ -51,7 +43,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         pants_run = self.run_test_compile(
           workdir, cachedir, target,
           extra_args=[
-            '--cache-compile-zinc-write-to=["{}/dummy_artifact_cache_dir"]'.format(cachedir),
+            '--cache-compile-rsc-write-to=["{}/dummy_artifact_cache_dir"]'.format(cachedir),
           ],
           clean_all=True,
         )
@@ -65,7 +57,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
               workdir,
               cachedir,
               'testprojects/src/java/org/pantsbuild/testproject/compilation_warnings:{}'.format(target),
-              extra_args=['--compile-zinc-warning-args=-C-Xlint:all'])
+              extra_args=['--compile-rsc-warning-args=-C-Xlint:all'])
 
           if expect_success:
             self.assert_success(pants_run)
@@ -87,7 +79,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
 
     with self.do_test_compile(target_rel_spec,
       expected_files = list(classpath_file_by_target_id.values()),
-      extra_args=['--compile-zinc-capture-classpath']) as found:
+      extra_args=['--compile-rsc-capture-classpath']) as found:
       for target_id, filename in classpath_file_by_target_id.items():
         found_classpath_file = self.get_only(found, filename)
         with open(found_classpath_file, 'r') as f:
@@ -105,7 +97,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
     classpath_filename = '{}.txt'.format(target_id)
     with self.do_test_compile(target_spec,
                               expected_files=[classpath_filename, 'PrintVersion.class'],
-                              extra_args=['--compile-zinc-capture-classpath']) as found:
+                              extra_args=['--compile-rsc-capture-classpath']) as found:
       found_classpath_file = self.get_only(found, classpath_filename)
       self.assertTrue(found_classpath_file
                       .endswith(os.path.join('compile_classpath', classpath_filename)))
@@ -118,7 +110,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
     classpath_filename = '{}.txt'.format(target_id)
     with self.do_test_compile(target_spec,
                               expected_files=['PrintVersion.class'],
-                              extra_args=['--no-compile-zinc-capture-classpath']) as found:
+                              extra_args=['--no-compile-rsc-capture-classpath']) as found:
       self.assertFalse(classpath_filename in found)
 
   @skipIf(is_missing_jvm('1.8'), 'no java 1.8 installation on testing machine')
@@ -143,8 +135,8 @@ class ZincCompileIntegrationTest(BaseCompileIT):
   def test_failed_hermetic_incremental_compile(self):
     with temporary_dir() as cache_dir:
       config = {
-        'cache.compile.zinc': {'write_to': [cache_dir]},
-        'compile.zinc': {
+        'cache.compile.rsc': {'write_to': [cache_dir]},
+        'compile.rsc': {
           'execution_strategy': 'hermetic',
           'use_classpath_jars': False,
           'incremental': True,
@@ -162,13 +154,13 @@ class ZincCompileIntegrationTest(BaseCompileIT):
           config,
         )
         self.assert_failure(pants_run)
-        self.assertIn('Please use --no-compile-zinc-incremental', pants_run.stdout_data)
+        self.assertIn('Please use --no-compile-rsc-incremental', pants_run.stdout_data)
 
   def test_failed_compile_with_hermetic(self):
     with temporary_dir() as cache_dir:
       config = {
-        'cache.compile.zinc': {'write_to': [cache_dir]},
-        'compile.zinc': {
+        'cache.compile.rsc': {'write_to': [cache_dir]},
+        'compile.rsc': {
           'execution_strategy': 'hermetic',
           'use_classpath_jars': False,
           'incremental': False,
@@ -187,16 +179,18 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         )
         self.assert_failure(pants_run)
         self.assertIn('package System2 does not exist', pants_run.stderr_data)
-        self.assertIn(
-          'Failed jobs: compile(testprojects/src/java/org/pantsbuild/testproject/dummies:'
-          'compilation_failure_target)',
-          pants_run.stdout_data)
+        self.assertTrue(
+          re.search(
+            'Compilation failure.*testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target',
+            pants_run.stdout_data
+          )
+        )
 
   def test_failed_compile_with_subprocess(self):
     with temporary_dir() as cache_dir:
       config = {
-        'cache.compile.zinc': {'write_to': [cache_dir]},
-        'compile.zinc': {
+        'cache.compile.rsc': {'write_to': [cache_dir]},
+        'compile.rsc': {
           'execution_strategy': 'subprocess',
           'use_classpath_jars': False,
           'incremental': False,
@@ -216,16 +210,18 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         )
         self.assert_failure(pants_run)
         self.assertIn('package System2 does not exist', pants_run.stdout_data)
-        self.assertIn(
-          'Failed jobs: compile(testprojects/src/java/org/pantsbuild/testproject/dummies:'
-          'compilation_failure_target)',
-          pants_run.stdout_data)
+        self.assertTrue(
+          re.search(
+          'Compilation failure.*testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target',
+          pants_run.stdout_data
+          )
+        )
 
   def test_hermetic_binary_with_dependencies(self):
     with temporary_dir() as cache_dir:
       config = {
-        'cache.compile.zinc': {'write_to': [cache_dir]},
-        'compile.zinc': {
+        'cache.compile.rsc': {'write_to': [cache_dir]},
+        'compile.rsc': {
           'execution_strategy': 'hermetic',
           'use_classpath_jars': False,
           'incremental': False,
@@ -248,11 +244,11 @@ class ZincCompileIntegrationTest(BaseCompileIT):
           pants_run.stdout_data,
         )
 
-        compile_dir = os.path.join(workdir, 'compile', 'zinc', 'current')
+        compile_dir = os.path.join(workdir, 'compile', 'rsc', 'current')
 
         for path_suffix in [
-          'examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/classes/org/pantsbuild/example/hello/exe/Exe.class',
-          'examples.src.scala.org.pantsbuild.example.hello.welcome.welcome/current/classes/org/pantsbuild/example/hello/welcome/WelcomeEverybody.class',
+          'examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/zinc/classes/org/pantsbuild/example/hello/exe/Exe.class',
+          'examples.src.scala.org.pantsbuild.example.hello.welcome.welcome/current/zinc/classes/org/pantsbuild/example/hello/welcome/WelcomeEverybody.class',
         ]:
           path = os.path.join(compile_dir, path_suffix)
           self.assertTrue(os.path.exists(path), "Want path {} to exist".format(path))
@@ -263,8 +259,8 @@ class ZincCompileIntegrationTest(BaseCompileIT):
 
     with temporary_dir() as cache_dir:
       config = {
-        'cache.compile.zinc': {'write_to': [cache_dir]},
-        'compile.zinc': {
+        'cache.compile.rsc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
+        'compile.rsc': {
           'execution_strategy': 'hermetic',
           'use_classpath_jars': False,
           'incremental': False,
@@ -287,21 +283,20 @@ class ZincCompileIntegrationTest(BaseCompileIT):
           pants_run.stdout_data,
         )
 
-        compile_dir = os.path.join(workdir, 'compile', 'zinc', 'current')
+        compile_dir = os.path.join(workdir, 'compile', 'rsc', 'current')
 
         for path_suffix in [
-          'examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/classes/org/pantsbuild/example/hello/exe/Exe.class',
-          'examples.src.scala.org.pantsbuild.example.hello.welcome.welcome/current/classes/org/pantsbuild/example/hello/welcome/WelcomeEverybody.class',
+          'examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/zinc/classes/org/pantsbuild/example/hello/exe/Exe.class',
+          'examples.src.scala.org.pantsbuild.example.hello.welcome.welcome/current/zinc/classes/org/pantsbuild/example/hello/welcome/WelcomeEverybody.class',
         ]:
           path = os.path.join(compile_dir, path_suffix)
           self.assertTrue(os.path.exists(path), "Want path {} to exist".format(path))
-
         with self.with_overwritten_file_content(file_abs_path):
 
           new_temp_test = '''package org.pantsbuild.example.hello.exe
                               
                               import java.io.{BufferedReader, InputStreamReader}
-                              
+                              import org.pantsbuild.example.hello
                               import org.pantsbuild.example.hello.welcome
                               
                               // A simple jvm binary to illustrate Scala BUILD targets
@@ -349,43 +344,11 @@ class ZincCompileIntegrationTest(BaseCompileIT):
             pants_run.stdout_data,
           )
 
-          compile_dir = os.path.join(workdir, 'compile', 'zinc', 'current')
+          compile_dir = os.path.join(workdir, 'compile', 'rsc', 'current')
 
           for path_suffix in [
-            'examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/classes/org/pantsbuild/example/hello/exe/Exe.class',
-            'examples.src.scala.org.pantsbuild.example.hello.welcome.welcome/current/classes/org/pantsbuild/example/hello/welcome/WelcomeEverybody.class',
+            'examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/zinc/classes/org/pantsbuild/example/hello/exe/Exe.class',
+            'examples.src.scala.org.pantsbuild.example.hello.welcome.welcome/current/zinc/classes/org/pantsbuild/example/hello/welcome/WelcomeEverybody.class',
           ]:
             path = os.path.join(compile_dir, path_suffix)
             self.assertTrue(os.path.exists(path), "Want path {} to exist".format(path))
-
-  def test_hermetic_binary_with_3rdparty_dependencies(self):
-    for resolver in ('ivy', 'coursier'):
-      for use_classpath_jars in (False, True):
-        config = {
-          'resolve.ivy': {'capture_snapshots': True},
-          'resolve.coursier': {'capture_snapshots': True},
-          'compile.zinc': {
-            'execution_strategy': 'hermetic',
-            'use_classpath_jars': use_classpath_jars,
-            'incremental': False,
-          },
-          'resolver': {
-            'resolver': resolver,
-          }
-        }
-
-        with self.temporary_workdir() as workdir:
-          with self.temporary_file_content("readme.txt", b"yo"):
-            pants_run = self.run_pants_with_workdir(
-              [
-                'run',
-                'testprojects/src/java/org/pantsbuild/testproject/cwdexample',
-              ],
-              workdir,
-              config,
-            )
-            self.assert_success(pants_run)
-            self.assertIn(
-              'Found readme.txt',
-              pants_run.stdout_data,
-            )

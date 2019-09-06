@@ -3,6 +3,7 @@
 
 import os
 from hashlib import sha1
+from pathlib import Path
 from threading import Lock
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
@@ -21,7 +22,7 @@ from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.java.distribution.distribution import Distribution
 from pants.java.jar.jar_dependency import JarDependency
-from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir
+from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_mkdir_for
 from pants.util.fileutil import safe_hardlink_or_copy
 from pants.util.memo import memoized_method, memoized_property
 
@@ -144,28 +145,30 @@ class Zinc:
 
     @classmethod
     def _zinc(cls, products):
-      return cls.tool_jar_from_products(products, Zinc.ZINC_COMPILER_TOOL_NAME, cls.options_scope)
+      return cls.tool_jar_entry_from_products(products, Zinc.ZINC_COMPILER_TOOL_NAME, cls.options_scope)
 
     @classmethod
     def _compiler_bridge(cls, products):
-      return cls.tool_jar_from_products(products, 'compiler-bridge', cls.options_scope)
+      return cls.tool_jar_entry_from_products(products, 'compiler-bridge', cls.options_scope)
 
     @classmethod
     def _compiler_interface(cls, products):
-      return cls.tool_jar_from_products(products, 'compiler-interface', cls.options_scope)
+      return cls.tool_jar_entry_from_products(products, 'compiler-interface', cls.options_scope)
 
     @classmethod
     def _compiler_bootstrapper(cls, products):
-      return cls.tool_jar_from_products(products, Zinc.ZINC_BOOTSTRAPPER_TOOL_NAME, cls.options_scope)
+      return cls.tool_jar_entry_from_products(products, Zinc.ZINC_BOOTSTRAPPER_TOOL_NAME, cls.options_scope)
 
     # Retrieves the path of a tool's jar
     # by looking at the classpath of the registered tool with the user-specified scala version.
     def _fetch_tool_jar_from_scalac_classpath(self, products, jar_name):
       scala_version = ScalaPlatform.global_instance().version
-      classpath = self.tool_classpath_from_products(products,
-                                                    ScalaPlatform.versioned_tool_name('scalac', scala_version),
-                                                    scope=self.options_scope)
-      candidates = [jar for jar in classpath if jar_name in jar]
+      classpath = self.tool_classpath_entries_from_products(
+          products,
+          ScalaPlatform.versioned_tool_name('scalac', scala_version),
+          scope=self.options_scope
+        )
+      candidates = [jar for jar in classpath if jar_name in jar.path]
       assert(len(candidates) == 1)
       return candidates[0]
 
@@ -210,76 +213,69 @@ class Zinc:
     return self._zinc_factory.hackily_snapshot(context)
 
   @memoized_property
-  def dist(self):
-    """Return the `Distribution` selected for Zinc based on execution strategy.
-
-    :rtype: pants.java.distribution.distribution.Distribution
-    """
+  def dist(self) -> Distribution:
+    """Return the `Distribution` selected for Zinc based on execution strategy."""
     underlying_dist = self.underlying_dist
-    if self._execution_strategy != NailgunTaskBase.HERMETIC:
-      # symlink .pants.d/.jdk -> /some/java/home/
-      jdk_home_symlink = os.path.relpath(
-        os.path.join(self._zinc_factory.get_options().pants_workdir, '.jdk'),
-        get_buildroot())
-
-      # Since this code can be run in multi-threading mode due to multiple
-      # zinc workers, we need to make sure the file operations below are atomic.
-      with self._lock:
-        # Create the symlink if it does not exist, or points to a file that doesn't exist,
-        # (e.g., a JDK that is no longer present), or points to the wrong JDK.
-        if (not os.path.exists(jdk_home_symlink) or
-            os.readlink(jdk_home_symlink) != underlying_dist.home):
-          safe_delete(jdk_home_symlink)  # Safe-delete, in case it's a broken symlink.
-          os.symlink(underlying_dist.home, jdk_home_symlink)
-
-      return Distribution(home_path=jdk_home_symlink)
-    else:
+    if self._execution_strategy == NailgunTaskBase.HERMETIC:
       return underlying_dist
+    # symlink .pants.d/.jdk -> /some/java/home/
+    jdk_home_symlink = (
+      Path(self._zinc_factory.get_options().pants_workdir) / '.jdk'
+    ).relative_to(get_buildroot())
+
+    # Since this code can be run in multi-threading mode due to multiple
+    # zinc workers, we need to make sure the file operations below are atomic.
+    with self._lock:
+      # Create the symlink if it does not exist, or points to a file that doesn't exist,
+      # (e.g., a JDK that is no longer present), or points to the wrong JDK.
+      if not jdk_home_symlink.exists() or jdk_home_symlink.resolve() != Path(underlying_dist.home):
+        safe_delete(str(jdk_home_symlink))  # Safe-delete, in case it's a broken symlink.
+        safe_mkdir_for(jdk_home_symlink)
+        jdk_home_symlink.symlink_to(underlying_dist.home)
+
+    return Distribution(home_path=jdk_home_symlink)
 
   @property
-  def underlying_dist(self):
-    """
-    :rtype: pants.java.distribution.distribution.Distribution
-    """
+  def underlying_dist(self) -> Distribution:
     return self._zinc_factory.dist
 
   @memoized_property
-  def compiler_bridge(self):
-    """Return the path to the Zinc compiler-bridge jar.
+  def _compiler_bridge(self):
+    """Return a ClasspathEntry for the Zinc compiler-bridge jar.
 
-    :rtype: str
+    :rtype: ClasspathEntry
     """
     return self._zinc_factory._compiler_bridge(self._products)
 
   @memoized_property
-  def compiler_interface(self):
-    """Return the path to the Zinc compiler-interface jar.
+  def _compiler_interface(self):
+    """Return a ClasspathEntry for the Zinc compiler-interface jar.
 
-    :rtype: str
+    :rtype: ClasspathEntry
     """
     return self._zinc_factory._compiler_interface(self._products)
 
   @memoized_property
   def scala_compiler(self):
-    """Return the path to the scala compiler jar.
+    """Return a ClasspathEntry for the scala compiler jar.
 
-    :rtype: str
+    :rtype: ClasspathEntry
     """
     return self._zinc_factory._scala_compiler(self._products)
 
   @memoized_property
   def scala_library(self):
-    """Return the path to the scala library jar (runtime).
+    """Return a ClasspathEntry for the scala library jar (runtime).
 
-    :rtype: str
+    :rtype: ClasspathEntry
     """
     return self._zinc_factory._scala_library(self._products)
 
   @memoized_property
   def scala_reflect(self):
-    """Return the path to the scala library jar (runtime).
+    """Return a ClasspathEntry for the scala library jar (runtime).
 
-    :rtype: str
+    :rtype: ClasspathEntry
     """
     return self._zinc_factory._scala_reflect(self._products)
 
@@ -297,8 +293,8 @@ class Zinc:
     and the compiler bridge.
     """
     hasher = sha1()
-    for cp_entry in [self.zinc, self.compiler_interface, self.compiler_bridge]:
-      hasher.update(os.path.relpath(cp_entry, self._workdir()).encode())
+    for cp_entry in [self.zinc, self._compiler_interface, self._compiler_bridge]:
+      hasher.update(cp_entry.directory_digest.fingerprint.encode())
     key = hasher.hexdigest()[:12]
 
     return os.path.join(self._workdir(), 'zinc', 'compiler-bridge', key)
@@ -308,28 +304,37 @@ class Zinc:
     return fast_relpath(path, get_buildroot())
 
   def _run_bootstrapper(self, bridge_jar, context):
-    bootstrapper = self._relative_to_buildroot(
-      self._zinc_factory._compiler_bootstrapper(self._products),
-    )
+    bootstrapper_entry = self._zinc_factory._compiler_bootstrapper(self._products)
+    bootstrapper = self._relative_to_buildroot(bootstrapper_entry.path)
+
+    # CLI args and their associated ClasspathEntry objects.
+    bootstrap_cp_entries = (
+        ('--compiler-interface', self._compiler_interface),
+        ('--compiler-bridge-src', self._compiler_bridge),
+        ('--scala-compiler', self.scala_compiler),
+        ('--scala-library', self.scala_library),
+        ('--scala-reflect', self.scala_reflect),
+      )
+
     bootstrapper_args = [
-      '--out', self._relative_to_buildroot(bridge_jar),
-      '--compiler-interface', self._relative_to_buildroot(self.compiler_interface),
-      '--compiler-bridge-src', self._relative_to_buildroot(self.compiler_bridge),
-      '--scala-compiler', self._relative_to_buildroot(self.scala_compiler),
-      '--scala-library', self._relative_to_buildroot(self.scala_library),
-      '--scala-reflect', self._relative_to_buildroot(self.scala_reflect),
-    ]
-    input_jar_snapshots = context._scheduler.capture_snapshots((PathGlobsAndRoot(
-      PathGlobs(tuple([bootstrapper] + bootstrapper_args[1::2])),
-      get_buildroot(),
-    ),))
+        '--out', self._relative_to_buildroot(bridge_jar),
+      ]
+    for arg, cp_entry in bootstrap_cp_entries:
+      bootstrapper_args.append(arg)
+      bootstrapper_args.append(self._relative_to_buildroot(cp_entry.path))
+
+    inputs_digest = context._scheduler.merge_directories([
+        bootstrapper_entry.directory_digest
+      ] + [
+        entry.directory_digest for _, entry in bootstrap_cp_entries
+      ])
     argv = tuple(['.jdk/bin/java'] +
                  ['-cp', bootstrapper, Zinc.ZINC_BOOTSTRAPER_MAIN] +
                  bootstrapper_args
     )
     req = ExecuteProcessRequest(
       argv=argv,
-      input_files=input_jar_snapshots[0].directory_digest,
+      input_files=inputs_digest,
       output_files=(self._relative_to_buildroot(bridge_jar),),
       description='bootstrap compiler bridge.',
       # Since this is always hermetic, we need to use `underlying_dist`
@@ -381,21 +386,6 @@ class Zinc:
       return ClasspathEntry(bridge_jar, bridge_jar_digest)
 
   @memoized_method
-  def snapshot(self, scheduler):
-    buildroot = get_buildroot()
-    return scheduler.capture_snapshots((
-      PathGlobsAndRoot(
-        PathGlobs(
-          tuple(
-            fast_relpath(a, buildroot)
-              for a in (self.zinc, self.compiler_bridge, self.compiler_interface)
-          )
-        ),
-        buildroot,
-      ),
-    ))[0]
-
-  @memoized_method
   def _compiler_plugins_cp_entries(self):
     """Any additional global compiletime classpath entries for compiler plugins."""
     java_options_src = Java.global_instance()
@@ -403,10 +393,10 @@ class Zinc:
 
     def cp(instance, toolname):
       scope = instance.options_scope
-      return instance.tool_classpath_from_products(self._products, toolname, scope=scope)
+      return instance.tool_classpath_entries_from_products(self._products, toolname, scope=scope)
     classpaths = (cp(java_options_src, 'javac-plugin-dep') +
                   cp(scala_options_src, 'scalac-plugin-dep'))
-    return [(conf, ClasspathEntry(jar)) for conf in self.DEFAULT_CONFS for jar in classpaths]
+    return [(conf, jar) for conf in self.DEFAULT_CONFS for jar in classpaths]
 
   @memoized_property
   def extractor(self):

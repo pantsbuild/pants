@@ -144,6 +144,10 @@ class NodeDistribution(NativeTool):
     """
     yarnpkg_package_path = YarnpkgDistribution.scoped_instance(self).select()
     yarnpkg_bin_path = os.path.join(yarnpkg_package_path, 'dist', 'bin')
+    if not is_readable_dir(yarnpkg_bin_path):
+      # The binary was pulled from yarn's Github release page and not our S3,
+      # in which case it's installed under a different directory.
+      return os.path.join(yarnpkg_package_path, os.listdir(yarnpkg_package_path)[0], 'bin')
     return yarnpkg_bin_path
 
   def node_command(self, args=None, node_paths=None):

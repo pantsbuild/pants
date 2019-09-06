@@ -50,8 +50,9 @@ class TestResult:
   @classmethod
   def from_error(cls, error):
     if not isinstance(error, TaskError):
-      raise AssertionError('Can only synthesize a {} from a TaskError, given a {}'
-                           .format(cls.__name__, type(error).__name__))
+      raise AssertionError(
+        f'Can only synthesize a {cls.__name__} from a TaskError, given a {type(error).__name__}'
+      )
     return cls(str(error), rc=error.exit_code, failed_targets=error.failed_targets)
 
   def with_failed_targets(self, failed_targets):
@@ -123,9 +124,9 @@ class TestRunnerTaskMixin:
     if (self.get_options().timeout_maximum is not None
         and self.get_options().timeout_default is not None
         and self.get_options().timeout_maximum < self.get_options().timeout_default):
-      message = "Error: timeout-default: {} exceeds timeout-maximum: {}".format(
-        self.get_options().timeout_maximum,
-        self.get_options().timeout_default
+      message = (
+        f"Error: timeout-default: {self.get_options().timeout_maximum} exceeds timeout-maximum: "
+        f"{self.get_options().timeout_default}"
       )
       self.context.log.error(message)
       raise ErrorWhileTesting(message)
@@ -198,8 +199,7 @@ class TestRunnerTaskMixin:
       """Indicates an error parsing a xml report file."""
 
       def __init__(self, xml_path, cause):
-        super().__init__('Error parsing test result file {}: {}'
-          .format(xml_path, cause))
+        super().__init__(f'Error parsing test result file {xml_path}: {cause}')
         self.xml_path = xml_path
         self.cause = cause
 
@@ -240,20 +240,13 @@ class TestRunnerTaskMixin:
 
     return tests_in_path
 
-  def _get_test_targets_for_spawn(self):
-    """Invoked by spawn_and_wait to know targets being executed. Defaults to _get_test_targets().
+  def spawn_and_wait(self, test_targets, *args, **kwargs):
+    """Spawn the actual test runner process, and wait for it to complete.
 
-    spawn_and_wait passes all its arguments through to _spawn, but it needs to know what targets
-    are being executed by _spawn. A caller to spawn_and_wait can override this method to return
-    the targets being executed by the current spawn_and_wait. By default it returns
-    _get_test_targets(), which is all test targets.
+    Other than the required positional test_targets argument, all args and kwargs are passed through
+    to spawn.
     """
-    return self._get_test_targets()
 
-  def spawn_and_wait(self, *args, **kwargs):
-    """Spawn the actual test runner process, and wait for it to complete."""
-
-    test_targets = self._get_test_targets_for_spawn()
     timeout = self._timeout_for_targets(test_targets)
 
     process_handler = self._spawn(*args, **kwargs)

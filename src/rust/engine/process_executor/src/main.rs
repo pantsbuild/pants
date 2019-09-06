@@ -190,6 +190,14 @@ fn main() {
           .required(false)
           .help("The name of a directory (which may or may not exist), where the output tree will be materialized.")
     )
+    .arg(
+      Arg::with_name("store-connection-limit")
+          .help("Number of concurrent servers to allow connections to.")
+          .takes_value(true)
+          .long("store-connection-limit")
+          .required(false)
+          .default_value("3")
+    )
     .get_matches();
 
   let argv: Vec<String> = args
@@ -248,9 +256,9 @@ fn main() {
       Store::with_remote(
         executor.clone(),
         local_store_path,
-        &[cas_server.to_owned()],
+        vec![cas_server.to_owned()],
         remote_instance_arg.clone(),
-        &root_ca_certs,
+        root_ca_certs,
         oauth_bearer_token,
         1,
         chunk_size,
@@ -258,6 +266,8 @@ fn main() {
         // TODO: Take a command line arg.
         BackoffConfig::new(Duration::from_secs(1), 1.2, Duration::from_secs(20)).unwrap(),
         3,
+        value_t!(args.value_of("store-connection-limit"), usize)
+          .expect("Bad store-connection-limit flag"),
       )
     }
     (None, None) => Store::local_only(executor.clone(), local_store_path),
@@ -330,7 +340,7 @@ fn main() {
 
   if let Some(output) = args.value_of("materialize-output-to").map(PathBuf::from) {
     runtime
-      .block_on(store.materialize_directory(output, result.output_directory))
+      .block_on(store.materialize_directory(output, result.output_directory, WorkUnitStore::new()))
       .unwrap();
   }
 

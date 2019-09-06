@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 from datetime import datetime
+from pathlib import Path
 
 from pystache import Renderer
 
@@ -65,20 +66,19 @@ class SiteGen(Task):
 
 def load_config(json_path):
   """Load config info from a .json file and return it."""
-  with open(json_path, 'r') as json_file:
-    config = json.loads(json_file.read())
+  with Path(json_path).open() as f:
+    config = json.load(f)
   # sanity-test the config:
-  assert(config['tree'][0]['page'] == 'index')
+  assert config['tree'][0]['page'] == 'index'
   return config
 
 
 def load_soups(config):
   """Generate BeautifulSoup AST for each page listed in config."""
-  soups = {}
-  for page, path in config['sources'].items():
-    with open(path, 'r') as orig_file:
-      soups[page] = beautiful_soup(orig_file.read(), features='html.parser')
-  return soups
+  return {
+    page: beautiful_soup(Path(path).read_text(), features='html.parser')
+    for page, path in config['sources'].items()
+  }
 
 
 class Precomputed:
@@ -126,8 +126,9 @@ def precompute_pantsrefs(soups):
         continue
       pantsmark = tag['pantsmark']
       if pantsmark in accumulator:
-        raise TaskError('pantsmarks are unique but "{}" appears in {} and {}'
-                        .format(pantsmark, page, accumulator[pantsmark]))
+        raise TaskError(
+          f'pantsmarks are unique but "{pantsmark}" appears in {page} and {accumulator[pantsmark]}'
+        )
 
       # To link to a place "mid-page", we need an HTML anchor.
       # If this tag already has such an anchor, use it.
@@ -137,11 +138,11 @@ def precompute_pantsrefs(soups):
         anchor = pantsmark
         while anchor in existing_anchors:
           count += 1
-          anchor = '{}_{}'.format(pantsmark, count)
+          anchor = f'{pantsmark}_{count}'
         tag['id'] = anchor
         existing_anchors = find_existing_anchors(soup)
 
-      link = '{}.html#{}'.format(page, anchor)
+      link = f'{page}.html#{anchor}'
       accumulator[pantsmark] = link
   return accumulator
 
@@ -171,11 +172,11 @@ def fixup_internal_links(config, soups):
   for name, soup in soups.items():
     old_src_dir = os.path.dirname(config['sources'][name])
     for tag in soup.find_all(True):
-      if not 'href' in tag.attrs:
+      if 'href' not in tag.attrs:
         continue
       old_rel_path = tag['href'].split('#')[0]
       old_dst = os.path.normpath(os.path.join(old_src_dir, old_rel_path))
-      if not old_dst in reverse_directory:
+      if old_dst not in reverse_directory:
         continue
       new_dst = reverse_directory[old_dst] + '.html'
       new_rel_path = rel_href(name, new_dst)
@@ -186,10 +187,10 @@ def fixup_internal_links(config, soups):
 _heading_re = re.compile(r'^h[1-6]$')  # match heading tag names h1,h2,h3,...
 
 
-def rel_href(src, dst):
+def rel_href(src: str, dst: str) -> str:
   """For src='foo/bar.html', dst='garply.html#frotz' return relative link '../garply.html#frotz'.
   """
-  src_dir = os.path.dirname(src)
+  src_dir = Path(src).parent
   return os.path.relpath(dst, src_dir)
 
 
@@ -222,8 +223,8 @@ def ensure_page_headings_linkable(soup):
       snippet = ''.join([c for c in tag.text if c.isalpha()])[:20]
       while True:
         count += 1
-        candidate_id = 'heading_{}_{}'.format(snippet, count).lower()
-        if not candidate_id in existing_anchors:
+        candidate_id = f'heading_{snippet}_{count}'.lower()
+        if candidate_id not in existing_anchors:
           existing_anchors.add(candidate_id)
           tag['id'] = candidate_id
           break
@@ -236,9 +237,10 @@ def link_pantsrefs(soups, precomputed):
       if not a.has_attr('pantsref'):
         continue
       pantsref = a['pantsref']
-      if not pantsref in precomputed.pantsref:
-        raise TaskError('Page {} has pantsref "{}" and I cannot find pantsmark for'
-                        ' it'.format(page, pantsref))
+      if pantsref not in precomputed.pantsref:
+        raise TaskError(
+          f'Page {page} has pantsref "{pantsref}" and I cannot find pantsmark for it'
+        )
       a['href'] = rel_href(page, precomputed.pantsref[pantsref])
 
 
@@ -272,7 +274,7 @@ def generate_site_toc(config, precomputed, here):
         links = []
         collapse_open = False
         for cur_page in pages:
-          html_filename = '{}.html'.format(cur_page)
+          html_filename = f'{cur_page}.html'
           page_is_here = cur_page == here
           if page_is_here:
             link = html_filename
@@ -284,11 +286,11 @@ def generate_site_toc(config, precomputed, here):
       if 'heading' in node:
         heading = node['heading']
         site_toc.append(dict(depth=depth_so_far, links=None, dropdown=False, heading=heading, id=heading.replace(' ', '-')))
-      if 'pages' in node and not 'collapsible_heading' in node:
+      if 'pages' in node and 'collapsible_heading' not in node:
         pages = node['pages']
         links = []
         for cur_page in pages:
-          html_filename = '{}.html'.format(cur_page)
+          html_filename = f'{cur_page}.html'
           page_is_here = cur_page == here
           if page_is_here:
             link = html_filename
@@ -309,7 +311,7 @@ def hdepth(tag):
   E.g., h1 at top level is 1, h1 in a section is 2, h2 at top level is 2.
   """
   if not _heading_re.search(tag.name):
-    raise TaskError("Can't compute heading depth of non-heading {}".format(tag))
+    raise TaskError(f"Can't compute heading depth of non-heading {tag}")
   depth = int(tag.name[1], 10)  # get the 2 from 'h2'
   cursor = tag
   while cursor:
@@ -332,7 +334,7 @@ def generate_page_toc(soup):
   # one heading of some outline level, don't show it.
   found_depth_counts = collections.defaultdict(int)
   for tag in soup.find_all(_heading_re):
-    if (tag.get('id') or tag.get('name')):
+    if tag.get('id') or tag.get('name'):
       found_depth_counts[hdepth(tag)] += 1
 
   depth_list = [i for i in range(100) if 1 < found_depth_counts[i]]
@@ -348,7 +350,7 @@ def generate_page_toc(soup):
 
 
 def generate_generated(config, here):
-  return '{} {}'.format(config['sources'][here], datetime.now().isoformat())
+  return f"{config['sources'][here]} {datetime.now().isoformat()}"
 
 
 def render_html(dst, config, soups, precomputed, template):
@@ -356,7 +358,7 @@ def render_html(dst, config, soups, precomputed, template):
   renderer = Renderer()
   title = precomputed.page[dst].title
   topdots = '../' * dst.count('/')
-  body_html = '{}'.format(soup.body) if soup.body else '{}'.format(soup)
+  body_html = f'{soup.body if soup.body else soup}'
   html = renderer.render(template,
                          body_html=body_html,
                          generated=generate_generated(config, dst),
@@ -372,27 +374,20 @@ def render_html(dst, config, soups, precomputed, template):
 def write_en_pages(config, soups, precomputed, template):
   outdir = config['outdir']
   for dst in soups:
-    html = render_html(dst, config, soups, precomputed, template)
-    dst_path = os.path.join(outdir, dst + '.html')
-    dst_dir = os.path.dirname(dst_path)
-    if not os.path.isdir(dst_dir):
-      os.makedirs(dst_dir)
-    with open(dst_path, 'w') as f:
-      f.write(html)
+    dst_path = Path(outdir) / f'{dst}.html'
+    dst_path.parent.mkdir(parents=True, exist_ok=True)
+    dst_path.write_text(data=render_html(dst, config, soups, precomputed, template))
 
 
 def copy_extras(config):
   """copy over "extra" files named in config json: stylesheets, logos, ..."""
   outdir = config['outdir']
   for dst, src in config['extras'].items():
-    dst_path = os.path.join(outdir, dst)
-    dst_dir = os.path.dirname(dst_path)
-    if not os.path.isdir(dst_dir):
-      os.makedirs(dst_dir)
+    dst_path = Path(outdir) / dst
+    dst_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy(src, dst_path)
 
 
 def load_template(config):
   """Return text of template file specified in config"""
-  with open(config['template'], 'r') as template_file:
-    return template_file.read()
+  return Path(config['template']).read_text()

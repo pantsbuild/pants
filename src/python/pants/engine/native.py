@@ -333,12 +333,23 @@ class _FFISpecification(object):
     c = self._ffi.from_handle(context_handle)
     return c.utf8_buf(str(c.from_id(type_id.tup_0).__name__))
 
+  # If we try to pass a None to the CFFI layer, it will silently fail 
+  # in a weird way. So instead we use the empty string/bytestring as
+  # a de-facto null value, in both `extern_val_to_str` and
+  # `extern_val_to_bytes`.
+  @_extern_decl('Buffer', ['ExternContext*', 'Handle*'])
+  def extern_val_to_bytes(self, context_handle, val):
+    """Given a Handle for `obj`, write bytes(obj) and return it."""
+    c = self._ffi.from_handle(context_handle)
+    v = c.from_value(val[0])
+    v_bytes = b'' if v is None else bytes(v)
+    return c.buf(v_bytes)
+
   @_extern_decl('Buffer', ['ExternContext*', 'Handle*'])
   def extern_val_to_str(self, context_handle, val):
     """Given a Handle for `obj`, write str(obj) and return it."""
     c = self._ffi.from_handle(context_handle)
     v = c.from_value(val[0])
-    # Consistently use the empty string to indicate None.
     v_str = '' if v is None else str(v)
     return c.utf8_buf(v_str)
 
@@ -381,9 +392,15 @@ class _FFISpecification(object):
     c = self._ffi.from_handle(context_handle)
     return c.to_value(self._ffi.string(utf8_ptr, utf8_len).decode())
 
+  @_extern_decl('Handle', ['ExternContext*', 'uint64_t'])
+  def extern_store_u64(self, context_handle, u64):
+    """Given a context and uint64_t, return a new Handle to represent the uint64_t."""
+    c = self._ffi.from_handle(context_handle)
+    return c.to_value(u64)
+
   @_extern_decl('Handle', ['ExternContext*', 'int64_t'])
   def extern_store_i64(self, context_handle, i64):
-    """Given a context and int32_t, return a new Handle to represent the int32_t."""
+    """Given a context and int64_t, return a new Handle to represent the int64_t."""
     c = self._ffi.from_handle(context_handle)
     return c.to_value(i64)
 
@@ -677,12 +694,14 @@ class Native(Singleton):
                            self.ffi_lib.extern_clone_val,
                            self.ffi_lib.extern_drop_handles,
                            self.ffi_lib.extern_type_to_str,
+                           self.ffi_lib.extern_val_to_bytes,
                            self.ffi_lib.extern_val_to_str,
                            self.ffi_lib.extern_store_tuple,
                            self.ffi_lib.extern_store_set,
                            self.ffi_lib.extern_store_dict,
                            self.ffi_lib.extern_store_bytes,
                            self.ffi_lib.extern_store_utf8,
+                           self.ffi_lib.extern_store_u64,
                            self.ffi_lib.extern_store_i64,
                            self.ffi_lib.extern_store_f64,
                            self.ffi_lib.extern_store_bool,
@@ -763,7 +782,6 @@ class Native(Singleton):
                     tasks,
                     root_subject_types,
                     build_root,
-                    work_dir,
                     local_store_dir,
                     ignore_patterns,
                     execution_options,
@@ -779,6 +797,7 @@ class Native(Singleton):
                     type_merge_snapshots_request,
                     type_directory_with_prefix_to_strip,
                     type_files_content,
+                    type_input_file_content,
                     type_dir,
                     type_file,
                     type_link,
@@ -809,6 +828,7 @@ class Native(Singleton):
         ti(type_merge_snapshots_request),
         ti(type_directory_with_prefix_to_strip),
         ti(type_files_content),
+        ti(type_input_file_content),
         ti(type_dir),
         ti(type_file),
         ti(type_link),
@@ -820,7 +840,6 @@ class Native(Singleton):
         ti(bytes),
         # Project tree.
         self.context.utf8_buf(build_root),
-        self.context.utf8_buf(work_dir),
         self.context.utf8_buf(local_store_dir),
         self.context.utf8_buf_buf(ignore_patterns),
         self.to_ids_buf(root_subject_types),
@@ -835,6 +854,7 @@ class Native(Singleton):
         self.context.utf8_buf(execution_options.remote_oauth_bearer_token_path or ""),
         execution_options.remote_store_thread_count,
         execution_options.remote_store_chunk_bytes,
+        execution_options.remote_store_connection_limit,
         execution_options.remote_store_chunk_upload_timeout_seconds,
         execution_options.remote_store_rpc_retries,
         self.context.utf8_buf_buf(execution_options.remote_execution_extra_platform_properties),

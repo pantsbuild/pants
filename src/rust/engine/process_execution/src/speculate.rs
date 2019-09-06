@@ -155,18 +155,17 @@ mod tests {
     is_err: bool,
     call_counter: Arc<Mutex<u32>>,
   ) -> DelayedCommandRunner {
-    let mut result;
-    if is_err {
-      result = Err(msg.into());
+    let result = if is_err {
+      Err(msg.into())
     } else {
-      result = Ok(FallibleExecuteProcessResult {
+      Ok(FallibleExecuteProcessResult {
         stdout: msg.into(),
         stderr: "".into(),
         exit_code: 0,
         output_directory: EMPTY_DIGEST,
         execution_attempts: vec![],
       })
-    }
+    };
     DelayedCommandRunner::new(Duration::from_millis(delay), result, call_counter)
   }
 

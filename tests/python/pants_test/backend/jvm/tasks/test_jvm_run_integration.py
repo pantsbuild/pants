@@ -71,28 +71,32 @@ class JvmRunIntegrationTest(PantsRunIntegrationTest):
     self.assertIn('Synthetic jar run is not detected', output)
 
   def test_enable_extra_jvm_options(self):
-    output = self.run_pants(
+    jvm_run_fixed_heap_size = {'jvm.run.jvm': {'options': '["-Xmx123456789"]'}}
+    def run_pants_with_heap_size(cmd):
+      return self.run_pants(cmd, config=jvm_run_fixed_heap_size)
+
+    output = run_pants_with_heap_size(
       ['run',
         'testprojects/src/java/org/pantsbuild/testproject/extra_jvm_options:python_app']).stdout_data
     self.assertIn('Python app runs correctly', output)
 
-    output = self.run_pants(
+    output = run_pants_with_heap_size(
       ['run',
         'testprojects/src/java/org/pantsbuild/testproject/extra_jvm_options:noopts']).stdout_data
     self.assertIn("""Property property.color is null
 Property property.size is null
 Flag -DMyFlag is NOT set
-Max Heap Size: 954728448""", output)
+Max Heap Size: 119013376""", output)
 
-    output = self.run_pants(
+    output = run_pants_with_heap_size(
       ['run',
         'testprojects/src/java/org/pantsbuild/testproject/extra_jvm_options:app_noopts']).stdout_data
     self.assertIn("""Property property.color is null
 Property property.size is null
 Flag -DMyFlag is NOT set
-Max Heap Size: 954728448""", output)
+Max Heap Size: 119013376""", output)
 
-    output = self.run_pants(
+    output = run_pants_with_heap_size(
       ['run',
         'testprojects/src/java/org/pantsbuild/testproject/extra_jvm_options:opts']).stdout_data
     self.assertIn("""Property property.color is orange

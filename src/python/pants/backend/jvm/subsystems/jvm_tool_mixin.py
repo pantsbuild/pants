@@ -177,6 +177,14 @@ class JvmToolMixin:
   def tool_jar_from_products(cls, products, key, scope):
     """Get the jar for the tool previously registered under key in the given scope.
 
+    See tool_jar_entry_from_products.
+    """
+    return cls.tool_jar_entry_from_products(products, key, scope).path
+
+  @classmethod
+  def tool_jar_entry_from_products(cls, products, key, scope):
+    """Get a ClasspathEntry for the jar for the tool previously registered under key in the given scope.
+
     :param products: The products of the current pants run.
     :type products: :class:`pants.goal.products.Products`
     :param string key: The key the tool configuration was registered under.
@@ -186,16 +194,24 @@ class JvmToolMixin:
     :raises: `JvmToolMixin.InvalidToolClasspath` when the tool classpath is not composed of exactly
              one jar.
     """
-    classpath = cls.tool_classpath_from_products(products, key, scope)
+    classpath = cls.tool_classpath_entries_from_products(products, key, scope)
     if len(classpath) != 1:
       params = dict(tool=key, scope=scope, count=len(classpath), classpath='\n\t'.join(classpath))
       raise cls.InvalidToolClasspath('Expected tool {tool} in scope {scope} to resolve to one '
                                      'jar, instead found {count}:\n\t{classpath}'.format(**params))
     return classpath[0]
 
+  @classmethod
+  def tool_classpath_from_products(cls, products, key, scope):
+    """Get a classpath of paths for the tool previously registered under key in the given scope.
+
+    See tool_classpath_entries_from_products.
+    """
+    return [entry.path for entry in cls.tool_classpath_entries_from_products(products, key, scope)]
+
   @staticmethod
-  def tool_classpath_from_products(products, key, scope):
-    """Get a classpath for the tool previously registered under key in the given scope.
+  def tool_classpath_entries_from_products(products, key, scope):
+    """Get ClasspathEntries for the tool previously registered under key in the given scope.
 
     :param products: The products of the current pants run.
     :type products: :class:`pants.goal.products.Products`

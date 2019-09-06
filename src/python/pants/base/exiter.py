@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 PANTS_SUCCEEDED_EXIT_CODE = 0
 PANTS_FAILED_EXIT_CODE = 1
 
+ExitCode = int
+
 
 class Exiter:
   """A class that provides standard runtime exit behavior.

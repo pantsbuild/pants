@@ -6,7 +6,9 @@ import subprocess
 
 
 def main() -> None:
-  subprocess.run(["./pants", "--tag=+type_checked", "mypy", "::"], check=True)
+  subprocess.run(["./pants", "--backend-packages=pants.contrib.mypy", "--lint-mypy-verbose",
+                  "--lint-mypy-whitelist-tag-name=type_checked", "--tag=type_checked",
+                  "--lint-mypy-config-file=build-support/mypy/mypy.ini", "lint", "::"], check=True)
 
 
 if __name__ == '__main__':

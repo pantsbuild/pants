@@ -50,6 +50,7 @@ use log::{error, Log};
 use logging::logger::LOGGER;
 use logging::{Destination, Logger};
 use rule_graph::{GraphMaker, RuleGraph};
+use std::any::Any;
 use std::borrow::Borrow;
 use std::collections::BTreeMap;
 use std::ffi::CStr;
@@ -60,7 +61,6 @@ use std::os::raw;
 use std::panic;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use time::Timespec;
 
 // TODO: Consider renaming and making generic for collections of PyResults.
 #[repr(C)]
@@ -100,12 +100,14 @@ pub extern "C" fn externs_set(
   clone_val: CloneValExtern,
   drop_handles: DropHandlesExtern,
   type_to_str: TypeToStrExtern,
+  val_to_bytes: ValToBytesExtern,
   val_to_str: ValToStrExtern,
   store_tuple: StoreTupleExtern,
   store_set: StoreTupleExtern,
   store_dict: StoreTupleExtern,
   store_bytes: StoreBytesExtern,
   store_utf8: StoreUtf8Extern,
+  store_u64: StoreU64Extern,
   store_i64: StoreI64Extern,
   store_f64: StoreF64Extern,
   store_bool: StoreBoolExtern,
@@ -127,12 +129,14 @@ pub extern "C" fn externs_set(
     clone_val,
     drop_handles,
     type_to_str,
+    val_to_bytes,
     val_to_str,
     store_tuple,
     store_set,
     store_dict,
     store_bytes,
     store_utf8,
+    store_u64,
     store_i64,
     store_f64,
     store_bool,
@@ -173,6 +177,7 @@ pub extern "C" fn scheduler_create(
   type_merge_directories_request: TypeId,
   type_directory_with_prefix_to_strip: TypeId,
   type_files_content: TypeId,
+  type_input_file_content: TypeId,
   type_dir: TypeId,
   type_file: TypeId,
   type_link: TypeId,
@@ -183,7 +188,6 @@ pub extern "C" fn scheduler_create(
   type_string: TypeId,
   type_bytes: TypeId,
   build_root_buf: Buffer,
-  work_dir_buf: Buffer,
   local_store_dir_buf: Buffer,
   ignore_patterns_buf: BufferBuffer,
   root_type_ids: TypeIdBuffer,
@@ -196,6 +200,7 @@ pub extern "C" fn scheduler_create(
   remote_oauth_bearer_token_path_buffer: Buffer,
   remote_store_thread_count: u64,
   remote_store_chunk_bytes: u64,
+  remote_store_connection_limit: u64,
   remote_store_chunk_upload_timeout_seconds: u64,
   remote_store_rpc_retries: u64,
   remote_execution_extra_platform_properties_buf: BufferBuffer,
@@ -223,6 +228,7 @@ pub extern "C" fn scheduler_create(
     directories_to_merge: type_merge_directories_request,
     directory_with_prefix_to_strip: type_directory_with_prefix_to_strip,
     files_content: type_files_content,
+    input_file_content: type_input_file_content,
     dir: type_dir,
     file: type_file,
     link: type_link,
@@ -288,7 +294,6 @@ pub extern "C" fn scheduler_create(
     types,
     PathBuf::from(build_root_buf.to_os_string()),
     &ignore_patterns,
-    PathBuf::from(work_dir_buf.to_os_string()),
     PathBuf::from(local_store_dir_buf.to_os_string()),
     remote_execution,
     remote_store_servers_vec,
@@ -313,6 +318,7 @@ pub extern "C" fn scheduler_create(
     remote_store_chunk_bytes as usize,
     Duration::from_secs(remote_store_chunk_upload_timeout_seconds),
     remote_store_rpc_retries as usize,
+    remote_store_connection_limit as usize,
     remote_execution_extra_platform_properties_map,
     process_execution_local_parallelism as usize,
     process_execution_remote_parallelism as usize,
@@ -351,10 +357,14 @@ pub extern "C" fn scheduler_metrics(
             let mut workunit_zipkin_trace_info = vec![
               externs::store_utf8("name"),
               externs::store_utf8(&workunit.name),
-              externs::store_utf8("start_timestamp"),
-              externs::store_f64(timespec_as_float_secs(&workunit.start_timestamp)),
-              externs::store_utf8("end_timestamp"),
-              externs::store_f64(timespec_as_float_secs(&workunit.end_timestamp)),
+              externs::store_utf8("start_secs"),
+              externs::store_u64(workunit.time_span.start.secs),
+              externs::store_utf8("start_nanos"),
+              externs::store_u64(u64::from(workunit.time_span.start.nanos)),
+              externs::store_utf8("duration_secs"),
+              externs::store_u64(workunit.time_span.duration.secs),
+              externs::store_utf8("duration_nanos"),
+              externs::store_u64(u64::from(workunit.time_span.duration.nanos)),
               externs::store_utf8("span_id"),
               externs::store_utf8(&workunit.span_id),
             ];
@@ -371,13 +381,6 @@ pub extern "C" fn scheduler_metrics(
       externs::store_dict(&values).into()
     })
   })
-}
-
-fn timespec_as_float_secs(timespec: &Timespec) -> f64 {
-  //  Reverting time from Timespec to f64 decreases precision.
-  let whole_secs = timespec.sec as f64;
-  let fract_part_in_nanos = f64::from(timespec.nsec);
-  whole_secs + fract_part_in_nanos / 1_000_000_000.0
 }
 
 ///
@@ -651,15 +654,22 @@ pub extern "C" fn rule_subgraph_visualize(
   })
 }
 
-// TODO(#4884): This produces "thread panicked while processing panic. aborting." on my linux
-// laptop, requiring me to set RUST_BACKTRACE=1 (or "full") to get the panic message.
+fn generate_panic_string(payload: &(dyn Any + Send)) -> String {
+  match payload
+    .downcast_ref::<String>()
+    .cloned()
+    .or_else(|| payload.downcast_ref::<&str>().map(|s| s.to_string()))
+  {
+    Some(ref s) => format!("panic at '{}'", s),
+    None => format!("Non-string panic payload at {:p}", payload),
+  }
+}
+
 #[no_mangle]
 pub extern "C" fn set_panic_handler() {
   panic::set_hook(Box::new(|panic_info| {
-    let mut panic_str = format!(
-      "panic at '{}'",
-      panic_info.payload().downcast_ref::<&str>().unwrap()
-    );
+    let payload = panic_info.payload();
+    let mut panic_str = generate_panic_string(payload);
 
     if let Some(location) = panic_info.location() {
       let panic_location_str = format!(", {}:{}", location.file(), location.line());
@@ -671,6 +681,26 @@ pub extern "C" fn set_panic_handler() {
     let panic_file_bug_str = "Please file a bug at https://github.com/pantsbuild/pants/issues.";
     error!("{}", panic_file_bug_str);
   }));
+}
+
+#[cfg(test)]
+#[test]
+fn test_panic_string() {
+  let a: &str = "a str panic payload";
+  assert_eq!(
+    generate_panic_string(&a as &(dyn Any + Send)),
+    "panic at 'a str panic payload'"
+  );
+
+  let b: String = "a String panic payload".to_string();
+  assert_eq!(
+    generate_panic_string(&b as &(dyn Any + Send)),
+    "panic at 'a String panic payload'"
+  );
+
+  let c: u32 = 18;
+  let output = generate_panic_string(&c as &(dyn Any + Send));
+  assert!(output.contains("Non-string panic payload at"));
 }
 
 #[no_mangle]
@@ -718,6 +748,7 @@ pub extern "C" fn match_path_globs(path_globs: Handle, paths_buf: BufferBuffer) 
 #[no_mangle]
 pub extern "C" fn capture_snapshots(
   scheduler_ptr: *mut Scheduler,
+  session_ptr: *mut Session,
   path_globs_and_root_tuple_wrapper: Handle,
 ) -> PyResult {
   let values = externs::project_multi(&path_globs_and_root_tuple_wrapper.into(), "dependencies");
@@ -746,6 +777,7 @@ pub extern "C" fn capture_snapshots(
       return e.into();
     }
   };
+  let workunit_store = with_session(session_ptr, |session| session.workunit_store());
 
   with_scheduler(scheduler_ptr, |scheduler| {
     let core = scheduler.core.clone();
@@ -761,6 +793,7 @@ pub extern "C" fn capture_snapshots(
               root,
               path_globs,
               digest_hint,
+              workunit_store.clone(),
             )
             .map(move |snapshot| nodes::Snapshot::store_snapshot(&core, &snapshot))
           })
@@ -775,6 +808,7 @@ pub extern "C" fn capture_snapshots(
 #[no_mangle]
 pub extern "C" fn merge_directories(
   scheduler_ptr: *mut Scheduler,
+  session_ptr: *mut Session,
   directories_value: Handle,
 ) -> PyResult {
   let digests_result: Result<Vec<hashing::Digest>, String> =
@@ -789,6 +823,7 @@ pub extern "C" fn merge_directories(
       return e.into();
     }
   };
+  let workunit_store = with_session(session_ptr, |session| session.workunit_store());
 
   with_scheduler(scheduler_ptr, |scheduler| {
     scheduler
@@ -797,6 +832,7 @@ pub extern "C" fn merge_directories(
       .block_on(store::Snapshot::merge_directories(
         scheduler.core.store(),
         digests,
+        workunit_store,
       ))
       .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
       .into()
@@ -806,6 +842,7 @@ pub extern "C" fn merge_directories(
 #[no_mangle]
 pub extern "C" fn materialize_directories(
   scheduler_ptr: *mut Scheduler,
+  session_ptr: *mut Session,
   directories_paths_and_digests_value: Handle,
 ) -> PyResult {
   let values = externs::project_multi(&directories_paths_and_digests_value.into(), "dependencies");
@@ -826,13 +863,18 @@ pub extern "C" fn materialize_directories(
       return e.into();
     }
   };
-
+  let workunit_store = with_session(session_ptr, |session| session.workunit_store());
   with_scheduler(scheduler_ptr, |scheduler| {
     scheduler.core.executor.block_on(
       futures::future::join_all(
         dir_and_digests
           .into_iter()
-          .map(|(dir, digest)| scheduler.core.store().materialize_directory(dir, digest))
+          .map(|(dir, digest)| {
+            scheduler
+              .core
+              .store()
+              .materialize_directory(dir, digest, workunit_store.clone())
+          })
           .collect::<Vec<_>>(),
       )
       .map(|_| ()),

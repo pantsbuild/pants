@@ -6,7 +6,7 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
+concrete_time = { path = "../concrete_time" }
 futures = "0.1.27"
 parking_lot = "0.6"
 rand = "0.6"
-time = "0.1.40"

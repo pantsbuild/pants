@@ -178,6 +178,11 @@ to this directory.",
           )),
       )
         .subcommand(
+          SubCommand::with_name("directories")
+              .subcommand(SubCommand::with_name("list"))
+              .about("List all directory digests known in the local store")
+        )
+        .subcommand(
           SubCommand::with_name("gc")
               .about("Garbage collect the on-disk store. Note that after running this command, any processes with an open store (e.g. a pantsd) may need to re-initialize their store.")
               .arg(
@@ -242,6 +247,14 @@ to this directory.",
               .required(false)
               .default_value("3")
         )
+        .arg(
+          Arg::with_name("connection-limit")
+              .help("Number of concurrent servers to allow connections to.")
+              .takes_value(true)
+              .long("connection-limit")
+              .required(false)
+              .default_value("3")
+        )
       .get_matches(),
   ) {
     Ok(_) => {}
@@ -290,11 +303,11 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           Store::with_remote(
             runtime.clone(),
             &store_dir,
-            &cas_addresses,
+            cas_addresses,
             top_match
               .value_of("remote-instance-name")
               .map(str::to_owned),
-            &root_ca_certs,
+            root_ca_certs,
             oauth_bearer_token,
             value_t!(top_match.value_of("thread-count"), usize).expect("Invalid thread count"),
             chunk_size,
@@ -314,6 +327,8 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
               std::time::Duration::from_secs(20),
             )?,
             value_t!(top_match.value_of("rpc-attempts"), usize).expect("Bad rpc-attempts flag"),
+            value_t!(top_match.value_of("connection-limit"), usize)
+              .expect("Bad connection-limit flag"),
           ),
           true,
         )
@@ -340,9 +355,11 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
             .parse::<usize>()
             .expect("size_bytes must be a non-negative number");
           let digest = Digest(fingerprint, size_bytes);
-          let write_result = runtime.block_on(
-            store.load_file_bytes_with(digest, |bytes| io::stdout().write_all(&bytes).unwrap()),
-          )?;
+          let write_result = runtime.block_on(store.load_file_bytes_with(
+            digest,
+            |bytes| io::stdout().write_all(&bytes).unwrap(),
+            workunit_store::WorkUnitStore::new(),
+          ))?;
           write_result
             .ok_or_else(|| {
               ExitError(
@@ -371,7 +388,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
               let digest = runtime
                 .block_on(
                   store::OneOffStoreFileByDigest::new(store.clone(), Arc::new(posix_fs))
-                    .store_by_digest(f),
+                    .store_by_digest(f, workunit_store::WorkUnitStore::new()),
                 )
                 .unwrap();
 
@@ -405,7 +422,11 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
           .expect("size_bytes must be a non-negative number");
         let digest = Digest(fingerprint, size_bytes);
         runtime
-          .block_on(store.materialize_directory(destination, digest))
+          .block_on(store.materialize_directory(
+            destination,
+            digest,
+            workunit_store::WorkUnitStore::new(),
+          ))
           .map(|metadata| {
             eprintln!("{}", serde_json::to_string_pretty(&metadata).unwrap());
           })
@@ -443,6 +464,7 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
                 store_copy.clone(),
                 &store::OneOffStoreFileByDigest::new(store_copy, posix_fs),
                 paths,
+                workunit_store::WorkUnitStore::new(),
               )
             })
             .map(|snapshot| snapshot.digest),
@@ -465,10 +487,10 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         let digest = Digest(fingerprint, size_bytes);
         let proto_bytes = match args.value_of("output-format").unwrap() {
           "binary" => runtime
-            .block_on(store.load_directory(digest))
+            .block_on(store.load_directory(digest, workunit_store::WorkUnitStore::new()))
             .map(|maybe_d| maybe_d.map(|(d, _metadata)| d.write_to_bytes().unwrap())),
           "text" => runtime
-            .block_on(store.load_directory(digest))
+            .block_on(store.load_directory(digest, workunit_store::WorkUnitStore::new()))
             .map(|maybe_p| maybe_p.map(|(p, _metadata)| format!("{:?}\n", p).as_bytes().to_vec())),
           "recursive-file-list" => runtime
             .block_on(expand_files(store, digest))
@@ -522,16 +544,24 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         .parse::<usize>()
         .expect("size_bytes must be a non-negative number");
       let digest = Digest(fingerprint, size_bytes);
-      let v = match runtime.block_on(store.load_file_bytes_with(digest, |bytes| bytes))? {
-        None => runtime.block_on(store.load_directory(digest).map(|maybe_dir| {
-          maybe_dir.map(|(dir, _metadata)| {
-            Bytes::from(
-              dir
-                .write_to_bytes()
-                .expect("Error serializing Directory proto"),
-            )
-          })
-        }))?,
+      let v = match runtime.block_on(store.load_file_bytes_with(
+        digest,
+        |bytes| bytes,
+        workunit_store::WorkUnitStore::new(),
+      ))? {
+        None => runtime.block_on(
+          store
+            .load_directory(digest, workunit_store::WorkUnitStore::new())
+            .map(|maybe_dir| {
+              maybe_dir.map(|(dir, _metadata)| {
+                Bytes::from(
+                  dir
+                    .write_to_bytes()
+                    .expect("Error serializing Directory proto"),
+                )
+              })
+            }),
+        )?,
         Some((bytes, _metadata)) => Some(bytes),
       };
       match v {
@@ -545,6 +575,18 @@ fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         )),
       }
     }
+    ("directories", Some(sub_match)) => match sub_match.subcommand() {
+      ("list", _) => {
+        for digest in store
+          .all_local_digests(::store::EntryType::Directory)
+          .expect("Error opening store")
+        {
+          println!("{} {}", digest.0, digest.1);
+        }
+        Ok(())
+      }
+      _ => unimplemented!(),
+    },
     ("gc", Some(args)) => {
       let target_size_bytes = value_t!(args.value_of("target-size-bytes"), usize)
         .expect("--target-size-bytes must be passed as a non-negative integer");
@@ -577,7 +619,7 @@ fn expand_files_helper(
   files: Arc<Mutex<Vec<(String, Digest)>>>,
 ) -> BoxFuture<Option<()>, String> {
   store
-    .load_directory(digest)
+    .load_directory(digest, workunit_store::WorkUnitStore::new())
     .and_then(|maybe_dir| match maybe_dir {
       Some((dir, _metadata)) => {
         {
@@ -621,7 +663,7 @@ fn ensure_uploaded_to_remote(
 ) -> impl Future<Item = SummaryWithDigest, Error = String> {
   let summary = if store_has_remote {
     store
-      .ensure_remote_has_recursive(vec![digest])
+      .ensure_remote_has_recursive(vec![digest], workunit_store::WorkUnitStore::new())
       .map(Some)
       .to_boxed()
   } else {

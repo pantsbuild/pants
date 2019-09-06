@@ -21,7 +21,7 @@ python_tests(
     'tests/python/pants_test/testutils:git_util',
   ],
   tags = {'integration'},
-  timeout=120,
+  timeout=540,
 )
 
 python_tests(
@@ -32,7 +32,7 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
-  timeout = 120,
+  timeout = 540,
 )
 
 python_tests(

@@ -13,6 +13,7 @@ from pants.java.jar.jar_dependency import JarDependency
 from pants.option.custom_types import file_option
 from pants.task.fmt_task_mixin import FmtTaskMixin
 from pants.task.lint_task_mixin import LintTaskMixin
+from pants.util.memo import memoized_property
 
 
 class ScalaFix(RewriteBase):
@@ -50,9 +51,29 @@ class ScalaFix(RewriteBase):
   @classmethod
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)
-    # Only request a classpath if semantic checks are enabled.
+    # Only request a classpath and zinc_args if semantic checks are enabled.
     if options.semantic:
+      round_manager.require_data('zinc_args') 
       round_manager.require_data('runtime_classpath')
+
+  @memoized_property
+  def _scalac_args(self):
+    if self.get_options().semantic:
+      targets = self.context.targets()
+      targets_to_zinc_args = self.context.products.get_data('zinc_args')
+      
+      for t in targets:
+        zinc_args = targets_to_zinc_args[t]
+        args = []
+        for arg in zinc_args:
+          arg = arg.strip()
+          if arg.startswith('-S'):
+            args.append(arg[2:])
+        # All targets will get the same scalac args
+        if args:
+          return args
+
+    return []
 
   @staticmethod
   def _compute_classpath(runtime_classpath, targets):
@@ -79,6 +100,12 @@ class ScalaFix(RewriteBase):
       args.append('--rules={}'.format(self.get_options().rules))
     if self.get_options().level == 'debug':
       args.append('--verbose')
+
+    # This is how you pass a list of strings to a single arg key
+    for a in self._scalac_args:
+      args.append('--scalac-options')
+      args.append(a)
+      
     args.extend(self.additional_args or [])
 
     args.extend(source for _, source in target_sources)
