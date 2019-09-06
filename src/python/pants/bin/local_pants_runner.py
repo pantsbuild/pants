@@ -10,7 +10,6 @@ from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, Exiter
 from pants.base.workunit import WorkUnit
 from pants.bin.goal_runner import GoalRunner
-from pants.build_graph.address import Address
 from pants.engine.native import Native
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
