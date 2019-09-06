@@ -13,26 +13,21 @@ object BloopConfigGen extends App {
     buildRoot,
     scalaVersion,
     distDir,
-    bloopConfigDir) = args
+    bloopConfigDir,
+    scalacClasspath): Array[String] = args
 
   val buildRootPath = Path(buildRoot)
   val distDirPath = Path(distDir)
   val bloopConfigDirPath = Path(bloopConfigDir)
 
   val allStdin = scala.io.Source.stdin.mkString
+  throw new Exception(s"parsed: ${allStdin.parseJson}")
   val pantsExportParsed = allStdin.parseJson.convertTo[PantsExport]
 
-  val scalaCompilerJars = sys.env("SCALA_COMPILER_JARS_CLASSPATH")
+  val scalaCompilerJars = scalacClasspath
     .split(":")
     .map(jar => buildRootPath / RelPath(jar))
 
-  // TODO: unused for now! It's probably preferable to do the target filtering on the pants side.
-  // val sourceTargetTypes = sys.env("PANTS_TARGET_TYPES")
-  //   .split(":")
-  //   .toSet
-  // val sourceTargets = pantsExportParsed.targets.filter { case (_, target) =>
-  //   sourceTargetTypes(target.targetType)
-  // }
   val sourceTargets = pantsExportParsed.targets
 
   // Refer to dependencies by their `id`, not by `depName` (which is a pants target spec -- not
@@ -63,13 +58,8 @@ object BloopConfigGen extends App {
         .flatMap(sourceTargetMap.get(_))
         .flatMap(_.classesDir.map(Path(_)))
 
-      // TODO: Metals currently doesn't handle complete source file paths
-      // (https://github.com/scalameta/metals/issues/770), although bloop/BSP does and may require
-      // it to compile correctly. Until that is fixed, we can use "source roots" like we do for the
-      // IntelliJ plugin to get the IDE experience working.
-      // val sources = target.sources.getOrElse(Seq())
-      //   .map(srcRelPath => buildRootPath / RelPath(srcRelPath))
-      val sources = target.sourceRoots.map(_.sourceRootPath).map(Path(_))
+      val sources = target.sources.getOrElse(Seq())
+        .map(srcRelPath => buildRootPath / RelPath(srcRelPath))
 
       val curPlatformString = target.platform
         .getOrElse(pantsExportParsed.jvmPlatforms.defaultPlatform)

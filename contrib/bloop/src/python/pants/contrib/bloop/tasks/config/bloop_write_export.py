@@ -64,34 +64,24 @@ class BloopWriteExport(NailgunTask):
       bloop_export.reported_scala_version,
       self.get_options().pants_distdir,
       output_dir,
+      ':'.join(bloop_export.scala_compiler_jars),
     ]
 
-    env = {
-      'SCALA_COMPILER_JARS_CLASSPATH': ':'.join(bloop_export.scala_compiler_jars),
-      # NB: This is unused right now!!
-      'PANTS_TARGET_TYPES': ':'.join(bloop_export.pants_target_types),
-    }
-
-    # self.context.log.debug('export_result:\n{}'.format(export_result))
-    self.context.log.debug('env:\n{}'.format(env))
-
-
-    with environment_as(**env):
-      proc = self.runjava(
-        classpath=self.tool_classpath('bloop-config-gen'),
-        main='pants.contrib.bloop.config.BloopConfigGen',
-        jvm_options=self.get_options().jvm_options,
-        args=argv,
-        do_async=True,
-        workunit_name='bloop-config-gen',
-        workunit_labels=[WorkUnitLabel.TOOL],
-        stdin=subprocess.PIPE)
-      # Write the json export to the subprocess stdin.
-      stdout, stderr = proc.communicate(stdin=export_result.encode())
-      assert stdout is None
-      assert stderr is None
-      rc = proc.wait()
-      if rc != 0:
-        raise TaskError('???', exit_code=rc)
+    proc = self.runjava(
+      classpath=self.tool_classpath('bloop-config-gen'),
+      main='pants.contrib.bloop.config.BloopConfigGen',
+      jvm_options=self.get_options().jvm_options,
+      args=argv,
+      do_async=True,
+      workunit_name='bloop-config-gen',
+      workunit_labels=[WorkUnitLabel.TOOL],
+      stdin=subprocess.PIPE)
+    # Write the json export to the subprocess stdin.
+    stdout, stderr = proc.communicate(stdin=export_result.encode())
+    assert stdout is None
+    assert stderr is None
+    rc = proc.wait()
+    if rc != 0:
+      raise TaskError('???', exit_code=rc)
 
     self.context.products.register_data('bloop_output_dir', output_dir)
