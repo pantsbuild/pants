@@ -801,7 +801,11 @@ In function g: yield in @rule without assignment must come at the end of a serie
 
 A yield in an @rule without an assignment is equivalent to a return, and we
 currently require that no statements follow such a yield at the same level of nesting.
-Use `_ = yield Get(...)` if you wish to yield control to the engine and discard the result.
+Use `_ = yield Get(...)` if you wish to yield control to the engine and discard the
+result.
+
+Note that any `yield Get(...)` in an @rule without assignment is also currently not
+supported. See https://github.com/pantsbuild/pants/pull/8227 for progress.
 
 The invalid statement was:
 test_rules.py:{lineno}:{col}
@@ -814,9 +818,9 @@ test_rules.py:{rule_lineno}:{rule_col}
         # This is a yield statement without an assignment, and not at the end.
         yield Get(B, D, D())
         yield A()
-""".format(lineno=(sys._getframe().f_lineno - 22),
+""".format(lineno=(sys._getframe().f_lineno - 26),
            col=8,
-           rule_lineno=(sys._getframe().f_lineno - 27),
+           rule_lineno=(sys._getframe().f_lineno - 31),
            rule_col=6))
 
   def test_final_yield(self):
@@ -843,9 +847,9 @@ test_rules.py:{rule_lineno}:{rule_col}
     exc_msg_trimmed = re.sub(r'^.*?(test_rules\.py)', r'\1', exc_msg, flags=re.MULTILINE)
     self.assertIn('`yield Get(...)` in @rule is currently not allowed without an assignment.',
                   exc_msg_trimmed)
-    self.assertIn("""\
+    self.assertIn(f"""\
 The invalid statement was:
-test_rules.py:842:10
+test_rules.py:{sys._getframe().f_lineno - 9}:10
           yield Get(X, Y(n))
 """, exc_msg_trimmed)
 
