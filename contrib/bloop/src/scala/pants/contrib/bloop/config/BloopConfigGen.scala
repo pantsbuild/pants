@@ -21,7 +21,6 @@ object BloopConfigGen extends App {
   val bloopConfigDirPath = Path(bloopConfigDir)
 
   val allStdin = scala.io.Source.stdin.mkString
-  throw new Exception(s"parsed: ${allStdin.parseJson}")
   val pantsExportParsed = allStdin.parseJson.convertTo[PantsExport]
 
   val scalaCompilerJars = scalacClasspath
