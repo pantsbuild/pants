@@ -13,8 +13,8 @@ from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.build_graph.build_graph import CycleException, sort_targets
 from pants.task.console_task import ConsoleTask
 from pants.task.task import Task
-from pants.util.meta import classproperty
 from pants.util.memo import memoized_property
+from pants.util.meta import classproperty
 
 
 class JvmPlatformAnalysisMixin:
