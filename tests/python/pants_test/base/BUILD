@@ -28,6 +28,7 @@ python_tests(
   sources = [ 'test_exclude_target_regexp_integration.py' ],
   dependencies = [
     'tests/python/pants_test:int-test',
+    'testprojects/src/java/org/pantsbuild/testproject:phrases_directory',
   ],
   tags = {'integration'},
   timeout = 240,
@@ -221,6 +222,7 @@ python_tests(
   sources = [ 'test_exiter_integration.py' ],
   dependencies = [
     'tests/python/pants_test:int-test',
+    'testprojects/src/python:unicode_directory',
   ],
   tags = {'integration'},
   timeout = 120,

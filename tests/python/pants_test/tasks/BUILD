@@ -6,6 +6,7 @@ python_tests(
   sources = ['test_scalastyle_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test',
+    'examples/src/scala/org/pantsbuild/example:styleissue_directory',
   ],
   tags = {'integration'},
 )
@@ -30,6 +31,8 @@ python_tests(
   dependencies = [
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
+    'examples/src/java/org/pantsbuild/example:hello_directory',
+    'examples/src/scala/org/pantsbuild/example:hello_directory',
   ],
   tags = {'integration'},
   timeout = 540,
