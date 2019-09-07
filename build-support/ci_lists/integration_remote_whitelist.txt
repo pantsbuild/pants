@@ -1,4 +1,5 @@
 src/python/pants/help:integration
-tests/python/pants_test/help:help_integration
+tests/python/pants_test/bin:integration
 tests/python/pants_test/core_tasks:prep_command_integration
+tests/python/pants_test/help:help_integration
 tests/python/pants_test/targets:unknown_arguments_integration

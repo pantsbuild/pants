@@ -9,6 +9,7 @@ python_tests(
     'src/python/pants/bin',
     'src/python/pants/option',
     'tests/python/pants_test:int-test',
+    'testprojects:pants-plugins',
   ],
   tags = {'integration'},
 )

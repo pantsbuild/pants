@@ -64,15 +64,20 @@ python_binary(
   emit_warnings=False,
 )
 
-# This binary is for internal use only.  It adds deps on both internal_backends not meant for
-# publishing in the `pantsbuild.pants` sdist as well as deps on backend plugins published as
-# separate sdists from the core `pantsbuild.pants` sdist that this repo uses.
+# This binary is for internal use only. It adds deps on internal_backends and build-support config
+# files, both of which are not meant for publishing in the `pantsbuild.pants` sdist. It also adds
+# deps on contrib plugins published as separate sdists from the core `pantsbuild.pants` sdist that
+# this repo uses.
 python_binary(
   name='pants_local_binary',
   entry_point='pants.bin.pants_loader:main',
   dependencies=[
     ':bin',
-    'contrib/python/src/python/pants/contrib/python/checks/tasks/checkstyle',
+    'build-support/checkstyle',
+    'build-support/eslint',
+    'build-support/regexes',
+    'build-support/scalastyle',
+    'contrib:plugins',
     'pants-plugins/src/python/internal_backend:plugins',
   ],
   # We depend on twitter.common libraries that trigger pex warnings for not properly declaring their

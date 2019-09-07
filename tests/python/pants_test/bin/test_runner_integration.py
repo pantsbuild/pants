@@ -1,7 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
+from pathlib import Path
 
 from pants.base.build_environment import get_buildroot
 from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
@@ -11,22 +11,15 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class RunnerIntegrationTest(PantsRunIntegrationTest):
   """Test logic performed in PantsRunner."""
 
-  def _deprecation_warning_cmdline(self):
-    # Load the testprojects pants-plugins to get some testing tasks and subsystems.
-    testproject_backend_src_dir = os.path.join(
-      get_buildroot(), 'testprojects/pants-plugins/src/python')
-    testproject_backend_pkg_name = 'test_pants_plugin'
-    deprecation_warning_cmdline = [
+  def test_warning_filter(self):
+    # We load the testprojects pants-plugins to get some testing tasks and subsystems.
+    cmdline = [
       '--no-enable-pantsd',
-      "--pythonpath=+['{}']".format(testproject_backend_src_dir),
-      "--backend-packages=+['{}']".format(testproject_backend_pkg_name),
+      f"--pythonpath=+['{Path(get_buildroot(), 'testprojects/pants-plugins/src/python')}']",
+      f"--backend-packages=+['test_pants_plugin']",
       # This task will always emit a DeprecationWarning.
       'deprecation-warning-task',
     ]
-    return deprecation_warning_cmdline
-
-  def test_warning_filter(self):
-    cmdline = self._deprecation_warning_cmdline()
 
     warning_run = self.run_pants(cmdline)
     self.assert_success(warning_run)
