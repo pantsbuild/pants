@@ -11,16 +11,13 @@ source "${ROOT}/build-support/common.sh"
 
 # Note we allow the user to predefine this value so that they may point to a specific interpreter.
 export PY="${PY:-python3.6}"
-interpreter_constraint="CPython==3.6.*"
 if ! command -v "${PY}" >/dev/null; then
   die "Python interpreter ${PY} not discoverable on your PATH."
 fi
 py_major_minor=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:2])))')
-if [[ "${py_major_minor}" != "3.6" ]]; then
-  die "Invalid interpreter. The release script requires Python 3.6 (you are using ${py_major_minor})."
+if [[ "${py_major_minor}" != "3.6" || "${py_major_minor}" != "3.7" ]]; then
+  die "Invalid interpreter. The release script requires Python 3.6 or 3.7 (you are using ${py_major_minor})."
 fi
-
-export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['${interpreter_constraint}']"
 
 function run_local_pants() {
   "${ROOT}/pants" "$@"
@@ -567,7 +564,6 @@ function build_pex() {
   local linux_platform_noabi="linux_x86_64"
   local osx_platform_noabi="macosx_10.11_x86_64"
 
-  dest_suffix="py36.pex"
   case "${mode}" in
     build)
       case "$(uname)" in
@@ -585,21 +581,19 @@ function build_pex() {
           ;;
       esac
       local platforms=("${platform}")
-      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.${dest_suffix}"
-      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${platform}.${dest_suffix}"
+      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.pex"
+      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${platform}.pex"
       ;;
     fetch)
       local platforms=()
-      # TODO: once we add Python 3.7 PEX support, which requires first building Py37 wheels,
-      # we'll want to release one big flexible Pex that works with Python 3.6+.
-      abis=("cp-36-m")
+      abis=("cp-36-m" "cp-37-m")
       for platform in "${linux_platform_noabi}" "${osx_platform_noabi}"; do
         for abi in "${abis[@]}"; do
           platforms=("${platforms[@]}" "${platform}-${abi}")
         done
       done
-      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${dest_suffix}"
-      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${dest_suffix}"
+      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.pex"
+      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.pex"
       ;;
     *)
       echo >&2 "Bad build_pex mode ${mode}"
@@ -634,7 +628,7 @@ function build_pex() {
     -o "${dest}" \
     --no-emit-warnings \
     --script=pants \
-    --interpreter-constraint="${interpreter_constraint}" \
+    --interpreter-constraint="CPython>=3.6,<3.8" \
     "${platform_flags[@]}" \
     "${requirements[@]}"
 
