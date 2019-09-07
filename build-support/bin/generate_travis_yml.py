@@ -452,9 +452,10 @@ def unit_tests(python_version: PythonVersion) -> Dict:
     "name": f"Unit tests (Python {python_version.decimal})",
     "script": [
       (
-        "./build-support/bin/ci.py --unit-tests --remote-execution-enabled "
-        f"--plugin-tests --python-version {python_version.decimal}"
-      )
+        "travis_wait 25 ./build-support/bin/ci.py --unit-tests --remote-execution-enabled "
+        f"--python-version {python_version.decimal}"
+      ),
+      f"./build-support/bin/ci.py --plugin-tests --python-version {python_version.decimal}",
     ],
   }
   shard["env"] = shard.get("env", []) + [f"CACHE_NAME=unit_tests.py{python_version.number}"]
@@ -510,28 +511,45 @@ def build_wheels_osx() -> Dict:
 # Integration tests
 # -------------------------------------------------------------------------
 
-def integration_tests(python_version: PythonVersion, *, use_pantsd: bool = False) -> List[Dict]:
+def integration_tests_v1(python_version: PythonVersion, *, use_pantsd: bool = False) -> List[Dict]:
   num_integration_shards = 20
 
   def make_shard(*, shard_num: int) -> Dict:
     shard = {
       **linux_shard(python_version=python_version),
-      "name": f"Integration tests {'with Pantsd' if use_pantsd else ''} - shard {shard_num} (Python {python_version.decimal})",
+      "name": f"Integration tests {'with Pantsd' if use_pantsd else ''} - V1 - shard {shard_num} (Python {python_version.decimal})",
       "script": [
         (
-          f"./build-support/bin/ci.py --integration-tests --integration-shard "
+          "./build-support/bin/ci.py --integration-tests-v1 --integration-shard "
           f"{shard_num}/{num_integration_shards} --python-version {python_version.decimal}"
         ),
       ]
     }
     shard["env"] = shard.get("env", []) + [
-      f"CACHE_NAME=integration.shard_{shard_num}.py{python_version.number}{'.pantsd' if use_pantsd else ''}"
+      f"CACHE_NAME=integration.v1.shard_{shard_num}.py{python_version.number}{'.pantsd' if use_pantsd else ''}"
     ]
     if use_pantsd:
       shard["stage"] = Stage.test_cron.value
       shard["env"].append('USE_PANTSD_FOR_INTEGRATION_TESTS="true"')
     return shard
   return [make_shard(shard_num=i) for i in range(num_integration_shards)]
+
+
+def integration_tests_v2(python_version: PythonVersion) -> Dict:
+  shard = {
+    **linux_shard(python_version=python_version),
+    "name": f"Integration tests - V2 (Python {python_version.decimal})",
+    "script": [
+      (
+        "./build-support/bin/ci.py --integration-tests-v2 --remote-execution-enabled "
+        f"--python-version {python_version.decimal}"
+      ),
+    ]
+  }
+  shard["env"] = shard.get("env", []) + [
+    f"CACHE_NAME=integration.v2.py{python_version.number}"
+  ]
+  return shard
 
 # -------------------------------------------------------------------------
 # Rust tests
@@ -731,21 +749,23 @@ def main() -> None:
       *[bootstrap_osx(v) for v in PythonVersion],
       {**bootstrap_linux(PythonVersion.py36), "stage": Stage.bootstrap_cron.value},
       {**bootstrap_osx(PythonVersion.py36), "stage": Stage.bootstrap_cron.value},
-      # NB: We move this test here, above the other unit tests, to ensure that the shard is #5. Per
-      # the token generator design
+      # NB: We move both the unit test and V2 integration test shards up here to ensure that
+      # they are shards #5 and #6. Per the token generator design
       # https://docs.google.com/document/d/1gL3D1f-AzL_LzRxWLskCpVQ2ZlB_26GTETgXkXsrpDY/edit#heading=h.akhkfdtqfpw,
-      # the RBE token server will only give tokens to job number #5, so we must do this for the cron
-      # job to work with remoting.
+      # the RBE token server will only give tokens to job numbers #5 and #6, so we must do this
+      # for the cron jobs to work with remoting.
       unit_tests(PythonVersion.py37),
+      integration_tests_v2(PythonVersion.py37),
       *[lint(v) for v in PythonVersion],
       clippy(),
       cargo_audit(),
       unit_tests(PythonVersion.py36),
+      integration_tests_v2(PythonVersion.py36),
       build_wheels_linux(),
       build_wheels_osx(),
-      *integration_tests(PythonVersion.py36),
-      *integration_tests(PythonVersion.py36, use_pantsd=True),
-      *integration_tests(PythonVersion.py37),
+      *integration_tests_v1(PythonVersion.py36),
+      *integration_tests_v1(PythonVersion.py36, use_pantsd=True),
+      *integration_tests_v1(PythonVersion.py37),
       rust_tests_linux(),
       rust_tests_osx(),
       *[osx_platform_tests(v) for v in PythonVersion],
