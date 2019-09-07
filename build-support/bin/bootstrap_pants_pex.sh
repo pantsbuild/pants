@@ -44,7 +44,11 @@ function calculate_pants_pex_current_hash() {
     python --version 2>&1
     git ls-files --cached --others --exclude-standard \
      "${REPO_ROOT}/3rdparty/python" \
-     "${REPO_ROOT}/contrib/python/src/python/pants/contrib/python/checks" \
+     "${REPO_ROOT}/build-support/checkstyle" \
+     "${REPO_ROOT}/build-support/eslint" \
+     "${REPO_ROOT}/build-support/regexes" \
+     "${REPO_ROOT}/build-support/scalastyle" \
+     "${REPO_ROOT}/contrib" \
      "${REPO_ROOT}/src/python" \
      "${REPO_ROOT}/pants-plugins" \
    | git hash-object --stdin-paths) | fingerprint_data
