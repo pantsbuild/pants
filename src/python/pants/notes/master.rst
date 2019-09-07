@@ -4,6 +4,63 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.21.0.dev0 (09/06/2019)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* New intrinsic InputFileContent -> Digest (#8226)
+  `PR #8226 <https://github.com/pantsbuild/pants/pull/8226>`_
+
+Bugfixes
+~~~~~~~~
+
+* fix exception handling of KeyboardInterrupt during startup (#8182)
+  `PR #8182 <https://github.com/pantsbuild/pants/pull/8182>`_
+
+* Use correct function on list (#8238)
+  `PR #8238 <https://github.com/pantsbuild/pants/pull/8238>`_
+
+* Support omitting the test sources themselves from coverage. (#8208)
+  `PR #8208 <https://github.com/pantsbuild/pants/pull/8208>`_
+
+* Use NGContext.exit() instead of sys.exit(). (#8239)
+  `PR #8239 <https://github.com/pantsbuild/pants/pull/8239>`_
+
+* Disable pantsd in inner runs. (#7884)
+  `PR #7884 <https://github.com/pantsbuild/pants/pull/7884>`_
+
+* Fix error when uploading stats to stats storage (#8233)
+  `PR #8233 <https://github.com/pantsbuild/pants/pull/8233>`_
+
+* Fix custom panic handler (#4884) (#8219)
+  `PR #4884 <https://github.com/pantsbuild/pants/pull/4884>`_
+  `PR #8219 <https://github.com/pantsbuild/pants/pull/8219>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Quash warnings about missing dyn in generated code (#8245)
+  `PR #8245 <https://github.com/pantsbuild/pants/pull/8245>`_
+
+* Split store into lib, local, remote modules (#8244)
+  `PR #8244 <https://github.com/pantsbuild/pants/pull/8244>`_
+
+* Use `./pants.pex`, not `./pants`, to run internal integration tests (#8183)
+  `Issue #8113 <https://github.com/pantsbuild/pants/issues/8113>`_
+  `Issue #8209 <https://github.com/pantsbuild/pants/issues/8209>`_
+  `PR #8183 <https://github.com/pantsbuild/pants/pull/8183>`_
+
+* Refactor auth logic out of RunTracker and into BasicAuth (#8211)
+  `PR #8211 <https://github.com/pantsbuild/pants/pull/8211>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Update notes for the hotfix for 1.20 release (#8240)
+  `PR #8240 <https://github.com/pantsbuild/pants/pull/8240>`_
+
 1.20.0rc0 (08/30/2019)
 ----------------------
 
