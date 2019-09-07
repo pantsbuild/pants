@@ -66,5 +66,5 @@ def travis_section(slug: str, message: str) -> Iterator[None]:
   try:
     yield
   finally:
-    travis_fold(action="end", target=travis_fold_state_path.read_text().splitlines()[0].strip())
+    travis_fold(action="end", target=travis_fold_state_path.read_text().splitlines()[0])
     travis_fold_state_path.unlink()

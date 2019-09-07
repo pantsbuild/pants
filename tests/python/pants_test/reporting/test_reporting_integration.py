@@ -2,11 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import json
-import os.path
 import re
 import unittest
 from collections import defaultdict
 from http.server import BaseHTTPRequestHandler
+from pathlib import Path
 
 import psutil
 from parameterized import parameterized
@@ -34,22 +34,23 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
                  '--reporting-invalidation-report']
       pants_run = self.run_pants_with_workdir(command, workdir)
       self.assert_success(pants_run)
-      output = os.path.join(workdir, _REPORT_LOCATION)
-      self.assertTrue(os.path.exists(output))
-      with open(output, 'r') as f:
-        self.assertEqual(_HEADER, f.readline())
-        init = False
-        pre = False
-        post = False
-        for line in f.readlines():
-          self.assertTrue(_ENTRY.match(line))
-          if _INIT.match(line):
-            init = True
-          elif _PRE.match(line):
-            pre = True
-          elif _POST.match(line):
-            post = True
-        self.assertTrue(init and pre and post)
+      output = Path(workdir, _REPORT_LOCATION)
+      self.assertTrue(output.exists())
+
+      output_contents = output.read_text().splitlines()
+      self.assertEqual(_HEADER, output_contents[0])
+      init = False
+      pre = False
+      post = False
+      for line in output_contents[1:]:
+        self.assertTrue(_ENTRY.match(line))
+        if _INIT.match(line):
+          init = True
+        elif _PRE.match(line):
+          pre = True
+        elif _POST.match(line):
+          post = True
+      self.assertTrue(init and pre and post)
 
   def test_invalidation_report_clean_all(self):
     with self.temporary_workdir() as workdir:
@@ -60,14 +61,14 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
       self.assert_success(pants_run)
 
       # The 'latest' link has been removed by clean-all but that's not fatal.
-      report_dirs = os.listdir(os.path.join(workdir, 'reports'))
+      report_dirs = list(Path(workdir, 'reports').iterdir())
       self.assertEqual(1, len(report_dirs))
 
-      output = os.path.join(workdir, 'reports', report_dirs[0], 'invalidation-report.csv')
-      self.assertTrue(os.path.exists(output), msg='Missing report file {}'.format(output))
+      output = Path(workdir, 'reports', report_dirs[0], 'invalidation-report.csv')
+      self.assertTrue(output.exists(), msg=f'Missing report file {output}')
 
-  INFO_LEVEL_COMPILE_MSG='Compiling 1 mixed source in 1 target (examples/src/java/org/pantsbuild/example/hello/simple:simple).'
-  DEBUG_LEVEL_COMPILE_MSG='examples/src/java/org/pantsbuild/example/hello/simple:simple) finished with status Successful'
+  INFO_LEVEL_COMPILE_MSG = 'Compiling 1 mixed source in 1 target (examples/src/java/org/pantsbuild/example/hello/simple:simple).'
+  DEBUG_LEVEL_COMPILE_MSG = 'examples/src/java/org/pantsbuild/example/hello/simple:simple) finished with status Successful'
 
   def test_output_level_warn(self):
     command = ['compile',
