@@ -115,13 +115,13 @@ class LoaderTest(unittest.TestCase):
   def create_register(self, build_file_aliases=None, register_goals=None, global_subsystems=None,
                       rules=None, module_name='register'):
 
-    package_name = '__test_package_{0}'.format(uuid.uuid4().hex)
+    package_name = f'__test_package_{uuid.uuid4().hex}'
     self.assertFalse(package_name in sys.modules)
 
     package_module = types.ModuleType(package_name)
     sys.modules[package_name] = package_module
     try:
-      register_module_fqn = '{0}.{1}'.format(package_name, module_name)
+      register_module_fqn = f'{package_name}.{module_name}'
       register_module = types.ModuleType(register_module_fqn)
       setattr(package_module, module_name, register_module)
       sys.modules[register_module_fqn] = register_module
@@ -219,10 +219,10 @@ class LoaderTest(unittest.TestCase):
     :param callable rules: Optional callable for rules entry point
     """
 
-    plugin_pkg = 'demoplugin{0}'.format(uuid.uuid4().hex)
+    plugin_pkg = f'demoplugin{uuid.uuid4().hex}'
     pkg = types.ModuleType(plugin_pkg)
     sys.modules[plugin_pkg] = pkg
-    module_name = '{0}.{1}'.format(plugin_pkg, 'demo')
+    module_name = f'{plugin_pkg}.demo'
     plugin = types.ModuleType(module_name)
     setattr(pkg, 'demo', plugin)
     sys.modules[module_name] = plugin
@@ -232,19 +232,19 @@ class LoaderTest(unittest.TestCase):
 
     if reg is not None:
       setattr(plugin, 'foo', reg)
-      entry_lines.append('register_goals = {}:foo\n'.format(module_name))
+      entry_lines.append(f'register_goals = {module_name}:foo\n')
 
     if alias is not None:
       setattr(plugin, 'bar', alias)
-      entry_lines.append('build_file_aliases = {}:bar\n'.format(module_name))
+      entry_lines.append(f'build_file_aliases = {module_name}:bar\n')
 
     if after is not None:
       setattr(plugin, 'baz', after)
-      entry_lines.append('load_after = {}:baz\n'.format(module_name))
+      entry_lines.append(f'load_after = {module_name}:baz\n')
 
     if rules is not None:
       setattr(plugin, 'qux', rules)
-      entry_lines.append('rules = {}:qux\n'.format(module_name))
+      entry_lines.append(f'rules = {module_name}:qux\n')
 
     if entry_lines:
       entry_data = '[pantsbuild.plugin]\n{}\n'.format('\n'.join(entry_lines))

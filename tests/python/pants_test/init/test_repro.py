@@ -21,7 +21,9 @@ class ReproTest(unittest.TestCase):
     full_path = Path(root, relpath)
     safe_file_dump(str(full_path), payload=content)
 
-  def assert_file(self, root: Path, relpath: str, *, expected_content: Optional[str] = None) -> None:
+  def assert_file(
+    self, root: Path, relpath: str, *, expected_content: Optional[str] = None
+  ) -> None:
     full_path = Path(root, relpath)
     self.assertTrue(full_path.exists())
     if expected_content is not None:
@@ -30,7 +32,7 @@ class ReproTest(unittest.TestCase):
   def assert_not_exists(self, root: Path, relpath: str) -> None:
     self.assertFalse(Path(root, relpath).exists())
 
-  def test_repro(self):
+  def test_repro(self) -> None:
     """Verify that Repro object creates expected tar.gz file"""
     with temporary_dir() as tmpdir:
       fake_buildroot = Path(tmpdir, 'buildroot')
@@ -57,7 +59,7 @@ class ReproTest(unittest.TestCase):
       assert_not_exists('.git')
       assert_not_exists('dist')
 
-  def test_ignore_dir(self):
+  def test_ignore_dir(self) -> None:
     """Verify that passing --repro-ignore option ignores the directory"""
 
     # Buildroot is is based on your cwd so we need to step into a fresh
