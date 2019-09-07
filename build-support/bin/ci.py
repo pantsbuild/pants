@@ -218,6 +218,9 @@ class TestStrategy(Enum):
                         "--no-v1",
                         "--v2",
                         "--pants-config-files=pants.remote.ini",
+                        # We turn off speculation to reduce the risk of flakiness, where a test
+                        # passes either locally or remotely and fails in the other environment.
+                        "--process-execution-speculation-strategy=none",
                         f"--remote-oauth-bearer-token-path={oauth_token_path}",
                         "test"
                       ] + sorted(targets),
