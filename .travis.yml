@@ -384,8 +384,9 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --unit-tests --remote-execution-enabled --plugin-tests
+    - travis_wait 25 ./build-support/bin/ci.py --unit-tests --remote-execution-enabled
       --python-version 3.7
+    - ./build-support/bin/ci.py --plugin-tests --python-version 3.7
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -674,8 +675,9 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --unit-tests --remote-execution-enabled --plugin-tests
+    - travis_wait 25 ./build-support/bin/ci.py --unit-tests --remote-execution-enabled
       --python-version 3.6
+    - ./build-support/bin/ci.py --plugin-tests --python-version 3.6
     stage: Test Pants
     sudo: required
   - addons:
