@@ -76,13 +76,16 @@ class NativeHandler(StreamHandler):
     self.setLevel(level)
 
   def emit(self, record):
-    self.native.write_log(self.format(record), record.levelno, "{}:pid={}".format(record.name, os.getpid()))
+    self.native.write_log(self.format(record), record.levelno, f"{record.name}:pid={os.getpid()}")
 
   def flush(self):
     self.native.flush_log()
 
   def __repr__(self):
-    return "NativeHandler(id={}, level={}, filename={}, stream={})".format(id(self), self.level, self.native_filename, self.stream)
+    return (
+      f"NativeHandler(id={id(self)}, level={self.level}, filename={self.native_filename}, "
+      f"stream={self.stream})"
+    )
 
 
 def create_native_pantsd_file_log_handler(level, native, native_filename):
@@ -95,7 +98,7 @@ def create_native_stderr_log_handler(level, native, stream=None):
   try:
     native.setup_stderr_logger(get_numeric_level(level))
   except Exception as e:
-    print("Error setting up pantsd logger: {}".format(e), file=sys.stderr)
+    print(f"Error setting up pantsd logger: {e!r}", file=sys.stderr)
     raise e
 
   return NativeHandler(level, native, stream)
