@@ -1,9 +1,9 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os.path
 import unittest.mock
 from hashlib import sha1
+from pathlib import Path
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
@@ -128,9 +128,9 @@ class TargetTest(TestBase):
 
   def test_target_id_long(self):
     long_path = 'dummy'
-    for i in range(1,30):
-      long_path = os.path.join(long_path, 'dummy{}'.format(i))
-    long_target = self.make_target('{}:foo'.format(long_path), Target)
+    for i in range(1, 30):
+      long_path = Path(long_path, f'dummy{i}')
+    long_target = self.make_target(f'{long_path}:foo', Target)
     long_id = long_target.id
     self.assertEqual(len(long_id), 100)
     self.assertTrue(long_id.startswith('dummy.dummy1.'))
@@ -138,9 +138,9 @@ class TargetTest(TestBase):
 
   def test_target_id_short(self):
     short_path = 'dummy'
-    for i in range(1,10):
-      short_path = os.path.join(short_path, 'dummy{}'.format(i))
-    short_target = self.make_target('{}:foo'.format(short_path), Target)
+    for i in range(1, 10):
+      short_path = Path(short_path, f'dummy{i}')
+    short_target = self.make_target(f'{short_path}:foo', Target)
     short_id = short_target.id
     self.assertEqual(short_id,
                      'dummy.dummy1.dummy2.dummy3.dummy4.dummy5.dummy6.dummy7.dummy8.dummy9.foo')
@@ -178,21 +178,21 @@ class TargetTest(TestBase):
     hasher = sha1()
     dep_hash = hasher.hexdigest()[:12]
     target_hash = target_a.invalidation_hash()
-    hash_value = '{}.{}'.format(target_hash, dep_hash)
+    hash_value = f'{target_hash}.{dep_hash}'
     self.assertEqual(hash_value, target_a.transitive_invalidation_hash())
 
     hasher = sha1()
     hasher.update(hash_value.encode())
     dep_hash = hasher.hexdigest()[:12]
     target_hash = target_b.invalidation_hash()
-    hash_value = '{}.{}'.format(target_hash, dep_hash)
+    hash_value = f'{target_hash}.{dep_hash}'
     self.assertEqual(hash_value, target_b.transitive_invalidation_hash())
 
     hasher = sha1()
     hasher.update(hash_value.encode())
     dep_hash = hasher.hexdigest()[:12]
     target_hash = target_c.invalidation_hash()
-    hash_value = '{}.{}'.format(target_hash, dep_hash)
+    hash_value = f'{target_hash}.{dep_hash}'
     self.assertEqual(hash_value, target_c.transitive_invalidation_hash())
 
     # Check direct invalidation.
@@ -205,7 +205,7 @@ class TargetTest(TestBase):
     hasher.update(target_b.invalidation_hash(fingerprint_strategy=fingerprint_strategy).encode())
     dep_hash = hasher.hexdigest()[:12]
     target_hash = target_c.invalidation_hash(fingerprint_strategy=fingerprint_strategy)
-    hash_value = '{}.{}'.format(target_hash, dep_hash)
+    hash_value = f'{target_hash}.{dep_hash}'
     self.assertEqual(hash_value, target_c.transitive_invalidation_hash(fingerprint_strategy=fingerprint_strategy))
 
   def test_has_sources(self):
