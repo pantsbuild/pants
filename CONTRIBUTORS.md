@@ -202,3 +202,4 @@ Created by running `./build-support/bin/contributors.sh`.
 + Yi Cheng
 + Yujie Chen
 + billybecker
++ Ólafur Páll Geirsson
