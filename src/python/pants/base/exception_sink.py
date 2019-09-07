@@ -518,6 +518,8 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
 
 # Setup global state such as signal handlers and sys.excepthook with probably-safe values at module
 # import time.
+# Set the log location for writing logs before bootstrap options are parsed.
+ExceptionSink.reset_log_location(os.getcwd())
 # Sets except hook for exceptions at import time.
 ExceptionSink._reset_exiter(Exiter(exiter=sys.exit))
 # Sets a SIGUSR2 handler.
@@ -530,4 +532,4 @@ ExceptionSink.reset_signal_handler(SignalHandler())
 # to explicitly request it. The exception log will have any stacktraces regardless so this should
 # not hamper debugging.
 ExceptionSink.reset_should_print_backtrace_to_terminal(
-  should_print_backtrace=os.environ.get('PANTS_PRINT_EXCEPTION_STACKTRACE') == 'True')
+  should_print_backtrace=os.environ.get('PANTS_PRINT_EXCEPTION_STACKTRACE', 'True') == 'True')

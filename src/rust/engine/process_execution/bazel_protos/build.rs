@@ -132,7 +132,10 @@ fn disable_clippy_in_generated_code(dir: &Path) -> Result<(), String> {
       .filter(|line| !line.contains("clippy"))
       .map(str::to_owned)
       .collect();
-    let content = String::from("#![allow(clippy::all)]\n") + &lines.join("\n");
+    let content = (String::from("#![allow(clippy::all)]\n") + &lines.join("\n"))
+      // Quash warnings about missing dyn, because we can't currently update the code generator
+      // to get rid of them because we forked it upstream a while ago.
+      .replace("::std::any::Any", "dyn ::std::any::Any");
     std::fs::write(file.path(), content).map_err(|err| {
       format!(
         "Error re-writing generated protobuf at {}: {}",
