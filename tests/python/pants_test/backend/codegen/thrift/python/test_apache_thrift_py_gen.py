@@ -107,7 +107,7 @@ class ApacheThriftPyGenTest(TaskTestBase):
     _, synthetic_target = self.generate_single_thrift_target(one)
     for filepath in synthetic_target.sources_relative_to_buildroot():
       if '__init__' not in filepath:
-        first_line = (Path(get_buildroot()) / filepath).read_text().splitlines()[0]
+        first_line = Path(get_buildroot(), filepath).read_text().splitlines()[0]
         self.assertEqual(first_line, "# -*- coding: utf-8 -*-")
 
   def test_nested_namespaces(self):

@@ -374,7 +374,7 @@ def render_html(dst, config, soups, precomputed, template):
 def write_en_pages(config, soups, precomputed, template):
   outdir = config['outdir']
   for dst in soups:
-    dst_path = Path(outdir) / f'{dst}.html'
+    dst_path = Path(outdir, f'{dst}.html')
     dst_path.parent.mkdir(parents=True, exist_ok=True)
     dst_path.write_text(data=render_html(dst, config, soups, precomputed, template))
 
@@ -383,7 +383,7 @@ def copy_extras(config):
   """copy over "extra" files named in config json: stylesheets, logos, ..."""
   outdir = config['outdir']
   for dst, src in config['extras'].items():
-    dst_path = Path(outdir) / dst
+    dst_path = Path(outdir, dst)
     dst_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy(src, dst_path)
 
