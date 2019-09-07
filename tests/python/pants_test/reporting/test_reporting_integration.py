@@ -16,7 +16,7 @@ from pants.util.contextutil import http_server
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-_HEADER = 'invocation_id,task_name,targets_hash,target_id,cache_key_id,cache_key_hash,phase,valid\n'
+_HEADER = 'invocation_id,task_name,targets_hash,target_id,cache_key_id,cache_key_hash,phase,valid'
 _REPORT_LOCATION = 'reports/latest/invalidation-report.csv'
 
 _ENTRY = re.compile(r'^\d+,\S+,(init|pre-check|post-check),(True|False)')
