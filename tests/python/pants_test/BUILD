@@ -32,7 +32,6 @@ python_library(
     '3rdparty/python:dataclasses',
     '//:build_root',
     '//:pants_pex',
-    'build-support/regexes',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
     'src/python/pants/base:exiter',

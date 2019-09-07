@@ -2,5 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 files(
-  sources = globs('*'),
+  name = 'pants-plugins',
+  sources = rglobs('pants-plugins/*'),
+  dependencies = [
+    'tests/python/pants_test:test_base',
+  ],
 )
