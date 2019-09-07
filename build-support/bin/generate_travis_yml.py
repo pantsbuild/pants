@@ -471,34 +471,33 @@ def _build_wheels_command() -> List[str]:
   ]
 
 
-def _build_wheels_env(*, platform: Platform) -> List[str]:
-  return [
-    "PREPARE_DEPLOY=1",
-    f"CACHE_NAME=wheels.{platform}.py36",
-  ]
-
-
-def build_wheels_linux() -> Dict:
+def build_wheels_linux(python_version: PythonVersion) -> Dict:
   command = " && ".join(_build_wheels_command())
   shard = {
-    **linux_shard(python_version=PythonVersion.py36, use_docker=True),
-    "name": "Build Linux wheels (Python 3.6)",
+    **linux_shard(python_version=python_version, use_docker=True),
+    "name": f"Build Linux wheels (Python {python_version.decimal})",
+    "stage": Stage.test.value,
     "script": [
-      docker_build_travis_ci_image(python_version=PythonVersion.py36),
+      docker_build_travis_ci_image(python_version=python_version),
       docker_run_travis_ci_image(command)
     ]
   }
-  shard["env"] = shard.get("env", []) + (_build_wheels_env(platform=Platform.linux))
+  shard["env"] = shard.get("env", []) + [
+    "PREPARE_DEPLOY=1", f"CACHE_NAME=wheels.linux.py{python_version.number}"
+  ]
   return shard
 
 
-def build_wheels_osx() -> Dict:
+def build_wheels_osx(python_version: PythonVersion) -> Dict:
   shard = {
-    **osx_shard(python_version=PythonVersion.py36, osx_image="xcode8"),
-    "name": "Build OSX wheels (Python 3.6)",
+    **osx_shard(python_version=python_version, osx_image="xcode8"),
+    "name": f"Build OSX wheels (Python {python_version.decimal})",
+    "stage": Stage.test.value,
     "script": _build_wheels_command(),
   }
-  shard["env"] = shard.get("env", []) + _build_wheels_env(platform=Platform.osx) + [
+  shard["env"] = shard.get("env", []) + [
+    "PREPARE_DEPLOY=1",
+    f"CACHE_NAME=wheels.osx.py{python_version.number}",
     # We ensure selection of the pyenv interpreter by PY aware scripts and pants.pex with these
     # env vars.
     'PY=${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin/python',
@@ -741,8 +740,8 @@ def main() -> None:
       clippy(),
       cargo_audit(),
       unit_tests(PythonVersion.py36),
-      build_wheels_linux(),
-      build_wheels_osx(),
+      *[build_wheels_linux(v) for v in PythonVersion],
+      *[build_wheels_osx(v) for v in PythonVersion],
       *integration_tests(PythonVersion.py36),
       *integration_tests(PythonVersion.py36, use_pantsd=True),
       *integration_tests(PythonVersion.py37),
