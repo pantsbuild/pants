@@ -8,4 +8,3 @@ tests/python/pants_test/help:help_integration
 tests/python/pants_test/targets:unknown_arguments_integration
 tests/python/pants_test/tasks:changed_target_integration
 tests/python/pants_test/tasks:clean_all_integration
-tests/python/pants_test/tasks:scalastyle_integration
