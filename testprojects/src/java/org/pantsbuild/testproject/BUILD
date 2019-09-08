@@ -22,6 +22,14 @@ files(
 )
 
 files(
+  name = 'page_directory',
+  sources = rglobs('page/*'),
+  dependencies = [
+    'examples/src/java/org/pantsbuild/example:hello_directory',
+  ],
+)
+
+files(
   name = 'phrases_directory',
   sources = rglobs('phrases/*'),
 )
