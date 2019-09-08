@@ -31,12 +31,12 @@ class PluginResolverTest(unittest.TestCase):
   @staticmethod
   def create_plugin(distribution_repo_dir, plugin, version=None, packager_cls=None):
     with safe_open(os.path.join(distribution_repo_dir, plugin, 'setup.py'), 'w') as fp:
-      fp.write(dedent("""
+      fp.write(dedent(f"""
         from setuptools import setup
 
 
-        setup(name="{plugin}", version="{version}")
-      """).format(plugin=plugin, version=version or '0.0.0'))
+        setup(name="{plugin}", version="{version or '0.0.0'}")
+      """))
     packager_cls = packager_cls or Packager
     packager = packager_cls(source_dir=os.path.join(distribution_repo_dir, plugin),
                             install_dir=distribution_repo_dir)
@@ -57,7 +57,7 @@ class PluginResolverTest(unittest.TestCase):
       repo_dir = None
       if plugins:
         repo_dir = os.path.join(root_dir, 'repo')
-        env.update(PANTS_PYTHON_REPOS_REPOS='[{!r}]'.format(repo_dir),
+        env.update(PANTS_PYTHON_REPOS_REPOS=f'[{repo_dir!r}]',
                    PANTS_PYTHON_REPOS_INDEXES='[]',
                    PANTS_PYTHON_SETUP_RESOLVER_CACHE_TTL='1')
         plugin_list = []
@@ -65,7 +65,7 @@ class PluginResolverTest(unittest.TestCase):
           version = None
           if isinstance(plugin, tuple):
             plugin, version = plugin
-          plugin_list.append('{}=={}'.format(plugin, version) if version else plugin)
+          plugin_list.append(f'{plugin}=={version}' if version else plugin)
           if create_artifacts:
             self.create_plugin(repo_dir, plugin, version, packager_cls=packager_cls)
         env['PANTS_PLUGINS'] = '[{}]'.format(','.join(map(repr, plugin_list)))
@@ -73,7 +73,7 @@ class PluginResolverTest(unittest.TestCase):
       configpath = os.path.join(root_dir, 'pants.ini')
       if create_artifacts:
         touch(configpath)
-      args = ["--pants-config-files=['{}']".format(configpath)]
+      args = [f"--pants-config-files=['{configpath}']"]
 
       options_bootstrapper = OptionsBootstrapper.create(env=env, args=args)
       plugin_resolver = PluginResolver(options_bootstrapper, interpreter=interpreter)

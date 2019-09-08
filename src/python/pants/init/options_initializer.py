@@ -137,8 +137,9 @@ class OptionsInitializer:
       if glob_relpath and (not glob_relpath.startswith("../")):
         invalidation_globs.extend([glob_relpath, glob_relpath + '/**'])
       else:
-        logging.getLogger(__name__).warning("Changes to {}, outside of the buildroot"
-                                            ", will not be invalidated.".format(glob))
+        logging.getLogger(__name__).warning(
+          f"Changes to {glob}, outside of the buildroot, will not be invalidated."
+        )
 
     return invalidation_globs
 
@@ -148,8 +149,8 @@ class OptionsInitializer:
 
     if global_bootstrap_options.pants_version != pants_version():
       raise BuildConfigurationError(
-        'Version mismatch: Requested version was {}, our version is {}.'
-        .format(global_bootstrap_options.pants_version, pants_version())
+        f'Version mismatch: Requested version was {global_bootstrap_options.pants_version}, '
+        f'our version is {pants_version()}.'
       )
 
     # Parse and register options.

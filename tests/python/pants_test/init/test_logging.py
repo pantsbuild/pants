@@ -3,6 +3,7 @@
 
 import logging
 from contextlib import contextmanager
+from pathlib import Path
 
 from pants.init.logging import get_numeric_level, setup_logging
 from pants.util.contextutil import temporary_dir
@@ -30,9 +31,7 @@ class LoggingTest(TestBase):
       cat = "🐈"
       file_logger.info(cat)
       logging_setup_result.log_handler.flush()
-      with open(logging_setup_result.log_filename, "r") as fp:
-        contents = fp.read()
-        self.assertIn(cat, contents)
+      self.assertIn(cat, Path(logging_setup_result.log_filename).read_text())
 
   def test_file_logging(self):
     with self.logger('INFO') as (file_logger, logging_setup_result):
@@ -41,8 +40,7 @@ class LoggingTest(TestBase):
       file_logger.debug('this is some debug info')
       logging_setup_result.log_handler.flush()
 
-      with open(logging_setup_result.log_filename, 'r') as fp:
-        loglines = fp.read().splitlines()
-        self.assertEqual(2, len(loglines))
-        self.assertIn("[WARN] this is a warning", loglines[0])
-        self.assertIn("[INFO] this is some info", loglines[1])
+      loglines = Path(logging_setup_result.log_filename).read_text().splitlines()
+      self.assertEqual(2, len(loglines))
+      self.assertIn("[WARN] this is a warning", loglines[0])
+      self.assertIn("[INFO] this is some info", loglines[1])
