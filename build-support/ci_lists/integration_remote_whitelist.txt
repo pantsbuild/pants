@@ -25,6 +25,9 @@ tests/python/pants_test/base:exclude_target_regexp_integration
 tests/python/pants_test/base:exiter_integration
 tests/python/pants_test/bin:integration
 tests/python/pants_test/core_tasks:prep_command_integration
+tests/python/pants_test/engine/legacy:dependencies_integration
+tests/python/pants_test/engine/legacy:filedeps_integration
+tests/python/pants_test/engine/legacy:list_integration
 tests/python/pants_test/engine:scheduler_integration
 tests/python/pants_test/help:help_integration
 tests/python/pants_test/java/distribution:distribution_integration
