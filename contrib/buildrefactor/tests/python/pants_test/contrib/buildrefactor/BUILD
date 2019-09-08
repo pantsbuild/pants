@@ -41,6 +41,7 @@ python_tests(
   sources=['test_meta_rename_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
+    'testprojects/tests/java/org/pantsbuild/testproject:buildrefactor_directory',
   ],
   tags={'integration'},
 )
@@ -51,6 +52,7 @@ python_tests(
   sources=['test_buildozer_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
+    'testprojects/tests/java/org/pantsbuild/testproject:buildrefactor_directory',
   ],
   tags={'integration'},
 )
