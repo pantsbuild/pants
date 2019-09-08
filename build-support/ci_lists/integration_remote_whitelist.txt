@@ -1,4 +1,5 @@
 contrib/awslambda/python/tests/python/pants_test/contrib/awslambda/python:python
+contrib/codeanalysis/tests/python/pants_test/contrib/codeanalysis/tasks:integration
 contrib/cpp/tests/python/pants_test/contrib/cpp:cpp_integration
 contrib/errorprone/tests/python/pants_test/contrib/errorprone/tasks:integration
 contrib/findbugs/tests/python/pants_test/contrib/findbugs/tasks:integration
