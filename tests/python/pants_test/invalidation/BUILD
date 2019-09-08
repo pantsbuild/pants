@@ -29,6 +29,7 @@ python_tests(
   dependencies = [
     'src/python/pants/base:build_environment',
     'tests/python/pants_test:int-test',
+    'testprojects/tests/java/org/pantsbuild/testproject:strictdeps_directory',
   ],
   tags = {'integration'},
   timeout = 480,

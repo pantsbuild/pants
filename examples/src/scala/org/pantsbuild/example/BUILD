@@ -37,6 +37,10 @@ files(
 files(
   name = 'hello_directory',
   sources = rglobs('hello/*'),
+  dependencies = [
+    'examples/src/java/org/pantsbuild/example:hello_directory',
+    'examples/src/resources/org/pantsbuild/example:hello_directory',
+  ],
 )
 
 files(

@@ -78,8 +78,9 @@ python_tests(
   sources = ['test_pantsd_integration.py'],
   dependencies = [
     ':pantsd_integration_test_base',
-    'tests/python/pants_test:int-test',
-    'tests/python/pants_test/testutils:process_test_util',
+    'examples/src/java/org/pantsbuild/example:hello_directory',
+    'examples/src/python/example:hello_directory',
+    'examples/src/scala/org/pantsbuild/example:hello_directory',
   ],
   tags = {'integration'},
   timeout = 900

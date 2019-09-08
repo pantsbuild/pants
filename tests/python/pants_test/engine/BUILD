@@ -202,6 +202,7 @@ python_tests(
   dependencies=[
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
+    'examples/src/scala/org/pantsbuild/example:hello_directory',
   ],
   tags={'integration'},
 )

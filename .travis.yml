@@ -384,7 +384,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - travis_wait 25 ./build-support/bin/ci.py --unit-tests --remote-execution-enabled
+    - travis_wait 40 ./build-support/bin/ci.py --unit-tests --remote-execution-enabled
       --python-version 3.7
     - ./build-support/bin/ci.py --plugin-tests --python-version 3.7
     stage: Test Pants (Cron)
@@ -443,7 +443,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - travis_wait 25 ./build-support/bin/ci.py --integration-tests-v2 --remote-execution-enabled
+    - travis_wait 40 ./build-support/bin/ci.py --integration-tests-v2 --remote-execution-enabled
       --python-version 3.7
     stage: Test Pants (Cron)
     sudo: required
@@ -675,7 +675,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - travis_wait 25 ./build-support/bin/ci.py --unit-tests --remote-execution-enabled
+    - travis_wait 40 ./build-support/bin/ci.py --unit-tests --remote-execution-enabled
       --python-version 3.6
     - ./build-support/bin/ci.py --plugin-tests --python-version 3.6
     stage: Test Pants
@@ -733,7 +733,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - travis_wait 25 ./build-support/bin/ci.py --integration-tests-v2 --remote-execution-enabled
+    - travis_wait 40 ./build-support/bin/ci.py --integration-tests-v2 --remote-execution-enabled
       --python-version 3.6
     stage: Test Pants
     sudo: required
@@ -889,7 +889,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 0/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 0/13 --python-version
       3.6
     stage: Test Pants
     sudo: required
@@ -946,7 +946,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 1/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 1/13 --python-version
       3.6
     stage: Test Pants
     sudo: required
@@ -1003,7 +1003,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 2/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 2/13 --python-version
       3.6
     stage: Test Pants
     sudo: required
@@ -1060,7 +1060,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 3/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 3/13 --python-version
       3.6
     stage: Test Pants
     sudo: required
@@ -1117,7 +1117,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 4/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 4/13 --python-version
       3.6
     stage: Test Pants
     sudo: required
@@ -1174,7 +1174,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 5/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 5/13 --python-version
       3.6
     stage: Test Pants
     sudo: required
@@ -1231,7 +1231,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 6/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 6/13 --python-version
       3.6
     stage: Test Pants
     sudo: required
@@ -1288,7 +1288,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 7/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 7/13 --python-version
       3.6
     stage: Test Pants
     sudo: required
@@ -1345,7 +1345,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 8/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 8/13 --python-version
       3.6
     stage: Test Pants
     sudo: required
@@ -1402,7 +1402,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 9/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 9/13 --python-version
       3.6
     stage: Test Pants
     sudo: required
@@ -1459,7 +1459,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 10/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 10/13 --python-version
       3.6
     stage: Test Pants
     sudo: required
@@ -1516,7 +1516,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 11/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 11/13 --python-version
       3.6
     stage: Test Pants
     sudo: required
@@ -1573,178 +1573,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 12/16 --python-version
-      3.6
-    stage: Test Pants
-    sudo: required
-  - addons:
-      apt:
-        packages:
-        - lib32stdc++6
-        - lib32z1
-        - lib32z1-dev
-        - gcc-multilib
-        - python-dev
-        - openssl
-        - libssl-dev
-        - jq
-        - unzip
-        - shellcheck
-    after_failure:
-    - ./build-support/bin/ci-failure.sh
-    before_cache:
-    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
-    - du -m -d2 ${HOME}/.cache/pants | sort -r -n
-    before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
-    cache:
-      directories:
-      - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
-      timeout: 500
-    dist: xenial
-    env:
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
-    - CACHE_NAME=integration.v1.shard_13.py36
-    language: python
-    name: Integration tests  - V1 - shard 13 (Python 3.6)
-    os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 13/16 --python-version
-      3.6
-    stage: Test Pants
-    sudo: required
-  - addons:
-      apt:
-        packages:
-        - lib32stdc++6
-        - lib32z1
-        - lib32z1-dev
-        - gcc-multilib
-        - python-dev
-        - openssl
-        - libssl-dev
-        - jq
-        - unzip
-        - shellcheck
-    after_failure:
-    - ./build-support/bin/ci-failure.sh
-    before_cache:
-    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
-    - du -m -d2 ${HOME}/.cache/pants | sort -r -n
-    before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
-    cache:
-      directories:
-      - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
-      timeout: 500
-    dist: xenial
-    env:
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
-    - CACHE_NAME=integration.v1.shard_14.py36
-    language: python
-    name: Integration tests  - V1 - shard 14 (Python 3.6)
-    os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 14/16 --python-version
-      3.6
-    stage: Test Pants
-    sudo: required
-  - addons:
-      apt:
-        packages:
-        - lib32stdc++6
-        - lib32z1
-        - lib32z1-dev
-        - gcc-multilib
-        - python-dev
-        - openssl
-        - libssl-dev
-        - jq
-        - unzip
-        - shellcheck
-    after_failure:
-    - ./build-support/bin/ci-failure.sh
-    before_cache:
-    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
-    - du -m -d2 ${HOME}/.cache/pants | sort -r -n
-    before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
-    cache:
-      directories:
-      - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
-      timeout: 500
-    dist: xenial
-    env:
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
-    - CACHE_NAME=integration.v1.shard_15.py36
-    language: python
-    name: Integration tests  - V1 - shard 15 (Python 3.6)
-    os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 15/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 12/13 --python-version
       3.6
     stage: Test Pants
     sudo: required
@@ -1802,7 +1631,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 0/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 0/13 --python-version
       3.6
     stage: Test Pants (Cron)
     sudo: required
@@ -1860,7 +1689,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 1/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 1/13 --python-version
       3.6
     stage: Test Pants (Cron)
     sudo: required
@@ -1918,7 +1747,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 2/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 2/13 --python-version
       3.6
     stage: Test Pants (Cron)
     sudo: required
@@ -1976,7 +1805,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 3/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 3/13 --python-version
       3.6
     stage: Test Pants (Cron)
     sudo: required
@@ -2034,7 +1863,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 4/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 4/13 --python-version
       3.6
     stage: Test Pants (Cron)
     sudo: required
@@ -2092,7 +1921,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 5/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 5/13 --python-version
       3.6
     stage: Test Pants (Cron)
     sudo: required
@@ -2150,7 +1979,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 6/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 6/13 --python-version
       3.6
     stage: Test Pants (Cron)
     sudo: required
@@ -2208,7 +2037,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 7/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 7/13 --python-version
       3.6
     stage: Test Pants (Cron)
     sudo: required
@@ -2266,7 +2095,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 8/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 8/13 --python-version
       3.6
     stage: Test Pants (Cron)
     sudo: required
@@ -2324,7 +2153,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 9/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 9/13 --python-version
       3.6
     stage: Test Pants (Cron)
     sudo: required
@@ -2382,7 +2211,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 10/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 10/13 --python-version
       3.6
     stage: Test Pants (Cron)
     sudo: required
@@ -2440,7 +2269,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 11/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 11/13 --python-version
       3.6
     stage: Test Pants (Cron)
     sudo: required
@@ -2498,181 +2327,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 12/16 --python-version
-      3.6
-    stage: Test Pants (Cron)
-    sudo: required
-  - addons:
-      apt:
-        packages:
-        - lib32stdc++6
-        - lib32z1
-        - lib32z1-dev
-        - gcc-multilib
-        - python-dev
-        - openssl
-        - libssl-dev
-        - jq
-        - unzip
-        - shellcheck
-    after_failure:
-    - ./build-support/bin/ci-failure.sh
-    before_cache:
-    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
-    - du -m -d2 ${HOME}/.cache/pants | sort -r -n
-    before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
-    cache:
-      directories:
-      - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
-      timeout: 500
-    dist: xenial
-    env:
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
-    - CACHE_NAME=integration.v1.shard_13.py36.pantsd
-    - USE_PANTSD_FOR_INTEGRATION_TESTS="true"
-    language: python
-    name: Integration tests with Pantsd - V1 - shard 13 (Python 3.6)
-    os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 13/16 --python-version
-      3.6
-    stage: Test Pants (Cron)
-    sudo: required
-  - addons:
-      apt:
-        packages:
-        - lib32stdc++6
-        - lib32z1
-        - lib32z1-dev
-        - gcc-multilib
-        - python-dev
-        - openssl
-        - libssl-dev
-        - jq
-        - unzip
-        - shellcheck
-    after_failure:
-    - ./build-support/bin/ci-failure.sh
-    before_cache:
-    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
-    - du -m -d2 ${HOME}/.cache/pants | sort -r -n
-    before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
-    cache:
-      directories:
-      - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
-      timeout: 500
-    dist: xenial
-    env:
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
-    - CACHE_NAME=integration.v1.shard_14.py36.pantsd
-    - USE_PANTSD_FOR_INTEGRATION_TESTS="true"
-    language: python
-    name: Integration tests with Pantsd - V1 - shard 14 (Python 3.6)
-    os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 14/16 --python-version
-      3.6
-    stage: Test Pants (Cron)
-    sudo: required
-  - addons:
-      apt:
-        packages:
-        - lib32stdc++6
-        - lib32z1
-        - lib32z1-dev
-        - gcc-multilib
-        - python-dev
-        - openssl
-        - libssl-dev
-        - jq
-        - unzip
-        - shellcheck
-    after_failure:
-    - ./build-support/bin/ci-failure.sh
-    before_cache:
-    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
-    - du -m -d2 ${HOME}/.cache/pants | sort -r -n
-    before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
-    cache:
-      directories:
-      - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
-      timeout: 500
-    dist: xenial
-    env:
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
-    - CACHE_NAME=integration.v1.shard_15.py36.pantsd
-    - USE_PANTSD_FOR_INTEGRATION_TESTS="true"
-    language: python
-    name: Integration tests with Pantsd - V1 - shard 15 (Python 3.6)
-    os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 15/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 12/13 --python-version
       3.6
     stage: Test Pants (Cron)
     sudo: required
@@ -2730,7 +2385,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 0/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 0/13 --python-version
       3.7
     stage: Test Pants (Cron)
     sudo: required
@@ -2788,7 +2443,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 1/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 1/13 --python-version
       3.7
     stage: Test Pants (Cron)
     sudo: required
@@ -2846,7 +2501,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 2/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 2/13 --python-version
       3.7
     stage: Test Pants (Cron)
     sudo: required
@@ -2904,7 +2559,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 3/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 3/13 --python-version
       3.7
     stage: Test Pants (Cron)
     sudo: required
@@ -2962,7 +2617,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 4/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 4/13 --python-version
       3.7
     stage: Test Pants (Cron)
     sudo: required
@@ -3020,7 +2675,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 5/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 5/13 --python-version
       3.7
     stage: Test Pants (Cron)
     sudo: required
@@ -3078,7 +2733,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 6/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 6/13 --python-version
       3.7
     stage: Test Pants (Cron)
     sudo: required
@@ -3136,7 +2791,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 7/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 7/13 --python-version
       3.7
     stage: Test Pants (Cron)
     sudo: required
@@ -3194,7 +2849,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 8/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 8/13 --python-version
       3.7
     stage: Test Pants (Cron)
     sudo: required
@@ -3252,7 +2907,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 9/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 9/13 --python-version
       3.7
     stage: Test Pants (Cron)
     sudo: required
@@ -3310,7 +2965,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 10/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 10/13 --python-version
       3.7
     stage: Test Pants (Cron)
     sudo: required
@@ -3368,7 +3023,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 11/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 11/13 --python-version
       3.7
     stage: Test Pants (Cron)
     sudo: required
@@ -3426,181 +3081,7 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 12/16 --python-version
-      3.7
-    stage: Test Pants (Cron)
-    sudo: required
-  - addons:
-      apt:
-        packages:
-        - lib32stdc++6
-        - lib32z1
-        - lib32z1-dev
-        - gcc-multilib
-        - python-dev
-        - openssl
-        - libssl-dev
-        - jq
-        - unzip
-        - shellcheck
-    after_failure:
-    - ./build-support/bin/ci-failure.sh
-    before_cache:
-    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
-    - du -m -d2 ${HOME}/.cache/pants | sort -r -n
-    before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
-    cache:
-      directories:
-      - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
-      timeout: 500
-    dist: xenial
-    env:
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
-    - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
-    - CACHE_NAME=integration.v1.shard_13.py37
-    language: python
-    name: Integration tests  - V1 - shard 13 (Python 3.7)
-    os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 13/16 --python-version
-      3.7
-    stage: Test Pants (Cron)
-    sudo: required
-  - addons:
-      apt:
-        packages:
-        - lib32stdc++6
-        - lib32z1
-        - lib32z1-dev
-        - gcc-multilib
-        - python-dev
-        - openssl
-        - libssl-dev
-        - jq
-        - unzip
-        - shellcheck
-    after_failure:
-    - ./build-support/bin/ci-failure.sh
-    before_cache:
-    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
-    - du -m -d2 ${HOME}/.cache/pants | sort -r -n
-    before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
-    cache:
-      directories:
-      - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
-      timeout: 500
-    dist: xenial
-    env:
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
-    - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
-    - CACHE_NAME=integration.v1.shard_14.py37
-    language: python
-    name: Integration tests  - V1 - shard 14 (Python 3.7)
-    os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 14/16 --python-version
-      3.7
-    stage: Test Pants (Cron)
-    sudo: required
-  - addons:
-      apt:
-        packages:
-        - lib32stdc++6
-        - lib32z1
-        - lib32z1-dev
-        - gcc-multilib
-        - python-dev
-        - openssl
-        - libssl-dev
-        - jq
-        - unzip
-        - shellcheck
-    after_failure:
-    - ./build-support/bin/ci-failure.sh
-    before_cache:
-    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
-    - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
-    - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
-    - rm -rf ${HOME}/.ivy2/pants/com.example
-    - du -m -d2 ${HOME}/.cache/pants | sort -r -n
-    before_install:
-    - PATH="/usr/lib/jvm/java-8-openjdk-amd64/jre/bin":$PATH
-    - JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-    - sudo sysctl fs.inotify.max_user_watches=524288
-    - ./build-support/bin/install_aws_cli_for_ci.sh
-    - pyenv global 2.7.15 3.6.7 3.7.1
-    before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
-    cache:
-      directories:
-      - ${AWS_CLI_ROOT}
-      - ${PYENV_ROOT}
-      - ${HOME}/.cache/pants/lmdb_store
-      - ${HOME}/.cache/pants/tools
-      - ${HOME}/.cache/pants/zinc
-      - ${HOME}/.ivy2/pants
-      - ${HOME}/.npm
-      timeout: 500
-    dist: xenial
-    env:
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
-    - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
-    - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
-    - CACHE_NAME=integration.v1.shard_15.py37
-    language: python
-    name: Integration tests  - V1 - shard 15 (Python 3.7)
-    os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
-    script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 15/16 --python-version
+    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 12/13 --python-version
       3.7
     stage: Test Pants (Cron)
     sudo: required

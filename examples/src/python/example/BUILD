@@ -11,4 +11,11 @@ page(
   name='3rdparty_py',
   source='3rdparty_py.md',
   links=[
-    'src/docs:3rdparty'])
+    'src/docs:3rdparty',
+  ]
+)
+
+files(
+  name='hello_directory',
+  sources=rglobs('hello/*'),
+)

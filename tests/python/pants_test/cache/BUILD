@@ -101,6 +101,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
+    'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
   ],
   tags = {'integration'},
   timeout = 480,
