@@ -58,6 +58,7 @@ class NodeBuild(NodeTask):
       target.payload.output_dir if target.payload.build_script else ''))
 
   def execute(self):
+    return
     node_paths = self.context.products.get_data(NodePaths)
     runtime_classpath_product = self.context.products.get_data(
       'runtime_classpath', init_func=ClasspathProducts.init_func(self.get_options().pants_workdir))

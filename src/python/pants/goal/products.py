@@ -435,6 +435,13 @@ class Products:
     if typename not in self.data_products:
       if not init_func:
         return None
+      if typename == 'runtime_classpath':
+        print(init_func)
+        for _ in range(5):
+          r = init_func()
+          print('get_data')
+          print(r)
+
       self.data_products[typename] = init_func()
     return self.data_products.get(typename)
 
