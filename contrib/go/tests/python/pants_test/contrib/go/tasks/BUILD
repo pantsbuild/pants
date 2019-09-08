@@ -24,6 +24,7 @@ python_tests(
   sources = globs('*_integration.py'),
   dependencies=[
     'contrib/go/src/python/pants/contrib/go/subsystems',
+    'contrib/go:examples_directory',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

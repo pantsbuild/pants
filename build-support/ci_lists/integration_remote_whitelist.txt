@@ -1,4 +1,6 @@
 contrib/awslambda/python/tests/python/pants_test/contrib/awslambda/python:python
+contrib/go/tests/python/pants_test/contrib/go/subsystems:integration
+contrib/go/tests/python/pants_test/contrib/go/tasks:integration
 src/python/pants/help:integration
 tests/python/pants_test/base:exclude_target_regexp_integration
 tests/python/pants_test/base:exiter_integration
