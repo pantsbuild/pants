@@ -17,6 +17,7 @@ contrib/node/tests/python/pants_test/contrib/node/tasks:node_repl_integration
 contrib/node/tests/python/pants_test/contrib/node/tasks:node_resolve_integration
 contrib/node/tests/python/pants_test/contrib/node/tasks:node_run_integration
 contrib/node/tests/python/pants_test/contrib/node/tasks:node_test_integration
+contrib/scalajs/tests/python/pants_test/contrib/scalajs/tasks:scalajs_repl_integratio
 src/python/pants/help:integration
 tests/python/pants_test/base:exclude_target_regexp_integration
 tests/python/pants_test/base:exiter_integration
