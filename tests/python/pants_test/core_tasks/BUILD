@@ -63,6 +63,7 @@ python_tests(
   sources = ['test_substitute_target_aliases_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test',
+    'testprojects/src/java/org/pantsbuild/testproject:aliases_directory'
   ],
   tags = {'integration'},
   timeout = 120,

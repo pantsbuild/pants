@@ -2,6 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 files(
+  name = 'aliases_directory',
+  sources = rglobs('aliases/*'),
+)
+
+files(
   name = 'phrases_directory',
   sources = rglobs('phrases/*'),
 )
