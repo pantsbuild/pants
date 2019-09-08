@@ -15,3 +15,11 @@ files(
   name = 'printversion_directory',
   sources = rglobs('printversion/*'),
 )
+
+files(
+  name = 'unicode_directory',
+  sources = rglobs('unicode/*'),
+  dependencies = [
+    'testprojects/src/scala/org/pantsbuild/testproject:unicode_directory',
+  ],
+)
