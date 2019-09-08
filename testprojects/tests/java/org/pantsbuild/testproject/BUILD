@@ -5,3 +5,8 @@ files(
   name='buildrefactor_directory',
   sources=rglobs('buildrefactor/*'),
 )
+
+files(
+  name='strictdeps_directory',
+  sources=rglobs('strictdeps/*'),
+)
