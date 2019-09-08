@@ -24,6 +24,9 @@ src/python/pants/help:integration
 tests/python/pants_test/base:exclude_target_regexp_integration
 tests/python/pants_test/base:exiter_integration
 tests/python/pants_test/bin:integration
+tests/python/pants_test/build_graph:build_graph_integration
+tests/python/pants_test/build_graph:intermediate_target_integration
+tests/python/pants_test/build_graph:subproject_integration
 tests/python/pants_test/cache:cache_cleanup_integration
 tests/python/pants_test/core_tasks:deferred_sources_mapper_integration
 tests/python/pants_test/core_tasks:prep_command_integration

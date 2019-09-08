@@ -70,6 +70,10 @@ python_tests(
   sources = ['test_build_graph_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test',
+    'testprojects/src/java/org/pantsbuild/testproject:cycle1_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:cycle2_directory',
+    'testprojects/src/python:build_file_imports_function_directory',
+    'testprojects/src/python:build_file_imports_module_directory',
   ],
   tags = {'integration'},
 )
@@ -80,6 +84,9 @@ python_tests(
   dependencies = [
     'src/python/pants/build_graph',
     'tests/python/pants_test:int-test',
+    'testprojects/maven_layout:provided_patching_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:intransitive_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:runtime_directory',
   ],
   tags = {'integration'},
 )

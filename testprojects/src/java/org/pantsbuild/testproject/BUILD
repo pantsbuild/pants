@@ -7,6 +7,21 @@ files(
 )
 
 files(
+  name = 'cycle1_directory',
+  sources = rglobs('cycle1/*'),
+)
+
+files(
+  name = 'cycle2_directory',
+  sources = rglobs('cycle2/*'),
+)
+
+files(
+  name = 'intransitive_directory',
+  sources = rglobs('intransitive/*'),
+)
+
+files(
   name = 'phrases_directory',
   sources = rglobs('phrases/*'),
 )
@@ -14,6 +29,11 @@ files(
 files(
   name = 'printversion_directory',
   sources = rglobs('printversion/*'),
+)
+
+files(
+  name = 'runtime_directory',
+  sources = rglobs('runtime/*'),
 )
 
 files(
