@@ -4,4 +4,7 @@
 files(
   name='examples_directory',
   sources=rglobs('examples/*'),
+  dependencies=[
+    'examples/src/scala/org/pantsbuild/example:fact_directory',
+  ],
 )

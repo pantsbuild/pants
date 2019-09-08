@@ -30,6 +30,11 @@ page(
 )
 
 files(
+  name = 'fact_directory',
+  sources = rglobs('fact/*'),
+)
+
+files(
   name = 'hello_directory',
   sources = rglobs('hello/*'),
 )

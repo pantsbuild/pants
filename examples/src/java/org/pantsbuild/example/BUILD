@@ -54,4 +54,7 @@ page(
 files(
   name = 'hello_directory',
   sources = rglobs('hello/*'),
+  dependencies = [
+    'examples/src/resources/org/pantsbuild/example:hello_directory',
+  ],
 )
