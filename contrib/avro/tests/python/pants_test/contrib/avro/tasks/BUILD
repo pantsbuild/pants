@@ -17,6 +17,7 @@ python_tests(
   sources=['test_avro_gen_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
+    'contrib/avro:avro_tests_directory',
   ],
   tags={'integration'},
 )

@@ -32,6 +32,8 @@ python_tests(
   sources=['test_scrooge_gen_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
+    'contrib/scrooge:scala_tests_directory',
+    'contrib/scrooge:thrift_tests_directory',
   ],
   tags={'integration'},
   timeout=180,
@@ -42,6 +44,7 @@ python_tests(
   sources=['test_thrift_linter_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
+    'contrib/scrooge:thrift_tests_directory',
   ],
   tags={'integration'},
   timeout=240,

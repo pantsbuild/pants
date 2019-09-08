@@ -19,8 +19,6 @@ def have_compiler():
 class CppIntegrationTest(PantsRunIntegrationTest):
   """Integration test for cpp which builds libraries and builds and runs binaries."""
 
-  # TODO(dhamon): Move these to the test folder and keep the example folder for more
-  # complete examples.
   TEST_SIMPLE_BINARY_TARGET = 'contrib/cpp/examples/src/cpp/example:hello_pants'
   TEST_BINARY_WITH_LIBRARY_TARGET = 'contrib/cpp/examples/src/cpp/calcsqrt'
   TEST_LIBRARY_TARGET = 'contrib/cpp/examples/src/cpp/example/hello'
@@ -65,8 +63,8 @@ class CppIntegrationTest(PantsRunIntegrationTest):
       args = [
         'clean-all',
         task,
-        "--cache-write-to=['{}']".format(cache),
-        "--cache-read-from=['{}']".format(cache),
+        f"--cache-write-to=['{cache}']",
+        f"--cache-read-from=['{cache}']",
         target,
         '-ldebug',
       ]

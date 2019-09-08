@@ -17,8 +17,8 @@ files(
 )
 
 files(
-  name = '3rdparty_build',
-  source = '3rdparty/BUILD',
+  name = '3rdparty_directory',
+  sources = rglobs('3rdparty/*'),
 )
 
 files(

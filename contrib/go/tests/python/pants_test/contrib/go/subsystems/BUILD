@@ -34,6 +34,7 @@ python_tests(
   sources = globs('test_*_integration.py'),
   dependencies=[
     'contrib/go/src/python/pants/contrib/go/subsystems',
+    'contrib/go:examples_directory',
     'tests/python/pants_test:int-test',
   ],
   tags={'integration'},
