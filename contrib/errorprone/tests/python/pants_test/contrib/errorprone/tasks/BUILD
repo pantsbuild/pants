@@ -16,6 +16,7 @@ python_tests(
   sources=['test_errorprone_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
+    'contrib/errorprone:java_tests_directory',
   ],
   tags={'integration'},
   timeout=300,
