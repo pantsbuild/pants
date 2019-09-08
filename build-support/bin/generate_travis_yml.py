@@ -512,7 +512,7 @@ def build_wheels_osx() -> Dict:
 # -------------------------------------------------------------------------
 
 def integration_tests_v1(python_version: PythonVersion, *, use_pantsd: bool = False) -> List[Dict]:
-  num_integration_shards = 18
+  num_integration_shards = 19
 
   def make_shard(*, shard_num: int) -> Dict:
     shard = {
