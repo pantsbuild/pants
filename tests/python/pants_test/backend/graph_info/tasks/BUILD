@@ -20,6 +20,7 @@ python_tests(
   sources=['test_cloc_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
+    'testprojects/src/python:python_targets_directory',
   ],
   tags = {'integration'},
 )
@@ -105,6 +106,7 @@ python_tests(
   sources=['test_paths_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
+    'testprojects/src/python:python_targets_directory',
   ],
   tags = {'integration'},
 )

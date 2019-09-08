@@ -21,6 +21,8 @@ contrib/scalajs/tests/python/pants_test/contrib/scalajs/tasks:scalajs_repl_integ
 contrib/scrooge/tests/python/pants_test/contrib/scrooge/tasks:scrooge_gen_integration
 contrib/scrooge/tests/python/pants_test/contrib/scrooge/tasks:thrift_linter_integration
 src/python/pants/help:integration
+tests/python/pants_test/backend/graph_info/tasks:cloc_integration
+tests/python/pants_test/backend/graph_info/tasks:paths_integration
 tests/python/pants_test/base:exclude_target_regexp_integration
 tests/python/pants_test/base:exiter_integration
 tests/python/pants_test/bin:integration

@@ -12,6 +12,14 @@ files(
 )
 
 files(
+  name = 'python_targets_directory',
+  sources = rglobs('python_targets/*'),
+  dependencies = [
+    'testprojects/src/python/python_targets:test',
+  ],
+)
+
+files(
   name = 'unicode_directory',
   sources = rglobs('unicode/*'),
 )
