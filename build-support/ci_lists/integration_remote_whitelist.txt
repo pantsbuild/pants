@@ -8,6 +8,7 @@ contrib/errorprone/tests/python/pants_test/contrib/errorprone/tasks:integration
 contrib/findbugs/tests/python/pants_test/contrib/findbugs/tasks:integration
 contrib/go/tests/python/pants_test/contrib/go/subsystems:integration
 contrib/go/tests/python/pants_test/contrib/go/tasks:integration
+contrib/jax_ws/tests/python/pants_test/contrib/jax_ws/tasks:integration
 src/python/pants/help:integration
 tests/python/pants_test/base:exclude_target_regexp_integration
 tests/python/pants_test/base:exiter_integration
