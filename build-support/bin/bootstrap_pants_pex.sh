@@ -43,10 +43,18 @@ function calculate_pants_pex_current_hash() {
    (uname
     python --version 2>&1
     git ls-files --cached --others --exclude-standard \
+     "${REPO_ROOT}/BUILD" \
+     "${REPO_ROOT}/BUILD.tools" \
+     "${REPO_ROOT}/BUILD_ROOT" \
+     "${REPO_ROOT}/pants.ini" \
      "${REPO_ROOT}/3rdparty/python" \
      "${REPO_ROOT}/build-support/checkstyle" \
      "${REPO_ROOT}/build-support/eslint" \
+     "${REPO_ROOT}/build-support/ivy" \
+     "${REPO_ROOT}/build-support/mypy" \
+     "${REPO_ROOT}/build-support/pylint" \
      "${REPO_ROOT}/build-support/regexes" \
+     "${REPO_ROOT}/build-support/scalafmt" \
      "${REPO_ROOT}/build-support/scalastyle" \
      "${REPO_ROOT}/contrib" \
      "${REPO_ROOT}/src/python" \
