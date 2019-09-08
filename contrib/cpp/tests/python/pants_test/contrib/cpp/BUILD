@@ -23,6 +23,7 @@ python_tests(
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'contrib/cpp/src/python/pants/contrib/cpp/toolchain:toolchain',
+    'contrib/cpp:examples_directory',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ],
