@@ -5,3 +5,8 @@ files(
   name = 'phrases_directory',
   sources = rglobs('phrases/*'),
 )
+
+files(
+  name = 'printversion_directory',
+  sources = rglobs('printversion/*'),
+)
