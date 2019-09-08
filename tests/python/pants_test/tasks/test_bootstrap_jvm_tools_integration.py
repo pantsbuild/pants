@@ -12,8 +12,8 @@ class BootstrapJvmToolsIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir() as artifact_cache:
       bootstrap_args = [
         'bootstrap.bootstrap-jvm-tools',
-        "--cache-write-to=['{}']".format(artifact_cache),
-        "--cache-read-from=['{}']".format(artifact_cache)
+        f"--cache-write-to=['{artifact_cache}']",
+        f"--cache-read-from=['{artifact_cache}']"
       ]
 
       # Scala compilation should bootstrap and shade zinc.

@@ -512,7 +512,7 @@ def build_wheels_osx() -> Dict:
 # -------------------------------------------------------------------------
 
 def integration_tests_v1(python_version: PythonVersion, *, use_pantsd: bool = False) -> List[Dict]:
-  num_integration_shards = 20
+  num_integration_shards = 19
 
   def make_shard(*, shard_num: int) -> Dict:
     shard = {
@@ -541,8 +541,8 @@ def integration_tests_v2(python_version: PythonVersion) -> Dict:
     "name": f"Integration tests - V2 (Python {python_version.decimal})",
     "script": [
       (
-        "./build-support/bin/ci.py --integration-tests-v2 --remote-execution-enabled "
-        f"--python-version {python_version.decimal}"
+        "travis_wait 20 ./build-support/bin/ci.py --integration-tests-v2 "
+        f"--remote-execution-enabled --python-version {python_version.decimal}"
       ),
     ]
   }

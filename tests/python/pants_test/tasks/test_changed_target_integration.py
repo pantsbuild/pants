@@ -54,7 +54,7 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
 
         test_build_file = os.path.join(worktree, 'tests/java/org/pantsbuild/BUILD')
         with safe_open(test_build_file, 'w') as fp:
-          fp.write(dedent("""
+          fp.write(dedent(f"""
           jar_library(name='junit', jars=[jar('junit', 'junit', '4.12')])
 
           junit_tests(
@@ -62,10 +62,10 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
             sources=['ClassTest.java'],
             dependencies=[
               ':junit',
-              '{}'
+              '{os.path.relpath(os.path.dirname(src_build_file), get_buildroot())}'
             ]
           )
-          """).format(os.path.relpath(os.path.dirname(src_build_file), get_buildroot())))
+          """))
 
         git.add(test_file, test_build_file)
         git.commit('Introduce ClassTest.')

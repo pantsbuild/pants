@@ -1,5 +1,10 @@
+contrib/awslambda/python/tests/python/pants_test/contrib/awslambda/python:python
 src/python/pants/help:integration
+tests/python/pants_test/base:exclude_target_regexp_integration
+tests/python/pants_test/base:exiter_integration
 tests/python/pants_test/bin:integration
 tests/python/pants_test/core_tasks:prep_command_integration
 tests/python/pants_test/help:help_integration
 tests/python/pants_test/targets:unknown_arguments_integration
+tests/python/pants_test/tasks:changed_target_integration
+tests/python/pants_test/tasks:clean_all_integration

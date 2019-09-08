@@ -19,6 +19,9 @@ python_tests(
   source='test_filedeps_integration.py',
   dependencies=[
     'tests/python/pants_test:int-test',
+    'examples/src/java/org/pantsbuild/example:hello_directory',
+    'examples/src/scala/org/pantsbuild/example:hello_directory',
+    'examples/src/resources/org/pantsbuild/example:hello_directory',
   ],
   tags={'integration'},
 )
