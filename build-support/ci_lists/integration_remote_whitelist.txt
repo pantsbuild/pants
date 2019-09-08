@@ -10,6 +10,13 @@ contrib/go/tests/python/pants_test/contrib/go/subsystems:integration
 contrib/go/tests/python/pants_test/contrib/go/tasks:integration
 contrib/jax_ws/tests/python/pants_test/contrib/jax_ws/tasks:integration
 contrib/mypy/tests/python/pants_test/contrib/mypy/tasks:mypy_integration
+contrib/node/tests/python/pants_test/contrib/node/tasks:node_bundle_integration
+contrib/node/tests/python/pants_test/contrib/node/tasks:node_install_integration
+contrib/node/tests/python/pants_test/contrib/node/tasks:node_lint_integration
+contrib/node/tests/python/pants_test/contrib/node/tasks:node_repl_integration
+contrib/node/tests/python/pants_test/contrib/node/tasks:node_resolve_integration
+contrib/node/tests/python/pants_test/contrib/node/tasks:node_run_integration
+contrib/node/tests/python/pants_test/contrib/node/tasks:node_test_integration
 src/python/pants/help:integration
 tests/python/pants_test/base:exclude_target_regexp_integration
 tests/python/pants_test/base:exiter_integration
