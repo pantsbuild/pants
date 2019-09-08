@@ -10,7 +10,7 @@ files(
   name='examples_directory',
   sources=rglobs('examples/*'),
   dependencies = [
-    '//:3rdparty_build',
+    '//:3rdparty_directory',
   ],
 )
 

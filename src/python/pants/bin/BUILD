@@ -76,7 +76,7 @@ python_binary(
     '//:build_root',
     '//:build_tools',
     '//:pants_ini',
-    '//:3rdparty_build',
+    '//:3rdparty_directory',
     'build-support/checkstyle',
     'build-support/eslint',
     'build-support/ivy',
