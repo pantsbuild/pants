@@ -1,7 +1,6 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
 import signal
 
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -37,8 +36,7 @@ class PythonRun(PythonExecutionTaskBase):
         args.extend(safe_shlex_split(arg))
       args += self.get_passthru_args()
 
-      env = os.environ.copy()
-      env.update(self.ensure_interpreter_search_path_env())
+      env = self.prepare_pex_env()
 
       self.context.release_lock()
       cmdline = ' '.join(pex.cmdline(args))
