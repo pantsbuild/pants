@@ -757,6 +757,11 @@ def main() -> None:
       # for the cron jobs to work with remoting.
       unit_tests(PythonVersion.py37),
       integration_tests_v2(PythonVersion.py37),
+      *[lint(v) for v in PythonVersion],
+      clippy(),
+      cargo_audit(),
+      unit_tests(PythonVersion.py36),
+      integration_tests_v2(PythonVersion.py36),
     ]},
   }, Dumper=NoAliasDumper)
   print(f"{HEADER}\n\n{generated_yaml}")
