@@ -153,7 +153,7 @@ impl StubCAS {
       .register_service(
         bazel_protos::remote_execution_grpc::create_content_addressable_storage(responder.clone()),
       )
-      .bind("localhost", port)
+      .bind("0.0.0.0", port)
       .build()
       .unwrap();
     server_transport.start();
