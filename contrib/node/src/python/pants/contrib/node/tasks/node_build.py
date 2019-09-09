@@ -27,6 +27,7 @@ class NodeBuild(NodeTask):
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)
     round_manager.require_data(NodePaths)
+    round_manager.require_data('compile_classpath')
 
   @property
   def create_target_dirs(self):
