@@ -120,7 +120,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     if pythonpath:
       self.context.log.warn('scrubbed PYTHONPATH={} from environment'.format(pythonpath))
 
-    return interpreter_search_path_env
+    return env
 
   def create_pex(self, pex_info=None):
     """Returns a wrapped pex that "merges" other pexes produced in previous tasks via PEX_PATH.
