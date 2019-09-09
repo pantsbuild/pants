@@ -52,9 +52,19 @@ page(
 )
 
 files(
+  name = 'autovalue_directory',
+  sources = rglobs('autovalue/*'),
+)
+
+files(
   name = 'hello_directory',
   sources = rglobs('hello/*'),
   dependencies = [
     'examples/src/resources/org/pantsbuild/example:hello_directory',
   ],
+)
+
+files(
+  name = 'javac_directory',
+  sources = rglobs('javac/*'),
 )

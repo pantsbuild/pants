@@ -2,6 +2,65 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 files(
+  name = 'compilation_failure_directory',
+  sources = rglobs('compilation_failure/*'),
+)
+
+files(
+  name = 'compilation_warnings_directory',
+  sources = rglobs('compilation_warnings/*'),
+)
+
+files(
+  name = 'custom_scala_platform_directory',
+  sources = rglobs('custom_scala_platform/*'),
+)
+
+files(
+  name = 'emptyscala_directory',
+  sources = rglobs('emptyscala/*'),
+)
+
+files(
+  name = 'exclude_direct_dep_directory',
+  sources = rglobs('exclude_direct_dep/*'),
+)
+
+files(
+  name = 'javadepsonscalatransitive_directory',
+  sources = rglobs('javadepsonscalatransitive/*'),
+)
+
+files(
+  name = 'javasources_directory',
+  sources = rglobs('javasources/*'),
+  dependencies = [
+    'testprojects/src/java/org/pantsbuild/testproject:javasources_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:publish_directory'
+  ]
+)
+
+files(
+  name = 'mutual_directory',
+  sources = rglobs('mutual/*'),
+)
+
+files(
+  name = 'procedure_syntax_directory',
+  sources = rglobs('procedure_syntax/*'),
+)
+
+files(
+  name = 'rsc_compat_directory',
+  sources = rglobs('rsc_compat/*'),
+)
+
+files(
+  name = 'sharedsources_directory',
+  sources = rglobs('sharedsources/*'),
+)
+
+files(
   name = 'unicode_directory',
   sources = rglobs('unicode/*'),
 )

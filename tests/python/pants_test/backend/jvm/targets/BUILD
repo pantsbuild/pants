@@ -25,6 +25,7 @@ python_tests(
   sources = ['test_jar_dependency_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test',
+    'testprojects/3rdparty:org_directory',
   ],
   tags = {'integration'},
 )
