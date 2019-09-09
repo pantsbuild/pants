@@ -62,18 +62,10 @@ class RunJvmPrepCommandBase(Task):
       raise  AssertionError('Got goal "{}". Expected goal to be one of {}'.format(
           self.goal, JvmPrepCommand.goals()))
 
-    print('start')
     targets = self.context.targets(postorder=True,  predicate=self.runnable_prep_cmd)
 
     compile_classpath = self.context.products.get_data('compile_classpath')
     classpath_products = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
-
-    print('cp')
-    print(compile_classpath._classpaths)
-    print('rp')
-    print(classpath_products._classpaths)
-    print('another copy')
-    print(compile_classpath.copy()._classpaths)
 
     with self.context.new_workunit(name='jvm_prep_command', labels=[WorkUnitLabel.PREP]) as workunit:
       for target in targets:

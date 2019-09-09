@@ -6,7 +6,7 @@
 python_tests(
   dependencies=[
     'examples/src/python/example/hello/greet:greet',
-    # ':prep',
+    ':prep',
   ],
 )
 

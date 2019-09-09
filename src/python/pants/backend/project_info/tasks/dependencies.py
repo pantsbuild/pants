@@ -4,13 +4,11 @@
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.register import DummyProduct, MyFloat, MyInt
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TaskError
 from pants.base.payload_field import JarsField, PythonRequirementsField
-from pants.engine.selectors import Params
 from pants.task.console_task import ConsoleTask
 
 
@@ -44,9 +42,6 @@ class Dependencies(ConsoleTask):
       raise TaskError('At most one of --internal-only or --external-only can be selected.')
 
   def console_output(self, unused_method_argument):
-    x = self.context._scheduler.product_request(DummyProduct, [Params(MyInt(2), MyFloat(3.0))])
-    print(x)
-
     ordered_closure = OrderedSet()
     for target in self.context.target_roots:
       if self._transitive:

@@ -65,8 +65,6 @@ class JvmTask(Task):
                                  exclude_scopes=exclude_scopes, respect_intransitive=True)
 
     classpath_for_targets = ClasspathUtil.classpath(closure, classpath_product, self.confs)
-    print('rc', classpath_product._classpaths)
-    print('cc', self.context.products.get_data('compile_classpath')._classpaths)
     classpath = list(classpath_prefix or ())
     classpath.extend(classpath_for_targets)
     return classpath
