@@ -540,6 +540,7 @@ def integration_tests_v2(python_version: PythonVersion) -> Dict:
     **linux_shard(python_version=python_version),
     "name": f"Integration tests - V2 (Python {python_version.decimal})",
     "script": [
+      "env",
       (
         "travis_wait 40 ./build-support/bin/ci.py --integration-tests-v2 "
         f"--remote-execution-enabled --python-version {python_version.decimal}"
@@ -756,24 +757,6 @@ def main() -> None:
       # for the cron jobs to work with remoting.
       unit_tests(PythonVersion.py37),
       integration_tests_v2(PythonVersion.py37),
-      *[lint(v) for v in PythonVersion],
-      clippy(),
-      cargo_audit(),
-      unit_tests(PythonVersion.py36),
-      integration_tests_v2(PythonVersion.py36),
-      build_wheels_linux(),
-      build_wheels_osx(),
-      *integration_tests_v1(PythonVersion.py36),
-      *integration_tests_v1(PythonVersion.py36, use_pantsd=True),
-      *integration_tests_v1(PythonVersion.py37),
-      rust_tests_linux(),
-      rust_tests_osx(),
-      *[osx_platform_tests(v) for v in PythonVersion],
-      *[osx_10_12_sanity_check(v) for v in PythonVersion],
-      *[osx_10_13_sanity_check(v) for v in PythonVersion],
-      *[jvm_tests(v) for v in PythonVersion],
-      deploy_stable(),
-      deploy_unstable(),
     ]},
   }, Dumper=NoAliasDumper)
   print(f"{HEADER}\n\n{generated_yaml}")
