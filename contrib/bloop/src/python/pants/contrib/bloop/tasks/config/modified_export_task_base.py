@@ -74,10 +74,20 @@ class ModifiedExportTaskBase(ExportTask):
 
     target_roots_set = set(self.context.target_roots)
 
+    # Keep a set of `java_library()` targets specified in `java_sources` for some `scala_library()`
+    # target. We will collapse the sources from `java_sources` targets into the `scala_librar()`
+    # target, then remove the `java_sources` targets from being exported. This mirrors how pants
+    # compiles these targets, and avoids producing a dependency cycle in the projects exported to
+    # Bloop.
+    known_java_sources_targets = set()
+
     def process_target(current_target, is_java_sources=False):
       """
       :type current_target:pants.build_graph.target.Target
       """
+      if isinstance(current_target, JarLibrary):
+        return
+
       def get_target_type(tgt):
         def is_test(t):
           return isinstance(t, JUnitTests) or isinstance(t, PythonTests)
@@ -175,18 +185,21 @@ class ModifiedExportTaskBase(ExportTask):
 
       dep_ctx = DependencyContext.global_instance()
       for dep in current_target.strict_dependencies(dep_ctx):
-        info['targets'].append(dep.address.spec)
-        if isinstance(dep, JarLibrary):
+        # We remove `jar_library()` targets from dependencies, and instead update
+        # `target_libraries` for the `current_target` (so that bloop has those jars on the classpath
+        # when compiling `current_target`).
           for jar in dep.jar_dependencies:
             target_libraries.add(M2Coordinate(
               org=jar.org, name=jar.name, rev=jar.rev, classifier=jar.classifier))
           # Add all the jars pulled in by this jar_library
           target_libraries.update(iter_transitive_jars(dep))
+
         if isinstance(dep, Resources):
           resource_target_map[dep] = current_target
 
       if isinstance(current_target, ScalaLibrary):
         for dep in current_target.java_sources:
+          known_java_sources_targets.add(dep)
           if self.get_options().flatten_java_sources:
             info['globs'].update(dep.globs_relative_to_buildroot())
             info['sources'].extend(dep.sources_relative_to_buildroot())
@@ -208,10 +221,15 @@ class ModifiedExportTaskBase(ExportTask):
 
       if classpath_products:
         info['libraries'] = [self._jar_id(lib) for lib in target_libraries]
+
+      # Write the `info` object for the `current_target` into the `targets_map` dict.
       targets_map[current_target.address.spec] = info
 
     for target in targets:
       process_target(target)
+
+    for java_sources_tgt in known_java_sources_targets:
+      del targets_map[java_sources_tgt.address.spec]
 
     jvm_platforms_map = {
       'default_platform' : JvmPlatform.global_instance().default_platform.name,
