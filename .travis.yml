@@ -16,9 +16,14 @@ env:
   global:
   - PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.ini"
   - LC_ALL="en_US.UTF-8"
-  - BOOTSTRAPPED_PEX_BUCKET=ci-public.pantsbuild.org
-  - BOOTSTRAPPED_PEX_KEY_PREFIX=${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex
-  - BOOTSTRAPPED_PEX_URL_PREFIX=s3://${BOOTSTRAPPED_PEX_BUCKET}/${BOOTSTRAPPED_PEX_KEY_PREFIX}
+  - BOOTSTRAP_BUCKET=ci-public.pantsbuild.org
+  - BOOTSTRAP_KEY_DIRECTORY=${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}
+  - BOOTSTRAPPED_PEX_KEY_PREFIX=${BOOTSTRAP_KEY_DIRECTORY}/pants.pex
+  - BOOTSTRAPPED_PEX_URL_PREFIX=s3://${BOOTSTRAP_BUCKET}/${BOOTSTRAPPED_PEX_KEY_PREFIX}
+  - BOOTSTRAPPED_MOCK_CAS_KEY=${BOOTSTRAP_KEY_DIRECTORY}/local_cas
+  - BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY=${BOOTSTRAP_KEY_DIRECTORY}/local_execution_server
+  - BOOTSTRAPPED_MOCK_CAS_URL=s3://${BOOTSTRAP_BUCKET}/${BOOTSTRAPPED_MOCK_CAS_KEY}
+  - BOOTSTRAPPED_MOCK_EXECUTION_SERVER_URL=s3://${BOOTSTRAP_BUCKET}/${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}
   - PYENV_PY27_VERSION=2.7.15
   - PYENV_PY36_VERSION=3.6.8
   - PYENV_PY37_VERSION=3.7.2
@@ -64,6 +69,7 @@ matrix:
     dist: xenial
     env:
     - CACHE_NAME=bootstrap.linux.py36
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PREPARE_DEPLOY=1
     language: python
@@ -79,9 +85,14 @@ matrix:
       "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci:latest sh -c "./build-support/bin/ci.py --bootstrap --python-version
-      3.6 && ./build-support/bin/release.sh -f"
+      3.6 && ./build-support/bin/ci.py --bootstrap-mock-remote && ./build-support/bin/release.sh
+      -f"
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex
       ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/local_cas
+      ${BOOTSTRAPPED_MOCK_CAS_URL}.${PLATFORM}
+    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/local_execution_server
+      ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_URL}.${PLATFORM}
     services:
     - docker
     stage: Bootstrap Pants
@@ -120,6 +131,7 @@ matrix:
     dist: xenial
     env:
     - CACHE_NAME=bootstrap.linux.py37
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     language: python
     name: Build Linux native engine and pants.pex (Python 3.7)
@@ -134,9 +146,13 @@ matrix:
       "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci:latest sh -c "./build-support/bin/ci.py --bootstrap --python-version
-      3.7"
+      3.7 && ./build-support/bin/ci.py --bootstrap-mock-remote"
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex
       ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/local_cas
+      ${BOOTSTRAPPED_MOCK_CAS_URL}.${PLATFORM}
+    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/local_execution_server
+      ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_URL}.${PLATFORM}
     services:
     - docker
     stage: Bootstrap Pants (Cron)
@@ -174,6 +190,7 @@ matrix:
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
     - CACHE_NAME=bootstrap.osx.py36
+    - PLATFORM=osx
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - PREPARE_DEPLOY=1
     language: generic
@@ -182,9 +199,14 @@ matrix:
     osx_image: xcode8
     script:
     - ./build-support/bin/ci.py --bootstrap --python-version 3.6
+    - ./build-support/bin/ci.py --bootstrap-mock-remote
     - ./build-support/bin/release.sh -f
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex
       ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/local_cas
+      ${BOOTSTRAPPED_MOCK_CAS_URL}.${PLATFORM}
+    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/local_execution_server
+      ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_URL}.${PLATFORM}
     stage: Bootstrap Pants
   - addons:
       brew:
@@ -219,6 +241,7 @@ matrix:
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
     - CACHE_NAME=bootstrap.osx.py37
+    - PLATFORM=osx
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
     language: generic
     name: Build OSX native engine and pants.pex (Python 3.7)
@@ -226,8 +249,13 @@ matrix:
     osx_image: xcode8
     script:
     - ./build-support/bin/ci.py --bootstrap --python-version 3.7
+    - ./build-support/bin/ci.py --bootstrap-mock-remote
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex
       ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/local_cas
+      ${BOOTSTRAPPED_MOCK_CAS_URL}.${PLATFORM}
+    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/local_execution_server
+      ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_URL}.${PLATFORM}
     stage: Bootstrap Pants (Cron)
   - addons:
       apt:
@@ -263,6 +291,7 @@ matrix:
     dist: xenial
     env:
     - CACHE_NAME=bootstrap.linux.py36
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PREPARE_DEPLOY=1
     language: python
@@ -278,9 +307,14 @@ matrix:
       "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci:latest sh -c "./build-support/bin/ci.py --bootstrap --python-version
-      3.6 && ./build-support/bin/release.sh -f"
+      3.6 && ./build-support/bin/ci.py --bootstrap-mock-remote && ./build-support/bin/release.sh
+      -f"
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex
       ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/local_cas
+      ${BOOTSTRAPPED_MOCK_CAS_URL}.${PLATFORM}
+    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/local_execution_server
+      ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_URL}.${PLATFORM}
     services:
     - docker
     stage: Bootstrap Pants (Cron)
@@ -318,6 +352,7 @@ matrix:
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
     - CACHE_NAME=bootstrap.osx.py36
+    - PLATFORM=osx
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - PREPARE_DEPLOY=1
     language: generic
@@ -326,9 +361,14 @@ matrix:
     osx_image: xcode8
     script:
     - ./build-support/bin/ci.py --bootstrap --python-version 3.6
+    - ./build-support/bin/ci.py --bootstrap-mock-remote
     - ./build-support/bin/release.sh -f
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex
       ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/local_cas
+      ${BOOTSTRAPPED_MOCK_CAS_URL}.${PLATFORM}
+    - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/local_execution_server
+      ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_URL}.${PLATFORM}
     stage: Bootstrap Pants (Cron)
   - addons:
       apt:
@@ -358,8 +398,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -372,6 +415,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
@@ -417,8 +461,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -431,6 +478,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
@@ -475,8 +523,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -489,6 +540,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=lint.py36
@@ -532,8 +584,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -546,6 +601,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
@@ -650,8 +706,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -664,6 +723,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=unit_tests.py36
@@ -708,8 +768,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -722,6 +785,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v2.py36
@@ -765,8 +829,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     - ulimit -c unlimited
     cache:
       directories:
@@ -780,6 +847,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PREPARE_DEPLOY=1
@@ -815,15 +883,19 @@ matrix:
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     env:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
+    - - PLATFORM=osx
+      - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - PREPARE_DEPLOY=1
     - CACHE_NAME=wheels.osx.py36
     - PY=${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin/python
@@ -864,8 +936,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -878,6 +953,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_0.py36
@@ -921,8 +997,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -935,6 +1014,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_1.py36
@@ -978,8 +1058,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -992,6 +1075,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_2.py36
@@ -1035,8 +1119,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1049,6 +1136,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_3.py36
@@ -1092,8 +1180,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1106,6 +1197,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_4.py36
@@ -1149,8 +1241,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1163,6 +1258,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_5.py36
@@ -1206,8 +1302,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1220,6 +1319,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_6.py36
@@ -1263,8 +1363,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1277,6 +1380,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_7.py36
@@ -1320,8 +1424,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1334,6 +1441,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_8.py36
@@ -1377,8 +1485,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1391,6 +1502,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_9.py36
@@ -1434,8 +1546,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1448,6 +1563,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_10.py36
@@ -1491,8 +1607,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1505,6 +1624,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_11.py36
@@ -1548,8 +1668,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1562,6 +1685,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_12.py36
@@ -1605,8 +1729,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1619,6 +1746,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_0.py36.pantsd
@@ -1663,8 +1791,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1677,6 +1808,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_1.py36.pantsd
@@ -1721,8 +1853,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1735,6 +1870,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_2.py36.pantsd
@@ -1779,8 +1915,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1793,6 +1932,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_3.py36.pantsd
@@ -1837,8 +1977,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1851,6 +1994,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_4.py36.pantsd
@@ -1895,8 +2039,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1909,6 +2056,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_5.py36.pantsd
@@ -1953,8 +2101,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -1967,6 +2118,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_6.py36.pantsd
@@ -2011,8 +2163,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -2025,6 +2180,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_7.py36.pantsd
@@ -2069,8 +2225,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -2083,6 +2242,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_8.py36.pantsd
@@ -2127,8 +2287,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -2141,6 +2304,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_9.py36.pantsd
@@ -2185,8 +2349,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -2199,6 +2366,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_10.py36.pantsd
@@ -2243,8 +2411,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -2257,6 +2428,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_11.py36.pantsd
@@ -2301,8 +2473,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -2315,6 +2490,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=integration.v1.shard_12.py36.pantsd
@@ -2359,8 +2535,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -2373,6 +2552,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
@@ -2417,8 +2597,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -2431,6 +2614,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
@@ -2475,8 +2659,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -2489,6 +2676,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
@@ -2533,8 +2721,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -2547,6 +2738,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
@@ -2591,8 +2783,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -2605,6 +2800,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
@@ -2649,8 +2845,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -2663,6 +2862,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
@@ -2707,8 +2907,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -2721,6 +2924,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
@@ -2765,8 +2969,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -2779,6 +2986,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
@@ -2823,8 +3031,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -2837,6 +3048,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
@@ -2881,8 +3093,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -2895,6 +3110,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
@@ -2939,8 +3155,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -2953,6 +3172,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
@@ -2997,8 +3217,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -3011,6 +3234,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
@@ -3055,8 +3279,11 @@ matrix:
     - ./build-support/bin/install_aws_cli_for_ci.sh
     - pyenv global 2.7.15 3.6.7 3.7.1
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -3069,6 +3296,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
@@ -3171,15 +3399,19 @@ matrix:
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     env:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
+    - - PLATFORM=osx
+      - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - CACHE_NAME=osx_platform_tests.py36
     language: generic
     name: OSX platform-specific tests (Python 3.6)
@@ -3200,15 +3432,19 @@ matrix:
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     env:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
+    - - PLATFORM=osx
+      - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
     - CACHE_NAME=osx_platform_tests.py37
     language: generic
     name: OSX platform-specific tests (Python 3.7)
@@ -3229,15 +3465,19 @@ matrix:
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     env:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
+    - - PLATFORM=osx
+      - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - CACHE_NAME=osx_sanity.10_12.py36
     language: generic
     name: OSX 10.12 sanity check (Python 3.6)
@@ -3259,15 +3499,19 @@ matrix:
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     env:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
+    - - PLATFORM=osx
+      - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
     - CACHE_NAME=osx_sanity.10_12.py37
     language: generic
     name: OSX 10.12 sanity check (Python 3.7)
@@ -3289,15 +3533,19 @@ matrix:
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     env:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
+    - - PLATFORM=osx
+      - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - CACHE_NAME=osx_sanity.10_13.py36
     language: generic
     name: OSX 10.13 sanity check (Python 3.6)
@@ -3319,15 +3567,19 @@ matrix:
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     env:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
-    - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
+    - - PLATFORM=osx
+      - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
     - CACHE_NAME=osx_sanity.10_13.py37
     language: generic
     name: OSX 10.13 sanity check (Python 3.7)
@@ -3368,8 +3620,11 @@ matrix:
     - sudo chmod 666 /dev/fuse
     - sudo chown root:$USER /etc/fuse.conf
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -3382,6 +3637,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - CACHE_NAME=jvm_tests.py36
@@ -3428,8 +3684,11 @@ matrix:
     - sudo chmod 666 /dev/fuse
     - sudo chown root:$USER /etc/fuse.conf
     before_script:
-    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAPPED_PEX_BUCKET}
-      ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_CAS_KEY}.${PLATFORM}
+      ./local_cas
+    - ./build-support/bin/get_aws_artifact.sh ${BOOTSTRAP_BUCKET} ${BOOTSTRAPPED_MOCK_EXECUTION_SERVER_KEY}.${PLATFORM}
+      ./local_execution_server
     cache:
       directories:
       - ${AWS_CLI_ROOT}
@@ -3442,6 +3701,7 @@ matrix:
       timeout: 500
     dist: xenial
     env:
+    - PLATFORM=linux
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
