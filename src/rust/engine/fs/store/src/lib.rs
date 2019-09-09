@@ -246,6 +246,7 @@ impl Store {
     &self,
     name: PathBuf,
     digest: hashing::Digest,
+    is_executable: bool,
   ) -> BoxFuture<Snapshot, String> {
     let store = self.clone();
 
@@ -271,7 +272,7 @@ impl Store {
         path: name.clone(),
         stat: fs::File {
           path: name,
-          is_executable: true,
+          is_executable: is_executable,
         },
       }],
       WorkUnitStore::new(),
@@ -810,6 +811,7 @@ impl Store {
               .iter()
               .map(|file_node| {
                 let path = path_so_far.join(file_node.get_name());
+                let is_executable = file_node.is_executable;
                 store
                   .load_file_bytes_with(
                     try_future!(file_node.get_digest().into()),
@@ -819,7 +821,11 @@ impl Store {
                   .and_then(move |maybe_bytes| {
                     maybe_bytes
                       .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))
-                      .map(|(content, _metadata)| FileContent { path, content })
+                      .map(|(content, _metadata)| FileContent {
+                        path,
+                        content,
+                        is_executable,
+                      })
                   })
                   .to_boxed()
               })
