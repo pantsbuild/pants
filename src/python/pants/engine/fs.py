@@ -21,10 +21,13 @@ class FileContent(datatype([('path', str), ('content', bytes)])):
     return repr(self)
 
 
-class InputFileContent(FileContent):
-  """A newtype wrapper for FileContent.
+FilesContent = Collection.of(FileContent)
+
+
+class InputFilesContent(FilesContent):
+  """A newtype wrapper for FilesContent.
   TODO(7710): This class is currently necessary because the engine
-  otherwise finds a cycle between FileContent <=> DirectoryDigest.
+  otherwise finds a cycle between FilesContent <=> DirectoryDigest.
   """
 
 
@@ -163,9 +166,6 @@ class UrlToFetch(datatype([('url', str), ('digest', Digest)])):
   pass
 
 
-FilesContent = Collection.of(FileContent)
-
-
 # TODO: don't recreate this in python, get this from fs::EMPTY_DIGEST somehow.
 _EMPTY_FINGERPRINT = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
 
@@ -185,7 +185,7 @@ EMPTY_SNAPSHOT = Snapshot(
 def create_fs_rules():
   """Creates rules that consume the intrinsic filesystem types."""
   return [
-    RootRule(InputFileContent),
+    RootRule(InputFilesContent),
     RootRule(Digest),
     RootRule(DirectoriesToMerge),
     RootRule(PathGlobs),

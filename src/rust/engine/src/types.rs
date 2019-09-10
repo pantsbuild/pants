@@ -13,7 +13,7 @@ pub struct Types {
   pub directories_to_merge: TypeId,
   pub directory_with_prefix_to_strip: TypeId,
   pub files_content: TypeId,
-  pub input_file_content: TypeId,
+  pub input_files_content: TypeId,
   pub dir: TypeId,
   pub file: TypeId,
   pub link: TypeId,
