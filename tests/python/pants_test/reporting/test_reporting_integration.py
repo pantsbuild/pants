@@ -1,18 +1,9 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-<<<<<<< HEAD
-import json
 import re
 import unittest
-from collections import defaultdict
-from http.server import BaseHTTPRequestHandler
 from pathlib import Path
-=======
-import os.path
-import re
-import unittest
->>>>>>> Test reporting with remote execution
 
 from parameterized import parameterized
 

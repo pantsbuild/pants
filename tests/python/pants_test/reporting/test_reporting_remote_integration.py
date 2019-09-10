@@ -34,7 +34,7 @@ class TestReportingRemoteIntegration(PantsRunIntegrationTest, unittest.TestCase)
       while port is None:
         line = process.stdout.readline().decode("utf-8")
         print(f"{line}")
-        match = re.search("localhost:([0-9]+)", line)
+        match = re.search("at address:.*:([0-9]+)", line)
         if match is not None:
           port = int(match.group(1))
       yield port
