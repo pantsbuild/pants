@@ -176,6 +176,10 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       ]
     )
 
+  @classmethod
+  def product_types(cls):
+    return super(RscCompile, cls).product_types() + ['rsc_mixed_compile_classpath']
+
   @memoized_property
   def _rsc(self):
     return Rsc.global_instance()
