@@ -27,22 +27,23 @@ use super::{
 use std;
 use std::cmp::min;
 use workunit_store::{generate_random_64bit_string, get_parent_id, WorkUnit, WorkUnitStore};
-use std::fmt;
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an ExecuteProcessRequest, and may be populated only by the
 // CommandRunner.
 const CACHE_KEY_GEN_VERSION_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_GEN_VERSION";
 
-
+#[derive(Derivative)]
+#[derivative(Debug)]
 struct CancelRemoteExecutionToken {
   // Remote execution process needs to be cancel in the case of Fatal error or timeout or
   // pants run is cancelled by the user.
   // CancelRemoteExecutionToken is used to cancel remote execution process by sending
   // CancelOperationRequest.
+  #[derivative(Debug = "ignore")]
   operations_client: Arc<bazel_protos::operations_grpc::OperationsClient>,
   cancel_op_req: bazel_protos::operations::CancelOperationRequest,
-  drop_enabled: bool,
+  send_cancellation_on_drop: bool,
 }
 
 impl CancelRemoteExecutionToken {
@@ -56,20 +57,23 @@ impl CancelRemoteExecutionToken {
     CancelRemoteExecutionToken {
       operations_client,
       cancel_op_req,
-      drop_enabled: true,
+      send_cancellation_on_drop: true,
     }
   }
 
-  fn dismiss(&mut self) {
-    self.drop_enabled = false;
+  fn do_not_send_cancellation_on_drop(&mut self) {
+    self.send_cancellation_on_drop = false;
   }
 }
 
 impl Drop for CancelRemoteExecutionToken {
   fn drop(&mut self) {
-    if self.drop_enabled {
+    if self.send_cancellation_on_drop {
       let operation_name = self.cancel_op_req.name.clone();
-      match self.operations_client.cancel_operation_async(&self.cancel_op_req) {
+      match self
+        .operations_client
+        .cancel_operation_async(&self.cancel_op_req)
+      {
         Ok(receiver) => {
           tokio::spawn(receiver.then(move |res| {
             match res {
@@ -77,26 +81,14 @@ impl Drop for CancelRemoteExecutionToken {
               Err(err) => debug!("Failed to cancel operation {}, err {}", operation_name, err),
             }
             future::ok(())
-          },
-          ));
-        },
+          }));
+        }
         Err(err) => debug!(
           "Failed to schedule cancel operation: {}, err {}",
-          self.cancel_op_req.name,
-          err
+          self.cancel_op_req.name, err
         ),
       };
     }
-  }
-}
-
-impl fmt::Debug for CancelRemoteExecutionToken {
-  fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-    fmt.debug_struct("CancelRemoteExecutionToken")
-        .field("operations_client", &"OperationsClient".to_string())
-        .field("cancel_op_req", &self.cancel_op_req)
-        .field("drop_enabled", &self.drop_enabled)
-        .finish()
   }
 }
 
@@ -257,153 +249,174 @@ impl super::CommandRunner for CommandRunner {
             move |(operation, history)| {
               let maybe_cancel_remote_exec_token = match operation {
                 OperationOrStatus::Operation(ref operation) => Some(
-                  CancelRemoteExecutionToken::new(
-                  operations_client,
-                  operation.name.clone()
-                )),
+                  CancelRemoteExecutionToken::new(operations_client, operation.name.clone()),
+                ),
                 _ => None,
               };
               (operation, history, maybe_cancel_remote_exec_token)
-          }})
-          .and_then(move |(operation, history, maybe_cancel_remote_exec_token)| {
-            let start_time = Instant::now();
-
-            future::loop_fn(
-              (history, operation, maybe_cancel_remote_exec_token, 0),
-              move |(mut history, operation, maybe_cancel_remote_exec_token, iter_num)| {
-                let description = description.clone();
-
-                let execute_request = execute_request.clone();
-                let store = store.clone();
-                let operations_client = operations_client.clone();
-                let command_runner = command_runner.clone();
-                let workunit_store = workunit_store.clone();
-                let f = command_runner.extract_execute_response(
-                  operation,
-                  &mut history,
-                  workunit_store.clone(),
-                ).map_err(|err| (err, maybe_cancel_remote_exec_token));
-                f.map(future::Loop::Break).or_else(move |(value, maybe_cancel_remote_exec_token)| {
-                  match value {
-                    ExecutionError::Fatal(err) => {
-                      if let Some(mut cancel_remote_exec_token) = maybe_cancel_remote_exec_token {
-                        &cancel_remote_exec_token.dismiss();
-                      }
-                      future::err(err).to_boxed()
-                    },
-                    ExecutionError::MissingDigests(missing_digests) => {
-                      let ExecutionHistory {
-                        mut attempts,
-                        current_attempt,
-                      } = history;
-
-                      trace!(
-                        "Server reported missing digests ({:?}); trying to upload: {:?}",
-                        current_attempt,
-                        missing_digests,
-                      );
-
-                      attempts.push(current_attempt);
-                      let history = ExecutionHistory {
-                        attempts,
-                        current_attempt: ExecutionStats::default(),
-                      };
-
-                      let execute_request = execute_request.clone();
-                      store
-                        .ensure_remote_has_recursive(missing_digests, workunit_store.clone())
-                        .and_then({
-                          let command_runner = command_runner.clone();
-                          move |summary| {
-                            let mut history = history;
-                            history.current_attempt += summary;
-                            command_runner
-                              .oneshot_execute(&execute_request)
-                              .join(future::ok(history))
-                          }
-                        })
-                        .map({
-                          let operations_client = operations_client.clone();
-                          move |(operation, history)| {
-                            let maybe_cancel_remote_exec_token = match operation {
-                              OperationOrStatus::Operation(ref operation) => Some(
-                                CancelRemoteExecutionToken::new(
-                                  operations_client,
-                                  operation.name.clone()
-                                )),
-                              _ => None,
-                            };
-                            // Reset `iter_num` on `MissingDigests`
-                            future::Loop::Continue((history, operation, maybe_cancel_remote_exec_token, 0))
-                          }})
-
-                        .to_boxed()
-                    }
-                    ExecutionError::NotFinished(operation_name) => {
-                      let mut operation_request =
-                        bazel_protos::operations::GetOperationRequest::new();
-                      operation_request.set_name(operation_name.clone());
-
-                      let backoff_period = min(
-                        CommandRunner::BACKOFF_MAX_WAIT_MILLIS,
-                        (1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS,
-                      );
-
-                      // take the grpc result and cancel the op if too much time has passed.
-                      let elapsed = start_time.elapsed();
-
-                      if elapsed > timeout {
-                        let ExecutionHistory {
-                          mut attempts,
-                          mut current_attempt,
-                        } = history;
-                        current_attempt.remote_execution = Some(elapsed);
-                        attempts.push(current_attempt);
-                        future::ok(future::Loop::Break(FallibleExecuteProcessResult {
-                          stdout: Bytes::from(format!(
-                            "Exceeded timeout of {:?} with {:?} for operation {}, {}",
-                            timeout, elapsed, operation_name, description
-                          )),
-                          stderr: Bytes::new(),
-                          exit_code: -libc::SIGTERM,
-                          output_directory: hashing::EMPTY_DIGEST,
-                          execution_attempts: attempts,
-                        }))
-                        .to_boxed()
-                      } else {
-                        // maybe the delay here should be the min of remaining time and the backoff period
-                        Delay::new(Instant::now() + Duration::from_millis(backoff_period))
-                          .map_err(move |e| {
-                            format!(
-                              "Future-Delay errored at operation result polling for {}, {}: {}",
-                              operation_name, description, e
-                            )
-                          })
-                          .and_then(move |_| {
-                            future::done(
-                              operations_client
-                                .get_operation_opt(&operation_request, command_runner.call_option())
-                                .or_else(move |err| {
-                                  rpcerror_recover_cancelled(operation_request.take_name(), err)
-                                })
-                                .map( |operation| {
-                                  OperationOrStatus::Operation(operation)
-                                     })
-                                .map_err(rpcerror_to_string),
-                            )
-                            .map(move |operation| {
-                              future::Loop::Continue((history, operation, maybe_cancel_remote_exec_token, iter_num + 1))
-                            })
-                            .to_boxed()
-                          })
-                          .to_boxed()
-                      }
-                    }
-                  }
-                })
-              },
-            )
+            }
           })
+          .and_then(
+            move |(operation, history, maybe_cancel_remote_exec_token)| {
+              let start_time = Instant::now();
+
+              future::loop_fn(
+                (history, operation, maybe_cancel_remote_exec_token, 0),
+                move |(mut history, operation, maybe_cancel_remote_exec_token, iter_num)| {
+                  let description = description.clone();
+
+                  let execute_request = execute_request.clone();
+                  let store = store.clone();
+                  let operations_client = operations_client.clone();
+                  let command_runner = command_runner.clone();
+                  let workunit_store = workunit_store.clone();
+
+                  let f = command_runner
+                    .extract_execute_response(operation, &mut history, workunit_store.clone());
+                  f.then(move |value| {
+                    match value {
+                      Ok(result) => {
+                        if let Some(mut cancel_remote_exec_token) = maybe_cancel_remote_exec_token {
+                          cancel_remote_exec_token.do_not_send_cancellation_on_drop();
+                        }
+                        future::ok(result).map(future::Loop::Break).to_boxed()
+                      },
+                      Err(err) => {
+                        match err {
+                          ExecutionError::Fatal(err) => {
+                            if let Some(mut cancel_remote_exec_token) = maybe_cancel_remote_exec_token {
+                              cancel_remote_exec_token.do_not_send_cancellation_on_drop();
+                            }
+                            future::err(err).to_boxed()
+                          }
+                          ExecutionError::MissingDigests(missing_digests) => {
+                            let ExecutionHistory {
+                              mut attempts,
+                              current_attempt,
+                            } = history;
+
+                            trace!(
+                              "Server reported missing digests ({:?}); trying to upload: {:?}",
+                              current_attempt,
+                              missing_digests,
+                            );
+
+                            attempts.push(current_attempt);
+                            let history = ExecutionHistory {
+                              attempts,
+                              current_attempt: ExecutionStats::default(),
+                            };
+
+                            let execute_request = execute_request.clone();
+                            store
+                                .ensure_remote_has_recursive(missing_digests, workunit_store.clone())
+                                .and_then({
+                                            let command_runner = command_runner.clone();
+                                            move |summary| {
+                                              let mut history = history;
+                                              history.current_attempt += summary;
+                                              command_runner2
+                                                  .oneshot_execute(&execute_request)
+                                                  .join(future::ok(history))
+                                            }
+                                          })
+                                .map({
+                                  let operations_client = operations_client.clone();
+                                  move |(operation, history)| {
+                                    let maybe_cancel_remote_exec_token = match operation {
+                                      OperationOrStatus::Operation(ref operation) => {
+                                        Some(CancelRemoteExecutionToken::new(
+                                          operations_client,
+                                          operation.name.clone(),
+                                        ))
+                                      }
+                                      _ => None,
+                                    };
+                                    // Reset `iter_num` on `MissingDigests`
+                                    future::Loop::Continue((
+                                      history,
+                                      operation,
+                                      maybe_cancel_remote_exec_token,
+                                      0,
+                                    ))
+                                  }
+                                })
+                                .to_boxed()
+                          }
+                          ExecutionError::NotFinished(operation_name) => {
+                            let mut operation_request =
+                                bazel_protos::operations::GetOperationRequest::new();
+                            operation_request.set_name(operation_name.clone());
+
+                            let backoff_period = min(
+                              CommandRunner::BACKOFF_MAX_WAIT_MILLIS,
+                              (1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS,
+                            );
+
+                            // take the grpc result and cancel the op if too much time has passed.
+                            let elapsed = start_time.elapsed();
+
+                            if elapsed > timeout {
+                              let ExecutionHistory {
+                                mut attempts,
+                                mut current_attempt,
+                              } = history;
+                              current_attempt.remote_execution = Some(elapsed);
+                              attempts.push(current_attempt);
+                              future::ok(future::Loop::Break(FallibleExecuteProcessResult {
+                                stdout: Bytes::from(format!(
+                                  "Exceeded timeout of {:?} with {:?} for operation {}, {}",
+                                  timeout, elapsed, operation_name, description
+                                )),
+                                stderr: Bytes::new(),
+                                exit_code: -libc::SIGTERM,
+                                output_directory: hashing::EMPTY_DIGEST,
+                                execution_attempts: attempts,
+                              }))
+                                  .to_boxed()
+                            } else {
+                              // maybe the delay here should be the min of remaining time and the backoff period
+                              Delay::new(Instant::now() + Duration::from_millis(backoff_period))
+                                  .map_err(move |e| {
+                                    format!(
+                                      "Future-Delay errored at operation result polling for {}, {}: {}",
+                                      operation_name, description, e
+                                    )
+                                  })
+                                  .and_then(move |_| {
+                                    future::done(
+                                      operations_client
+                                          .get_operation_opt(
+                                            &operation_request,
+                                            command_runner.call_option(),
+                                          )
+                                          .or_else(move |err| {
+                                            rpcerror_recover_cancelled(operation_request.take_name(), err)
+                                          })
+                                          .map( OperationOrStatus::Operation)
+                                          .map_err(rpcerror_to_string),
+                                    )
+                                    .map(move |operation| {
+                                      future::Loop::Continue((
+                                        history,
+                                        operation,
+                                        maybe_cancel_remote_exec_token,
+                                        iter_num + 1,
+                                      ))
+                                    })
+                                    .to_boxed()
+                                  })
+                                  .to_boxed()
+                            }
+                          }
+                        }
+                      }
+                    }
+                  })
+                },
+              )
+            },
+          )
           .map(move |resp| {
             let mut attempts = String::new();
             for (i, attempt) in resp.execution_attempts.iter().enumerate() {
@@ -1137,8 +1150,8 @@ pub mod tests {
   use std::ops::Sub;
   use std::path::PathBuf;
   use std::time::{Duration, Instant};
-  use workunit_store::{workunits_with_constant_span_id, WorkUnit, WorkUnitStore};
   use tokio::timer::Delay;
+  use workunit_store::{workunits_with_constant_span_id, WorkUnit, WorkUnitStore};
 
   #[derive(Debug, PartialEq)]
   enum StdoutType {
@@ -1563,9 +1576,9 @@ pub mod tests {
   #[test]
   fn successful_execution_after_one_getoperation() {
     let execute_request = echo_foo_request();
+    let op_name = "gimme-foo".to_string();
 
     let mock_server = {
-      let op_name = "gimme-foo".to_string();
 
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
@@ -1599,6 +1612,16 @@ pub mod tests {
         execution_attempts: vec![],
       }
     );
+
+    let expected_value: Vec<String> = Vec::new();
+    let cancels = mock_server
+        .mock_responder
+        .cancelation_requests
+        .lock()
+        .iter()
+        .map(|req| req.get_name().to_owned())
+        .collect::<Vec<_>>();
+    assert_eq!(expected_value, cancels);
   }
 
   #[test]
@@ -1843,10 +1866,13 @@ pub mod tests {
     assert!(maybe_execution_duration.is_some());
     assert_that(&maybe_execution_duration.unwrap()).is_greater_than_or_equal_to(request_timeout);
 
-    let cancels = mock_server.mock_responder.cancelation_req.lock()
-        .iter()
-        .map(|req| req.get_name().to_owned())
-        .collect::<Vec<_>>();
+    let cancels = mock_server
+      .mock_responder
+      .cancelation_requests
+      .lock()
+      .iter()
+      .map(|req| req.get_name().to_owned())
+      .collect::<Vec<_>>();
     assert_eq!(vec![op_name.to_owned()], cancels);
   }
 
@@ -1873,8 +1899,8 @@ pub mod tests {
         mock::execution_server::MockExecution::new(
           op_name.clone(),
           super::make_execute_request(&execute_request, empty_request_metadata())
-              .unwrap()
-              .2,
+            .unwrap()
+            .2,
           vec![
             make_incomplete_operation(&op_name),
             make_delayed_incomplete_operation(&op_name, delayed_operation_time),
@@ -1885,9 +1911,9 @@ pub mod tests {
     };
 
     let cas = mock::StubCAS::builder()
-        .file(&TestData::roland())
-        .directory(&TestDirectory::containing_roland())
-        .build();
+      .file(&TestData::roland())
+      .directory(&TestDirectory::containing_roland())
+      .build();
     let command_runner = create_command_runner(mock_server.address(), &cas);
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
@@ -1900,21 +1926,33 @@ pub mod tests {
     };
 
     let run_future = command_runner.run(execute_request, WorkUnitStore::new());
-    let faster_future = Delay::new(Instant::now() + Duration::from_secs(1)).map_err(|err| format!("Error {}", err)).map({
-      let successful_mock_result = successful_mock_result.clone();
-      |_| successful_mock_result
-    });
+    let faster_future = Delay::new(Instant::now() + Duration::from_secs(1))
+      .map_err(|err| format!("Error from timer: {}", err))
+      .map({
+        let successful_mock_result = successful_mock_result.clone();
+        |_| successful_mock_result
+      });
 
-    let result = runtime.block_on(run_future.select(faster_future).map(|(result, _future)| result).map_err(|(err, _future)| err)).unwrap();
+    let result = runtime
+      .block_on(
+        run_future
+          .select(faster_future)
+          .map(|(result, _future)| result)
+          .map_err(|(err, _future)| err),
+      )
+      .unwrap();
 
     assert_eq!(result.without_execution_attempts(), successful_mock_result);
 
-    std::thread::sleep(Duration::from_secs(2));
+    runtime.shutdown_on_idle().wait().unwrap();
 
-    let cancels = mock_server.mock_responder.cancelation_req.lock()
-        .iter()
-        .map(|req| req.get_name().to_owned())
-        .collect::<Vec<_>>();
+    let cancels = mock_server
+      .mock_responder
+      .cancelation_requests
+      .lock()
+      .iter()
+      .map(|req| req.get_name().to_owned())
+      .collect::<Vec<_>>();
     assert_eq!(vec![op_name.to_owned()], cancels);
   }
 
