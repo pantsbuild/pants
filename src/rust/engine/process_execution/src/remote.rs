@@ -257,7 +257,7 @@ impl super::CommandRunner for CommandRunner {
                         } = history;
                         current_attempt.remote_execution = Some(elapsed);
                         attempts.push(current_attempt);
-                        return future::ok(future::Loop::Break(FallibleExecuteProcessResult {
+                        future::ok(future::Loop::Break(FallibleExecuteProcessResult {
                           stdout: Bytes::from(format!(
                             "Exceeded timeout of {:?} with {:?} for operation {}, {}",
                             timeout, elapsed, operation_name, description
@@ -267,7 +267,7 @@ impl super::CommandRunner for CommandRunner {
                           output_directory: hashing::EMPTY_DIGEST,
                           execution_attempts: attempts,
                         }))
-                        .to_boxed();
+                        .to_boxed()
                       } else {
                         // maybe the delay here should be the min of remaining time and the backoff period
                         Delay::new(Instant::now() + Duration::from_millis(backoff_period))
