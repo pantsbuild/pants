@@ -100,6 +100,7 @@ class OptionsBootstrapper(datatype([
     flags = set()
     short_flags = set()
 
+    # TODO: This codepath probably shouldn't be using FileContent, which is a very v2 engine thing.
     def filecontent_for(path):
       is_executable = os.stat(path).st_mode & stat.S_IXUSR == stat.S_IXUSR
       return FileContent(
