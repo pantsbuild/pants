@@ -13,6 +13,7 @@ use fs::{self, File, PathStat};
 use futures::{future, Future, Stream};
 use grpcio;
 use hashing::{Digest, Fingerprint};
+use libc;
 use log::{debug, trace, warn};
 use protobuf::{self, Message, ProtobufEnum};
 use sha2::Sha256;
@@ -250,10 +251,22 @@ impl super::CommandRunner for CommandRunner {
                       let elapsed = start_time.elapsed();
 
                       if elapsed > timeout {
-                        future::err(format!(
-                          "Exceeded time out of {:?} with {:?} for operation {}, {}",
-                          timeout, elapsed, operation_name, description
-                        ))
+                        let ExecutionHistory {
+                          mut attempts,
+                          mut current_attempt,
+                        } = history;
+                        current_attempt.remote_execution = Some(elapsed);
+                        attempts.push(current_attempt);
+                        future::ok(future::Loop::Break(FallibleExecuteProcessResult {
+                          stdout: Bytes::from(format!(
+                            "Exceeded timeout of {:?} with {:?} for operation {}, {}",
+                            timeout, elapsed, operation_name, description
+                          )),
+                          stderr: Bytes::new(),
+                          exit_code: -libc::SIGTERM,
+                          output_directory: hashing::EMPTY_DIGEST,
+                          execution_attempts: attempts,
+                        }))
                         .to_boxed()
                       } else {
                         // maybe the delay here should be the min of remaining time and the backoff period
@@ -1017,6 +1030,7 @@ pub mod tests {
   use maplit::hashset;
   use mock::execution_server::MockOperation;
   use protobuf::well_known_types::Timestamp;
+  use spectral::numeric::OrderedAssertions;
   use std::collections::{BTreeMap, BTreeSet};
   use std::iter::{self, FromIterator};
   use std::ops::Sub;
@@ -1717,10 +1731,15 @@ pub mod tests {
       )
     };
 
-    let error_msg = run_command_remote(mock_server.address(), execute_request)
-      .expect_err("Timeout did not cause failure.");
-    assert_contains(&error_msg, "Exceeded time out");
-    assert_contains(&error_msg, "echo-a-foo");
+    let result = run_command_remote(mock_server.address(), execute_request).unwrap();
+    assert_eq!(result.exit_code, -15);
+    let error_msg = String::from_utf8(result.stdout.to_vec()).unwrap();
+    assert_that(&error_msg).contains("Exceeded timeout");
+    assert_that(&error_msg).contains("echo-a-foo");
+    assert_eq!(result.execution_attempts.len(), 1);
+    let maybe_execution_duration = result.execution_attempts[0].remote_execution;
+    assert!(maybe_execution_duration.is_some());
+    assert_that(&maybe_execution_duration.unwrap()).is_greater_than_or_equal_to(request_timeout);
   }
 
   #[test]
