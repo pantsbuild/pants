@@ -27,7 +27,6 @@ class NodeBuild(NodeTask):
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)
     round_manager.require_data(NodePaths)
-    round_manager.require_data('compile_classpath')
 
   @property
   def create_target_dirs(self):
@@ -67,7 +66,12 @@ class NodeBuild(NodeTask):
     # This is required even if node does not need `compile_classpaths` because some downstream
     # tasks requires `runtime_classpath` to be initialized correctly with `compile_classpaths`
     compile_classpath = self.context.products.get_data('compile_classpath')
-    runtime_classpath = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
+    if compile_classpath is not None:
+      init_func = compile_classpath.copy
+    else:
+      init_func = ClasspathProducts.init_func(self.get_options().pants_workdir)
+    runtime_classpath = self.context.products.get_data('runtime_classpath', init_func)
+
     bundleable_js_product = self.context.products.get_data(
       'bundleable_js', init_func=lambda: defaultdict(MultipleRootedProducts))
 
