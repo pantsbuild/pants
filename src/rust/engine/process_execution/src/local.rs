@@ -39,14 +39,13 @@ impl CommandRunner {
     executor: task_executor::Executor,
     work_dir: PathBuf,
     cleanup_local_dirs: bool,
-    platform: Platform,
   ) -> CommandRunner {
     CommandRunner {
       store,
       executor,
       work_dir,
       cleanup_local_dirs,
-      platform,
+      platform: Platform::current_platform().unwrap(),
     }
   }
 
@@ -216,14 +215,14 @@ impl ChildResults {
 }
 
 impl super::CommandRunner for CommandRunner {
-  fn get_compatible_request(
+  fn extract_compatible_request(
     &self,
     req: &MultiPlatformExecuteProcessRequest,
   ) -> Option<ExecuteProcessRequest> {
     for compatible_constraint in vec![
       &(Platform::None, Platform::None),
-      &(self.platform.clone(), Platform::None),
-      &(self.platform.clone(), Platform::current_platform().unwrap()),
+      &(self.platform, Platform::None),
+      &(self.platform, Platform::current_platform().unwrap()),
     ]
     .iter()
     {
@@ -251,7 +250,7 @@ impl super::CommandRunner for CommandRunner {
         "Error making tempdir for local process execution: {:?}",
         err
       )));
-    let req = self.get_compatible_request(&req).unwrap();
+    let req = self.extract_compatible_request(&req).unwrap();
     let workdir_path = workdir.path().to_owned();
     let workdir_path2 = workdir_path.clone();
     let workdir_path3 = workdir_path.clone();

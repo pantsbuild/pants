@@ -146,7 +146,6 @@ impl Core {
           executor.clone(),
           std::env::temp_dir(),
           process_execution_cleanup_local_dirs,
-          Platform::current_platform().unwrap(),
         )),
         process_execution_local_parallelism,
       ));

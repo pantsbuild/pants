@@ -91,7 +91,8 @@ class MultiPlatformExecuteProcessRequest(datatype([
       tuple(request_dict.values())
     )
 
-  def get_product_description(self):
+  @property
+  def product_description(self):
     # we can safely extract the first description because we guarantee that at
     # least one request exists and that all of their descriptions are the same
     # in __new__
@@ -148,11 +149,14 @@ stderr:
 
 @rule(ProductDescription, [MultiPlatformExecuteProcessRequest])
 def get_multi_platform_request_description(req):
-  return req.get_product_description()
+  return req.product_description
 
 
 @rule(MultiPlatformExecuteProcessRequest, [ExecuteProcessRequest])
 def upcast_execute_process_request(req):
+  """This rule allows an ExecuteProcessRequest to be run as a
+  platform compatible MultiPlatformExecuteProcessRequest.
+  """
   return MultiPlatformExecuteProcessRequest(
     {(Platform.none, Platform.none): req}
   )

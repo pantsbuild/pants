@@ -24,11 +24,11 @@ pub struct CommandRunner {
 }
 
 impl crate::CommandRunner for CommandRunner {
-  fn get_compatible_request(
+  fn extract_compatible_request(
     &self,
     req: &MultiPlatformExecuteProcessRequest,
   ) -> Option<ExecuteProcessRequest> {
-    self.underlying.get_compatible_request(req)
+    self.underlying.extract_compatible_request(req)
   }
 
   // TODO: Maybe record WorkUnits for local cache checks.
@@ -175,7 +175,7 @@ impl CommandRunner {
 #[cfg(test)]
 mod test {
   use crate::ExecuteProcessRequest;
-  use crate::{CommandRunner as CommandRunnerTrait, ExecuteProcessRequestMetadata, Platform};
+  use crate::{CommandRunner as CommandRunnerTrait, ExecuteProcessRequestMetadata};
   use hashing::EMPTY_DIGEST;
   use sharded_lmdb::ShardedLmdb;
   use std::collections::{BTreeMap, BTreeSet};
@@ -199,7 +199,6 @@ mod test {
       runtime.clone(),
       work_dir.path().to_owned(),
       true,
-      Platform::current_platform().unwrap(),
     );
 
     let script_dir = TempDir::new().unwrap();

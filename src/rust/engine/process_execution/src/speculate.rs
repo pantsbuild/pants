@@ -55,13 +55,13 @@ impl SpeculatingCommandRunner {
 }
 
 impl CommandRunner for SpeculatingCommandRunner {
-  fn get_compatible_request(
+  fn extract_compatible_request(
     &self,
     req: &MultiPlatformExecuteProcessRequest,
   ) -> Option<ExecuteProcessRequest> {
     match (
-      self.primary.get_compatible_request(req),
-      self.secondary.get_compatible_request(req),
+      self.primary.extract_compatible_request(req),
+      self.secondary.extract_compatible_request(req),
     ) {
       (Some(req), _) => Some(req.clone()),
       (_, Some(req)) => Some(req.clone()),
@@ -75,8 +75,8 @@ impl CommandRunner for SpeculatingCommandRunner {
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     match (
-      self.primary.get_compatible_request(&req),
-      self.secondary.get_compatible_request(&req),
+      self.primary.extract_compatible_request(&req),
+      self.secondary.extract_compatible_request(&req),
     ) {
       (Some(_), Some(_)) => self.speculate(req, workunit_store),
       (Some(_), None) => self.primary.run(req, workunit_store),
@@ -311,16 +311,17 @@ mod tests {
       command_runner.incr_call_counter();
       delay
         .then(move |delay_res| match delay_res {
-          Ok(_) => {
-            command_runner.incr_finished_counter();
-            exec_result
-          }
+          Ok(_) => exec_result,
           Err(_) => Err(String::from("Timer failed during testing")),
+        })
+        .then(move |res| {
+          command_runner.incr_finished_counter();
+          res
         })
         .to_boxed()
     }
 
-    fn get_compatible_request(
+    fn extract_compatible_request(
       &self,
       req: &MultiPlatformExecuteProcessRequest,
     ) -> Option<ExecuteProcessRequest> {

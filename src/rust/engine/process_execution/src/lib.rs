@@ -49,7 +49,7 @@ pub mod speculate;
 
 extern crate uname;
 
-#[derive(PartialOrd, Ord, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum Platform {
   Darwin,
   Linux,
@@ -63,6 +63,25 @@ impl Platform {
       uname::Info { ref sysname, .. } if sysname.to_lowercase() == "darwin" => Ok(Platform::Darwin),
       uname::Info { ref sysname, .. } if sysname.to_lowercase() == "linux" => Ok(Platform::Linux),
       uname::Info { ref sysname, .. } => Err(format!("Found unknown system name {}", sysname)),
+    }
+  }
+}
+
+impl TryFrom<&String> for Platform {
+  type Error = String;
+  ///
+  /// This is a helper method to convert values from the python/engine/platform.py::Platform enum,
+  /// which have been serialized, into the rust Platform enum.
+  ///
+  fn try_from(variant_candidate: &String) -> Result<Self, Self::Error> {
+    match variant_candidate.as_ref() {
+      "darwin" => Ok(Platform::Darwin),
+      "linux" => Ok(Platform::Linux),
+      "none" => Ok(Platform::None),
+      other => Err(format!(
+        "Unknown, platform {:?} encountered in parsing",
+        other
+      )),
     }
   }
 }
@@ -128,8 +147,7 @@ impl TryFrom<MultiPlatformExecuteProcessRequest> for ExecuteProcessRequest {
 ///
 /// A container of platform constrained processes.
 ///
-#[derive(Derivative, Clone, Debug, Eq)]
-#[derivative(PartialEq, Hash)]
+#[derive(Derivative, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct MultiPlatformExecuteProcessRequest(
   pub BTreeMap<(Platform, Platform), ExecuteProcessRequest>,
 );
@@ -217,7 +235,7 @@ pub trait CommandRunner: Send + Sync {
   /// with the current command runners platform configuration. If so return the
   /// first candidate that will be run if the multi platform request is submitted to
   /// `fn run(..)`
-  fn get_compatible_request(
+  fn extract_compatible_request(
     &self,
     req: &MultiPlatformExecuteProcessRequest,
   ) -> Option<ExecuteProcessRequest>;
@@ -252,11 +270,11 @@ impl CommandRunner for BoundedCommandRunner {
       .with_acquired(move || inner.0.run(req, workunit_store))
   }
 
-  fn get_compatible_request(
+  fn extract_compatible_request(
     &self,
     req: &MultiPlatformExecuteProcessRequest,
   ) -> Option<ExecuteProcessRequest> {
-    self.inner.0.get_compatible_request(&req)
+    self.inner.0.extract_compatible_request(&req)
   }
 }
 

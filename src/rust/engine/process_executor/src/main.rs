@@ -330,7 +330,6 @@ fn main() {
       executor,
       work_dir,
       true,
-      Platform::current_platform().unwrap(),
     )) as Box<dyn process_execution::CommandRunner>,
   };
 

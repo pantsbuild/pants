@@ -371,19 +371,6 @@ pub fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
 pub struct MultiPlatformExecuteProcess(MultiPlatformExecuteProcessRequest);
 
 impl MultiPlatformExecuteProcess {
-  ///
-  /// This is a helper method to convert values from the python/engine/platform.py::Platform enum,
-  /// which have been serialized, into the rust Platform enum.
-  ///
-  fn get_platform_variant(variant_candidate: String) -> Platform {
-    match variant_candidate.as_ref() {
-      "darwin" => Platform::Darwin,
-      "linux" => Platform::Linux,
-      "none" => Platform::None,
-      _ => unreachable!(),
-    }
-  }
-
   fn lift_execute_process(value: &Value) -> Result<ExecuteProcessRequest, String> {
     let mut env: BTreeMap<String, String> = BTreeMap::new();
     let env_var_parts = externs::project_multi_strs(&value, "env");
@@ -439,10 +426,7 @@ impl MultiPlatformExecuteProcess {
       jdk_home: jdk_home,
     })
   }
-
   fn lift(value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
-    let mut request_by_constraint: BTreeMap<(Platform, Platform), ExecuteProcessRequest> =
-      BTreeMap::new();
     let constraint_parts = externs::project_multi_strs(&value, "platform_constraints");
     let mut requests: Vec<ExecuteProcessRequest> = Vec::new();
     for execute_process in externs::project_multi(&value, "execute_process_requests").iter() {
@@ -459,16 +443,17 @@ impl MultiPlatformExecuteProcess {
         requests.len()
       ));
     }
-    for (constraint_key_pair, request) in constraint_parts.chunks_exact(2).zip(requests.iter()) {
-      let mut platform_constaint: Vec<Platform> = constraint_key_pair
-        .iter()
-        .map(|c| MultiPlatformExecuteProcess::get_platform_variant(c.to_string()))
+    let request_by_constraint: BTreeMap<(Platform, Platform), ExecuteProcessRequest> =
+      constraint_parts
+        .chunks_exact(2)
+        .map(|constraint_key_pair| {
+          (
+            Platform::try_from(&constraint_key_pair[2]).unwrap(),
+            Platform::try_from(&constraint_key_pair[1]).unwrap(),
+          )
+        })
+        .zip(requests.iter().cloned())
         .collect();
-      request_by_constraint.insert(
-        (platform_constaint.remove(0), platform_constaint.remove(0)),
-        request.clone(),
-      );
-    }
     Ok(MultiPlatformExecuteProcess(
       MultiPlatformExecuteProcessRequest(request_by_constraint),
     ))
@@ -490,7 +475,7 @@ impl WrappedNode for MultiPlatformExecuteProcess {
     if context
       .core
       .command_runner
-      .get_compatible_request(&request)
+      .extract_compatible_request(&request)
       .is_some()
     {
       context

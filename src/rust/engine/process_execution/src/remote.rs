@@ -129,14 +129,14 @@ impl super::CommandRunner for CommandRunner {
   ///
   /// Loops until the server gives a response, either successful or error. Does not have any
   /// timeout: polls in a tight loop.
-  fn get_compatible_request(
+  fn extract_compatible_request(
     &self,
     req: &MultiPlatformExecuteProcessRequest,
   ) -> Option<ExecuteProcessRequest> {
     for compatible_constraint in vec![
       &(Platform::None, Platform::None),
-      &(self.platform.clone(), Platform::None),
-      &(self.platform.clone(), Platform::current_platform().unwrap()),
+      &(self.platform, Platform::None),
+      &(self.platform, Platform::current_platform().unwrap()),
     ]
     .iter()
     {
@@ -155,7 +155,7 @@ impl super::CommandRunner for CommandRunner {
     req: MultiPlatformExecuteProcessRequest,
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
-    let compatible_underlying_request = self.get_compatible_request(&req).unwrap();
+    let compatible_underlying_request = self.extract_compatible_request(&req).unwrap();
     let operations_client = self.operations_client.clone();
     let store = self.store.clone();
     let execute_request_result =
