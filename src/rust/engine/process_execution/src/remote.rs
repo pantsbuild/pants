@@ -259,7 +259,7 @@ impl super::CommandRunner for CommandRunner {
                         attempts.push(current_attempt);
                         return future::ok(future::Loop::Break(FallibleExecuteProcessResult {
                           stdout: Bytes::from(format!(
-                            "Exceeded time out of {:?} with {:?} for operation {}, {}",
+                            "Exceeded timeout of {:?} with {:?} for operation {}, {}",
                             timeout, elapsed, operation_name, description
                           )),
                           stderr: Bytes::new(),
@@ -1734,7 +1734,7 @@ pub mod tests {
     let result = run_command_remote(mock_server.address(), execute_request).unwrap();
     assert_eq!(result.exit_code, -15);
     let error_msg = String::from_utf8(result.stdout.to_vec()).unwrap();
-    assert_that(&error_msg).contains("Exceeded time out");
+    assert_that(&error_msg).contains("Exceeded timeout");
     assert_that(&error_msg).contains("echo-a-foo");
     assert_eq!(result.execution_attempts.len(), 1);
     let maybe_execution_duration = result.execution_attempts[0].remote_execution;
