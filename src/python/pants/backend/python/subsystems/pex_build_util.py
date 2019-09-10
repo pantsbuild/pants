@@ -110,7 +110,7 @@ def _create_source_dumper(builder: PEXBuilder, tgt: Target) -> Callable[[str], N
     return str(Path(relpath).relative_to(tgt.target_base))
 
   def dump_source(relpath: str) -> None:
-    source_path = str(Path(buildroot) / relpath)
+    source_path = str(Path(buildroot, relpath))
     dest_path = get_chroot_path(relpath)
     if has_resources(tgt):
       builder.add_resource(filename=source_path, env_filename=dest_path)

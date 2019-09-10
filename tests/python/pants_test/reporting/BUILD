@@ -18,6 +18,8 @@ python_tests(
     '3rdparty/python:py-zipkin',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
+    'examples/src/java/org/pantsbuild/example:hello_directory',
+    'examples/src/scala/org/pantsbuild/example:several_scala_targets_directory',
   ],
   tags = {'integration'},
   timeout = 600,

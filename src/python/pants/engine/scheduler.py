@@ -106,7 +106,7 @@ class Scheduler:
       type_merge_snapshots_request=DirectoriesToMerge,
       type_directory_with_prefix_to_strip=DirectoryWithPrefixToStrip,
       type_files_content=FilesContent,
-      type_input_file_content=InputFileContent,
+      type_input_files_content=InputFilesContent,
       type_dir=Dir,
       type_file=File,
       type_link=Link,

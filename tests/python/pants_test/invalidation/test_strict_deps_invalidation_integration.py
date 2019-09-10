@@ -21,7 +21,7 @@ class StrictDepsInvalidationIntegrationTest(PantsRunIntegrationTest):
       src_dir = os.path.relpath(os.path.join(tmp_src, os.path.basename(self.TEST_SRC)), get_buildroot())
       shutil.copytree(self.TEST_SRC, src_dir)
       with self.temporary_workdir() as workdir:
-        cmd = ['compile', '{}:{}'.format(src_dir, target_name)]
+        cmd = ['compile', f'{src_dir}:{target_name}']
         cmd.extend(extra_args)
         pants_run = self.run_pants_with_workdir(command=cmd, workdir=workdir)
         self.assert_success(pants_run)

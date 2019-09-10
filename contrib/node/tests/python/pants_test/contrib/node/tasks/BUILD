@@ -33,6 +33,7 @@ python_tests(
   sources=['test_node_bundle_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
+    'contrib/node:examples_directory',
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
   ],
@@ -45,6 +46,7 @@ python_tests(
   sources=['test_node_repl_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
+    'contrib/node:examples_directory',
   ],
   tags={'integration'},
 )
@@ -54,6 +56,8 @@ python_tests(
   sources=['test_node_resolve_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
+    'contrib/node:examples_directory',
+    'contrib/node:testprojects_directory',
   ],
   timeout=180,
   tags={'integration'},
@@ -64,6 +68,7 @@ python_tests(
   sources=['test_node_run_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
+    'contrib/node:examples_directory',
   ],
   timeout=180,
   tags={'integration'},
@@ -74,6 +79,7 @@ python_tests(
   sources=['test_node_test_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
+    'contrib/node:examples_directory',
   ],
   timeout=240,
   tags={'integration'},
@@ -116,6 +122,7 @@ python_tests(
   sources=['test_node_lint_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
+    'contrib/node:examples_directory',
   ],
   timeout=180,
   tags={'integration'},
@@ -126,6 +133,7 @@ python_tests(
   sources=['test_node_install_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
+    'contrib/node:examples_directory',
   ],
   timeout=180,
   tags={'integration'},

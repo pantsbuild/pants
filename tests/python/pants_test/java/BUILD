@@ -64,6 +64,7 @@ python_tests(
   sources = ['test_nailgun_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test',
+    'examples/src/scala/org/pantsbuild/example:hello_directory',
   ],
   tags = {'integration'},
   timeout = 180,

@@ -5,6 +5,7 @@ import logging
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
+from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, Exiter
 from pants.base.workunit import WorkUnit
@@ -54,7 +55,7 @@ class LocalExiter(Exiter):
           # Log the unrecognized exit code to the fatal exception log.
           ExceptionSink.log_exception(run_tracker_msg)
           # Ensure the unrecognized exit code message is also logged to the terminal.
-          additional_messages.push(run_tracker_msg)
+          additional_messages.append(run_tracker_msg)
           outcome = WorkUnit.FAILURE
 
         self._run_tracker.set_root_outcome(outcome)
@@ -65,7 +66,7 @@ class LocalExiter(Exiter):
       # so we just log that fact here and keep going.
       exception_string = str(e)
       ExceptionSink.log_exception(exception_string)
-      additional_messages.push(exception_string)
+      additional_messages.append(exception_string)
     finally:
       if self._repro:
         # TODO: Have Repro capture the 'after' state (as a diff) as well? (in reference to the below
@@ -220,6 +221,14 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     self._run_start_time = start_time
     self._reporting.initialize(self._run_tracker, self._options, start_time=self._run_start_time)
 
+    spec_parser = CmdLineSpecParser(get_buildroot())
+    target_specs = [
+      spec_parser.parse_spec(spec).to_spec_string()
+      for spec in self._options.target_specs
+    ]
+    # Note: This will not include values from `--owner-of` or `--changed-*` flags.
+    self._run_tracker.run_info.add_info("specs_from_command_line", target_specs, stringify=False)
+
     # Capture a repro of the 'before' state for this build, if needed.
     self._repro = Reproducer.global_instance().create_repro()
     if self._repro:
@@ -266,6 +275,7 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
 
     _, ambiguous_goals, v2_goals = self._options.goals_by_version
     goals = v2_goals + (ambiguous_goals if self._global_options.v2 else tuple())
+    self._run_tracker.set_v2_console_rule_names(goals)
     if not goals:
       return PANTS_SUCCEEDED_EXIT_CODE
 

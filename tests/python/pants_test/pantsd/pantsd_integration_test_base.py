@@ -31,9 +31,7 @@ class PantsDaemonMonitor(ProcessManager):
     self.runner_process_context = runner_process_context
 
   def _log(self):
-    print(magenta(
-      'PantsDaemonMonitor: pid is {} is_alive={}'.format(self._pid, self.is_alive()))
-    )
+    print(magenta(f'PantsDaemonMonitor: pid is {self._pid} is_alive={self.is_alive()}'))
 
   # TODO(#7330): Determine why pantsd takes so long to start! Waiting for
   # 'testprojects/src/python/coordinated_runs:waiter' specifically seems to require this 16-second

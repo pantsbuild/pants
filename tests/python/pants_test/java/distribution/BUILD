@@ -23,6 +23,7 @@ python_tests(
     'src/python/pants/util:osutil',
     'tests/python/pants_test:int-test',
     'tests/python/pants_test/subsystem:subsystem_utils',
+    'testprojects/src/java/org/pantsbuild/testproject:printversion_directory'
   ],
   tags = {'integration'},
   timeout = 180,

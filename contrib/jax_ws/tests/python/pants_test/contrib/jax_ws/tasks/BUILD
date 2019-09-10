@@ -16,6 +16,7 @@ python_tests(
   sources=['test_jax_ws_gen_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
+    'contrib/jax_ws:wsdl_tests_directory',
   ],
   tags={'integration'},
   timeout=300,

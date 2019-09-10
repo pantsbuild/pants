@@ -185,7 +185,7 @@ class LegacyGraphSession(datatype(['scheduler_session', 'build_file_aliases', 'g
     for goal in goals:
       goal_product = self.goal_map[goal]
       params = Params(subject, options_bootstrapper, console)
-      logger.debug('requesting {} to satisfy execution of `{}` goal'.format(goal_product, goal))
+      logger.debug(f'requesting {goal_product} to satisfy execution of `{goal}` goal')
       try:
         exit_code = self.scheduler_session.run_console_rule(goal_product, params)
       finally:
@@ -230,8 +230,7 @@ class EngineInitializer:
       goal = r.output_type.name
       if goal in goal_map:
         raise EngineInitializer.GoalMappingError(
-          'could not map goal `{}` to rule `{}`: already claimed by product `{}`'
-          .format(goal, r, goal_map[goal])
+          f'could not map goal `{goal}` to rule `{r}`: already claimed by product `{goal_map[goal]}`'
         )
       goal_map[goal] = r.output_type
     return goal_map

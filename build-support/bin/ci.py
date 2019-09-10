@@ -8,9 +8,9 @@ import platform
 import subprocess
 import tempfile
 from contextlib import contextmanager
-from enum import Enum
+from enum import Enum, auto
 from pathlib import Path
-from typing import Iterator, List, Optional, Set
+from typing import Iterator, List, NamedTuple, Optional, Set
 
 from common import banner, die, green, travis_section
 
@@ -21,34 +21,40 @@ def main() -> None:
   args = create_parser().parse_args()
   setup_environment(python_version=args.python_version)
 
-  if args.bootstrap:
-    bootstrap(clean=args.bootstrap_clean, python_version=args.python_version)
-  set_run_from_pex()
+  with maybe_get_remote_execution_oauth_token_path(
+    remote_execution_enabled=args.remote_execution_enabled
+  ) as remote_execution_oauth_token_path:
 
-  if args.githooks:
-    run_githooks()
-  if args.sanity_checks:
-    run_sanity_checks()
-  if args.lint:
-    run_lint()
-  if args.doc_gen:
-    run_doc_gen_tests()
-  if args.clippy:
-    run_clippy()
-  if args.cargo_audit:
-    run_cargo_audit()
-  if args.unit_tests:
-    run_unit_tests(remote_execution_enabled=args.remote_execution_enabled)
-  if args.rust_tests:
-    run_rust_tests()
-  if args.jvm_tests:
-    run_jvm_tests()
-  if args.integration_tests:
-    run_integration_tests(shard=args.integration_shard)
-  if args.plugin_tests:
-    run_plugin_tests()
-  if args.platform_specific_tests:
-    run_platform_specific_tests()
+    if args.bootstrap:
+      bootstrap(clean=args.bootstrap_clean, python_version=args.python_version)
+    set_run_from_pex()
+
+    if args.githooks:
+      run_githooks()
+    if args.sanity_checks:
+      run_sanity_checks()
+    if args.lint:
+      run_lint()
+    if args.doc_gen:
+      run_doc_gen_tests()
+    if args.clippy:
+      run_clippy()
+    if args.cargo_audit:
+      run_cargo_audit()
+    if args.unit_tests:
+      run_unit_tests(oauth_token_path=remote_execution_oauth_token_path)
+    if args.rust_tests:
+      run_rust_tests()
+    if args.jvm_tests:
+      run_jvm_tests()
+    if args.integration_tests_v1:
+      run_integration_tests_v1(shard=args.integration_shard)
+    if args.integration_tests_v2:
+      run_integration_tests_v2(oauth_token_path=remote_execution_oauth_token_path)
+    if args.plugin_tests:
+      run_plugin_tests()
+    if args.platform_specific_tests:
+      run_platform_specific_tests()
 
   banner("CI ENDS")
   print()
@@ -107,7 +113,12 @@ def create_parser() -> argparse.ArgumentParser:
   parser.add_argument("--rust-tests", action="store_true", help="Run Rust tests.")
   parser.add_argument("--jvm-tests", action="store_true", help="Run JVM tests.")
   parser.add_argument(
-    "--integration-tests", action="store_true", help="Run Python integration tests."
+    "--integration-tests-v1", action="store_true",
+    help="Run Python integration tests w/ V1 runner."
+  )
+  parser.add_argument(
+    "--integration-tests-v2", action="store_true",
+    help="Run Python integration tests w/ V2 runner."
   )
   parser.add_argument(
     "--integration-shard", metavar="SHARD_NUMBER/TOTAL_SHARDS", default=None,
@@ -158,7 +169,12 @@ def set_run_from_pex() -> None:
 
 
 @contextmanager
-def get_remote_execution_oauth_token_path() -> Iterator[str]:
+def maybe_get_remote_execution_oauth_token_path(
+  *, remote_execution_enabled: bool
+) -> Iterator[Optional[str]]:
+  if not remote_execution_enabled:
+    yield None
+    return
   command = (
     ["./pants.pex", "--quiet", "run", "build-support/bin:get_rbe_token"]
     if os.getenv("CI")
@@ -175,30 +191,115 @@ def get_remote_execution_oauth_token_path() -> Iterator[str]:
     yield tf.name
 
 # -------------------------------------------------------------------------
-# Blacklists
+# Blacklists and whitelists
 # -------------------------------------------------------------------------
 
-def get_blacklisted_targets(filename: str) -> Set[str]:
-  return {
-    line.strip()
-    for line in Path(f"build-support/ci_blacklists/{filename}").read_text().splitlines()
-  }
+Target = str
+TargetSet = Set[Target]
 
 
-def get_all_python_tests(*, tag: Optional[str] = None) -> Set[str]:
-  command = [
-    "./pants.pex",
-    "--filter-type=python_tests",
-    "filter",
-    "src/python::",
-    "tests/python::",
-    "contrib::"
-  ]
-  if tag is not None:
-    command.insert(1, f"--tag={tag}")
-  return set(subprocess.run(
-    command, stdout=subprocess.PIPE, encoding="utf-8", check=True
-  ).stdout.strip().split("\n"))
+class TestStrategy(Enum):
+  v1_no_chroot = auto()
+  v1_chroot = auto()
+  v2_local = auto()
+  v2_remote = auto()
+
+  def pants_command(
+    self, *, targets: TargetSet, shard: Optional[str] = None, oauth_token_path: Optional[str] = None
+  ) -> List[str]:
+    if self == self.v2_remote and oauth_token_path is None:  # type: ignore
+      raise ValueError("Must specify oauth_token_path.")
+    result: List[str] = {  # type: ignore
+      self.v1_no_chroot: ["./pants.pex", "test"] + sorted(targets) + PYTEST_PASSTHRU_ARGS,
+      self.v1_chroot: ["./pants.pex", "--test-pytest-chroot", "test"] + sorted(targets) + PYTEST_PASSTHRU_ARGS,
+      self.v2_local: ["./pants.pex", "--no-v1", "--v2", "test"] + sorted(targets),
+      self.v2_remote: [
+                        "./pants.pex",
+                        "--no-v1",
+                        "--v2",
+                        "--pants-config-files=pants.remote.ini",
+                        # We turn off speculation to reduce the risk of flakiness, where a test
+                        # passes either locally or remotely and fails in the other environment.
+                        "--process-execution-speculation-strategy=none",
+                        f"--remote-oauth-bearer-token-path={oauth_token_path}",
+                        "test"
+                      ] + sorted(targets),
+    }[self]
+    if shard is not None and self in [self.v1_no_chroot, self.v1_chroot]:  # type: ignore
+      result.insert(1, f"--test-pytest-test-shard={shard}")
+    return result
+
+
+class TestType(Enum):
+  unit = "unit"
+  integration = "integration"
+
+  def __str__(self) -> str:
+    return str(self.value)
+
+
+class TestTargetSets(NamedTuple):
+  v1_no_chroot: TargetSet
+  v1_chroot: TargetSet
+  v2_local: TargetSet
+  v2_remote: TargetSet
+
+  @staticmethod
+  def calculate(
+    *,
+    test_type: TestType,
+    default_test_strategy: TestStrategy,
+    remote_execution_enabled: bool = False,
+  ) -> 'TestTargetSets':
+
+    def get_listed_targets(filename: str) -> TargetSet:
+      list_path = Path(f"build-support/ci_lists/{filename}")
+      if not list_path.exists():
+        return set()
+      return {line.strip() for line in list_path.read_text().splitlines()}
+
+    all_targets = set(subprocess.run(
+      [
+        "./pants.pex",
+        f"--tag={'-' if test_type == TestType.unit else '+'}integration",
+        "--filter-type=python_tests",
+        "filter",
+        "src/python::",
+        "tests/python::",
+        "contrib::",
+      ], stdout=subprocess.PIPE, encoding="utf-8", check=True
+    ).stdout.strip().split("\n"))
+
+    if default_test_strategy == TestStrategy.v2_remote:
+      blacklisted_chroot_targets = get_listed_targets(f"{test_type}_chroot_blacklist.txt")
+      blacklisted_v2_targets = get_listed_targets(f"{test_type}_v2_blacklist.txt")
+      blacklisted_remote_targets = get_listed_targets(f"{test_type}_remote_blacklist.txt")
+
+      v1_no_chroot_targets = blacklisted_chroot_targets
+      v1_chroot_targets = blacklisted_v2_targets
+      v2_local_targets = blacklisted_remote_targets
+      v2_remote_targets = all_targets - v2_local_targets - v1_chroot_targets - v1_no_chroot_targets
+
+    else:
+      whitelisted_chroot_targets = get_listed_targets(f"{test_type}_chroot_whitelist.txt")
+      whitelisted_v2_targets = get_listed_targets(f"{test_type}_v2_whitelist.txt")
+      whitelisted_remote_targets = get_listed_targets(f"{test_type}_remote_whitelist.txt")
+
+      v2_remote_targets = whitelisted_remote_targets
+      v2_local_targets = whitelisted_v2_targets
+      v1_chroot_targets = whitelisted_chroot_targets
+      v1_no_chroot_targets = all_targets - v1_chroot_targets - v2_local_targets - v2_remote_targets
+
+    if not remote_execution_enabled:
+      v2_local_targets |= v2_remote_targets
+      v2_remote_targets = set()
+
+    return TestTargetSets(
+      v1_no_chroot=v1_no_chroot_targets,
+      v1_chroot=v1_chroot_targets,
+      v2_local=v2_local_targets,
+      v2_remote=v2_remote_targets
+    )
 
 # -------------------------------------------------------------------------
 # Bootstrap pants.pex
@@ -332,56 +433,43 @@ def run_cargo_audit() -> None:
       die("Cargo audit failure")
 
 
-def run_unit_tests(*, remote_execution_enabled: bool) -> None:
-  check_pants_pex_exists()
+def run_unit_tests(*, oauth_token_path: Optional[str] = None) -> None:
+  target_sets = TestTargetSets.calculate(
+    test_type=TestType.unit,
+    default_test_strategy=TestStrategy.v2_remote,
+    remote_execution_enabled=oauth_token_path is not None
+  )
+  if target_sets.v2_remote:
+    _run_command(
+      command=TestStrategy.v2_remote.pants_command(
+        targets=target_sets.v2_remote, oauth_token_path=oauth_token_path
+      ),
+      slug="UnitTestsV2Remote",
+      start_message="Running unit tests via remote V2 strategy",
+      die_message="Unit test failure (remote V2 strategy)",
+    )
+  if target_sets.v2_local:
+    _run_command(
+      command=TestStrategy.v2_local.pants_command(targets=target_sets.v2_local),
+      slug="UnitTestsV2Local",
+      start_message="Running unit tests via local V2 strategy",
+      die_message="Unit test failure (local V2)",
+    )
+  if target_sets.v1_chroot:
+    _run_command(
+      command=TestStrategy.v1_chroot.pants_command(targets=target_sets.v1_chroot),
+      slug="UnitTestsV1Chroot",
+      start_message="Running unit tests via local V1 chroot strategy",
+      die_message="Unit test failure (V1 chroot)",
+    )
 
-  all_targets = get_all_python_tests(tag="-integration")
-  blacklisted_chroot_targets = get_blacklisted_targets("unit_test_chroot_blacklist.txt")
-  blacklisted_v2_targets = get_blacklisted_targets("unit_test_v2_blacklist.txt")
-  blacklisted_remote_targets = get_blacklisted_targets("unit_test_remote_blacklist.txt")
-
-  v1_no_chroot_targets = blacklisted_chroot_targets
-  v1_chroot_targets = blacklisted_v2_targets
-  v2_local_targets = blacklisted_remote_targets
-  v2_remote_targets = all_targets - v2_local_targets - v1_chroot_targets - v1_no_chroot_targets
-
-  basic_command = ["./pants.pex", "test.pytest"]
-  v2_command = ["./pants.pex", "--no-v1", "--v2", "test.pytest"]
-  v1_no_chroot_command = basic_command + sorted(v1_no_chroot_targets) + PYTEST_PASSTHRU_ARGS
-  v1_chroot_command = basic_command + ["--test-pytest-chroot"] + sorted(v1_chroot_targets) + PYTEST_PASSTHRU_ARGS
-  v2_local_command = v2_command + sorted(v2_local_targets)
-
-  if not remote_execution_enabled:
-    v2_local_targets = v2_local_targets | v2_remote_targets
-    v2_local_command = v2_command + sorted(v2_local_targets)
-  else:
-    with travis_section(
-      "UnitTestsRemote", "Running unit tests via remote execution"
-    ), get_remote_execution_oauth_token_path() as oauth_token_path:
-      v2_remote_command = v2_command[:-1] + [
-          "--pants-config-files=pants.remote.ini",
-          # We turn off speculation to reduce the risk of flakiness, where a test passes locally but
-          # fails remoting and we have a race condition for which environment executes first.
-          "--process-execution-speculation-strategy=none",
-          f"--remote-oauth-bearer-token-path={oauth_token_path}",
-          "test.pytest",
-        ] + sorted(v2_remote_targets)
-      try:
-        subprocess.run(v2_remote_command, check=True)
-      except subprocess.CalledProcessError:
-        die("Unit test failure (remote execution)")
-      else:
-        green("Unit tests passed (remote execution)")
-
-  with travis_section("UnitTestsLocal", "Running unit tests via local execution"):
-    try:
-      subprocess.run(v2_local_command, check=True)
-      subprocess.run(v1_chroot_command, check=True)
-      subprocess.run(v1_no_chroot_command, check=True)
-    except subprocess.CalledProcessError:
-      die("Unit test failure (local execution)")
-    else:
-      green("Unit tests passed (local execution)")
+  if target_sets.v1_no_chroot:
+    _run_command(
+      command=TestStrategy.v1_no_chroot.pants_command(targets=target_sets.v1_no_chroot),
+      slug="UnitTestsV1NoChroot",
+      start_message="Running unit tests via local V1 no-chroot strategy",
+      die_message="Unit test failure (V1 no-chroot)",
+    )
 
 
 def run_rust_tests() -> None:
@@ -417,17 +505,50 @@ def run_jvm_tests() -> None:
   )
 
 
-def run_integration_tests(*, shard: Optional[str]) -> None:
-  check_pants_pex_exists()
-  all_targets = get_all_python_tests(tag="+integration")
-  command = ["./pants.pex", "test.pytest"]
-  if shard is not None:
-    command.append(f"--test-pytest-test-shard={shard}")
-  with travis_section("IntegrationTests", f"Running Pants Integration tests {shard if shard is not None else ''}"):
-    try:
-      subprocess.run(command + sorted(all_targets) + PYTEST_PASSTHRU_ARGS, check=True)
-    except subprocess.CalledProcessError:
-      die("Integration test failure.")
+def run_integration_tests_v1(*, shard: Optional[str]) -> None:
+  target_sets = TestTargetSets.calculate(
+    test_type=TestType.integration,
+    default_test_strategy=TestStrategy.v1_no_chroot,
+    remote_execution_enabled=False
+  )
+  if target_sets.v1_no_chroot:
+    _run_command(
+      command=TestStrategy.v1_no_chroot.pants_command(targets=target_sets.v1_no_chroot, shard=shard),
+      slug="IntegrationTestsV1NoChroot",
+      start_message="Running integration tests via V1 no-chroot strategy.",
+      die_message="Integration test failure (V1 no-chroot)",
+    )
+  if target_sets.v1_chroot:
+    _run_command(
+      command=TestStrategy.v1_chroot.pants_command(targets=target_sets.v1_chroot, shard=shard),
+      slug="IntegrationTestsV1Chroot",
+      start_message="Running integration tests via V1 chroot strategy.",
+      die_message="Integration test failure (V1 chroot)",
+    )
+
+
+def run_integration_tests_v2(*, oauth_token_path: Optional[str] = None) -> None:
+  target_sets = TestTargetSets.calculate(
+    test_type=TestType.integration,
+    default_test_strategy=TestStrategy.v1_no_chroot,
+    remote_execution_enabled=oauth_token_path is not None
+  )
+  if target_sets.v2_remote:
+    _run_command(
+      command=TestStrategy.v2_remote.pants_command(
+        targets=target_sets.v2_remote, oauth_token_path=oauth_token_path
+      ),
+      slug="IntegrationTestsV2Remote",
+      start_message="Running integration tests via V2 remote strategy.",
+      die_message="Integration test failure (V2 remote)",
+    )
+  if target_sets.v2_local:
+    _run_command(
+      command=TestStrategy.v2_local.pants_command(targets=target_sets.v2_local),
+      slug="IntegrationTestsV2Local",
+      start_message="Running integration tests via V2 local strategy.",
+      die_message="Integration test failure (V2 local)",
+    )
 
 
 def run_plugin_tests() -> None:

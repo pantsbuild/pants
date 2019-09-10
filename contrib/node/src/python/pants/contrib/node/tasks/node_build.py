@@ -58,13 +58,23 @@ class NodeBuild(NodeTask):
       target.payload.output_dir if target.payload.build_script else ''))
 
   def execute(self):
+    targets = self.context.targets(predicate=self.is_node_module)
+    if not targets:
+      return
+
     node_paths = self.context.products.get_data(NodePaths)
-    runtime_classpath_product = self.context.products.get_data(
-      'runtime_classpath', init_func=ClasspathProducts.init_func(self.get_options().pants_workdir))
+    # This is required even if node does not need `compile_classpaths` because some downstream
+    # tasks requires `runtime_classpath` to be initialized correctly with `compile_classpaths`
+    compile_classpath = self.context.products.get_data('compile_classpath')
+    if compile_classpath is not None:
+      init_func = compile_classpath.copy
+    else:
+      init_func = ClasspathProducts.init_func(self.get_options().pants_workdir)
+    runtime_classpath = self.context.products.get_data('runtime_classpath', init_func)
+
     bundleable_js_product = self.context.products.get_data(
       'bundleable_js', init_func=lambda: defaultdict(MultipleRootedProducts))
 
-    targets = self.context.targets(predicate=self.is_node_module)
     with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.all_vts:
         target = vt.target
@@ -84,4 +94,4 @@ class NodeBuild(NodeTask):
                   target.address.reference(), target.payload.build_script, output_dir))
             absolute_symlink(output_dir, os.path.join(vt.results_dir, target.address.target_name))
             bundleable_js_product[target].add_abs_paths(output_dir, [output_dir])
-            runtime_classpath_product.add_for_target(target, [('default', vt.results_dir)])
+            runtime_classpath.add_for_target(target, [('default', vt.results_dir)])

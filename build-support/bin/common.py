@@ -55,27 +55,16 @@ def elapsed_time() -> Tuple[int, int]:
 
 @contextmanager
 def travis_section(slug: str, message: str) -> Iterator[None]:
-  travis_fold_state = "/tmp/.travis_fold_current"
+  travis_fold_state_path = Path("/tmp/.travis_fold_current")
 
-  def travis_fold(action: str, target: str) -> None:
+  def travis_fold(*, action: str, target: str) -> None:
     print(f"travis_fold:{action}:{target}\r{_CLEAR_LINE}", end="")
 
-  def read_travis_fold_state() -> str:
-    with open(travis_fold_state, "r") as f:
-      return f.readline()
-
-  def write_slug_to_travis_fold_state() -> None:
-    with open(travis_fold_state, "w") as f:
-      f.write(slug)
-
-  def remove_travis_fold_state() -> None:
-    Path(travis_fold_state).unlink()
-
-  travis_fold("start", slug)
-  write_slug_to_travis_fold_state()
+  travis_fold(action="start", target=slug)
+  travis_fold_state_path.write_text(slug)
   banner(message)
   try:
     yield
   finally:
-    travis_fold("end", read_travis_fold_state())
-    remove_travis_fold_state()
+    travis_fold(action="end", target=travis_fold_state_path.read_text().splitlines()[0])
+    travis_fold_state_path.unlink()

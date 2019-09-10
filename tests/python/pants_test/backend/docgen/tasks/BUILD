@@ -25,6 +25,7 @@ python_tests(
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:int-test',
+    'testprojects/src/java/org/pantsbuild/testproject:page_directory',
   ],
   coverage = [
     'pants.backend.docgen.tasks.markdown_to_html',

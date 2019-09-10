@@ -671,14 +671,14 @@ function publish_packages() {
   end_travis_section
 }
 
-_OPTS="hdnftcloepqw"
+_OPTS="dhnftlowepq"
 
 function usage() {
   echo "With no options all packages are built, smoke tested and published to"
   echo "PyPi.  Credentials are needed for this as described in the"
   echo "release docs: http://pantsbuild.org/release.html"
   echo
-  echo "Usage: $0 [-d] [-c] (-h|-n|-f|-t|-l|-o|-e|-p)"
+  echo "Usage: $0 [-d] (-h|-n|-f|-t|-l|-o|-w|-e|-p|-q)"
   echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
   echo " -h  Prints out this help message."
   echo " -n  Performs a release dry run."
@@ -691,11 +691,12 @@ function usage() {
   echo "       and can be installed in an ephemeral virtualenv."
   echo " -l  Lists all pantsbuild packages that this script releases."
   echo " -o  Lists all pantsbuild package owners."
+  echo " -w  List pre-built wheels for this release."
   echo " -e  Check that wheels are prebuilt for this release."
   echo " -p  Build a pex from prebuilt wheels for this release."
   echo " -q  Build a pex which only works on the host platform, using the code as exists on disk."
   echo
-  echo "All options (except for '-d' and '-3') are mutually exclusive."
+  echo "All options (except for '-d') are mutually exclusive."
 
   if (( $# > 0 )); then
     die "$@"
@@ -704,7 +705,7 @@ function usage() {
   fi
 }
 
-while getopts "${_OPTS}" opt; do
+while getopts ":${_OPTS}" opt; do
   case ${opt} in
     h) usage ;;
     d) debug="true" ;;
@@ -713,10 +714,10 @@ while getopts "${_OPTS}" opt; do
     t) test_release="true" ;;
     l) run_packages_script list ; exit $? ;;
     o) run_packages_script list-owners ; exit $? ;;
+    w) list_prebuilt_wheels ; exit $? ;;
     e) fetch_and_check_prebuilt_wheels ; exit $? ;;
     p) build_pex fetch ; exit $? ;;
     q) build_pex build ; exit $? ;;
-    w) list_prebuilt_wheels ; exit $? ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done

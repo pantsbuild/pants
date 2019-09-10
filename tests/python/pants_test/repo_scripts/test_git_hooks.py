@@ -23,12 +23,12 @@ class PreCommitHookTest(unittest.TestCase):
     with temporary_dir() as gitdir,\
          temporary_dir() as worktree:
       # A tiny little fake git repo we will set up. initialize_repo() requires at least one file.
-      (Path(worktree) / 'README').touch()
+      Path(worktree, 'README').touch()
       # The contextmanager interface is only necessary if an explicit gitdir is not provided.
       with initialize_repo(worktree, gitdir=gitdir) as git:
         if copy_files is not None:
           for fp in copy_files:
-            new_fp = Path(worktree) / fp
+            new_fp = Path(worktree, fp)
             safe_mkdir_for(str(new_fp))
             shutil.copy(fp, new_fp)
         yield git, worktree, gitdir

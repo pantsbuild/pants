@@ -107,7 +107,7 @@ class Bootstrapper:
         digest.update(fp.read())
     else:
       digest.update(self._version_or_ivyxml.encode())
-    classpath = os.path.join(ivy_bootstrap_dir, '{}.classpath'.format(digest.hexdigest()))
+    classpath = os.path.join(ivy_bootstrap_dir, f'{digest.hexdigest()}')
 
     if not os.path.exists(classpath):
       ivy = self._bootstrap_ivy(os.path.join(ivy_bootstrap_dir, 'bootstrap.jar'))
