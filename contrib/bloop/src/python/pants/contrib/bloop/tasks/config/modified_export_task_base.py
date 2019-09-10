@@ -185,17 +185,14 @@ class ModifiedExportTaskBase(ExportTask):
 
       dep_ctx = DependencyContext.global_instance()
       for dep in current_target.strict_dependencies(dep_ctx):
+        info['targets'].append(dep.address.spec)
         # We remove `jar_library()` targets from dependencies, and instead update
         # `target_libraries` for the `current_target` (so that bloop has those jars on the classpath
         # when compiling `current_target`).
-          for jar in dep.jar_dependencies:
-            target_libraries.add(M2Coordinate(
-              org=jar.org, name=jar.name, rev=jar.rev, classifier=jar.classifier))
-          # Add all the jars pulled in by this jar_library
-          target_libraries.update(iter_transitive_jars(dep))
-
         if isinstance(dep, Resources):
           resource_target_map[dep] = current_target
+        # Add all the jars pulled in by this jar_library
+        target_libraries.update(iter_transitive_jars(dep))
 
       if isinstance(current_target, ScalaLibrary):
         for dep in current_target.java_sources:
