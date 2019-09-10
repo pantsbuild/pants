@@ -510,6 +510,10 @@ class PyResult(datatype(['is_throw', 'handle'])):
   """Corresponds to the native object of the same name."""
 
 
+class RawResult(datatype(['is_throw', 'throw_handle', 'raw_pointer'])):
+  """Corresponds to the native object of the same name."""
+
+
 class ExternContext:
   """A wrapper around python objects used in static extern functions in this module.
 
@@ -820,7 +824,7 @@ class Native(Singleton):
     def ti(type_obj):
       return TypeId(self.context.to_id(type_obj))
 
-    scheduler = self.lib.scheduler_create(
+    scheduler_result = self.lib.scheduler_create(
         tasks,
         # Constructors/functions.
         func(construct_directory_digest),
@@ -873,6 +877,12 @@ class Native(Singleton):
         self.context.utf8_buf(execution_options.process_execution_speculation_strategy),
         execution_options.process_execution_use_local_cache,
       )
+    if scheduler_result.is_throw:
+      value = self.context.from_value(scheduler_result.throw_handle)
+      self.context.drop_handles([scheduler_result.throw_handle])
+      raise value
+    else:
+      scheduler = scheduler_result.raw_pointer
     return self.gc(scheduler, self.lib.scheduler_destroy)
 
   def set_panic_handler(self):

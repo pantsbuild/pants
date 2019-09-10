@@ -79,7 +79,7 @@ impl Core {
     process_execution_speculation_delay: Duration,
     process_execution_speculation_strategy: String,
     process_execution_use_local_cache: bool,
-  ) -> Core {
+  ) -> Result<Core, String> {
     // Randomize CAS address order to avoid thundering herds from common config.
     let mut remote_store_servers = remote_store_servers;
     remote_store_servers.shuffle(&mut rand::thread_rng());
@@ -89,7 +89,7 @@ impl Core {
     let root_ca_certs = if let Some(path) = remote_root_ca_certs_path {
       Some(
         std::fs::read(&path)
-          .unwrap_or_else(|err| panic!("Error reading root CA certs file {:?}: {}", path, err)),
+          .map_err(|err| format!("Error reading root CA certs file {:?}: {}", path, err))?,
       )
     } else {
       None
@@ -130,7 +130,7 @@ impl Core {
           )
         }
       })
-      .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
+      .map_err(|e| format!("Could not initialize Store: {:?}", e))?;
 
     let process_execution_metadata = ExecuteProcessRequestMetadata {
       instance_name: remote_instance_name.clone(),
@@ -184,7 +184,7 @@ impl Core {
         5 * GIGABYTES,
         executor.clone(),
       )
-      .expect("Could not initialize store for process cache: {:?}");
+      .map_err(|err| format!("Could not initialize store for process cache: {:?}", err))?;
       command_runner = Box::new(process_execution::cache::CommandRunner {
         underlying: command_runner.into(),
         process_execution_store,
@@ -196,7 +196,7 @@ impl Core {
     let http_client = reqwest::r#async::Client::new();
     let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);
 
-    Core {
+    Ok(Core {
       graph: Graph::new(),
       tasks: tasks,
       rule_graph: rule_graph,
@@ -207,11 +207,10 @@ impl Core {
       http_client,
       // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
-      vfs: PosixFS::new(&build_root, &ignore_patterns, executor).unwrap_or_else(|e| {
-        panic!("Could not initialize VFS: {:?}", e);
-      }),
+      vfs: PosixFS::new(&build_root, &ignore_patterns, executor)
+        .map_err(|e| format!("Could not initialize VFS: {:?}", e))?,
       build_root: build_root,
-    }
+    })
   }
 
   pub fn store(&self) -> Store {
