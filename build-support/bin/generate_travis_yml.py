@@ -452,7 +452,7 @@ def unit_tests(python_version: PythonVersion) -> Dict:
     "name": f"Unit tests (Python {python_version.decimal})",
     "script": [
       (
-        "travis_wait 40 ./build-support/bin/ci.py --unit-tests --remote-execution-enabled "
+        "travis_wait 80 ./build-support/bin/ci.py --unit-tests --remote-execution-enabled "
         f"--python-version {python_version.decimal}"
       ),
       f"./build-support/bin/ci.py --plugin-tests --python-version {python_version.decimal}",
@@ -512,7 +512,7 @@ def build_wheels_osx() -> Dict:
 # -------------------------------------------------------------------------
 
 def integration_tests_v1(python_version: PythonVersion, *, use_pantsd: bool = False) -> List[Dict]:
-  num_integration_shards = 13
+  num_integration_shards = 6
 
   def make_shard(*, shard_num: int) -> Dict:
     shard = {
@@ -541,7 +541,7 @@ def integration_tests_v2(python_version: PythonVersion) -> Dict:
     "name": f"Integration tests - V2 (Python {python_version.decimal})",
     "script": [
       (
-        "travis_wait 40 ./build-support/bin/ci.py --integration-tests-v2 "
+        "travis_wait 80 ./build-support/bin/ci.py --integration-tests-v2 "
         f"--remote-execution-enabled --python-version {python_version.decimal}"
       ),
     ]
