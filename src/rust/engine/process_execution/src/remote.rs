@@ -43,20 +43,23 @@ struct CancelRemoteExecutionToken {
   #[derivative(Debug = "ignore")]
   operations_client: Arc<bazel_protos::operations_grpc::OperationsClient>,
   cancel_op_req: bazel_protos::operations::CancelOperationRequest,
+  #[derivative(Debug = "ignore")]
+  executor: task_executor::Executor,
   send_cancellation_on_drop: bool,
 }
 
 impl CancelRemoteExecutionToken {
-
   fn new(
     operations_client: Arc<bazel_protos::operations_grpc::OperationsClient>,
     operation_name: ::std::string::String,
+    executor: task_executor::Executor,
   ) -> CancelRemoteExecutionToken {
     let mut cancel_op_req = bazel_protos::operations::CancelOperationRequest::new();
     cancel_op_req.set_name(operation_name);
     CancelRemoteExecutionToken {
       operations_client,
       cancel_op_req,
+      executor,
       send_cancellation_on_drop: true,
     }
   }
@@ -75,7 +78,7 @@ impl Drop for CancelRemoteExecutionToken {
         .cancel_operation_async(&self.cancel_op_req)
       {
         Ok(receiver) => {
-          tokio::spawn(receiver.then(move |res| {
+          self.executor.spawn_and_ignore(receiver.then(move |res| {
             match res {
               Ok(_) => debug!("Canceled operation {} successfully", operation_name),
               Err(err) => debug!("Failed to cancel operation {}, err {}", operation_name, err),
@@ -83,10 +86,15 @@ impl Drop for CancelRemoteExecutionToken {
             future::ok(())
           }));
         }
-        Err(err) => debug!(
-          "Failed to schedule cancel operation: {}, err {}",
-          self.cancel_op_req.name, err
-        ),
+        Err(err) => {
+          let cancel_op_req_name = self.cancel_op_req.name.clone();
+          self.executor.spawn_and_ignore(futures::lazy(move || {
+            future::ok(debug!(
+              "Failed to schedule cancel operation: {}, err {}",
+              cancel_op_req_name, err
+            ))
+          }))
+        }
       };
     }
   }
@@ -107,6 +115,7 @@ pub struct CommandRunner {
   execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
   operations_client: Arc<bazel_protos::operations_grpc::OperationsClient>,
   store: Store,
+  executor: task_executor::Executor,
 }
 
 #[derive(Debug, PartialEq)]
@@ -156,7 +165,7 @@ impl CommandRunner {
         drop(stream);
         error
       })
-      .then( move |maybe_operation_result| match maybe_operation_result {
+      .then(move |maybe_operation_result| match maybe_operation_result {
         Ok(Some(operation)) => Ok(OperationOrStatus::Operation(operation)),
         Ok(None) => {
           Err("Didn't get proper stream response from server during remote execution".to_owned())
@@ -246,10 +255,11 @@ impl super::CommandRunner for CommandRunner {
           })
           .map({
             let operations_client = operations_client.clone();
+            let executor = command_runner2.executor.clone();
             move |(operation, history)| {
               let maybe_cancel_remote_exec_token = match operation {
                 OperationOrStatus::Operation(ref operation) => Some(
-                  CancelRemoteExecutionToken::new(operations_client, operation.name.clone()),
+                  CancelRemoteExecutionToken::new(operations_client, operation.name.clone(), executor),
                 ),
                 _ => None,
               };
@@ -311,23 +321,25 @@ impl super::CommandRunner for CommandRunner {
                             store
                                 .ensure_remote_has_recursive(missing_digests, workunit_store.clone())
                                 .and_then({
-                                            let command_runner = command_runner.clone();
-                                            move |summary| {
-                                              let mut history = history;
-                                              history.current_attempt += summary;
-                                              command_runner2
-                                                  .oneshot_execute(&execute_request)
-                                                  .join(future::ok(history))
-                                            }
-                                          })
+                                  let command_runner = command_runner.clone();
+                                  move |summary| {
+                                    let mut history = history;
+                                    history.current_attempt += summary;
+                                    command_runner
+                                        .oneshot_execute(&execute_request)
+                                        .join(future::ok(history))
+                                  }
+                                })
                                 .map({
                                   let operations_client = operations_client.clone();
+                                  let executor = command_runner.executor.clone();
                                   move |(operation, history)| {
                                     let maybe_cancel_remote_exec_token = match operation {
                                       OperationOrStatus::Operation(ref operation) => {
                                         Some(CancelRemoteExecutionToken::new(
                                           operations_client,
                                           operation.name.clone(),
+                                          executor,
                                         ))
                                       }
                                       _ => None,
@@ -447,6 +459,7 @@ impl CommandRunner {
     root_ca_certs: Option<Vec<u8>>,
     oauth_bearer_token: Option<String>,
     store: Store,
+    executor: task_executor::Executor,
   ) -> CommandRunner {
     let env = Arc::new(grpcio::EnvBuilder::new().build());
     let channel = {
@@ -475,6 +488,7 @@ impl CommandRunner {
       execution_client,
       operations_client,
       store,
+      executor,
     }
   }
 
@@ -1579,7 +1593,6 @@ pub mod tests {
     let op_name = "gimme-foo".to_string();
 
     let mock_server = {
-
       mock::execution_server::TestServer::new(
         mock::execution_server::MockExecution::new(
           op_name.clone(),
@@ -1615,12 +1628,12 @@ pub mod tests {
 
     let expected_value: Vec<String> = Vec::new();
     let cancels = mock_server
-        .mock_responder
-        .cancelation_requests
-        .lock()
-        .iter()
-        .map(|req| req.get_name().to_owned())
-        .collect::<Vec<_>>();
+      .mock_responder
+      .cancelation_requests
+      .lock()
+      .iter()
+      .map(|req| req.get_name().to_owned())
+      .collect::<Vec<_>>();
     assert_eq!(expected_value, cancels);
   }
 
@@ -1735,6 +1748,7 @@ pub mod tests {
       None,
       None,
       store,
+      runtime.clone(),
     );
     let result = runtime
       .block_on(cmd_runner.run(echo_roland_request(), WorkUnitStore::new()))
@@ -2236,6 +2250,7 @@ pub mod tests {
       None,
       None,
       store,
+      runtime.clone(),
     );
 
     let result = runtime
@@ -2306,8 +2321,9 @@ pub mod tests {
     let cas = mock::StubCAS::builder()
       .directory(&TestDirectory::containing_roland())
       .build();
+    let runtime = task_executor::Executor::new();
     let store = Store::with_remote(
-      task_executor::Executor::new(),
+      runtime.clone(),
       store_dir,
       vec![cas.address()],
       None,
@@ -2332,6 +2348,7 @@ pub mod tests {
       None,
       None,
       store,
+      runtime.clone(),
     )
     .run(cat_roland_request(), WorkUnitStore::new())
     .wait();
@@ -2400,6 +2417,7 @@ pub mod tests {
       None,
       None,
       store,
+      runtime.clone(),
     );
 
     let error = runtime
@@ -3138,9 +3156,10 @@ pub mod tests {
   }
 
   fn create_command_runner(address: String, cas: &mock::StubCAS) -> CommandRunner {
+    let runtime = task_executor::Executor::new();
     let store_dir = TempDir::new().unwrap();
     let store = Store::with_remote(
-      task_executor::Executor::new(),
+      runtime.clone(),
       store_dir,
       vec![cas.address()],
       None,
@@ -3155,7 +3174,14 @@ pub mod tests {
     )
     .expect("Failed to make store");
 
-    CommandRunner::new(&address, empty_request_metadata(), None, None, store)
+    CommandRunner::new(
+      &address,
+      empty_request_metadata(),
+      None,
+      None,
+      store,
+      runtime.clone(),
+    )
   }
 
   fn extract_execute_response(
