@@ -203,7 +203,7 @@ mod tests {
     Arc<Mutex<u32>>,
     Arc<Mutex<u32>>,
   ) {
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    let runtime = tokio::runtime::Runtime::new().unwrap();
     let execute_request = echo_foo_request();
     let msg1: String = "m1".into();
     let msg2: String = "m2".into();
@@ -230,7 +230,7 @@ mod tests {
       Duration::from_millis(speculation_delay_ms),
     );
     (
-      runtime.block_on(runner.run(execute_request, workunit_store)),
+      runtime.block_on_all(runner.run(execute_request, workunit_store)),
       call_counter,
       finished_counter,
     )
