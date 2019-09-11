@@ -18,6 +18,7 @@ import sbt.internal.inc.{
 import sbt.internal.inc.classpath.ClassLoaderCache
 import sbt.io.Path
 import sbt.io.syntax._
+import sbt.util.Logger
 import xsbti.compile.{
   ClasspathOptionsUtil,
   CompilerCache,
