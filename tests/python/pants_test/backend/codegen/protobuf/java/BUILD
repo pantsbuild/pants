@@ -27,5 +27,5 @@ python_tests(
     'testprojects/src/protobuf/org/pantsbuild/testproject:import_from_buildroot_directory',
   ],
   tags = {'integration'},
-  timeout = 240,
+  timeout = 330,
 )

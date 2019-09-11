@@ -19,5 +19,5 @@ python_tests(
     'contrib/errorprone:java_tests_directory',
   ],
   tags={'integration'},
-  timeout=300,
+  timeout=420,
 )

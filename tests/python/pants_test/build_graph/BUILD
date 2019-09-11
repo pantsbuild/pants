@@ -76,6 +76,7 @@ python_tests(
     'testprojects/src/python:build_file_imports_module_directory',
   ],
   tags = {'integration'},
+  timeout = 75,
 )
 
 python_tests(

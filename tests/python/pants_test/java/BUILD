@@ -67,7 +67,7 @@ python_tests(
     'examples/src/scala/org/pantsbuild/example:hello_directory',
   ],
   tags = {'integration'},
-  timeout = 180,
+  timeout = 270,
 )
 
 python_tests(

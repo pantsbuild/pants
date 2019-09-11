@@ -57,7 +57,7 @@ python_tests(
     'testprojects/src/scala/org/pantsbuild/testproject:custom_scala_platform_directory',
   ],
   tags = {'integration'},
-  timeout=360,
+  timeout=500,
 )
 
 python_tests(
@@ -73,7 +73,7 @@ python_tests(
     'testprojects/3rdparty:managed_directory',
   ],
   tags = {'integration'},
-  timeout = 240,
+  timeout = 370,
 )
 
 python_tests(
