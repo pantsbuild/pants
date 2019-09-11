@@ -4,7 +4,7 @@
 import logging
 
 from pants.engine.fs import Digest
-from pants.engine.platform import Platform
+from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import RootRule, rule
 from pants.util.objects import (Exactly, TypedCollection, datatype, enum, hashable_string_list,
                                 string_optional)
@@ -70,7 +70,6 @@ class MultiPlatformExecuteProcessRequest(datatype([
   ('execute_process_requests', TypedCollection(Exactly(ExecuteProcessRequest))),
 ])):
   # args collects a set of tuples representing platform constraints mapped to a req, just like a dict constructor can.
-  ALLOWED_PLATFORM_CONSTRAINTS = enum(['darwin', 'linux', 'none'])
 
   def __new__(cls, request_dict):
     if len(request_dict) == 0:
@@ -80,7 +79,7 @@ class MultiPlatformExecuteProcessRequest(datatype([
     validated_constraints = tuple(
       constraint.value
       for pair in request_dict.keys() for constraint in pair
-      if cls.ALLOWED_PLATFORM_CONSTRAINTS(constraint.value)
+      if PlatformConstraint(constraint.value)
     )
     if len({req.description for req in request_dict.values()}) != 1:
       raise ValueError(f"The `description` of all execute_process_requests in a {cls.__name__} must be identical.")
@@ -158,7 +157,7 @@ def upcast_execute_process_request(req):
   platform compatible MultiPlatformExecuteProcessRequest.
   """
   return MultiPlatformExecuteProcessRequest(
-    {(Platform.none, Platform.none): req}
+    {(PlatformConstraint.none, PlatformConstraint.none): req}
   )
 
 

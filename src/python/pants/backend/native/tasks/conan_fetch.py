@@ -121,7 +121,6 @@ class ConanFetch(SimpleCodegenTask):
     return Platform.current.resolve_for_enum_variant({
       'darwin': 'Macos',
       'linux': 'Linux',
-      'none': '',
     })
 
   @property

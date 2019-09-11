@@ -19,8 +19,13 @@ class Platform(enum(all_normalized_os_names())):
     return self.resolve_for_enum_variant({
       'darwin': 'DYLD_LIBRARY_PATH',
       'linux': 'LD_LIBRARY_PATH',
-      'none': '',
     })
+
+
+class PlatformConstraint(enum(list(all_normalized_os_names()) + ['none'])):
+  @memoized_classproperty
+  def local_platform(cls):
+      return cls(Platform.current.value)
 
 
 # TODO We will want to allow users to specify the execution platform for rules,
@@ -28,7 +33,6 @@ class Platform(enum(all_normalized_os_names())):
 @rule(Platform, [])
 def materialize_platform():
   return Platform.current
-
 
 def create_platform_rules():
   return [materialize_platform]

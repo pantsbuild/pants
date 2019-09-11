@@ -113,7 +113,6 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       contains_current_platform = Platform.current.resolve_for_enum_variant({
         'darwin': wheel_platform.startswith('macosx'),
         'linux': wheel_platform.startswith('linux'),
-        'none': False,
       })
       self.assertTrue(contains_current_platform)
 
@@ -170,7 +169,6 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     attempt_pants_run = Platform.current.resolve_for_enum_variant({
       'darwin': toolchain_variant == ToolchainVariant.llvm,
       'linux': True,
-      'none': False,
     })
     if attempt_pants_run:
       pants_run_interop = self.run_pants(['-q', 'run', self._binary_target_with_interop], config={
@@ -200,7 +198,6 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     attempt_pants_run = Platform.current.resolve_for_enum_variant({
       'darwin': toolchain_variant == ToolchainVariant.llvm,
       'linux': True,
-      'none': False,
     })
     if attempt_pants_run:
       pants_run = self.run_pants(['-q', 'run', self._binary_target_with_third_party], config={
@@ -247,7 +244,6 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     attempt_pants_run = Platform.current.resolve_for_enum_variant({
       'darwin': toolchain_variant == ToolchainVariant.llvm,
       'linux': True,
-      'none': False,
     })
     if not attempt_pants_run:
       return

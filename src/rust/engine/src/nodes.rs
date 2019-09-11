@@ -459,7 +459,7 @@ impl MultiPlatformExecuteProcess {
         .chunks_exact(2)
         .map(|constraint_key_pair| {
           (
-            Platform::try_from(&constraint_key_pair[2]).unwrap(),
+            Platform::try_from(&constraint_key_pair[0]).unwrap(),
             Platform::try_from(&constraint_key_pair[1]).unwrap(),
           )
         })

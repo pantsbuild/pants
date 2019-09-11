@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 OS_ALIASES = {
   'darwin': {'macos', 'darwin', 'macosx', 'mac os x', 'mac'},
   'linux': {'linux', 'linux2'},
-  'none': {'none'},
 }
 
 Pid = int

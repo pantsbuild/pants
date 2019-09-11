@@ -114,22 +114,6 @@ impl CommandRunner {
 // we cancel a potential RPC. So we need to distinguish local vs. remote
 // requests and save enough state to BoxFuture or another abstraction around our execution results
 impl super::CommandRunner for CommandRunner {
-  ///
-  /// Runs a command via a gRPC service implementing the Bazel Remote Execution API
-  /// (https://docs.google.com/document/d/1AaGk7fOPByEvpAbqeXIyE8HX_A3_axxNnvroblTZ_6s/edit).
-  ///
-  /// If the CommandRunner has a Store, files will be uploaded to the remote CAS as needed.
-  /// Note that it does not proactively upload files to a remote CAS. This is because if we will
-  /// get a cache hit, uploading the files was wasted time and bandwidth, and if the remote CAS
-  /// already has some files, uploading them all is a waste. Instead, we look at the responses we
-  /// get back from the server, and upload the files it says it's missing.
-  ///
-  /// In the future, we may want to do some clever things like proactively upload files which the
-  /// user has changed, or files which aren't known to the local git repository, but these are
-  /// optimizations to shave off a round-trip in the future.
-  ///
-  /// Loops until the server gives a response, either successful or error. Does not have any
-  /// timeout: polls in a tight loop.
   fn extract_compatible_request(
     &self,
     req: &MultiPlatformExecuteProcessRequest,
@@ -148,6 +132,22 @@ impl super::CommandRunner for CommandRunner {
     None
   }
 
+  ///
+  /// Runs a command via a gRPC service implementing the Bazel Remote Execution API
+  /// (https://docs.google.com/document/d/1AaGk7fOPByEvpAbqeXIyE8HX_A3_axxNnvroblTZ_6s/edit).
+  ///
+  /// If the CommandRunner has a Store, files will be uploaded to the remote CAS as needed.
+  /// Note that it does not proactively upload files to a remote CAS. This is because if we will
+  /// get a cache hit, uploading the files was wasted time and bandwidth, and if the remote CAS
+  /// already has some files, uploading them all is a waste. Instead, we look at the responses we
+  /// get back from the server, and upload the files it says it's missing.
+  ///
+  /// In the future, we may want to do some clever things like proactively upload files which the
+  /// user has changed, or files which aren't known to the local git repository, but these are
+  /// optimizations to shave off a round-trip in the future.
+  ///
+  /// Loops until the server gives a response, either successful or error. Does not have any
+  /// timeout: polls in a tight loop.
   ///
   /// TODO: Request jdk_home be created if set.
   ///
