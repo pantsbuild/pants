@@ -63,14 +63,11 @@ class NodeBuild(NodeTask):
       return
 
     node_paths = self.context.products.get_data(NodePaths)
-    # This is required even if node does not need `compile_classpaths` because some downstream
-    # tasks requires `runtime_classpath` to be initialized correctly with `compile_classpaths`
-    compile_classpath = self.context.products.get_data('compile_classpath')
-    if compile_classpath is not None:
-      init_func = compile_classpath.copy
-    else:
-      init_func = ClasspathProducts.init_func(self.get_options().pants_workdir)
-    runtime_classpath = self.context.products.get_data('runtime_classpath', init_func)
+    # This is required even if node does not need `compile_classpaths` because certain downstream
+    # tasks require `runtime_classpath` to be initialized correctly with `compile_classpaths`
+    compile_classpath = self.context.products.get_data('compile_classpath',
+      init_func=ClasspathProducts.init_func(self.get_options().pants_workdir))
+    runtime_classpath = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
 
     bundleable_js_product = self.context.products.get_data(
       'bundleable_js', init_func=lambda: defaultdict(MultipleRootedProducts))
