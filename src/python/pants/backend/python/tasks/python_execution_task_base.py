@@ -103,7 +103,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
   def prepare_pex_env(self, env: Optional[Dict[str, str]] = None) -> Dict[str, str]:
     """Prepares an environment that will run this task's pex with proper isolation.
 
-    :param dict env: An optional seed environment to use; os.environ by default.
+    :param env: An optional seed environment to use; os.environ by default.
     :return: An environment dict for use in running a PEX.
     """
     env = (env or os.environ).copy()

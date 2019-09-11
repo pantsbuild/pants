@@ -1,7 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-# Enable `python -mpants ...` style execution ala `json.tool` or `venv`.
+# Enable `python -m pants ...` style execution ala `json.tool` or `venv`.
 python_library(
   name='entry_point',
   sources=['__main__.py'],
@@ -28,9 +28,7 @@ python_library(
     # NB: by setting `ext_modules`, we signal to setup_py and bdist_wheel that this library
     # has native code. As a consquence, bdist_wheel pins the ABI (application binary interface)
     # used when creating the wheel, which is a good thing. We should be setting this ABI to ensure
-    # consumers of pantsbuild.pants are using a compatible interpreter, for example
-    # that we correctly distinguish when using Python 2 between interpreters built with UCS2 vs.
-    # UCS4 (see https://www.python.org/dev/peps/pep-0513/#ucs-2-vs-ucs-4-builds).
+    # consumers of pantsbuild.pants are using a compatible interpreter.
     # TODO(7344): the tuple syntax for ext_modules is deprecated. Use Extension once we support it.
     ext_modules=[('native_engine', {'sources': ['src/pants/dummy.c']})],
   ).with_binaries(
