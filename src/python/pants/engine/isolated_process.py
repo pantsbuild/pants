@@ -4,9 +4,9 @@
 import logging
 
 from pants.engine.fs import Digest
-from pants.engine.platform import Platform, PlatformConstraint
+from pants.engine.platform import PlatformConstraint
 from pants.engine.rules import RootRule, rule
-from pants.util.objects import (Exactly, TypedCollection, datatype, enum, hashable_string_list,
+from pants.util.objects import (Exactly, TypedCollection, datatype, hashable_string_list,
                                 string_optional)
 
 

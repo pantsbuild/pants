@@ -25,7 +25,7 @@ class Platform(enum(all_normalized_os_names())):
 class PlatformConstraint(enum(list(all_normalized_os_names()) + ['none'])):
   @memoized_classproperty
   def local_platform(cls):
-      return cls(Platform.current.value)
+    return cls(Platform.current.value)
 
 
 # TODO We will want to allow users to specify the execution platform for rules,
@@ -33,6 +33,7 @@ class PlatformConstraint(enum(list(all_normalized_os_names()) + ['none'])):
 @rule(Platform, [])
 def materialize_platform():
   return Platform.current
+
 
 def create_platform_rules():
   return [materialize_platform]

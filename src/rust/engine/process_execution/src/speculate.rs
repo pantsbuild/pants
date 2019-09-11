@@ -130,7 +130,7 @@ mod tests {
   #[test]
   fn first_req_slow_success() {
     let (result, call_counter, finished_counter) =
-      run_speculation_test(50, 100, 25, false, false, true, true);
+      run_speculation_test(500, 1000, 250, false, false, true, true);
     assert_eq![2, *call_counter.lock().unwrap()];
     assert_eq![1, *finished_counter.lock().unwrap()];
     assert_eq![result.unwrap().stdout, Bytes::from("m1")]
@@ -139,7 +139,7 @@ mod tests {
   #[test]
   fn first_req_slow_fail() {
     let (result, call_counter, finished_counter) =
-      run_speculation_test(100, 0, 10, true, false, true, true);
+      run_speculation_test(1000, 0, 100, true, false, true, true);
     assert_eq![2, *call_counter.lock().unwrap()];
     assert_eq![1, *finished_counter.lock().unwrap()];
     assert_eq![result.unwrap().stdout, Bytes::from("m2")]
@@ -148,7 +148,7 @@ mod tests {
   #[test]
   fn first_req_fast_fail() {
     let (result, call_counter, finished_counter) =
-      run_speculation_test(50, 100, 25, true, false, true, true);
+      run_speculation_test(500, 1000, 250, true, false, true, true);
     assert_eq![2, *call_counter.lock().unwrap()];
     assert_eq![1, *finished_counter.lock().unwrap()];
     assert_eq![result.unwrap_err(), Bytes::from("m1")]
@@ -157,7 +157,7 @@ mod tests {
   #[test]
   fn second_req_fast_fail() {
     let (result, call_counter, finished_counter) =
-      run_speculation_test(100, 0, 10, true, true, true, true);
+      run_speculation_test(1000, 0, 100, true, true, true, true);
     assert_eq![2, *call_counter.lock().unwrap()];
     assert_eq![1, *finished_counter.lock().unwrap()];
     assert_eq![result.unwrap_err(), Bytes::from("m2")]
@@ -184,7 +184,7 @@ mod tests {
   #[test]
   fn platform_compatible_with_both_speculates() {
     let (result, call_counter, finished_counter) =
-      run_speculation_test(50, 50, 25, false, false, true, true);
+      run_speculation_test(1000, 1000, 500, false, false, true, true);
     assert_eq![2, *call_counter.lock().unwrap()];
     assert_eq![1, *finished_counter.lock().unwrap()];
     assert_eq![result.unwrap().stdout, Bytes::from("m1")]

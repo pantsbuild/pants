@@ -7,7 +7,7 @@ from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.engine.fs import Digest
 from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
                                            MultiPlatformExecuteProcessRequest)
-from pants.engine.platform import PlatformConstraint, Platform
+from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.util.objects import datatype, hashable_string_list, string_optional, string_type
@@ -63,7 +63,7 @@ def create_requirements_pex(request, pex_bin, python_setup, pex_build_environmen
   # it is run on `execution_platform_constraint`".
   execute_process_request = MultiPlatformExecuteProcessRequest(
     {
-      (PlatformConstraint.local_platform, PlatformConstraint.local_platform): ExecuteProcessRequest(
+      (PlatformConstraint(platform.value), PlatformConstraint(platform.value)): ExecuteProcessRequest(
         argv=tuple(argv),
         env=env,
         input_files=pex_bin.directory_digest,
