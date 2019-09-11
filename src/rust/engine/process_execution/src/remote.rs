@@ -168,7 +168,8 @@ impl super::CommandRunner for CommandRunner {
                 vec![command_digest, action_digest, input_files],
                 workunit_store,
               )
-            }})
+            }
+          })
           .and_then({
             let execute_request = execute_request.clone();
             let command_runner = command_runner.clone();
@@ -180,8 +181,8 @@ impl super::CommandRunner for CommandRunner {
                 command
               );
               command_runner
-                  .oneshot_execute(&execute_request)
-                  .join(future::ok(history))
+                .oneshot_execute(&execute_request)
+                .join(future::ok(history))
             }
           })
           .and_then(move |(operation, history)| {
@@ -229,12 +230,13 @@ impl super::CommandRunner for CommandRunner {
                         .and_then({
                           let command_runner = command_runner.clone();
                           move |summary| {
-                          let mut history = history;
-                          history.current_attempt += summary;
-                          command_runner
-                            .oneshot_execute(&execute_request)
-                            .join(future::ok(history))
-                        }})
+                            let mut history = history;
+                            history.current_attempt += summary;
+                            command_runner
+                              .oneshot_execute(&execute_request)
+                              .join(future::ok(history))
+                          }
+                        })
                         // Reset `iter_num` on `MissingDigests`
                         .map(|(operation, history)| future::Loop::Continue((history, operation, 0)))
                         .to_boxed()
@@ -282,10 +284,7 @@ impl super::CommandRunner for CommandRunner {
                           .and_then(move |_| {
                             future::done(
                               operations_client
-                                .get_operation_opt(
-                                  &operation_request,
-                                  command_runner.call_option(),
-                                )
+                                .get_operation_opt(&operation_request, command_runner.call_option())
                                 .or_else(move |err| {
                                   rpcerror_recover_cancelled(operation_request.take_name(), err)
                                 })
