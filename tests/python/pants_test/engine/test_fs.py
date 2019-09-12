@@ -10,9 +10,11 @@ from abc import ABCMeta
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler
 
-from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, DirectoriesToMerge,
-                             DirectoryToMaterialize, DirectoryWithPrefixToStrip, FilesContent,
-                             PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch, create_fs_rules)
+from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, DirectoriesToMaterialize,
+                             DirectoriesToMerge, DirectoryToMaterialize, DirectoryWithPrefixToStrip,
+                             FileContent, FilesContent, InputFilesContent,
+                             MaterializeDirectoriesResult, MaterializeDirectoryResult, PathGlobs,
+                             PathGlobsAndRoot, Snapshot, UrlToFetch, create_fs_rules)
 from pants.engine.scheduler import ExecutionError
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.collections import assert_single_element
@@ -343,6 +345,32 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       )[0]
 
       self.assertEqual(both_snapshot.directory_digest, both_merged)
+
+  def test_materialize_directories_new(self) -> None:
+    from pathlib import Path
+
+    input_file = InputFilesContent((
+      FileContent(path='a.file', content=b'test'),
+      FileContent(path='subdir/b.file', content=b'some content'),
+    ))
+
+    digest, = self.scheduler.product_request(Digest, [input_file])
+
+    with temporary_dir() as temp_dir:
+      dtm = DirectoryToMaterialize(
+        path = temp_dir,
+        directory_digest = digest
+      )
+
+      dtms = DirectoriesToMaterialize((dtm,))
+      output, = self.scheduler.product_request(MaterializeDirectoriesResult, [dtms])
+
+      materialize_result = output.dependencies[0]
+      self.assertEqual(materialize_result, MaterializeDirectoryResult(output_paths=('a.file', 'subdir/b.file')))
+
+      self.assertTrue(Path(temp_dir, 'a.file').is_file())
+      self.assertTrue(Path(temp_dir, 'subdir').is_dir())
+      self.assertTrue(Path(temp_dir, 'subdir', 'b.file').is_file())
 
   def test_materialize_directories(self):
     # I tried passing in the digest of a file, but it didn't make it to the

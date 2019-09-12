@@ -799,6 +799,7 @@ class Native(Singleton):
     return self.gc(self.lib.session_create(scheduler, should_record_zipkin_spans, should_render_ui, ui_worker_count), self.lib.session_destroy)
 
   def new_scheduler(self,
+                    *,
                     tasks,
                     root_subject_types,
                     build_root,
@@ -810,6 +811,8 @@ class Native(Singleton):
                     construct_file_content,
                     construct_files_content,
                     construct_process_result,
+                    construct_materialize_directory_result,
+                    construct_materialize_directories_results,
                     type_address,
                     type_path_globs,
                     type_directory_digest,
@@ -824,7 +827,9 @@ class Native(Singleton):
                     type_multi_platform_process_request,
                     type_process_result,
                     type_generator,
-                    type_url_to_fetch):
+                    type_url_to_fetch,
+                    type_directories_to_materialize,
+                    type_materialize_directories_result):
     """Create and return an ExternContext and native Scheduler."""
 
     def func(fn):
@@ -841,6 +846,8 @@ class Native(Singleton):
         func(construct_file_content),
         func(construct_files_content),
         func(construct_process_result),
+        func(construct_materialize_directory_result),
+        func(construct_materialize_directories_results),
         # Types.
         ti(type_address),
         ti(type_path_globs),
@@ -857,6 +864,8 @@ class Native(Singleton):
         ti(type_process_result),
         ti(type_generator),
         ti(type_url_to_fetch),
+        ti(type_directories_to_materialize),
+        ti(type_materialize_directories_result),
         ti(str),
         ti(bytes),
         # Project tree.

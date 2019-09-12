@@ -13,9 +13,11 @@ from types import GeneratorType
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
 from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
-from pants.engine.fs import (Digest, DirectoriesToMerge, DirectoryToMaterialize,
-                             DirectoryWithPrefixToStrip, FileContent, FilesContent,
-                             InputFilesContent, PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch)
+from pants.engine.fs import (Digest, DirectoriesToMaterialize, DirectoriesToMerge,
+                             DirectoryToMaterialize, DirectoryWithPrefixToStrip, FileContent,
+                             FilesContent, InputFilesContent, MaterializeDirectoriesResult,
+                             MaterializeDirectoryResult, PathGlobs, PathGlobsAndRoot, Snapshot,
+                             UrlToFetch)
 from pants.engine.isolated_process import (FallibleExecuteProcessResult,
                                            MultiPlatformExecuteProcessRequest)
 from pants.engine.native import Function, TypeId
@@ -99,6 +101,8 @@ class Scheduler:
       construct_file_content=FileContent,
       construct_files_content=FilesContent,
       construct_process_result=FallibleExecuteProcessResult,
+      construct_materialize_directory_result=MaterializeDirectoryResult,
+      construct_materialize_directories_results=MaterializeDirectoriesResult,
       type_address=Address,
       type_path_globs=PathGlobs,
       type_directory_digest=Digest,
@@ -114,6 +118,8 @@ class Scheduler:
       type_process_result=FallibleExecuteProcessResult,
       type_generator=GeneratorType,
       type_url_to_fetch=UrlToFetch,
+      type_directories_to_materialize=DirectoriesToMaterialize,
+      type_materialize_directories_result=MaterializeDirectoriesResult
     )
 
     # If configured, visualize the rule graph before asserting that it is valid.

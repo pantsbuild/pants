@@ -162,6 +162,10 @@ impl Tasks {
         product: types.process_result,
         input: types.multi_platform_process_request,
       },
+      Intrinsic {
+        product: types.materialize_directories_result,
+        input: types.directories_to_materialize,
+      },
     ];
 
     for intrinsic in intrinsics {

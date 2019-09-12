@@ -8,7 +8,7 @@ from pants.engine.rules import RootRule
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.dirutil import maybe_read_file, safe_delete, safe_file_dump
-from pants.util.objects import Exactly, datatype
+from pants.util.objects import Exactly, datatype, string_list
 
 
 class FileContent(datatype([('path', str), ('content', bytes), ('is_executable', bool)])):
@@ -163,7 +163,14 @@ class DirectoryWithPrefixToStrip(datatype([('directory_digest', Digest), ('prefi
 
 class DirectoryToMaterialize(datatype([('path', str), ('directory_digest', Digest)])):
   """A request to materialize the contents of a directory digest at the provided path."""
-  pass
+
+DirectoriesToMaterialize = Collection.of(DirectoryToMaterialize)
+
+
+class MaterializeDirectoryResult(datatype([('output_paths', string_list)])):
+  """Result of materializing a directory, contains the full output paths."""
+
+MaterializeDirectoriesResult = Collection.of(MaterializeDirectoryResult)
 
 
 class UrlToFetch(datatype([('url', str), ('digest', Digest)])):
@@ -189,6 +196,7 @@ EMPTY_SNAPSHOT = Snapshot(
 def create_fs_rules():
   """Creates rules that consume the intrinsic filesystem types."""
   return [
+    RootRule(DirectoriesToMaterialize),
     RootRule(InputFilesContent),
     RootRule(Digest),
     RootRule(DirectoriesToMerge),

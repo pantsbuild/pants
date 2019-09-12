@@ -182,6 +182,8 @@ pub extern "C" fn scheduler_create(
   construct_file_content: Function,
   construct_files_content: Function,
   construct_process_result: Function,
+  construct_materialize_directory_result: Function,
+  construct_materialize_directories_results: Function,
   type_address: TypeId,
   type_path_globs: TypeId,
   type_directory_digest: TypeId,
@@ -197,6 +199,8 @@ pub extern "C" fn scheduler_create(
   type_process_result: TypeId,
   type_generator: TypeId,
   type_url_to_fetch: TypeId,
+  type_directories_to_materialize: TypeId,
+  type_materialize_directories_result: TypeId,
   type_string: TypeId,
   type_bytes: TypeId,
   build_root_buf: Buffer,
@@ -233,6 +237,8 @@ pub extern "C" fn scheduler_create(
     construct_file_content: construct_file_content,
     construct_files_content: construct_files_content,
     construct_process_result: construct_process_result,
+    construct_materialize_directory_result,
+    construct_materialize_directories_results,
     address: type_address,
     path_globs: type_path_globs,
     directory_digest: type_directory_digest,
@@ -248,6 +254,8 @@ pub extern "C" fn scheduler_create(
     process_result: type_process_result,
     generator: type_generator,
     url_to_fetch: type_url_to_fetch,
+    directories_to_materialize: type_directories_to_materialize,
+    materialize_directories_result: type_materialize_directories_result,
     string: type_string,
     bytes: type_bytes,
   };
@@ -880,7 +888,7 @@ pub extern "C" fn materialize_directories(
     })
     .collect();
 
-  let dir_and_digests = match directories_paths_and_digests_results {
+  let dir_and_digests: Vec<(PathBuf, Digest)> = match directories_paths_and_digests_results {
     Ok(d) => d,
     Err(err) => {
       let e: Result<Value, String> = Err(err);
@@ -901,7 +909,7 @@ pub extern "C" fn materialize_directories(
           })
           .collect::<Vec<_>>(),
       )
-      .map(|_| ()),
+      .map(|_x: Vec<store::DirectoryMaterializeMetadata>| ()),
     )
   })
   .into()

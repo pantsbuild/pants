@@ -170,6 +170,74 @@ impl WrappedNode for Select {
           entry: Arc::new(self.entry.clone()),
         }),
         &Rule::Intrinsic(Intrinsic { product, input })
+          if product == types.materialize_directories_result
+            && input == types.directories_to_materialize =>
+        {
+          let new_context = context.clone();
+          let construct_materialize_directories_results =
+            types.construct_materialize_directories_results;
+          let construct_materialize_directory_result = types.construct_materialize_directory_result;
+          self
+            .select_product(&new_context, types.directories_to_materialize, "intrinsic")
+            .and_then(move |directories_to_materialize: Value| {
+              let values = externs::project_multi(&directories_to_materialize, "dependencies");
+              let directories_paths_and_digests_results: Result<
+                Vec<(PathBuf, hashing::Digest)>,
+                String,
+              > = values
+                .iter()
+                .map(|value| {
+                  let dir = PathBuf::from(externs::project_str(&value, "path"));
+                  let dir_digest =
+                    lift_digest(&externs::project_ignoring_type(&value, "directory_digest"));
+                  dir_digest.map(|dir_digest| (dir, dir_digest))
+                })
+                .collect();
+
+              let dir_and_digests: Vec<(PathBuf, hashing::Digest)> =
+                try_future!(directories_paths_and_digests_results.map_err(|e| throw(&e)));
+              let store = context.clone().core.store();
+
+              futures::future::join_all(
+                dir_and_digests
+                  .into_iter()
+                  .map(|(dir, digest)| {
+                    store.materialize_directory(dir, digest, workunit_store.clone())
+                  })
+                  .collect::<Vec<_>>(),
+              )
+              .map_err(|err| throw(&err))
+              .to_boxed()
+            })
+            .and_then(
+              move |directory_materialize_metadata: Vec<store::DirectoryMaterializeMetadata>| {
+                let entries: Vec<Value> = directory_materialize_metadata
+                  .iter()
+                  .map(|metadata: &store::DirectoryMaterializeMetadata| {
+                    let path_list = metadata.to_path_list();
+                    let path_values: Vec<Value> = path_list
+                      .into_iter()
+                      .map(|path: String| externs::store_utf8(&path))
+                      .collect();
+
+                    externs::unsafe_call(
+                      &construct_materialize_directory_result,
+                      &[externs::store_tuple(&path_values)],
+                    )
+                  })
+                  .collect();
+
+                let output: Value = externs::unsafe_call(
+                  &construct_materialize_directories_results,
+                  &[externs::store_tuple(&entries)],
+                );
+
+                future::ok(output)
+              },
+            )
+            .to_boxed()
+        }
+        &Rule::Intrinsic(Intrinsic { product, input })
           if product == types.directory_digest && input == types.input_files_content =>
         {
           let new_context = context.clone();
