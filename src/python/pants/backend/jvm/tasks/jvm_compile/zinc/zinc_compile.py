@@ -178,12 +178,6 @@ class BaseZincCompile(JvmCompile):
     ZincCompile.validate_arguments(self.context.log, self.get_options().whitelisted_args,
                                    self._args)
     if self.execution_strategy == self.HERMETIC:
-      # TODO: Make incremental compiles work. See:
-      # hermetically https://github.com/pantsbuild/pants/issues/6517
-      if self.get_options().incremental:
-        raise TaskError("Hermetic zinc execution does not currently support incremental compiles. "
-                        "Please use --no-{}-incremental."
-                        .format(self.get_options_scope_equivalent_flag_component()))
       try:
         fast_relpath(self.get_options().pants_workdir, get_buildroot())
       except ValueError:
@@ -455,6 +449,13 @@ class BaseZincCompile(JvmCompile):
         ),
       ])
 
+    relpath_to_analysis = fast_relpath(ctx.analysis_file, get_buildroot())
+    analysis_snapshot, = self.context._scheduler.capture_snapshots([
+      PathGlobsAndRoot(
+        PathGlobs([relpath_to_analysis]),
+        get_buildroot(),
+      ),
+    ])
     # TODO: Extract something common from Executor._create_command to make the command line
     argv = image_specific_argv + ['@{}'.format(argfile_snapshot.files[0])]
 
@@ -463,7 +464,11 @@ class BaseZincCompile(JvmCompile):
       [s.directory_digest for s in snapshots] +
       directory_digests +
       native_image_snapshots +
-      [self.post_compile_extra_resources_digest(ctx), argfile_snapshot.directory_digest]
+      [self.post_compile_extra_resources_digest(ctx), argfile_snapshot.directory_digest] +
+      # It is okay to unconditionally add the analysis file snapshot here, because if the compile is
+      # not incremental the previous analysis file would be deleted from the results dir before
+      # the compile, resulting an empty snapshot.
+      [analysis_snapshot.directory_digest]
     )
 
     # NB: We always capture the output jar, but if classpath jars are not used, we additionally
@@ -471,11 +476,10 @@ class BaseZincCompile(JvmCompile):
     #   1) allow loose classes as an input to dependent compiles
     #   2) allow jars to be materialized at the end of the run.
     output_directories = () if self.get_options().use_classpath_jars else (classes_dir,)
-
     req = ExecuteProcessRequest(
       argv=tuple(argv),
       input_files=merged_input_digest,
-      output_files=(jar_file,),
+      output_files=(jar_file, relpath_to_analysis),
       output_directories=output_directories,
       description="zinc compile for {}".format(ctx.target.address.spec),
       jdk_home=self._zinc.underlying_dist.home,
