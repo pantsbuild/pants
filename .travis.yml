@@ -965,8 +965,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 0/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      0/13 --python-version 3.6"
     stage: Test Pants
     sudo: required
   - addons:
@@ -1026,8 +1030,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 1/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      1/13 --python-version 3.6"
     stage: Test Pants
     sudo: required
   - addons:
@@ -1087,8 +1095,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 2/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      2/13 --python-version 3.6"
     stage: Test Pants
     sudo: required
   - addons:
@@ -1148,8 +1160,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 3/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      3/13 --python-version 3.6"
     stage: Test Pants
     sudo: required
   - addons:
@@ -1209,8 +1225,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 4/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      4/13 --python-version 3.6"
     stage: Test Pants
     sudo: required
   - addons:
@@ -1270,8 +1290,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 5/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      5/13 --python-version 3.6"
     stage: Test Pants
     sudo: required
   - addons:
@@ -1331,8 +1355,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 6/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      6/13 --python-version 3.6"
     stage: Test Pants
     sudo: required
   - addons:
@@ -1392,8 +1420,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 7/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      7/13 --python-version 3.6"
     stage: Test Pants
     sudo: required
   - addons:
@@ -1453,8 +1485,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 8/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      8/13 --python-version 3.6"
     stage: Test Pants
     sudo: required
   - addons:
@@ -1514,8 +1550,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 9/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      9/13 --python-version 3.6"
     stage: Test Pants
     sudo: required
   - addons:
@@ -1575,8 +1615,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 10/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      10/13 --python-version 3.6"
     stage: Test Pants
     sudo: required
   - addons:
@@ -1636,8 +1680,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 11/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      11/13 --python-version 3.6"
     stage: Test Pants
     sudo: required
   - addons:
@@ -1697,8 +1745,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 12/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      12/13 --python-version 3.6"
     stage: Test Pants
     sudo: required
   - addons:
@@ -1759,8 +1811,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 0/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      0/13 --python-version 3.6"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -1821,8 +1877,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 1/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      1/13 --python-version 3.6"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -1883,8 +1943,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 2/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      2/13 --python-version 3.6"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -1945,8 +2009,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 3/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      3/13 --python-version 3.6"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -2007,8 +2075,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 4/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      4/13 --python-version 3.6"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -2069,8 +2141,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 5/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      5/13 --python-version 3.6"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -2131,8 +2207,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 6/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      6/13 --python-version 3.6"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -2193,8 +2273,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 7/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      7/13 --python-version 3.6"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -2255,8 +2339,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 8/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      8/13 --python-version 3.6"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -2317,8 +2405,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 9/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      9/13 --python-version 3.6"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -2379,8 +2471,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 10/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      10/13 --python-version 3.6"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -2441,8 +2537,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 11/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      11/13 --python-version 3.6"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -2503,8 +2603,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 12/13 --python-version
-      3.6
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos6:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      12/13 --python-version 3.6"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -2565,8 +2669,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 0/13 --python-version
-      3.7
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos7:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      0/13 --python-version 3.7"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -2627,8 +2735,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 1/13 --python-version
-      3.7
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos7:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      1/13 --python-version 3.7"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -2689,8 +2801,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 2/13 --python-version
-      3.7
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos7:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      2/13 --python-version 3.7"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -2751,8 +2867,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 3/13 --python-version
-      3.7
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos7:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      3/13 --python-version 3.7"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -2813,8 +2933,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 4/13 --python-version
-      3.7
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos7:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      4/13 --python-version 3.7"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -2875,8 +2999,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 5/13 --python-version
-      3.7
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos7:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      5/13 --python-version 3.7"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -2937,8 +3065,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 6/13 --python-version
-      3.7
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos7:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      6/13 --python-version 3.7"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -2999,8 +3131,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 7/13 --python-version
-      3.7
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos7:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      7/13 --python-version 3.7"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -3061,8 +3197,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 8/13 --python-version
-      3.7
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos7:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      8/13 --python-version 3.7"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -3123,8 +3263,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 9/13 --python-version
-      3.7
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos7:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      9/13 --python-version 3.7"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -3185,8 +3329,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 10/13 --python-version
-      3.7
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos7:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      10/13 --python-version 3.7"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -3247,8 +3395,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 11/13 --python-version
-      3.7
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos7:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      11/13 --python-version 3.7"
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -3309,8 +3461,12 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-    - ./build-support/bin/ci.py --integration-tests-v1 --integration-shard 12/13 --python-version
-      3.7
+    - docker build --rm -t travis_ci --build-arg "BASE_IMAGE=pantsbuild/centos7:latest"
+      --build-arg "TRAVIS_USER=$(id -un)" --build-arg "TRAVIS_UID=$(id -u)" --build-arg
+      "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
+    - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+      travis_ci:latest sh -c "./build-support/bin/ci.py --integration-tests-v1 --integration-shard
+      12/13 --python-version 3.7"
     stage: Test Pants (Cron)
     sudo: required
   - before_cache:

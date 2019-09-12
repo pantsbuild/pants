@@ -549,15 +549,16 @@ def integration_tests_v1(python_version: PythonVersion, *, use_pantsd: bool = Fa
   num_integration_shards = 13
 
   def make_shard(*, shard_num: int) -> Dict:
+    command = (
+          "./build-support/bin/ci.py --integration-tests-v1 --integration-shard "
+          f"{shard_num}/{num_integration_shards} --python-version {python_version.decimal}"
+        )
     shard = {
       **linux_shard(python_version=python_version),
       "name": f"Integration tests {'with Pantsd' if use_pantsd else ''} - V1 - shard {shard_num} (Python {python_version.decimal})",
-      "script": [
-        (
-          "./build-support/bin/ci.py --integration-tests-v1 --integration-shard "
-          f"{shard_num}/{num_integration_shards} --python-version {python_version.decimal}"
-        ),
-      ]
+      "script": [ 
+          docker_build_travis_ci_image(python_version=python_version),
+          docker_run_travis_ci_image(command) ]
     }
     shard["env"] = shard.get("env", []) + [
       f"CACHE_NAME=integration.v1.shard_{shard_num}.py{python_version.number}{'.pantsd' if use_pantsd else ''}"
