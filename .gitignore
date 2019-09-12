@@ -31,6 +31,8 @@
 .pydevproject
 .pytest_cache/
 codegen/classes/
+local_cas
+local_execution_server
 htmlcov/
 out/
 # remove root-level /bin, which is created by Eclipse
