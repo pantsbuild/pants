@@ -382,10 +382,13 @@ def _bootstrap_command(*, python_version: PythonVersion) -> List[str]:
   # to take advantage of the Rust code built during bootstrapping. We use the Python 3.6 shard, as
   # it runs during both daily and nightly CI. This requires setting PREPARE_DEPLOY=1.
   command = [f'./build-support/bin/ci.py --bootstrap --python-version {python_version.decimal}']
-  command.append('./build-support/bin/ci.py --bootstrap-mock-remote')
   if python_version.is_py36:
     command.append('./build-support/bin/release.sh -f')
   return command
+
+
+def _bootstrap_remote_command() -> str:
+  return './build-support/bin/ci.py --bootstrap-mock-remote'
 
 
 def _bootstrap_env(*, python_version: PythonVersion, platform: Platform) -> List[str]:
@@ -409,6 +412,7 @@ def bootstrap_linux(python_version: PythonVersion) -> Dict:
     "script": [
       docker_build_travis_ci_image(python_version=python_version),
       docker_run_travis_ci_image(command),
+      _bootstrap_remote_command(),
       AWS_DEPLOY_PANTS_PEX_COMMAND,
       AWS_DEPLOY_MOCK_CAS,
       AWS_DEPLOY_MOCK_EXECUTION_SERVER,
@@ -428,7 +432,7 @@ def bootstrap_osx(python_version: PythonVersion) -> Dict:
     "name": f"Build OSX native engine and pants.pex (Python {python_version.decimal})",
     "after_failure": ["./build-support/bin/ci-failure.sh"],
     "stage": python_version.default_stage(is_bootstrap=True).value,
-    "script": _bootstrap_command(python_version=python_version) + [AWS_DEPLOY_PANTS_PEX_COMMAND, AWS_DEPLOY_MOCK_CAS, AWS_DEPLOY_MOCK_EXECUTION_SERVER]
+    "script": _bootstrap_command(python_version=python_version) + [ _bootstrap_remote_command(), AWS_DEPLOY_PANTS_PEX_COMMAND, AWS_DEPLOY_MOCK_CAS, AWS_DEPLOY_MOCK_EXECUTION_SERVER]
   }
   shard["env"] = shard.get("env", []) + _bootstrap_env(python_version=python_version, platform=Platform.osx)
   return shard
