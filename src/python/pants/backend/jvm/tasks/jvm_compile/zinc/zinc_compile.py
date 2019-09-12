@@ -456,6 +456,13 @@ class BaseZincCompile(JvmCompile):
         get_buildroot(),
       ),
     ])
+
+    classes_dir_snapshot, = self.context._scheduler.capture_snapshots([
+      PathGlobsAndRoot(
+        PathGlobs([classes_dir]),
+        get_buildroot(),
+      ),
+    ])
     # TODO: Extract something common from Executor._create_command to make the command line
     argv = image_specific_argv + ['@{}'.format(argfile_snapshot.files[0])]
 
@@ -465,10 +472,9 @@ class BaseZincCompile(JvmCompile):
       directory_digests +
       native_image_snapshots +
       [self.post_compile_extra_resources_digest(ctx), argfile_snapshot.directory_digest] +
-      # It is okay to unconditionally add the analysis file snapshot here, because if the compile is
-      # not incremental the previous analysis file would be deleted from the results dir before
-      # the compile, resulting an empty snapshot.
-      [analysis_snapshot.directory_digest]
+      # It is okay to unconditionally add the analysis file and classes_dir snapshots here,
+      # because if the compile is not incremental, the snapshots would be empty.
+      [analysis_snapshot.directory_digest, classes_dir_snapshot.directory_digest]
     )
 
     # NB: We always capture the output jar, but if classpath jars are not used, we additionally
