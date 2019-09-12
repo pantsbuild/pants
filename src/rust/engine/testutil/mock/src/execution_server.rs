@@ -96,7 +96,7 @@ impl TestServer {
       .register_service(bazel_protos::operations_grpc::create_operations(
         mock_responder.clone(),
       ))
-      .bind("localhost", port.unwrap_or(0))
+      .bind("0.0.0.0", port.unwrap_or(0))
       .build()
       .unwrap();
     server_transport.start();
