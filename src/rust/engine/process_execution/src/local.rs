@@ -394,6 +394,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "echo foo".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     assert_eq!(
@@ -420,6 +421,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "echo foo and fail".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     assert_eq!(
@@ -447,6 +449,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "kill self".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     assert_eq!(
@@ -477,6 +480,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "run env".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     let stdout = String::from_utf8(result.unwrap().stdout.to_vec()).unwrap();
@@ -513,6 +517,7 @@ mod tests {
         timeout: Duration::from_millis(1000),
         description: "run env".to_string(),
         jdk_home: None,
+        target_platform: Platform::None,
       }
     }
 
@@ -533,6 +538,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "echo foo".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     })
     .expect_err("Want Err");
   }
@@ -548,6 +554,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
     assert_eq!(
       result.unwrap(),
@@ -576,6 +583,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     assert_eq!(
@@ -610,6 +618,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     assert_eq!(
@@ -645,6 +654,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "treats-roland".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     assert_eq!(
@@ -678,6 +688,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "echo foo".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     assert_eq!(
@@ -709,6 +720,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "echo-roland".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     assert_eq!(
@@ -738,6 +750,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     assert_eq!(
@@ -767,6 +780,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "cat roland".to_string(),
       jdk_home: Some(preserved_work_tmpdir.path().to_path_buf()),
+      target_platform: Platform::None,
     });
     assert_eq!(
       result,
@@ -799,6 +813,7 @@ mod tests {
         timeout: Duration::from_millis(1000),
         description: "bash".to_string(),
         jdk_home: None,
+        target_platform: Platform::None,
       },
       preserved_work_root.clone(),
       false,
@@ -834,6 +849,7 @@ mod tests {
         timeout: Duration::from_millis(1000),
         description: "failing execution".to_string(),
         jdk_home: None,
+        target_platform: Platform::None,
       },
       preserved_work_root.clone(),
       false,
@@ -866,6 +882,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "create nonoverlapping directories and file".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     assert_eq!(
@@ -895,6 +912,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     assert_eq!(

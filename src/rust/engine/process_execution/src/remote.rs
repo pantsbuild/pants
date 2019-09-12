@@ -714,6 +714,7 @@ pub fn make_execute_request(
     // well-known path in the docker container you specify in which to run.
     platform_properties.insert("JDK_SYMLINK".to_owned(), ".jdk".to_owned());
   }
+  platform_properties.insert("OSFamily".to_owned(), req.target_platform.into());
 
   for (name, value) in platform_properties {
     command.mut_platform().mut_properties().push({
@@ -1095,6 +1096,7 @@ pub mod tests {
       timeout: Duration::from_millis(1000),
       description: "some description".to_owned(),
       jdk_home: None,
+      target_platform: Platform::None,
     };
 
     let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -1115,15 +1117,21 @@ pub mod tests {
     want_command
       .mut_output_directories()
       .push("directory/name".to_owned());
+    want_command.mut_platform().mut_properties().push({
+      let mut property = bazel_protos::remote_execution::Platform_Property::new();
+      property.set_name("OSFamily".to_owned());
+      property.set_value("none".to_owned());
+      property
+    });
 
     let mut want_action = bazel_protos::remote_execution::Action::new();
     want_action.set_command_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "cc4ddd3085aaffbe0abce22f53b30edbb59896bb4a4f0d76219e48070cd0afe1",
+          "3cde00c8549159a3a7236a107d2bb488dbe423740abf8ea9377a6d27d078f2af",
         )
         .unwrap(),
-        72,
+        92,
       ))
         .into(),
     );
@@ -1133,7 +1141,7 @@ pub mod tests {
     want_execute_request.set_action_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "844c929423444f3392e0dcc89ebf1febbfdf3a2e2fcab7567cc474705a5385e4",
+          "313738ec23da2ba4631c781df542b61ca2df88371603bbf29ac2be9210adf9dd",
         )
         .unwrap(),
         140,
@@ -1168,6 +1176,7 @@ pub mod tests {
       timeout: Duration::from_millis(1000),
       description: "some description".to_owned(),
       jdk_home: None,
+      target_platform: Platform::None,
     };
 
     let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -1188,15 +1197,21 @@ pub mod tests {
     want_command
       .mut_output_directories()
       .push("directory/name".to_owned());
+    want_command.mut_platform().mut_properties().push({
+      let mut property = bazel_protos::remote_execution::Platform_Property::new();
+      property.set_name("OSFamily".to_owned());
+      property.set_value("none".to_owned());
+      property
+    });
 
     let mut want_action = bazel_protos::remote_execution::Action::new();
     want_action.set_command_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "cc4ddd3085aaffbe0abce22f53b30edbb59896bb4a4f0d76219e48070cd0afe1",
+          "3cde00c8549159a3a7236a107d2bb488dbe423740abf8ea9377a6d27d078f2af",
         )
         .unwrap(),
-        72,
+        92,
       ))
         .into(),
     );
@@ -1207,7 +1222,7 @@ pub mod tests {
     want_execute_request.set_action_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "844c929423444f3392e0dcc89ebf1febbfdf3a2e2fcab7567cc474705a5385e4",
+          "313738ec23da2ba4631c781df542b61ca2df88371603bbf29ac2be9210adf9dd",
         )
         .unwrap(),
         140,
@@ -1249,6 +1264,7 @@ pub mod tests {
       timeout: Duration::from_millis(1000),
       description: "some description".to_owned(),
       jdk_home: None,
+      target_platform: Platform::None,
     };
 
     let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -1275,15 +1291,21 @@ pub mod tests {
     want_command
       .mut_output_directories()
       .push("directory/name".to_owned());
+    want_command.mut_platform().mut_properties().push({
+      let mut property = bazel_protos::remote_execution::Platform_Property::new();
+      property.set_name("OSFamily".to_owned());
+      property.set_value("none".to_owned());
+      property
+    });
 
     let mut want_action = bazel_protos::remote_execution::Action::new();
     want_action.set_command_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "1a95e3482dd235593df73dc12b808ec7d922733a40d97d8233c1a32c8610a56d",
+          "31f38f68df1bb1b09c17d2e0fb94002b8ba0dc2688e55c794d87b4b5b273ae90",
         )
         .unwrap(),
-        109,
+        129,
       ))
         .into(),
     );
@@ -1293,10 +1315,10 @@ pub mod tests {
     want_execute_request.set_action_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "0ee5d4c8ac12513a87c8d949c6883ac533a264d30215126af71a9028c4ab6edf",
+          "ef3ad4de41f04552c516d9c160b209233e37814c9dcd49484b0116b74adbb4b5",
         )
         .unwrap(),
-        140,
+        141,
       ))
         .into(),
     );
@@ -1326,6 +1348,7 @@ pub mod tests {
       timeout: Duration::from_millis(1000),
       description: "some description".to_owned(),
       jdk_home: Some(PathBuf::from("/tmp")),
+      target_platform: Platform::None,
     };
 
     let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -1337,15 +1360,21 @@ pub mod tests {
       property.set_value(".jdk".to_owned());
       property
     });
+    want_command.mut_platform().mut_properties().push({
+      let mut property = bazel_protos::remote_execution::Platform_Property::new();
+      property.set_name("OSFamily".to_owned());
+      property.set_value("none".to_owned());
+      property
+    });
 
     let mut want_action = bazel_protos::remote_execution::Action::new();
     want_action.set_command_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "f373f421b328ddeedfba63542845c0423d7730f428dd8e916ec6a38243c98448",
+          "baf0556d237e88b7bd2025ff616c12928e932df30606c6d3e6dd747ac5a596e8",
         )
         .unwrap(),
-        38,
+        56,
       ))
         .into(),
     );
@@ -1355,7 +1384,7 @@ pub mod tests {
     want_execute_request.set_action_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "b1fb7179ce496995a4e3636544ec000dca1b951f1f6216493f6c7608dc4dd910",
+          "609e31774bc5aff80d697745b6ed987cb0381749a1f7b61ea850a15b7e882063",
         )
         .unwrap(),
         140,
@@ -1381,6 +1410,7 @@ pub mod tests {
       timeout: Duration::from_millis(1000),
       description: "some description".to_owned(),
       jdk_home: Some(PathBuf::from("/tmp")),
+      target_platform: Platform::None,
     };
 
     let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -1400,6 +1430,12 @@ pub mod tests {
     });
     want_command.mut_platform().mut_properties().push({
       let mut property = bazel_protos::remote_execution::Platform_Property::new();
+      property.set_name("OSFamily".to_owned());
+      property.set_value("none".to_owned());
+      property
+    });
+    want_command.mut_platform().mut_properties().push({
+      let mut property = bazel_protos::remote_execution::Platform_Property::new();
       property.set_name("last".to_owned());
       property.set_value("bar".to_owned());
       property
@@ -1409,10 +1445,10 @@ pub mod tests {
     want_action.set_command_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "a809e7c54a105e7d98cc61558ac13ca3c05a5e1cb33326dfde189c72887dac29",
+          "c3743715b566a865fa2f1f95ac5b2d60ec78fd6e4787b112930b1f33d7d2271b",
         )
         .unwrap(),
-        65,
+        83,
       ))
         .into(),
     );
@@ -1422,7 +1458,7 @@ pub mod tests {
     want_execute_request.set_action_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "3d8d2a0282cb45b365b338f80ddab039dfa461dadde053e12bd5c3ab3329d928",
+          "1edbd2beb9b367627f8f19d118129b6c4f756155680f901538580e253805c461",
         )
         .unwrap(),
         140,
@@ -1466,6 +1502,7 @@ pub mod tests {
               timeout: Duration::from_millis(1000),
               description: "wrong command".to_string(),
               jdk_home: None,
+              target_platform: Platform::None,
             },
             empty_request_metadata(),
           )
@@ -1745,6 +1782,7 @@ pub mod tests {
       timeout: request_timeout,
       description: "echo-a-foo".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     };
 
     let mock_server = {
@@ -2827,6 +2865,7 @@ pub mod tests {
       timeout: Duration::from_millis(5000),
       description: "echo a foo".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     };
     req.into()
   }
@@ -3097,6 +3136,7 @@ pub mod tests {
       timeout: Duration::from_millis(1000),
       description: "cat a roland".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     };
     req.into()
   }
@@ -3111,6 +3151,7 @@ pub mod tests {
       timeout: Duration::from_millis(1000),
       description: "unleash a roaring meow".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     };
     req.into()
   }

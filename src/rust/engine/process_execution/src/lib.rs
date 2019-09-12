@@ -86,6 +86,16 @@ impl TryFrom<&String> for Platform {
   }
 }
 
+impl From<Platform> for String {
+  fn from(platform: Platform) -> String {
+    match platform {
+      Platform::Linux => "linux".to_string(),
+      Platform::Darwin => "osx".to_string(),
+      Platform::None => "none".to_string(),
+    }
+  }
+}
+
 ///
 /// A process to be executed.
 ///
@@ -129,6 +139,7 @@ pub struct ExecuteProcessRequest {
   /// see https://github.com/pantsbuild/pants/issues/6416.
   ///
   pub jdk_home: Option<PathBuf>,
+  pub target_platform: Platform,
 }
 
 impl TryFrom<MultiPlatformExecuteProcessRequest> for ExecuteProcessRequest {
@@ -286,7 +297,7 @@ impl From<Box<BoundedCommandRunner>> for Arc<dyn CommandRunner> {
 
 #[cfg(test)]
 mod tests {
-  use super::ExecuteProcessRequest;
+  use super::{ExecuteProcessRequest, Platform};
   use std::collections::hash_map::DefaultHasher;
   use std::collections::{BTreeMap, BTreeSet};
   use std::hash::{Hash, Hasher};
@@ -304,6 +315,7 @@ mod tests {
         timeout,
         description,
         jdk_home: None,
+        target_platform: Platform::None,
       };
 
     fn hash<Hashable: Hash>(hashable: &Hashable) -> u64 {

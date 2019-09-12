@@ -174,8 +174,8 @@ impl CommandRunner {
 
 #[cfg(test)]
 mod test {
-  use crate::ExecuteProcessRequest;
   use crate::{CommandRunner as CommandRunnerTrait, ExecuteProcessRequestMetadata};
+  use crate::{ExecuteProcessRequest, Platform};
   use hashing::EMPTY_DIGEST;
   use sharded_lmdb::ShardedLmdb;
   use std::collections::{BTreeMap, BTreeSet};
@@ -225,6 +225,7 @@ mod test {
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     };
 
     let local_result = runtime.block_on(local.run(request.clone().into(), WorkUnitStore::new()));

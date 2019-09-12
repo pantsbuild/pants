@@ -382,7 +382,10 @@ pub fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
 pub struct MultiPlatformExecuteProcess(MultiPlatformExecuteProcessRequest);
 
 impl MultiPlatformExecuteProcess {
-  fn lift_execute_process(value: &Value) -> Result<ExecuteProcessRequest, String> {
+  fn lift_execute_process(
+    value: &Value,
+    target_platform: Platform,
+  ) -> Result<ExecuteProcessRequest, String> {
     let mut env: BTreeMap<String, String> = BTreeMap::new();
     let env_var_parts = externs::project_multi_strs(&value, "env");
     if env_var_parts.len() % 2 != 0 {
@@ -426,6 +429,7 @@ impl MultiPlatformExecuteProcess {
         Some(PathBuf::from(val))
       }
     };
+
     Ok(process_execution::ExecuteProcessRequest {
       argv: externs::project_multi_strs(&value, "argv"),
       env: env,
@@ -435,18 +439,24 @@ impl MultiPlatformExecuteProcess {
       timeout: Duration::from_millis((timeout_in_seconds * 1000.0) as u64),
       description: description,
       jdk_home: jdk_home,
+      target_platform: target_platform,
     })
   }
   fn lift(value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
     let constraint_parts = externs::project_multi_strs(&value, "platform_constraints");
-    let mut requests: Vec<ExecuteProcessRequest> = Vec::new();
-    for execute_process in externs::project_multi(&value, "execute_process_requests").iter() {
-      let underlying_req = MultiPlatformExecuteProcess::lift_execute_process(execute_process)?;
-      requests.push(underlying_req);
-    }
     if constraint_parts.len() % 2 != 0 {
       return Err("Error parsing platform_constraints: odd number of parts".to_owned());
     }
+    let constraint_key_pairs: Vec<_> = constraint_parts
+      .chunks_exact(2)
+      .map(|constraint_key_pair| {
+        (
+          Platform::try_from(&constraint_key_pair[0]).unwrap(),
+          Platform::try_from(&constraint_key_pair[1]).unwrap(),
+        )
+      })
+      .collect();
+    let requests = externs::project_multi(&value, "execute_process_requests");
     if constraint_parts.len() / 2 != requests.len() {
       return Err(format!(
         "Size of constraint keys and requests does not match: {} vs. {}",
@@ -454,17 +464,14 @@ impl MultiPlatformExecuteProcess {
         requests.len()
       ));
     }
-    let request_by_constraint: BTreeMap<(Platform, Platform), ExecuteProcessRequest> =
-      constraint_parts
-        .chunks_exact(2)
-        .map(|constraint_key_pair| {
-          (
-            Platform::try_from(&constraint_key_pair[0]).unwrap(),
-            Platform::try_from(&constraint_key_pair[1]).unwrap(),
-          )
-        })
-        .zip(requests.iter().cloned())
-        .collect();
+
+    let mut request_by_constraint: BTreeMap<(Platform, Platform), ExecuteProcessRequest> =
+      BTreeMap::new();
+    for (constraint_key, execute_process) in constraint_key_pairs.iter().zip(requests.iter()) {
+      let underlying_req =
+        MultiPlatformExecuteProcess::lift_execute_process(execute_process, constraint_key.1)?;
+      request_by_constraint.insert(constraint_key.clone(), underlying_req.clone());
+    }
     Ok(MultiPlatformExecuteProcess(
       MultiPlatformExecuteProcessRequest(request_by_constraint),
     ))
