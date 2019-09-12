@@ -96,14 +96,14 @@ impl Core {
     };
 
     // We re-use this token for both the execution and store service; they're generally tied together.
-    let oauth_bearer_token =
-      if let Some(path) = remote_oauth_bearer_token_path {
-        Some(std::fs::read_to_string(&path).unwrap_or_else(|err| {
-          panic!("Error reading OAuth bearer token file {:?}: {}", path, err)
-        }))
-      } else {
-        None
-      };
+    let oauth_bearer_token = if let Some(path) = remote_oauth_bearer_token_path {
+      Some(
+        std::fs::read_to_string(&path)
+          .map_err(|err| format!("Error reading OAuth bearer token file {:?}: {}", path, err))?,
+      )
+    } else {
+      None
+    };
 
     let local_store_dir2 = local_store_dir.clone();
     let store = safe_create_dir_all_ioerror(&local_store_dir)
