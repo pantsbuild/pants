@@ -4,6 +4,7 @@
 import itertools
 import logging
 import os
+import stat
 import sys
 
 from pants.base.build_environment import get_default_pants_config_file
@@ -99,8 +100,14 @@ class OptionsBootstrapper(datatype([
     flags = set()
     short_flags = set()
 
+    # TODO: This codepath probably shouldn't be using FileContent, which is a very v2 engine thing.
     def filecontent_for(path):
-      return FileContent(ensure_text(path), read_file(path, binary_mode=True))
+      is_executable = os.stat(path).st_mode & stat.S_IXUSR == stat.S_IXUSR
+      return FileContent(
+        ensure_text(path),
+        read_file(path, binary_mode=True),
+        is_executable=is_executable,
+      )
 
     def capture_the_flags(*args, **kwargs):
       for arg in args:

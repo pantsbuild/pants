@@ -246,6 +246,7 @@ impl Store {
     &self,
     name: PathBuf,
     digest: hashing::Digest,
+    is_executable: bool,
   ) -> BoxFuture<Snapshot, String> {
     let store = self.clone();
 
@@ -271,7 +272,7 @@ impl Store {
         path: name.clone(),
         stat: fs::File {
           path: name,
-          is_executable: true,
+          is_executable: is_executable,
         },
       }],
       WorkUnitStore::new(),
@@ -810,6 +811,7 @@ impl Store {
               .iter()
               .map(|file_node| {
                 let path = path_so_far.join(file_node.get_name());
+                let is_executable = file_node.is_executable;
                 store
                   .load_file_bytes_with(
                     try_future!(file_node.get_digest().into()),
@@ -819,7 +821,11 @@ impl Store {
                   .and_then(move |maybe_bytes| {
                     maybe_bytes
                       .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))
-                      .map(|(content, _metadata)| FileContent { path, content })
+                      .map(|(content, _metadata)| FileContent {
+                        path,
+                        content,
+                        is_executable,
+                      })
                   })
                   .to_boxed()
               })
@@ -2076,10 +2082,12 @@ mod tests {
         FileContent {
           path: PathBuf::from("cats").join("roland"),
           content: roland.bytes(),
+          is_executable: false,
         },
         FileContent {
           path: PathBuf::from("treats"),
           content: catnip.bytes(),
+          is_executable: false,
         },
       ],
     );
@@ -2108,6 +2116,13 @@ mod tests {
         eprintln!(
           "Content did not match for index {}: {:?}, {:?}",
           index, l.content, r.content
+        );
+      }
+      if l.is_executable != r.is_executable {
+        success = false;
+        eprintln!(
+          "Executable bit did not match for index {}: {:?}, {:?}",
+          index, l.is_executable, r.is_executable
         );
       }
     }

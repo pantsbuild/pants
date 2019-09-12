@@ -160,6 +160,19 @@ pub fn project_multi(value: &Value, field: &str) -> Vec<Value> {
   })
 }
 
+pub fn project_bool(value: &Value, field: &str) -> bool {
+  with_externs(|e| {
+    let named_val: Value = (e.project_ignoring_type)(
+      e.context,
+      value as &Handle,
+      field.as_ptr(),
+      field.len() as u64,
+    )
+    .into();
+    (e.val_to_bool)(e.context, &named_val as &Handle)
+  })
+}
+
 pub fn project_multi_strs(item: &Value, field: &str) -> Vec<String> {
   project_multi(item, field)
     .iter()
@@ -371,6 +384,7 @@ pub struct Externs {
   pub type_to_str: TypeToStrExtern,
   pub val_to_bytes: ValToBytesExtern,
   pub val_to_str: ValToStrExtern,
+  pub val_to_bool: ValToBoolExtern,
   pub create_exception: CreateExceptionExtern,
 }
 
@@ -708,6 +722,8 @@ pub type TypeToStrExtern = extern "C" fn(*const ExternContext, TypeId) -> Buffer
 
 pub type ValToStrExtern = extern "C" fn(*const ExternContext, *const Handle) -> Buffer;
 pub type ValToBytesExtern = extern "C" fn(*const ExternContext, *const Handle) -> Buffer;
+
+pub type ValToBoolExtern = extern "C" fn(*const ExternContext, *const Handle) -> bool;
 
 pub type CreateExceptionExtern =
   extern "C" fn(*const ExternContext, str_ptr: *const u8, str_len: u64) -> Handle;

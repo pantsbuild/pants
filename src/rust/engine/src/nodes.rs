@@ -182,11 +182,12 @@ impl WrappedNode for Select {
                   let filename = externs::project_str(&file, "path");
                   let path: PathBuf = filename.into();
                   let bytes = bytes::Bytes::from(externs::project_bytes(&file, "content"));
+                  let is_executable = externs::project_bool(&file, "is_executable");
 
                   let store = new_context.core.store();
                   store
                     .store_file_bytes(bytes, true)
-                    .and_then(move |digest| store.snapshot_of_one_file(path, digest))
+                    .and_then(move |digest| store.snapshot_of_one_file(path, digest, is_executable))
                     .map(|snapshot| snapshot.digest)
                     .map_err(|err| throw(&err))
                     .to_boxed()
@@ -642,6 +643,7 @@ impl Snapshot {
       &[
         Self::store_path(&item.path),
         externs::store_bytes(&item.content),
+        externs::store_bool(item.is_executable),
       ],
     )
   }
@@ -704,7 +706,7 @@ impl DownloadedFile {
           .and_then(move |()| {
             core
               .store()
-              .snapshot_of_one_file(PathBuf::from(file_name), digest)
+              .snapshot_of_one_file(PathBuf::from(file_name), digest, true)
           })
       })
       .to_boxed()

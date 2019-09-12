@@ -113,6 +113,7 @@ pub extern "C" fn externs_set(
   store_bool: StoreBoolExtern,
   project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
+  val_to_bool: ValToBoolExtern,
   create_exception: CreateExceptionExtern,
 ) {
   externs::set_externs(Externs {
@@ -142,6 +143,7 @@ pub extern "C" fn externs_set(
     store_bool,
     project_ignoring_type,
     project_multi,
+    val_to_bool,
     create_exception,
   });
 }
