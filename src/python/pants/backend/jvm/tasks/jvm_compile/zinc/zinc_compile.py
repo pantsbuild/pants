@@ -449,6 +449,8 @@ class BaseZincCompile(JvmCompile):
         ),
       ])
 
+    # Snapshot analysis file and classes_dir for incremental compilation.
+    # If incremental is disabled, they would be empty snapshots.
     relpath_to_analysis = fast_relpath(ctx.analysis_file, get_buildroot())
     analysis_snapshot, = self.context._scheduler.capture_snapshots([
       PathGlobsAndRoot(
