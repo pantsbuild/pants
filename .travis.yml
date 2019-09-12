@@ -85,8 +85,8 @@ matrix:
       "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci:latest sh -c "./build-support/bin/ci.py --bootstrap --python-version
-      3.6 && ./build-support/bin/release.sh -f"
-    - ./build-support/bin/ci.py --bootstrap-mock-remote
+      3.6 && ./build-support/bin/ci.py --bootstrap-mock-remote && ./build-support/bin/release.sh
+      -f"
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex
       ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/local_cas
@@ -146,8 +146,7 @@ matrix:
       "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci:latest sh -c "./build-support/bin/ci.py --bootstrap --python-version
-      3.7"
-    - ./build-support/bin/ci.py --bootstrap-mock-remote
+      3.7 && ./build-support/bin/ci.py --bootstrap-mock-remote"
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex
       ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/local_cas
@@ -200,8 +199,8 @@ matrix:
     osx_image: xcode8
     script:
     - ./build-support/bin/ci.py --bootstrap --python-version 3.6
-    - ./build-support/bin/release.sh -f
     - ./build-support/bin/ci.py --bootstrap-mock-remote
+    - ./build-support/bin/release.sh -f
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex
       ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/local_cas
@@ -308,8 +307,8 @@ matrix:
       "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id -g)" build-support/docker/travis_ci/
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci:latest sh -c "./build-support/bin/ci.py --bootstrap --python-version
-      3.6 && ./build-support/bin/release.sh -f"
-    - ./build-support/bin/ci.py --bootstrap-mock-remote
+      3.6 && ./build-support/bin/ci.py --bootstrap-mock-remote && ./build-support/bin/release.sh
+      -f"
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex
       ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/local_cas
@@ -362,8 +361,8 @@ matrix:
     osx_image: xcode8
     script:
     - ./build-support/bin/ci.py --bootstrap --python-version 3.6
-    - ./build-support/bin/release.sh -f
     - ./build-support/bin/ci.py --bootstrap-mock-remote
+    - ./build-support/bin/release.sh -f
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/pants.pex
       ${BOOTSTRAPPED_PEX_URL_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
     - aws --no-sign-request --region us-east-1 s3 cp ${TRAVIS_BUILD_DIR}/local_cas
