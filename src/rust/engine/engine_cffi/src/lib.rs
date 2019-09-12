@@ -158,6 +158,16 @@ pub extern "C" fn val_for(key: Key) -> Handle {
   externs::val_for(&key).into()
 }
 
+// Like PyResult, but for values that aren't Python values.
+// throw_handle will be set iff is_throw, otherwise accessing it will likely segfault.
+// raw_pointer will be set iff !is_throw, otherwise accessing it will likely segfault.
+#[repr(C)]
+pub struct RawResult {
+  is_throw: bool,
+  throw_handle: Handle,
+  raw_pointer: *const raw::c_void,
+}
+
 ///
 /// Given a set of Tasks and type information, creates a Scheduler.
 ///
@@ -212,7 +222,7 @@ pub extern "C" fn scheduler_create(
   process_execution_speculation_delay: f64,
   process_execution_speculation_strategy_buf: Buffer,
   process_execution_use_local_cache: bool,
-) -> *const Scheduler {
+) -> RawResult {
   let root_type_ids = root_type_ids.to_vec();
   let ignore_patterns = ignore_patterns_buf
     .to_strings()
@@ -289,8 +299,7 @@ pub extern "C" fn scheduler_create(
   let process_execution_speculation_strategy = process_execution_speculation_strategy_buf
     .to_string()
     .expect("process_execution_speculation_strategy was not valid UTF8");
-
-  Box::into_raw(Box::new(Scheduler::new(Core::new(
+  let core = Core::new(
     root_type_ids.clone(),
     tasks,
     types,
@@ -330,7 +339,20 @@ pub extern "C" fn scheduler_create(
     Duration::from_millis((process_execution_speculation_delay * 1000.0).round() as u64),
     process_execution_speculation_strategy,
     process_execution_use_local_cache,
-  ))))
+  );
+
+  match core {
+    Ok(core) => RawResult {
+      is_throw: false,
+      raw_pointer: Box::into_raw(Box::new(Scheduler::new(core))) as *const raw::c_void,
+      throw_handle: Handle(std::ptr::null()),
+    },
+    Err(err) => RawResult {
+      is_throw: true,
+      throw_handle: externs::create_exception(&err).into(),
+      raw_pointer: std::ptr::null(),
+    },
+  }
 }
 
 ///
