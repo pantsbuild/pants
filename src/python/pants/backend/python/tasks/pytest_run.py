@@ -448,6 +448,14 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     try:
       env = dict(os.environ)
 
+      # TODO(John Sirois): remove PYTHONPATH hacks when we ingest a pex with fixes for:
+      #   https://github.com/pantsbuild/pex/issues/707
+      #   https://github.com/pantsbuild/pex/issues/764
+      #
+      # The right answer here though is probably to use v2 parameterized Get to add in the
+      # extra_pythonpath to the built pex instead of using PYTHONPATH to hack them into the PEX
+      # environment.
+
       # Ensure we don't leak source files or undeclared 3rdparty requirements into the pytest PEX
       # environment.
       pythonpath = env.pop('PYTHONPATH', None)

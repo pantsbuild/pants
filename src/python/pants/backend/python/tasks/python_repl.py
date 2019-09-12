@@ -1,8 +1,6 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
-
 from pex.pex_info import PexInfo
 
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -47,8 +45,7 @@ class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
     return self.create_pex(pex_info)
 
   def _run_repl(self, pex, **pex_run_kwargs):
-    env = pex_run_kwargs.pop('env', os.environ).copy()
-    env.update(self.ensure_interpreter_search_path_env())
+    env = self.prepare_pex_env(env=pex_run_kwargs.pop('env', None))
     pex.run(env=env, **pex_run_kwargs)
 
   # N.B. **pex_run_kwargs is used by tests only.

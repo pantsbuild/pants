@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from typing import Dict, Optional
 
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
@@ -99,9 +100,27 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     """
     return ()
 
-  def ensure_interpreter_search_path_env(self):
-    """See ensure_interpreter_search_path_env."""
-    return ensure_interpreter_search_path_env(self.context.products.get_data(PythonInterpreter))
+  def prepare_pex_env(self, env: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+    """Prepares an environment that will run this task's pex with proper isolation.
+
+    :param env: An optional seed environment to use; os.environ by default.
+    :return: An environment dict for use in running a PEX.
+    """
+    env = (env or os.environ).copy()
+
+    interpreter = self.context.products.get_data(PythonInterpreter)
+    interpreter_search_path_env = ensure_interpreter_search_path_env(interpreter)
+    env.update(interpreter_search_path_env)
+
+    # TODO(John Sirois): remove when we ingest a pex with a fix for:
+    #  https://github.com/pantsbuild/pex/issues/707
+    # Ensure we don't leak source files or undeclared 3rdparty requirements into the PEX
+    # environment.
+    pythonpath = env.pop('PYTHONPATH', None)
+    if pythonpath:
+      self.context.log.warn('scrubbed PYTHONPATH={} from environment'.format(pythonpath))
+
+    return env
 
   def create_pex(self, pex_info=None):
     """Returns a wrapped pex that "merges" other pexes produced in previous tasks via PEX_PATH.
