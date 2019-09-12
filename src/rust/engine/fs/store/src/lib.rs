@@ -2082,10 +2082,12 @@ mod tests {
         FileContent {
           path: PathBuf::from("cats").join("roland"),
           content: roland.bytes(),
+          is_executable: false,
         },
         FileContent {
           path: PathBuf::from("treats"),
           content: catnip.bytes(),
+          is_executable: false,
         },
       ],
     );
@@ -2114,6 +2116,13 @@ mod tests {
         eprintln!(
           "Content did not match for index {}: {:?}, {:?}",
           index, l.content, r.content
+        );
+      }
+      if l.is_executable != r.is_executable {
+        success = false;
+        eprintln!(
+          "Executable bit did not match for index {}: {:?}, {:?}",
+          index, l.is_executable, r.is_executable
         );
       }
     }
