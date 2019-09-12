@@ -343,7 +343,7 @@ pub extern "C" fn scheduler_create(
     Ok(core) => RawResult {
       is_throw: false,
       raw_pointer: Box::into_raw(Box::new(Scheduler::new(core))) as *const raw::c_void,
-      throw_handle: Handle(std::ptr::null()).into(),
+      throw_handle: Handle(std::ptr::null()),
     },
     Err(err) => RawResult {
       is_throw: true,
