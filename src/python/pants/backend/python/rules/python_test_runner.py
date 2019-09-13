@@ -1,31 +1,26 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Dict, Optional
-
 from pants.backend.python.rules.create_requirements_pex import (RequirementsPex,
                                                                 RequirementsPexRequest)
 from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.build_graph.files import Files
-from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryWithPrefixToStrip
+from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import BuildFileAddresses, TransitiveHydratedTargets
-from pants.engine.legacy.structs import PythonTestsAdaptor
+from pants.engine.legacy.structs import PythonTestsAdaptor, TargetAdaptor
 from pants.engine.rules import UnionRule, optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.core_test_model import Status, TestResult, TestTarget
-from pants.source.source_root import SourceRoot, SourceRootConfig
-from pants.util.strutil import create_path_env_var, strip_prefix
+from pants.rules.core.strip_source_root import SourceRootStrippedSources
+from pants.util.strutil import create_path_env_var
 
 
-# TODO(7697): Use a dedicated rule for removing the source root prefix, so that this rule
-# does not have to depend on SourceRootConfig.
-@rule(TestResult, [PythonTestsAdaptor, PyTest, PythonSetup, SourceRootConfig, SubprocessEncodingEnvironment])
-def run_python_test(test_target, pytest, python_setup, source_root_config, subprocess_encoding_environment):
-  """Runs pytest for one target."""
+@rule(TestResult, [PythonTestsAdaptor, PyTest, PythonSetup, SubprocessEncodingEnvironment])
+def run_python_test(test_target, pytest, python_setup, subprocess_encoding_environment):
+  """Runs Pytest for one target."""
 
   # TODO(7726): replace this with a proper API to get the `closure` for a
   # TransitiveHydratedTarget.
@@ -68,37 +63,21 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
   # https://pytest.org/en/latest/goodpractices.html#test-discovery. In addition to a performance
   # optimization, this ensures that any transitive sources, such as a test project file named
   # test_fail.py, do not unintentionally end up being run as tests.
-  source_roots = source_root_config.get_source_roots()
-  test_target_sources_file_names = []
-  for source_target_filename in test_target.sources.files_relative_to_buildroot:
-    source_root = source_roots.find_by_path(source_target_filename)
-    test_target_sources_file_names.append(
-      strip_prefix(source_target_filename, prefix=f"{source_root.path}/")
-    )
+  source_root_stripped_test_target_sources = yield Get(
+    SourceRootStrippedSources, TargetAdaptor, test_target
+  )
+  test_target_sources_file_names = sorted(source_root_stripped_test_target_sources.snapshot.files)
 
-  # Gather sources and adjust for source roots.
-  # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of raising to
-  # simplify the hasattr() checks here!
-  sources_digest_to_source_roots: Dict[Digest, Optional[SourceRoot]] = {}
-  for maybe_source_target in all_targets:
-    if not hasattr(maybe_source_target, 'sources'):
-      continue
-    digest = maybe_source_target.sources.snapshot.directory_digest
-    source_root = source_roots.find_by_path(maybe_source_target.address.spec_path)
-    if maybe_source_target.type_alias == Files.alias():
-      # Loose `Files`, as opposed to `Resources` or `PythonTarget`s, have no (implied) package
-      # structure and so we do not remove their source root like we normally do, so that Python
-      # filesystem APIs may still access the files. See pex_build_util.py's `_create_source_dumper`.
-      source_root = None
-    sources_digest_to_source_roots[digest] = source_root.path if source_root else ""
-
-  stripped_sources_digests = yield [
-    Get(Digest, DirectoryWithPrefixToStrip(directory_digest=digest, prefix=source_root))
-    for digest, source_root in sources_digest_to_source_roots.items()
+  source_root_stripped_sources = yield [
+    Get(SourceRootStrippedSources, TargetAdaptor, target_adaptor)
+    for target_adaptor in all_targets
   ]
-
   sources_digest = yield Get(
-    Digest, DirectoriesToMerge(directories=tuple(stripped_sources_digests)),
+    Digest, DirectoriesToMerge(
+      directories=tuple(
+        stripped_sources.snapshot.digest for stripped_sources in source_root_stripped_sources
+      )
+    ),
   )
 
   inits_digest = yield Get(InjectedInitDigest, Digest, sources_digest)
@@ -129,7 +108,7 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
     argv=(
       "python",
       f'./{output_pytest_requirements_pex_filename}',
-      *sorted(test_target_sources_file_names)
+      *test_target_sources_file_names,
     ),
     env=pex_exe_env,
     input_files=merged_input_files,
@@ -152,5 +131,4 @@ def rules():
     UnionRule(TestTarget, PythonTestsAdaptor),
     optionable_rule(PyTest),
     optionable_rule(PythonSetup),
-    optionable_rule(SourceRootConfig),
   ]
