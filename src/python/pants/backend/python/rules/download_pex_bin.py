@@ -14,8 +14,8 @@ class DownloadedPexBin(datatype([('executable', str), ('directory_digest', Diges
 @rule(DownloadedPexBin, [])
 def download_pex_bin():
   # TODO: Inject versions and digests here through some option, rather than hard-coding it.
-  url = 'https://github.com/pantsbuild/pex/releases/download/v1.6.10/pex'
-  digest = Digest('f4ac0f61f0c469537f04418e9347658340b0bce4ba61d302c5b805d194dda482', 1868106)
+  url = 'https://github.com/pantsbuild/pex/releases/download/v1.6.11/pex'
+  digest = Digest('7a8fdfce2de22d25ba38afaa9df0282c33dd436959b3a5c3f788ded2ccc2cae9', 1867604)
   snapshot = yield Get(Snapshot, UrlToFetch(url, digest))
   yield DownloadedPexBin(executable=snapshot.files[0], directory_digest=snapshot.directory_digest)
 
