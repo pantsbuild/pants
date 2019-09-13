@@ -83,18 +83,13 @@ impl Drop for CancelRemoteExecutionToken {
               Ok(_) => debug!("Canceled operation {} successfully", operation_name),
               Err(err) => debug!("Failed to cancel operation {}, err {}", operation_name, err),
             }
-            future::ok(())
+            Ok(())
           }));
         }
-        Err(err) => {
-          let cancel_op_req_name = self.cancel_op_req.name.clone();
-          self.executor.spawn_and_ignore(futures::lazy(move || {
-            future::ok(debug!(
-              "Failed to schedule cancel operation: {}, err {}",
-              cancel_op_req_name, err
-            ))
-          }))
-        }
+        Err(err) => debug!(
+          "Failed to schedule cancel operation: {}, err {}",
+          operation_name, err
+        ),
       };
     }
   }
@@ -255,7 +250,7 @@ impl super::CommandRunner for CommandRunner {
           })
           .map({
             let operations_client = operations_client.clone();
-            let executor = command_runner2.executor.clone();
+            let executor = command_runner.executor.clone();
             move |(operation, history)| {
               let maybe_cancel_remote_exec_token = match operation {
                 OperationOrStatus::Operation(ref operation) => Some(
@@ -317,7 +312,6 @@ impl super::CommandRunner for CommandRunner {
                               current_attempt: ExecutionStats::default(),
                             };
 
-                            let execute_request = execute_request.clone();
                             store
                                 .ensure_remote_has_recursive(missing_digests, workunit_store.clone())
                                 .and_then({
