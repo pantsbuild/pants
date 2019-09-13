@@ -164,7 +164,7 @@ impl Core {
             // TODO if we ever want to configure the remote platform to be something else we
             // need to take an option all the way down here and into the remote::CommandRunner struct.
             Platform::Linux,
-          executor.clone(),
+            executor.clone(),
           )),
           process_execution_remote_parallelism,
         ));
