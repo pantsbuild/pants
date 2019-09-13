@@ -36,13 +36,12 @@ const CACHE_KEY_GEN_VERSION_ENV_VAR_NAME: &str = "PANTS_CACHE_KEY_GEN_VERSION";
 #[derive(Derivative)]
 #[derivative(Debug)]
 struct CancelRemoteExecutionToken {
-  // Remote execution process needs to be cancel in the case of Fatal error or timeout or
-  // pants run is cancelled by the user.
-  // CancelRemoteExecutionToken is used to cancel remote execution process by sending
-  // CancelOperationRequest.
+  //  CancelRemoteExecutionToken is used to cancel remote execution process
+  // if we no longer care about the result, but we think it's still running.
+  // Remote execution process can be cancelled by sending CancelOperationRequest.
   #[derivative(Debug = "ignore")]
   operations_client: Arc<bazel_protos::operations_grpc::OperationsClient>,
-  cancel_op_req: bazel_protos::operations::CancelOperationRequest,
+  operation_name: ::std::string::String,
   #[derivative(Debug = "ignore")]
   executor: task_executor::Executor,
   send_cancellation_on_drop: bool,
@@ -54,11 +53,9 @@ impl CancelRemoteExecutionToken {
     operation_name: ::std::string::String,
     executor: task_executor::Executor,
   ) -> CancelRemoteExecutionToken {
-    let mut cancel_op_req = bazel_protos::operations::CancelOperationRequest::new();
-    cancel_op_req.set_name(operation_name);
     CancelRemoteExecutionToken {
       operations_client,
-      cancel_op_req,
+      operation_name,
       executor,
       send_cancellation_on_drop: true,
     }
@@ -72,10 +69,12 @@ impl CancelRemoteExecutionToken {
 impl Drop for CancelRemoteExecutionToken {
   fn drop(&mut self) {
     if self.send_cancellation_on_drop {
-      let operation_name = self.cancel_op_req.name.clone();
+      let mut cancel_op_req = bazel_protos::operations::CancelOperationRequest::new();
+      cancel_op_req.set_name(self.operation_name.clone());
+      let operation_name = self.operation_name.clone();
       match self
         .operations_client
-        .cancel_operation_async(&self.cancel_op_req)
+        .cancel_operation_async(&cancel_op_req)
       {
         Ok(receiver) => {
           self.executor.spawn_and_ignore(receiver.then(move |res| {
@@ -88,7 +87,7 @@ impl Drop for CancelRemoteExecutionToken {
         }
         Err(err) => debug!(
           "Failed to schedule cancel operation: {}, err {}",
-          operation_name, err
+          self.operation_name, err
         ),
       };
     }
@@ -284,11 +283,13 @@ impl super::CommandRunner for CommandRunner {
                         if let Some(mut cancel_remote_exec_token) = maybe_cancel_remote_exec_token {
                           cancel_remote_exec_token.do_not_send_cancellation_on_drop();
                         }
-                        future::ok(result).map(future::Loop::Break).to_boxed()
+                        future::ok(future::Loop::Break(result)).to_boxed()
                       },
                       Err(err) => {
                         match err {
                           ExecutionError::Fatal(err) => {
+                            // In case of receiving  Fatal error from the server it is assumed that
+                            // remote execution is no longer running
                             if let Some(mut cancel_remote_exec_token) = maybe_cancel_remote_exec_token {
                               cancel_remote_exec_token.do_not_send_cancellation_on_drop();
                             }
@@ -1620,15 +1621,7 @@ pub mod tests {
       }
     );
 
-    let expected_value: Vec<String> = Vec::new();
-    let cancels = mock_server
-      .mock_responder
-      .cancelation_requests
-      .lock()
-      .iter()
-      .map(|req| req.get_name().to_owned())
-      .collect::<Vec<_>>();
-    assert_eq!(expected_value, cancels);
+    assert_cancellation_requests(&mock_server, vec![]);
   }
 
   #[test]
@@ -1874,14 +1867,7 @@ pub mod tests {
     assert!(maybe_execution_duration.is_some());
     assert_that(&maybe_execution_duration.unwrap()).is_greater_than_or_equal_to(request_timeout);
 
-    let cancels = mock_server
-      .mock_responder
-      .cancelation_requests
-      .lock()
-      .iter()
-      .map(|req| req.get_name().to_owned())
-      .collect::<Vec<_>>();
-    assert_eq!(vec![op_name.to_owned()], cancels);
+    assert_cancellation_requests(&mock_server, vec![op_name.to_owned()]);
   }
 
   #[test]
@@ -1954,14 +1940,7 @@ pub mod tests {
 
     runtime.shutdown_on_idle().wait().unwrap();
 
-    let cancels = mock_server
-      .mock_responder
-      .cancelation_requests
-      .lock()
-      .iter()
-      .map(|req| req.get_name().to_owned())
-      .collect::<Vec<_>>();
-    assert_eq!(vec![op_name.to_owned()], cancels);
+    assert_cancellation_requests(&mock_server, vec![op_name.to_owned()]);
   }
 
   #[test]
@@ -2118,6 +2097,8 @@ pub mod tests {
     let result = run_command_remote(mock_server.address(), execute_request).expect_err("Want Err");
 
     assert_eq!(result, "INTERNAL: Something went wrong");
+
+    assert_cancellation_requests(&mock_server, vec![]);
   }
 
   #[test]
@@ -2360,6 +2341,8 @@ pub mod tests {
       let blobs = cas.blobs.lock();
       assert_eq!(blobs.get(&roland.fingerprint()), Some(&roland.bytes()));
     }
+
+    assert_cancellation_requests(&mock_server, vec![]);
   }
 
   #[test]
@@ -3275,5 +3258,19 @@ pub mod tests {
       cache_key_gen_version: None,
       platform_properties: BTreeMap::new(),
     }
+  }
+
+  fn assert_cancellation_requests(
+    mock_server: &mock::execution_server::TestServer,
+    expected: Vec<String>,
+  ) {
+    let cancels = mock_server
+      .mock_responder
+      .cancelation_requests
+      .lock()
+      .iter()
+      .map(|req| req.get_name().to_owned())
+      .collect::<Vec<_>>();
+    assert_eq!(expected, cancels);
   }
 }
