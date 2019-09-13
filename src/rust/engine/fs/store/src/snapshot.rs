@@ -375,6 +375,21 @@ impl Snapshot {
       .to_boxed()
   }
 
+  pub fn add_prefix(
+    store: Store,
+    digest: Digest,
+    prefix: PathBuf,
+  ) -> impl Future<Item = Digest, Error = String> {
+    let mut dir_node = bazel_protos::remote_execution::DirectoryNode::new();
+    dir_node.set_name(try_future!(osstring_as_utf8(prefix.into_os_string())));
+    dir_node.set_digest((&digest).into());
+
+    let mut out_dir = bazel_protos::remote_execution::Directory::new();
+    out_dir.set_directories(protobuf::RepeatedField::from_vec(vec![dir_node]));
+
+    store.record_directory(&out_dir, true)
+  }
+
   pub fn strip_prefix(
     store: Store,
     root_digest: Digest,

@@ -9,7 +9,12 @@ from pants.backend.python.rules.hermetic_pex import HermeticPex
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.engine.fs import Digest
+from pants.engine.fs import (
+  EMPTY_DIRECTORY_DIGEST,
+  Digest,
+  DirectoriesToMerge,
+  DirectoryWithPrefixToAdd,
+)
 from pants.engine.isolated_process import ExecuteProcessResult, MultiPlatformExecuteProcessRequest
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import optionable_rule, rule
@@ -17,15 +22,18 @@ from pants.engine.selectors import Get
 
 
 @dataclass(frozen=True)
-class RequirementsPexRequest:
+class CreatePex:
+  """Represents a generic request to create a PEX from its inputs."""
   output_filename: str
-  requirements: Tuple[str, ...]
-  interpreter_constraints: Tuple[str, ...]
-  entry_point: Optional[str]
+  requirements: Tuple[str] = ()
+  interpreter_constraints: Tuple[str] = ()
+  entry_point: Optional[str] = None
+  input_files_digest: Optional[Digest] = None
 
 
 @dataclass(frozen=True)
-class RequirementsPex(HermeticPex):
+class Pex(HermeticPex):
+  """Wrapper for a digest containing a pex file created with some filename."""
   directory_digest: Digest
 
 
@@ -33,13 +41,13 @@ class RequirementsPex(HermeticPex):
 # pex, where it should be hermetically provided in some way.
 @rule
 def create_requirements_pex(
-    request: RequirementsPexRequest,
+    request: CreatePex,
     pex_bin: DownloadedPexBin,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
     pex_build_environment: PexBuildEnvironment,
     platform: Platform
-) -> RequirementsPex:
+) -> Pex:
   """Returns a PEX with the given requirements, optional entry point, and optional
   interpreter constraints."""
 
@@ -51,6 +59,14 @@ def create_requirements_pex(
   if request.entry_point is not None:
     argv.extend(["--entry-point", request.entry_point])
   argv.extend(interpreter_constraint_args + list(request.requirements))
+
+  source_dir_name = 'source_files'
+
+  argv.append(f'--sources-directory={source_dir_name}')
+  sources_digest = request.input_files_digest if request.input_files_digest else EMPTY_DIRECTORY_DIGEST
+  sources_digest_as_subdir = yield Get(Digest, DirectoryWithPrefixToAdd(sources_digest, source_dir_name))
+  all_inputs = (pex_bin.directory_digest, sources_digest_as_subdir,)
+  merged_digest = yield Get(Digest, DirectoriesToMerge(directories=all_inputs))
 
   # NB: PEX outputs are platform dependent so in order to get a PEX that we can use locally, without
   # cross-building we specify that out PEX command be run on the current local platform. When we
@@ -69,6 +85,7 @@ def create_requirements_pex(
           subprocess_encoding_environment=subprocess_encoding_environment,
           pex_build_environment=pex_build_environment,
           pex_args=argv,
+          input_files=merged_digest,
           description=f"Create a requirements PEX: {', '.join(request.requirements)}",
           output_files=(request.output_filename,)
         )
@@ -80,7 +97,7 @@ def create_requirements_pex(
     MultiPlatformExecuteProcessRequest,
     execute_process_request
   )
-  yield RequirementsPex(directory_digest=result.output_directory_digest)
+  yield Pex(directory_digest=result.output_directory_digest)
 
 
 def rules():

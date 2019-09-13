@@ -466,7 +466,7 @@ python_tests(
     'testprojects/tests/java/org/pantsbuild/testproject:workdirs_directory',
   ],
   tags = {'integration'},
-  timeout = 240,
+  timeout = 1240,
 )
 
 python_tests(
