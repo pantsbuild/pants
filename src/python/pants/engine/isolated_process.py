@@ -4,8 +4,10 @@
 import logging
 
 from pants.engine.fs import Digest
+from pants.engine.platform import PlatformConstraint
 from pants.engine.rules import RootRule, rule
-from pants.util.objects import Exactly, datatype, hashable_string_list, string_optional, string_type
+from pants.util.objects import (Exactly, TypedCollection, datatype, hashable_string_list,
+                                string_optional)
 
 
 logger = logging.getLogger(__name__)
@@ -13,10 +15,13 @@ logger = logging.getLogger(__name__)
 _default_timeout_seconds = 15 * 60
 
 
+class ProductDescription(datatype([('value', str)])): pass
+
+
 class ExecuteProcessRequest(datatype([
   ('argv', hashable_string_list),
   ('input_files', Digest),
-  ('description', string_type),
+  ('description', str),
   ('env', hashable_string_list),
   ('output_files', hashable_string_list),
   ('output_directories', hashable_string_list),
@@ -58,6 +63,39 @@ class ExecuteProcessRequest(datatype([
       timeout_seconds=timeout_seconds,
       jdk_home=jdk_home,
     )
+
+
+class MultiPlatformExecuteProcessRequest(datatype([
+  ('platform_constraints', hashable_string_list),
+  ('execute_process_requests', TypedCollection(Exactly(ExecuteProcessRequest))),
+])):
+  # args collects a set of tuples representing platform constraints mapped to a req, just like a dict constructor can.
+
+  def __new__(cls, request_dict):
+    if len(request_dict) == 0:
+      raise cls.make_type_error("At least one platform constrained ExecuteProcessRequest must be passed.")
+
+    # validate the platform constraints using the platforms enum an flatten the keys.
+    validated_constraints = tuple(
+      constraint.value
+      for pair in request_dict.keys() for constraint in pair
+      if PlatformConstraint(constraint.value)
+    )
+    if len({req.description for req in request_dict.values()}) != 1:
+      raise ValueError(f"The `description` of all execute_process_requests in a {cls.__name__} must be identical.")
+
+    return super().__new__(
+      cls,
+      validated_constraints,
+      tuple(request_dict.values())
+    )
+
+  @property
+  def product_description(self):
+    # we can safely extract the first description because we guarantee that at
+    # least one request exists and that all of their descriptions are the same
+    # in __new__
+    return ProductDescription(self.execute_process_requests[0].description)
 
 
 class ExecuteProcessResult(datatype([('stdout', bytes),
@@ -108,8 +146,23 @@ stderr:
     super().__init__(msg)
 
 
-@rule(ExecuteProcessResult, [FallibleExecuteProcessResult, ExecuteProcessRequest])
-def fallible_to_exec_result_or_raise(fallible_result, request):
+@rule(ProductDescription, [MultiPlatformExecuteProcessRequest])
+def get_multi_platform_request_description(req):
+  return req.product_description
+
+
+@rule(MultiPlatformExecuteProcessRequest, [ExecuteProcessRequest])
+def upcast_execute_process_request(req):
+  """This rule allows an ExecuteProcessRequest to be run as a
+  platform compatible MultiPlatformExecuteProcessRequest.
+  """
+  return MultiPlatformExecuteProcessRequest(
+    {(PlatformConstraint.none, PlatformConstraint.none): req}
+  )
+
+
+@rule(ExecuteProcessResult, [FallibleExecuteProcessResult, ProductDescription])
+def fallible_to_exec_result_or_raise(fallible_result, description):
   """Converts a FallibleExecuteProcessResult to a ExecuteProcessResult or raises an error."""
 
   if fallible_result.exit_code == 0:
@@ -123,7 +176,7 @@ def fallible_to_exec_result_or_raise(fallible_result, request):
       fallible_result.exit_code,
       fallible_result.stdout,
       fallible_result.stderr,
-      request.description
+      description.value
     )
 
 
@@ -131,5 +184,8 @@ def create_process_rules():
   """Creates rules that consume the intrinsic filesystem types."""
   return [
     RootRule(ExecuteProcessRequest),
-    fallible_to_exec_result_or_raise
+    RootRule(MultiPlatformExecuteProcessRequest),
+    upcast_execute_process_request,
+    fallible_to_exec_result_or_raise,
+    get_multi_platform_request_description,
   ]

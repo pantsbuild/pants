@@ -821,7 +821,7 @@ class Native(Singleton):
                     type_dir,
                     type_file,
                     type_link,
-                    type_process_request,
+                    type_multi_platform_process_request,
                     type_process_result,
                     type_generator,
                     type_url_to_fetch):
@@ -829,6 +829,7 @@ class Native(Singleton):
 
     def func(fn):
       return Function(self.context.to_key(fn))
+
     def ti(type_obj):
       return TypeId(self.context.to_id(type_obj))
 
@@ -852,7 +853,7 @@ class Native(Singleton):
         ti(type_dir),
         ti(type_file),
         ti(type_link),
-        ti(type_process_request),
+        ti(type_multi_platform_process_request),
         ti(type_process_result),
         ti(type_generator),
         ti(type_url_to_fetch),

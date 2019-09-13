@@ -104,6 +104,7 @@ python_library(
     ':fs',
     ':rules',
     ':selectors',
+    ':platform',
     'src/python/pants/util:objects',
   ]
 )
@@ -139,6 +140,17 @@ python_library(
     ':objects',
     'src/python/pants/build_graph',
     'src/python/pants/util:memo',
+  ]
+)
+
+python_library(
+  name='platform',
+  sources=['platform.py'],
+  dependencies=[
+      ':rules',
+      'src/python/pants/util:objects',
+      'src/python/pants/util:memo',
+      'src/python/pants/util:osutil',
   ]
 )
 
