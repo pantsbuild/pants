@@ -322,6 +322,7 @@ fn main() {
         root_ca_certs,
         oauth_bearer_token,
         store.clone(),
+        executor.clone(),
       )) as Box<dyn process_execution::CommandRunner>
     }
     None => Box::new(process_execution::local::CommandRunner::new(

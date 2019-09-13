@@ -159,6 +159,7 @@ impl Core {
           root_ca_certs.clone(),
           oauth_bearer_token.clone(),
           store.clone(),
+          executor.clone(),
         )),
         process_execution_remote_parallelism,
       ));

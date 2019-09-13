@@ -160,6 +160,7 @@ pub struct ReceivedMessage {
 pub struct MockResponder {
   mock_execution: MockExecution,
   pub received_messages: Arc<Mutex<Vec<ReceivedMessage>>>,
+  pub cancelation_requests: Arc<Mutex<Vec<bazel_protos::operations::CancelOperationRequest>>>,
 }
 
 impl MockResponder {
@@ -167,6 +168,7 @@ impl MockResponder {
     MockResponder {
       mock_execution: mock_execution,
       received_messages: Arc::new(Mutex::new(vec![])),
+      cancelation_requests: Arc::new(Mutex::new(vec![])),
     }
   }
 
@@ -329,12 +331,11 @@ impl bazel_protos::operations_grpc::Operations for MockResponder {
   fn cancel_operation(
     &self,
     _: grpcio::RpcContext<'_>,
-    _: bazel_protos::operations::CancelOperationRequest,
+    req: bazel_protos::operations::CancelOperationRequest,
     sink: grpcio::UnarySink<bazel_protos::empty::Empty>,
   ) {
-    sink.fail(grpcio::RpcStatus::new(
-      grpcio::RpcStatusCode::Unimplemented,
-      None,
-    ));
+    self.log(req.clone());
+    self.cancelation_requests.lock().push(req);
+    sink.success(bazel_protos::empty::Empty::new());
   }
 }
