@@ -126,7 +126,11 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
   # somewhere on that PATH). This is only used to run the downloaded PEX tool; it is not
   # necessarily the interpreter that PEX will use to execute the generated .pex file.
   request = ExecuteProcessRequest(
-    argv=("python", f'./{output_pytest_requirements_pex_filename}', *test_target_sources_file_names),
+    argv=(
+      "python",
+      f'./{output_pytest_requirements_pex_filename}',
+      *sorted(test_target_sources_file_names)
+    ),
     env=pex_exe_env,
     input_files=merged_input_files,
     description=f'Run Pytest for {test_target.address.reference()}',
