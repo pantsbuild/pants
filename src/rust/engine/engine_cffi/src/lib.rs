@@ -888,7 +888,7 @@ pub extern "C" fn materialize_directories(
     })
     .collect();
 
-  let dir_and_digests: Vec<(PathBuf, Digest)> = match directories_paths_and_digests_results {
+  let dir_and_digests = match directories_paths_and_digests_results {
     Ok(d) => d,
     Err(err) => {
       let e: Result<Value, String> = Err(err);
@@ -909,7 +909,7 @@ pub extern "C" fn materialize_directories(
           })
           .collect::<Vec<_>>(),
       )
-      .map(|_x: Vec<store::DirectoryMaterializeMetadata>| ()),
+      .map(|_| ()),
     )
   })
   .into()
