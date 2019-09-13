@@ -51,6 +51,7 @@ object Main {
     else published
   }
 
+  // TODO(#8286) Investigate the root cause of the logger swallowing character numbers, and reinstate our custom logger.
   def mkLogger(settings: Settings): ConsoleLogger = {
     // If someone has not explicitly enabled log4j2 JMX, disable it.
     if (!Util.isSetProperty("log4j2.disable.jmx")) {
