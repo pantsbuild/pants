@@ -251,6 +251,30 @@ class BaseZincCompileIntegrationTest:
     test_combination('fatal', expect_success=False,
       extra_args=['--compile-rsc-compiler-option-sets-disabled-args={"fatal_warnings": ["-S-Xfatal-warnings"]}'])
 
+  def test_zinc_logs_warnings_properly(self):
+    """Test that the zinc logger emits warnings correctly."""
+    with self.temporary_workdir() as workdir:
+      with self.temporary_cachedir() as cachedir:
+        # Compile a target that we expect will raise an "Unused import" warning.
+        pants_run = self.run_test_compile(
+          workdir,
+          cachedir,
+          'testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings/unused_import_warning:unused_import',
+          extra_args=[
+            '--compile-rsc-args=+["-S-Ywarn-unused:_"]'
+          ])
+        self.assert_success(pants_run)
+
+        # Confirm that we were warned in the expected format.
+        expected_strings =[
+          "/testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings/unused_import_warning/UnusedImportWarning.scala:2:14: Unused import",
+          "[warn] import scala.List // Unused import warning",
+          "[warn] one warning found"
+        ]
+
+        for expected in expected_strings:
+          self.assertIn(expected, pants_run.stdout_data)
+
   @unittest.expectedFailure
   def test_soft_excludes_at_compiletime(self):
     with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testproject/exclude_direct_dep',
