@@ -714,7 +714,7 @@ pub fn make_execute_request(
     // well-known path in the docker container you specify in which to run.
     platform_properties.insert("JDK_SYMLINK".to_owned(), ".jdk".to_owned());
   }
-  platform_properties.insert("OSFamily".to_owned(), req.target_platform.into());
+  platform_properties.insert("target_platform".to_owned(), req.target_platform.into());
 
   for (name, value) in platform_properties {
     command.mut_platform().mut_properties().push({
@@ -1119,7 +1119,7 @@ pub mod tests {
       .push("directory/name".to_owned());
     want_command.mut_platform().mut_properties().push({
       let mut property = bazel_protos::remote_execution::Platform_Property::new();
-      property.set_name("OSFamily".to_owned());
+      property.set_name("target_platform".to_owned());
       property.set_value("none".to_owned());
       property
     });
@@ -1128,10 +1128,10 @@ pub mod tests {
     want_action.set_command_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "3cde00c8549159a3a7236a107d2bb488dbe423740abf8ea9377a6d27d078f2af",
+          "6cfe2081e40c7542a8b369b669618fe7c6e690e274183e406ed75dc3959dc82f",
         )
         .unwrap(),
-        92,
+        99,
       ))
         .into(),
     );
@@ -1141,7 +1141,7 @@ pub mod tests {
     want_execute_request.set_action_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "313738ec23da2ba4631c781df542b61ca2df88371603bbf29ac2be9210adf9dd",
+          "1b52d1997da65c69c5fe2f8717caa6e538dabc13f90f16332454d95b1f8949a4",
         )
         .unwrap(),
         140,
@@ -1199,7 +1199,7 @@ pub mod tests {
       .push("directory/name".to_owned());
     want_command.mut_platform().mut_properties().push({
       let mut property = bazel_protos::remote_execution::Platform_Property::new();
-      property.set_name("OSFamily".to_owned());
+      property.set_name("target_platform".to_owned());
       property.set_value("none".to_owned());
       property
     });
@@ -1208,10 +1208,10 @@ pub mod tests {
     want_action.set_command_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "3cde00c8549159a3a7236a107d2bb488dbe423740abf8ea9377a6d27d078f2af",
+          "6cfe2081e40c7542a8b369b669618fe7c6e690e274183e406ed75dc3959dc82f",
         )
         .unwrap(),
-        92,
+        99,
       ))
         .into(),
     );
@@ -1222,7 +1222,7 @@ pub mod tests {
     want_execute_request.set_action_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "313738ec23da2ba4631c781df542b61ca2df88371603bbf29ac2be9210adf9dd",
+          "1b52d1997da65c69c5fe2f8717caa6e538dabc13f90f16332454d95b1f8949a4",
         )
         .unwrap(),
         140,
@@ -1293,7 +1293,7 @@ pub mod tests {
       .push("directory/name".to_owned());
     want_command.mut_platform().mut_properties().push({
       let mut property = bazel_protos::remote_execution::Platform_Property::new();
-      property.set_name("OSFamily".to_owned());
+      property.set_name("target_platform".to_owned());
       property.set_value("none".to_owned());
       property
     });
@@ -1302,10 +1302,10 @@ pub mod tests {
     want_action.set_command_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "31f38f68df1bb1b09c17d2e0fb94002b8ba0dc2688e55c794d87b4b5b273ae90",
+          "c803d479ce49fc85fe5dfe55177594d9957713192b011459cbd3532982c388f5",
         )
         .unwrap(),
-        129,
+        136,
       ))
         .into(),
     );
@@ -1315,7 +1315,7 @@ pub mod tests {
     want_execute_request.set_action_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "ef3ad4de41f04552c516d9c160b209233e37814c9dcd49484b0116b74adbb4b5",
+          "a56e51451c48a993ba7b0e5051f53618562f2b25be93e06171d819b9104cc96c",
         )
         .unwrap(),
         141,
@@ -1362,7 +1362,7 @@ pub mod tests {
     });
     want_command.mut_platform().mut_properties().push({
       let mut property = bazel_protos::remote_execution::Platform_Property::new();
-      property.set_name("OSFamily".to_owned());
+      property.set_name("target_platform".to_owned());
       property.set_value("none".to_owned());
       property
     });
@@ -1371,10 +1371,10 @@ pub mod tests {
     want_action.set_command_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "baf0556d237e88b7bd2025ff616c12928e932df30606c6d3e6dd747ac5a596e8",
+          "9a396c5e4359a0e6289c4112098e2851d608fe730e2584881b7182ef08229a42",
         )
         .unwrap(),
-        56,
+        63,
       ))
         .into(),
     );
@@ -1384,7 +1384,7 @@ pub mod tests {
     want_execute_request.set_action_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "609e31774bc5aff80d697745b6ed987cb0381749a1f7b61ea850a15b7e882063",
+          "de42e6b80e82818bda020ac5a3b6f040a9d7cef6e4a5aecb5001b6a098a2fe28",
         )
         .unwrap(),
         140,
@@ -1430,14 +1430,14 @@ pub mod tests {
     });
     want_command.mut_platform().mut_properties().push({
       let mut property = bazel_protos::remote_execution::Platform_Property::new();
-      property.set_name("OSFamily".to_owned());
-      property.set_value("none".to_owned());
+      property.set_name("last".to_owned());
+      property.set_value("bar".to_owned());
       property
     });
     want_command.mut_platform().mut_properties().push({
       let mut property = bazel_protos::remote_execution::Platform_Property::new();
-      property.set_name("last".to_owned());
-      property.set_value("bar".to_owned());
+      property.set_name("target_platform".to_owned());
+      property.set_value("none".to_owned());
       property
     });
 
@@ -1445,10 +1445,10 @@ pub mod tests {
     want_action.set_command_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "c3743715b566a865fa2f1f95ac5b2d60ec78fd6e4787b112930b1f33d7d2271b",
+          "f54a2a67d16f46c9ce8e846a4fe1cb86a16ec3f11ddfca8cbfc34ff7bac630b8",
         )
         .unwrap(),
-        83,
+        90,
       ))
         .into(),
     );
@@ -1458,7 +1458,7 @@ pub mod tests {
     want_execute_request.set_action_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "1edbd2beb9b367627f8f19d118129b6c4f756155680f901538580e253805c461",
+          "be4b5057c50f3cb54b45431dcaa52588a5eb3566f63b0f28014abdb544c73b0f",
         )
         .unwrap(),
         140,
