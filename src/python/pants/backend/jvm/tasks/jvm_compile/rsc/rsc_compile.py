@@ -668,7 +668,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
     ctx.rsc_jar_file = ClasspathEntry(ctx.rsc_jar_file.path, res.output_directory_digest)
 
-    _, = self.context._scheduler.product_request(
+    self.context._scheduler.product_request(
       MaterializeDirectoriesResult,
       DirectoryToMaterialize(
         # NB the first element here is the root to materialize into, not the dir to snapshot
