@@ -235,7 +235,7 @@ class BaseZincCompileIntegrationTest:
           pants_run = self.run_test_compile(
               workdir,
               cachedir,
-              'testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings:{}'.format(
+              'testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings/fatal_and_nonfatal_warnings:{}'.format(
                 target),
               extra_args=extra_args)
 
