@@ -43,6 +43,7 @@ tests/python/pants_test/java/distribution:distribution_integration
 tests/python/pants_test/java:nailgun_integration
 tests/python/pants_test/rules:filedeps_integration
 tests/python/pants_test/targets:unknown_arguments_integration
+tests/python/pants_test/task:goal_options_mixin_integration
 tests/python/pants_test/tasks:bootstrap_jvm_tools_integration
 tests/python/pants_test/tasks:changed_target_integration
 tests/python/pants_test/tasks:clean_all_integration

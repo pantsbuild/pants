@@ -28,10 +28,10 @@ python_library(
     'pants_run_integration_test.py'
   ],
   dependencies = [
-    '3rdparty/python:ansicolors',
-    '3rdparty/python:dataclasses',
     '//:build_root',
     '//:pants_pex',
+    '3rdparty/python:ansicolors',
+    '3rdparty/python:dataclasses',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
     'src/python/pants/base:exiter',
@@ -43,6 +43,7 @@ python_library(
     'src/python/pants/util:osutil',
     'src/python/pants/util:process_handler',
     'src/python/pants/util:strutil',
+    'src/python/pants:entry_point',
     'tests/python/pants_test/testutils:file_test_util',
   ]
 )

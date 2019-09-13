@@ -1,6 +1,7 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import logging
 import os
 import subprocess
 from contextlib import contextmanager
@@ -21,6 +22,8 @@ from pants.util.strutil import ensure_binary, safe_shlex_join
 
 
 class PythonToolInstance:
+  logger = logging.getLogger(__name__)
+
   def __init__(self, pex_path, interpreter):
     self._pex = PEX(pex_path, interpreter=interpreter)
     self._interpreter = interpreter
@@ -53,6 +56,16 @@ class PythonToolInstance:
 
   @contextmanager
   def run_with(self, workunit_factory, args, **kwargs):
+    # TODO(John Sirois): remove when we ingest a pex with a fix for:
+    #  https://github.com/pantsbuild/pex/issues/707
+    # Ensure we don't leak source files or undeclared 3rdparty requirements into the PEX
+    # environment.
+    supplied_env = kwargs.pop('env', None)
+    env = (supplied_env or os.environ).copy()
+    pythonpath = env.pop('PYTHONPATH', None)
+    if pythonpath:
+      self.logger.warning('scrubbed PYTHONPATH={} from environment'.format(pythonpath))
+
     cmdline = self._pretty_cmdline(args)
     with workunit_factory(cmd=cmdline) as workunit:
       exit_code = self._pex.run(args,
@@ -60,6 +73,7 @@ class PythonToolInstance:
                                 stderr=workunit.output('stderr'),
                                 with_chroot=False,
                                 blocking=True,
+                                env=env,
                                 **kwargs)
       yield cmdline, exit_code, workunit
 

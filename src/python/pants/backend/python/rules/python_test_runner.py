@@ -18,7 +18,7 @@ from pants.engine.rules import UnionRule, optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.core_test_model import Status, TestResult, TestTarget
 from pants.source.source_root import SourceRoot, SourceRootConfig
-from pants.util.strutil import create_path_env_var
+from pants.util.strutil import create_path_env_var, strip_prefix
 
 
 # TODO(7697): Use a dedicated rule for removing the source root prefix, so that this rule
@@ -63,10 +63,22 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
     )
   )
 
+  # Get the file names for the test_target, adjusted for the source root. This allows us to
+  # specify to Pytest which files to test and thus to avoid the test auto-discovery defined by
+  # https://pytest.org/en/latest/goodpractices.html#test-discovery. In addition to a performance
+  # optimization, this ensures that any transitive sources, such as a test project file named
+  # test_fail.py, do not unintentionally end up being run as tests.
+  source_roots = source_root_config.get_source_roots()
+  test_target_sources_file_names = []
+  for source_target_filename in test_target.sources.files_relative_to_buildroot:
+    source_root = source_roots.find_by_path(source_target_filename)
+    test_target_sources_file_names.append(
+      strip_prefix(source_target_filename, prefix=f"{source_root.path}/")
+    )
+
   # Gather sources and adjust for source roots.
   # TODO: make TargetAdaptor return a 'sources' field with an empty snapshot instead of raising to
   # simplify the hasattr() checks here!
-  source_roots = source_root_config.get_source_roots()
   sources_digest_to_source_roots: Dict[Digest, Optional[SourceRoot]] = {}
   for maybe_source_target in all_targets:
     if not hasattr(maybe_source_target, 'sources'):
@@ -114,7 +126,11 @@ def run_python_test(test_target, pytest, python_setup, source_root_config, subpr
   # somewhere on that PATH). This is only used to run the downloaded PEX tool; it is not
   # necessarily the interpreter that PEX will use to execute the generated .pex file.
   request = ExecuteProcessRequest(
-    argv=("python", f'./{output_pytest_requirements_pex_filename}'),
+    argv=(
+      "python",
+      f'./{output_pytest_requirements_pex_filename}',
+      *sorted(test_target_sources_file_names)
+    ),
     env=pex_exe_env,
     input_files=merged_input_files,
     description=f'Run Pytest for {test_target.address.reference()}',

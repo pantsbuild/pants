@@ -333,6 +333,7 @@ fn main() {
         oauth_bearer_token,
         store.clone(),
         Platform::Linux,
+        executor.clone(),
       )) as Box<dyn process_execution::CommandRunner>
     }
     None => Box::new(process_execution::local::CommandRunner::new(

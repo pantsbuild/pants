@@ -17,7 +17,7 @@ pub type RawHandle = *const raw::c_void;
 /// underlying CFFI handle.
 ///
 #[repr(C)]
-pub struct Handle(RawHandle);
+pub struct Handle(pub RawHandle);
 
 impl Handle {
   ///

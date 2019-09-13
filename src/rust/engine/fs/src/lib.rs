@@ -676,6 +676,7 @@ impl PosixFS {
     self
       .executor
       .spawn_on_io_pool(futures::future::lazy(move || {
+        let is_executable = path_abs.metadata()?.permissions().mode() & 0o100 == 0o100;
         std::fs::File::open(&path_abs)
           .and_then(|mut f| {
             let mut content = Vec::new();
@@ -683,6 +684,7 @@ impl PosixFS {
             Ok(FileContent {
               path: path,
               content: Bytes::from(content),
+              is_executable,
             })
           })
           .map_err(|e| {
@@ -870,6 +872,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
 pub struct FileContent {
   pub path: PathBuf,
   pub content: Bytes,
+  pub is_executable: bool,
 }
 
 impl fmt::Debug for FileContent {

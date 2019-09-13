@@ -359,6 +359,13 @@ class _FFISpecification(object):
     v_str = '' if v is None else str(v)
     return c.utf8_buf(v_str)
 
+  @_extern_decl('_Bool', ['ExternContext*', 'Handle*'])
+  def extern_val_to_bool(self, context_handle, val):
+    """Given a Handle for `obj`, write bool(obj) and return it."""
+    c = self._ffi.from_handle(context_handle)
+    v = c.from_value(val[0])
+    return bool(v)
+
   @_extern_decl('Handle', ['ExternContext*', 'Handle**', 'uint64_t'])
   def extern_store_tuple(self, context_handle, vals_ptr, vals_len):
     """Given storage and an array of Handles, return a new Handle to represent the list."""
@@ -507,6 +514,10 @@ class TypeId(datatype(['tup_0'])):
 
 
 class PyResult(datatype(['is_throw', 'handle'])):
+  """Corresponds to the native object of the same name."""
+
+
+class RawResult(datatype(['is_throw', 'throw_handle', 'raw_pointer'])):
   """Corresponds to the native object of the same name."""
 
 
@@ -715,6 +726,7 @@ class Native(Singleton):
                            self.ffi_lib.extern_store_bool,
                            self.ffi_lib.extern_project_ignoring_type,
                            self.ffi_lib.extern_project_multi,
+                           self.ffi_lib.extern_val_to_bool,
                            self.ffi_lib.extern_create_exception)
       return context
 
@@ -821,7 +833,7 @@ class Native(Singleton):
     def ti(type_obj):
       return TypeId(self.context.to_id(type_obj))
 
-    scheduler = self.lib.scheduler_create(
+    scheduler_result = self.lib.scheduler_create(
         tasks,
         # Constructors/functions.
         func(construct_directory_digest),
@@ -874,6 +886,12 @@ class Native(Singleton):
         self.context.utf8_buf(execution_options.process_execution_speculation_strategy),
         execution_options.process_execution_use_local_cache,
       )
+    if scheduler_result.is_throw:
+      value = self.context.from_value(scheduler_result.throw_handle)
+      self.context.drop_handles([scheduler_result.throw_handle])
+      raise value
+    else:
+      scheduler = scheduler_result.raw_pointer
     return self.gc(scheduler, self.lib.scheduler_destroy)
 
   def set_panic_handler(self):
