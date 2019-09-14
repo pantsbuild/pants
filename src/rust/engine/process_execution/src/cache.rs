@@ -1,10 +1,15 @@
-use crate::{ExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecuteProcessResult};
-use boxfuture::{try_future, BoxFuture, Boxable};
+use crate::{
+  ExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecuteProcessResult,
+  MultiPlatformExecuteProcessRequest,
+};
+use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
+use digest::{Digest as DigestTrait, FixedOutput};
 use futures::Future;
 use hashing::{Digest, Fingerprint};
 use log::{debug, warn};
 use protobuf::Message;
+use sha2::Sha256;
 use sharded_lmdb::ShardedLmdb;
 use std::sync::Arc;
 use store::Store;
@@ -19,13 +24,20 @@ pub struct CommandRunner {
 }
 
 impl crate::CommandRunner for CommandRunner {
+  fn extract_compatible_request(
+    &self,
+    req: &MultiPlatformExecuteProcessRequest,
+  ) -> Option<ExecuteProcessRequest> {
+    self.underlying.extract_compatible_request(req)
+  }
+
   // TODO: Maybe record WorkUnits for local cache checks.
   fn run(
     &self,
-    req: ExecuteProcessRequest,
+    req: MultiPlatformExecuteProcessRequest,
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
-    let digest = try_future!(self.digest(&req));
+    let digest = self.digest(req.clone());
     let key = digest.0;
 
     let command_runner = self.clone();
@@ -60,10 +72,33 @@ impl crate::CommandRunner for CommandRunner {
 }
 
 impl CommandRunner {
-  fn digest(&self, req: &ExecuteProcessRequest) -> Result<Digest, String> {
-    let (_action, _command, execute_request) =
-      crate::remote::make_execute_request(req, self.metadata.clone())?;
-    execute_request.get_action_digest().into()
+  fn bytes_to_digest(&self, bytes: &[u8]) -> Digest {
+    let mut hasher = Sha256::default();
+    hasher.input(bytes);
+
+    Digest(
+      Fingerprint::from_bytes_unsafe(&hasher.fixed_result()),
+      bytes.len(),
+    )
+  }
+
+  fn digest(&self, req: MultiPlatformExecuteProcessRequest) -> Digest {
+    let mut hashes: Vec<String> = req
+      .0
+      .values()
+      .map(|ref epr| crate::remote::make_execute_request(epr, self.metadata.clone()).unwrap())
+      .map(|(_a, _b, er)| er.get_action_digest().get_hash().to_string())
+      .collect();
+    hashes.sort();
+    self.bytes_to_digest(
+      hashes
+        .iter()
+        .fold(String::new(), |mut acc, hash| {
+          acc.push_str(&hash);
+          acc
+        })
+        .as_bytes(),
+    )
   }
 
   fn lookup(
@@ -139,8 +174,8 @@ impl CommandRunner {
 
 #[cfg(test)]
 mod test {
-  use crate::ExecuteProcessRequest;
   use crate::{CommandRunner as CommandRunnerTrait, ExecuteProcessRequestMetadata};
+  use crate::{ExecuteProcessRequest, Platform};
   use hashing::EMPTY_DIGEST;
   use sharded_lmdb::ShardedLmdb;
   use std::collections::{BTreeMap, BTreeSet};
@@ -190,9 +225,10 @@ mod test {
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     };
 
-    let local_result = runtime.block_on(local.run(request.clone(), WorkUnitStore::new()));
+    let local_result = runtime.block_on(local.run(request.clone().into(), WorkUnitStore::new()));
 
     let cache_dir = TempDir::new().unwrap();
     let caching = crate::cache::CommandRunner {
@@ -211,12 +247,13 @@ mod test {
       },
     };
 
-    let uncached_result = runtime.block_on(caching.run(request.clone(), WorkUnitStore::new()));
+    let uncached_result =
+      runtime.block_on(caching.run(request.clone().into(), WorkUnitStore::new()));
 
     assert_eq!(local_result, uncached_result);
 
     std::fs::remove_file(&script_path).unwrap();
-    let cached_result = runtime.block_on(caching.run(request, WorkUnitStore::new()));
+    let cached_result = runtime.block_on(caching.run(request.into(), WorkUnitStore::new()));
 
     assert_eq!(uncached_result, cached_result);
   }

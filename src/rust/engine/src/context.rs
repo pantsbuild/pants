@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std;
-use std::convert::TryInto;
+use std::convert::{Into, TryInto};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -21,6 +21,7 @@ use fs::{safe_create_dir_all_ioerror, PosixFS};
 use graph::{EntryId, Graph, NodeContext};
 use process_execution::{
   self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, ExecuteProcessRequestMetadata,
+  Platform,
 };
 use rand::seq::SliceRandom;
 use reqwest;
@@ -79,7 +80,7 @@ impl Core {
     process_execution_speculation_delay: Duration,
     process_execution_speculation_strategy: String,
     process_execution_use_local_cache: bool,
-  ) -> Core {
+  ) -> Result<Core, String> {
     // Randomize CAS address order to avoid thundering herds from common config.
     let mut remote_store_servers = remote_store_servers;
     remote_store_servers.shuffle(&mut rand::thread_rng());
@@ -89,21 +90,21 @@ impl Core {
     let root_ca_certs = if let Some(path) = remote_root_ca_certs_path {
       Some(
         std::fs::read(&path)
-          .unwrap_or_else(|err| panic!("Error reading root CA certs file {:?}: {}", path, err)),
+          .map_err(|err| format!("Error reading root CA certs file {:?}: {}", path, err))?,
       )
     } else {
       None
     };
 
     // We re-use this token for both the execution and store service; they're generally tied together.
-    let oauth_bearer_token =
-      if let Some(path) = remote_oauth_bearer_token_path {
-        Some(std::fs::read_to_string(&path).unwrap_or_else(|err| {
-          panic!("Error reading OAuth bearer token file {:?}: {}", path, err)
-        }))
-      } else {
-        None
-      };
+    let oauth_bearer_token = if let Some(path) = remote_oauth_bearer_token_path {
+      Some(
+        std::fs::read_to_string(&path)
+          .map_err(|err| format!("Error reading OAuth bearer token file {:?}: {}", path, err))?,
+      )
+    } else {
+      None
+    };
 
     let local_store_dir2 = local_store_dir.clone();
     let store = safe_create_dir_all_ioerror(&local_store_dir)
@@ -130,7 +131,7 @@ impl Core {
           )
         }
       })
-      .unwrap_or_else(|e| panic!("Could not initialize Store: {:?}", e));
+      .map_err(|e| format!("Could not initialize Store: {:?}", e))?;
 
     let process_execution_metadata = ExecuteProcessRequestMetadata {
       instance_name: remote_instance_name.clone(),
@@ -150,18 +151,23 @@ impl Core {
       ));
 
     if remote_execution {
-      let remote_command_runner = Box::new(BoundedCommandRunner::new(
-        Box::new(process_execution::remote::CommandRunner::new(
-          // No problem unwrapping here because the global options validation
-          // requires the remote_execution_server be present when remote_execution is set.
-          &remote_execution_server.unwrap(),
-          process_execution_metadata.clone(),
-          root_ca_certs.clone(),
-          oauth_bearer_token.clone(),
-          store.clone(),
-        )),
-        process_execution_remote_parallelism,
-      ));
+      let remote_command_runner: Box<dyn process_execution::CommandRunner> =
+        Box::new(BoundedCommandRunner::new(
+          Box::new(process_execution::remote::CommandRunner::new(
+            // No problem unwrapping here because the global options validation
+            // requires the remote_execution_server be present when remote_execution is set.
+            &remote_execution_server.unwrap(),
+            process_execution_metadata.clone(),
+            root_ca_certs.clone(),
+            oauth_bearer_token.clone(),
+            store.clone(),
+            // TODO if we ever want to configure the remote platform to be something else we
+            // need to take an option all the way down here and into the remote::CommandRunner struct.
+            Platform::Linux,
+            executor.clone(),
+          )),
+          process_execution_remote_parallelism,
+        ));
       command_runner = match process_execution_speculation_strategy.as_ref() {
         "local_first" => Box::new(SpeculatingCommandRunner::new(
           command_runner,
@@ -184,7 +190,7 @@ impl Core {
         5 * GIGABYTES,
         executor.clone(),
       )
-      .expect("Could not initialize store for process cache: {:?}");
+      .map_err(|err| format!("Could not initialize store for process cache: {:?}", err))?;
       command_runner = Box::new(process_execution::cache::CommandRunner {
         underlying: command_runner.into(),
         process_execution_store,
@@ -196,7 +202,7 @@ impl Core {
     let http_client = reqwest::r#async::Client::new();
     let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);
 
-    Core {
+    Ok(Core {
       graph: Graph::new(),
       tasks: tasks,
       rule_graph: rule_graph,
@@ -207,11 +213,10 @@ impl Core {
       http_client,
       // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
-      vfs: PosixFS::new(&build_root, &ignore_patterns, executor).unwrap_or_else(|e| {
-        panic!("Could not initialize VFS: {:?}", e);
-      }),
+      vfs: PosixFS::new(&build_root, &ignore_patterns, executor)
+        .map_err(|e| format!("Could not initialize VFS: {:?}", e))?,
       build_root: build_root,
-    }
+    })
   }
 
   pub fn store(&self) -> Store {

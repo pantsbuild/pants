@@ -19,7 +19,9 @@ use store::{OneOffStoreFileByDigest, Snapshot, Store};
 use tokio_codec::{BytesCodec, FramedRead};
 use tokio_process::CommandExt;
 
-use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
+use super::{
+  ExecuteProcessRequest, FallibleExecuteProcessResult, MultiPlatformExecuteProcessRequest, Platform,
+};
 
 use bytes::{Bytes, BytesMut};
 use workunit_store::WorkUnitStore;
@@ -29,6 +31,7 @@ pub struct CommandRunner {
   executor: task_executor::Executor,
   work_dir: PathBuf,
   cleanup_local_dirs: bool,
+  platform: Platform,
 }
 
 impl CommandRunner {
@@ -43,6 +46,7 @@ impl CommandRunner {
       executor,
       work_dir,
       cleanup_local_dirs,
+      platform: Platform::current_platform().unwrap(),
     }
   }
 
@@ -212,6 +216,24 @@ impl ChildResults {
 }
 
 impl super::CommandRunner for CommandRunner {
+  fn extract_compatible_request(
+    &self,
+    req: &MultiPlatformExecuteProcessRequest,
+  ) -> Option<ExecuteProcessRequest> {
+    for compatible_constraint in vec![
+      &(Platform::None, Platform::None),
+      &(self.platform, Platform::None),
+      &(self.platform, Platform::current_platform().unwrap()),
+    ]
+    .iter()
+    {
+      if let Some(compatible_req) = req.0.get(compatible_constraint) {
+        return Some(compatible_req.clone());
+      }
+    }
+    None
+  }
+
   ///
   /// Runs a command on this machine in the passed working directory.
   ///
@@ -219,7 +241,7 @@ impl super::CommandRunner for CommandRunner {
   ///
   fn run(
     &self,
-    req: ExecuteProcessRequest,
+    req: MultiPlatformExecuteProcessRequest,
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let workdir = try_future!(tempfile::Builder::new()
@@ -229,6 +251,7 @@ impl super::CommandRunner for CommandRunner {
         "Error making tempdir for local process execution: {:?}",
         err
       )));
+    let req = self.extract_compatible_request(&req).unwrap();
     let workdir_path = workdir.path().to_owned();
     let workdir_path2 = workdir_path.clone();
     let workdir_path3 = workdir_path.clone();
@@ -371,6 +394,7 @@ mod tests {
 
   use super::super::CommandRunner as CommandRunnerTrait;
   use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
+  use crate::Platform;
   use hashing::EMPTY_DIGEST;
   use std;
   use std::collections::{BTreeMap, BTreeSet};
@@ -395,6 +419,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "echo foo".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     assert_eq!(
@@ -421,6 +446,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "echo foo and fail".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     assert_eq!(
@@ -448,6 +474,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "kill self".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     assert_eq!(
@@ -478,6 +505,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "run env".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     let stdout = String::from_utf8(result.unwrap().stdout.to_vec()).unwrap();
@@ -514,6 +542,7 @@ mod tests {
         timeout: Duration::from_millis(1000),
         description: "run env".to_string(),
         jdk_home: None,
+        target_platform: Platform::None,
       }
     }
 
@@ -534,6 +563,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "echo foo".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     })
     .expect_err("Want Err");
   }
@@ -549,6 +579,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
     assert_eq!(
       result.unwrap(),
@@ -577,6 +608,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     assert_eq!(
@@ -611,6 +643,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     assert_eq!(
@@ -646,6 +679,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "treats-roland".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     assert_eq!(
@@ -679,6 +713,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "echo foo".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     assert_eq!(
@@ -710,6 +745,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "echo-roland".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     assert_eq!(
@@ -739,6 +775,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     assert_eq!(
@@ -759,7 +796,6 @@ mod tests {
     let roland = TestData::roland().bytes();
     std::fs::write(preserved_work_tmpdir.path().join("roland"), roland.clone())
       .expect("Writing temporary file");
-
     let result = run_command_locally(ExecuteProcessRequest {
       argv: vec!["/bin/cat".to_owned(), ".jdk/roland".to_owned()],
       env: BTreeMap::new(),
@@ -769,6 +805,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "cat roland".to_string(),
       jdk_home: Some(preserved_work_tmpdir.path().to_path_buf()),
+      target_platform: Platform::None,
     });
     assert_eq!(
       result,
@@ -801,6 +838,7 @@ mod tests {
         timeout: Duration::from_millis(1000),
         description: "bash".to_string(),
         jdk_home: None,
+        target_platform: Platform::None,
       },
       preserved_work_root.clone(),
       false,
@@ -836,6 +874,7 @@ mod tests {
         timeout: Duration::from_millis(1000),
         description: "failing execution".to_string(),
         jdk_home: None,
+        target_platform: Platform::None,
       },
       preserved_work_root.clone(),
       false,
@@ -868,6 +907,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "create nonoverlapping directories and file".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     assert_eq!(
@@ -897,6 +937,7 @@ mod tests {
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
       jdk_home: None,
+      target_platform: Platform::None,
     });
 
     assert_eq!(
@@ -938,7 +979,8 @@ mod tests {
       executor: executor.clone(),
       work_dir: dir,
       cleanup_local_dirs: cleanup,
+      platform: Platform::current_platform().unwrap(),
     };
-    executor.block_on(runner.run(req, WorkUnitStore::new()))
+    executor.block_on(runner.run(req.into(), WorkUnitStore::new()))
   }
 }

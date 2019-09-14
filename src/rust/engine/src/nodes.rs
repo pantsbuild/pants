@@ -27,7 +27,9 @@ use fs::{
   PathGlobs, PathStat, StrictGlobMatching, VFS,
 };
 use hashing;
-use process_execution;
+use process_execution::{
+  self, ExecuteProcessRequest, MultiPlatformExecuteProcessRequest, Platform,
+};
 use rule_graph;
 
 use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
@@ -182,11 +184,12 @@ impl WrappedNode for Select {
                   let filename = externs::project_str(&file, "path");
                   let path: PathBuf = filename.into();
                   let bytes = bytes::Bytes::from(externs::project_bytes(&file, "content"));
+                  let is_executable = externs::project_bool(&file, "is_executable");
 
                   let store = new_context.core.store();
                   store
                     .store_file_bytes(bytes, true)
-                    .and_then(move |digest| store.snapshot_of_one_file(path, digest))
+                    .and_then(move |digest| store.snapshot_of_one_file(path, digest, is_executable))
                     .map(|snapshot| snapshot.digest)
                     .map_err(|err| throw(&err))
                     .to_boxed()
@@ -248,14 +251,14 @@ impl WrappedNode for Select {
           if product == types.snapshot && input == types.directory_digest =>
         {
           let core = context.core.clone();
+          let store = context.core.store();
           self
             .select_product(&context, types.directory_digest, "intrinsic")
             .and_then(|directory_digest_val| {
               lift_digest(&directory_digest_val).map_err(|str| throw(&str))
             })
             .and_then(move |digest| {
-              store::Snapshot::from_digest(context.core.store(), digest, workunit_store)
-                .map_err(|str| throw(&str))
+              store::Snapshot::from_digest(store, digest, workunit_store).map_err(|str| throw(&str))
             })
             .map(move |snapshot| Snapshot::store_snapshot(&core, &snapshot))
             .to_boxed()
@@ -309,15 +312,19 @@ impl WrappedNode for Select {
             .to_boxed()
         }
         &Rule::Intrinsic(Intrinsic { product, input })
-          if product == types.process_result && input == types.process_request =>
+          if product == types.process_result && input == types.multi_platform_process_request =>
         {
           let context = context.clone();
           let core = context.core.clone();
           self
-            .select_product(&context, types.process_request, "intrinsic")
+            .select_product(&context, types.multi_platform_process_request, "intrinsic")
             .and_then(|request| {
-              ExecuteProcess::lift(&request)
-                .map_err(|str| throw(&format!("Error lifting ExecuteProcess: {}", str)))
+              MultiPlatformExecuteProcess::lift(&request).map_err(|str| {
+                throw(&format!(
+                  "Error lifting MultiPlatformExecuteProcess: {}",
+                  str
+                ))
+              })
             })
             .and_then(move |process_request| context.get(process_request))
             .map(move |result| {
@@ -370,17 +377,16 @@ pub fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
   ))
 }
 
-///
-/// A Node that represents executing a process.
+/// A Node that represents a set of processes to execute on specific platforms.
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct ExecuteProcess(process_execution::ExecuteProcessRequest);
+pub struct MultiPlatformExecuteProcess(MultiPlatformExecuteProcessRequest);
 
-impl ExecuteProcess {
-  ///
-  /// Lifts a Key representing a python ExecuteProcessRequest value into a ExecuteProcess Node.
-  ///
-  fn lift(value: &Value) -> Result<ExecuteProcess, String> {
+impl MultiPlatformExecuteProcess {
+  fn lift_execute_process(
+    value: &Value,
+    target_platform: Platform,
+  ) -> Result<ExecuteProcessRequest, String> {
     let mut env: BTreeMap<String, String> = BTreeMap::new();
     let env_var_parts = externs::project_multi_strs(&value, "env");
     if env_var_parts.len() % 2 != 0 {
@@ -443,7 +449,7 @@ impl ExecuteProcess {
       }
     };
 
-    Ok(ExecuteProcess(process_execution::ExecuteProcessRequest {
+    Ok(process_execution::ExecuteProcessRequest {
       argv: externs::project_multi_strs(&value, "argv"),
       env: env,
       input_files: digest,
@@ -454,34 +460,81 @@ impl ExecuteProcess {
       local_scratch_dest_dir: local_scratch_dest_dir,
       local_scratch_source_dir: local_scratch_source_dir,
       jdk_home: jdk_home,
-    }))
+      target_platform: target_platform,
+    })
+  }
+  fn lift(value: &Value) -> Result<MultiPlatformExecuteProcess, String> {
+    let constraint_parts = externs::project_multi_strs(&value, "platform_constraints");
+    if constraint_parts.len() % 2 != 0 {
+      return Err("Error parsing platform_constraints: odd number of parts".to_owned());
+    }
+    let constraint_key_pairs: Vec<_> = constraint_parts
+      .chunks_exact(2)
+      .map(|constraint_key_pair| {
+        (
+          Platform::try_from(&constraint_key_pair[0]).unwrap(),
+          Platform::try_from(&constraint_key_pair[1]).unwrap(),
+        )
+      })
+      .collect();
+    let requests = externs::project_multi(&value, "execute_process_requests");
+    if constraint_parts.len() / 2 != requests.len() {
+      return Err(format!(
+        "Size of constraint keys and requests does not match: {} vs. {}",
+        constraint_parts.len() / 2,
+        requests.len()
+      ));
+    }
+
+    let mut request_by_constraint: BTreeMap<(Platform, Platform), ExecuteProcessRequest> =
+      BTreeMap::new();
+    for (constraint_key, execute_process) in constraint_key_pairs.iter().zip(requests.iter()) {
+      let underlying_req =
+        MultiPlatformExecuteProcess::lift_execute_process(execute_process, constraint_key.1)?;
+      request_by_constraint.insert(constraint_key.clone(), underlying_req.clone());
+    }
+    Ok(MultiPlatformExecuteProcess(
+      MultiPlatformExecuteProcessRequest(request_by_constraint),
+    ))
   }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ProcessResult(process_execution::FallibleExecuteProcessResult);
+impl From<MultiPlatformExecuteProcess> for NodeKey {
+  fn from(n: MultiPlatformExecuteProcess) -> Self {
+    NodeKey::MultiPlatformExecuteProcess(Box::new(n))
+  }
+}
 
-impl WrappedNode for ExecuteProcess {
+impl WrappedNode for MultiPlatformExecuteProcess {
   type Item = ProcessResult;
 
   fn run(self, context: Context) -> NodeFuture<ProcessResult> {
     let request = self.0;
     let workunit_store = context.session.workunit_store();
-    context
+    if context
       .core
       .command_runner
-      .run(request, workunit_store)
-      .map(ProcessResult)
-      .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
-      .to_boxed()
+      .extract_compatible_request(&request)
+      .is_some()
+    {
+      context
+        .core
+        .command_runner
+        .run(request, workunit_store)
+        .map(ProcessResult)
+        .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
+        .to_boxed()
+    } else {
+      err(throw(&format!(
+        "No compatible platform found for request: {:?}",
+        request
+      )))
+    }
   }
 }
 
-impl From<ExecuteProcess> for NodeKey {
-  fn from(n: ExecuteProcess) -> Self {
-    NodeKey::ExecuteProcess(Box::new(n))
-  }
-}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProcessResult(process_execution::FallibleExecuteProcessResult);
 
 ///
 /// A Node that represents reading the destination of a symlink (non-recursively).
@@ -662,6 +715,7 @@ impl Snapshot {
       &[
         Self::store_path(&item.path),
         externs::store_bytes(&item.content),
+        externs::store_bool(item.is_executable),
       ],
     )
   }
@@ -724,7 +778,7 @@ impl DownloadedFile {
           .and_then(move |()| {
             core
               .store()
-              .snapshot_of_one_file(PathBuf::from(file_name), digest)
+              .snapshot_of_one_file(PathBuf::from(file_name), digest, true)
           })
       })
       .to_boxed()
@@ -1088,7 +1142,7 @@ impl NodeTracer<NodeKey> for Tracer {
 pub enum NodeKey {
   DigestFile(DigestFile),
   DownloadedFile(DownloadedFile),
-  ExecuteProcess(Box<ExecuteProcess>),
+  MultiPlatformExecuteProcess(Box<MultiPlatformExecuteProcess>),
   ReadLink(ReadLink),
   Scandir(Scandir),
   Select(Box<Select>),
@@ -1099,7 +1153,7 @@ pub enum NodeKey {
 impl NodeKey {
   fn product_str(&self) -> String {
     match self {
-      &NodeKey::ExecuteProcess(..) => "ProcessResult".to_string(),
+      &NodeKey::MultiPlatformExecuteProcess(..) => "ProcessResult".to_string(),
       &NodeKey::DownloadedFile(..) => "DownloadedFile".to_string(),
       &NodeKey::Select(ref s) => format!("{}", s.product),
       &NodeKey::Task(ref s) => format!("{}", s.product),
@@ -1120,7 +1174,7 @@ impl NodeKey {
       // Explicitly listed so that if people add new NodeKeys they need to consider whether their
       // NodeKey represents an FS operation, and accordingly whether they need to add it to the
       // above list or the below list.
-      &NodeKey::ExecuteProcess { .. }
+      &NodeKey::MultiPlatformExecuteProcess { .. }
       | &NodeKey::Select { .. }
       | &NodeKey::Snapshot { .. }
       | &NodeKey::Task { .. }
@@ -1150,7 +1204,7 @@ impl Node for NodeKey {
       match self {
         NodeKey::DigestFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
         NodeKey::DownloadedFile(n) => n.run(context).map(NodeResult::from).to_boxed(),
-        NodeKey::ExecuteProcess(n) => n.run(context).map(NodeResult::from).to_boxed(),
+        NodeKey::MultiPlatformExecuteProcess(n) => n.run(context).map(NodeResult::from).to_boxed(),
         NodeKey::ReadLink(n) => n.run(context).map(NodeResult::from).to_boxed(),
         NodeKey::Scandir(n) => n.run(context).map(NodeResult::from).to_boxed(),
         NodeKey::Select(n) => n.run(context).map(NodeResult::from).to_boxed(),
@@ -1199,7 +1253,9 @@ impl Display for NodeKey {
     match self {
       &NodeKey::DigestFile(ref s) => write!(f, "DigestFile({:?})", s.0),
       &NodeKey::DownloadedFile(ref s) => write!(f, "DownloadedFile({:?})", s.0),
-      &NodeKey::ExecuteProcess(ref s) => write!(f, "ExecuteProcess({:?}", s.0),
+      &NodeKey::MultiPlatformExecuteProcess(ref s) => {
+        write!(f, "MultiPlatformExecuteProcess({:?}", s.0)
+      }
       &NodeKey::ReadLink(ref s) => write!(f, "ReadLink({:?})", s.0),
       &NodeKey::Scandir(ref s) => write!(f, "Scandir({:?})", s.0),
       &NodeKey::Select(ref s) => write!(f, "Select({}, {})", s.params, s.product,),

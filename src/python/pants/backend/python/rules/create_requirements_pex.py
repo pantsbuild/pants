@@ -5,7 +5,9 @@ from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment, PythonNativeCode
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.engine.fs import Digest
-from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
+from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
+                                           MultiPlatformExecuteProcessRequest)
+from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.util.objects import datatype, hashable_string_list, string_optional, string_type
@@ -27,8 +29,8 @@ class RequirementsPex(datatype([('directory_digest', Digest)])):
 
 # TODO: This is non-hermetic because the requirements will be resolved on the fly by
 # pex, where it should be hermetically provided in some way.
-@rule(RequirementsPex, [RequirementsPexRequest, DownloadedPexBin, PythonSetup, PexBuildEnvironment])
-def create_requirements_pex(request, pex_bin, python_setup, pex_build_environment):
+@rule(RequirementsPex, [RequirementsPexRequest, DownloadedPexBin, PythonSetup, PexBuildEnvironment, Platform])
+def create_requirements_pex(request, pex_bin, python_setup, pex_build_environment, platform):
   """Returns a PEX with the given requirements, optional entry point, and optional
   interpreter constraints."""
 
@@ -50,16 +52,27 @@ def create_requirements_pex(request, pex_bin, python_setup, pex_build_environmen
   if request.entry_point is not None:
     argv.extend(["--entry-point", request.entry_point])
   argv.extend(interpreter_constraint_args + list(request.requirements))
-
-  execute_process_request = ExecuteProcessRequest(
-    argv=tuple(argv),
-    env=env,
-    input_files=pex_bin.directory_digest,
-    description=f"Create a requirements PEX: {', '.join(request.requirements)}",
-    output_files=(request.output_filename,),
+  # NOTE
+  # PEX outputs are platform dependent so in order to get a PEX that we can use locally, without cross-building
+  # we specify that out PEX command be run on the current local platform. When we support cross-building
+  # through CLI flags we can configure requests that build a PEX for out local platform that are
+  # able to execute on a different platform, but for now in order to guarantee correct build we need
+  # to restrict this command to execute on the same platform type that the output is intended for.
+  # The correct way to interpret the keys (execution_platform_constraint, target_platform_constraint)
+  # of this dictionary is "The output of this command is intended for `target_platform_constraint` iff
+  # it is run on `execution_platform_constraint`".
+  execute_process_request = MultiPlatformExecuteProcessRequest(
+    {
+      (PlatformConstraint(platform.value), PlatformConstraint(platform.value)): ExecuteProcessRequest(
+        argv=tuple(argv),
+        env=env,
+        input_files=pex_bin.directory_digest,
+        description=f"Create a requirements PEX: {', '.join(request.requirements)}",
+        output_files=(request.output_filename,))
+    }
   )
 
-  result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, execute_process_request)
+  result = yield Get(ExecuteProcessResult, MultiPlatformExecuteProcessRequest, execute_process_request)
   yield RequirementsPex(directory_digest=result.output_directory_digest)
 
 

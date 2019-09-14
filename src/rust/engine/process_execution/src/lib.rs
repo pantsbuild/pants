@@ -32,6 +32,7 @@ extern crate derivative;
 use boxfuture::BoxFuture;
 use bytes::Bytes;
 use std::collections::{BTreeMap, BTreeSet};
+use std::convert::TryFrom;
 use std::ops::AddAssign;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -45,6 +46,55 @@ pub mod cache;
 pub mod local;
 pub mod remote;
 pub mod speculate;
+
+extern crate uname;
+
+#[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum Platform {
+  Darwin,
+  Linux,
+  None,
+}
+
+impl Platform {
+  pub fn current_platform() -> Result<Platform, String> {
+    let platform_info = uname::uname().expect("Failed to get local platform info!");
+    match platform_info {
+      uname::Info { ref sysname, .. } if sysname.to_lowercase() == "darwin" => Ok(Platform::Darwin),
+      uname::Info { ref sysname, .. } if sysname.to_lowercase() == "linux" => Ok(Platform::Linux),
+      uname::Info { ref sysname, .. } => Err(format!("Found unknown system name {}", sysname)),
+    }
+  }
+}
+
+impl TryFrom<&String> for Platform {
+  type Error = String;
+  ///
+  /// This is a helper method to convert values from the python/engine/platform.py::Platform enum,
+  /// which have been serialized, into the rust Platform enum.
+  ///
+  fn try_from(variant_candidate: &String) -> Result<Self, Self::Error> {
+    match variant_candidate.as_ref() {
+      "darwin" => Ok(Platform::Darwin),
+      "linux" => Ok(Platform::Linux),
+      "none" => Ok(Platform::None),
+      other => Err(format!(
+        "Unknown, platform {:?} encountered in parsing",
+        other
+      )),
+    }
+  }
+}
+
+impl From<Platform> for String {
+  fn from(platform: Platform) -> String {
+    match platform {
+      Platform::Linux => "linux".to_string(),
+      Platform::Darwin => "osx".to_string(),
+      Platform::None => "none".to_string(),
+    }
+  }
+}
 
 ///
 /// A process to be executed.
@@ -96,6 +146,38 @@ pub struct ExecuteProcessRequest {
   /// see https://github.com/pantsbuild/pants/issues/6416.
   ///
   pub jdk_home: Option<PathBuf>,
+  pub target_platform: Platform,
+}
+
+impl TryFrom<MultiPlatformExecuteProcessRequest> for ExecuteProcessRequest {
+  type Error = String;
+
+  fn try_from(req: MultiPlatformExecuteProcessRequest) -> Result<Self, Self::Error> {
+    match req.0.get(&(Platform::None, Platform::None)) {
+      Some(crossplatform_req) => Ok(crossplatform_req.clone()),
+      None => Err(String::from(
+        "Cannot coerce to a simple ExecuteProcessRequest, no cross platform request exists.",
+      )),
+    }
+  }
+}
+
+///
+/// A container of platform constrained processes.
+///
+#[derive(Derivative, Clone, Debug, Eq, PartialEq, Hash)]
+pub struct MultiPlatformExecuteProcessRequest(
+  pub BTreeMap<(Platform, Platform), ExecuteProcessRequest>,
+);
+
+impl From<ExecuteProcessRequest> for MultiPlatformExecuteProcessRequest {
+  fn from(req: ExecuteProcessRequest) -> Self {
+    MultiPlatformExecuteProcessRequest(
+      vec![((Platform::None, Platform::None), req)]
+        .into_iter()
+        .collect(),
+    )
+  }
 }
 
 ///
@@ -155,11 +237,26 @@ impl AddAssign<UploadSummary> for ExecutionStats {
 }
 
 pub trait CommandRunner: Send + Sync {
+  ///
+  /// Submit a request for execution on the underlying runtime, and return
+  /// a future for it.
+  ///
   fn run(
     &self,
-    req: ExecuteProcessRequest,
+    req: MultiPlatformExecuteProcessRequest,
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<FallibleExecuteProcessResult, String>;
+
+  ///
+  /// Given a multi platform request which may have some platform
+  /// constraints determine if any of the requests contained within are compatible
+  /// with the current command runners platform configuration. If so return the
+  /// first candidate that will be run if the multi platform request is submitted to
+  /// `fn run(..)`
+  fn extract_compatible_request(
+    &self,
+    req: &MultiPlatformExecuteProcessRequest,
+  ) -> Option<ExecuteProcessRequest>;
 }
 
 ///
@@ -181,7 +278,7 @@ impl BoundedCommandRunner {
 impl CommandRunner for BoundedCommandRunner {
   fn run(
     &self,
-    req: ExecuteProcessRequest,
+    req: MultiPlatformExecuteProcessRequest,
     workunit_store: WorkUnitStore,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let inner = self.inner.clone();
@@ -190,11 +287,24 @@ impl CommandRunner for BoundedCommandRunner {
       .1
       .with_acquired(move || inner.0.run(req, workunit_store))
   }
+
+  fn extract_compatible_request(
+    &self,
+    req: &MultiPlatformExecuteProcessRequest,
+  ) -> Option<ExecuteProcessRequest> {
+    self.inner.0.extract_compatible_request(&req)
+  }
+}
+
+impl From<Box<BoundedCommandRunner>> for Arc<dyn CommandRunner> {
+  fn from(command_runner: Box<BoundedCommandRunner>) -> Arc<dyn CommandRunner> {
+    Arc::new(*command_runner)
+  }
 }
 
 #[cfg(test)]
 mod tests {
-  use super::ExecuteProcessRequest;
+  use super::{ExecuteProcessRequest, Platform};
   use std::collections::hash_map::DefaultHasher;
   use std::collections::{BTreeMap, BTreeSet};
   use std::hash::{Hash, Hasher};
@@ -212,6 +322,7 @@ mod tests {
         timeout,
         description,
         jdk_home: None,
+        target_platform: Platform::None,
       };
 
     fn hash<Hashable: Hash>(hashable: &Hashable) -> u64 {

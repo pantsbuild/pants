@@ -33,8 +33,9 @@ use process_execution;
 
 use clap::{value_t, App, AppSettings, Arg};
 use hashing::{Digest, Fingerprint};
-use process_execution::ExecuteProcessRequestMetadata;
+use process_execution::{ExecuteProcessRequestMetadata, Platform};
 use std::collections::{BTreeMap, BTreeSet};
+use std::convert::TryFrom;
 use std::iter::Iterator;
 use std::path::PathBuf;
 use std::process::exit;
@@ -159,6 +160,13 @@ fn main() {
             .takes_value(true)
             .required(false)
             .help("Symlink a JDK from .jdk in the working directory. For local execution, symlinks to the value of this flag. For remote execution, just requests that some JDK is symlinked if this flag has any value. https://github.com/pantsbuild/pants/issues/6416 will make this less weird in the future.")
+      )
+      .arg(
+        Arg::with_name("target-platform")
+            .long("target-platform")
+            .takes_value(true)
+            .required(true)
+            .help("The name of the platform that this request's output is compatible with. Options are 'linux', 'darwin', or 'none' (which indicates either)")
       )
     .setting(AppSettings::TrailingVarArg)
     .arg(
@@ -295,6 +303,8 @@ fn main() {
     timeout: Duration::new(15 * 60, 0),
     description: "process_executor".to_string(),
     jdk_home: args.value_of("jdk").map(PathBuf::from),
+    target_platform: Platform::try_from(&args.value_of("target-platform").unwrap().to_string())
+      .expect("invalid value for `target-platform"),
   };
 
   let runner: Box<dyn process_execution::CommandRunner> = match server_arg {
@@ -322,6 +332,8 @@ fn main() {
         root_ca_certs,
         oauth_bearer_token,
         store.clone(),
+        Platform::Linux,
+        executor.clone(),
       )) as Box<dyn process_execution::CommandRunner>
     }
     None => Box::new(process_execution::local::CommandRunner::new(
@@ -335,7 +347,7 @@ fn main() {
   let mut runtime = Runtime::new().unwrap();
 
   let result = runtime
-    .block_on(runner.run(request, WorkUnitStore::new()))
+    .block_on(runner.run(request.into(), WorkUnitStore::new()))
     .expect("Error executing");
 
   if let Some(output) = args.value_of("materialize-output-to").map(PathBuf::from) {

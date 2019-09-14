@@ -4,26 +4,10 @@
 import os
 from abc import ABC, abstractmethod
 
-from pants.engine.rules import rule
-from pants.util.memo import memoized_classproperty, memoized_property
-from pants.util.objects import datatype, enum
-from pants.util.osutil import all_normalized_os_names, get_normalized_os_name
+from pants.engine.platform import Platform
+from pants.util.memo import memoized_classproperty
+from pants.util.objects import datatype
 from pants.util.strutil import create_path_env_var
-
-
-class Platform(enum(all_normalized_os_names())):
-
-  # TODO: try to turn all of these accesses into v2 dependency injections!
-  @memoized_classproperty
-  def current(cls):
-    return cls(get_normalized_os_name())
-
-  @memoized_property
-  def runtime_lib_path_env_var(self):
-    return self.resolve_for_enum_variant({
-      'darwin': 'DYLD_LIBRARY_PATH',
-      'linux': 'LD_LIBRARY_PATH',
-    })
 
 
 class _list_field(property):
@@ -294,14 +278,3 @@ class CppToolchain(datatype([('cpp_compiler', CppCompiler), ('cpp_linker', Linke
 # TODO: make this an @rule, after we can automatically produce LibcDev and other subsystems in the
 # v2 engine (see #5788).
 class HostLibcDev(datatype(['crti_object', 'fingerprint'])): pass
-
-
-@rule(Platform, [])
-def platform_singleton():
-  return Platform.current
-
-
-def create_native_environment_rules():
-  return [
-    platform_singleton,
-  ]

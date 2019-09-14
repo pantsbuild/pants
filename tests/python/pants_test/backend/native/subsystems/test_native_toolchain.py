@@ -14,6 +14,7 @@ from pants.backend.native.subsystems.libc_dev import LibcDev
 from pants.backend.native.subsystems.native_toolchain import (GCCCppToolchain, GCCCToolchain,
                                                               LLVMCppToolchain, LLVMCToolchain,
                                                               NativeToolchain)
+from pants.engine.platform import create_platform_rules
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import is_executable, safe_open
 from pants.util.strutil import safe_shlex_join
@@ -35,7 +36,7 @@ class TestNativeToolchain(TestBase, SchedulerTestBase):
 
     self.platform = Platform.current
     self.toolchain = global_subsystem_instance(NativeToolchain)
-    self.rules = native_backend_rules()
+    self.rules = native_backend_rules() + create_platform_rules()
 
     gcc_subsystem = global_subsystem_instance(GCC)
     self.gcc_version = gcc_subsystem.version()

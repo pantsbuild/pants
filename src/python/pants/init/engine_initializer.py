@@ -31,6 +31,7 @@ from pants.engine.legacy.structs import (JvmAppAdaptor, JvmBinaryAdaptor, PageAd
 from pants.engine.legacy.structs import rules as structs_rules
 from pants.engine.mapper import AddressMapper
 from pants.engine.parser import SymbolTable
+from pants.engine.platform import create_platform_rules
 from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import Scheduler
 from pants.engine.selectors import Params
@@ -348,6 +349,7 @@ class EngineInitializer:
       create_legacy_graph_tasks() +
       create_fs_rules() +
       create_process_rules() +
+      create_platform_rules() +
       create_graph_rules(address_mapper) +
       create_options_parsing_rules() +
       structs_rules() +

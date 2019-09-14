@@ -16,7 +16,8 @@ from pants.build_graph.address import Address
 from pants.engine.fs import (Digest, DirectoriesToMerge, DirectoryToMaterialize,
                              DirectoryWithPrefixToStrip, FileContent, FilesContent,
                              InputFilesContent, PathGlobs, PathGlobsAndRoot, Snapshot, UrlToFetch)
-from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
+from pants.engine.isolated_process import (FallibleExecuteProcessResult,
+                                           MultiPlatformExecuteProcessRequest)
 from pants.engine.native import Function, TypeId
 from pants.engine.nodes import Return, Throw
 from pants.engine.objects import Collection
@@ -109,12 +110,11 @@ class Scheduler:
       type_dir=Dir,
       type_file=File,
       type_link=Link,
-      type_process_request=ExecuteProcessRequest,
+      type_multi_platform_process_request=MultiPlatformExecuteProcessRequest,
       type_process_result=FallibleExecuteProcessResult,
       type_generator=GeneratorType,
       type_url_to_fetch=UrlToFetch,
     )
-
 
     # If configured, visualize the rule graph before asserting that it is valid.
     if self._visualize_to_dir is not None:
