@@ -350,8 +350,8 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
     from pathlib import Path
 
     input_file = InputFilesContent((
-      FileContent(path='a.file', content=b'test'),
-      FileContent(path='subdir/b.file', content=b'some content'),
+      FileContent(path='a.file', content=b'test', is_executable=False),
+      FileContent(path='subdir/b.file', content=b'some content', is_executable=False),
     ))
 
     digest, = self.scheduler.product_request(Digest, [input_file])
