@@ -14,7 +14,6 @@ public final class Greeting {
   public static String greetFromFile(String filename) throws IOException {
     FileInputStream is = new FileInputStream(filename);
     try {
-      int x = 32;
       return greetFromStream(is);
     } finally {
       is.close();
