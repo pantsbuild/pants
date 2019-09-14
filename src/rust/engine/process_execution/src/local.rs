@@ -283,10 +283,10 @@ impl super::CommandRunner for CommandRunner {
         maybe_local_scratch_source_dir.map(|local_scratch_source_dir| {
           maybe_local_scratch_dest_dir.map(|local_scratch_dest_dir| {
             debug!("local scratch dir is in use.");
-            let dest_dir =  workdir_path4.clone().join(local_scratch_dest_dir.clone());
+            let dest_dir = workdir_path4.clone().join(local_scratch_dest_dir.clone());
             debug!("Scratch dest dir: {}", dest_dir.as_path().display());;
             debug!("============ before ============");
-            for file in walkdir::WalkDir::new( workdir_path4.clone()) {
+            for file in walkdir::WalkDir::new(workdir_path4.clone()) {
               debug!("{}", file.unwrap().path().display());
             }
             if !dest_dir.exists() {
@@ -294,7 +294,7 @@ impl super::CommandRunner for CommandRunner {
               copy_dir(&local_scratch_source_dir, dest_dir).unwrap();
             }
             debug!("============ after ============");
-            for file in walkdir::WalkDir::new( workdir_path4.clone()) {
+            for file in walkdir::WalkDir::new(workdir_path4.clone()) {
               debug!("{}", file.unwrap().path().display());
             }
           })
