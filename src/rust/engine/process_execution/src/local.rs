@@ -2,9 +2,10 @@ use log;
 use tempfile;
 
 use boxfuture::{try_future, BoxFuture, Boxable};
+use copy_dir::copy_dir;
 use fs::{self, GlobExpansionConjunction, GlobMatching, PathGlobs, StrictGlobMatching};
 use futures::{future, Future, Stream};
-use log::info;
+use log::{debug, info};
 use std::collections::{BTreeSet, HashSet};
 use std::ffi::OsStr;
 use std::fs::create_dir_all;
@@ -15,8 +16,6 @@ use std::process::{Command, Stdio};
 use std::sync::Arc;
 use store::{OneOffStoreFileByDigest, Snapshot, Store};
 
-use copy_dir::copy_dir;
-use log::{error};
 use tokio_codec::{BytesCodec, FramedRead};
 use tokio_process::CommandExt;
 
@@ -233,6 +232,7 @@ impl super::CommandRunner for CommandRunner {
     let workdir_path = workdir.path().to_owned();
     let workdir_path2 = workdir_path.clone();
     let workdir_path3 = workdir_path.clone();
+    let workdir_path4 = workdir_path.clone();
     let store = self.store.clone();
     let executor = self.executor.clone();
 
@@ -255,19 +255,25 @@ impl super::CommandRunner for CommandRunner {
           symlink(jdk_home, workdir_path3.clone().join(".jdk"))
             .map_err(|err| format!("Error making symlink for local execution: {:?}", err))
         })?;
+
+        // This part is diverging from the protocol and is for local only.
         maybe_local_scratch_source_dir.map(|local_scratch_source_dir| {
           maybe_local_scratch_dest_dir.map(|local_scratch_dest_dir| {
-            let mut xyz = local_scratch_dest_dir.clone();
-            xyz.push("test");
-            copy_dir(&local_scratch_source_dir, xyz).unwrap();
-
-            let y = local_scratch_dest_dir.clone();
-            error!("{}", "bad boy");;
-            error!("{}", y.as_path().display());;
-            for file in walkdir::WalkDir::new(y) {
-              error!("cargo:rerun-if-changed={}", file.unwrap().path().display());
+            debug!("local scratch dir is in use.");
+            let dest_dir =  workdir_path4.clone().join(local_scratch_dest_dir.clone());
+            debug!("Scratch dest dir: {}", dest_dir.as_path().display());;
+            debug!("============ before ============");
+            for file in walkdir::WalkDir::new( workdir_path4.clone()) {
+              debug!("{}", file.unwrap().path().display());
             }
-//            copy_dir(&local_scratch_source_dir, "/tmp/123").unwrap();
+            if !dest_dir.exists() {
+              debug!("copying!!!");
+              copy_dir(&local_scratch_source_dir, dest_dir).unwrap();
+            }
+            debug!("============ after ============");
+            for file in walkdir::WalkDir::new( workdir_path4.clone()) {
+              debug!("{}", file.unwrap().path().display());
+            }
           })
         });
         // The bazel remote execution API specifies that the parent directories for output files and
