@@ -1219,6 +1219,8 @@ pub mod tests {
         .collect(),
       timeout: Duration::from_millis(1000),
       description: "some description".to_owned(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: None,
       target_platform: Platform::None,
     };
@@ -1299,6 +1301,8 @@ pub mod tests {
         .collect(),
       timeout: Duration::from_millis(1000),
       description: "some description".to_owned(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: None,
       target_platform: Platform::None,
     };
@@ -1387,6 +1391,8 @@ pub mod tests {
         .collect(),
       timeout: Duration::from_millis(1000),
       description: "some description".to_owned(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: None,
       target_platform: Platform::None,
     };
@@ -1471,6 +1477,8 @@ pub mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "some description".to_owned(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: Some(PathBuf::from("/tmp")),
       target_platform: Platform::None,
     };
@@ -1533,6 +1541,8 @@ pub mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "some description".to_owned(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: Some(PathBuf::from("/tmp")),
       target_platform: Platform::None,
     };
@@ -1625,6 +1635,8 @@ pub mod tests {
               output_directories: BTreeSet::new(),
               timeout: Duration::from_millis(1000),
               description: "wrong command".to_string(),
+              local_scratch_dest_dir: None,
+              local_scratch_source_dir: None,
               jdk_home: None,
               target_platform: Platform::None,
             },
@@ -1907,6 +1919,8 @@ pub mod tests {
       output_directories: BTreeSet::new(),
       timeout: request_timeout,
       description: "echo-a-foo".to_string(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: None,
       target_platform: Platform::None,
     };
@@ -1955,6 +1969,8 @@ pub mod tests {
       output_directories: BTreeSet::new(),
       timeout: request_timeout,
       description: "echo-a-foo".to_string(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: None,
       target_platform: Platform::None,
     };
@@ -3074,6 +3090,8 @@ pub mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(5000),
       description: "echo a foo".to_string(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: None,
       target_platform: Platform::None,
     };
@@ -3347,6 +3365,8 @@ pub mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "cat a roland".to_string(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: None,
       target_platform: Platform::None,
     };
@@ -3362,6 +3382,8 @@ pub mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "unleash a roaring meow".to_string(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: None,
       target_platform: Platform::None,
     };

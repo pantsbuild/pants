@@ -321,6 +321,8 @@ mod tests {
         output_directories: BTreeSet::new(),
         timeout,
         description,
+        local_scratch_dest_dir: None,
+        local_scratch_source_dir: None,
         jdk_home: None,
         target_platform: Platform::None,
       };

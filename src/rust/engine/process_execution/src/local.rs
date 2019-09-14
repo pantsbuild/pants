@@ -418,6 +418,8 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "echo foo".to_string(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -445,6 +447,8 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "echo foo and fail".to_string(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -473,6 +477,8 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "kill self".to_string(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -504,6 +510,8 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "run env".to_string(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -541,6 +549,8 @@ mod tests {
         output_directories: BTreeSet::new(),
         timeout: Duration::from_millis(1000),
         description: "run env".to_string(),
+        local_scratch_dest_dir: None,
+        local_scratch_source_dir: None,
         jdk_home: None,
         target_platform: Platform::None,
       }
@@ -561,6 +571,8 @@ mod tests {
       output_files: BTreeSet::new(),
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       description: "echo foo".to_string(),
       jdk_home: None,
       target_platform: Platform::None,
@@ -578,6 +590,8 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -607,6 +621,8 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -642,6 +658,8 @@ mod tests {
       output_directories: vec![PathBuf::from("cats")].into_iter().collect(),
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -678,6 +696,8 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "treats-roland".to_string(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -712,6 +732,8 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "echo foo".to_string(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -744,6 +766,8 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "echo-roland".to_string(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -774,6 +798,8 @@ mod tests {
       output_directories: vec![PathBuf::from("cats")].into_iter().collect(),
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -804,6 +830,8 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "cat roland".to_string(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: Some(preserved_work_tmpdir.path().to_path_buf()),
       target_platform: Platform::None,
     });
@@ -837,6 +865,8 @@ mod tests {
         output_directories: BTreeSet::new(),
         timeout: Duration::from_millis(1000),
         description: "bash".to_string(),
+        local_scratch_dest_dir: None,
+        local_scratch_source_dir: None,
         jdk_home: None,
         target_platform: Platform::None,
       },
@@ -873,6 +903,8 @@ mod tests {
         output_directories: BTreeSet::new(),
         timeout: Duration::from_millis(1000),
         description: "failing execution".to_string(),
+        local_scratch_dest_dir: None,
+        local_scratch_source_dir: None,
         jdk_home: None,
         target_platform: Platform::None,
       },
@@ -906,6 +938,8 @@ mod tests {
       output_directories: vec![PathBuf::from("birds/falcons")].into_iter().collect(),
       timeout: Duration::from_millis(1000),
       description: "create nonoverlapping directories and file".to_string(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -936,6 +970,8 @@ mod tests {
       output_directories: vec![PathBuf::from("falcons")].into_iter().collect(),
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
+      local_scratch_dest_dir: None,
+      local_scratch_source_dir: None,
       jdk_home: None,
       target_platform: Platform::None,
     });
