@@ -2,6 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 files(
+  name = 'antlr_directory',
+  sources = rglobs('antlr/*'),
+)
+
+files(
   name = 'build_file_imports_function_directory',
   sources = rglobs('build_file_imports_function/*'),
 )
