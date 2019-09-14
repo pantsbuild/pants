@@ -17,6 +17,21 @@ files(
 )
 
 files(
+  name = 'interpreter_selection_directory',
+  sources = rglobs('interpreter_selection/*'),
+)
+
+files(
+  name = 'python_distribution_directory',
+  sources = rglobs('python_distribution/*'),
+)
+
+files(
+  name = 'print_env_directory',
+  sources = rglobs('print_env/*'),
+)
+
+files(
   name = 'python_targets_directory',
   sources = rglobs('python_targets/*'),
   dependencies = [

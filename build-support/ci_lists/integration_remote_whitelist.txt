@@ -57,6 +57,11 @@ tests/python/pants_test/backend/jvm/tasks:scope_provided_integration
 tests/python/pants_test/backend/jvm/tasks:scope_runtime_integration
 tests/python/pants_test/backend/jvm/tasks:scope_test_integration
 tests/python/pants_test/backend/jvm:integration
+tests/python/pants_test/backend/python/rules:python_test_runner_integration
+tests/python/pants_test/backend/python/tasks:interpreter_selection_integration
+tests/python/pants_test/backend/python/tasks:isort_run_integration
+tests/python/pants_test/backend/python/tasks:python_repl_integration
+tests/python/pants_test/backend/python/tasks:python_run_integration
 tests/python/pants_test/base:exclude_target_regexp_integration
 tests/python/pants_test/base:exiter_integration
 tests/python/pants_test/bin:integration

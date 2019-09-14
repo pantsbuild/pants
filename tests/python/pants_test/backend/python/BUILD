@@ -45,6 +45,8 @@ python_tests(
     ':pants_requirement_integration_test_base',
     'src/python/pants/base:build_environment',
     'tests/python/pants_test:int-test',
+    'examples/tests/python/example_test:hello_directory',
+    'testprojects:pants_plugins_directory',
   ],
   tags={'integration'},
 )
