@@ -5,7 +5,9 @@ import errno
 import logging
 import os
 import re
+import shutil
 import textwrap
+import zipfile
 from collections import defaultdict
 from contextlib import closing
 from xml.etree import ElementTree
@@ -24,7 +26,7 @@ from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
 from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
 from pants.engine.isolated_process import ExecuteProcessRequest
-from pants.util.contextutil import open_zip
+from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import classproperty
@@ -459,12 +461,6 @@ class BaseZincCompile(JvmCompile):
       ),
     ])
 
-    classes_dir_snapshot, = self.context._scheduler.capture_snapshots([
-      PathGlobsAndRoot(
-        PathGlobs([classes_dir]),
-        get_buildroot(),
-      ),
-    ])
     # TODO: Extract something common from Executor._create_command to make the command line
     argv = image_specific_argv + ['@{}'.format(argfile_snapshot.files[0])]
 
@@ -476,7 +472,7 @@ class BaseZincCompile(JvmCompile):
       [self.post_compile_extra_resources_digest(ctx), argfile_snapshot.directory_digest] +
       # It is okay to unconditionally add the analysis file and classes_dir snapshots here,
       # because if the compile is not incremental, the snapshots would be empty.
-      [analysis_snapshot.directory_digest, classes_dir_snapshot.directory_digest]
+      [analysis_snapshot.directory_digest]
     )
 
     # NB: We always capture the output jar, but if classpath jars are not used, we additionally
@@ -484,24 +480,37 @@ class BaseZincCompile(JvmCompile):
     #   1) allow loose classes as an input to dependent compiles
     #   2) allow jars to be materialized at the end of the run.
     output_directories = () if self.get_options().use_classpath_jars else (classes_dir,)
-    req = ExecuteProcessRequest(
-      argv=tuple(argv),
-      input_files=merged_input_digest,
-      output_files=(jar_file, relpath_to_analysis),
-      output_directories=output_directories,
-      description="zinc compile for {}".format(ctx.target.address.spec),
-      jdk_home=self._zinc.underlying_dist.home,
-    )
-    res = self.context.execute_process_synchronously_or_raise(
-      req, self.name(), [WorkUnitLabel.COMPILER])
 
-    # TODO: Materialize as a batch in do_compile or somewhere
-    self.context._scheduler.materialize_directories((
-      DirectoryToMaterialize(get_buildroot(), res.output_directory_digest),
-    ))
+    with temporary_dir() as tmpdir:
+      tmp_classes_dir = os.path.join(tmpdir, 'classes')
+      if not self.get_options().use_classpath_jars:
+        shutil.copytree(classes_dir, tmp_classes_dir)
+      elif self.get_options().use_classpath_jars and os.path.exists(jar_file):
+        with zipfile.ZipFile(jar_file, 'r') as zip_ref:
+          zip_ref.extractall(tmp_classes_dir)
+      else:
+        tmp_classes_dir = None
 
-    # TODO: This should probably return a ClasspathEntry rather than a Digest
-    return res.output_directory_digest
+      req = ExecuteProcessRequest(
+        argv=tuple(argv),
+        input_files=merged_input_digest,
+        output_files=(jar_file, relpath_to_analysis),
+        output_directories=output_directories,
+        description="zinc compile for {}".format(ctx.target.address.spec),
+        local_scratch_source_dir=tmp_classes_dir,
+        local_scratch_dest_dir=classes_dir,
+        jdk_home=self._zinc.underlying_dist.home,
+      )
+      res = self.context.execute_process_synchronously_or_raise(
+        req, self.name(), [WorkUnitLabel.COMPILER])
+
+      # TODO: Materialize as a batch in do_compile or somewhere
+      self.context._scheduler.materialize_directories((
+        DirectoryToMaterialize(get_buildroot(), res.output_directory_digest),
+      ))
+
+      # TODO: This should probably return a ClasspathEntry rather than a Digest
+      return res.output_directory_digest
 
   def get_zinc_compiler_classpath(self):
     """Get the classpath for the zinc compiler JVM tool.

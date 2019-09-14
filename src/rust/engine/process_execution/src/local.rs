@@ -15,6 +15,8 @@ use std::process::{Command, Stdio};
 use std::sync::Arc;
 use store::{OneOffStoreFileByDigest, Snapshot, Store};
 
+use copy_dir::copy_dir;
+use log::{error};
 use tokio_codec::{BytesCodec, FramedRead};
 use tokio_process::CommandExt;
 
@@ -242,6 +244,8 @@ impl super::CommandRunner for CommandRunner {
     let cleanup_local_dirs = self.cleanup_local_dirs;
     let argv = req.argv;
     let req_description = req.description;
+    let maybe_local_scratch_dest_dir = req.local_scratch_dest_dir;
+    let maybe_local_scratch_source_dir = req.local_scratch_source_dir;
     let maybe_jdk_home = req.jdk_home;
     self
       .store
@@ -251,6 +255,21 @@ impl super::CommandRunner for CommandRunner {
           symlink(jdk_home, workdir_path3.clone().join(".jdk"))
             .map_err(|err| format!("Error making symlink for local execution: {:?}", err))
         })?;
+        maybe_local_scratch_source_dir.map(|local_scratch_source_dir| {
+          maybe_local_scratch_dest_dir.map(|local_scratch_dest_dir| {
+            let mut xyz = local_scratch_dest_dir.clone();
+            xyz.push("test");
+            copy_dir(&local_scratch_source_dir, xyz).unwrap();
+
+            let y = local_scratch_dest_dir.clone();
+            error!("{}", "bad boy");;
+            error!("{}", y.as_path().display());;
+            for file in walkdir::WalkDir::new(y) {
+              error!("cargo:rerun-if-changed={}", file.unwrap().path().display());
+            }
+//            copy_dir(&local_scratch_source_dir, "/tmp/123").unwrap();
+          })
+        });
         // The bazel remote execution API specifies that the parent directories for output files and
         // output directories should be created before execution completes: see
         //   https://github.com/pantsbuild/pants/issues/7084.

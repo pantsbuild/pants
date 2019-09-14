@@ -425,6 +425,24 @@ impl ExecuteProcess {
       }
     };
 
+    let local_scratch_dest_dir = {
+      let val = externs::project_str(&value, "local_scratch_dest_dir");
+      if val.is_empty() {
+        None
+      } else {
+        Some(PathBuf::from(val))
+      }
+    };
+
+    let local_scratch_source_dir = {
+      let val = externs::project_str(&value, "local_scratch_source_dir");
+      if val.is_empty() {
+        None
+      } else {
+        Some(PathBuf::from(val))
+      }
+    };
+
     Ok(ExecuteProcess(process_execution::ExecuteProcessRequest {
       argv: externs::project_multi_strs(&value, "argv"),
       env: env,
@@ -433,6 +451,8 @@ impl ExecuteProcess {
       output_directories: output_directories,
       timeout: Duration::from_millis((timeout_in_seconds * 1000.0) as u64),
       description: description,
+      local_scratch_dest_dir: local_scratch_dest_dir,
+      local_scratch_source_dir: local_scratch_source_dir,
       jdk_home: jdk_home,
     }))
   }
