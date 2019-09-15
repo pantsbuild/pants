@@ -4,6 +4,94 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+
+1.21.0.dev1 (09/14/2019)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+* Introduce multi-platform support to hermetic execution. (#8216)
+  `PR #8216 <https://github.com/pantsbuild/pants/pull/8216>`_
+
+* Implement cancellation for remote execution (#8222)
+  `PR #8222 <https://github.com/pantsbuild/pants/pull/8222>`_
+
+API Changes
+~~~~~~~~~~~
+* Invoke Pants via module in ITs. (#8265)
+  `Issue #707 <https://github.com/pantsbuild/pex/issues/707>`_
+  `PR #8265 <https://github.com/pantsbuild/pants/pull/8265>`_
+
+Bugfixes
+~~~~~~~~
+* Raise a python exception, rather than panicking (#8275)
+  `PR #8275 <https://github.com/pantsbuild/pants/pull/8275>`_
+
+* Don't error on remote execution timeouts (#8269)
+  `PR #8269 <https://github.com/pantsbuild/pants/pull/8269>`_
+
+* Fix runtime_classpath initialization in node_build (#8267)
+  `PR #8267 <https://github.com/pantsbuild/pants/pull/8267>`_
+  `PR #8277 <https://github.com/pantsbuild/pants/pull/8277>`_
+
+* Add rsc_mixed_compile_classpath to RscCompile products (#8249)
+  `PR #8249 <https://github.com/pantsbuild/pants/pull/8249>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Use more precise test discovery for V2 Pytest runner (#8281)
+  `PR #8281 <https://github.com/pantsbuild/pants/pull/8281>`_
+
+* Pipe is_executable both ways in FileContent (#8271)
+  `PR #8271 <https://github.com/pantsbuild/pants/pull/8271>`_
+
+* Refactor code of remote.rs (#8276)
+  `PR #8276 <https://github.com/pantsbuild/pants/pull/8276>`_
+
+* Use InputFilesContent instead of InputFileContent (#8272)
+  `PR #8272 <https://github.com/pantsbuild/pants/pull/8272>`_
+  `PR #8226 <https://github.com/pantsbuild/pants/pull/8226>`_
+
+* Remove unused backend/jvm integration test (#8264)
+  `PR #8264 <https://github.com/pantsbuild/pants/pull/8264>`_
+
+* Port ~20 integration tests to remote execution (#8262)
+  `Issue #8113) <https://github.com/pantsbuild/pants/issues/8113)>`_
+  `PR #8262 <https://github.com/pantsbuild/pants/pull/8262>`_
+
+* Run all contrib integration tests using V2 remote execution (#8261)
+  `Issue #8113) <https://github.com/pantsbuild/pants/issues/8113)>`_
+  `PR #8261 <https://github.com/pantsbuild/pants/pull/8261>`_
+
+* Port `tasks`, `base`, and `awslambda` integration tests to V2 (#8259)
+  `PR #8259 <https://github.com/pantsbuild/pants/pull/8259>`_
+  `PR #8257 <https://github.com/pantsbuild/pants/pull/8257>`_
+
+* Refactor `init` code and tests (#8258)
+  `PR #8258 <https://github.com/pantsbuild/pants/pull/8258>`_
+
+* `pants.pex` used for tests always includes `pants.ini` (#8260)
+  `PR #8260 <https://github.com/pantsbuild/pants/pull/8260>`_
+  `PR #8259 <https://github.com/pantsbuild/pants/pull/8259>`_
+
+* Properly depend on plugins in chrooted integration tests (#8257)
+  `Issue #8113 <https://github.com/pantsbuild/pants/issues/8113>`_
+  `PR #8257 <https://github.com/pantsbuild/pants/pull/8257>`_
+
+* Refactor `pathlib.Path` usages to use multiple path segments constructor (#8255)
+  `PR #8255 <https://github.com/pantsbuild/pants/pull/8255>`_
+
+* Run first few integration tests through remote execution (#8210)
+  `Issue #8113 <https://github.com/pantsbuild/pants/issues/8113>`_
+  `PR #8210 <https://github.com/pantsbuild/pants/pull/8210>`_
+
+* Fixup `release.sh` getopts / usage. (#8254)
+  `PR #8254 <https://github.com/pantsbuild/pants/pull/8254>`_
+
+* Log computed information in RunTracker (#8237)
+  `PR #8237 <https://github.com/pantsbuild/pants/pull/8237>`_
+
+
 1.21.0.dev0 (09/06/2019)
 ------------------------
 
