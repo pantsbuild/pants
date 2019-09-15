@@ -451,15 +451,9 @@ class BaseZincCompile(JvmCompile):
         ),
       ])
 
-    # Snapshot analysis file and classes_dir for incremental compilation.
-    # If incremental is disabled, they would be empty snapshots.
+    # If analysis file exists, then incremental compile is enabled.
     relpath_to_analysis = fast_relpath(ctx.analysis_file, get_buildroot())
-    analysis_snapshot, = self.context._scheduler.capture_snapshots([
-      PathGlobsAndRoot(
-        PathGlobs([relpath_to_analysis]),
-        get_buildroot(),
-      ),
-    ])
+    scratch_inputs = self._compute_scratch_inputs(classes_dir, relpath_to_analysis, jar_file)
 
     # TODO: Extract something common from Executor._create_command to make the command line
     argv = image_specific_argv + ['@{}'.format(argfile_snapshot.files[0])]
@@ -469,10 +463,7 @@ class BaseZincCompile(JvmCompile):
       [s.directory_digest for s in snapshots] +
       directory_digests +
       native_image_snapshots +
-      [self.post_compile_extra_resources_digest(ctx), argfile_snapshot.directory_digest] +
-      # It is okay to unconditionally add the analysis file and classes_dir snapshots here,
-      # because if the compile is not incremental, the snapshots would be empty.
-      [analysis_snapshot.directory_digest]
+      [self.post_compile_extra_resources_digest(ctx), argfile_snapshot.directory_digest]
     )
 
     # NB: We always capture the output jar, but if classpath jars are not used, we additionally
@@ -481,36 +472,71 @@ class BaseZincCompile(JvmCompile):
     #   2) allow jars to be materialized at the end of the run.
     output_directories = () if self.get_options().use_classpath_jars else (classes_dir,)
 
-    with temporary_dir() as tmpdir:
-      tmp_classes_dir = os.path.join(tmpdir, 'classes')
-      if not self.get_options().use_classpath_jars:
-        shutil.copytree(classes_dir, tmp_classes_dir)
-      elif self.get_options().use_classpath_jars and os.path.exists(jar_file):
+    req = ExecuteProcessRequest(
+      argv=tuple(argv),
+      input_files=merged_input_digest,
+      output_files=(jar_file, relpath_to_analysis),
+      output_directories=output_directories,
+      description="zinc compile for {}".format(ctx.target.address.spec),
+      # local_scratch_source_dir=tmp_classes_dir,
+      # local_scratch_dest_dir=classes_dir,
+      jdk_home=self._zinc.underlying_dist.home,
+    )
+    res = self.context.execute_process_synchronously_or_raise(
+      req, self.name(), [WorkUnitLabel.COMPILER])
+
+    # TODO: Materialize as a batch in do_compile or somewhere
+    self.context._scheduler.materialize_directories((
+      DirectoryToMaterialize(get_buildroot(), res.output_directory_digest),
+    ))
+
+    # TODO: This should probably return a ClasspathEntry rather than a Digest
+    return res.output_directory_digest
+
+  def _compute_scratch_inputs(self, classes_dir, relpath_to_analysis, jar_file):
+    """
+    Compute for the scratch inputs for ExecuteProcessRequest.
+    :param classes_dir: relative path to classes dir from sd
+    :param ctx:
+    :return: list of digest of classes dir and analysis file if the analysis file exists;
+    otherwise empty.
+    """
+    if not os.path.exists(relpath_to_analysis):
+      return []
+
+    def _get_analysis_snaoshot(relpath_to_analysis):
+      analysis_snapshot, = self.context._scheduler.capture_snapshots([
+        PathGlobsAndRoot(
+          PathGlobs([relpath_to_analysis]),
+          get_buildroot(),
+        ),
+      ])
+      return analysis_snapshot
+
+    def _get_classes_dir_snapshot(classes_dir, jar_file):
+      if self.get_options().use_classpath_jars:
         with zipfile.ZipFile(jar_file, 'r') as zip_ref:
-          zip_ref.extractall(tmp_classes_dir)
+          zip_ref.extractall(classes_dir)
+
+        _unzipped_classes_dir_snapshot, = self.context._scheduler.capture_snapshots([
+          PathGlobsAndRoot(
+            PathGlobs([classes_dir + '/**']),
+            get_buildroot(),
+          ),
+        ])
+        return _unzipped_classes_dir_snapshot
       else:
-        tmp_classes_dir = None
+        _classes_dir_snapshot, = self.context._scheduler.capture_snapshots([
+          PathGlobsAndRoot(
+            PathGlobs([classes_dir + '/**']),
+            get_buildroot(),
+          ),
+        ])
+        return _classes_dir_snapshot
 
-      req = ExecuteProcessRequest(
-        argv=tuple(argv),
-        input_files=merged_input_digest,
-        output_files=(jar_file, relpath_to_analysis),
-        output_directories=output_directories,
-        description="zinc compile for {}".format(ctx.target.address.spec),
-        local_scratch_source_dir=tmp_classes_dir,
-        local_scratch_dest_dir=classes_dir,
-        jdk_home=self._zinc.underlying_dist.home,
-      )
-      res = self.context.execute_process_synchronously_or_raise(
-        req, self.name(), [WorkUnitLabel.COMPILER])
-
-      # TODO: Materialize as a batch in do_compile or somewhere
-      self.context._scheduler.materialize_directories((
-        DirectoryToMaterialize(get_buildroot(), res.output_directory_digest),
-      ))
-
-      # TODO: This should probably return a ClasspathEntry rather than a Digest
-      return res.output_directory_digest
+    analysis_snapshot = _get_analysis_snaoshot(relpath_to_analysis)
+    classes_dir_snapshot = _get_classes_dir_snapshot(classes_dir, jar_file)
+    return [analysis_snapshot.directory_digest, classes_dir_snapshot.directory_digest]
 
   def get_zinc_compiler_classpath(self):
     """Get the classpath for the zinc compiler JVM tool.
