@@ -55,17 +55,23 @@ impl crate::CommandRunner for CommandRunner {
           },
         }
         command_runner
-            .underlying
-            .run(req, workunit_store)
-            .and_then(move |result| {
-              command_runner.store(key, &result).then(|store_result| {
-                if let Err(err) = store_result {
-                  debug!("Error storing process execution result to local cache: {} - ignoring and continuing", err);
-                }
-                Ok(result)
-              })
-            })
-            .to_boxed()
+          .underlying
+          .run(req, workunit_store)
+          .and_then(move |result| {
+            if result.exit_code == 0 {
+              command_runner
+                .store(key, &result)
+                .then(|store_result| {
+                  if let Err(err) = store_result {
+                    debug!("Error storing process execution result to local cache: {} - ignoring and continuing", err);
+                  }
+                  Ok(result)
+                }).to_boxed()
+            } else {
+              futures::future::ok(result).to_boxed()
+            }
+          })
+          .to_boxed()
       })
       .to_boxed()
   }
