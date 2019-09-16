@@ -271,7 +271,6 @@ impl super::CommandRunner for CommandRunner {
     let store2 = self.store.clone();
     let scratch = req.local_scratch_files.clone();
     let workunit_store2 = workunit_store.clone();
-    //    self.store.clone().materialize_directory(workdir_path.clone(), req.local_scratch_files, workunit_store.clone());
 
     self
       .store
@@ -311,7 +310,7 @@ impl super::CommandRunner for CommandRunner {
         }
         Ok(())
       })
-      .and_then(move |_m3| {
+      .and_then(move |()| {
         StreamedHermeticCommand::new(&argv[0])
           .args(&argv[1..])
           .current_dir(&workdir_path)

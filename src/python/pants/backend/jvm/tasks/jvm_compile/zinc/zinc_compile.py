@@ -5,7 +5,6 @@ import errno
 import logging
 import os
 import re
-import shutil
 import textwrap
 import zipfile
 from collections import defaultdict
@@ -27,7 +26,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot, \
   EMPTY_DIRECTORY_DIGEST
 from pants.engine.isolated_process import ExecuteProcessRequest
-from pants.util.contextutil import open_zip, temporary_dir
+from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import classproperty
