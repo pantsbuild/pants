@@ -2,7 +2,6 @@ use log;
 use tempfile;
 
 use boxfuture::{try_future, BoxFuture, Boxable};
-use copy_dir::copy_dir;
 use fs::{self, GlobExpansionConjunction, GlobMatching, PathGlobs, StrictGlobMatching};
 use futures::{future, Future, Stream};
 use log::{debug, info};
@@ -256,6 +255,7 @@ impl super::CommandRunner for CommandRunner {
     let workdir_path2 = workdir_path.clone();
     let workdir_path3 = workdir_path.clone();
     let workdir_path4 = workdir_path.clone();
+    let workdir_path5 = workdir_path.clone();
     let store = self.store.clone();
     let executor = self.executor.clone();
 
@@ -267,38 +267,26 @@ impl super::CommandRunner for CommandRunner {
     let cleanup_local_dirs = self.cleanup_local_dirs;
     let argv = req.argv;
     let req_description = req.description;
-    let maybe_local_scratch_dest_dir = req.local_scratch_dest_dir;
-    let maybe_local_scratch_source_dir = req.local_scratch_source_dir;
     let maybe_jdk_home = req.jdk_home;
+    let store2 = self.store.clone();
+    let scratch = req.local_scratch_files.clone();
+    let workunit_store2 = workunit_store.clone();
+    //    self.store.clone().materialize_directory(workdir_path.clone(), req.local_scratch_files, workunit_store.clone());
+
     self
       .store
       .materialize_directory(workdir_path.clone(), req.input_files, workunit_store)
+      .and_then(move |_m2| store2.materialize_directory(workdir_path5, scratch, workunit_store2))
       .and_then(move |_metadata| {
         maybe_jdk_home.map_or(Ok(()), |jdk_home| {
           symlink(jdk_home, workdir_path3.clone().join(".jdk"))
             .map_err(|err| format!("Error making symlink for local execution: {:?}", err))
         })?;
+        debug!("============ after ============");
+        for file in walkdir::WalkDir::new(workdir_path4.clone()) {
+          debug!("{}", file.unwrap().path().display());
+        }
 
-        // This part is diverging from the protocol and is for local only.
-        maybe_local_scratch_source_dir.map(|local_scratch_source_dir| {
-          maybe_local_scratch_dest_dir.map(|local_scratch_dest_dir| {
-            debug!("local scratch dir is in use.");
-            let dest_dir = workdir_path4.clone().join(local_scratch_dest_dir.clone());
-            debug!("Scratch dest dir: {}", dest_dir.as_path().display());;
-            debug!("============ before ============");
-            for file in walkdir::WalkDir::new(workdir_path4.clone()) {
-              debug!("{}", file.unwrap().path().display());
-            }
-            if !dest_dir.exists() {
-              debug!("copying!!!");
-              copy_dir(&local_scratch_source_dir, dest_dir).unwrap();
-            }
-            debug!("============ after ============");
-            for file in walkdir::WalkDir::new(workdir_path4.clone()) {
-              debug!("{}", file.unwrap().path().display());
-            }
-          })
-        });
         // The bazel remote execution API specifies that the parent directories for output files and
         // output directories should be created before execution completes: see
         //   https://github.com/pantsbuild/pants/issues/7084.
@@ -323,7 +311,7 @@ impl super::CommandRunner for CommandRunner {
         }
         Ok(())
       })
-      .and_then(move |()| {
+      .and_then(move |_m3| {
         StreamedHermeticCommand::new(&argv[0])
           .args(&argv[1..])
           .current_dir(&workdir_path)

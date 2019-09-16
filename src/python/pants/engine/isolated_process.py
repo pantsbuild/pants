@@ -27,8 +27,7 @@ class ExecuteProcessRequest(datatype([
   ('output_directories', hashable_string_list),
   # NB: timeout_seconds covers the whole remote operation including queuing and setup.
   ('timeout_seconds', Exactly(float, int)),
-  ('local_scratch_dest_dir', string_optional),
-  ('local_scratch_source_dir', string_optional),
+  ('local_scratch_files', Digest),
   ('jdk_home', string_optional),
 ])):
   """Request for execution with args and snapshots to extract."""
@@ -44,8 +43,7 @@ class ExecuteProcessRequest(datatype([
     output_files=(),
     output_directories=(),
     timeout_seconds=_default_timeout_seconds,
-    local_scratch_dest_dir=None,
-    local_scratch_source_dir=None,
+    local_scratch_files=(),
     jdk_home=None,
   ):
     if env is None:
@@ -65,8 +63,7 @@ class ExecuteProcessRequest(datatype([
       output_files=output_files,
       output_directories=output_directories,
       timeout_seconds=timeout_seconds,
-      local_scratch_source_dir=local_scratch_source_dir,
-      local_scratch_dest_dir=local_scratch_dest_dir,
+      local_scratch_files=local_scratch_files,
       jdk_home=jdk_home,
     )
 

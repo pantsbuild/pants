@@ -134,9 +134,9 @@ pub struct ExecuteProcessRequest {
   // The content of the local_scratch_content_zip will be unzipped into local_scratch_content_zip
   // This is useful for cases such as local ExecuteProcessRequest for incremental compile.
   // If the loose classes are in the
-  pub local_scratch_dest_dir: Option<PathBuf>,
-  pub local_scratch_source_dir: Option<PathBuf>,
-
+  pub local_scratch_files: hashing::Digest,
+  //  pub local_scratch_dest_dir: Option<PathBuf>,
+  //  pub local_scratch_source_dir: Option<PathBuf>,
   ///
   /// If present, a symlink will be created at .jdk which points to this directory for local
   /// execution, or a system-installed JDK (ignoring the value of the present Some) for remote

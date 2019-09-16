@@ -24,7 +24,8 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
-from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
+from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot, \
+  EMPTY_DIRECTORY_DIGEST
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import fast_relpath
@@ -453,7 +454,7 @@ class BaseZincCompile(JvmCompile):
 
     # If analysis file exists, then incremental compile is enabled.
     relpath_to_analysis = fast_relpath(ctx.analysis_file, get_buildroot())
-    scratch_inputs = self._compute_scratch_inputs(classes_dir, relpath_to_analysis, jar_file)
+    merged_scratch_inputs = self._compute_scratch_inputs(classes_dir, relpath_to_analysis, jar_file)
 
     # TODO: Extract something common from Executor._create_command to make the command line
     argv = image_specific_argv + ['@{}'.format(argfile_snapshot.files[0])]
@@ -478,8 +479,7 @@ class BaseZincCompile(JvmCompile):
       output_files=(jar_file, relpath_to_analysis),
       output_directories=output_directories,
       description="zinc compile for {}".format(ctx.target.address.spec),
-      # local_scratch_source_dir=tmp_classes_dir,
-      # local_scratch_dest_dir=classes_dir,
+      local_scratch_files=merged_scratch_inputs,
       jdk_home=self._zinc.underlying_dist.home,
     )
     res = self.context.execute_process_synchronously_or_raise(
@@ -501,19 +501,20 @@ class BaseZincCompile(JvmCompile):
     :return: list of digest of classes dir and analysis file if the analysis file exists;
     otherwise empty.
     """
-    if not os.path.exists(relpath_to_analysis):
-      return []
 
-    def _get_analysis_snaoshot(relpath_to_analysis):
-      analysis_snapshot, = self.context._scheduler.capture_snapshots([
+    if not os.path.exists(relpath_to_analysis):
+      return EMPTY_DIRECTORY_DIGEST
+
+    def _get_analysis_snaoshot():
+      _analysis_snapshot, = self.context._scheduler.capture_snapshots([
         PathGlobsAndRoot(
           PathGlobs([relpath_to_analysis]),
           get_buildroot(),
         ),
       ])
-      return analysis_snapshot
+      return _analysis_snapshot
 
-    def _get_classes_dir_snapshot(classes_dir, jar_file):
+    def _get_classes_dir_snapshot():
       if self.get_options().use_classpath_jars:
         with zipfile.ZipFile(jar_file, 'r') as zip_ref:
           zip_ref.extractall(classes_dir)
@@ -534,9 +535,11 @@ class BaseZincCompile(JvmCompile):
         ])
         return _classes_dir_snapshot
 
-    analysis_snapshot = _get_analysis_snaoshot(relpath_to_analysis)
-    classes_dir_snapshot = _get_classes_dir_snapshot(classes_dir, jar_file)
-    return [analysis_snapshot.directory_digest, classes_dir_snapshot.directory_digest]
+    analysis_snapshot = _get_analysis_snaoshot()
+    classes_dir_snapshot = _get_classes_dir_snapshot()
+    return self.context._scheduler.merge_directories(
+      [analysis_snapshot.directory_digest, classes_dir_snapshot.directory_digest]
+    )
 
   def get_zinc_compiler_classpath(self):
     """Get the classpath for the zinc compiler JVM tool.

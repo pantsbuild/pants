@@ -431,23 +431,11 @@ impl MultiPlatformExecuteProcess {
       }
     };
 
-    let local_scratch_dest_dir = {
-      let val = externs::project_str(&value, "local_scratch_dest_dir");
-      if val.is_empty() {
-        None
-      } else {
-        Some(PathBuf::from(val))
-      }
-    };
-
-    let local_scratch_source_dir = {
-      let val = externs::project_str(&value, "local_scratch_source_dir");
-      if val.is_empty() {
-        None
-      } else {
-        Some(PathBuf::from(val))
-      }
-    };
+    let local_scratch_files = lift_digest(&externs::project_ignoring_type(
+      &value,
+      "local_scratch_files",
+    ))
+    .map_err(|err| format!("Error parsing digest {}", err))?;
 
     Ok(process_execution::ExecuteProcessRequest {
       argv: externs::project_multi_strs(&value, "argv"),
@@ -457,8 +445,7 @@ impl MultiPlatformExecuteProcess {
       output_directories: output_directories,
       timeout: Duration::from_millis((timeout_in_seconds * 1000.0) as u64),
       description: description,
-      local_scratch_dest_dir: local_scratch_dest_dir,
-      local_scratch_source_dir: local_scratch_source_dir,
+      local_scratch_files: local_scratch_files,
       jdk_home: jdk_home,
       target_platform: target_platform,
     })
