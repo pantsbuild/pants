@@ -224,6 +224,7 @@ mod test {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
+      local_scratch_files: hashing::EMPTY_DIGEST,
       jdk_home: None,
       target_platform: Platform::None,
     };

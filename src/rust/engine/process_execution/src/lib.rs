@@ -130,13 +130,10 @@ pub struct ExecuteProcessRequest {
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub description: String,
 
-  // If local_scratch_dir and local_scratch_content_zip are present,
-  // The content of the local_scratch_content_zip will be unzipped into local_scratch_content_zip
-  // This is useful for cases such as local ExecuteProcessRequest for incremental compile.
-  // If the loose classes are in the
+  // If local_scratch_files is present, it will be materialized for local for local
+  // ExecuteProcessRequest only. Eventually we want to remove this.
+  // Context: https://github.com/pantsbuild/pants/pull/8282
   pub local_scratch_files: hashing::Digest,
-  //  pub local_scratch_dest_dir: Option<PathBuf>,
-  //  pub local_scratch_source_dir: Option<PathBuf>,
   ///
   /// If present, a symlink will be created at .jdk which points to this directory for local
   /// execution, or a system-installed JDK (ignoring the value of the present Some) for remote
@@ -321,6 +318,7 @@ mod tests {
         output_directories: BTreeSet::new(),
         timeout,
         description,
+        local_scratch_files: hashing::EMPTY_DIGEST,
         jdk_home: None,
         target_platform: Platform::None,
       };

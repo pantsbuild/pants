@@ -496,12 +496,12 @@ class BaseZincCompile(JvmCompile):
   def _compute_scratch_inputs(self, classes_dir, relpath_to_analysis, jar_file):
     """
     Compute for the scratch inputs for ExecuteProcessRequest.
-    :param classes_dir: relative path to classes dir from sd
-    :param ctx:
-    :return: list of digest of classes dir and analysis file if the analysis file exists;
-    otherwise empty.
-    """
 
+    :param classes_dir: relative path to classes dir from buildroot
+    :param relpath_to_analysis: relative path to zinc analysis file from buildroot
+    :param jar_file: relative path to z.jar from buildroot
+    :return: digest of merged analysis file and loose class files.
+    """
     if not os.path.exists(relpath_to_analysis):
       return EMPTY_DIRECTORY_DIGEST
 
