@@ -104,5 +104,5 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:depman_directory',
   ],
   tags = {'integration'},
-  timeout=540,
+  timeout=600,
 )
