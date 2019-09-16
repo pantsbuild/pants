@@ -7,7 +7,6 @@ import os
 import platform
 import subprocess
 import tempfile
-import time
 from contextlib import contextmanager
 from enum import Enum, auto
 from pathlib import Path
@@ -534,44 +533,15 @@ def run_integration_tests_v2(*, oauth_token_path: Optional[str] = None) -> None:
     default_test_strategy=TestStrategy.v1_no_chroot,
     remote_execution_enabled=oauth_token_path is not None
   )
-
   if target_sets.v2_remote:
-    # NB: We add extra logic to work around the limitation that Google RBE tokens expire after 60
-    # minutes. At our current worker count, Our integration test suite frequently takes longer
-    # than 60 minutes to run. So, if the suite fails, we check if this is due to the token expiring
-    # and if so then regenerate a new token and rerun the suite. This strategy works thanks to
-    # remote caching: already completed tests will use their cached results, so we avoid having to
-    # redo too much work (still some inefficiency), and consequently there will be enough workers
-    # to finish the remaining tests.
-
-    def run_remote_tests(*, oauth_token_path: Optional[str]) -> None:
-      _run_command(
-        command=TestStrategy.v2_remote.pants_command(
-          targets=target_sets.v2_remote, oauth_token_path=oauth_token_path
-        ),
-        slug="IntegrationTestsV2Remote",
-        start_message="Running integration tests via V2 remote strategy.",
-        die_message="Integration test failure (V2 remote)",
-      )
-
-    start_time = time.time()
-    try:
-      run_remote_tests(oauth_token_path=oauth_token_path)
-    except SystemExit:
-      elapsed_seconds = int(time.time() - start_time)
-      token_lifetime_in_seconds = 60 * 60
-      overhead_between_token_generation_and_tests = 60
-      if elapsed_seconds < token_lifetime_in_seconds - overhead_between_token_generation_and_tests:
-        raise
-      with maybe_get_remote_execution_oauth_token_path(
-        remote_execution_enabled=True
-      ) as new_oauth_token_path:
-        banner(
-          "RBE token expired while still running integration tests. Regenerating the token and "
-          "restarting the test suite..."
-        )
-        run_remote_tests(oauth_token_path=new_oauth_token_path)
-
+    _run_command(
+      command=TestStrategy.v2_remote.pants_command(
+        targets=target_sets.v2_remote, oauth_token_path=oauth_token_path
+      ),
+      slug="IntegrationTestsV2Remote",
+      start_message="Running integration tests via V2 remote strategy.",
+      die_message="Integration test failure (V2 remote)",
+    )
   if target_sets.v2_local:
     _run_command(
       command=TestStrategy.v2_local.pants_command(targets=target_sets.v2_local),

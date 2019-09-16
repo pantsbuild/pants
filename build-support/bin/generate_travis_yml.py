@@ -452,11 +452,7 @@ def unit_tests(python_version: PythonVersion) -> Dict:
     "name": f"Unit tests (Python {python_version.decimal})",
     "script": [
       (
-        # NB: `travis_wait` cannot be more than 60 minutes because the Google RBE token expires
-        # after 60 minutes. We could teach ci.py to regenerate the token after 60 minutes, but
-        # don't do this for unit tests to avoid unnecessary complexity since unit tests
-        # consistently take less than 60 minutes to execute.
-        "travis_wait 60 ./build-support/bin/ci.py --unit-tests --remote-execution-enabled "
+        "travis_wait 80 ./build-support/bin/ci.py --unit-tests --remote-execution-enabled "
         f"--python-version {python_version.decimal}"
       ),
       f"./build-support/bin/ci.py --plugin-tests --python-version {python_version.decimal}",
