@@ -153,8 +153,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
           workdir,
           config,
         )
-        self.assert_failure(pants_run)
-        self.assertIn('Please use --no-compile-rsc-incremental', pants_run.stdout_data)
+        self.assertEqual(0, pants_run.returncode)
 
   def test_failed_compile_with_hermetic(self):
     with temporary_dir() as cache_dir:
