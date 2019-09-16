@@ -3,7 +3,7 @@
 
 import logging
 
-from pants.engine.fs import Digest
+from pants.engine.fs import Digest, EMPTY_DIRECTORY_DIGEST
 from pants.engine.platform import PlatformConstraint
 from pants.engine.rules import RootRule, rule
 from pants.util.objects import (Exactly, TypedCollection, datatype, hashable_string_list,
@@ -43,7 +43,7 @@ class ExecuteProcessRequest(datatype([
     output_files=(),
     output_directories=(),
     timeout_seconds=_default_timeout_seconds,
-    local_scratch_files=(),
+    local_scratch_files=EMPTY_DIRECTORY_DIGEST,
     jdk_home=None,
   ):
     if env is None:
