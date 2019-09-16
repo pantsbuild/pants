@@ -269,7 +269,7 @@ impl super::CommandRunner for CommandRunner {
     let req_description = req.description;
     let maybe_jdk_home = req.jdk_home;
     let store2 = self.store.clone();
-    let scratch = req.local_scratch_files.clone();
+    let scratch = req.local_scratch_files;
     let workunit_store2 = workunit_store.clone();
 
     self
