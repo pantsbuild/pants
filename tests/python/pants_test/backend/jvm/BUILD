@@ -14,6 +14,7 @@ python_tests(
   sources=globs('*_integration.py'),
   dependencies=[
     'tests/python/pants_test:int-test',
+    'examples/tests/java/org/pantsbuild/example:hello_directory',
   ],
   tags={'integration'},
   timeout=300

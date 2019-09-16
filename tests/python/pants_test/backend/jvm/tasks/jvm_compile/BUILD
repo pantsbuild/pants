@@ -38,6 +38,8 @@ python_tests(
   sources=['test_declared_deps_integration.py'],
   dependencies=[
     ':base_compile_integration_test',
+    'testprojects/src/java/org/pantsbuild/testproject:missingdirectdepswhitelist_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:missingjardepswhitelist_directory',
   ],
   tags={'integration'},
   timeout=360,
@@ -49,6 +51,10 @@ python_tests(
   dependencies = [
     'src/python/pants/base:build_environment',
     'tests/python/pants_test:int-test',
+    'testprojects/tests/java/org/pantsbuild/testproject:exports_directory',
+    'testprojects/tests/scala/org/pantsbuild/testproject:exports_directory',
+    'testprojects/tests/scala/org/pantsbuild/testproject:non_exports_directory',
+    'testprojects/src/thrift/org/pantsbuild:thrift_exports_directory',
   ],
   tags={'integration'},
   timeout=600,
@@ -68,6 +74,8 @@ python_tests(
   dependencies=[
     'tests/python/pants_test:int-test',
     'src/python/pants/backend/jvm/tasks/jvm_compile:missing_dependency_finder',
+    'testprojects/src/java/org/pantsbuild/testproject:dummies_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:missingjardepswhitelist_directory',
   ],
   tags={'integration'},
   timeout = 240,

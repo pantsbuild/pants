@@ -7,6 +7,7 @@ python_tests(
   sources=['test_scalac_plugin_integration.py'],
   dependencies=[
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
+    'examples/src/scala/org/pantsbuild/example:scalac_directory',
   ],
   timeout = 480,
   tags = {'integration'},
