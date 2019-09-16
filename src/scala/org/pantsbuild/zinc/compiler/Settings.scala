@@ -39,7 +39,8 @@ case class Settings(
   _incOptions: IncOptions           = IncOptions(),
   analysis: AnalysisOptions         = AnalysisOptions(),
   creationTime: Long                = 0,
-  compiledBridgeJar: Option[File]   = None
+  compiledBridgeJar: Option[File]   = None,
+  useBarebonesLogger: Boolean       = false
 ) {
   import Settings._
 
@@ -90,7 +91,8 @@ case class ConsoleOptions(
   logLevel: Level.Value      = Level.Info,
   color: Boolean             = true,
   fileFilters: Seq[Regex]    = Seq.empty,
-  msgFilters: Seq[Regex]     = Seq.empty
+  msgFilters: Seq[Regex]     = Seq.empty,
+  useBarebonesLogger: Boolean= false
 ) {
   def javaLogLevel: jlogging.Level = logLevel match {
     case Level.Info =>
@@ -279,6 +281,11 @@ object Settings {
       .unbounded()
       .action((x, c) => c.copy(consoleLog = c.consoleLog.copy(fileFilters = c.consoleLog.fileFilters :+ x.r)))
       .text("Filter warning messages from filenames matching the given regex")
+
+    opt[Unit]("use-barebones-logger")
+        .abbr("use-barebones-logger")
+        .action((x, c) => c.copy(consoleLog = c.consoleLog.copy(useBarebonesLogger = true)))
+        .text("Use our custom barebones logger instead of the sbt logger. This is an experimental feature that speeds up native-image startup times considerably.")
 
     opt[Seq[File]]("classpath")
       .abbr("cp")
