@@ -142,6 +142,9 @@ class BaseZincCompile(JvmCompile):
                   'This is unset by default, because it is generally a good precaution to cache '
                   'only clean/cold builds.')
 
+    register('--use-barebones-logger', advanced=True, type=bool, default=False,
+             help='???')
+
   @classmethod
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (Zinc.Factory, JvmPlatform,)
@@ -289,6 +292,9 @@ class BaseZincCompile(JvmCompile):
     if self.post_compile_extra_resources(ctx):
       post_compile_merge_dir = relative_to_exec_root(ctx.post_compile_merge_dir)
       zinc_args.extend(['--post-compile-merge-dir', post_compile_merge_dir])
+
+    if self.get_options().use_barebones_logger:
+      zinc_args.append('--use-barebones-logger')
 
     compiler_bridge_classpath_entry = self._zinc.compile_compiler_bridge(self.context)
     zinc_args.extend(['-compiled-bridge-jar', relative_to_exec_root(compiler_bridge_classpath_entry.path)])
