@@ -283,9 +283,9 @@ object Settings {
       .text("Filter warning messages from filenames matching the given regex")
 
     opt[Unit]("use-barebones-logger")
-        .abbr("use-barebones-logger")
-        .action((x, c) => c.copy(consoleLog = c.consoleLog.copy(useBarebonesLogger = true)))
-        .text("Use our custom barebones logger instead of the sbt logger. This is an experimental feature that speeds up native-image startup times considerably.")
+      .abbr("use-barebones-logger")
+      .action((x, c) => c.copy(consoleLog = c.consoleLog.copy(useBarebonesLogger = true)))
+      .text("Use our custom barebones logger instead of the sbt logger. This is an experimental feature that speeds up native-image startup times considerably.")
 
     opt[Seq[File]]("classpath")
       .abbr("cp")
