@@ -3,7 +3,7 @@
 
 import logging
 
-from pants.engine.fs import Digest, EMPTY_DIRECTORY_DIGEST
+from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest
 from pants.engine.platform import PlatformConstraint
 from pants.engine.rules import RootRule, rule
 from pants.util.objects import (Exactly, TypedCollection, datatype, hashable_string_list,
