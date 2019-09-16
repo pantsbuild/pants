@@ -130,8 +130,8 @@ pub struct ExecuteProcessRequest {
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub description: String,
 
-  // If local_scratch_files is present, it will be materialized for local for local
-  // ExecuteProcessRequest only. Eventually we want to remove this.
+  // This will be materialized for local ExecuteProcessRequest only.
+  // Eventually we want to remove this.
   // Context: https://github.com/pantsbuild/pants/pull/8282
   pub local_scratch_files: hashing::Digest,
   ///
