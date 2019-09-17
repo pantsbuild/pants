@@ -3,13 +3,14 @@
 
 import os
 from dataclasses import dataclass
+from typing import Tuple
 
 from pants.engine.objects import Collection
 from pants.engine.rules import RootRule
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.dirutil import maybe_read_file, safe_delete, safe_file_dump
-from pants.util.objects import Exactly, datatype
+from pants.util.objects import Exactly, datatype, string_list
 
 
 class FileContent(datatype([('path', str), ('content', bytes), ('is_executable', bool)])):
@@ -170,11 +171,30 @@ class DirectoryWithPrefixToAdd:
 
 class DirectoryToMaterialize(datatype([('path', str), ('directory_digest', Digest)])):
   """A request to materialize the contents of a directory digest at the provided path."""
-  pass
+
+
+DirectoriesToMaterialize = Collection.of(DirectoryToMaterialize)
+
+
+class MaterializeDirectoryResult(datatype([('output_paths', string_list)])):
+  """Result of materializing a directory, contains the full output paths."""
+
+
+MaterializeDirectoriesResult = Collection.of(MaterializeDirectoryResult)
 
 
 class UrlToFetch(datatype([('url', str), ('digest', Digest)])):
   pass
+
+
+class Workspace:
+  """Abstract handle for operations that touch the real local filesystem."""
+
+  def __init__(self, scheduler):
+    self._scheduler = scheduler
+
+  def materialize_directories(self, directories_to_materialize: Tuple[DirectoryToMaterialize]) -> MaterializeDirectoriesResult:
+    return self._scheduler.materialize_directories(directories_to_materialize)
 
 
 # TODO: don't recreate this in python, get this from fs::EMPTY_DIGEST somehow.
@@ -196,6 +216,7 @@ EMPTY_SNAPSHOT = Snapshot(
 def create_fs_rules():
   """Creates rules that consume the intrinsic filesystem types."""
   return [
+    RootRule(Workspace),
     RootRule(InputFilesContent),
     RootRule(Digest),
     RootRule(DirectoriesToMerge),

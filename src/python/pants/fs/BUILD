@@ -8,3 +8,11 @@ python_library(
     'src/python/pants/util:strutil',
   ]
 )
+
+python_tests(
+  name = "tests",
+  dependencies = [
+    'tests/python/pants_test:console_rule_test_base',
+    'tests/python/pants_test/engine:util'
+  ]
+)
