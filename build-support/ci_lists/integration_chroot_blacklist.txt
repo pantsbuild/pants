@@ -27,7 +27,6 @@ tests/python/pants_test/engine/legacy:dependees_integration
 tests/python/pants_test/engine/legacy:filemap_integration
 tests/python/pants_test/engine/legacy:graph_integration
 tests/python/pants_test/engine/legacy:owners_integration
-tests/python/pants_test/goal:run_tracker_integration
 tests/python/pants_test/invalidation:strict_deps_invalidation_integration
 tests/python/pants_test/logging:test_native_engine_logging
 tests/python/pants_test/pantsd:pantsd_integration

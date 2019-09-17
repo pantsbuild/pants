@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import json
-import os
 
 from pants.util.contextutil import temporary_file_path
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -81,8 +80,8 @@ class RunTrackerIntegrationTest(PantsRunIntegrationTest):
 
   def test_workunit_failure(self):
     pants_run = self.run_pants([
-      '--pythonpath={}'.format(os.path.join(os.getcwd(), 'tests', 'python')),
-      '--backend-packages={}'.format('pants_test.goal.data'),
+      '--backend-packages=pants_test.logging.data',
+      '--backend-packages=pants_test.goal.data',
       'run-dummy-workunit',
       '--no-success'
     ])
@@ -93,8 +92,8 @@ class RunTrackerIntegrationTest(PantsRunIntegrationTest):
 
   def test_workunit_success(self):
     pants_run = self.run_pants([
-      '--pythonpath={}'.format(os.path.join(os.getcwd(), 'tests', 'python')),
-      '--backend-packages={}'.format('pants_test.goal.data'),
+      '--backend-packages=pants_test.logging.data',
+      '--backend-packages=pants_test.goal.data',
       'run-dummy-workunit',
       '--success'
     ])
