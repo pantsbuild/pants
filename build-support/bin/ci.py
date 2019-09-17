@@ -191,7 +191,7 @@ def maybe_get_remote_execution_oauth_token_path(
     yield tf.name
 
 # -------------------------------------------------------------------------
-# Blacklists and whitelists
+# Blacklists
 # -------------------------------------------------------------------------
 
 Target = str
@@ -245,12 +245,7 @@ class TestTargetSets(NamedTuple):
   v2_remote: TargetSet
 
   @staticmethod
-  def calculate(
-    *,
-    test_type: TestType,
-    default_test_strategy: TestStrategy,
-    remote_execution_enabled: bool = False,
-  ) -> 'TestTargetSets':
+  def calculate(*, test_type: TestType, remote_execution_enabled: bool = False) -> 'TestTargetSets':
 
     def get_listed_targets(filename: str) -> TargetSet:
       list_path = Path(f"build-support/ci_lists/{filename}")
@@ -270,25 +265,14 @@ class TestTargetSets(NamedTuple):
       ], stdout=subprocess.PIPE, encoding="utf-8", check=True
     ).stdout.strip().split("\n"))
 
-    if default_test_strategy == TestStrategy.v2_remote:
-      blacklisted_chroot_targets = get_listed_targets(f"{test_type}_chroot_blacklist.txt")
-      blacklisted_v2_targets = get_listed_targets(f"{test_type}_v2_blacklist.txt")
-      blacklisted_remote_targets = get_listed_targets(f"{test_type}_remote_blacklist.txt")
+    blacklisted_chroot_targets = get_listed_targets(f"{test_type}_chroot_blacklist.txt")
+    blacklisted_v2_targets = get_listed_targets(f"{test_type}_v2_blacklist.txt")
+    blacklisted_remote_targets = get_listed_targets(f"{test_type}_remote_blacklist.txt")
 
-      v1_no_chroot_targets = blacklisted_chroot_targets
-      v1_chroot_targets = blacklisted_v2_targets
-      v2_local_targets = blacklisted_remote_targets
-      v2_remote_targets = all_targets - v2_local_targets - v1_chroot_targets - v1_no_chroot_targets
-
-    else:
-      whitelisted_chroot_targets = get_listed_targets(f"{test_type}_chroot_whitelist.txt")
-      whitelisted_v2_targets = get_listed_targets(f"{test_type}_v2_whitelist.txt")
-      whitelisted_remote_targets = get_listed_targets(f"{test_type}_remote_whitelist.txt")
-
-      v2_remote_targets = whitelisted_remote_targets
-      v2_local_targets = whitelisted_v2_targets
-      v1_chroot_targets = whitelisted_chroot_targets
-      v1_no_chroot_targets = all_targets - v1_chroot_targets - v2_local_targets - v2_remote_targets
+    v1_no_chroot_targets = blacklisted_chroot_targets
+    v1_chroot_targets = blacklisted_v2_targets
+    v2_local_targets = blacklisted_remote_targets
+    v2_remote_targets = all_targets - v2_local_targets - v1_chroot_targets - v1_no_chroot_targets
 
     if not remote_execution_enabled:
       v2_local_targets |= v2_remote_targets
@@ -435,9 +419,7 @@ def run_cargo_audit() -> None:
 
 def run_unit_tests(*, oauth_token_path: Optional[str] = None) -> None:
   target_sets = TestTargetSets.calculate(
-    test_type=TestType.unit,
-    default_test_strategy=TestStrategy.v2_remote,
-    remote_execution_enabled=oauth_token_path is not None
+    test_type=TestType.unit, remote_execution_enabled=oauth_token_path is not None
   )
   if target_sets.v2_remote:
     _run_command(
@@ -507,9 +489,7 @@ def run_jvm_tests() -> None:
 
 def run_integration_tests_v1(*, shard: Optional[str]) -> None:
   target_sets = TestTargetSets.calculate(
-    test_type=TestType.integration,
-    default_test_strategy=TestStrategy.v1_no_chroot,
-    remote_execution_enabled=False
+    test_type=TestType.integration, remote_execution_enabled=False
   )
   if target_sets.v1_no_chroot:
     _run_command(
@@ -529,9 +509,7 @@ def run_integration_tests_v1(*, shard: Optional[str]) -> None:
 
 def run_integration_tests_v2(*, oauth_token_path: Optional[str] = None) -> None:
   target_sets = TestTargetSets.calculate(
-    test_type=TestType.integration,
-    default_test_strategy=TestStrategy.v1_no_chroot,
-    remote_execution_enabled=oauth_token_path is not None
+    test_type=TestType.integration, remote_execution_enabled=oauth_token_path is not None
   )
   if target_sets.v2_remote:
     _run_command(
