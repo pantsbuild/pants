@@ -1,7 +1,3 @@
-tests/python/pants_test/backend/codegen/antlr/java:integration
-tests/python/pants_test/backend/codegen/antlr/python:integration
-tests/python/pants_test/backend/codegen/protobuf/java:integration
-tests/python/pants_test/backend/codegen/wire/java:integration
 tests/python/pants_test/backend/jvm/subsystems:jar_dependency_management_integration
 tests/python/pants_test/backend/jvm/tasks/jvm_compile/java:cache_compile_integration
 tests/python/pants_test/backend/jvm/tasks/jvm_compile/java:java_compile_integration
@@ -16,15 +12,10 @@ tests/python/pants_test/backend/jvm/tasks:junit_tests_concurrency_integration
 tests/python/pants_test/backend/jvm/tasks:jvm_run_integration
 tests/python/pants_test/backend/project_info/tasks:export_integration
 tests/python/pants_test/backend/project_info/tasks:idea_plugin_integration
-tests/python/pants_test/backend/python/rules:python_test_runner_integration
 tests/python/pants_test/backend/python/tasks/native:integration
 tests/python/pants_test/backend/python/tasks:build_local_python_distributions_integration
-tests/python/pants_test/backend/python/tasks:interpreter_selection_integration
-tests/python/pants_test/backend/python/tasks:isort_run_integration
 tests/python/pants_test/backend/python/tasks:pytest_run_integration
 tests/python/pants_test/backend/python/tasks:python_binary_integration
-tests/python/pants_test/backend/python/tasks:python_repl_integration
-tests/python/pants_test/backend/python/tasks:python_run_integration
 tests/python/pants_test/backend/python/tasks:setup_py_integration
 tests/python/pants_test/backend/python:integration
 tests/python/pants_test/base:exception_sink_integration

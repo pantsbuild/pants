@@ -5,3 +5,13 @@ files(
   name = 'distance_directory',
   sources = rglobs('distance/*'),
 )
+
+files(
+  name = 'import_from_buildroot_directory',
+  sources = rglobs('import_from_buildroot/*'),
+)
+
+files(
+  name = 'proto-ordering_directory',
+  sources = rglobs('proto-ordering/*'),
+)

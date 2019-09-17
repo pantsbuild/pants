@@ -21,6 +21,8 @@ python_tests(
   dependencies = [
     'tests/python/pants_test:int-test',
     'tests/python/pants_test:interpreter_selection_utils',
+    'testprojects/src/python:antlr_directory',
+    'testprojects/src/antlr/python:test_directory',
   ],
   tags = {'integration'},
 )
