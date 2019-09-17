@@ -17,6 +17,11 @@ files(
 )
 
 files(
+  name = 'coordinated_runs_directory',
+  sources = rglobs('coordinated_runs/*'),
+)
+
+files(
   name = 'interpreter_selection_directory',
   sources = rglobs('interpreter_selection/*'),
 )
