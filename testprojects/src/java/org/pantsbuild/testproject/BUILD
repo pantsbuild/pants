@@ -155,6 +155,14 @@ files(
 )
 
 files(
+  name = 'proto-ordering_directory',
+  sources = rglobs('proto-ordering/*'),
+  dependencies = [
+    'testprojects/src/protobuf/org/pantsbuild/testproject:proto-ordering_directory',
+  ],
+)
+
+files(
   name = 'provided_directory',
   sources = rglobs('provided/*'),
 )

@@ -23,8 +23,8 @@ python_tests(
   dependencies = [
     'tests/python/pants_test:int-test',
     'examples/src/java/org/pantsbuild/example:protobuf_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:proto-ordering_directory',
     'testprojects/src/protobuf/org/pantsbuild/testproject:import_from_buildroot_directory',
-    'testprojects/src/protobuf/org/pantsbuild/testproject:proto-ordering_directory',
   ],
   tags = {'integration'},
   timeout = 240,
