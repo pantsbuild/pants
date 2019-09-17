@@ -41,7 +41,6 @@ python_library(
   sources = ['dirutil.py'],
   dependencies = [
     ':strutil',
-    'src/python/pants/base:deprecated',
   ],
 )
 
