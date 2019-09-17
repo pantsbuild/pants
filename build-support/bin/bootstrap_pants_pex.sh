@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd ../.. && pwd -P)"
 
+cd "$REPO_ROOT" || exit 1
+
 # This script is used to generate pants.pex and particularly to allow us to maintain multiple versions,
 # each mapped to a particular snapshot of the source code. The different versions are maintained in
 # the CACHE_ROOT, with the current one symlinked into the build root. This allows us to quickly
