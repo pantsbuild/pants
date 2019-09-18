@@ -253,6 +253,7 @@ class BaseZincCompileIntegrationTest:
 
   def test_zinc_logs_warnings_properly(self):
     """Test that the zinc logger emits warnings correctly."""
+    # TODO(#8306) When the new zinc-compiler version is published (0.0.17), add the test linked in the issue here.
     with self.temporary_workdir() as workdir:
       with self.temporary_cachedir() as cachedir:
         # Compile a target that we expect will raise an "Unused import" warning.
