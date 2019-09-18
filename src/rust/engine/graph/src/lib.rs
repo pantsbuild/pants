@@ -189,7 +189,9 @@ impl<N: Node> InnerGraph<N> {
   }
 
   ///
-  /// Begins a topological Walk from the given roots.
+  /// Begins a Walk from the given roots.
+  /// The Walk will iterate over all nodes that descend from the roots in the direction of
+  /// traversal but won't necessarily be in topological order.
   ///
   fn walk(&self, roots: VecDeque<EntryId>, direction: Direction) -> Walk<'_, N> {
     Walk {
@@ -879,8 +881,8 @@ impl<N: Node> Graph<N> {
 }
 
 ///
-/// Represents the state of a particular topological walk through a Graph. Implements Iterator and
-/// has the same lifetime as the Graph itself.
+/// Represents the state of a particular walk through a Graph. Implements Iterator and has the same
+/// lifetime as the Graph itself.
 ///
 struct Walk<'a, N: Node> {
   graph: &'a InnerGraph<N>,
