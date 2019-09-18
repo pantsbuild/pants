@@ -189,6 +189,83 @@ impl<N: Node> InnerGraph<N> {
   }
 
   ///
+  /// Compute the critical path for this graph.
+  ///
+  /// The critical path is the longest path. For a directed acyclic graph, it is equivalent to a
+  /// shortest path algorithm.
+  ///
+  /// Ideally, we would have used an existing algorithm to calculate the shortest path, such as
+  /// petgraph::algo::astar, but this assumes that the weight is on the edges rather than on the
+  /// nodes.
+  ///
+  /// Since in our use of the graph, nodes have a duration as opposed to edges, manually implement
+  /// the algorithm.
+  ///
+  fn critical_path<F>(&self, duration: F) -> (Duration, Vec<Entry<N>>)
+  where
+    F: Fn(&Entry<N>) -> Duration,
+  {
+    // First, do one pass in topological order, recording the maximum duration so far for each node.
+    let topological_order = petgraph::algo::toposort(&self.pg, None).unwrap();
+    let mut max_duration = HashMap::new();
+    for entry_id in topological_order {
+      // Max duration so far: duration of this entry + max duration of any incoming neighbor entry
+      let max = duration(self.unsafe_entry_for_id(entry_id))
+        + self
+          .pg
+          .neighbors_directed(entry_id, Direction::Incoming)
+          .map(|incoming| {
+            // It's OK to panic if an entry is missing, because we are traversing the graph in
+            // topological order, so any incoming entry must have been traversed (and added to
+            // max_duration) before hitting this entry.
+            max_duration[&incoming]
+          })
+          .max()
+          // If this entry has no incoming neighbor, it will take no time to get to it
+          .unwrap_or(std::time::Duration::from_nanos(0));
+      max_duration.insert(entry_id, max);
+    }
+
+    // The total weight is the maximum weight of any sink entries.
+    let sink_entries = self.pg.externals(Direction::Outgoing);
+    let max_sink =
+      sink_entries.max_by(|left, right| max_duration[&left].cmp(&max_duration[&right]));
+    let total_duration = max_sink
+      .map(|entry| max_duration[&entry])
+      .unwrap_or(std::time::Duration::from_nanos(0));
+
+    // We can retrace the critical path by traversing the graph backward, grabbing the incoming
+    // entry with the maximum duration every time.
+    let critical_path = match max_sink {
+      Some(mut next) => {
+        let mut rev_critical_path = vec![next];
+        let greatest_incoming_entry = |entry_id: EntryId| {
+          self
+            .pg
+            .neighbors_directed(entry_id, Direction::Incoming)
+            .max_by(|left, right| {
+              // All entries have been inserted into max_duration during our first pass, so safe
+              // to panic if any entry is missing
+              max_duration[&left].cmp({ &max_duration[&right] })
+            })
+        };
+        while let Some(entry) = greatest_incoming_entry(next) {
+          next = entry;
+          rev_critical_path.push(next);
+        }
+        rev_critical_path
+          .into_iter()
+          .rev()
+          .map(|entry_id| self.unsafe_entry_for_id(entry_id))
+          .cloned()
+          .collect()
+      }
+      None => Vec::new(),
+    };
+    (total_duration, critical_path)
+  }
+
+  ///
   /// Begins a Walk from the given roots.
   /// The Walk will iterate over all nodes that descend from the roots in the direction of
   /// traversal but won't necessarily be in topological order.
@@ -651,6 +728,13 @@ impl<N: Node> Graph<N> {
         return Ok(false);
       }
     }
+  }
+
+  pub fn critical_path<F>(&self, duration: F) -> (Duration, Vec<Entry<N>>)
+  where
+    F: Fn(&Entry<N>) -> Duration,
+  {
+    self.inner.lock().critical_path(duration)
   }
 
   ///
@@ -1201,6 +1285,78 @@ mod tests {
     let res = graph.create(initial_top, &context_up).wait();
 
     assert_eq!(res, Ok(vec![T(1, 1), T(2, 1)]));
+  }
+
+  #[test]
+  fn critical_path() {
+    use super::entry::{Entry, EntryKey};
+    // First, let's describe the scenario with plain data.
+    //
+    // We label the nodes with static strings to help visualise the situation.
+    // The first element of each tuple is a readable label. The second element represents the
+    // duration for this action.
+    let nodes = [
+      ("download jvm", 10),
+      ("download a", 1),
+      ("download b", 2),
+      ("download c", 3),
+      ("compile a", 3),
+      ("compile b", 20),
+      ("compile c", 5),
+    ];
+    let deps = [
+      ("download jvm", "compile a"),
+      ("download jvm", "compile b"),
+      ("download jvm", "compile c"),
+      ("download a", "compile a"),
+      ("download b", "compile b"),
+      ("download c", "compile c"),
+      ("compile a", "compile c"),
+      ("compile b", "compile c"),
+    ];
+    let (expected_total_duration, expected_critical_path) = (
+      Duration::from_secs(35),
+      vec!["download jvm", "compile b", "compile c"],
+    );
+
+    // Describe a few transformations to navigate between our readable data and the actual types
+    // needed for the graph.
+    let node_entry = |node: &str| {
+      Entry::new(EntryKey::Valid(TNode(
+        nodes
+          .iter()
+          .map(|(k, _)| k)
+          .position(|label| &node == label)
+          .unwrap(),
+      )))
+    };
+    let node_and_duration_from_entry = |entry: &super::entry::Entry<TNode>| nodes[entry.node().0];
+    let node_duration = |entry: &super::entry::Entry<TNode>| {
+      Duration::from_secs(node_and_duration_from_entry(entry).1)
+    };
+
+    // Construct a graph and populate it with the nodes and edges prettily defined above.
+    let graph = Graph::new();
+    {
+      let pg = &mut graph.inner.lock().pg;
+      let mut node_indices = HashMap::new();
+      for (node, _) in &nodes {
+        let node_index = pg.add_node(node_entry(node));
+        node_indices.insert(node, node_index);
+      }
+      for (src, dst) in &deps {
+        pg.add_edge(node_indices[src], node_indices[dst], 1.0);
+      }
+    }
+
+    // Calculate the critical path and validate it.
+    let (total_duration, critical_path) = graph.critical_path(node_duration);
+    assert_eq!(expected_total_duration, total_duration);
+    let critical_path = critical_path
+      .iter()
+      .map(|entry| node_and_duration_from_entry(entry).0)
+      .collect::<Vec<_>>();
+    assert_eq!(expected_critical_path, critical_path);
   }
 
   ///
