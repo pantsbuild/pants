@@ -3,6 +3,15 @@
 
 This document describes releases leading up to the ``1.20.x`` ``stable`` series.
 
+1.20.0rc2 (09/18/2019)
+----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Add rsc_mixed_compile_classpath to RscCompile products (#8249)
+  `PR #8249 <https://github.com/pantsbuild/pants/pull/8249>`_
+
 1.20.0rc1 (09/04/2019)
 ----------------------
 
