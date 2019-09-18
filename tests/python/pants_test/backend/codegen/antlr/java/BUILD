@@ -22,6 +22,8 @@ python_tests(
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
+    'examples/src/java/org/pantsbuild/example:antlr3_directory',
+    'examples/src/java/org/pantsbuild/example:antlr4_directory',
   ],
   tags = {'integration'},
   timeout = 240,

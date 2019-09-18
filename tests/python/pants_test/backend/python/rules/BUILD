@@ -34,6 +34,7 @@ python_tests(
   source='test_python_test_runner_integration.py',
   dependencies=[
     'tests/python/pants_test:int-test',
+    'testprojects/tests/python/pants:dummies_directory',
   ],
   tags={'integration'},
   timeout = 90,

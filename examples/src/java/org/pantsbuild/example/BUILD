@@ -52,9 +52,55 @@ page(
 )
 
 files(
+  name = 'antlr3_directory',
+  sources = rglobs('antlr3/*'),
+  dependencies = [
+    'examples/src/antlr/org/pantsbuild/example:exp_directory',
+  ],
+)
+
+files(
+  name = 'antlr4_directory',
+  sources = rglobs('antlr4/*'),
+  dependencies = [
+    'examples/src/antlr/org/pantsbuild/example:exp_directory',
+  ],
+)
+
+files(
+  name = 'autovalue_directory',
+  sources = rglobs('autovalue/*'),
+)
+
+files(
   name = 'hello_directory',
   sources = rglobs('hello/*'),
   dependencies = [
     'examples/src/resources/org/pantsbuild/example:hello_directory',
+  ],
+)
+
+files(
+  name = 'javac_directory',
+  sources = rglobs('javac/*'),
+)
+
+files(
+  name = 'protobuf_directory',
+  sources = rglobs('protobuf/*'),
+  dependencies = [
+    'examples/src/protobuf/org/pantsbuild/example:distance_directory',
+    'examples/src/protobuf/org/pantsbuild/example:imports_directory',
+    'examples/src/protobuf/org/pantsbuild/example:unpacked_jars_directory',
+  ],
+)
+
+files(
+  name = 'wire_directory',
+  sources = rglobs('wire/*'),
+  dependencies = [
+    'examples/src/wire/org/pantsbuild/example:element_directory',
+    'examples/src/wire/org/pantsbuild/example:roots_directory',
+    'examples/src/wire/org/pantsbuild/example:temperature_directory',
   ],
 )

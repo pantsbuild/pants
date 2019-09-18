@@ -60,6 +60,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
     'tests/python/pants_test:interpreter_selection_utils',
+    'testprojects/src/python:interpreter_selection_directory',
   ],
   tags = {'integration'},
   timeout=240,
@@ -83,6 +84,7 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/python/tasks',
     'tests/python/pants_test:int-test',
+    'testprojects/tests/java/org/pantsbuild/testproject:dummies_directory',
   ],
   tags = {'integration'},
 )
@@ -114,6 +116,11 @@ python_tests(
     'tests/python/pants_test:int-test',
     'tests/python/pants_test:interpreter_selection_utils',
     'tests/python/pants_test/testutils:pexrc_util',
+    'examples:3rdparty_directory',
+    'testprojects/src/python:interpreter_selection_directory',
+    'testprojects/tests/python/pants:conf_test_directory',
+    'testprojects/tests/python/pants:constants_only_directory',
+    'testprojects/tests/python/pants:timeout_directory',
   ],
   tags = {'integration'},
   timeout=240,
@@ -137,6 +144,7 @@ python_tests(
     '3rdparty/python:pex',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
+    'testprojects/src/python:python_distribution_directory',
   ],
   tags = {'integration'},
   timeout=240
@@ -160,6 +168,7 @@ python_tests(
   sources = ['test_python_repl_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test',
+    'testprojects/src/python:interpreter_selection_directory',
   ],
   tags = {'integration'},
   timeout=120,
@@ -174,6 +183,8 @@ python_tests(
     'tests/python/pants_test:int-test',
     'tests/python/pants_test:interpreter_selection_utils',
     'tests/python/pants_test/testutils:pexrc_util',
+    'testprojects/src/python:interpreter_selection_directory',
+    'testprojects/src/python:print_env_directory',
   ],
   tags = {'integration'},
   timeout=240
@@ -249,6 +260,10 @@ python_tests(
   sources = ['test_setup_py_integration.py'],
   dependencies = [
     'tests/python/pants_test/backend/python:pants_requirement_integration_test_base',
+    'examples:3rdparty_directory',
+    'examples/src/thrift/org/pantsbuild/example:distance_directory',
+    'examples/src/thrift/org/pantsbuild/example:precipitation_directory',
+    'testprojects:pants_plugins_directory',
   ],
   tags = {'integration'},
   timeout=240,

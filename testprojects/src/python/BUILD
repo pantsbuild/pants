@@ -2,6 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 files(
+  name = 'antlr_directory',
+  sources = rglobs('antlr/*'),
+)
+
+files(
   name = 'build_file_imports_function_directory',
   sources = rglobs('build_file_imports_function/*'),
 )
@@ -9,6 +14,21 @@ files(
 files(
   name = 'build_file_imports_module_directory',
   sources = rglobs('build_file_imports_module/*'),
+)
+
+files(
+  name = 'interpreter_selection_directory',
+  sources = rglobs('interpreter_selection/*'),
+)
+
+files(
+  name = 'python_distribution_directory',
+  sources = rglobs('python_distribution/*'),
+)
+
+files(
+  name = 'print_env_directory',
+  sources = rglobs('print_env/*'),
 )
 
 files(

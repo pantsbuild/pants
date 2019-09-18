@@ -44,6 +44,11 @@ files(
 )
 
 files(
+  name = 'scalac_directory',
+  sources = rglobs('scalac/*'),
+)
+
+files(
   name = 'several_scala_targets_directory',
   sources = rglobs('several_scala_targets/*'),
 )
