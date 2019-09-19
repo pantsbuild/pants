@@ -133,6 +133,7 @@ pub struct ExecuteProcessRequest {
   // This will be materialized for local ExecuteProcessRequest only.
   // Eventually we want to remove this.
   // Context: https://github.com/pantsbuild/pants/pull/8282
+  // Think twice before using it.
   pub local_only_scratch_files: hashing::Digest,
   ///
   /// If present, a symlink will be created at .jdk which points to this directory for local
