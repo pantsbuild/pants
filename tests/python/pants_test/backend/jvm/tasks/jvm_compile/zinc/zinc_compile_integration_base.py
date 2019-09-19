@@ -251,49 +251,50 @@ class BaseZincCompileIntegrationTest:
     test_combination('fatal', expect_success=False,
       extra_args=['--compile-rsc-compiler-option-sets-disabled-args={"fatal_warnings": ["-S-Xfatal-warnings"]}'])
 
-  def _compile_unused_import(self, workdir, cachedir, use_barebones_logger=False):
+  def _compile_unused_import(self, use_barebones_logger=False):
     # Compile a target that we expect will raise an "Unused import" warning.
-    pants_run = self.run_test_compile(
-        workdir,
-        cachedir,
-        'testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings/unused_import_warning:unused_import',
-        extra_args=[
-          '--compile-rsc-args=+["-S-Ywarn-unused:_"]'
-        ] + ['--compile-rsc-use-barebones-logger'] if use_barebones_logger else []
-    )
-    self.assert_success(pants_run)
-    return pants_run
-
-  def test_zinc_logs_warnings_properly(self):
-    """ Test that, with the standard logger, we log the warning in the expected format. """
     with self.temporary_workdir() as workdir:
       with self.temporary_cachedir() as cachedir:
-        pants_run = self._compile_unused_import(workdir, cachedir)
-        # Confirm that we were warned in the expected format.
-        expected_strings =[
-          "/testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings/unused_import_warning/UnusedImportWarning.scala:2:14: Unused import",
-          "[warn] import scala.List // Unused import warning",
-          "[warn] one warning found"
-        ]
+        args = [
+              '--compile-rsc-args=+["-S-Ywarn-unused:_"]',
+              # '--compile-rsc-cache-ignore',
+              '-ldebug',
+        ] + (['--compile-rsc-use-barebones-logger'] if use_barebones_logger else [])
+        pants_run = self.run_test_compile(
+            workdir,
+            cachedir,
+            'testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings/unused_import_warning:unused_import',
+            extra_args=args
+        )
+        self.assert_success(pants_run)
+        return pants_run
 
-        for expected in expected_strings:
-          self.assertIn(expected, pants_run.stdout_data)
+  def test_zinc_logs_warnings_properly(self):
+    """Test that, with the standard logger, we log the warning in the expected format."""
+    pants_run = self._compile_unused_import()
+    # Confirm that we were warned in the expected format.
+    expected_strings =[
+      "/testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings/unused_import_warning/UnusedImportWarning.scala:2:14: Unused import",
+      "[warn] import scala.List // Unused import warning",
+      "[warn] one warning found"
+    ]
+
+    for expected in expected_strings:
+      self.assertIn(expected, pants_run.stdout_data)
 
   def test_barebones_logger_works(self):
     """
     Test that, the barebones logger logs the expected warning.
     We don't check the format of the warning.
     """
-    with self.temporary_workdir() as workdir:
-      with self.temporary_cachedir() as cachedir:
-        pants_run = self._compile_unused_import(workdir, cachedir, use_barebones_logger=True)
-        expected_strings =[
-          "/testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings/unused_import_warning/UnusedImportWarning.scala",
-          "[warn] one warning found"
-        ]
+    pants_run = self._compile_unused_import(use_barebones_logger=True)
+    expected_strings =[
+      "/testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings/unused_import_warning/UnusedImportWarning.scala",
+      "[warn] one warning found"
+    ]
 
-        for expected in expected_strings:
-          self.assertIn(expected, pants_run.stdout_data)
+    for expected in expected_strings:
+      self.assertIn(expected, pants_run.stdout_data)
 
   @unittest.expectedFailure
   def test_soft_excludes_at_compiletime(self):
