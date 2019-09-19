@@ -478,7 +478,7 @@ class BaseZincCompile(JvmCompile):
       output_files=(jar_file, relpath_to_analysis),
       output_directories=output_directories,
       description="zinc compile for {}".format(ctx.target.address.spec),
-      local_scratch_files=merged_scratch_inputs,
+      local_only_scratch_files=merged_scratch_inputs,
       jdk_home=self._zinc.underlying_dist.home,
     )
     res = self.context.execute_process_synchronously_or_raise(

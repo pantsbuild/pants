@@ -133,7 +133,7 @@ pub struct ExecuteProcessRequest {
   // This will be materialized for local ExecuteProcessRequest only.
   // Eventually we want to remove this.
   // Context: https://github.com/pantsbuild/pants/pull/8282
-  pub local_scratch_files: hashing::Digest,
+  pub local_only_scratch_files: hashing::Digest,
   ///
   /// If present, a symlink will be created at .jdk which points to this directory for local
   /// execution, or a system-installed JDK (ignoring the value of the present Some) for remote
@@ -318,7 +318,7 @@ mod tests {
         output_directories: BTreeSet::new(),
         timeout,
         description,
-        local_scratch_files: hashing::EMPTY_DIGEST,
+        local_only_scratch_files: hashing::EMPTY_DIGEST,
         jdk_home: None,
         target_platform: Platform::None,
       };

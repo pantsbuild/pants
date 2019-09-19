@@ -431,9 +431,9 @@ impl MultiPlatformExecuteProcess {
       }
     };
 
-    let local_scratch_files = lift_digest(&externs::project_ignoring_type(
+    let local_only_scratch_files = lift_digest(&externs::project_ignoring_type(
       &value,
-      "local_scratch_files",
+      "local_only_scratch_files",
     ))
     .map_err(|err| format!("Error parsing digest {}", err))?;
 
@@ -445,7 +445,7 @@ impl MultiPlatformExecuteProcess {
       output_directories: output_directories,
       timeout: Duration::from_millis((timeout_in_seconds * 1000.0) as u64),
       description: description,
-      local_scratch_files: local_scratch_files,
+      local_only_scratch_files: local_only_scratch_files,
       jdk_home: jdk_home,
       target_platform: target_platform,
     })
