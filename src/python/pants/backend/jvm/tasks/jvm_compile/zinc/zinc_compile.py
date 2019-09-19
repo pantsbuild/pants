@@ -518,21 +518,13 @@ class BaseZincCompile(JvmCompile):
         with zipfile.ZipFile(jar_file, 'r') as zip_ref:
           zip_ref.extractall(classes_dir)
 
-        _unzipped_classes_dir_snapshot, = self.context._scheduler.capture_snapshots([
-          PathGlobsAndRoot(
-            PathGlobs([classes_dir + '/**']),
-            get_buildroot(),
-          ),
-        ])
-        return _unzipped_classes_dir_snapshot
-      else:
-        _classes_dir_snapshot, = self.context._scheduler.capture_snapshots([
-          PathGlobsAndRoot(
-            PathGlobs([classes_dir + '/**']),
-            get_buildroot(),
-          ),
-        ])
-        return _classes_dir_snapshot
+      _classes_dir_snapshot, = self.context._scheduler.capture_snapshots([
+        PathGlobsAndRoot(
+          PathGlobs([classes_dir + '/**']),
+          get_buildroot(),
+        ),
+      ])
+      return _classes_dir_snapshot
 
     analysis_snapshot = _get_analysis_snaoshot()
     classes_dir_snapshot = _get_classes_dir_snapshot()
