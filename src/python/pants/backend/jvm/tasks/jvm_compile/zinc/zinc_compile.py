@@ -143,7 +143,8 @@ class BaseZincCompile(JvmCompile):
                   'only clean/cold builds.')
 
     register('--use-barebones-logger', advanced=True, type=bool, default=False,
-             help='???')
+             help='Use our own implementation of the SBT logger in the Zinc compiler. '
+                  'This is experimental, but it provides great speedups in native-images of Zinc.')
 
   @classmethod
   def subsystem_dependencies(cls):
