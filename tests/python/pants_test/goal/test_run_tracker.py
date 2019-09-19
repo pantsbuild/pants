@@ -27,13 +27,22 @@ class RunTrackerTest(TestBase):
             handler.end_headers()
           else:
             self.assertEqual('/upload', handler.path)
-            self.assertEqual('application/x-www-form-urlencoded', handler.headers['Content-type'])
-            length = int(handler.headers['Content-Length'])
-            post_data = parse_qs(handler.rfile.read(length).decode())
-            decoded_post_data = {k: json.loads(v[0]) for k, v in post_data.items()}
-            self.assertEqual(stats, decoded_post_data)
+            stats_version = handler.headers['X-Pants-Stats-Version']
+            self.assertIn(stats_version, {"1", "2"})
             self.assertEqual(handler.headers['User-Agent'], f"pants/v{VERSION}")
-            self.assertIn(handler.headers['X-Pants-Stats-Version'], {"1", "2"})
+            length = int(handler.headers['Content-Length'])
+            content = handler.rfile.read(length).decode()
+            if stats_version == "2":
+              self.assertEqual('application/json', handler.headers['Content-type'])
+              decoded_post_data = json.loads(content)
+              self.assertEqual(len(decoded_post_data), 1)
+              builds = decoded_post_data['builds']
+              self.assertEqual(len(builds), 1)
+              received_stats = builds[0]
+            else:
+              self.assertEqual('application/x-www-form-urlencoded', handler.headers['Content-type'])
+              received_stats = {k: json.loads(v[0]) for k, v in parse_qs(content).items()}
+            self.assertEqual(stats, received_stats)
             handler.send_response(response_code)
             handler.end_headers()
         except Exception:
@@ -53,9 +62,9 @@ class RunTrackerTest(TestBase):
 
     self.context(for_subsystems=[Cookies])
     self.assertTrue(RunTracker.post_stats(mk_url('/upload'), stats, stats_version=1))
+    self.assertTrue(RunTracker.post_stats(mk_url('/upload'), stats, stats_version=2))
     self.assertTrue(RunTracker.post_stats(mk_url('/redirect307'), stats, stats_version=1))
     self.assertFalse(RunTracker.post_stats(mk_url('/redirect302'), stats, stats_version=2))
-
     server.shutdown()
     server.server_close()
 

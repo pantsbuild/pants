@@ -380,14 +380,21 @@ class RunTracker(Subsystem):
 
     if stats_version not in cls.SUPPORTED_STATS_VERSIONS:
       raise ValueError("Invalid stats version")
-    # TODO(benjy): The upload protocol currently requires separate top-level params, with JSON
-    # values.  Probably better for there to be one top-level JSON value, namely json.dumps(stats).
-    # But this will first require changing the upload receiver at every shop that uses this.
-    params = {k: cls._json_dump_options(v) for (k, v) in stats.items()}
+    
 
     auth_data = BasicAuth.global_instance().get_auth_for_provider(auth_provider)
     headers = cls._get_headers(stats_version=stats_version)
     headers.update(auth_data.headers)
+
+    if stats_version == 2:
+      params = cls._json_dump_options({'builds': [stats]})
+      headers['Content-Type'] = 'application/json'
+    else:
+      # TODO(benjy): The upload protocol currently requires separate top-level params, with JSON
+      # values.  Probably better for there to be one top-level JSON value, namely json.dumps(stats).
+      # But this will first require changing the upload receiver at every shop that uses this.
+      params = {k: cls._json_dump_options(v) for (k, v) in stats.items()}
+
 
     # We can't simply let requests handle redirects, as we only allow them for specific codes:
     # 307 and 308 indicate that the redirected request must use the same method, POST in this case.
