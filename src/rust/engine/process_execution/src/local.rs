@@ -257,6 +257,7 @@ impl super::CommandRunner for CommandRunner {
     let workdir_path4 = workdir_path.clone();
     let workdir_path5 = workdir_path.clone();
     let store = self.store.clone();
+    let store2 = self.store.clone();
     let executor = self.executor.clone();
 
     let env = req.env;
@@ -268,14 +269,13 @@ impl super::CommandRunner for CommandRunner {
     let argv = req.argv;
     let req_description = req.description;
     let maybe_jdk_home = req.jdk_home;
-    let store2 = self.store.clone();
-    let scratch = req.local_only_scratch_files;
+    let local_only_scratch_files = req.local_only_scratch_files;
     let workunit_store2 = workunit_store.clone();
 
     self
       .store
       .materialize_directory(workdir_path.clone(), req.input_files, workunit_store)
-      .and_then(move |_m2| store2.materialize_directory(workdir_path5, scratch, workunit_store2))
+      .and_then(move |_metadata| store2.materialize_directory(workdir_path5, local_only_scratch_files, workunit_store2))
       .and_then(move |_metadata| {
         maybe_jdk_home.map_or(Ok(()), |jdk_home| {
           symlink(jdk_home, workdir_path3.clone().join(".jdk"))
