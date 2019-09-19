@@ -139,7 +139,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
     1) create a target containing two scala files
     2) compile the target, which would be a full compile
     3) modify a scala file slightly
-    3) recompile, and make sure the compile is incremental by checking the zinc outputs
+    4) recompile, and make sure the compile is incremental by checking the zinc outputs
     """
 
     def _create_file(path, value):
