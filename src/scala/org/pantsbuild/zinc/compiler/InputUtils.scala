@@ -67,8 +67,22 @@ object InputUtils {
         .withScalacOptions(scalacOptions.toArray)
         .withJavacOptions(javacOptions.toArray)
         .withOrder(compileOrder)
-    val reporter = ReporterUtil.getReporter(
-      BareBonesLogger(settings.consoleLog.logLevel), ReporterManager.getDefaultReporterConfig)
+
+    val reporter =
+      if (settings.consoleLog.useBarebonesLogger) {
+        ReporterUtil.getReporter(
+          BareBonesLogger(settings.consoleLog.logLevel), ReporterManager.getDefaultReporterConfig)
+      } else {
+        ReporterUtil.getDefault(
+        ReporterUtil.getDefaultReporterConfig()
+          .withMaximumErrors(Int.MaxValue)
+          .withUseColor(settings.consoleLog.color)
+          .withMsgFilters(settings.consoleLog.msgPredicates.toArray)
+          .withFileFilters(settings.consoleLog.filePredicates.toArray)
+          .withLogLevel(settings.consoleLog.javaLogLevel)
+          .withPositionMapper(positionMapper)
+        )
+      }
     val setup =
       Setup.create(
         analysisMap.getPCELookup,
