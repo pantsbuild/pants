@@ -274,7 +274,9 @@ impl super::CommandRunner for CommandRunner {
     self
       .store
       .materialize_directory(workdir_path.clone(), req.input_files, workunit_store)
-      .and_then(move |_metadata| store2.materialize_directory(workdir_path4, local_only_scratch_files, workunit_store2))
+      .and_then(move |_metadata| {
+        store2.materialize_directory(workdir_path4, local_only_scratch_files, workunit_store2)
+      })
       .and_then(move |_metadata| {
         maybe_jdk_home.map_or(Ok(()), |jdk_home| {
           symlink(jdk_home, workdir_path3.clone().join(".jdk"))
