@@ -4,7 +4,7 @@ use tempfile;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use fs::{self, GlobExpansionConjunction, GlobMatching, PathGlobs, StrictGlobMatching};
 use futures::{future, Future, Stream};
-use log::{debug, info};
+use log::info;
 use std::collections::{BTreeSet, HashSet};
 use std::ffi::OsStr;
 use std::fs::create_dir_all;
@@ -255,7 +255,6 @@ impl super::CommandRunner for CommandRunner {
     let workdir_path2 = workdir_path.clone();
     let workdir_path3 = workdir_path.clone();
     let workdir_path4 = workdir_path.clone();
-    let workdir_path5 = workdir_path.clone();
     let store = self.store.clone();
     let store2 = self.store.clone();
     let executor = self.executor.clone();
@@ -275,17 +274,12 @@ impl super::CommandRunner for CommandRunner {
     self
       .store
       .materialize_directory(workdir_path.clone(), req.input_files, workunit_store)
-      .and_then(move |_metadata| store2.materialize_directory(workdir_path5, local_only_scratch_files, workunit_store2))
+      .and_then(move |_metadata| store2.materialize_directory(workdir_path4, local_only_scratch_files, workunit_store2))
       .and_then(move |_metadata| {
         maybe_jdk_home.map_or(Ok(()), |jdk_home| {
           symlink(jdk_home, workdir_path3.clone().join(".jdk"))
             .map_err(|err| format!("Error making symlink for local execution: {:?}", err))
         })?;
-        debug!("============ after ============");
-        for file in walkdir::WalkDir::new(workdir_path4.clone()) {
-          debug!("{}", file.unwrap().path().display());
-        }
-
         // The bazel remote execution API specifies that the parent directories for output files and
         // output directories should be created before execution completes: see
         //   https://github.com/pantsbuild/pants/issues/7084.
