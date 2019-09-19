@@ -212,6 +212,8 @@ python_tests(
     'src/python/pants/base:exception_sink',
     'src/python/pants/util:osutil',
     'tests/python/pants_test:int-test',
+    'testprojects/src/python:coordinated_runs_directory',
+    'testprojects:pants_plugins_directory',
   ],
   tags = {'platform_specific_behavior', 'integration'},
   timeout = 540,

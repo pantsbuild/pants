@@ -2,13 +2,19 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import json
-import os
+from pathlib import Path
 
 from pants.util.contextutil import temporary_file_path
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class RunTrackerIntegrationTest(PantsRunIntegrationTest):
+
+  load_plugin_cmdline = [
+    f'--pythonpath={Path.cwd().joinpath("tests", "python")}',
+    '--backend-packages=pants_test.goal.data',
+  ]
+
   def test_stats_local_json_file_v1(self):
     with temporary_file_path() as tmpfile:
       pants_run = self.run_pants([
@@ -80,22 +86,12 @@ class RunTrackerIntegrationTest(PantsRunIntegrationTest):
         self.assertNotIn('engine_workunits', stats_json['pantsd_stats'])
 
   def test_workunit_failure(self):
-    pants_run = self.run_pants([
-      '--pythonpath={}'.format(os.path.join(os.getcwd(), 'tests', 'python')),
-      '--backend-packages={}'.format('pants_test.goal.data'),
-      'run-dummy-workunit',
-      '--no-success'
-    ])
+    pants_run = self.run_pants([*self.load_plugin_cmdline, 'run-dummy-workunit', '--no-success'])
     # Make sure the task actually happens and of no exception.
     self.assertIn('[run-dummy-workunit]', pants_run.stdout_data)
     self.assertNotIn('Exception', pants_run.stderr_data)
     self.assert_failure(pants_run)
 
   def test_workunit_success(self):
-    pants_run = self.run_pants([
-      '--pythonpath={}'.format(os.path.join(os.getcwd(), 'tests', 'python')),
-      '--backend-packages={}'.format('pants_test.goal.data'),
-      'run-dummy-workunit',
-      '--success'
-    ])
+    pants_run = self.run_pants([*self.load_plugin_cmdline, 'run-dummy-workunit', '--success'])
     self.assert_success(pants_run)

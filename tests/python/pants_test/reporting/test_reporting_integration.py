@@ -179,7 +179,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
         '-ldebug',
         '--reporting-zipkin-endpoint={}'.format(endpoint),
         'cloc',
-        'src/python/pants:version'
+        'examples/src/java/org/pantsbuild/example/hello/simple',
       ]
 
       pants_run = self.run_pants(command)
@@ -212,7 +212,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
         '--reporting-zipkin-trace-id={}'.format(trace_id),
         '--reporting-zipkin-parent-id={}'.format(parent_span_id),
         'cloc',
-        'src/python/pants:version'
+        'examples/src/java/org/pantsbuild/example/hello/simple'
       ]
 
       pants_run = self.run_pants(command)
@@ -247,7 +247,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
         '--reporting-zipkin-endpoint={}'.format(endpoint),
         '--reporting-zipkin-sample-rate=0.0',
         'cloc',
-        'src/python/pants:version'
+        'examples/src/java/org/pantsbuild/example/hello/simple'
       ]
 
       pants_run = self.run_pants(command)
@@ -268,7 +268,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
         '--reporting-zipkin-endpoint={}'.format(endpoint),
         '--reporting-zipkin-trace-v2',
         'cloc',
-        'src/python/pants:version'
+        'examples/src/java/org/pantsbuild/example/hello/simple'
       ]
 
       pants_run = self.run_pants(command)

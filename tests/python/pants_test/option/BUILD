@@ -20,6 +20,7 @@ python_tests(
   dependencies=[
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
+    'testprojects/src/python:plugins_directory',
   ],
   tags = {'integration'},
   timeout=90,
