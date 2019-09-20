@@ -256,7 +256,7 @@ impl<N: Node> InnerGraph<N> {
       let mut path = Vec::new();
       while next != src {
         if let Some(entry) = graph.node_weight(next).unwrap() {
-          path.push(entry.clone());
+          path.push(*entry);
         }
         next = paths[next.index()].unwrap();
       }
