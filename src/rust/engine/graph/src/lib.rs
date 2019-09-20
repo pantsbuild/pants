@@ -201,66 +201,71 @@ impl<N: Node> InnerGraph<N> {
   /// Since in our use of the graph, nodes have a duration as opposed to edges, manually implement
   /// the algorithm.
   ///
-  fn critical_path<F>(&self, duration: F) -> (Duration, Vec<Entry<N>>)
+  fn critical_path<F>(&self, duration: &F) -> (Duration, Vec<Entry<N>>)
   where
     F: Fn(&Entry<N>) -> Duration,
   {
-    // First, do one pass in topological order, recording the maximum duration so far for each node.
-    let topological_order = petgraph::algo::toposort(&self.pg, None).unwrap();
-    let mut max_duration = HashMap::new();
-    for entry_id in topological_order {
-      // Max duration so far: duration of this entry + max duration of any incoming neighbor entry
-      let max = duration(self.unsafe_entry_for_id(entry_id))
-        + self
-          .pg
-          .neighbors_directed(entry_id, Direction::Incoming)
-          .map(|incoming| {
-            // It's OK to panic if an entry is missing, because we are traversing the graph in
-            // topological order, so any incoming entry must have been traversed (and added to
-            // max_duration) before hitting this entry.
-            max_duration[&incoming]
-          })
-          .max()
-          // If this entry has no incoming neighbor, it will take no time to get to it
-          .unwrap_or(std::time::Duration::from_nanos(0));
-      max_duration.insert(entry_id, max);
+    // Since the graph is acyclic, the critical path or longest path corresponds to the shortest
+    // path algorithm with weights on the edges being opposite to the duration.
+    // Create a new graph which allows us to reuse the shortest path algorithm.
+
+    fn duration_into_weight(d: Duration) -> f64 {
+      -(d.as_nanos() as f64)
     }
 
-    // The total weight is the maximum weight of any sink entries.
-    let sink_entries = self.pg.externals(Direction::Outgoing);
-    let max_sink =
-      sink_entries.max_by(|left, right| max_duration[&left].cmp(&max_duration[&right]));
-    let total_duration = max_sink
-      .map(|entry| max_duration[&entry])
-      .unwrap_or(std::time::Duration::from_nanos(0));
+    // First, let's map nodes to edges
+    let mut graph = self.pg.filter_map(
+      |_node_idx, node_weight| Some(Some(node_weight)),
+      |edge_idx, _edge_weight| {
+        let source_node = self.pg.raw_edges()[edge_idx.index()].source();
+        self
+          .pg
+          .node_weight(source_node)
+          .map(duration)
+          .map(duration_into_weight)
+      },
+    );
 
-    // We can retrace the critical path by traversing the graph backward, grabbing the incoming
-    // entry with the maximum duration every time.
-    let critical_path = match max_sink {
-      Some(mut next) => {
-        let mut rev_critical_path = vec![next];
-        let greatest_incoming_entry = |entry_id: EntryId| {
-          self
-            .pg
-            .neighbors_directed(entry_id, Direction::Incoming)
-            .max_by(|left, right| {
-              // All entries have been inserted into max_duration during our first pass, so safe
-              // to panic if any entry is missing
-              max_duration[&left].cmp({ &max_duration[&right] })
-            })
-        };
-        while let Some(entry) = greatest_incoming_entry(next) {
-          next = entry;
-          rev_critical_path.push(next);
+    // Add a single source that's a parent to to all previous sources
+    // TODO: use argument instead to avoid covering the full graph
+    let srcs = graph.externals(Direction::Incoming).collect::<Vec<_>>();
+    let src = graph.add_node(None);
+    for node in srcs {
+      graph.add_edge(src, node, 0.);
+    }
+
+    // Add a single destination that's a child from all the previous destinations
+    let dsts = graph.externals(Direction::Outgoing).collect::<Vec<_>>();
+    let dst = graph.add_node(None);
+    for node in dsts {
+      graph.add_edge(
+        node,
+        dst,
+        graph
+          .node_weight(node)
+          .map(|maybe_weight| {
+            maybe_weight
+              .map(duration)
+              .map(duration_into_weight)
+              .unwrap_or(0.)
+          })
+          .unwrap(),
+      );
+    }
+
+    let (weights, paths) =
+      petgraph::algo::bellman_ford(&graph, src).expect("The graph must be acyclic");
+    let total_duration = Duration::from_nanos(-weights[dst.index()] as u64);
+    let critical_path = {
+      let mut next = dst;
+      let mut path = Vec::new();
+      while next != src {
+        if let Some(entry) = graph.node_weight(next).unwrap() {
+          path.push(entry.clone());
         }
-        rev_critical_path
-          .into_iter()
-          .rev()
-          .map(|entry_id| self.unsafe_entry_for_id(entry_id))
-          .cloned()
-          .collect()
+        next = paths[next.index()].unwrap();
       }
-      None => Vec::new(),
+      path.into_iter().rev().cloned().collect()
     };
     (total_duration, critical_path)
   }
@@ -730,7 +735,7 @@ impl<N: Node> Graph<N> {
     }
   }
 
-  pub fn critical_path<F>(&self, duration: F) -> (Duration, Vec<Entry<N>>)
+  pub fn critical_path<F>(&self, duration: &F) -> (Duration, Vec<Entry<N>>)
   where
     F: Fn(&Entry<N>) -> Duration,
   {
@@ -1350,7 +1355,7 @@ mod tests {
     }
 
     // Calculate the critical path and validate it.
-    let (total_duration, critical_path) = graph.critical_path(node_duration);
+    let (total_duration, critical_path) = graph.critical_path(&node_duration);
     assert_eq!(expected_total_duration, total_duration);
     let critical_path = critical_path
       .iter()
