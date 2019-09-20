@@ -284,8 +284,8 @@ class BaseZincCompileIntegrationTest:
 
   def test_barebones_logger_works(self):
     """
-    Test that, the barebones logger logs the expected warning.
-    We don't check the format of the warning.
+    Test that the barebones logger logs the expected warning.
+    TODO(#8312): this should be synced up with the normal logging output in order to use native-image zinc!
     """
     pants_run = self._compile_unused_import(use_barebones_logger=True)
     expected_strings =[
