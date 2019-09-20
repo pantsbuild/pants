@@ -201,7 +201,7 @@ impl<N: Node> InnerGraph<N> {
   /// Since in our use of the graph, nodes have a duration as opposed to edges, manually implement
   /// the algorithm.
   ///
-  fn critical_path<F>(&self, duration: &F) -> (Duration, Vec<Entry<N>>)
+  fn critical_path<F>(&self, roots: &[N], duration: &F) -> (Duration, Vec<Entry<N>>)
   where
     F: Fn(&Entry<N>) -> Duration,
   {
@@ -226,9 +226,12 @@ impl<N: Node> InnerGraph<N> {
       },
     );
 
-    // Add a single source that's a parent to to all previous sources
-    // TODO: use argument instead to avoid covering the full graph
-    let srcs = graph.externals(Direction::Incoming).collect::<Vec<_>>();
+    // Add a single source that's a parent to to all roots
+    let srcs = roots
+      .iter()
+      .filter_map(|n| self.entry_id(&EntryKey::Valid(n.clone())))
+      .cloned()
+      .collect::<Vec<_>>();
     let src = graph.add_node(None);
     for node in srcs {
       graph.add_edge(src, node, 0.);
@@ -735,11 +738,11 @@ impl<N: Node> Graph<N> {
     }
   }
 
-  pub fn critical_path<F>(&self, duration: &F) -> (Duration, Vec<Entry<N>>)
+  pub fn critical_path<F>(&self, roots: &[N], duration: &F) -> (Duration, Vec<Entry<N>>)
   where
     F: Fn(&Entry<N>) -> Duration,
   {
-    self.inner.lock().critical_path(duration)
+    self.inner.lock().critical_path(roots, duration)
   }
 
   ///
@@ -1319,22 +1322,20 @@ mod tests {
       ("compile a", "compile c"),
       ("compile b", "compile c"),
     ];
-    let (expected_total_duration, expected_critical_path) = (
-      Duration::from_secs(35),
-      vec!["download jvm", "compile b", "compile c"],
-    );
 
     // Describe a few transformations to navigate between our readable data and the actual types
     // needed for the graph.
-    let node_entry = |node: &str| {
-      Entry::new(EntryKey::Valid(TNode(
+    let tnode = |node: &str| {
+      TNode(
         nodes
           .iter()
           .map(|(k, _)| k)
           .position(|label| &node == label)
           .unwrap(),
-      )))
+      )
     };
+    let node_key = |node: &str| EntryKey::Valid(tnode(node));
+    let node_entry = |node: &str| Entry::new(node_key(node));
     let node_and_duration_from_entry = |entry: &super::entry::Entry<TNode>| nodes[entry.node().0];
     let node_duration = |entry: &super::entry::Entry<TNode>| {
       Duration::from_secs(node_and_duration_from_entry(entry).1)
@@ -1343,25 +1344,55 @@ mod tests {
     // Construct a graph and populate it with the nodes and edges prettily defined above.
     let graph = Graph::new();
     {
-      let pg = &mut graph.inner.lock().pg;
-      let mut node_indices = HashMap::new();
+      let inner = &mut graph.inner.lock();
       for (node, _) in &nodes {
-        let node_index = pg.add_node(node_entry(node));
-        node_indices.insert(node, node_index);
+        let node_index = inner.pg.add_node(node_entry(node));
+        inner.nodes.insert(node_key(node), node_index);
       }
       for (src, dst) in &deps {
-        pg.add_edge(node_indices[src], node_indices[dst], 1.0);
+        let src = inner.nodes[&node_key(src)];
+        let dst = inner.nodes[&node_key(dst)];
+        inner.pg.add_edge(src, dst, 1.0);
       }
     }
 
     // Calculate the critical path and validate it.
-    let (total_duration, critical_path) = graph.critical_path(&node_duration);
-    assert_eq!(expected_total_duration, total_duration);
-    let critical_path = critical_path
-      .iter()
-      .map(|entry| node_and_duration_from_entry(entry).0)
-      .collect::<Vec<_>>();
-    assert_eq!(expected_critical_path, critical_path);
+    {
+      // The roots are all the sources, so we're covering the entire graph
+      let roots = ["download jvm", "download a", "download b", "download c"]
+        .into_iter()
+        .map(|n| tnode(n))
+        .collect::<Vec<_>>();
+      let (expected_total_duration, expected_critical_path) = (
+        Duration::from_secs(35),
+        vec!["download jvm", "compile b", "compile c"],
+      );
+      let (total_duration, critical_path) = graph.critical_path(&roots, &node_duration);
+      assert_eq!(expected_total_duration, total_duration);
+      let critical_path = critical_path
+        .iter()
+        .map(|entry| node_and_duration_from_entry(entry).0)
+        .collect::<Vec<_>>();
+      assert_eq!(expected_critical_path, critical_path);
+    }
+    {
+      // The roots exclude some nodes ("download jvm", "download a") from the graph.
+      let roots = ["download b", "download c"]
+        .into_iter()
+        .map(|n| tnode(n))
+        .collect::<Vec<_>>();
+      let (expected_total_duration, expected_critical_path) = (
+        Duration::from_secs(27),
+        vec!["download b", "compile b", "compile c"],
+      );
+      let (total_duration, critical_path) = graph.critical_path(&roots, &node_duration);
+      assert_eq!(expected_total_duration, total_duration);
+      let critical_path = critical_path
+        .iter()
+        .map(|entry| node_and_duration_from_entry(entry).0)
+        .collect::<Vec<_>>();
+      assert_eq!(expected_critical_path, critical_path);
+    }
   }
 
   ///
