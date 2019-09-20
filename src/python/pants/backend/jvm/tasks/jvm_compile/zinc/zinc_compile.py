@@ -451,7 +451,6 @@ class BaseZincCompile(JvmCompile):
         ),
       ])
 
-    # If analysis file exists, then incremental compile is enabled.
     relpath_to_analysis = fast_relpath(ctx.analysis_file, get_buildroot())
     merged_local_only_scratch_inputs = self._compute_scratch_inputs(classes_dir, relpath_to_analysis, jar_file)
 
@@ -495,6 +494,9 @@ class BaseZincCompile(JvmCompile):
   def _compute_scratch_inputs(self, classes_dir, relpath_to_analysis, jar_file):
     """
     Compute for the scratch inputs for ExecuteProcessRequest.
+
+    If analysis file exists, then incremental compile is enabled. Otherwise, the compile is not
+    incremental, an empty digest will be returned.
 
     :param classes_dir: relative path to classes dir from buildroot
     :param relpath_to_analysis: relative path to zinc analysis file from buildroot
