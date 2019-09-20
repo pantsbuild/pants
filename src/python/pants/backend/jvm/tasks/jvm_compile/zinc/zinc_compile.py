@@ -453,7 +453,7 @@ class BaseZincCompile(JvmCompile):
 
     # If analysis file exists, then incremental compile is enabled.
     relpath_to_analysis = fast_relpath(ctx.analysis_file, get_buildroot())
-    merged_scratch_inputs = self._compute_scratch_inputs(classes_dir, relpath_to_analysis, jar_file)
+    merged_local_only_scratch_inputs = self._compute_scratch_inputs(classes_dir, relpath_to_analysis, jar_file)
 
     # TODO: Extract something common from Executor._create_command to make the command line
     argv = image_specific_argv + ['@{}'.format(argfile_snapshot.files[0])]
@@ -478,7 +478,7 @@ class BaseZincCompile(JvmCompile):
       output_files=(jar_file, relpath_to_analysis),
       output_directories=output_directories,
       description="zinc compile for {}".format(ctx.target.address.spec),
-      local_only_scratch_files=merged_scratch_inputs,
+      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule=merged_local_only_scratch_inputs,
       jdk_home=self._zinc.underlying_dist.home,
     )
     res = self.context.execute_process_synchronously_or_raise(

@@ -302,7 +302,8 @@ fn main() {
     output_directories,
     timeout: Duration::new(15 * 60, 0),
     description: "process_executor".to_string(),
-    local_only_scratch_files: hashing::EMPTY_DIGEST,
+    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+      hashing::EMPTY_DIGEST,
     jdk_home: args.value_of("jdk").map(PathBuf::from),
     target_platform: Platform::try_from(&args.value_of("target-platform").unwrap().to_string())
       .expect("invalid value for `target-platform"),

@@ -134,7 +134,8 @@ pub struct ExecuteProcessRequest {
   // Eventually we want to remove this.
   // Context: https://github.com/pantsbuild/pants/pull/8282
   // Think twice before using it.
-  pub local_only_scratch_files: hashing::Digest,
+  pub unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+    hashing::Digest,
   ///
   /// If present, a symlink will be created at .jdk which points to this directory for local
   /// execution, or a system-installed JDK (ignoring the value of the present Some) for remote
@@ -319,7 +320,8 @@ mod tests {
         output_directories: BTreeSet::new(),
         timeout,
         description,
-        local_only_scratch_files: hashing::EMPTY_DIGEST,
+        unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+          hashing::EMPTY_DIGEST,
         jdk_home: None,
         target_platform: Platform::None,
       };
