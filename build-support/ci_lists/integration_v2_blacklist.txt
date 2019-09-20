@@ -1,0 +1,2 @@
+tests/python/pants_test/base:exception_sink_integration
+tests/python/pants_test/reporting:reporting_integration

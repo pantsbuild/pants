@@ -40,6 +40,9 @@ python_tests(
   dependencies=[
     'src/python/pants/goal:run_tracker',
     'tests/python/pants_test:int-test',
+    'tests/python/pants_test/goal/data:plugin',
+    'testprojects/src/java/org/pantsbuild/testproject:extra_jvm_options_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
   ],
   tags = {'integration'},
   timeout = 180,

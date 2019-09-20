@@ -107,7 +107,20 @@ object Main {
     // so we can run zinc without $PATH (as needed in remoting).
     System.setProperty("sbt.log.format", "true")
 
-    BareBonesLogger(settings.consoleLog.logLevel)
+    def mkConsoleLogger(level: Level.Value, color: Boolean): ConsoleLogger = {
+      val cl = ConsoleLogger(
+        out = ConsoleOut.systemOut,
+        ansiCodesSupported = color
+      )
+      cl.setLevel(level)
+      cl
+    }
+
+    if (settings.consoleLog.useBarebonesLogger) {
+      BareBonesLogger(settings.consoleLog.logLevel)
+    } else {
+      mkConsoleLogger(settings.consoleLog.logLevel, settings.consoleLog.color)
+    }
   }
 
   def preprocessArgs(rawArgs: Array[String]): Array[String] = {
@@ -176,7 +189,7 @@ object Main {
   }
 
   def mainImpl(settings: Settings, startTime: Long, exit: Int => Unit): Unit = {
-    val log = BareBonesLogger(settings.consoleLog.logLevel)
+    val log = mkLogger(settings)
     val isDebug = settings.consoleLog.logLevel <= Level.Debug
 
     // if there are no sources provided, print outputs based on current analysis if requested,

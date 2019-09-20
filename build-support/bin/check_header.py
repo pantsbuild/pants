@@ -93,7 +93,7 @@ def get_header_lines(file_path: Path) -> List[str]:
       # We grab an extra line in case there is a shebang.
       lines = [f.readline() for _ in range(0, EXPECTED_NUM_LINES + 1)]
   except OSError as e:
-    raise HeaderCheckFailure(f"{file_path}: error while reading input ({e})")
+    raise HeaderCheckFailure(f"{file_path}: error while reading input ({e!r})")
   # If a shebang line is included, remove it. Otherwise, we will have conservatively grabbed
   # one extra line at the end for the shebang case that is no longer necessary.
   lines.pop(0 if lines[0].startswith("#!") else - 1)

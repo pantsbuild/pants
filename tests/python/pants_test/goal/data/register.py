@@ -4,7 +4,6 @@
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.workunit import WorkUnit
 from pants.goal.task_registrar import TaskRegistrar as task
-from pants.task.task import Task
 
 
 def register_goals():

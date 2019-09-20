@@ -17,8 +17,23 @@ files(
 )
 
 files(
+  name = 'coordinated_runs_directory',
+  sources = rglobs('coordinated_runs/*'),
+)
+
+files(
   name = 'interpreter_selection_directory',
   sources = rglobs('interpreter_selection/*'),
+)
+
+files(
+  name = 'plugins_directory',
+  sources = rglobs('plugins/*'),
+)
+
+files(
+  name = 'print_env_directory',
+  sources = rglobs('print_env/*'),
 )
 
 files(
@@ -26,10 +41,6 @@ files(
   sources = rglobs('python_distribution/*'),
 )
 
-files(
-  name = 'print_env_directory',
-  sources = rglobs('print_env/*'),
-)
 
 files(
   name = 'python_targets_directory',

@@ -74,7 +74,7 @@ def get_scm():
         logger.debug(f'Detected git repository at {worktree} on branch {git.branch_name}')
         set_scm(git)
       except git.LocalException as e:
-        logger.info(f'Failed to load git repository at {worktree}: {e}')
+        logger.info(f'Failed to load git repository at {worktree}: {e!r}')
   return _SCM
 
 

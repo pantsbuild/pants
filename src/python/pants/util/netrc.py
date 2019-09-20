@@ -44,4 +44,4 @@ class Netrc:
         if len(self._login) == 0:
           raise self.NetrcError('Found no usable authentication blocks in ~/.netrc')
       except NetrcParseError as e:
-        raise self.NetrcError(f'Problem parsing ~/.netrc: {e}')
+        raise self.NetrcError(f'Problem parsing ~/.netrc: {e!r}')

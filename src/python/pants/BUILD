@@ -67,3 +67,18 @@ This file is no longer a changelog, but remains in this location in order to avo
 older changelog links unnecessarily. Could consider removing it by 2.0.x, perhaps.
 ''',
 )
+
+# NB: This is used for the integration test `test_reversion.py`. It includes all transitive
+# dependencies to ensure that the chroot can run `src/python/pants/releases:reversion` properly.
+files(
+  name='reversion_file_with_dependencies',
+  sources=[
+    'releases/BUILD',
+    'releases/reversion.py',
+    'util/BUILD',
+    'util/contextutil.py',
+    'util/dirutil.py',
+    'util/strutil.py',
+    'util/tarutil.py',
+  ],
+)

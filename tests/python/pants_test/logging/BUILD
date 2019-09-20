@@ -21,6 +21,7 @@ python_tests(
   dependencies=[
     'src/python/pants/goal:run_tracker',
     'tests/python/pants_test:int-test',
+    'tests/python/pants_test/logging/data:plugin',
   ],
   tags = {'integration'},
 )

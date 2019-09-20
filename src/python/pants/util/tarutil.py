@@ -48,12 +48,12 @@ class TarFile(tarfile.TarFile):
         tarinfo = self.tarinfo.fromtarfile(self)
       except tarfile.EOFHeaderError as e:
         if self.ignore_zeros:
-          self._dbg(2, f"0x{self.offset:X}: {e}")
+          self._dbg(2, f"0x{self.offset:X}: {e!r}")
           self.offset += tarfile.BLOCKSIZE
           continue
       except tarfile.InvalidHeaderError as e:
         if self.ignore_zeros:
-          self._dbg(2, f"0x{self.offset:X}: {e}")
+          self._dbg(2, f"0x{self.offset:X}: {e!r}")
           self.offset += tarfile.BLOCKSIZE
           continue
         # Modify here, to raise exceptions if errorlevel is bigger than 0.
