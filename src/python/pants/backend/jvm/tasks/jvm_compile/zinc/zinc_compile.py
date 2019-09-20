@@ -504,7 +504,7 @@ class BaseZincCompile(JvmCompile):
     if not os.path.exists(relpath_to_analysis):
       return EMPTY_DIRECTORY_DIGEST
 
-    def _get_analysis_snaoshot():
+    def _get_analysis_snapshot():
       _analysis_snapshot, = self.context._scheduler.capture_snapshots([
         PathGlobsAndRoot(
           PathGlobs([relpath_to_analysis]),
@@ -526,7 +526,7 @@ class BaseZincCompile(JvmCompile):
       ])
       return _classes_dir_snapshot
 
-    analysis_snapshot = _get_analysis_snaoshot()
+    analysis_snapshot = _get_analysis_snapshot()
     classes_dir_snapshot = _get_classes_dir_snapshot()
     return self.context._scheduler.merge_directories(
       [analysis_snapshot.directory_digest, classes_dir_snapshot.directory_digest]
