@@ -257,7 +257,6 @@ class BaseZincCompileIntegrationTest:
       with self.temporary_cachedir() as cachedir:
         args = [
               '--compile-rsc-args=+["-S-Ywarn-unused:_"]',
-              # '--compile-rsc-cache-ignore',
               '-ldebug',
         ] + (['--compile-rsc-use-barebones-logger'] if use_barebones_logger else [])
         pants_run = self.run_test_compile(
