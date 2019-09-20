@@ -194,21 +194,13 @@ impl<N: Node> InnerGraph<N> {
   /// The critical path is the longest path. For a directed acyclic graph, it is equivalent to a
   /// shortest path algorithm.
   ///
-  /// Ideally, we would have used an existing algorithm to calculate the shortest path, such as
-  /// petgraph::algo::astar, but this assumes that the weight is on the edges rather than on the
-  /// nodes.
-  ///
-  /// Since in our use of the graph, nodes have a duration as opposed to edges, manually implement
-  /// the algorithm.
+  /// Modify the graph we have to fit into the expectations of the Bellman-Ford shortest graph
+  /// algorithm and use that to calculate the critical path.
   ///
   fn critical_path<F>(&self, roots: &[N], duration: &F) -> (Duration, Vec<Entry<N>>)
   where
     F: Fn(&Entry<N>) -> Duration,
   {
-    // Since the graph is acyclic, the critical path or longest path corresponds to the shortest
-    // path algorithm with weights on the edges being opposite to the duration.
-    // Create a new graph which allows us to reuse the shortest path algorithm.
-
     fn duration_into_weight(d: Duration) -> f64 {
       -(d.as_nanos() as f64)
     }
@@ -738,6 +730,10 @@ impl<N: Node> Graph<N> {
     }
   }
 
+  ///
+  /// Calculate the critical path for the subset of the graph that descends from these roots,
+  /// assuming this mapping between entries and durations.
+  ///
   pub fn critical_path<F>(&self, roots: &[N], duration: &F) -> (Duration, Vec<Entry<N>>)
   where
     F: Fn(&Entry<N>) -> Duration,
