@@ -1,19 +1,16 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.engine.legacy.structs import TargetAdaptor, PythonBinaryAdaptor, PythonTestsAdaptor
-from pants.rules.core.strip_source_root import SourceRootStrippedSources, strip_source_root
-from pants.engine.rules import optionable_rule, RootRule
-from pants.engine.selectors import Get, Params
-from pants_test.test_base import TestBase
-from pants.source.source_root import SourceRootConfig
-
 from unittest.mock import Mock
-from pants.build_graph.address import Address, BuildFileAddress
-from pants.engine.legacy.graph import HydratedTarget, TransitiveHydratedTargets
-from pants_test.subsystem.subsystem_util import init_subsystem
-from pants.engine.fs import EMPTY_SNAPSHOT, Digest, DirectoryWithPrefixToStrip, Snapshot, create_fs_rules
 
+from pants.engine.fs import create_fs_rules
+from pants.engine.legacy.graph import HydratedTarget
+from pants.engine.rules import RootRule
+from pants.engine.selectors import Params
+from pants.rules.core.strip_source_root import SourceRootStrippedSources, strip_source_root
+from pants.source.source_root import SourceRootConfig
+from pants_test.subsystem.subsystem_util import init_subsystem
+from pants_test.test_base import TestBase
 
 
 class StripSourceRootsTests(TestBase):
@@ -21,20 +18,30 @@ class StripSourceRootsTests(TestBase):
   def rules(cls):
     return super().rules() + [
       strip_source_root,
-      optionable_rule(SourceRootConfig),
       RootRule(SourceRootConfig),
+      RootRule(HydratedTarget),
     ] + create_fs_rules()
 
+  def mock_hydrated_target(self, target_address, source_filename):
+    adaptor = Mock()
+    adaptor.sources = Mock()
+    source_files = dict()
+    source_files[source_filename] = "print('random python')"
+    adaptor.sources.snapshot = self.make_snapshot(source_files)
+    adaptor.address = Mock()
+    adaptor.address.spec_path = source_filename
+    return HydratedTarget(target_address, adaptor, tuple())
+
   def test_source_roots(self):
-
     init_subsystem(SourceRootConfig)
-
-    adaptor = PythonTestsAdaptor(type_alias='python_tests')
-    target = HydratedTarget(Address.parse("some/target"), adaptor, ())
-
+    target = self.mock_hydrated_target("some/target/address", 'src/python/pants/util/strutil.py')
     output = self.scheduler.product_request(SourceRootStrippedSources, [Params(target, SourceRootConfig.global_instance())])
+    stripped_sources = output[0]
+    self.assertEqual(stripped_sources.snapshot.files, ('pants/util/strutil.py',))
 
-    print(f"Output: {output}")
-    self.assertEqual(1, 1)
-    self.assertEqual(output, 5)
-
+  def test_source_roots_java(self):
+    init_subsystem(SourceRootConfig)
+    target = self.mock_hydrated_target("some/target/address", 'src/java/some/path/to/something.java')
+    output = self.scheduler.product_request(SourceRootStrippedSources, [Params(target, SourceRootConfig.global_instance())])
+    stripped_sources = output[0]
+    self.assertEqual(stripped_sources.snapshot.files, ('some/path/to/something.java',))

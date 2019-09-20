@@ -3,6 +3,7 @@
 
 from pants.rules.core import filedeps, list_roots, list_targets, strip_source_root, test
 
+
 def rules():
   return [
     *list_roots.rules(),
@@ -11,4 +12,3 @@ def rules():
     *strip_source_root.rules(),
     *test.rules()
   ]
-

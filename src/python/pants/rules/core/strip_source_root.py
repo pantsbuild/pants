@@ -13,6 +13,7 @@ from pants.util.objects import datatype
 class SourceRootStrippedSources(datatype([('snapshot', Snapshot)])):
   """Wrapper for a snapshot of targets whose source roots have been stripped."""
 
+
 @rule(SourceRootStrippedSources, [HydratedTarget, SourceRootConfig])
 def strip_source_root(hydrated_target, source_root_config):
   """Relativize targets to their source root, e.g.
@@ -48,4 +49,3 @@ def strip_source_root(hydrated_target, source_root_config):
 
 def rules():
   return [strip_source_root, optionable_rule(SourceRootConfig)]
-

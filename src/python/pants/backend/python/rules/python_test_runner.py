@@ -1,25 +1,21 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Dict, Optional
-
 from pants.backend.python.rules.create_requirements_pex import (RequirementsPex,
                                                                 RequirementsPexRequest)
 from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.build_graph.files import Files
-from pants.engine.fs import Digest, DirectoriesToMerge, DirectoryWithPrefixToStrip
+from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
-from pants.engine.legacy.graph import BuildFileAddresses, TransitiveHydratedTargets, HydratedTarget
+from pants.engine.legacy.graph import BuildFileAddresses, HydratedTarget, TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonTestsAdaptor
 from pants.engine.rules import UnionRule, optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.core_test_model import Status, TestResult, TestTarget
-from pants.source.source_root import SourceRoot, SourceRootConfig
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
-from pants.util.strutil import create_path_env_var, strip_prefix
+from pants.util.strutil import create_path_env_var
 
 
 @rule(TestResult, [PythonTestsAdaptor, PyTest, PythonSetup, SubprocessEncodingEnvironment])
