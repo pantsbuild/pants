@@ -7,7 +7,7 @@ import re
 import subprocess
 import sys
 from functools import wraps
-from unittest import skipIf
+from unittest import skip, skipIf
 from zipfile import ZipFile
 
 from pants.backend.native.config.environment import Platform
@@ -182,8 +182,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run_interop)
       self.assertEqual('x=3, f(x)=299\n', pants_run_interop.stdout_data)
 
-  @skipIf(_IS_OSX and _PYTHON_MAJOR_MINOR == (3, 7),
-          reason='Broken as described in https://github.com/pantsbuild/pants/issues/7762.')
+  @skip('See https://github.com/pantsbuild/pants/issues/8316 and https://github.com/pantsbuild/pants/issues/7762')
   @_toolchain_variants
   def test_ctypes_third_party_integration(self, toolchain_variant):
     pants_binary = self.run_pants(['binary', self._binary_target_with_third_party], config={
