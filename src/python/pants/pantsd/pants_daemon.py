@@ -381,6 +381,8 @@ class PantsDaemon(FingerprintedProcessManager):
 
   def run_sync(self):
     """Synchronously run pantsd."""
+    os.environ.pop('PYTHONPATH')
+
     # Switch log output to the daemon's log stream from here forward.
     # Also, register an exiter using os._exit to ensure we only close stdio streams once.
     self._close_stdio()
@@ -420,11 +422,20 @@ class PantsDaemon(FingerprintedProcessManager):
 
   def post_fork_child(self):
     """Post-fork() child callback for ProcessManager.daemon_spawn()."""
-    entry_point = '{}:launch'.format(__name__)
-    exec_env = combined_dict(os.environ, dict(PANTS_ENTRYPOINT=entry_point))
+    spawn_control_env = dict(PANTS_ENTRYPOINT=f'{__name__}:launch',
+                             # The daemon should run under the same sys.path as us; so we ensure
+                             # this. NB: It will scrub PYTHONPATH once started to avoid infecting
+                             # its own unrelated subprocesses.
+                             PYTHONPATH=os.pathsep.join(sys.path))
+    exec_env = combined_dict(os.environ, spawn_control_env)
+
     # Pass all of sys.argv so that we can proxy arg flags e.g. `-ldebug`.
     cmd = [sys.executable] + sys.argv
-    self._logger.debug('cmd is: PANTS_ENTRYPOINT={} {}'.format(entry_point, ' '.join(cmd)))
+
+    spawn_control_env_vars = ' '.join(f'{k}={v}' for k, v in spawn_control_env.items())
+    cmd_line = ' '.join(cmd)
+    self._logger.debug(f'cmd is: {spawn_control_env_vars} {cmd_line}')
+
     # TODO: Improve error handling on launch failures.
     os.spawnve(os.P_NOWAIT, sys.executable, cmd, env=exec_env)
 
