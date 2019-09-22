@@ -75,7 +75,7 @@ Exception message:.* 1 Exception encountered:
         pants_run = self.run_pants_with_workdir(self._lifecycle_stub_cmdline(), workdir=tmpdir)
         self.assert_failure(pants_run)
 
-        self.assertEqual(dedent("""\
+        self.assertIn(dedent("""\
         Interrupted by user:
         ctrl-c during import!
         """), pants_run.stderr_data)
