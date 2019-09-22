@@ -189,6 +189,83 @@ impl<N: Node> InnerGraph<N> {
   }
 
   ///
+  /// Compute the critical path for this graph.
+  ///
+  /// The critical path is the longest path. For a directed acyclic graph, it is equivalent to a
+  /// shortest path algorithm.
+  ///
+  /// Modify the graph we have to fit into the expectations of the Bellman-Ford shortest graph
+  /// algorithm and use that to calculate the critical path.
+  ///
+  fn critical_path<F>(&self, roots: &[N], duration: &F) -> (Duration, Vec<Entry<N>>)
+  where
+    F: Fn(&Entry<N>) -> Duration,
+  {
+    fn duration_into_weight(d: Duration) -> f64 {
+      -(d.as_nanos() as f64)
+    }
+
+    // First, let's map nodes to edges
+    let mut graph = self.pg.filter_map(
+      |_node_idx, node_weight| Some(Some(node_weight)),
+      |edge_idx, _edge_weight| {
+        let source_node = self.pg.raw_edges()[edge_idx.index()].source();
+        self
+          .pg
+          .node_weight(source_node)
+          .map(duration)
+          .map(duration_into_weight)
+      },
+    );
+
+    // Add a single source that's a parent to to all roots
+    let srcs = roots
+      .iter()
+      .filter_map(|n| self.entry_id(&EntryKey::Valid(n.clone())))
+      .cloned()
+      .collect::<Vec<_>>();
+    let src = graph.add_node(None);
+    for node in srcs {
+      graph.add_edge(src, node, 0.);
+    }
+
+    // Add a single destination that's a child from all the previous destinations
+    let dsts = graph.externals(Direction::Outgoing).collect::<Vec<_>>();
+    let dst = graph.add_node(None);
+    for node in dsts {
+      graph.add_edge(
+        node,
+        dst,
+        graph
+          .node_weight(node)
+          .map(|maybe_weight| {
+            maybe_weight
+              .map(duration)
+              .map(duration_into_weight)
+              .unwrap_or(0.)
+          })
+          .unwrap(),
+      );
+    }
+
+    let (weights, paths) =
+      petgraph::algo::bellman_ford(&graph, src).expect("The graph must be acyclic");
+    let total_duration = Duration::from_nanos(-weights[dst.index()] as u64);
+    let critical_path = {
+      let mut next = dst;
+      let mut path = Vec::new();
+      while next != src {
+        if let Some(entry) = graph.node_weight(next).unwrap() {
+          path.push(*entry);
+        }
+        next = paths[next.index()].unwrap();
+      }
+      path.into_iter().rev().cloned().collect()
+    };
+    (total_duration, critical_path)
+  }
+
+  ///
   /// Begins a Walk from the given roots.
   /// The Walk will iterate over all nodes that descend from the roots in the direction of
   /// traversal but won't necessarily be in topological order.
@@ -651,6 +728,17 @@ impl<N: Node> Graph<N> {
         return Ok(false);
       }
     }
+  }
+
+  ///
+  /// Calculate the critical path for the subset of the graph that descends from these roots,
+  /// assuming this mapping between entries and durations.
+  ///
+  pub fn critical_path<F>(&self, roots: &[N], duration: &F) -> (Duration, Vec<Entry<N>>)
+  where
+    F: Fn(&Entry<N>) -> Duration,
+  {
+    self.inner.lock().critical_path(roots, duration)
   }
 
   ///
@@ -1201,6 +1289,106 @@ mod tests {
     let res = graph.create(initial_top, &context_up).wait();
 
     assert_eq!(res, Ok(vec![T(1, 1), T(2, 1)]));
+  }
+
+  #[test]
+  fn critical_path() {
+    use super::entry::{Entry, EntryKey};
+    // First, let's describe the scenario with plain data.
+    //
+    // We label the nodes with static strings to help visualise the situation.
+    // The first element of each tuple is a readable label. The second element represents the
+    // duration for this action.
+    let nodes = [
+      ("download jvm", 10),
+      ("download a", 1),
+      ("download b", 2),
+      ("download c", 3),
+      ("compile a", 3),
+      ("compile b", 20),
+      ("compile c", 5),
+    ];
+    let deps = [
+      ("download jvm", "compile a"),
+      ("download jvm", "compile b"),
+      ("download jvm", "compile c"),
+      ("download a", "compile a"),
+      ("download b", "compile b"),
+      ("download c", "compile c"),
+      ("compile a", "compile c"),
+      ("compile b", "compile c"),
+    ];
+
+    // Describe a few transformations to navigate between our readable data and the actual types
+    // needed for the graph.
+    let tnode = |node: &str| {
+      TNode(
+        nodes
+          .iter()
+          .map(|(k, _)| k)
+          .position(|label| &node == label)
+          .unwrap(),
+      )
+    };
+    let node_key = |node: &str| EntryKey::Valid(tnode(node));
+    let node_entry = |node: &str| Entry::new(node_key(node));
+    let node_and_duration_from_entry = |entry: &super::entry::Entry<TNode>| nodes[entry.node().0];
+    let node_duration = |entry: &super::entry::Entry<TNode>| {
+      Duration::from_secs(node_and_duration_from_entry(entry).1)
+    };
+
+    // Construct a graph and populate it with the nodes and edges prettily defined above.
+    let graph = Graph::new();
+    {
+      let inner = &mut graph.inner.lock();
+      for (node, _) in &nodes {
+        let node_index = inner.pg.add_node(node_entry(node));
+        inner.nodes.insert(node_key(node), node_index);
+      }
+      for (src, dst) in &deps {
+        let src = inner.nodes[&node_key(src)];
+        let dst = inner.nodes[&node_key(dst)];
+        inner.pg.add_edge(src, dst, 1.0);
+      }
+    }
+
+    // Calculate the critical path and validate it.
+    {
+      // The roots are all the sources, so we're covering the entire graph
+      let roots = ["download jvm", "download a", "download b", "download c"]
+        .into_iter()
+        .map(|n| tnode(n))
+        .collect::<Vec<_>>();
+      let (expected_total_duration, expected_critical_path) = (
+        Duration::from_secs(35),
+        vec!["download jvm", "compile b", "compile c"],
+      );
+      let (total_duration, critical_path) = graph.critical_path(&roots, &node_duration);
+      assert_eq!(expected_total_duration, total_duration);
+      let critical_path = critical_path
+        .iter()
+        .map(|entry| node_and_duration_from_entry(entry).0)
+        .collect::<Vec<_>>();
+      assert_eq!(expected_critical_path, critical_path);
+    }
+    {
+      // The roots exclude some nodes ("download jvm", "download a") from the graph.
+      let roots = ["download b", "download c"]
+        .into_iter()
+        .map(|n| tnode(n))
+        .collect::<Vec<_>>();
+      let (expected_total_duration, expected_critical_path) = (
+        Duration::from_secs(27),
+        vec!["download b", "compile b", "compile c"],
+      );
+      let (total_duration, critical_path) = graph.critical_path(&roots, &node_duration);
+      assert_eq!(expected_total_duration, total_duration);
+      let critical_path = critical_path
+        .iter()
+        .map(|entry| node_and_duration_from_entry(entry).0)
+        .collect::<Vec<_>>();
+      assert_eq!(expected_critical_path, critical_path);
+    }
   }
 
   ///
