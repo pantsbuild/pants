@@ -47,7 +47,18 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
            not self.will_terminate_pantsd() and \
            not global_bootstrap_options.concurrent
 
+  @staticmethod
+  def scrub_pythonpath():
+    # If PYTHONPATH was used to set up the Pants runtime environment, its entries our now on our
+    # `sys.path` allowing us to run. Do not propagate any of these Pants-specific sys.path entries
+    # forward to our subprocesses.
+    pythonpath = os.environ.pop('PYTHONPATH', None)
+    if pythonpath:
+      logger.warning(f'Scrubbed PYTHONPATH={pythonpath} from the environment.')
+
   def run(self):
+    self.scrub_pythonpath()
+
     options_bootstrapper = OptionsBootstrapper.create(env=self._env, args=self._args)
     bootstrap_options = options_bootstrapper.bootstrap_options
     global_bootstrap_options = bootstrap_options.for_global_scope()

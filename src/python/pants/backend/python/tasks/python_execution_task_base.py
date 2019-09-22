@@ -112,14 +112,6 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     interpreter_search_path_env = ensure_interpreter_search_path_env(interpreter)
     env.update(interpreter_search_path_env)
 
-    # TODO(John Sirois): remove when we ingest a pex with a fix for:
-    #  https://github.com/pantsbuild/pex/issues/707
-    # Ensure we don't leak source files or undeclared 3rdparty requirements into the PEX
-    # environment.
-    pythonpath = env.pop('PYTHONPATH', None)
-    if pythonpath:
-      self.context.log.warn('scrubbed PYTHONPATH={} from environment'.format(pythonpath))
-
     return env
 
   def create_pex(self, pex_info=None):

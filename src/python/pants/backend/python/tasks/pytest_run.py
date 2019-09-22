@@ -448,24 +448,12 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     try:
       env = dict(os.environ)
 
-      # TODO(John Sirois): remove PYTHONPATH hacks when we ingest a pex with fixes for:
-      #   https://github.com/pantsbuild/pex/issues/707
-      #   https://github.com/pantsbuild/pex/issues/764
-      #
-      # The right answer here though is probably to use v2 parameterized Get to add in the
-      # extra_pythonpath to the built pex instead of using PYTHONPATH to hack them into the PEX
-      # environment.
-
-      # Ensure we don't leak source files or undeclared 3rdparty requirements into the pytest PEX
-      # environment.
-      pythonpath = env.pop('PYTHONPATH', None)
-      if pythonpath:
-        self.context.log.warn('scrubbed PYTHONPATH={} from pytest environment'.format(pythonpath))
-      # But allow this back door for users who do want to force something onto the test pythonpath,
+      # Allow this back door for users who do want to force something onto the test pythonpath,
       # e.g., modules required during a debugging session.
       extra_pythonpath = self.get_options().extra_pythonpath
       if extra_pythonpath:
         env['PYTHONPATH'] = os.pathsep.join(extra_pythonpath)
+        env['PEX_INHERIT_PATH'] = 'prefer'
 
       # The pytest runner we use accepts a --pdb argument that will launch an interactive pdb
       # session on any test failure.  In order to support use of this pass-through flag we must
