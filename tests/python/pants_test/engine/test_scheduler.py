@@ -193,7 +193,7 @@ class SchedulerTest(TestBase):
     self.assertEquals(result_str, consumes_a_and_b(a, b))
 
     # But not a subset.
-    expected_msg = ("No installed @rules can compute {} for input Params(A)"
+    expected_msg = ("No installed @rules can compute {} for input Params(A), but"
                     .format(str.__name__))
     with self.assertRaisesRegexp(Exception, re.escape(expected_msg)):
       self.scheduler.product_request(str, [Params(a)])
@@ -283,7 +283,9 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
         TypeError: For datatype object CollectionType(items=[1, 2, 3]) (type 'CollectionType'): in field 'items': unhashable type: 'list'
         """), exc_str, "exc_str was: {}".format(exc_str))
 
-    resulting_engine_error = "Exception: No installed @rules can compute C for input Params(Any).\n\n\n"
+    resulting_engine_error = dedent("""\
+        Exception: Types that will be passed as Params at the root of a graph need to be registered via RootRule:
+          Any\n\n\n""")
 
     # Test that the error contains the full traceback from within the CFFI context as well
     # (mentioning which specific extern method ended up raising the exception).

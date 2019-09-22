@@ -854,11 +854,46 @@ impl<R: Rule> RuleGraph<R> {
 
     match subset_matches.len() {
       1 => Ok(subset_matches[0].1.clone()),
-      0 => Err(format!(
-        "No installed @rules can compute {} for input Params({}).",
-        product,
-        params_str(&params),
-      )),
+      0 if params.is_subset(&self.root_param_types) => {
+        // The Params were all registered as RootRules, but the combination wasn't legal.
+        let mut suggestions: Vec<_> = self
+          .rule_dependency_edges
+          .keys()
+          .filter_map(|entry| match entry {
+            EntryWithDeps::Root(ref root_entry) if root_entry.dependency_key == dependency_key => {
+              Some(format!("Params({})", params_str(&root_entry.params)))
+            }
+            _ => None,
+          })
+          .collect();
+        let suggestions_str = if suggestions.is_empty() {
+          ".".to_string()
+        } else {
+          suggestions.sort();
+          format!(
+            ", but there were @rules that could compute it using:\n  {}",
+            suggestions.join("\n  ")
+          )
+        };
+        Err(format!(
+          "No installed @rules can compute {} for input Params({}){}",
+          product,
+          params_str(&params),
+          suggestions_str,
+        ))
+      }
+      0 => {
+        // Some Param(s) were not registered.
+        let mut unregistered_params: Vec<_> = params
+          .difference(&self.root_param_types)
+          .map(|p| p.to_string())
+          .collect();
+        unregistered_params.sort();
+        Err(format!(
+          "Types that will be passed as Params at the root of a graph need to be registered via RootRule:\n  {}",
+          unregistered_params.join("\n  "),
+        ))
+      }
       _ => {
         let match_strs = subset_matches
           .into_iter()
