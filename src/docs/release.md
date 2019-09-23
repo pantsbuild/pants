@@ -157,7 +157,7 @@ is not required.
 3. Publish to PyPi
 ------------------
 
-Once the six "Build wheels" Travis shards have completed for your release
+Once the two "Build wheels" Travis shards have completed for your release
 commit, you can publish to PyPi. First, ensure that you are on your release branch at your version
 bump commit. Then, publish the release:
 
