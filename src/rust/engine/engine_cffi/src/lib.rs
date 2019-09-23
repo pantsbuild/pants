@@ -52,7 +52,6 @@ use logging::{Destination, Logger};
 use rule_graph::{GraphMaker, RuleGraph};
 use std::any::Any;
 use std::borrow::Borrow;
-use std::collections::BTreeMap;
 use std::ffi::CStr;
 use std::fs::File;
 use std::io;
@@ -267,7 +266,7 @@ pub extern "C" fn scheduler_create(
   let remote_instance_name_string = remote_instance_name
     .to_string()
     .expect("remote_instance_name was not valid UTF8");
-  let remote_execution_extra_platform_properties_map: BTreeMap<_, _> = remote_execution_extra_platform_properties_buf
+  let remote_execution_extra_platform_properties_list: Vec<_> = remote_execution_extra_platform_properties_buf
         .to_strings()
         .expect("Failed to decode remote_execution_extra_platform_properties")
         .into_iter()
@@ -277,7 +276,6 @@ pub extern "C" fn scheduler_create(
             let (value, key) = (parts.pop().unwrap().to_owned(), parts.pop().unwrap().to_owned());
             (key, value)
         }).collect();
-
   let remote_root_ca_certs_path = {
     let path = remote_root_ca_certs_path_buffer.to_os_string();
     if path.is_empty() {
@@ -330,7 +328,7 @@ pub extern "C" fn scheduler_create(
     Duration::from_secs(remote_store_chunk_upload_timeout_seconds),
     remote_store_rpc_retries as usize,
     remote_store_connection_limit as usize,
-    remote_execution_extra_platform_properties_map,
+    remote_execution_extra_platform_properties_list,
     process_execution_local_parallelism as usize,
     process_execution_remote_parallelism as usize,
     process_execution_cleanup_local_dirs,

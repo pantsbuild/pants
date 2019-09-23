@@ -243,7 +243,7 @@ mod test {
       metadata: ExecuteProcessRequestMetadata {
         instance_name: None,
         cache_key_gen_version: None,
-        platform_properties: BTreeMap::new(),
+        platform_properties: vec![],
       },
     };
 

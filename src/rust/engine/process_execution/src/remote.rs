@@ -835,9 +835,9 @@ pub fn make_execute_request(
     // some kind of consensus across tools as to how this should work; RBE appears to work by
     // allowing you to specify a jdk-version platform property, and it will put a JDK at a
     // well-known path in the docker container you specify in which to run.
-    platform_properties.insert("JDK_SYMLINK".to_owned(), ".jdk".to_owned());
+    platform_properties.push(("JDK_SYMLINK".to_owned(), ".jdk".to_owned()));
   }
-  platform_properties.insert("target_platform".to_owned(), req.target_platform.into());
+  platform_properties.push(("target_platform".to_owned(), req.target_platform.into()));
 
   for (name, value) in platform_properties {
     command.mut_platform().mut_properties().push({
@@ -1360,7 +1360,7 @@ pub mod tests {
         ExecuteProcessRequestMetadata {
           instance_name: Some("dark-tower".to_owned()),
           cache_key_gen_version: None,
-          platform_properties: BTreeMap::new(),
+          platform_properties: vec![],
         }
       ),
       Ok((want_action, want_command, want_execute_request))
@@ -1453,7 +1453,7 @@ pub mod tests {
         ExecuteProcessRequestMetadata {
           instance_name: None,
           cache_key_gen_version: Some("meep".to_owned()),
-          platform_properties: BTreeMap::new(),
+          platform_properties: vec![],
         }
       ),
       Ok((want_action, want_command, want_execute_request))
@@ -1548,14 +1548,26 @@ pub mod tests {
     });
     want_command.mut_platform().mut_properties().push({
       let mut property = bazel_protos::remote_execution::Platform_Property::new();
-      property.set_name("JDK_SYMLINK".to_owned());
-      property.set_value(".jdk".to_owned());
+      property.set_name("Multi".to_owned());
+      property.set_value("uno".to_owned());
       property
     });
     want_command.mut_platform().mut_properties().push({
       let mut property = bazel_protos::remote_execution::Platform_Property::new();
       property.set_name("last".to_owned());
       property.set_value("bar".to_owned());
+      property
+    });
+    want_command.mut_platform().mut_properties().push({
+      let mut property = bazel_protos::remote_execution::Platform_Property::new();
+      property.set_name("Multi".to_owned());
+      property.set_value("dos".to_owned());
+      property
+    });
+    want_command.mut_platform().mut_properties().push({
+      let mut property = bazel_protos::remote_execution::Platform_Property::new();
+      property.set_name("JDK_SYMLINK".to_owned());
+      property.set_value(".jdk".to_owned());
       property
     });
     want_command.mut_platform().mut_properties().push({
@@ -1569,10 +1581,10 @@ pub mod tests {
     want_action.set_command_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "f54a2a67d16f46c9ce8e846a4fe1cb86a16ec3f11ddfca8cbfc34ff7bac630b8",
+          "6c63c44ac364729d371931a091cc8379e32d021e06df52ab5f8461118d837e78",
         )
         .unwrap(),
-        90,
+        118,
       ))
         .into(),
     );
@@ -1582,7 +1594,7 @@ pub mod tests {
     want_execute_request.set_action_digest(
       (&Digest(
         Fingerprint::from_hex_string(
-          "be4b5057c50f3cb54b45431dcaa52588a5eb3566f63b0f28014abdb544c73b0f",
+          "5246770d23d09dc7d145e19d3a7b8233fc42316115fbc5420dfe501fb684e5e9",
         )
         .unwrap(),
         140,
@@ -1598,10 +1610,10 @@ pub mod tests {
           cache_key_gen_version: None,
           platform_properties: vec![
             ("FIRST".to_owned(), "foo".to_owned()),
-            ("last".to_owned(), "bar".to_owned())
+            ("Multi".to_owned(), "uno".to_owned()),
+            ("last".to_owned(), "bar".to_owned()),
+            ("Multi".to_owned(), "dos".to_owned()),
           ]
-          .into_iter()
-          .collect()
         },
       ),
       Ok((want_action, want_command, want_execute_request))
@@ -3372,7 +3384,7 @@ pub mod tests {
     ExecuteProcessRequestMetadata {
       instance_name: None,
       cache_key_gen_version: None,
-      platform_properties: BTreeMap::new(),
+      platform_properties: vec![],
     }
   }
 
