@@ -4,6 +4,69 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.21.0rc0 (09/23/2019)
+----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add "did you mean" functionality to runtime Param mismatches. (#8315)
+  `PR #8315 <https://github.com/pantsbuild/pants/pull/8315>`_
+
+Bugfixes
+~~~~~~~~
+* Fix support for running pants from source in other repositories. (#8297)
+  `PR #8297 <https://github.com/pantsbuild/pants/pull/8297>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Upgrade to Pex 1.6.11. (#8287)
+  `PR #8287 <https://github.com/pantsbuild/pants/pull/8287>`_
+
+* Implement critical path algorithm in Graph (#8308)
+  `PR #8308 <https://github.com/pantsbuild/pants/pull/8308>`_
+
+* Bump to latest zinc and remove the extractor. (#8246)
+  `PR #8246 <https://github.com/pantsbuild/pants/pull/8246>`_
+
+* Skip test_ctypes_third_party_integration due to network failure. (#8317)
+  `PR #8317 <https://github.com/pantsbuild/pants/pull/8317>`_
+
+* repr() exceptions when logging/stringifying them. (#8230)
+  `PR #8230 <https://github.com/pantsbuild/pants/pull/8230>`_
+
+* On stats v2, use json body, API will support uploading multiple builds in a single call (#8305)
+  `PR #8305 <https://github.com/pantsbuild/pants/pull/8305>`_
+
+* Hide zinc-compiler `BareBonesLogger` behind flag (#8295)
+  `PR #8295 <https://github.com/pantsbuild/pants/pull/8295>`_
+
+* Port 5 more integration tests to V2 remote execution (#8304)
+  `PR #8304 <https://github.com/pantsbuild/pants/pull/8304>`_
+
+* Port `backend/codegen` and `backend/python` integration tests to V2 remote execution (#8293)
+  `PR #8293 <https://github.com/pantsbuild/pants/pull/8293>`_
+
+* Default in CI to remote execution for integration tests (#8298)
+  `Issue #8113 <https://github.com/pantsbuild/pants/issues/8113>`_
+  `PR #8298 <https://github.com/pantsbuild/pants/pull/8298>`_
+
+* Increase zinc_compile_integration_test timeouts. (#8296)
+  `PR #8296 <https://github.com/pantsbuild/pants/pull/8296>`_
+
+* Port `backend/jvm` integration tests to remote execution (#8273)
+  `PR #8273 <https://github.com/pantsbuild/pants/pull/8273>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Prepare notes for 1.20.0rc2 (#8310)
+  `PR #8310 <https://github.com/pantsbuild/pants/pull/8310>`_
+
+* Correct misleading comment in graph::Walk (#8301)
+  `PR #8301 <https://github.com/pantsbuild/pants/pull/8301>`_
+
 
 1.21.0.dev1 (09/14/2019)
 ------------------------
@@ -56,11 +119,11 @@ Refactoring, Improvements, and Tooling
   `PR #8264 <https://github.com/pantsbuild/pants/pull/8264>`_
 
 * Port ~20 integration tests to remote execution (#8262)
-  `Issue #8113) <https://github.com/pantsbuild/pants/issues/8113)>`_
+  `Issue #8113 <https://github.com/pantsbuild/pants/issues/8113>`_
   `PR #8262 <https://github.com/pantsbuild/pants/pull/8262>`_
 
 * Run all contrib integration tests using V2 remote execution (#8261)
-  `Issue #8113) <https://github.com/pantsbuild/pants/issues/8113)>`_
+  `Issue #8113 <https://github.com/pantsbuild/pants/issues/8113>`_
   `PR #8261 <https://github.com/pantsbuild/pants/pull/8261>`_
 
 * Port `tasks`, `base`, and `awslambda` integration tests to V2 (#8259)
