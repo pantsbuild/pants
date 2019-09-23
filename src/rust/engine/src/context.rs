@@ -27,7 +27,6 @@ use rand::seq::SliceRandom;
 use reqwest;
 use rule_graph::RuleGraph;
 use sharded_lmdb::ShardedLmdb;
-use std::collections::btree_map::BTreeMap;
 use store::Store;
 
 const GIGABYTES: usize = 1024 * 1024 * 1024;
@@ -73,7 +72,7 @@ impl Core {
     remote_store_chunk_upload_timeout: Duration,
     remote_store_rpc_retries: usize,
     remote_store_connection_limit: usize,
-    remote_execution_extra_platform_properties: BTreeMap<String, String>,
+    remote_execution_extra_platform_properties: Vec<(String, String)>,
     process_execution_local_parallelism: usize,
     process_execution_remote_parallelism: usize,
     process_execution_cleanup_local_dirs: bool,

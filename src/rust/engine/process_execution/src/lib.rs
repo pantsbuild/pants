@@ -182,7 +182,7 @@ impl From<ExecuteProcessRequest> for MultiPlatformExecuteProcessRequest {
 pub struct ExecuteProcessRequestMetadata {
   pub instance_name: Option<String>,
   pub cache_key_gen_version: Option<String>,
-  pub platform_properties: BTreeMap<String, String>,
+  pub platform_properties: Vec<(String, String)>,
 }
 
 ///

@@ -36,7 +36,7 @@ use hashing::{Digest, Fingerprint};
 use process_execution::{ExecuteProcessRequestMetadata, Platform};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
-use std::iter::Iterator;
+use std::iter::{FromIterator, Iterator};
 use std::path::PathBuf;
 use std::process::exit;
 use std::time::Duration;
@@ -215,11 +215,11 @@ fn main() {
     .collect();
   let env = args
     .values_of("env")
-    .map(btreemap_from_keyvalues)
+    .map(collection_from_keyvalues::<_, BTreeMap<_, _>>)
     .unwrap_or_default();
   let platform_properties = args
     .values_of("extra-platform-property")
-    .map(btreemap_from_keyvalues)
+    .map(collection_from_keyvalues::<_, Vec<_>>)
     .unwrap_or_default();
   let work_dir = args
     .value_of("work-dir")
@@ -361,9 +361,11 @@ fn main() {
   exit(result.exit_code);
 }
 
-fn btreemap_from_keyvalues<'a, It: Iterator<Item = &'a str>>(
-  keyvalues: It,
-) -> BTreeMap<String, String> {
+fn collection_from_keyvalues<'a, It, Col>(keyvalues: It) -> Col
+where
+  It: Iterator<Item = &'a str>,
+  Col: FromIterator<(String, String)>,
+{
   keyvalues
     .map(|kv| {
       let mut parts = kv.splitn(2, '=');
