@@ -218,7 +218,7 @@ impl<N: Node> InnerGraph<N> {
       },
     );
 
-    // Add a single source that's a parent to to all roots
+    // Add a single source that's a parent to all roots
     let srcs = roots
       .iter()
       .filter_map(|n| self.entry_id(&EntryKey::Valid(n.clone())))
