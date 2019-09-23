@@ -41,7 +41,6 @@ Refactoring, Improvements, and Tooling
 
 * Hide zinc-compiler `BareBonesLogger` behind flag (#8295)
   `PR #8295 <https://github.com/pantsbuild/pants/pull/8295>`_
-  `PR #8279#pullrequestreview-288379413) <https://github.com/pantsbuild/pants/pull/8279#pullrequestreview-288379413)>`_
 
 * Port 5 more integration tests to V2 remote execution (#8304)
   `PR #8304 <https://github.com/pantsbuild/pants/pull/8304>`_
@@ -50,7 +49,7 @@ Refactoring, Improvements, and Tooling
   `PR #8293 <https://github.com/pantsbuild/pants/pull/8293>`_
 
 * Default in CI to remote execution for integration tests (#8298)
-  `Issue #8113, <https://github.com/pantsbuild/pants/issues/8113,>`_
+  `Issue #8113 <https://github.com/pantsbuild/pants/issues/8113>`_
   `PR #8298 <https://github.com/pantsbuild/pants/pull/8298>`_
 
 * Increase zinc_compile_integration_test timeouts. (#8296)
@@ -120,11 +119,11 @@ Refactoring, Improvements, and Tooling
   `PR #8264 <https://github.com/pantsbuild/pants/pull/8264>`_
 
 * Port ~20 integration tests to remote execution (#8262)
-  `Issue #8113) <https://github.com/pantsbuild/pants/issues/8113)>`_
+  `Issue #8113 <https://github.com/pantsbuild/pants/issues/8113>`_
   `PR #8262 <https://github.com/pantsbuild/pants/pull/8262>`_
 
 * Run all contrib integration tests using V2 remote execution (#8261)
-  `Issue #8113) <https://github.com/pantsbuild/pants/issues/8113)>`_
+  `Issue #8113 <https://github.com/pantsbuild/pants/issues/8113>`_
   `PR #8261 <https://github.com/pantsbuild/pants/pull/8261>`_
 
 * Port `tasks`, `base`, and `awslambda` integration tests to V2 (#8259)
