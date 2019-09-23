@@ -209,10 +209,10 @@ impl<N: Node> InnerGraph<N> {
     let mut graph = self.pg.filter_map(
       |_node_idx, node_weight| Some(Some(node_weight)),
       |edge_idx, _edge_weight| {
-        let source_node = self.pg.raw_edges()[edge_idx.index()].source();
+        let target_node = self.pg.raw_edges()[edge_idx.index()].target();
         self
           .pg
-          .node_weight(source_node)
+          .node_weight(target_node)
           .map(duration)
           .map(duration_into_weight)
       },
@@ -226,16 +226,9 @@ impl<N: Node> InnerGraph<N> {
       .collect::<Vec<_>>();
     let src = graph.add_node(None);
     for node in srcs {
-      graph.add_edge(src, node, 0.);
-    }
-
-    // Add a single destination that's a child from all the previous destinations
-    let dsts = graph.externals(Direction::Outgoing).collect::<Vec<_>>();
-    let dst = graph.add_node(None);
-    for node in dsts {
       graph.add_edge(
+        src,
         node,
-        dst,
         graph
           .node_weight(node)
           .map(|maybe_weight| {
@@ -250,19 +243,39 @@ impl<N: Node> InnerGraph<N> {
 
     let (weights, paths) =
       petgraph::algo::bellman_ford(&graph, src).expect("The graph must be acyclic");
-    let total_duration = Duration::from_nanos(-weights[dst.index()] as u64);
-    let critical_path = {
-      let mut next = dst;
-      let mut path = Vec::new();
-      while next != src {
-        if let Some(entry) = graph.node_weight(next).unwrap() {
-          path.push(*entry);
+    if let Some((index, total_duration)) = weights
+      .iter()
+      // INFINITY is used for missing entries. We don't want for this to interfere with our max_by.
+      // Use NEG_INFINITY instead, which has to be the minimum duration.
+      .map(|weight| {
+        if *weight == std::f64::INFINITY {
+          std::f64::NEG_INFINITY
+        } else {
+          *weight
         }
-        next = paths[next.index()].unwrap();
-      }
-      path.into_iter().rev().cloned().collect()
-    };
-    (total_duration, critical_path)
+      })
+      .map(|weight| Duration::from_nanos(-weight as u64))
+      .enumerate()
+      .max_by(|(_, left_duration), (_, right_duration)| left_duration.cmp(&right_duration))
+    {
+      let critical_path = {
+        let mut next = paths[index];
+        let mut path = vec![graph
+          .node_weight(petgraph::graph::NodeIndex::new(index))
+          .unwrap()
+          .unwrap()];
+        while next != Some(src) && next != None {
+          if let Some(entry) = graph.node_weight(next.unwrap()).unwrap() {
+            path.push(*entry);
+          }
+          next = paths[next.unwrap().index()];
+        }
+        path.into_iter().rev().cloned().collect()
+      };
+      (total_duration, critical_path)
+    } else {
+      (Duration::from_nanos(0), vec![])
+    }
   }
 
   ///
