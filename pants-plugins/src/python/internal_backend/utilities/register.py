@@ -50,6 +50,11 @@ def pants_setup_py(name, description, additional_classifiers=None, **kwargs):
       description=description,
       long_description=Path('src/python/pants/ABOUT.rst').read_text() + notes,
       url='https://github.com/pantsbuild/pants',
+      project_urls={
+          'Documentation': 'https://www.pantsbuild.org/',
+          'Source': 'https://github.com/pantsbuild/pants',
+          'Tracker': 'https://github.com/pantsbuild/pants/issues',
+      },
       license='Apache License, Version 2.0',
       zip_safe=True,
       classifiers=list(classifiers),
