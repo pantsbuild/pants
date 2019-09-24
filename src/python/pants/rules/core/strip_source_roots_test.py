@@ -23,34 +23,30 @@ class StripSourceRootsTests(TestBase):
       RootRule(HydratedTarget),
     ] + create_fs_rules()
 
-  def mock_hydrated_target(self, target_address, source_filename, type_alias=None):
+  def assert_stripped_source_file(self, *, original_path: str, expected_path: str, target_type_alias = None):
+    init_subsystem(SourceRootConfig)
     adaptor = Mock()
     adaptor.sources = Mock()
-    source_files = { source_filename: "print('random python')" }
+    source_files = {original_path: "print('random python')"}
     adaptor.sources.snapshot = self.make_snapshot(source_files)
     adaptor.address = Mock()
-    adaptor.address.spec_path = source_filename
-    if type_alias:
-      adaptor.type_alias = type_alias
-    return HydratedTarget(target_address, adaptor, tuple())
+    adaptor.address.spec_path = original_path
+    if target_type_alias:
+      adaptor.type_alias = target_type_alias
+    target = HydratedTarget('some/target/address', adaptor, tuple())
+    output = self.scheduler.product_request(SourceRootStrippedSources, [Params(target, SourceRootConfig.global_instance())])
+    stripped_sources = output[0]
+    self.assertEqual(stripped_sources.snapshot.files, (expected_path,))
 
   def test_source_roots_python(self):
-    init_subsystem(SourceRootConfig)
-    target = self.mock_hydrated_target("some/target/address", 'src/python/pants/util/strutil.py')
-    output = self.scheduler.product_request(SourceRootStrippedSources, [Params(target, SourceRootConfig.global_instance())])
-    stripped_sources = output[0]
-    self.assertEqual(stripped_sources.snapshot.files, ('pants/util/strutil.py',))
+    self.assert_stripped_source_file(original_path='src/python/pants/util/strutil.py', expected_path='pants/util/strutil.py')
 
   def test_source_roots_java(self):
-    init_subsystem(SourceRootConfig)
-    target = self.mock_hydrated_target("some/target/address", 'src/java/some/path/to/something.java')
-    output = self.scheduler.product_request(SourceRootStrippedSources, [Params(target, SourceRootConfig.global_instance())])
-    stripped_sources = output[0]
-    self.assertEqual(stripped_sources.snapshot.files, ('some/path/to/something.java',))
+    self.assert_stripped_source_file(original_path='src/java/some/path/to/something.java', expected_path='some/path/to/something.java')
 
   def test_dont_strip_source_for_files(self):
-    init_subsystem(SourceRootConfig)
-    target = self.mock_hydrated_target("some/target/address", 'src/python/pants/util/strutil.py', type_alias=Files.alias())
-    output = self.scheduler.product_request(SourceRootStrippedSources, [Params(target, SourceRootConfig.global_instance())])
-    stripped_sources = output[0]
-    self.assertEqual(stripped_sources.snapshot.files, ('src/python/pants/util/strutil.py',))
+    self.assert_stripped_source_file(
+        original_path='src/python/pants/util/strutil.py',
+        expected_path='src/python/pants/util/strutil.py',
+        target_type_alias=Files.alias()
+    )
