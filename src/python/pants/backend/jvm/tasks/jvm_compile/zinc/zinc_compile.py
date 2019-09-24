@@ -516,7 +516,7 @@ class BaseZincCompile(JvmCompile):
       return _analysis_snapshot
 
     def _get_classes_dir_snapshot():
-      if self.get_options().use_classpath_jars:
+      if self.get_options().use_classpath_jars and os.path.exists(jar_file):
         with zipfile.ZipFile(jar_file, 'r') as zip_ref:
           zip_ref.extractall(classes_dir)
 
