@@ -3,6 +3,7 @@
 
 from unittest.mock import Mock
 
+from pants.build_graph.files import Files
 from pants.engine.fs import create_fs_rules
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.rules import RootRule
@@ -22,13 +23,15 @@ class StripSourceRootsTests(TestBase):
       RootRule(HydratedTarget),
     ] + create_fs_rules()
 
-  def mock_hydrated_target(self, target_address, source_filename):
+  def mock_hydrated_target(self, target_address, source_filename, type_alias=None):
     adaptor = Mock()
     adaptor.sources = Mock()
     source_files = { source_filename: "print('random python')" }
     adaptor.sources.snapshot = self.make_snapshot(source_files)
     adaptor.address = Mock()
     adaptor.address.spec_path = source_filename
+    if type_alias:
+      adaptor.type_alias = type_alias
     return HydratedTarget(target_address, adaptor, tuple())
 
   def test_source_roots_python(self):
@@ -44,3 +47,10 @@ class StripSourceRootsTests(TestBase):
     output = self.scheduler.product_request(SourceRootStrippedSources, [Params(target, SourceRootConfig.global_instance())])
     stripped_sources = output[0]
     self.assertEqual(stripped_sources.snapshot.files, ('some/path/to/something.java',))
+
+  def test_dont_strip_source_for_files(self):
+    init_subsystem(SourceRootConfig)
+    target = self.mock_hydrated_target("some/target/address", 'src/python/pants/util/strutil.py', type_alias=Files.alias())
+    output = self.scheduler.product_request(SourceRootStrippedSources, [Params(target, SourceRootConfig.global_instance())])
+    stripped_sources = output[0]
+    self.assertEqual(stripped_sources.snapshot.files, ('src/python/pants/util/strutil.py',))
