@@ -51,7 +51,7 @@ use hashing::{Digest, EMPTY_DIGEST};
 use log::{self, error, warn, Log};
 use logging::logger::LOGGER;
 use logging::{Destination, Logger, PythonLogLevel};
-use rule_graph::RuleGraph;
+use rule_graph::{self, RuleGraph};
 use std::any::Any;
 use std::borrow::Borrow;
 use std::convert::TryInto;
