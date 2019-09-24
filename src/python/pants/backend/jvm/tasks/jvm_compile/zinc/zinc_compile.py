@@ -452,7 +452,7 @@ class BaseZincCompile(JvmCompile):
       ])
 
     relpath_to_analysis = fast_relpath(ctx.analysis_file, get_buildroot())
-    merged_local_only_scratch_inputs = self._compute_scratch_inputs(classes_dir, relpath_to_analysis, jar_file)
+    merged_local_only_scratch_inputs = self._compute_local_only_inputs(classes_dir, relpath_to_analysis, jar_file)
 
     # TODO: Extract something common from Executor._create_command to make the command line
     argv = image_specific_argv + ['@{}'.format(argfile_snapshot.files[0])]
@@ -491,7 +491,7 @@ class BaseZincCompile(JvmCompile):
     # TODO: This should probably return a ClasspathEntry rather than a Digest
     return res.output_directory_digest
 
-  def _compute_scratch_inputs(self, classes_dir, relpath_to_analysis, jar_file):
+  def _compute_local_only_inputs(self, classes_dir, relpath_to_analysis, jar_file):
     """
     Compute for the scratch inputs for ExecuteProcessRequest.
 
