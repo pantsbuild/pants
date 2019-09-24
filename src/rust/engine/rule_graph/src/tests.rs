@@ -2,7 +2,7 @@ use crate::{Palette, RuleGraph};
 use std::fmt;
 
 #[test]
-fn create_and_validate_valid() {
+fn valid() {
   let rules = vec![("a", vec![Rule("a_from_b", vec![DependencyKey("b", None)])])]
     .into_iter()
     .collect();
@@ -13,7 +13,7 @@ fn create_and_validate_valid() {
 }
 
 #[test]
-fn create_and_validate_no_root() {
+fn no_root() {
   let rules = vec![("a", vec![Rule("a_from_b", vec![DependencyKey("b", None)])])]
     .into_iter()
     .collect();
@@ -25,6 +25,61 @@ fn create_and_validate_no_root() {
     .err()
     .unwrap()
     .contains("No rule was available to compute DependencyKey(\"b\", None)."));
+}
+
+#[test]
+fn self_cycle() {
+  let rules = vec![(
+    "Fib",
+    vec![Rule(
+      "fib",
+      vec![
+        DependencyKey("int", None),
+        DependencyKey("Fib", Some("int")),
+      ],
+    )],
+  )]
+  .into_iter()
+  .collect();
+  let roots = vec!["Fib", "int", "nonsense"];
+  let graph = RuleGraph::new(&rules, roots);
+
+  graph.validate().unwrap();
+  graph.find_root_edges(vec!["int"], "Fib").unwrap();
+  graph.find_root_edges(vec!["Fib"], "Fib").unwrap();
+}
+
+#[test]
+fn self_cycle_with_external_dep() {
+  let rules = vec![
+    (
+      "Thing",
+      vec![Rule(
+        "transitive_thing",
+        vec![
+          DependencyKey("int", None),
+          // We expect this to be a self-cycle.
+          DependencyKey("Thing", Some("int")),
+          // And this to be satisfied by the second rule, even though we already have an int in scope.
+          DependencyKey("int", Some("ExternalDep")),
+        ],
+      )],
+    ),
+    (
+      "int",
+      vec![Rule(
+        "external_dep",
+        vec![DependencyKey("ExternalDep", None)],
+      )],
+    ),
+  ]
+  .into_iter()
+  .collect();
+  let roots = vec!["int"];
+  let graph = RuleGraph::new(&rules, roots);
+
+  graph.validate().unwrap();
+  graph.find_root_edges(vec!["int"], "Thing").unwrap();
 }
 
 impl super::TypeId for &'static str {
