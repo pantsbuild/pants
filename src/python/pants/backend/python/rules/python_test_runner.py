@@ -7,6 +7,7 @@ from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.build_graph.address import Address
 from pants.engine.fs import Digest, DirectoriesToMerge
 from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import BuildFileAddresses, HydratedTarget, TransitiveHydratedTargets
@@ -65,11 +66,9 @@ def run_python_test(test_target, pytest, python_setup, subprocess_encoding_envir
   # optimization, this ensures that any transitive sources, such as a test project file named
   # test_fail.py, do not unintentionally end up being run as tests.
 
-  hydrated_target = HydratedTarget(address="", adaptor=test_target, dependencies=())
   source_root_stripped_test_target_sources = yield Get(
-      SourceRootStrippedSources, HydratedTarget, hydrated_target
+      SourceRootStrippedSources, Address, test_target.address.to_address()
     )
-  test_target_sources_file_names = sorted(source_root_stripped_test_target_sources.snapshot.files)
 
   source_root_stripped_sources = yield [
     Get(SourceRootStrippedSources, HydratedTarget, target_adaptor)
@@ -100,6 +99,7 @@ def run_python_test(test_target, pytest, python_setup, subprocess_encoding_envir
     **subprocess_encoding_environment.invocation_environment_dict
   }
 
+  test_target_sources_file_names = sorted(source_root_stripped_test_target_sources.snapshot.files)
   # NB: we use the hardcoded and generic bin name `python`, rather than something dynamic like
   # `sys.executable`, to ensure that the interpreter may be discovered both locally and in remote
   # execution (so long as `env` is populated with a `PATH` env var and `python` is discoverable
