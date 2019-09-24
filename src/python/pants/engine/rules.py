@@ -10,6 +10,7 @@ from abc import ABC, abstractmethod
 from collections import OrderedDict
 from collections.abc import Iterable
 from textwrap import dedent
+from typing import Any, Callable, List, Type, cast
 
 import asttokens
 from twitter.common.collections import OrderedSet
@@ -207,21 +208,28 @@ def _get_starting_indent(source):
   return 0
 
 
-def _make_rule(output_type, input_selectors, cacheable=True):
+Decorator = Callable[[Callable], Callable]
+
+
+def _make_rule(output_type: type, input_types: List[type], cacheable: bool = True) -> Decorator:
   """A @decorator that declares that a particular static function may be used as a TaskRule.
 
   As a special case, if the output_type is a subclass of `Goal`, the `Goal.Options` for the `Goal`
   are registered as dependency Optionables.
 
-  :param type output_type: The return/output type for the Rule. This must be a concrete Python type.
-  :param list input_selectors: A list of Selector instances that matches the number of arguments
-    to the @decorated function.
+  :param output_type: The return/output type for the Rule. This must be a concrete Python type.
+  :param input_types: A list of types that matches the number and order of arguments to the
+                      @decorated decorated function.
+  :param cacheable: Whether the results of executing the Rule should be cached as keyed by all of
+                    its inputs.
   """
 
   is_goal_cls = isinstance(output_type, type) and issubclass(output_type, Goal)
   if is_goal_cls == cacheable:
-    raise TypeError('An `@rule` that produces a `Goal` must be declared with @console_rule in order '
-                    'to signal that it is not cacheable.')
+    raise TypeError(
+      'An `@rule` that produces a `Goal` must be declared with @console_rule in order to signal '
+      'that it is not cacheable.'
+    )
 
   def wrapper(func):
     if not inspect.isfunction(func):
@@ -242,7 +250,8 @@ def _make_rule(output_type, input_selectors, cacheable=True):
         )
       elif not isinstance(resolved, type):
         raise ValueError(
-          f'Expected a `type` constructor for `{name}`, but got: {resolved} (type `{type(resolved).__name__}`)'
+          f'Expected a `type` constructor for `{name}`, but got: {resolved} (type '
+          f'`{type(resolved).__name__}`)'
         )
       return resolved
 
@@ -276,7 +285,7 @@ def _make_rule(output_type, input_selectors, cacheable=True):
 
     func.rule = TaskRule(
         output_type,
-        tuple(input_selectors),
+        tuple(input_types),
         func,
         input_gets=tuple(gets),
         dependency_rules=dependency_rules,
@@ -287,12 +296,65 @@ def _make_rule(output_type, input_selectors, cacheable=True):
   return wrapper
 
 
-def rule(output_type, input_selectors):
-  return _make_rule(output_type, input_selectors)
+class MissingTypeAnnotation(TypeError):
+  pass
 
 
-def console_rule(goal_cls, input_selectors):
-  return _make_rule(goal_cls, input_selectors, False)
+class MissingReturnTypeAnnotation(MissingTypeAnnotation):
+  pass
+
+
+class MissingParameterTypeAnnotation(MissingTypeAnnotation):
+  pass
+
+
+def ensure_type_annotation(
+  annotation: Any, name: str, empty_value: Any, raise_type: Type[MissingTypeAnnotation]
+) -> type:
+  if annotation == empty_value:
+    raise raise_type(f'{name} is missing a type annotation.')
+  if not isinstance(annotation, type):
+    raise raise_type(f'The annotation for {name} must be a type, '
+                    f'got {annotation} of type {type(annotation)}.')
+  return cast(type, annotation)
+
+
+def rule(*args, cacheable=True) -> Callable:
+  if len(args) == 2:
+    output_type, input_selectors = args
+    if not isinstance(output_type, type):
+      raise ValueError(f'The output_type decorator parameter must be a type, '
+                       f'given {output_type} of type {type(output_type)}.')
+    if input_selectors is None:
+      raise ValueError('The input_selectors decorator parameter is required.')
+    return _make_rule(output_type, input_selectors, cacheable=cacheable)
+  elif len(args) == 1 and inspect.isfunction(args[0]):
+    func = args[0]
+    signature = inspect.signature(func)
+    output_type = ensure_type_annotation(
+      annotation=signature.return_annotation,
+      name=f'@rule {func.__module__}.{func.__name__} return',
+      empty_value=inspect.Signature.empty,
+      raise_type=MissingReturnTypeAnnotation
+    )
+    input_selectors = [
+      ensure_type_annotation(
+        annotation=parameter.annotation,
+        name=f'@rule {func.__module__}.{func.__name__} parameter {name}',
+        empty_value=inspect.Parameter.empty,
+        raise_type=MissingParameterTypeAnnotation
+      )
+      for name, parameter in signature.parameters.items()
+    ]
+    return _make_rule(output_type, input_selectors, cacheable=cacheable)(func)
+  else:
+    raise ValueError(f'The @rule decorator expects either no arguments when applied to a '
+                     f'type-annotated function or else two arguments: output_type: type, '
+                     f'input_selectors: List[type], Given {args}.')
+
+
+def console_rule(*args) -> Callable:
+  return rule(*args, cacheable=False)
 
 
 def union(cls):

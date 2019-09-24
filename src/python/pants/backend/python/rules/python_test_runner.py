@@ -19,8 +19,15 @@ from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.util.strutil import create_path_env_var
 
 
-@rule(TestResult, [PythonTestsAdaptor, PyTest, PythonSetup, SubprocessEncodingEnvironment])
-def run_python_test(test_target, pytest, python_setup, subprocess_encoding_environment):
+# TODO(7697): Use a dedicated rule for removing the source root prefix, so that this rule
+# does not have to depend on SourceRootConfig.
+@rule
+def run_python_test(
+  test_target: PythonTestsAdaptor,
+  pytest: PyTest,
+  python_setup: PythonSetup,
+  subprocess_encoding_environment: SubprocessEncodingEnvironment
+) -> TestResult:
   """Runs pytest for one target."""
 
   # TODO(7726): replace this with a proper API to get the `closure` for a
