@@ -533,6 +533,28 @@ mod tests {
       .contains("No rule was available to compute DependencyKey(\"b\", None)."));
   }
 
+  #[test]
+  fn create_and_validate_self_cycle() {
+    let rules = vec![(
+      "Fib",
+      vec![Rule(
+        "fib",
+        vec![
+          DependencyKey("int", None),
+          DependencyKey("Fib", Some("int")),
+        ],
+      )],
+    )]
+    .into_iter()
+    .collect();
+    let roots = vec!["Fib", "int", "nonsense"];
+    let graph = RuleGraph::new(&rules, roots);
+
+    graph.validate().unwrap();
+    graph.find_root_edges(vec!["int"], "Fib").unwrap();
+    graph.find_root_edges(vec!["Fib"], "Fib").unwrap();
+  }
+
   impl super::TypeId for &'static str {
     fn display<I>(type_ids: I) -> String
     where
