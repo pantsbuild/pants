@@ -7,11 +7,13 @@ import math
 import re
 import unittest
 from collections import OrderedDict
+from pathlib import Path
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.hash_utils import CoercingEncoder, Sharder, hash_all, hash_file, stable_json_sha1
-from pants.util.contextutil import temporary_file
+from pants.base.hash_utils import (CoercingEncoder, Sharder, hash_all, hash_dir, hash_file,
+                                   stable_json_sha1)
+from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
 
 
 class TestHashUtils(unittest.TestCase):
@@ -30,6 +32,65 @@ class TestHashUtils(unittest.TestCase):
       fd.close()
 
       self.assertEqual(expected_hash.hexdigest(), hash_file(fd.name, digest=hashlib.md5()))
+
+  def test_hash_dir_invalid(self):
+    with temporary_file_path() as path:
+      with self.assertRaises(TypeError):
+        hash_dir(path)
+      with self.assertRaises(ValueError):
+        hash_dir(Path(path))
+
+  def test_hash_dir(self):
+    with temporary_dir() as root1:
+      root1_path = Path(root1)
+      with root1_path.joinpath('a').open(mode='wb') as fd:
+        fd.write(b'jake jones')
+      with root1_path.joinpath('b').open(mode='wb') as fd:
+        fd.write(b'jane george')
+      hash1 = hash_dir(root1_path)
+
+    with temporary_dir() as root2:
+      root2_path = Path(root2)
+      with root2_path.joinpath('a').open(mode='wb') as fd:
+        fd.write(b'jake jones')
+      with root2_path.joinpath('b').open(mode='wb') as fd:
+        fd.write(b'jane george')
+      hash2 = hash_dir(root2_path)
+
+    self.assertNotEqual(root1_path, root2_path,
+                        "The path of the directory being hashed should not factor into the hash.")
+    self.assertEqual(hash1, hash2)
+
+    with temporary_dir() as root3:
+      root3_path = Path(root3)
+      with root3_path.joinpath('a1').open(mode='wb') as fd:
+        fd.write(b'jake jones')
+      with root3_path.joinpath('b').open(mode='wb') as fd:
+        fd.write(b'jane george')
+      hash3 = hash_dir(root3_path)
+
+    self.assertNotEqual(hash1, hash3, "File names should be included in the hash.")
+
+    with temporary_dir() as root4:
+      root4_path = Path(root4)
+      with root4_path.joinpath('a').open(mode='wb') as fd:
+        fd.write(b'jake jones')
+      with root4_path.joinpath('b').open(mode='wb') as fd:
+        fd.write(b'jane george')
+      root4_path.joinpath("c").mkdir()
+      hash4 = hash_dir(root4_path)
+
+    self.assertNotEqual(hash1, hash4, "Directory names should be included in the hash.")
+
+    with temporary_dir() as root5:
+      root5_path = Path(root5)
+      with root5_path.joinpath('a').open(mode='wb') as fd:
+        fd.write(b'jake jones II')
+      with root5_path.joinpath('b').open(mode='wb') as fd:
+        fd.write(b'jane george')
+      hash5 = hash_dir(root5_path)
+
+    self.assertNotEqual(hash1, hash5, "File content should be included in the hash.")
 
   def test_compute_shard(self):
     # Spot-check a couple of values, to make sure compute_shard doesn't do something
