@@ -25,14 +25,13 @@ class StripSourceRootsTests(TestBase):
   def mock_hydrated_target(self, target_address, source_filename):
     adaptor = Mock()
     adaptor.sources = Mock()
-    source_files = dict()
-    source_files[source_filename] = "print('random python')"
+    source_files = { source_filename: "print('random python')" }
     adaptor.sources.snapshot = self.make_snapshot(source_files)
     adaptor.address = Mock()
     adaptor.address.spec_path = source_filename
     return HydratedTarget(target_address, adaptor, tuple())
 
-  def test_source_roots(self):
+  def test_source_roots_python(self):
     init_subsystem(SourceRootConfig)
     target = self.mock_hydrated_target("some/target/address", 'src/python/pants/util/strutil.py')
     output = self.scheduler.product_request(SourceRootStrippedSources, [Params(target, SourceRootConfig.global_instance())])
