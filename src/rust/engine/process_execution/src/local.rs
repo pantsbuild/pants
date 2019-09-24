@@ -980,7 +980,7 @@ mod tests {
     )
   }
 
-  /// This tests attempts to make sure local only scratch files are materialized correctly by
+  /// This test attempts to make sure local only scratch files are materialized correctly by
   /// making sure that with input_files being empty, we would be able to capture the content of
   /// the local only scratch inputs as outputs.
   #[test]
