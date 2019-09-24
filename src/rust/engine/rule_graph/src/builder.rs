@@ -31,9 +31,10 @@ use std::collections::{hash_map, BTreeSet, HashMap, HashSet};
 use crate::rules::{DependencyKey, Rule};
 use crate::{
   entry_str, params_str, Diagnostic, Entry, EntryWithDeps, InnerEntry, ParamTypes, RootEntry,
-  RuleDependencyEdges, RuleEdges, RuleGraph, UnfulfillableRuleMap, UnreachableError,
+  RuleEdges, RuleGraph, UnfulfillableRuleMap, UnreachableError,
 };
 
+type RuleDependencyEdges<R> = HashMap<EntryWithDeps<R>, PolyRuleEdges<R>>;
 type ChosenDependency<'a, R> = (&'a <R as Rule>::DependencyKey, &'a Entry<R>);
 
 enum ConstructGraphResult<R: Rule> {
@@ -53,6 +54,34 @@ enum ConstructGraphResult<R: Rule> {
     cyclic_deps: HashSet<EntryWithDeps<R>>,
     partial_simplified_entries: Vec<EntryWithDeps<R>>,
   },
+}
+
+///
+/// A polymorphic form of crate::RuleEdges. Each dep has multiple possible implementation rules.
+///
+#[derive(Eq, PartialEq, Clone, Debug)]
+struct PolyRuleEdges<R: Rule> {
+  dependencies: HashMap<R::DependencyKey, Vec<Entry<R>>>,
+}
+
+impl<R: Rule> PolyRuleEdges<R> {
+  fn add_edge(&mut self, dependency_key: R::DependencyKey, new_dependency: Entry<R>) {
+    self
+      .dependencies
+      .entry(dependency_key)
+      .or_insert_with(Vec::new)
+      .push(new_dependency);
+  }
+}
+
+// TODO: We can't derive this due to https://github.com/rust-lang/rust/issues/26925, which
+// unnecessarily requires `Rule: Default`.
+impl<R: Rule> Default for PolyRuleEdges<R> {
+  fn default() -> Self {
+    PolyRuleEdges {
+      dependencies: HashMap::default(),
+    }
+  }
 }
 
 // Given the task index and the root subjects, it produces a rule graph that allows dependency nodes
@@ -94,6 +123,8 @@ impl<'t, R: Rule> Builder<'t, R> {
     let mut simplified_entries = HashMap::new();
     let mut unfulfillable_rules: UnfulfillableRuleMap<_> = HashMap::new();
 
+    // First construct a polymorphic graph (where each dependency edge might have multiple
+    // possible implementations).
     for beginning_root in roots {
       self.construct_graph_helper(
         &mut dependency_edges,
@@ -103,11 +134,15 @@ impl<'t, R: Rule> Builder<'t, R> {
       );
     }
 
-    let unreachable_rules = self.unreachable_rules(&dependency_edges);
+    // Then monomorphize it, turning it into a graph where each dependency edge has exactly one
+    // possible implementation.
+    let rule_dependency_edges = Self::monomorphize_graph(dependency_edges);
+
+    let unreachable_rules = self.unreachable_rules(&rule_dependency_edges);
 
     RuleGraph {
       root_param_types: self.root_param_types.clone(),
-      rule_dependency_edges: dependency_edges,
+      rule_dependency_edges,
       unfulfillable_rules,
       unreachable_rules,
     }
@@ -118,7 +153,7 @@ impl<'t, R: Rule> Builder<'t, R> {
   ///
   fn unreachable_rules(
     &self,
-    full_dependency_edges: &RuleDependencyEdges<R>,
+    full_dependency_edges: &HashMap<EntryWithDeps<R>, RuleEdges<R>>,
   ) -> Vec<UnreachableError<R>> {
     // Walk the graph, starting from root entries.
     let mut entry_stack: Vec<_> = full_dependency_edges
@@ -195,7 +230,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       hash_map::Entry::Vacant(re) => {
         // When a rule has not been visited before, we start the visit by storing a placeholder in
         // the rule dependencies map in order to detect rule cycles.
-        re.insert(RuleEdges::default());
+        re.insert(PolyRuleEdges::default());
       }
       hash_map::Entry::Occupied(_) => {
         // We're currently recursively under this rule, but its simplified equivalence has not yet
@@ -461,7 +496,7 @@ impl<'t, R: Rule> Builder<'t, R> {
 
       match Self::choose_dependencies(&available_params, deps) {
         Ok(Some(inputs)) => {
-          let mut rule_edges = RuleEdges::default();
+          let mut rule_edges = PolyRuleEdges::default();
           for (key, input) in inputs {
             rule_edges.add_edge(key.clone(), input.clone());
           }
@@ -565,6 +600,27 @@ impl<'t, R: Rule> Builder<'t, R> {
     }
 
     rules
+  }
+
+  ///
+  /// Given a polymorphic graph, where each Rule might have multiple implementations of each dep,
+  /// monomorphize it into a graph where each Rule has exactly one implementation per dep.
+  ///
+  fn monomorphize_graph(
+    poly_dependency_edges: RuleDependencyEdges<R>,
+  ) -> HashMap<EntryWithDeps<R>, RuleEdges<R>> {
+    poly_dependency_edges
+      .into_iter()
+      .map(|(e, poly_rule_edges)| {
+        let mut rule_edges = RuleEdges::default();
+        for (k, entries) in poly_rule_edges.dependencies.into_iter() {
+          for entry in entries {
+            rule_edges.add_edge(k, entry);
+          }
+        }
+        (e, rule_edges)
+      })
+      .collect()
   }
 
   fn powerset<'a, T: Clone>(slice: &'a [T]) -> impl Iterator<Item = Vec<T>> + 'a {

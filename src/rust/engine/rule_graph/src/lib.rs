@@ -29,7 +29,7 @@
 mod builder;
 mod rules;
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{hash_map, BTreeSet, HashMap, HashSet};
 use std::io;
 
 pub use crate::builder::Builder;
@@ -143,7 +143,6 @@ impl<R: Rule> InnerEntry<R> {
   }
 }
 
-type RuleDependencyEdges<R> = HashMap<EntryWithDeps<R>, RuleEdges<R>>;
 type UnfulfillableRuleMap<R> = HashMap<EntryWithDeps<R>, Vec<Diagnostic<<R as Rule>::TypeId>>>;
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -171,7 +170,7 @@ struct Diagnostic<T: TypeId> {
 #[derive(Debug)]
 pub struct RuleGraph<R: Rule> {
   root_param_types: ParamTypes<R::TypeId>,
-  rule_dependency_edges: RuleDependencyEdges<R>,
+  rule_dependency_edges: HashMap<EntryWithDeps<R>, RuleEdges<R>>,
   unfulfillable_rules: UnfulfillableRuleMap<R>,
   unreachable_rules: Vec<UnreachableError<R>>,
 }
@@ -182,7 +181,7 @@ impl<R: Rule> Default for RuleGraph<R> {
   fn default() -> Self {
     RuleGraph {
       root_param_types: ParamTypes::default(),
-      rule_dependency_edges: RuleDependencyEdges::default(),
+      rule_dependency_edges: HashMap::default(),
       unfulfillable_rules: UnfulfillableRuleMap::default(),
       unreachable_rules: Vec::default(),
     }
@@ -459,31 +458,37 @@ impl<R: Rule> RuleGraph<R> {
 }
 
 ///
-/// Records the dependency rules for a rule.
+/// Records the dependency Rules for a Rule. Unlike builder::PolyRuleEdges, these edges have been
+/// monomorphised, so each dependency has exactly one implementing Rule.
 ///
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct RuleEdges<R: Rule> {
-  dependencies: HashMap<R::DependencyKey, Vec<Entry<R>>>,
+  dependencies: HashMap<R::DependencyKey, Entry<R>>,
 }
 
 impl<R: Rule> RuleEdges<R> {
   pub fn entry_for(&self, dependency_key: &R::DependencyKey) -> Option<&Entry<R>> {
-    self
-      .dependencies
-      .get(dependency_key)
-      .and_then(|entries| entries.first())
+    self.dependencies.get(dependency_key)
   }
 
   pub fn all_dependencies(&self) -> impl Iterator<Item = &Entry<R>> {
-    self.dependencies.values().flatten()
+    self.dependencies.values()
   }
 
-  fn add_edge(&mut self, dependency_key: R::DependencyKey, new_dependency: Entry<R>) {
-    self
-      .dependencies
-      .entry(dependency_key)
-      .or_insert_with(Vec::new)
-      .push(new_dependency);
+  fn add_edge(&mut self, dependency_key: R::DependencyKey, dependency: Entry<R>) {
+    match self.dependencies.entry(dependency_key) {
+      hash_map::Entry::Occupied(oe) => {
+        panic!(
+          "Attempted to add a second implementation for {}:\n  {}\n  {}",
+          dependency_key,
+          entry_str(&dependency),
+          entry_str(oe.get())
+        );
+      }
+      hash_map::Entry::Vacant(ve) => {
+        ve.insert(dependency);
+      }
+    }
   }
 }
 
