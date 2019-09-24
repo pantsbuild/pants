@@ -57,18 +57,18 @@ enum ConstructGraphResult<R: Rule> {
 
 // Given the task index and the root subjects, it produces a rule graph that allows dependency nodes
 // to be found statically rather than dynamically.
-pub struct GraphMaker<'t, R: Rule> {
+pub struct Builder<'t, R: Rule> {
   tasks: &'t HashMap<R::TypeId, Vec<R>>,
   root_param_types: ParamTypes<R::TypeId>,
 }
 
-impl<'t, R: Rule> GraphMaker<'t, R> {
+impl<'t, R: Rule> Builder<'t, R> {
   pub fn new(
     tasks: &'t HashMap<R::TypeId, Vec<R>>,
     root_param_types: Vec<R::TypeId>,
-  ) -> GraphMaker<'t, R> {
+  ) -> Builder<'t, R> {
     let root_param_types = root_param_types.into_iter().collect();
-    GraphMaker {
+    Builder {
       tasks,
       root_param_types,
     }

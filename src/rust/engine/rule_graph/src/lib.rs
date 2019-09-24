@@ -32,7 +32,7 @@ mod rules;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::io;
 
-pub use crate::builder::GraphMaker;
+pub use crate::builder::Builder;
 pub use crate::rules::{DependencyKey, Rule, TypeId};
 
 // TODO: Consider switching to HashSet and dropping the Ord bound from TypeId.
@@ -223,7 +223,7 @@ fn entry_with_deps_str<R: Rule>(entry: &EntryWithDeps<R>) -> String {
 
 impl<R: Rule> RuleGraph<R> {
   pub fn new(tasks: &HashMap<R::TypeId, Vec<R>>, root_param_types: Vec<R::TypeId>) -> RuleGraph<R> {
-    GraphMaker::new(tasks, root_param_types).full_graph()
+    Builder::new(tasks, root_param_types).full_graph()
   }
 
   pub fn find_root_edges<I: IntoIterator<Item = R::TypeId>>(

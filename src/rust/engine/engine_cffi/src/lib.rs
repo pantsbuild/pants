@@ -49,7 +49,7 @@ use hashing::Digest;
 use log::{error, Log};
 use logging::logger::LOGGER;
 use logging::{Destination, Logger};
-use rule_graph::{GraphMaker, RuleGraph};
+use rule_graph::{self, RuleGraph};
 use std::any::Any;
 use std::borrow::Borrow;
 use std::ffi::CStr;
@@ -954,12 +954,12 @@ pub extern "C" fn override_thread_logging_destination(destination: Destination) 
 }
 
 fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph<Rule> {
-  let graph_maker = GraphMaker::new(scheduler.core.tasks.as_map(), subject_types);
+  let graph_maker = rule_graph::Builder::new(scheduler.core.tasks.as_map(), subject_types);
   graph_maker.full_graph()
 }
 
 fn graph_sub(scheduler: &Scheduler, subject_type: TypeId, product_type: TypeId) -> RuleGraph<Rule> {
-  let graph_maker = GraphMaker::new(scheduler.core.tasks.as_map(), vec![subject_type]);
+  let graph_maker = rule_graph::Builder::new(scheduler.core.tasks.as_map(), vec![subject_type]);
   graph_maker.sub_graph(subject_type, product_type)
 }
 
