@@ -41,54 +41,44 @@ class TestHashUtils(unittest.TestCase):
         hash_dir(Path(path))
 
   def test_hash_dir(self):
-    with temporary_dir() as root1:
-      root1_path = Path(root1)
-      with root1_path.joinpath('a').open(mode='wb') as fd:
-        fd.write(b'jake jones')
-      with root1_path.joinpath('b').open(mode='wb') as fd:
-        fd.write(b'jane george')
+    with temporary_dir() as root:
+      root1_path = Path(root)
+      root1_path.joinpath('a').write_text('jake jones')
+      root1_path.joinpath('b').write_text('jane george')
       hash1 = hash_dir(root1_path)
 
-    with temporary_dir() as root2:
-      root2_path = Path(root2)
-      with root2_path.joinpath('a').open(mode='wb') as fd:
-        fd.write(b'jake jones')
-      with root2_path.joinpath('b').open(mode='wb') as fd:
-        fd.write(b'jane george')
+    with temporary_dir() as root:
+      root2_path = Path(root)
+      root2_path.joinpath('a').write_text('jake jones')
+      root2_path.joinpath('b').write_text('jane george')
       hash2 = hash_dir(root2_path)
 
     self.assertNotEqual(root1_path, root2_path,
                         "The path of the directory being hashed should not factor into the hash.")
     self.assertEqual(hash1, hash2)
 
-    with temporary_dir() as root3:
-      root3_path = Path(root3)
-      with root3_path.joinpath('a1').open(mode='wb') as fd:
-        fd.write(b'jake jones')
-      with root3_path.joinpath('b').open(mode='wb') as fd:
-        fd.write(b'jane george')
-      hash3 = hash_dir(root3_path)
+    with temporary_dir() as root:
+      root_path = Path(root)
+      root_path.joinpath('a1').write_text('jake jones')
+      root_path.joinpath('b').write_text('jane george')
+      hash3 = hash_dir(root_path)
 
     self.assertNotEqual(hash1, hash3, "File names should be included in the hash.")
 
-    with temporary_dir() as root4:
-      root4_path = Path(root4)
-      with root4_path.joinpath('a').open(mode='wb') as fd:
-        fd.write(b'jake jones')
-      with root4_path.joinpath('b').open(mode='wb') as fd:
-        fd.write(b'jane george')
-      root4_path.joinpath("c").mkdir()
-      hash4 = hash_dir(root4_path)
+    with temporary_dir() as root:
+      root_path = Path(root)
+      root_path.joinpath('a').write_text('jake jones')
+      root_path.joinpath('b').write_text('jane george')
+      root_path.joinpath("c").mkdir()
+      hash4 = hash_dir(root_path)
 
     self.assertNotEqual(hash1, hash4, "Directory names should be included in the hash.")
 
-    with temporary_dir() as root5:
-      root5_path = Path(root5)
-      with root5_path.joinpath('a').open(mode='wb') as fd:
-        fd.write(b'jake jones II')
-      with root5_path.joinpath('b').open(mode='wb') as fd:
-        fd.write(b'jane george')
-      hash5 = hash_dir(root5_path)
+    with temporary_dir() as root:
+      root_path = Path(root)
+      root_path.joinpath('a').write_text('jake jones II')
+      root_path.joinpath('b').write_text('jane george')
+      hash5 = hash_dir(root_path)
 
     self.assertNotEqual(hash1, hash5, "File content should be included in the hash.")
 
