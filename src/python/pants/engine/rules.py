@@ -6,11 +6,12 @@ import inspect
 import itertools
 import logging
 import sys
+import typing
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from collections.abc import Iterable
 from textwrap import dedent
-from typing import Any, Callable, List, Type, cast
+from typing import Any, Callable, Type, cast
 
 import asttokens
 from twitter.common.collections import OrderedSet
@@ -211,20 +212,22 @@ def _get_starting_indent(source):
 Decorator = Callable[[Callable], Callable]
 
 
-def _make_rule(output_type: type, input_types: List[type], cacheable: bool = True) -> Decorator:
+def _make_rule(
+  return_type: type, parameter_types: typing.Iterable[type], cacheable: bool = True
+) -> Decorator:
   """A @decorator that declares that a particular static function may be used as a TaskRule.
 
   As a special case, if the output_type is a subclass of `Goal`, the `Goal.Options` for the `Goal`
   are registered as dependency Optionables.
 
-  :param output_type: The return/output type for the Rule. This must be a concrete Python type.
-  :param input_types: A list of types that matches the number and order of arguments to the
-                      @decorated decorated function.
+  :param return_type: The return/output type for the Rule. This must be a concrete Python type.
+  :param parameter_types: A sequence of types that matches the number and order of arguments to the
+                          @decorated decorated function.
   :param cacheable: Whether the results of executing the Rule should be cached as keyed by all of
                     its inputs.
   """
 
-  is_goal_cls = isinstance(output_type, type) and issubclass(output_type, Goal)
+  is_goal_cls = isinstance(return_type, type) and issubclass(return_type, Goal)
   if is_goal_cls == cacheable:
     raise TypeError(
       'An `@rule` that produces a `Goal` must be declared with @console_rule in order to signal '
@@ -279,13 +282,13 @@ def _make_rule(output_type: type, input_types: List[type], cacheable: bool = Tru
 
     # Register dependencies for @console_rule/Goal.
     if is_goal_cls:
-      dependency_rules = (optionable_rule(output_type.Options),)
+      dependency_rules = (optionable_rule(return_type.Options),)
     else:
       dependency_rules = None
 
     func.rule = TaskRule(
-        output_type,
-        tuple(input_types),
+        return_type,
+        tuple(parameter_types),
         func,
         input_gets=tuple(gets),
         dependency_rules=dependency_rules,
@@ -297,15 +300,15 @@ def _make_rule(output_type: type, input_types: List[type], cacheable: bool = Tru
 
 
 class MissingTypeAnnotation(TypeError):
-  pass
+  """Indicates a missing type annotation for an `@rule`."""
 
 
 class MissingReturnTypeAnnotation(MissingTypeAnnotation):
-  pass
+  """Indicates a missing return type annotation for an `@rule`."""
 
 
 class MissingParameterTypeAnnotation(MissingTypeAnnotation):
-  pass
+  """Indicates a missing parameter type annotation for an `@rule`."""
 
 
 def ensure_type_annotation(
@@ -315,42 +318,49 @@ def ensure_type_annotation(
     raise raise_type(f'{name} is missing a type annotation.')
   if not isinstance(annotation, type):
     raise raise_type(f'The annotation for {name} must be a type, '
-                    f'got {annotation} of type {type(annotation)}.')
+                     f'got {annotation} of type {type(annotation)}.')
   return cast(type, annotation)
 
 
 def rule(*args, cacheable=True) -> Callable:
   if len(args) == 2:
-    output_type, input_selectors = args
-    if not isinstance(output_type, type):
-      raise ValueError(f'The output_type decorator parameter must be a type, '
-                       f'given {output_type} of type {type(output_type)}.')
-    if input_selectors is None:
-      raise ValueError('The input_selectors decorator parameter is required.')
-    return _make_rule(output_type, input_selectors, cacheable=cacheable)
+    # TODO(John Sirois): Deprecate this form of @rule.
+    return_type, parameter_types = args
+    if not isinstance(return_type, type):
+      raise ValueError(f'The return_type decorator parameter must be a type, '
+                       f'given {return_type} of type {type(return_type)}.')
+    if not isinstance(parameter_types, Iterable):
+      raise ValueError('The parameter_types decorator parameter must be an iterable.')
+    for index, parameter_type in enumerate(parameter_types):
+      if not isinstance(parameter_type, type):
+        raise ValueError(f'The parameter_types decorator parameter must contain only types. '
+                         f'Element {index} (0-based) {parameter_type} is of type '
+                         f'{type(parameter_type)}')
+    return _make_rule(return_type, parameter_types, cacheable=cacheable)
   elif len(args) == 1 and inspect.isfunction(args[0]):
     func = args[0]
     signature = inspect.signature(func)
-    output_type = ensure_type_annotation(
+    func_id = f'@rule {func.__module__}:{func.__name__}'
+    return_type = ensure_type_annotation(
       annotation=signature.return_annotation,
-      name=f'@rule {func.__module__}.{func.__name__} return',
+      name=f'{func_id} return',
       empty_value=inspect.Signature.empty,
       raise_type=MissingReturnTypeAnnotation
     )
-    input_selectors = [
+    parameter_types = tuple(
       ensure_type_annotation(
         annotation=parameter.annotation,
-        name=f'@rule {func.__module__}.{func.__name__} parameter {name}',
+        name=f'{func_id} parameter {name}',
         empty_value=inspect.Parameter.empty,
         raise_type=MissingParameterTypeAnnotation
       )
       for name, parameter in signature.parameters.items()
-    ]
-    return _make_rule(output_type, input_selectors, cacheable=cacheable)(func)
+    )
+    return _make_rule(return_type, parameter_types, cacheable=cacheable)(func)
   else:
     raise ValueError(f'The @rule decorator expects either no arguments when applied to a '
-                     f'type-annotated function or else two arguments: output_type: type, '
-                     f'input_selectors: List[type], Given {args}.')
+                     f'type-annotated function or else two arguments: return_type: type, '
+                     f'parameter_types: Iterable[type], Given {args}.')
 
 
 def console_rule(*args) -> Callable:

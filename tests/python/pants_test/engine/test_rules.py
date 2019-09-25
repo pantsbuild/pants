@@ -99,16 +99,28 @@ class RuleTypeAnnotationTest(unittest.TestCase):
       return False
     self.assertIsNotNone(dry.rule)
 
-  def test_missing_return(self):
+  def test_missing_return_annotation(self):
     with self.assertRaises(MissingReturnTypeAnnotation):
       @rule
       def dry(a: int, b: str, c: float):
         return False
 
+  def test_bad_return_annotation(self):
+    with self.assertRaises(MissingReturnTypeAnnotation):
+      @rule
+      def dry(a: int, b: str, c: float) -> 42:
+        return False
+
   def test_missing_parameter_annotation(self):
     with self.assertRaises(MissingParameterTypeAnnotation):
       @rule
-      def dry(a: int, b, c:float) -> bool:
+      def dry(a: int, b, c: float) -> bool:
+        return False
+
+  def test_bad_parameter_annotation(self):
+    with self.assertRaises(MissingParameterTypeAnnotation):
+      @rule
+      def dry(a: int, b: 42, c: float) -> bool:
         return False
 
 
