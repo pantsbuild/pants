@@ -5,8 +5,10 @@ import os
 
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
-from pants.task.target_restriction_mixins import (HasSkipAndTransitiveGoalOptionsMixin,
-                                                  SkipAndTransitiveGoalOptionsRegistrar)
+from pants.task.target_restriction_mixins import (
+  HasSkipAndTransitiveGoalOptionsMixin,
+  SkipAndTransitiveGoalOptionsRegistrar,
+)
 from pants.task.task import Task
 
 

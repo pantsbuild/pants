@@ -11,8 +11,14 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.build_files import create_graph_rules
 from pants.engine.fs import create_fs_rules
-from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, DifferingFamiliesError,
-                                 DuplicateNameError, UnaddressableObjectError)
+from pants.engine.mapper import (
+  AddressFamily,
+  AddressMap,
+  AddressMapper,
+  DifferingFamiliesError,
+  DuplicateNameError,
+  UnaddressableObjectError,
+)
 from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct, SymbolTable
 from pants.engine.rules import rule

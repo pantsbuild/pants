@@ -12,8 +12,10 @@ from multiprocessing.pool import ThreadPool
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
-from pants.task.target_restriction_mixins import (HasSkipAndTransitiveOptionsMixin,
-                                                  SkipAndTransitiveOptionsRegistrar)
+from pants.task.target_restriction_mixins import (
+  HasSkipAndTransitiveOptionsMixin,
+  SkipAndTransitiveOptionsRegistrar,
+)
 from pants.util import desktop
 from pants.util.dirutil import safe_mkdir, safe_walk
 from pants.util.memo import memoized_property

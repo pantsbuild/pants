@@ -9,8 +9,12 @@ import unittest
 import unittest.mock
 
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
-from pants.util.fileutil import (atomic_copy, create_size_estimators, safe_hardlink_or_copy,
-                                 safe_temp_edit)
+from pants.util.fileutil import (
+  atomic_copy,
+  create_size_estimators,
+  safe_hardlink_or_copy,
+  safe_temp_edit,
+)
 
 
 class FileutilTest(unittest.TestCase):

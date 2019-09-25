@@ -2,8 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-from pants.backend.codegen.thrift.python.py_thrift_namespace_clash_check import \
-  PyThriftNamespaceClashCheck
+from pants.backend.codegen.thrift.python.py_thrift_namespace_clash_check import (
+  PyThriftNamespaceClashCheck,
+)
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
 from pants.util.dirutil import read_file
 from pants_test.task_test_base import DeclarativeTaskTestMixin, TaskTestBase

@@ -5,8 +5,14 @@ import os
 
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
-from pants.option.custom_types import (UnsetBool, dict_option, dir_option, file_option, list_option,
-                                       target_option)
+from pants.option.custom_types import (
+  UnsetBool,
+  dict_option,
+  dir_option,
+  file_option,
+  list_option,
+  target_option,
+)
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.util.contextutil import temporary_dir
 from pants_test.test_base import TestBase

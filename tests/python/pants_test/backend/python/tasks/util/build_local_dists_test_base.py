@@ -8,16 +8,19 @@ from pants.backend.native.register import rules as native_backend_rules
 from pants.backend.native.subsystems.libc_dev import LibcDev
 from pants.backend.native.subsystems.native_build_step import ToolchainVariant
 from pants.backend.python.subsystems.python_repos import PythonRepos
-from pants.backend.python.tasks.build_local_python_distributions import \
-  BuildLocalPythonDistributions
+from pants.backend.python.tasks.build_local_python_distributions import (
+  BuildLocalPythonDistributions,
+)
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.util.collections import assert_single_element
 from pants.util.meta import classproperty
 from pants.util.objects import enum
-from pants_test.backend.python.tasks.python_task_test_base import (PythonTaskTestBase,
-                                                                   name_and_platform,
-                                                                   normalized_current_platform)
+from pants_test.backend.python.tasks.python_task_test_base import (
+  PythonTaskTestBase,
+  name_and_platform,
+  normalized_current_platform,
+)
 from pants_test.task_test_base import DeclarativeTaskTestMixin
 
 

@@ -4,8 +4,9 @@
 import re
 import tarfile
 
-from pants_test.backend.python.pants_requirement_integration_test_base import \
-  PantsRequirementIntegrationTestBase
+from pants_test.backend.python.pants_requirement_integration_test_base import (
+  PantsRequirementIntegrationTestBase,
+)
 
 
 class SetupPyIntegrationTest(PantsRequirementIntegrationTestBase):

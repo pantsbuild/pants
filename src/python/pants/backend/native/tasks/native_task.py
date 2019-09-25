@@ -6,8 +6,10 @@ from abc import abstractmethod
 from pants.backend.native.config.environment import CppToolchain, CToolchain
 from pants.backend.native.subsystems.native_build_settings import NativeBuildSettings
 from pants.backend.native.subsystems.native_build_step import NativeBuildStep
-from pants.backend.native.subsystems.native_toolchain import (NativeToolchain,
-                                                              ToolchainVariantRequest)
+from pants.backend.native.subsystems.native_toolchain import (
+  NativeToolchain,
+  ToolchainVariantRequest,
+)
 from pants.backend.native.targets.native_library import NativeLibrary
 from pants.backend.native.targets.packaged_native_library import PackagedNativeLibrary
 from pants.build_graph.dependency_context import DependencyContext

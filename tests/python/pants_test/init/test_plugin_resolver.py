@@ -18,8 +18,12 @@ from pants.init.plugin_resolver import PluginResolver
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open, safe_rmtree, touch
-from pants_test.interpreter_selection_utils import (PY_36, PY_37, python_interpreter_path,
-                                                    skip_unless_python36_and_python37_present)
+from pants_test.interpreter_selection_utils import (
+  PY_36,
+  PY_37,
+  python_interpreter_path,
+  skip_unless_python36_and_python37_present,
+)
 
 
 req = Requirement.parse

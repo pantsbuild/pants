@@ -24,10 +24,18 @@ from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_tasks
 from pants.engine.legacy.options_parsing import create_options_parsing_rules
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
-from pants.engine.legacy.structs import (JvmAppAdaptor, JvmBinaryAdaptor, PageAdaptor,
-                                         PantsPluginAdaptor, PythonAppAdaptor, PythonBinaryAdaptor,
-                                         PythonTargetAdaptor, PythonTestsAdaptor,
-                                         RemoteSourcesAdaptor, TargetAdaptor)
+from pants.engine.legacy.structs import (
+  JvmAppAdaptor,
+  JvmBinaryAdaptor,
+  PageAdaptor,
+  PantsPluginAdaptor,
+  PythonAppAdaptor,
+  PythonBinaryAdaptor,
+  PythonTargetAdaptor,
+  PythonTestsAdaptor,
+  RemoteSourcesAdaptor,
+  TargetAdaptor,
+)
 from pants.engine.legacy.structs import rules as structs_rules
 from pants.engine.mapper import AddressMapper
 from pants.engine.parser import SymbolTable
@@ -36,8 +44,11 @@ from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import Scheduler
 from pants.engine.selectors import Params
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
-from pants.option.global_options import (DEFAULT_EXECUTION_OPTIONS, ExecutionOptions,
-                                         GlobMatchErrorBehavior)
+from pants.option.global_options import (
+  DEFAULT_EXECUTION_OPTIONS,
+  ExecutionOptions,
+  GlobMatchErrorBehavior,
+)
 from pants.util.objects import datatype
 
 

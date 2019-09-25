@@ -11,8 +11,14 @@ from pathlib import Path
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.hash_utils import (CoercingEncoder, Sharder, hash_all, hash_dir, hash_file,
-                                   stable_json_sha1)
+from pants.base.hash_utils import (
+  CoercingEncoder,
+  Sharder,
+  hash_all,
+  hash_dir,
+  hash_file,
+  stable_json_sha1,
+)
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
 
 

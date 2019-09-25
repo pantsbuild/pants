@@ -8,8 +8,12 @@ from hashlib import sha1
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
-from pants.base.payload_field import (ExcludesField, FingerprintedField, FingerprintedMixin,
-                                      PrimitiveField)
+from pants.base.payload_field import (
+  ExcludesField,
+  FingerprintedField,
+  FingerprintedMixin,
+  PrimitiveField,
+)
 from pants.base.validation import assert_list
 from pants.java.jar.exclude import Exclude
 

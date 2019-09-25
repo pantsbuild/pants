@@ -13,8 +13,11 @@ from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE,
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.init.logging import encapsulated_global_logger
 from pants.init.util import clean_global_runtime_state
-from pants.java.nailgun_io import (NailgunStreamStdinReader, NailgunStreamWriterError,
-                                   PipedNailgunStreamWriter)
+from pants.java.nailgun_io import (
+  NailgunStreamStdinReader,
+  NailgunStreamWriterError,
+  PipedNailgunStreamWriter,
+)
 from pants.java.nailgun_protocol import ChunkType, MaybeShutdownSocket, NailgunProtocol
 from pants.util.contextutil import hermetic_environment_as, stdio_as
 from pants.util.socket import teardown_socket

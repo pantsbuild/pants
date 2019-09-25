@@ -4,8 +4,12 @@
 import logging
 from typing import Optional
 
-from pants.util.osutil import (OS_ALIASES, get_closest_mac_host_platform_pair, known_os_names,
-                               normalize_os_name)
+from pants.util.osutil import (
+  OS_ALIASES,
+  get_closest_mac_host_platform_pair,
+  known_os_names,
+  normalize_os_name,
+)
 from pants_test.test_base import TestBase
 
 

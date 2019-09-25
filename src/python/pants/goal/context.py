@@ -12,8 +12,11 @@ from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.target import Target
-from pants.engine.isolated_process import (FallibleExecuteProcessResult, ProductDescription,
-                                           fallible_to_exec_result_or_raise)
+from pants.engine.isolated_process import (
+  FallibleExecuteProcessResult,
+  ProductDescription,
+  fallible_to_exec_result_or_raise,
+)
 from pants.goal.products import Products
 from pants.goal.workspace import ScmWorkspace
 from pants.process.lock import OwnerPrintingInterProcessFileLock

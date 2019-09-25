@@ -12,12 +12,23 @@ from pants.engine.console import Console
 from pants.engine.fs import create_fs_rules
 from pants.engine.goal import Goal
 from pants.engine.mapper import AddressMapper
-from pants.engine.rules import (MissingParameterTypeAnnotation, MissingReturnTypeAnnotation,
-                                RootRule, RuleIndex, _RuleVisitor, console_rule, rule)
+from pants.engine.rules import (
+  MissingParameterTypeAnnotation,
+  MissingReturnTypeAnnotation,
+  RootRule,
+  RuleIndex,
+  _RuleVisitor,
+  console_rule,
+  rule,
+)
 from pants.engine.selectors import Get
 from pants_test.engine.examples.parsers import JsonParser
-from pants_test.engine.util import (TARGET_TABLE, assert_equal_with_printing, create_scheduler,
-                                    run_rule)
+from pants_test.engine.util import (
+  TARGET_TABLE,
+  assert_equal_with_printing,
+  create_scheduler,
+  run_rule,
+)
 from pants_test.test_base import TestBase
 
 

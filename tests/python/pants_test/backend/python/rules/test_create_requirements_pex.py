@@ -5,15 +5,21 @@ import json
 import os.path
 import zipfile
 
-from pants.backend.python.rules.create_requirements_pex import (RequirementsPex,
-                                                                RequirementsPexRequest,
-                                                                create_requirements_pex)
+from pants.backend.python.rules.create_requirements_pex import (
+  RequirementsPex,
+  RequirementsPexRequest,
+  create_requirements_pex,
+)
 from pants.backend.python.rules.download_pex_bin import download_pex_bin
-from pants.backend.python.subsystems.python_native_code import (PythonNativeCode,
-                                                                create_pex_native_build_environment)
+from pants.backend.python.subsystems.python_native_code import (
+  PythonNativeCode,
+  create_pex_native_build_environment,
+)
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import (
-  SubprocessEnvironment, create_subprocess_encoding_environment)
+  SubprocessEnvironment,
+  create_subprocess_encoding_environment,
+)
 from pants.engine.fs import DirectoryToMaterialize
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
