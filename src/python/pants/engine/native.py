@@ -462,6 +462,7 @@ class _FFISpecification(object):
     response = self._ffi.new('PyGeneratorResponse*')
     try:
       res = c.from_value(func[0]).send(c.from_value(arg[0]))
+
       if isinstance(res, Get):
         # Get.
         response.tag = self._lib.Get
