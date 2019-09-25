@@ -35,7 +35,7 @@ use crate::{
 };
 
 type RuleDependencyEdges<R> = HashMap<EntryWithDeps<R>, PolyRuleEdges<R>>;
-type ChosenDependency<R> = (<R as Rule>::DependencyKey, Vec<Entry<R>>);
+type ChosenDependency<R> = (<R as Rule>::DependencyKey, Vec<(bool, Entry<R>)>);
 
 enum ConstructGraphResult<R: Rule> {
   // The Entry was satisfiable without waiting for any additional nodes to be satisfied. The result
@@ -583,8 +583,11 @@ impl<'t, R: Rule> Builder<'t, R> {
             ) {
               MonomorphizeGraphResult::Unfulfillable => {}
               MonomorphizeGraphResult::Fulfilled(simplified_entries) => {
-                monomorphized_candidates
-                  .extend(simplified_entries.into_iter().map(Entry::WithDeps));
+                monomorphized_candidates.extend(
+                  simplified_entries
+                    .into_iter()
+                    .map(|e| (false, Entry::WithDeps(e))),
+                );
               }
               MonomorphizeGraphResult::CycledOn {
                 cyclic_deps,
@@ -594,13 +597,16 @@ impl<'t, R: Rule> Builder<'t, R> {
                 cycled_on.extend(cyclic_deps);
                 // NB: In the case of a cycle, we consider the dependency to be fulfillable, because
                 // it is if we are.
-                monomorphized_candidates
-                  .extend(simplified_entries.into_iter().map(Entry::WithDeps));
+                monomorphized_candidates.extend(
+                  simplified_entries
+                    .into_iter()
+                    .map(|e| (true, Entry::WithDeps(e))),
+                );
               }
             }
           }
           p @ Entry::Param(_) => {
-            monomorphized_candidates.push(p);
+            monomorphized_candidates.push((false, p));
           }
         }
       }
@@ -656,7 +662,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       let mut all_used_params = BTreeSet::new();
       for (key, inputs) in &monomorphized_candidates {
         let provided_param = key.provided_param();
-        for input in inputs {
+        for (_, input) in inputs {
           all_used_params.extend(
             input
               .params()
@@ -708,7 +714,6 @@ impl<'t, R: Rule> Builder<'t, R> {
           .entry(entry.clone())
           .or_insert_with(Vec::new)
           .extend(diagnostics);
-        rule_dependency_edges.remove(&entry);
         Ok(MonomorphizeGraphResult::Unfulfillable)
       } else {
         rule_dependency_edges.extend(combinations.clone());
@@ -742,7 +747,7 @@ impl<'t, R: Rule> Builder<'t, R> {
   /// If an ambiguity is detected in rule dependencies (ie, if multiple rules are satisfiable for
   /// a single dependency key), fail with a Diagnostic.
   ///
-  fn choose_dependencies<'a>(
+  fn choose_dependencies(
     available_params: &ParamTypes<R::TypeId>,
     deps: &[ChosenDependency<R>],
   ) -> Result<Option<RuleEdges<R>>, Diagnostic<R::TypeId>> {
@@ -751,17 +756,22 @@ impl<'t, R: Rule> Builder<'t, R> {
       let provided_param = key.provided_param();
       let satisfiable_entries = input_entries
         .iter()
-        .filter(|input_entry| {
+        .filter_map(|(cyclic, input_entry)| {
           let consumes_provided_param = if let Some(p) = provided_param {
             input_entry.params().contains(&p)
           } else {
             true
           };
-          consumes_provided_param
+          let accept = (*cyclic || consumes_provided_param)
             && input_entry
               .params()
               .iter()
-              .all(|p| available_params.contains(p) || Some(*p) == provided_param)
+              .all(|p| available_params.contains(p) || Some(*p) == provided_param);
+          if accept {
+            Some(input_entry)
+          } else {
+            None
+          }
         })
         .collect::<Vec<_>>();
 
