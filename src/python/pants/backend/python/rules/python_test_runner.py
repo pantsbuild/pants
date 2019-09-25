@@ -19,8 +19,6 @@ from pants.rules.core.strip_source_root import SourceRootStrippedSources
 from pants.util.strutil import create_path_env_var
 
 
-# TODO(7697): Use a dedicated rule for removing the source root prefix, so that this rule
-# does not have to depend on SourceRootConfig.
 @rule
 def run_python_test(
   test_target: PythonTestsAdaptor,

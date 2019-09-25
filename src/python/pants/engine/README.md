@@ -62,7 +62,7 @@ def int_to_str(value: int) -> str:
 Here the only requirements for the `@rule` are:
 1. The decorated function is a free, top-level function; ie: methods cannot be `@rule`s.
 2. The decorated function must be fully type annotated.
-3. As mentioned above, the types of the function `Param`s must be hashable and have useful equality.
+3. As mentioned above, the types of the function parameters must be hashable and have useful equality.
 
 When the engine encounters this `@rule` while compiling the rule graph for `str`-producing-`@rule`s,
 it will next go hunting for the dependency `@rule` that can produce an `int` using the fewest number
