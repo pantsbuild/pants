@@ -59,8 +59,8 @@ def int_to_str(value: int) -> str:
   return str(value)
 ```
 
-Here the only requirements for the `@rule` are:
-1. The decorated function is a free, top-level function; ie: methods cannot be `@rule`s.
+Here, the only requirements for the `@rule` are:
+1. The decorated function is a free, top-level function; i.e.: methods cannot be `@rule`s.
 2. The decorated function must be fully type annotated.
 3. As mentioned above, the types of the function parameters must be hashable and have useful equality.
 

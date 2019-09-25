@@ -209,12 +209,9 @@ def _get_starting_indent(source):
   return 0
 
 
-Decorator = Callable[[Callable], Callable]
-
-
 def _make_rule(
   return_type: type, parameter_types: typing.Iterable[type], cacheable: bool = True
-) -> Decorator:
+) -> Callable[[Callable], Callable]:
   """A @decorator that declares that a particular static function may be used as a TaskRule.
 
   As a special case, if the output_type is a subclass of `Goal`, the `Goal.Options` for the `Goal`
@@ -311,7 +308,7 @@ class MissingParameterTypeAnnotation(MissingTypeAnnotation):
   """Indicates a missing parameter type annotation for an `@rule`."""
 
 
-def ensure_type_annotation(
+def _ensure_type_annotation(
   annotation: Any, name: str, empty_value: Any, raise_type: Type[MissingTypeAnnotation]
 ) -> type:
   if annotation == empty_value:
@@ -324,7 +321,8 @@ def ensure_type_annotation(
 
 def rule(*args, cacheable=True) -> Callable:
   if len(args) == 2:
-    # TODO(John Sirois): Deprecate this form of @rule.
+    # TODO(John Sirois): Deprecate this form of @rule:
+    #   https://github.com/pantsbuild/pants/issues/8338
     return_type, parameter_types = args
     if not isinstance(return_type, type):
       raise ValueError(f'The return_type decorator parameter must be a type, '
@@ -341,14 +339,14 @@ def rule(*args, cacheable=True) -> Callable:
     func = args[0]
     signature = inspect.signature(func)
     func_id = f'@rule {func.__module__}:{func.__name__}'
-    return_type = ensure_type_annotation(
+    return_type = _ensure_type_annotation(
       annotation=signature.return_annotation,
       name=f'{func_id} return',
       empty_value=inspect.Signature.empty,
       raise_type=MissingReturnTypeAnnotation
     )
     parameter_types = tuple(
-      ensure_type_annotation(
+      _ensure_type_annotation(
         annotation=parameter.annotation,
         name=f'{func_id} parameter {name}',
         empty_value=inspect.Parameter.empty,
@@ -360,7 +358,7 @@ def rule(*args, cacheable=True) -> Callable:
   else:
     raise ValueError(f'The @rule decorator expects either no arguments when applied to a '
                      f'type-annotated function or else two arguments: return_type: type, '
-                     f'parameter_types: Iterable[type], Given {args}.')
+                     f'parameter_types: Iterable[type]. Given {args}.')
 
 
 def console_rule(*args) -> Callable:
