@@ -12,6 +12,8 @@ from pants.backend.python.rules.download_pex_bin import download_pex_bin
 from pants.backend.python.subsystems.python_native_code import (PythonNativeCode,
                                                                 create_pex_native_build_environment)
 from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.backend.python.subsystems.subprocess_environment import (
+  SubprocessEnvironment, create_subprocess_encoding_environment)
 from pants.engine.fs import DirectoryToMaterialize
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
@@ -28,15 +30,17 @@ class TestResolveRequirements(TestBase):
     return super().rules() + [
       create_requirements_pex,
       create_pex_native_build_environment,
+      create_subprocess_encoding_environment,
       download_pex_bin,
       RootRule(RequirementsPexRequest),
       RootRule(PythonSetup),
       RootRule(PythonNativeCode),
+      RootRule(SubprocessEnvironment)
     ]
 
   def setUp(self):
     super().setUp()
-    init_subsystems([PythonSetup, PythonNativeCode])
+    init_subsystems([PythonSetup, PythonNativeCode, SubprocessEnvironment])
 
   def create_pex_and_get_pex_info(
     self, *, requirements=None, entry_point=None, interpreter_constraints=None
@@ -54,6 +58,7 @@ class TestResolveRequirements(TestBase):
       self.scheduler.product_request(RequirementsPex, [Params(
         request,
         PythonSetup.global_instance(),
+        SubprocessEnvironment.global_instance(),
         PythonNativeCode.global_instance()
       )])
     )

@@ -3,7 +3,7 @@
 
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.rules.hermetic_pex import HermeticPex
-from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment, PythonNativeCode
+from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest
@@ -94,5 +94,4 @@ def rules():
   return [
     create_requirements_pex,
     optionable_rule(PythonSetup),
-    optionable_rule(PythonNativeCode),
   ]
