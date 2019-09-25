@@ -98,6 +98,7 @@ python_library(
   name = 'hash_utils',
   sources = ['hash_utils.py'],
   dependencies = [
+    '3rdparty/python:typing-extensions',
     ':deprecated',
     'src/python/pants/util:objects',
   ]
