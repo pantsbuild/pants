@@ -1199,6 +1199,65 @@ pub mod tests {
     Digest(Digest),
   }
 
+  /// This test checks that `unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule`
+  /// is ignored for remoting by showing EPR with different digests of
+  /// `unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule`
+  /// end up having the same bazel_protos::remote_execution::ExecuteRequest.
+  #[test]
+  fn local_only_scratch_files_ignored() {
+    let input_directory = TestDirectory::containing_roland();
+    let req1 = ExecuteProcessRequest {
+      argv: owned_string_vec(&["/bin/echo", "yo"]),
+      env: vec![("SOME".to_owned(), "value".to_owned())]
+        .into_iter()
+        .collect(),
+      input_files: input_directory.digest(),
+      // Intentionally poorly sorted:
+      output_files: vec!["path/to/file", "other/file"]
+        .into_iter()
+        .map(PathBuf::from)
+        .collect(),
+      output_directories: vec!["directory/name"]
+        .into_iter()
+        .map(PathBuf::from)
+        .collect(),
+      timeout: Duration::from_millis(1000),
+      description: "some description".to_owned(),
+      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+        hashing::EMPTY_DIGEST,
+      jdk_home: None,
+      target_platform: Platform::None,
+    };
+
+    let req2 = ExecuteProcessRequest {
+      argv: owned_string_vec(&["/bin/echo", "yo"]),
+      env: vec![("SOME".to_owned(), "value".to_owned())]
+        .into_iter()
+        .collect(),
+      input_files: input_directory.digest(),
+      // Intentionally poorly sorted:
+      output_files: vec!["path/to/file", "other/file"]
+        .into_iter()
+        .map(PathBuf::from)
+        .collect(),
+      output_directories: vec!["directory/name"]
+        .into_iter()
+        .map(PathBuf::from)
+        .collect(),
+      timeout: Duration::from_millis(1000),
+      description: "some description".to_owned(),
+      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+        TestDirectory::containing_falcons_dir().digest(),
+      jdk_home: None,
+      target_platform: Platform::None,
+    };
+
+    assert_eq!(
+      super::make_execute_request(&req1, empty_request_metadata()),
+      super::make_execute_request(&req2, empty_request_metadata()),
+    );
+  }
+
   #[test]
   fn make_execute_request() {
     let input_directory = TestDirectory::containing_roland();
