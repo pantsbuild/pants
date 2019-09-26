@@ -130,6 +130,13 @@ pub struct ExecuteProcessRequest {
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub description: String,
 
+  // This will be materialized for local ExecuteProcessRequest only.
+  // Eventually we want to remove this.
+  // Context: https://github.com/pantsbuild/pants/issues/8314
+  // Think twice before using it.
+  #[derivative(PartialEq = "ignore", Hash = "ignore")]
+  pub unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+    hashing::Digest,
   ///
   /// If present, a symlink will be created at .jdk which points to this directory for local
   /// execution, or a system-installed JDK (ignoring the value of the present Some) for remote
@@ -298,6 +305,7 @@ impl From<Box<BoundedCommandRunner>> for Arc<dyn CommandRunner> {
 #[cfg(test)]
 mod tests {
   use super::{ExecuteProcessRequest, Platform};
+  use hashing::{Digest, Fingerprint};
   use std::collections::hash_map::DefaultHasher;
   use std::collections::{BTreeMap, BTreeSet};
   use std::hash::{Hash, Hasher};
@@ -306,7 +314,7 @@ mod tests {
   #[test]
   fn execute_process_request_equality() {
     let execute_process_request_generator =
-      |description: String, timeout: Duration| ExecuteProcessRequest {
+      |description: String, timeout: Duration, unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: hashing::Digest| ExecuteProcessRequest {
         argv: vec![],
         env: BTreeMap::new(),
         input_files: hashing::EMPTY_DIGEST,
@@ -314,6 +322,7 @@ mod tests {
         output_directories: BTreeSet::new(),
         timeout,
         description,
+        unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
         jdk_home: None,
         target_platform: Platform::None,
       };
@@ -324,13 +333,41 @@ mod tests {
       hasher.finish()
     }
 
-    let a = execute_process_request_generator("One thing".to_string(), Duration::new(0, 0));
-    let b = execute_process_request_generator("Another".to_string(), Duration::new(0, 0));
-    let c = execute_process_request_generator("One thing".to_string(), Duration::new(5, 0));
+    let a = execute_process_request_generator(
+      "One thing".to_string(),
+      Duration::new(0, 0),
+      hashing::EMPTY_DIGEST,
+    );
+    let b = execute_process_request_generator(
+      "Another".to_string(),
+      Duration::new(0, 0),
+      hashing::EMPTY_DIGEST,
+    );
+    let c = execute_process_request_generator(
+      "One thing".to_string(),
+      Duration::new(5, 0),
+      hashing::EMPTY_DIGEST,
+    );
+    let d = execute_process_request_generator(
+      "One thing".to_string(),
+      Duration::new(0, 0),
+      Digest(
+        Fingerprint::from_hex_string(
+          "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff",
+        )
+        .unwrap(),
+        1,
+      ),
+    );
 
     // ExecuteProcessRequest should derive a PartialEq and Hash that ignores the description
     assert!(a == b);
     assert!(hash(&a) == hash(&b));
+
+    // `unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule` field should
+    // be ignored for Hash
+    assert!(a == d);
+    assert!(hash(&a) == hash(&d));
 
     // but not other fields
     assert!(a != c);

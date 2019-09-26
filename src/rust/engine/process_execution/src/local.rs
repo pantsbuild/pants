@@ -254,7 +254,9 @@ impl super::CommandRunner for CommandRunner {
     let workdir_path = workdir.path().to_owned();
     let workdir_path2 = workdir_path.clone();
     let workdir_path3 = workdir_path.clone();
+    let workdir_path4 = workdir_path.clone();
     let store = self.store.clone();
+    let store2 = self.store.clone();
     let executor = self.executor.clone();
 
     let env = req.env;
@@ -266,9 +268,20 @@ impl super::CommandRunner for CommandRunner {
     let argv = req.argv;
     let req_description = req.description;
     let maybe_jdk_home = req.jdk_home;
+    let unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule =
+      req.unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule;
+    let workunit_store2 = workunit_store.clone();
+
     self
       .store
       .materialize_directory(workdir_path.clone(), req.input_files, workunit_store)
+      .and_then(move |_metadata| {
+        store2.materialize_directory(
+          workdir_path4,
+          unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
+          workunit_store2,
+        )
+      })
       .and_then(move |_metadata| {
         maybe_jdk_home.map_or(Ok(()), |jdk_home| {
           symlink(jdk_home, workdir_path3.clone().join(".jdk"))
@@ -393,6 +406,8 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "echo foo".to_string(),
+      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+        hashing::EMPTY_DIGEST,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -420,6 +435,8 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "echo foo and fail".to_string(),
+      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+        hashing::EMPTY_DIGEST,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -448,6 +465,8 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "kill self".to_string(),
+      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+        hashing::EMPTY_DIGEST,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -479,6 +498,8 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "run env".to_string(),
+      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+        hashing::EMPTY_DIGEST,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -516,6 +537,8 @@ mod tests {
         output_directories: BTreeSet::new(),
         timeout: Duration::from_millis(1000),
         description: "run env".to_string(),
+        unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+          hashing::EMPTY_DIGEST,
         jdk_home: None,
         target_platform: Platform::None,
       }
@@ -537,6 +560,8 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "echo foo".to_string(),
+      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+        hashing::EMPTY_DIGEST,
       jdk_home: None,
       target_platform: Platform::None,
     })
@@ -553,6 +578,8 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
+      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+        hashing::EMPTY_DIGEST,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -582,6 +609,8 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
+      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+        hashing::EMPTY_DIGEST,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -617,6 +646,8 @@ mod tests {
       output_directories: vec![PathBuf::from("cats")].into_iter().collect(),
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
+      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+        hashing::EMPTY_DIGEST,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -653,6 +684,8 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "treats-roland".to_string(),
+      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+        hashing::EMPTY_DIGEST,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -687,6 +720,8 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "echo foo".to_string(),
+      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+        hashing::EMPTY_DIGEST,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -719,6 +754,8 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "echo-roland".to_string(),
+      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+        hashing::EMPTY_DIGEST,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -749,6 +786,8 @@ mod tests {
       output_directories: vec![PathBuf::from("cats")].into_iter().collect(),
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
+      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+        hashing::EMPTY_DIGEST,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -779,6 +818,8 @@ mod tests {
       output_directories: BTreeSet::new(),
       timeout: Duration::from_millis(1000),
       description: "cat roland".to_string(),
+      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+        hashing::EMPTY_DIGEST,
       jdk_home: Some(preserved_work_tmpdir.path().to_path_buf()),
       target_platform: Platform::None,
     });
@@ -812,11 +853,15 @@ mod tests {
         output_directories: BTreeSet::new(),
         timeout: Duration::from_millis(1000),
         description: "bash".to_string(),
+        unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+          hashing::EMPTY_DIGEST,
         jdk_home: None,
         target_platform: Platform::None,
       },
       preserved_work_root.clone(),
       false,
+      None,
+      None,
     );
     result.unwrap();
 
@@ -848,11 +893,15 @@ mod tests {
         output_directories: BTreeSet::new(),
         timeout: Duration::from_millis(1000),
         description: "failing execution".to_string(),
+        unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+          hashing::EMPTY_DIGEST,
         jdk_home: None,
         target_platform: Platform::None,
       },
       preserved_work_root.clone(),
       false,
+      None,
+      None,
     )
     .expect_err("Want process to fail");
 
@@ -881,6 +930,8 @@ mod tests {
       output_directories: vec![PathBuf::from("birds/falcons")].into_iter().collect(),
       timeout: Duration::from_millis(1000),
       description: "create nonoverlapping directories and file".to_string(),
+      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+        hashing::EMPTY_DIGEST,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -911,6 +962,8 @@ mod tests {
       output_directories: vec![PathBuf::from("falcons")].into_iter().collect(),
       timeout: Duration::from_millis(1000),
       description: "bash".to_string(),
+      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+        hashing::EMPTY_DIGEST,
       jdk_home: None,
       target_platform: Platform::None,
     });
@@ -927,6 +980,57 @@ mod tests {
     )
   }
 
+  /// This test attempts to make sure local only scratch files are materialized correctly by
+  /// making sure that with input_files being empty, we would be able to capture the content of
+  /// the local only scratch inputs as outputs.
+  #[test]
+  fn local_only_scratch_files_materialized() {
+    let store_dir = TempDir::new().unwrap();
+    let executor = task_executor::Executor::new();
+    let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+
+    // Prepare the store to contain roland, because the EPR needs to materialize it
+    let roland_directory_digest = TestDirectory::containing_roland().digest();
+    executor
+      .block_on(store.record_directory(&TestDirectory::containing_roland().directory(), true))
+      .expect("Error saving directory");;
+    executor
+      .block_on(store.store_file_bytes(TestData::roland().bytes(), false))
+      .expect("Error saving file bytes");
+
+    let work_dir = TempDir::new().unwrap();
+    let result = run_command_locally_in_dir(
+      ExecuteProcessRequest {
+        argv: vec![find_bash(), "-c".to_owned(), format!("echo -n ''")],
+        env: BTreeMap::new(),
+        input_files: hashing::EMPTY_DIGEST,
+        output_files: vec![PathBuf::from("roland")].into_iter().collect(),
+        output_directories: BTreeSet::new(),
+        timeout: Duration::from_millis(1000),
+        description: "treats-roland".to_string(),
+        unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+          roland_directory_digest,
+        jdk_home: None,
+        target_platform: Platform::None,
+      },
+      work_dir.path().to_owned(),
+      true,
+      Some(store),
+      Some(executor),
+    );
+
+    assert_eq!(
+      result.unwrap(),
+      FallibleExecuteProcessResult {
+        stdout: as_bytes(""),
+        stderr: as_bytes(""),
+        exit_code: 0,
+        output_directory: roland_directory_digest,
+        execution_attempts: vec![],
+      }
+    );
+  }
+
   fn run_command_locally(
     req: ExecuteProcessRequest,
   ) -> Result<FallibleExecuteProcessResult, String> {
@@ -938,17 +1042,19 @@ mod tests {
     req: ExecuteProcessRequest,
     dir: PathBuf,
   ) -> Result<FallibleExecuteProcessResult, String> {
-    run_command_locally_in_dir(req, dir, true)
+    run_command_locally_in_dir(req, dir, true, None, None)
   }
 
   fn run_command_locally_in_dir(
     req: ExecuteProcessRequest,
     dir: PathBuf,
     cleanup: bool,
+    store: Option<Store>,
+    executor: Option<task_executor::Executor>,
   ) -> Result<FallibleExecuteProcessResult, String> {
     let store_dir = TempDir::new().unwrap();
-    let executor = task_executor::Executor::new();
-    let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
+    let executor = executor.unwrap_or(task_executor::Executor::new());
+    let store = store.unwrap_or(Store::local_only(executor.clone(), store_dir.path()).unwrap());
     let runner = super::CommandRunner {
       store: store,
       executor: executor.clone(),

@@ -431,6 +431,13 @@ impl MultiPlatformExecuteProcess {
       }
     };
 
+    let unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule =
+      lift_digest(&externs::project_ignoring_type(
+        &value,
+        "unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule",
+      ))
+      .map_err(|err| format!("Error parsing digest {}", err))?;
+
     Ok(process_execution::ExecuteProcessRequest {
       argv: externs::project_multi_strs(&value, "argv"),
       env: env,
@@ -439,6 +446,8 @@ impl MultiPlatformExecuteProcess {
       output_directories: output_directories,
       timeout: Duration::from_millis((timeout_in_seconds * 1000.0) as u64),
       description: description,
+      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
+        unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
       jdk_home: jdk_home,
       target_platform: target_platform,
     })

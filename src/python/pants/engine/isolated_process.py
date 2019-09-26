@@ -3,7 +3,7 @@
 
 import logging
 
-from pants.engine.fs import Digest
+from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest
 from pants.engine.platform import PlatformConstraint
 from pants.engine.rules import RootRule, rule
 from pants.util.objects import (Exactly, TypedCollection, datatype, hashable_string_list,
@@ -27,6 +27,7 @@ class ExecuteProcessRequest(datatype([
   ('output_directories', hashable_string_list),
   # NB: timeout_seconds covers the whole remote operation including queuing and setup.
   ('timeout_seconds', Exactly(float, int)),
+  ('unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule', Digest),
   ('jdk_home', string_optional),
 ])):
   """Request for execution with args and snapshots to extract."""
@@ -42,6 +43,7 @@ class ExecuteProcessRequest(datatype([
     output_files=(),
     output_directories=(),
     timeout_seconds=_default_timeout_seconds,
+    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule=EMPTY_DIRECTORY_DIGEST,
     jdk_home=None,
   ):
     if env is None:
@@ -61,6 +63,7 @@ class ExecuteProcessRequest(datatype([
       output_files=output_files,
       output_directories=output_directories,
       timeout_seconds=timeout_seconds,
+      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule=unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
       jdk_home=jdk_home,
     )
 

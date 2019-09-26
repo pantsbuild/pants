@@ -6,6 +6,8 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
+copy_dir = "0.1.2"
+walkdir = "2"
 async_semaphore = { path = "../async_semaphore" }
 bazel_protos = { path = "bazel_protos" }
 boxfuture = { path = "../boxfuture" }
