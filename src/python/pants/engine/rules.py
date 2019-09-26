@@ -6,9 +6,12 @@ import inspect
 import itertools
 import logging
 import sys
+import typing
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from collections.abc import Iterable
+from textwrap import dedent
+from typing import Any, Callable, Type, cast
 
 import asttokens
 from twitter.common.collections import OrderedSet
@@ -141,8 +144,11 @@ The rule defined by function `{func_name}` begins at:
       return True
     return False
 
+  def _is_get(self, node):
+    return isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == Get.__name__
+
   def visit_Call(self, node):
-    if isinstance(node.func, ast.Name) and node.func.id == Get.__name__:
+    if self._is_get(node):
       self._gets.append(Get.extract_constraints(node))
 
   def visit_Assign(self, node):
@@ -151,21 +157,36 @@ The rule defined by function `{func_name}` begins at:
     self.generic_visit(node)
 
   def visit_Yield(self, node):
-    if node in self._yields_in_assignments:
-      self.generic_visit(node)
-    else:
+    self.generic_visit(node)
+    if node not in self._yields_in_assignments:
       # The current yield "expr" is the child of an "Expr" "stmt".
       expr_for_yield = self._parents_table[node]
 
-      if not self._stmt_is_at_end_of_parent_list(expr_for_yield):
-        raise self.YieldVisitError(
-          self._generate_ast_error_message(node, """\
-yield in @rule without assignment must come at the end of a series of statements.
+      if self._stmt_is_at_end_of_parent_list(expr_for_yield):
+        if self._is_get(node.value):
+          raise self.YieldVisitError(
+            self._generate_ast_error_message(node, dedent("""\
+            `yield Get(...)` in @rule is currently not allowed without an assignment.
 
-A yield in an @rule without an assignment is equivalent to a return, and we
-currently require that no statements follow such a yield at the same level of nesting.
-Use `_ = yield Get(...)` if you wish to yield control to the engine and discard the result.
-"""))
+            Use something like the following instead:
+                x = yield Get(...)
+                yield x
+
+            See https://github.com/pantsbuild/pants/pull/8227 for progress.
+            """)))
+      else:
+        raise self.YieldVisitError(
+          self._generate_ast_error_message(node, dedent("""\
+          yield in @rule without assignment must come at the end of a series of statements.
+
+          A yield in an @rule without an assignment is equivalent to a return, and we
+          currently require that no statements follow such a yield at the same level of nesting.
+          Use `_ = yield Get(...)` if you wish to yield control to the engine and discard the
+          result.
+
+          Note that any `yield Get(...)` in an @rule without assignment is also currently not
+          supported. See https://github.com/pantsbuild/pants/pull/8227 for progress.
+          """)))
 
 
 @memoized
@@ -188,21 +209,27 @@ def _get_starting_indent(source):
   return 0
 
 
-def _make_rule(output_type, input_selectors, cacheable=True):
+def _make_rule(
+  return_type: type, parameter_types: typing.Iterable[type], cacheable: bool = True
+) -> Callable[[Callable], Callable]:
   """A @decorator that declares that a particular static function may be used as a TaskRule.
 
   As a special case, if the output_type is a subclass of `Goal`, the `Goal.Options` for the `Goal`
   are registered as dependency Optionables.
 
-  :param type output_type: The return/output type for the Rule. This must be a concrete Python type.
-  :param list input_selectors: A list of Selector instances that matches the number of arguments
-    to the @decorated function.
+  :param return_type: The return/output type for the Rule. This must be a concrete Python type.
+  :param parameter_types: A sequence of types that matches the number and order of arguments to the
+                          @decorated decorated function.
+  :param cacheable: Whether the results of executing the Rule should be cached as keyed by all of
+                    its inputs.
   """
 
-  is_goal_cls = isinstance(output_type, type) and issubclass(output_type, Goal)
+  is_goal_cls = isinstance(return_type, type) and issubclass(return_type, Goal)
   if is_goal_cls == cacheable:
-    raise TypeError('An `@rule` that produces a `Goal` must be declared with @console_rule in order '
-                    'to signal that it is not cacheable.')
+    raise TypeError(
+      'An `@rule` that produces a `Goal` must be declared with @console_rule in order to signal '
+      'that it is not cacheable.'
+    )
 
   def wrapper(func):
     if not inspect.isfunction(func):
@@ -223,7 +250,8 @@ def _make_rule(output_type, input_selectors, cacheable=True):
         )
       elif not isinstance(resolved, type):
         raise ValueError(
-          f'Expected a `type` constructor for `{name}`, but got: {resolved} (type `{type(resolved).__name__}`)'
+          f'Expected a `type` constructor for `{name}`, but got: {resolved} (type '
+          f'`{type(resolved).__name__}`)'
         )
       return resolved
 
@@ -251,13 +279,13 @@ def _make_rule(output_type, input_selectors, cacheable=True):
 
     # Register dependencies for @console_rule/Goal.
     if is_goal_cls:
-      dependency_rules = (optionable_rule(output_type.Options),)
+      dependency_rules = (optionable_rule(return_type.Options),)
     else:
       dependency_rules = None
 
     func.rule = TaskRule(
-        output_type,
-        tuple(input_selectors),
+        return_type,
+        tuple(parameter_types),
         func,
         input_gets=tuple(gets),
         dependency_rules=dependency_rules,
@@ -268,12 +296,73 @@ def _make_rule(output_type, input_selectors, cacheable=True):
   return wrapper
 
 
-def rule(output_type, input_selectors):
-  return _make_rule(output_type, input_selectors)
+class MissingTypeAnnotation(TypeError):
+  """Indicates a missing type annotation for an `@rule`."""
 
 
-def console_rule(goal_cls, input_selectors):
-  return _make_rule(goal_cls, input_selectors, False)
+class MissingReturnTypeAnnotation(MissingTypeAnnotation):
+  """Indicates a missing return type annotation for an `@rule`."""
+
+
+class MissingParameterTypeAnnotation(MissingTypeAnnotation):
+  """Indicates a missing parameter type annotation for an `@rule`."""
+
+
+def _ensure_type_annotation(
+  annotation: Any, name: str, empty_value: Any, raise_type: Type[MissingTypeAnnotation]
+) -> type:
+  if annotation == empty_value:
+    raise raise_type(f'{name} is missing a type annotation.')
+  if not isinstance(annotation, type):
+    raise raise_type(f'The annotation for {name} must be a type, '
+                     f'got {annotation} of type {type(annotation)}.')
+  return cast(type, annotation)
+
+
+def rule(*args, cacheable=True) -> Callable:
+  if len(args) == 2:
+    # TODO(John Sirois): Deprecate this form of @rule:
+    #   https://github.com/pantsbuild/pants/issues/8338
+    return_type, parameter_types = args
+    if not isinstance(return_type, type):
+      raise ValueError(f'The return_type decorator parameter must be a type, '
+                       f'given {return_type} of type {type(return_type)}.')
+    if not isinstance(parameter_types, Iterable):
+      raise ValueError('The parameter_types decorator parameter must be an iterable.')
+    for index, parameter_type in enumerate(parameter_types):
+      if not isinstance(parameter_type, type):
+        raise ValueError(f'The parameter_types decorator parameter must contain only types. '
+                         f'Element {index} (0-based) {parameter_type} is of type '
+                         f'{type(parameter_type)}')
+    return _make_rule(return_type, parameter_types, cacheable=cacheable)
+  elif len(args) == 1 and inspect.isfunction(args[0]):
+    func = args[0]
+    signature = inspect.signature(func)
+    func_id = f'@rule {func.__module__}:{func.__name__}'
+    return_type = _ensure_type_annotation(
+      annotation=signature.return_annotation,
+      name=f'{func_id} return',
+      empty_value=inspect.Signature.empty,
+      raise_type=MissingReturnTypeAnnotation
+    )
+    parameter_types = tuple(
+      _ensure_type_annotation(
+        annotation=parameter.annotation,
+        name=f'{func_id} parameter {name}',
+        empty_value=inspect.Parameter.empty,
+        raise_type=MissingParameterTypeAnnotation
+      )
+      for name, parameter in signature.parameters.items()
+    )
+    return _make_rule(return_type, parameter_types, cacheable=cacheable)(func)
+  else:
+    raise ValueError(f'The @rule decorator expects either no arguments when applied to a '
+                     f'type-annotated function or else two arguments: return_type: type, '
+                     f'parameter_types: Iterable[type]. Given {args}.')
+
+
+def console_rule(*args) -> Callable:
+  return rule(*args, cacheable=False)
 
 
 def union(cls):

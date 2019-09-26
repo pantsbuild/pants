@@ -18,8 +18,13 @@ from pants.rules.core.core_test_model import Status, TestResult, TestTarget
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
 
 
-@rule(TestResult, [PythonTestsAdaptor, PyTest, PythonSetup, SubprocessEncodingEnvironment])
-def run_python_test(test_target, pytest, python_setup, subprocess_encoding_environment):
+@rule
+def run_python_test(
+  test_target: PythonTestsAdaptor,
+  pytest: PyTest,
+  python_setup: PythonSetup,
+  subprocess_encoding_environment: SubprocessEncodingEnvironment
+) -> TestResult:
   """Runs pytest for one target."""
 
   # TODO(7726): replace this with a proper API to get the `closure` for a

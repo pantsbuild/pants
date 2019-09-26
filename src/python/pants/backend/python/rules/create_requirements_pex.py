@@ -29,24 +29,15 @@ class RequirementsPex(HermeticPex, datatype([('directory_digest', Digest)])):
 
 # TODO: This is non-hermetic because the requirements will be resolved on the fly by
 # pex, where it should be hermetically provided in some way.
-@rule(
-  RequirementsPex,
-  [
-    RequirementsPexRequest,
-    DownloadedPexBin,
-    PythonSetup,
-    SubprocessEncodingEnvironment,
-    PexBuildEnvironment,
-    Platform
-  ])
+@rule
 def create_requirements_pex(
-  request,
-  pex_bin,
-  python_setup,
-  subprocess_encoding_environment,
-  pex_build_environment,
-  platform
-):
+    request: RequirementsPexRequest,
+    pex_bin: DownloadedPexBin,
+    python_setup: PythonSetup,
+    subprocess_encoding_environment: SubprocessEncodingEnvironment,
+    pex_build_environment: PexBuildEnvironment,
+    platform: Platform
+) -> RequirementsPex:
   """Returns a PEX with the given requirements, optional entry point, and optional
   interpreter constraints."""
 
