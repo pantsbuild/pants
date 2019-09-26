@@ -6,6 +6,7 @@ from collections import defaultdict
 
 from pants.base.specs import DescendantAddresses
 from pants.task.console_task import ConsoleTask
+from pants.util.meta import classproperty
 
 
 class ReverseDepmap(ConsoleTask):
@@ -14,19 +15,23 @@ class ReverseDepmap(ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
-    register('--transitive', type=bool,
-             help='List transitive dependees.')
     register('--closed', type=bool,
              help='Include the input targets in the output along with the dependees.')
     # TODO: consider refactoring out common output format methods into MultiFormatConsoleTask.
     register('--output-format', default='text', choices=['text', 'json'],
              help='Output format of results.')
+    register('--transitive', type=bool, default=False,
+             help='Whether to include only the first level of dependendees.')
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
 
-    self._transitive = self.get_options().transitive
     self._closed = self.get_options().closed
+
+  @classproperty
+  def _register_console_transitivity_option(cls):
+    """This class does not use the targets provided as input!"""
+    return False
 
   def console_output(self, _):
     dependees_by_target = defaultdict(set)
@@ -70,7 +75,7 @@ class ReverseDepmap(ConsoleTask):
       for target in check:
         dependents.update(dependees_by_target[target])
       check = dependents - known_dependents
-      if not check or not self._transitive:
+      if not check or not self.act_transitively:
         return dependents - set(roots)
       known_dependents = dependents
 

@@ -14,6 +14,7 @@ from pants.build_graph.build_graph import CycleException, sort_targets
 from pants.task.console_task import ConsoleTask
 from pants.task.task import Task
 from pants.util.memo import memoized_property
+from pants.util.meta import classproperty
 
 
 class JvmPlatformAnalysisMixin:
@@ -264,6 +265,11 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
   Ranges = namedtuple('ranges', ['min_allowed_version', 'max_allowed_version',
                                  'target_dependencies', 'target_dependees'])
 
+  @classproperty
+  def _register_console_transitivity_option(cls):
+    """This class registers its own --transitive option, which acts differently."""
+    return False
+
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
@@ -284,9 +290,14 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
     register('--filter',
              help='Limit jvm platform possibility explanation to targets whose specs match this '
                   'regex pattern.')
-    # Note: We don't use the appropriate target_restriction_mixin, because --transitive
-    # here appears to mean something slightly different than what's implied by that mixin.
+
+    # TODO: remove `_register_console_transitivity_option` from ConsoleTask when this deprecation
+    # cycle is complete!
     register('--transitive', type=bool,
+             removal_version='1.22.0.dev0',
+             removal_hint='Use --list-transitive-deps instead!',
+             help='List transitive dependencies in analysis output.')
+    register('--list-transitive-deps', type=bool,
              help='List transitive dependencies in analysis output.')
 
   def __init__(self, *args, **kwargs):
@@ -304,7 +315,7 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
 
   @memoized_property
   def dependency_map(self):
-    if not self.get_options().transitive:
+    if not (self.get_options().transitive or self.get_options().list_transitive_deps):
       return self.jvm_dependency_map
     full_map = self._unfiltered_jvm_dependency_map(fully_transitive=True)
     return {target: deps for target, deps in full_map.items()

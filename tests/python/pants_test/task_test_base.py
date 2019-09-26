@@ -235,7 +235,8 @@ class ConsoleTaskTestBase(TaskTestBase):
     :rtype: list of strings
     """
     task = self.create_task(context)
-    return list(task.console_output(list(task.context.targets()) + list(extra_targets or ())))
+    input_targets = task.get_targets() if task.act_transitively else context.target_roots
+    return list(task.console_output(list(input_targets) + list(extra_targets or ())))
 
   def assert_entries(self, sep, *output, **kwargs):
     """Verifies the expected output text is flushed by the console task under test.
