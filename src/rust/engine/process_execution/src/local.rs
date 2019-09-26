@@ -1053,8 +1053,9 @@ mod tests {
     executor: Option<task_executor::Executor>,
   ) -> Result<FallibleExecuteProcessResult, String> {
     let store_dir = TempDir::new().unwrap();
-    let executor = executor.unwrap_or(task_executor::Executor::new());
-    let store = store.unwrap_or(Store::local_only(executor.clone(), store_dir.path()).unwrap());
+    let executor = executor.unwrap_or_else(task_executor::Executor::new);
+    let store =
+      store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
     let runner = super::CommandRunner {
       store: store,
       executor: executor.clone(),
