@@ -141,7 +141,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
     3) modify a scala file slightly
     4) recompile, and make sure the compile is incremental by checking the zinc outputs
     """
-    with self.temporary_workdir() as tmp_build_root:
+    with self.temporary_workdir(cleanup=False) as tmp_build_root:
       # Make sure the tmp build root is recognized by Pants as a build root
       # by touching BUILDROOT.
       with open(os.path.join(tmp_build_root, 'BUILDROOT'), 'w') as f:
@@ -185,7 +185,8 @@ class ZincCompileIntegrationTest(BaseCompileIT):
                                       """))
         return _lib_spec, _srcfile_a, _srcfile_content
 
-      with temporary_dir() as cache_dir, self.temporary_workdir() as workdir:
+      with temporary_dir() as cache_dir, \
+        temporary_dir(root_dir=tmp_build_root, suffix='.pants.d') as workdir:
         config = {
           'cache.compile.rsc': {'write_to': [cache_dir]},
           'compile.rsc': {
@@ -196,7 +197,6 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         }
 
         lib_spec, src_file_a, srcfile_content = _create_a_target_containing_two_sources()
-
 
         pants_run = self.run_pants_with_workdir(['-ldebug', 'compile', lib_spec],
           workdir=workdir,
