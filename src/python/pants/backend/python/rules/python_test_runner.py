@@ -16,7 +16,6 @@ from pants.engine.rules import UnionRule, optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.core_test_model import Status, TestResult, TestTarget
 from pants.rules.core.strip_source_root import SourceRootStrippedSources
-from pants.util.strutil import create_path_env_var
 
 
 @rule
@@ -98,25 +97,17 @@ def run_python_test(
     DirectoriesToMerge(directories=tuple(all_input_digests)),
   )
 
-  interpreter_search_paths = create_path_env_var(python_setup.interpreter_search_paths)
-  pex_exe_env = {
-    'PATH': interpreter_search_paths,
-    **subprocess_encoding_environment.invocation_environment_dict
-  }
-
   test_target_sources_file_names = sorted(source_root_stripped_test_target_sources.snapshot.files)
   # NB: we use the hardcoded and generic bin name `python`, rather than something dynamic like
   # `sys.executable`, to ensure that the interpreter may be discovered both locally and in remote
   # execution (so long as `env` is populated with a `PATH` env var and `python` is discoverable
   # somewhere on that PATH). This is only used to run the downloaded PEX tool; it is not
   # necessarily the interpreter that PEX will use to execute the generated .pex file.
-  request = ExecuteProcessRequest(
-    argv=(
-      "python",
-      f'./{output_pytest_requirements_pex_filename}',
-      *test_target_sources_file_names
-    ),
-    env=pex_exe_env,
+  request = resolved_requirements_pex.create_execute_request(
+    python_setup=python_setup,
+    subprocess_encoding_environment=subprocess_encoding_environment,
+    pex_path=f'./{output_pytest_requirements_pex_filename}',
+    pex_args=test_target_sources_file_names,
     input_files=merged_input_files,
     description=f'Run Pytest for {test_target.address.reference()}',
   )
