@@ -15,10 +15,15 @@ from pants.engine.fs import (
   DirectoriesToMerge,
   DirectoryWithPrefixToAdd,
 )
-from pants.engine.isolated_process import ExecuteProcessResult, MultiPlatformExecuteProcessRequest
+from pants.engine.isolated_process import (
+  ExecuteProcessRequest,
+  ExecuteProcessResult,
+  MultiPlatformExecuteProcessRequest,
+)
 from pants.engine.platform import Platform, PlatformConstraint
-from pants.engine.rules import optionable_rule, rule
+from pants.engine.rules import RootRule, optionable_rule, rule
 from pants.engine.selectors import Get
+from pants.util.strutil import create_path_env_var
 
 
 @dataclass(frozen=True)
@@ -35,6 +40,7 @@ class CreatePex:
 class Pex(HermeticPex):
   """Wrapper for a digest containing a pex file created with some filename."""
   directory_digest: Digest
+  output_filename: str
 
 
 # TODO: This is non-hermetic because the requirements will be resolved on the fly by
@@ -97,11 +103,43 @@ def create_pex(
     MultiPlatformExecuteProcessRequest,
     execute_process_request
   )
-  yield Pex(directory_digest=result.output_directory_digest)
+  yield Pex(directory_digest=result.output_directory_digest, output_filename=request.output_filename)
+
+
+@dataclass(frozen=True)
+class RunnablePex:
+  pex: CreatePex
+
+
+# NB: we use the hardcoded and generic bin name `python`, rather than something dynamic like
+# `sys.executable`, to ensure that the interpreter may be discovered both locally and in remote
+# execution (so long as `env` is populated with a `PATH` env var and `python` is discoverable
+# somewhere on that PATH). This is only used to run the downloaded PEX tool; it is not
+# necessarily the interpreter that PEX will use to execute the generated .pex file.
+@rule
+def pex_execute_request(
+  runnable_pex: RunnablePex,
+  subprocess_encoding_environment: SubprocessEncodingEnvironment,
+  python_setup: PythonSetup
+  ) -> ExecuteProcessRequest:
+
+  entry_point = runnable_pex.pex.entry_point
+  pex = yield Get(Pex, CreatePex, runnable_pex.pex)
+  interpreter_search_paths = create_path_env_var(python_setup.interpreter_search_paths)
+  pex_exe_env = { 'PATH': interpreter_search_paths, **subprocess_encoding_environment.invocation_environment_dict }
+  request = ExecuteProcessRequest(
+    argv=("python", f'./{pex.output_filename}'),
+    env=pex_exe_env,
+    input_files=pex.directory_digest,
+    description=f'Run {entry_point} as PEX'
+  )
+  yield request
 
 
 def rules():
   return [
     create_pex,
+    pex_execute_request,
     optionable_rule(PythonSetup),
+    RootRule(RunnablePex),
   ]
