@@ -2,7 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-import subprocess
+from pathlib import Path
+from textwrap import dedent
 from typing import List
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
@@ -10,13 +11,15 @@ from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.targets.python_tests import PythonTests
+from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
+from pants.base import hash_utils
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
 from pants.task.lint_task_mixin import LintTaskMixin
-from pants.util.contextutil import temporary_file_path
+from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.memo import memoized_property
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
@@ -51,10 +54,16 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
   def prepare(cls, options, round_manager):
     super().prepare(options, round_manager)
     round_manager.require_data(PythonInterpreter)
+    if options.include_requirements:
+      round_manager.require_data(ResolveRequirements.REQUIREMENTS_PEX)
 
   @classmethod
   def register_options(cls, register):
-    register('--mypy-version', default='0.710', help='The version of mypy to use.')
+    register('--mypy-version', default='0.720', help='The version of mypy to use.')
+    register('--include-requirements', type=bool, default=False,
+             help='Whether to include the transitive requirements of targets being checked. This is'
+                  'useful if those targets depend on mypy plugins or distributions that provide '
+                  'type stubs that should be active in the check.')
     register('--config-file', default=None,
              help='Path mypy configuration file, relative to buildroot.')
     register('--whitelist-tag-name', default=None,
@@ -144,19 +153,53 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
   def _interpreter_cache(self):
     return PythonInterpreterCache.global_instance()
 
-  def _run_mypy(self, py3_interpreter, mypy_args, **kwargs):
-    pex_info = PexInfo.default()
-    pex_info.entry_point = 'mypy'
+  def _get_mypy_pex(self, py3_interpreter: PythonInterpreter, *extra_pexes: PEX) -> PEX:
     mypy_version = self.get_options().mypy_version
+    extras_hash = hash_utils.hash_all(hash_utils.hash_dir(Path(extra_pex.path()))
+                                      for extra_pex in extra_pexes)
 
-    mypy_requirement_pex = self.resolve_requirement_strings(
-      py3_interpreter, [f'mypy=={mypy_version}'])
+    path = Path(self.workdir,
+                str(py3_interpreter.identity),
+                f'{mypy_version}-{extras_hash}')
+    pex_dir = str(path)
+    if not path.is_dir():
+      mypy_requirement_pex = self.resolve_requirement_strings(
+        py3_interpreter,
+        [f'mypy=={mypy_version}']
+      )
+      pex_info = PexInfo.default()
+      pex_info.entry_point = 'pants_mypy_launcher'
+      with self.merged_pex(path=pex_dir,
+                           pex_info=pex_info,
+                           interpreter=py3_interpreter,
+                           pexes=[mypy_requirement_pex, *extra_pexes]) as builder:
+        with temporary_file(binary_mode=False) as exe_fp:
+          # MyPy searches for types for a package in packages containing a `py.types` marker file
+          # or else in a sibling `<package>-stubs` package as per PEP-0561. Going further than that
+          # PEP, MyPy restricts its search to `site-packages`. Since PEX deliberately isolates
+          # itself from `site-packages` as part of its raison d'etre, we monkey-patch
+          # `site.getsitepackages` to look inside the scrubbed PEX sys.path before handing off to
+          # `mypy`.
+          #
+          # See:
+          #   https://mypy.readthedocs.io/en/stable/installed_packages.html#installed-packages
+          #   https://www.python.org/dev/peps/pep-0561/#stub-only-packages
+          exe_fp.write(dedent("""
+            import runpy
+            import site
+            import sys
 
-    path = os.path.realpath(os.path.join(self.workdir, str(py3_interpreter.identity), mypy_version))
-    if not os.path.isdir(path):
-      self.merge_pexes(path, pex_info, py3_interpreter, [mypy_requirement_pex])
-    pex = PEX(path, py3_interpreter)
-    return pex.run(mypy_args, **kwargs)
+
+            site.getsitepackages = lambda: sys.path[:]
+
+            
+            runpy.run_module('mypy', run_name='__main__')
+          """))
+          exe_fp.flush()
+          builder.set_executable(filename=exe_fp.name, env_filename=f'{pex_info.entry_point}.py')
+        builder.freeze(bytecode_compile=False)
+
+    return PEX(pex_dir, py3_interpreter)
 
   def execute(self):
     mypy_interpreter = self.find_mypy_interpreter()
@@ -176,6 +219,18 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
     if not interpreter_for_targets:
       raise TaskError('No Python interpreter compatible with specified sources.')
 
+    extra_pexes = []
+    if self.get_options().include_requirements:
+      if interpreter_for_targets.identity.matches(self._MYPY_COMPATIBLE_INTERPETER_CONSTRAINT):
+        extra_pexes.append(self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX))
+      else:
+        self.context.log.warn(
+          f"The --include-requirements option is set, but the current target's requirements have "
+          f"been resolved for {interpreter_for_targets.identity} which is not compatible with mypy "
+          f"which needs {self._MYPY_COMPATIBLE_INTERPETER_CONSTRAINT}: omitting resolved "
+          f"requirements from the mypy PYTHONPATH."
+        )
+
     with temporary_file_path() as sources_list_path:
       with open(sources_list_path, 'w') as f:
         for source in sources:
@@ -186,20 +241,25 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
         cmd.append(f'--config-file={os.path.join(get_buildroot(), self.get_options().config_file)}')
       cmd.extend(self.get_passthru_args())
       cmd.append(f'@{sources_list_path}')
-      self.context.log.debug(f'mypy command: {" ".join(cmd)}')
+
+      with self.context.new_workunit(name='create_mypy_pex', labels=[WorkUnitLabel.PREP]):
+        mypy_pex = self._get_mypy_pex(mypy_interpreter, *extra_pexes)
 
       # Collect source roots for the targets being checked.
-      source_roots = self._collect_source_roots()
+      buildroot = Path(get_buildroot())
+      sources_path = os.pathsep.join(str(buildroot.joinpath(root))
+                                     for root in self._collect_source_roots())
 
-      mypy_path = os.pathsep.join([os.path.join(get_buildroot(), root) for root in source_roots])
       # Execute mypy.
-      with self.context.new_workunit(
-        name='check',
-        labels=[WorkUnitLabel.TOOL, WorkUnitLabel.RUN],
-        log_config=WorkUnit.LogConfig(level=self.get_options().level,
-                                      colors=self.get_options().colors),
-        cmd=' '.join(cmd)) as workunit:
-        returncode = self._run_mypy(mypy_interpreter, cmd,
-          env={'MYPYPATH': mypy_path}, stdout=workunit.output('stdout'), stderr=subprocess.STDOUT)
+      with self.context.new_workunit(name='check',
+                                     labels=[WorkUnitLabel.TOOL, WorkUnitLabel.RUN],
+                                     cmd=' '.join(mypy_pex.cmdline(cmd))) as workunit:
+        returncode = mypy_pex.run(cmd,
+                                  env=dict(
+                                    PYTHONPATH=sources_path,
+                                    PEX_INHERIT_PATH='fallback'
+                                  ),
+                                  stdout=workunit.output('stdout'),
+                                  stderr=workunit.output('stderr'))
         if returncode != 0:
           raise MypyTaskError(f'mypy failed: code={returncode}')
