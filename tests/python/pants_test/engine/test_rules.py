@@ -12,7 +12,8 @@ from pants.engine.console import Console
 from pants.engine.fs import create_fs_rules
 from pants.engine.goal import Goal
 from pants.engine.mapper import AddressMapper
-from pants.engine.rules import RootRule, RuleIndex, _RuleVisitor, console_rule, rule
+from pants.engine.rules import (MissingParameterTypeAnnotation, MissingReturnTypeAnnotation,
+                                RootRule, RuleIndex, _RuleVisitor, console_rule, rule)
 from pants.engine.selectors import Get
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.util import (TARGET_TABLE, assert_equal_with_printing, create_scheduler,
@@ -89,6 +90,38 @@ class RuleIndexTest(TestBase):
       "'pants_test.engine.test_rules.A'>. Rules either extend Rule or UnionRule, or "
       "are static functions decorated with @rule."""):
       RuleIndex.create([A()])
+
+
+class RuleTypeAnnotationTest(unittest.TestCase):
+  def test_nominal(self):
+    @rule
+    def dry(a: int, b: str, c: float) -> bool:
+      return False
+    self.assertIsNotNone(dry.rule)
+
+  def test_missing_return_annotation(self):
+    with self.assertRaises(MissingReturnTypeAnnotation):
+      @rule
+      def dry(a: int, b: str, c: float):
+        return False
+
+  def test_bad_return_annotation(self):
+    with self.assertRaises(MissingReturnTypeAnnotation):
+      @rule
+      def dry(a: int, b: str, c: float) -> 42:
+        return False
+
+  def test_missing_parameter_annotation(self):
+    with self.assertRaises(MissingParameterTypeAnnotation):
+      @rule
+      def dry(a: int, b, c: float) -> bool:
+        return False
+
+  def test_bad_parameter_annotation(self):
+    with self.assertRaises(MissingParameterTypeAnnotation):
+      @rule
+      def dry(a: int, b: 42, c: float) -> bool:
+        return False
 
 
 class RuleGraphTest(TestBase):

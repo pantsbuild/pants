@@ -13,8 +13,8 @@ from pants.util.objects import datatype
 class InjectedInitDigest(datatype([('directory_digest', Digest)])): pass
 
 
-@rule(InjectedInitDigest, [Snapshot])
-def inject_init(snapshot):
+@rule
+def inject_init(snapshot: Snapshot) -> InjectedInitDigest:
   """Ensure that every package has an __init__.py file in it."""
   missing_init_files = tuple(sorted(identify_missing_init_files(snapshot.files)))
   if not missing_init_files:

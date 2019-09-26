@@ -24,8 +24,8 @@ class Test(Goal):
   name = 'test'
 
 
-@console_rule(Test, [Console, BuildFileAddresses])
-def fast_test(console, addresses):
+@console_rule
+def fast_test(console: Console, addresses: BuildFileAddresses) -> Test:
   test_results = yield [Get(TestResult, Address, address.to_address()) for address in addresses]
   did_any_fail = False
   for address, test_result in zip(addresses, test_results):
