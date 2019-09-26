@@ -896,42 +896,42 @@ pub extern "C" fn materialize_directories(
     let types = &scheduler.core.types;
     let construct_materialize_directories_results = types.construct_materialize_directories_results;
     let construct_materialize_directory_result = types.construct_materialize_directory_result;
-    scheduler.core.executor.block_on(
-      futures::future::join_all(
-        dir_and_digests
-          .into_iter()
-          .map(|(dir, digest)| {
-            scheduler
-              .core
-              .store()
-              .materialize_directory(dir, digest, workunit_store.clone())
-          })
-          .collect::<Vec<_>>(),
-      )
-      .map(move |metadata_list| {
-        let entries: Vec<Value> = metadata_list
-          .iter()
-          .map(|metadata: &store::DirectoryMaterializeMetadata| {
-            let path_list = metadata.to_path_list();
-            let path_values: Vec<Value> = path_list
-              .into_iter()
-              .map(|path: String| externs::store_utf8(&path))
-              .collect();
-
-            externs::unsafe_call(
-              &construct_materialize_directory_result,
-              &[externs::store_tuple(&path_values)],
-            )
-          })
-          .collect();
-
-        let output: Value = externs::unsafe_call(
-          &construct_materialize_directories_results,
-          &[externs::store_tuple(&entries)],
-        );
-        output
-      }),
+    let work_future = futures::future::join_all(
+      dir_and_digests
+        .into_iter()
+        .map(|(dir, digest)| {
+          scheduler
+            .core
+            .store()
+            .materialize_directory(dir, digest, workunit_store.clone())
+        })
+        .collect::<Vec<_>>(),
     )
+    .map(move |metadata_list| {
+      let entries: Vec<Value> = metadata_list
+        .iter()
+        .map(|metadata: &store::DirectoryMaterializeMetadata| {
+          let path_list = metadata.to_path_list();
+          let path_values: Vec<Value> = path_list
+            .into_iter()
+            .map(|path: String| externs::store_utf8(&path))
+            .collect();
+
+          externs::unsafe_call(
+            &construct_materialize_directory_result,
+            &[externs::store_tuple(&path_values)],
+          )
+        })
+        .collect();
+
+      let output: Value = externs::unsafe_call(
+        &construct_materialize_directories_results,
+        &[externs::store_tuple(&entries)],
+      );
+      output
+    });
+
+    scheduler.core.executor.io_pool.spawn(work_future).wait()
   })
   .into()
 }
