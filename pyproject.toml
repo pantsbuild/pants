@@ -1,0 +1,14 @@
+[tool.black]
+line-length = 100
+exclude = '''
+/(
+  | \.git
+  | \.mypy_cache
+  | dist
+  | \.pants\.d
+  | virtualenvs
+  # This file intentionally contains invalid syntax
+  # It trips black up.
+  | compilation_failure
+)/
+'''
