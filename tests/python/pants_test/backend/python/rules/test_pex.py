@@ -7,7 +7,7 @@ import zipfile
 from typing import Dict, List
 
 from pants.backend.python.rules.download_pex_bin import download_pex_bin
-from pants.backend.python.rules.pex import CreatePex, Pex, create_requirements_pex
+from pants.backend.python.rules.pex import CreatePex, Pex, create_pex
 from pants.backend.python.subsystems.python_native_code import (
   PythonNativeCode,
   create_pex_native_build_environment,
@@ -33,7 +33,7 @@ class TestResolveRequirements(TestBase):
   @classmethod
   def rules(cls):
     return super().rules() + [
-      create_requirements_pex,
+      create_pex,
       create_pex_native_build_environment,
       create_subprocess_encoding_environment,
       download_pex_bin,

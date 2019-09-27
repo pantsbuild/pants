@@ -40,7 +40,7 @@ class Pex(HermeticPex):
 # TODO: This is non-hermetic because the requirements will be resolved on the fly by
 # pex, where it should be hermetically provided in some way.
 @rule
-def create_requirements_pex(
+def create_pex(
     request: CreatePex,
     pex_bin: DownloadedPexBin,
     python_setup: PythonSetup,
@@ -102,6 +102,6 @@ def create_requirements_pex(
 
 def rules():
   return [
-    create_requirements_pex,
+    create_pex,
     optionable_rule(PythonSetup),
   ]
