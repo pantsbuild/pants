@@ -143,27 +143,10 @@ impl<'t, R: Rule> Builder<'t, R> {
       );
     }
 
-    for (e, edges) in &dependency_edges {
-      println!(">>> {}", entry_str(&Entry::WithDeps(e.clone())));
-      for (dep, entries) in &edges.dependencies {
-        println!(">>>   {}:", dep);
-        for entry in entries {
-          println!(">>>     {}", entry_str(entry));
-        }
-      }
-    }
-
     // Then monomorphize it, turning it into a graph where each dependency edge has exactly one
     // possible implementation.
     let rule_dependency_edges =
       Self::monomorphize_graph(&dependency_edges, &mut unfulfillable_rules);
-
-    for (e, edges) in &rule_dependency_edges {
-      println!("$$$ {}", entry_str(&Entry::WithDeps(e.clone())));
-      for (dep, entry) in &edges.dependencies {
-        println!("$$$   {}: {}", dep, entry_str(entry));
-      }
-    }
 
     // Finally, compute which rules are unreachable/dead post-monomorphization (which will have
     // chosen concrete implementations for each edge).
@@ -545,14 +528,7 @@ impl<'t, R: Rule> Builder<'t, R> {
     //
     // This is a `loop` because if we discover that this entry needs to complete in order to break
     // a cycle on itself, it will re-compute dependencies after having partially-completed.
-    let mut attempt = 1;
     loop {
-      println!(
-        ">>> attempt {} to visit {}",
-        attempt,
-        entry_str(&Entry::WithDeps(entry.clone()))
-      );
-      attempt += 1;
       if let Ok(res) = Self::monomorphize_dependencies(
         entry,
         poly_dependency_edges,
@@ -560,11 +536,6 @@ impl<'t, R: Rule> Builder<'t, R> {
         all_monomorphized_entries,
         unfulfillable_rules,
       ) {
-        println!(
-          ">>> visit to {} completed with {:?}",
-          entry_str(&Entry::WithDeps(entry.clone())),
-          std::mem::discriminant(&res)
-        );
         break res;
       }
     }
@@ -706,18 +677,6 @@ impl<'t, R: Rule> Builder<'t, R> {
       param_sets
     };
 
-    let powerset_len = params_powerset.len();
-    let debug_this = entry_str(&Entry::WithDeps(entry.clone()))
-      .to_string()
-      .starts_with("(Assembler,");
-
-    if debug_this {
-      println!(
-        "^^^ params_powerset for {}:",
-        entry_str(&Entry::WithDeps(entry.clone()))
-      );
-    }
-
     // Then, for the powerset of used parameters, determine which dependency combinations are
     // satisfiable.
     let mut combinations: HashMap<EntryWithDeps<_>, _> = HashMap::new();
@@ -731,60 +690,16 @@ impl<'t, R: Rule> Builder<'t, R> {
         .keys()
         .any(|satisfied_entry| satisfied_entry.params().is_subset(&available_params))
       {
-        if debug_this {
-          println!("^^^   {} was a superset", params_str(&available_params));
-        }
         continue;
       }
 
       match Self::choose_dependencies(&available_params, &monomorphized_candidates) {
         Ok(Some(rule_edges)) => {
-          if debug_this {
-            println!("^^^   {} was satisfied", params_str(&available_params));
-          }
           combinations.insert(entry.simplified(available_params), rule_edges);
         }
-        Ok(None) => {
-          if debug_this {
-            println!(
-              "^^^   {} was not satisfiable",
-              params_str(&available_params)
-            );
-          }
-        }
-        Err(diagnostic) => {
-          if debug_this {
-            println!("^^^   {} was ambiguous", params_str(&available_params));
-          }
-          diagnostics.push(diagnostic)
-        }
+        Ok(None) => {}
+        Err(diagnostic) => diagnostics.push(diagnostic),
       }
-    }
-    if !combinations.is_empty() {
-      let combinations_keys = combinations
-        .keys()
-        .map(|e| entry_str(&Entry::WithDeps(e.clone())))
-        .collect::<Vec<_>>();
-      println!(
-        ">>> of {} possible param_sets for {}:\n  {}",
-        powerset_len,
-        entry_str(&Entry::WithDeps(entry.clone())),
-        combinations_keys.join("\n  "),
-      );
-    }
-
-    {
-      let combinations_keys = combinations
-        .keys()
-        .map(|e| entry_str(&Entry::WithDeps(e.clone())))
-        .collect::<Vec<_>>();
-      println!(
-        ">>> {} of {} possible param_sets for {}:\n  {}",
-        combinations_keys.len(),
-        powerset_len,
-        entry_str(&Entry::WithDeps(entry.clone())),
-        combinations_keys.join("\n  "),
-      );
     }
 
     let simplified_entries: Vec<_> = combinations.keys().cloned().collect();
