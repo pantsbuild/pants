@@ -21,3 +21,6 @@ class Black(PythonToolBase):
             fingerprint=True,
             help="Path to formatting tool's config file",
         )
+        register(
+            "--options", advanced=True, type=str, fingerprint=True, help="Options to pass to black"
+        )

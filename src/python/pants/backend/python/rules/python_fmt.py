@@ -72,6 +72,9 @@ def run_black(
         pex_args += ("--config", config_path)
     if target.sources.snapshot.files:
         pex_args += ("--include", "|".join(re.escape(f) for f in target.sources.snapshot.files))
+    extra_options = black.get_options().options
+    if extra_options:
+        pex_args += (extra_options,)
 
     request = resolved_requirements_pex.create_execute_request(
         python_setup=python_setup,

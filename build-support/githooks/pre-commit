@@ -65,6 +65,10 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
   echo "* Checking types for targets marked \`type_checked\`"  
   ./build-support/bin/mypy.py || exit 1
 
+  if git diff "${MERGE_BASE}" --name-only | grep '\.py$' > /dev/null; then
+    echo "* Checking formatting of pyhon files"
+    ./build-support/bin/black.sh || die "To fix formatting, run \`build-support/bin/black.sh -f\`"
+  fi
   if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then
     echo "* Checking formatting of rust files"
     ./build-support/bin/check_rust_formatting.sh || exit 1
