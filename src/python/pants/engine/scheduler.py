@@ -47,6 +47,9 @@ class ExecutionError(Exception):
     super().__init__(message)
     self.wrapped_exceptions = wrapped_exceptions or ()
 
+  def end_user_messages(self):
+    return [str(exc) for exc in self.wrapped_exceptions]
+
 
 class Scheduler:
   def __init__(

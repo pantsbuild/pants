@@ -443,14 +443,12 @@ Exception message: {exception_message}{maybe_newline}
       maybe_newline=maybe_newline)
 
   _EXIT_FAILURE_TERMINAL_MESSAGE_FORMAT = """\
-timestamp: {timestamp}
 {terminal_msg}
 """
 
   @classmethod
   def _exit_with_failure(cls, terminal_msg):
     formatted_terminal_msg = cls._EXIT_FAILURE_TERMINAL_MESSAGE_FORMAT.format(
-      timestamp=cls._iso_timestamp_for_now(),
       terminal_msg=terminal_msg or '<no exit reason provided>')
     # Exit with failure, printing a message to the terminal (or whatever the interactive stream is).
     cls._exiter.exit_and_fail(msg=formatted_terminal_msg, out=cls._interactive_output_stream)
@@ -478,11 +476,19 @@ timestamp: {timestamp}
 
     # Generate an unhandled exception report fit to be printed to the terminal (respecting the
     # Exiter's should_print_backtrace field).
-    stderr_printed_error = cls._format_unhandled_exception_log(
-      exc, tb, add_newline,
-      should_print_backtrace=cls._should_print_backtrace_to_terminal)
-    if extra_err_msg:
-      stderr_printed_error = '{}\n{}'.format(stderr_printed_error, extra_err_msg)
+    if cls._should_print_backtrace_to_terminal:
+      stderr_printed_error = cls._format_unhandled_exception_log(
+        exc, tb, add_newline,
+        should_print_backtrace=cls._should_print_backtrace_to_terminal)
+      if extra_err_msg:
+        stderr_printed_error = '{}\n{}'.format(stderr_printed_error, extra_err_msg)
+    else:
+      # If the user didn't ask for a backtrace, show a succinct error message without
+      # all the exception-related preamble.  A power-user/pants developer can still
+      # get all the preamble info along with the backtrace, but the end user shouldn't
+      # see that boilerplate by default.
+      error_msgs = getattr(exc, 'end_user_messages', lambda: [str(type(exc))])()
+      stderr_printed_error = '\n' + '\n'.join(f'ERROR: {msg}' for msg in error_msgs)
     cls._exit_with_failure(stderr_printed_error)
 
   _CATCHABLE_SIGNAL_ERROR_LOG_FORMAT = """\
