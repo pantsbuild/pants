@@ -1,7 +1,8 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
+
 
 setup(
   name='hello_with_install_requires',

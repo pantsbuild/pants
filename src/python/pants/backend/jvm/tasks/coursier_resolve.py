@@ -9,8 +9,10 @@ from collections import defaultdict
 from urllib import parse
 
 from pants.backend.jvm.ivy_utils import IvyUtils
-from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
-                                                                    PinnedJarArtifactSet)
+from pants.backend.jvm.subsystems.jar_dependency_management import (
+  JarDependencyManagement,
+  PinnedJarArtifactSet,
+)
 from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget

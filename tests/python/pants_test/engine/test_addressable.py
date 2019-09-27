@@ -3,8 +3,13 @@
 
 import unittest
 
-from pants.engine.addressable import (MutationError, NotSerializableError, addressable,
-                                      addressable_dict, addressable_list)
+from pants.engine.addressable import (
+  MutationError,
+  NotSerializableError,
+  addressable,
+  addressable_dict,
+  addressable_list,
+)
 from pants.engine.objects import Resolvable, Serializable
 from pants.util.objects import Exactly, TypeConstraintError
 

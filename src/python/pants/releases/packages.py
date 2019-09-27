@@ -14,6 +14,7 @@ from urllib.request import Request, urlopen
 
 from bs4 import BeautifulSoup
 
+
 COLOR_BLUE = "\x1b[34m"
 COLOR_RESET = "\x1b[0m"
 

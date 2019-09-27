@@ -4,10 +4,21 @@
 import os
 import unittest
 
-from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, FileContent, FilesContent,
-                             InputFilesContent, PathGlobs, Snapshot)
-from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
-                                           FallibleExecuteProcessResult, ProcessExecutionFailure)
+from pants.engine.fs import (
+  EMPTY_DIRECTORY_DIGEST,
+  Digest,
+  FileContent,
+  FilesContent,
+  InputFilesContent,
+  PathGlobs,
+  Snapshot,
+)
+from pants.engine.isolated_process import (
+  ExecuteProcessRequest,
+  ExecuteProcessResult,
+  FallibleExecuteProcessResult,
+  ProcessExecutionFailure,
+)
 from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get

@@ -7,10 +7,19 @@ from abc import abstractmethod
 from collections import OrderedDict
 from textwrap import dedent
 
-from pants.util.objects import (EnumVariantSelectionError, Exactly, HashableTypedCollection,
-                                SubclassesOf, SuperclassesOf, TypeCheckError, TypeConstraintError,
-                                TypedCollection, TypedDatatypeInstanceConstructionError, datatype,
-                                enum)
+from pants.util.objects import (
+  EnumVariantSelectionError,
+  Exactly,
+  HashableTypedCollection,
+  SubclassesOf,
+  SuperclassesOf,
+  TypeCheckError,
+  TypeConstraintError,
+  TypedCollection,
+  TypedDatatypeInstanceConstructionError,
+  datatype,
+  enum,
+)
 from pants_test.test_base import TestBase
 
 

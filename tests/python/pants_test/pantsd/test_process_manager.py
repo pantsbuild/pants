@@ -11,8 +11,12 @@ from contextlib import contextmanager
 
 import psutil
 
-from pants.pantsd.process_manager import (ProcessGroup, ProcessManager, ProcessMetadataManager,
-                                          swallow_psutil_exceptions)
+from pants.pantsd.process_manager import (
+  ProcessGroup,
+  ProcessManager,
+  ProcessMetadataManager,
+  swallow_psutil_exceptions,
+)
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump
 from pants_test.test_base import TestBase

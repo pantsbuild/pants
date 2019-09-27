@@ -1,8 +1,10 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.python.rules.create_requirements_pex import (RequirementsPex,
-                                                                RequirementsPexRequest)
+from pants.backend.python.rules.create_requirements_pex import (
+  RequirementsPex,
+  RequirementsPexRequest,
+)
 from pants.backend.python.rules.inject_init import InjectedInitDigest
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup

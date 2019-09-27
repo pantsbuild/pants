@@ -4,8 +4,11 @@
 import os
 from contextlib import contextmanager
 
-from pants.backend.jvm.tasks.reports.junit_html_report import (JUnitHtmlReport, ReportTestCase,
-                                                               ReportTestSuite)
+from pants.backend.jvm.tasks.reports.junit_html_report import (
+  JUnitHtmlReport,
+  ReportTestCase,
+  ReportTestSuite,
+)
 from pants.util.contextutil import temporary_dir
 from pants_test.test_base import TestBase
 

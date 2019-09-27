@@ -2,8 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-from pants.backend.native.config.environment import (Assembler, CCompiler, CppCompiler,
-                                                     CppToolchain, CToolchain, Linker, Platform)
+from pants.backend.native.config.environment import (
+  Assembler,
+  CCompiler,
+  CppCompiler,
+  CppToolchain,
+  CToolchain,
+  Linker,
+  Platform,
+)
 from pants.backend.native.subsystems.binaries.binutils import Binutils
 from pants.backend.native.subsystems.binaries.gcc import GCC
 from pants.backend.native.subsystems.binaries.llvm import LLVM

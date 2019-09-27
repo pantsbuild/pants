@@ -6,8 +6,13 @@ import logging
 import os
 import unittest.mock
 
-from pants.binaries.binary_util import (BinaryRequest, BinaryToolFetcher, BinaryToolUrlGenerator,
-                                        BinaryUtil, select)
+from pants.binaries.binary_util import (
+  BinaryRequest,
+  BinaryToolFetcher,
+  BinaryToolUrlGenerator,
+  BinaryUtil,
+  select,
+)
 from pants.net.http.fetcher import Fetcher
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import environment_as, temporary_dir

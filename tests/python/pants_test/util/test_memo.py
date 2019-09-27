@@ -3,9 +3,17 @@
 
 import unittest
 
-from pants.util.memo import (memoized, memoized_classmethod, memoized_classproperty,
-                             memoized_method, memoized_property, memoized_staticmethod,
-                             memoized_staticproperty, per_instance, testable_memoized_property)
+from pants.util.memo import (
+  memoized,
+  memoized_classmethod,
+  memoized_classproperty,
+  memoized_method,
+  memoized_property,
+  memoized_staticmethod,
+  memoized_staticproperty,
+  per_instance,
+  testable_memoized_property,
+)
 
 
 class MemoizeTest(unittest.TestCase):

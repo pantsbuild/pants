@@ -10,9 +10,15 @@ from contextlib import contextmanager
 from twitter.common.collections import maybe_list
 
 from pants.base.revision import Revision
-from pants.java.distribution.distribution import (Distribution, DistributionLocator,
-                                                  _EnvVarEnvironment, _LinuxEnvironment, _Locator,
-                                                  _OSXEnvironment, _UnknownEnvironment)
+from pants.java.distribution.distribution import (
+  Distribution,
+  DistributionLocator,
+  _EnvVarEnvironment,
+  _LinuxEnvironment,
+  _Locator,
+  _OSXEnvironment,
+  _UnknownEnvironment,
+)
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_open, touch
 from pants_test.subsystem.subsystem_util import global_subsystem_instance

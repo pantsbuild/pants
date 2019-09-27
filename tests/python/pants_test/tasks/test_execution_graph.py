@@ -5,9 +5,14 @@ import re
 import unittest
 from collections import defaultdict
 
-from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
-                                                                 Job, JobExistsError,
-                                                                 NoRootJobError, UnknownJobError)
+from pants.backend.jvm.tasks.jvm_compile.execution_graph import (
+  ExecutionFailure,
+  ExecutionGraph,
+  Job,
+  JobExistsError,
+  NoRootJobError,
+  UnknownJobError,
+)
 
 
 class ImmediatelyExecutingPool:

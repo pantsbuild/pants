@@ -2,8 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.jvm.artifact import Artifact
-from pants.backend.jvm.ossrh_publication_metadata import (Developer, License,
-                                                          OSSRHPublicationMetadata, Scm)
+from pants.backend.jvm.ossrh_publication_metadata import (
+  Developer,
+  License,
+  OSSRHPublicationMetadata,
+  Scm,
+)
 from pants.backend.jvm.repository import Repository as repo
 from pants.backend.jvm.scala_artifact import ScalaArtifact
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagementSetup
@@ -21,8 +25,10 @@ from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
 from pants.backend.jvm.targets.jvm_prep_command import JvmPrepCommand
-from pants.backend.jvm.targets.managed_jar_dependencies import (ManagedJarDependencies,
-                                                                ManagedJarLibraries)
+from pants.backend.jvm.targets.managed_jar_dependencies import (
+  ManagedJarDependencies,
+  ManagedJarLibraries,
+)
 from pants.backend.jvm.targets.scala_exclude import ScalaExclude
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
@@ -57,9 +63,11 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunKillall
 from pants.backend.jvm.tasks.prepare_resources import PrepareResources
 from pants.backend.jvm.tasks.prepare_services import PrepareServices
 from pants.backend.jvm.tasks.provide_tools_jar import ProvideToolsJar
-from pants.backend.jvm.tasks.run_jvm_prep_command import (RunBinaryJvmPrepCommand,
-                                                          RunCompileJvmPrepCommand,
-                                                          RunTestJvmPrepCommand)
+from pants.backend.jvm.tasks.run_jvm_prep_command import (
+  RunBinaryJvmPrepCommand,
+  RunCompileJvmPrepCommand,
+  RunTestJvmPrepCommand,
+)
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.scalafix import ScalaFixCheck, ScalaFixFix

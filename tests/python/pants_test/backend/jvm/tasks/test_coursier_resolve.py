@@ -6,15 +6,19 @@ import re
 from contextlib import contextmanager
 from unittest.mock import MagicMock
 
-from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
-                                                                    PinnedJarArtifactSet)
+from pants.backend.jvm.subsystems.jar_dependency_management import (
+  JarDependencyManagement,
+  PinnedJarArtifactSet,
+)
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDependencies
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
-from pants.backend.jvm.tasks.coursier_resolve import (CoursierResolve,
-                                                      CoursierResolveFingerprintStrategy)
+from pants.backend.jvm.tasks.coursier_resolve import (
+  CoursierResolve,
+  CoursierResolveFingerprintStrategy,
+)
 from pants.base.exceptions import TaskError
 from pants.java import util
 from pants.java.jar.exclude import Exclude

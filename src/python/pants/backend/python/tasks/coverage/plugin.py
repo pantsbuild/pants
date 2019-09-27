@@ -4,8 +4,6 @@
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-# NB: This file must keep Python 2 support because it is a resource that may be run with Python 2.
-
 import json
 import os
 
@@ -14,6 +12,11 @@ from coverage.config import DEFAULT_PARTIAL, DEFAULT_PARTIAL_ALWAYS
 from coverage.misc import join_regex
 from coverage.parser import PythonParser
 from coverage.python import PythonFileReporter
+
+
+# NB: This file must keep Python 2 support because it is a resource that may be run with Python 2.
+
+
 
 
 class SimpleFileTracer(FileTracer):

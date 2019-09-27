@@ -2,11 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
-                                                                    JarDependencyManagementSetup)
+from pants.backend.jvm.subsystems.jar_dependency_management import (
+  JarDependencyManagement,
+  JarDependencyManagementSetup,
+)
 from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.jvm.targets.managed_jar_dependencies import (ManagedJarDependencies,
-                                                                ManagedJarLibraries)
+from pants.backend.jvm.targets.managed_jar_dependencies import (
+  ManagedJarDependencies,
+  ManagedJarLibraries,
+)
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.target import Target

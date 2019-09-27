@@ -8,8 +8,13 @@ from contextlib import contextmanager
 from pants.base.build_file import BuildFile
 from pants.base.build_root import BuildRoot
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.build_graph.address import (Address, BuildFileAddress, InvalidSpecPath,
-                                       InvalidTargetName, parse_spec)
+from pants.build_graph.address import (
+  Address,
+  BuildFileAddress,
+  InvalidSpecPath,
+  InvalidTargetName,
+  parse_spec,
+)
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import touch
 

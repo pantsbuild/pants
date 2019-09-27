@@ -5,8 +5,11 @@ import unittest
 
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
-from pants.help.build_dictionary_info_extracter import (BuildDictionaryInfoExtracter,
-                                                        BuildSymbolInfo, FunctionArg)
+from pants.help.build_dictionary_info_extracter import (
+  BuildDictionaryInfoExtracter,
+  BuildSymbolInfo,
+  FunctionArg,
+)
 from pants.util.objects import datatype
 
 
