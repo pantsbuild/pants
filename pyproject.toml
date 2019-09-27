@@ -2,6 +2,7 @@
 line-length = 100
 exclude = '''
 /(
+  # These would already be ignored by pants, but having them here allows for manually running Black if one so whishes.
   | \.git
   | \.mypy_cache
   | dist

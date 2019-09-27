@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import re
 
 from pants.backend.python.rules.pex import CreatePex, Pex
 from pants.backend.python.subsystems.black import Black
@@ -21,14 +22,16 @@ from pants.engine.selectors import Get
 from pants.rules.core.fmt import FmtResult, FmtTarget
 from pants.util.objects import datatype
 
-
-class PythonFormatable(datatype(['target'])):
+# Note: this is a workaround until https://github.com/pantsbuild/pants/issues/8343 is addressed
+# We have to write this type which basically represents a union of all various kinds of targets
+# containing python files so we can have one single type used as an input in the run_black rule.
+class FormattablePythonTarget(datatype(['target'])):
   pass
 
 
 @rule
 def run_black(
-  target: PythonFormatable,
+  wrapped_target: FormattablePythonTarget,
   black: Black,
   python_setup: PythonSetup,
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -40,11 +43,11 @@ def run_black(
     Pex, CreatePex(
       output_filename="black.pex",
       requirements=tuple(black.get_requirement_specs()),
-      interpreter_constraints=(),
+      interpreter_constraints=tuple(black.default_interpreter_constraints),
       entry_point=black.get_entry_point(),
     )
   )
-  target = target.target
+  target = wrapped_target.target
   sources_digest = target.sources.snapshot.directory_digest
 
   all_input_digests = [
@@ -61,14 +64,14 @@ def run_black(
   # The exclude option from Black only works on recursive invocations,
   # so call black with the directories in which the files are present
   # and passing the full file names with the include option
-  dirs = []
+  dirs = set()
   for filename in target.sources.snapshot.files:
-    dirs.append(os.path.dirname(filename))
-  pex_args= tuple(dirs)
+    dirs.add(os.path.dirname(filename))
+  pex_args= tuple(sorted(dirs))
   if config_path:
     pex_args += ("--config", config_path)
   if target.sources.snapshot.files:
-    pex_args += ("--include",) + target.sources.snapshot.files
+    pex_args += ("--include", "|".join(re.escape(file) for file in target.sources.snapshot.files))
 
   request = resolved_requirements_pex.create_execute_request(
     python_setup=python_setup,
@@ -90,28 +93,28 @@ def run_black(
 
 
 @rule
-def target_adaptor(target: PythonTargetAdaptor) -> PythonFormatable:
-  yield PythonFormatable(target)
+def target_adaptor(target: PythonTargetAdaptor) -> FormattablePythonTarget:
+  yield FormattablePythonTarget(target)
 
 
 @rule
-def app_adaptor(target: PythonAppAdaptor) -> PythonFormatable:
-  yield PythonFormatable(target)
+def app_adaptor(target: PythonAppAdaptor) -> FormattablePythonTarget:
+  yield FormattablePythonTarget(target)
 
 
 @rule
-def binary_adaptor(target: PythonBinaryAdaptor) -> PythonFormatable:
-  yield PythonFormatable(target)
+def binary_adaptor(target: PythonBinaryAdaptor) -> FormattablePythonTarget:
+  yield FormattablePythonTarget(target)
 
 
 @rule
-def tests_adaptor(target: PythonTestsAdaptor) -> PythonFormatable:
-  yield PythonFormatable(target)
+def tests_adaptor(target: PythonTestsAdaptor) -> FormattablePythonTarget:
+  yield FormattablePythonTarget(target)
 
 
 @rule
-def plugin_adaptor(target: PantsPluginAdaptor) -> PythonFormatable:
-  yield PythonFormatable(target)
+def plugin_adaptor(target: PantsPluginAdaptor) -> FormattablePythonTarget:
+  yield FormattablePythonTarget(target)
 
 
 def rules():
