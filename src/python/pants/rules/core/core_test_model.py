@@ -21,7 +21,9 @@ class TestResult(datatype([
 
 @union
 class TestTarget:
-  """A union for registration of a testable target type."""
+  """testable target"""
+  # NB: This docstring is used in error messages, so do not change
+  # capitalization or add punctuation.
 
   # Prevent this class from being detected by pytest as a test class.
   __test__ = False
