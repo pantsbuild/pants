@@ -14,7 +14,6 @@ API Changes
   `PR #8330 <https://github.com/pantsbuild/pants/pull/8330>`_
 
 * Upgrade `spin` crate to patch a vulnerability. (#8320)
-  `Issue #65 <https://github.com/mvdnes/spin-rs/issues/65>`_
   `PR #8320 <https://github.com/pantsbuild/pants/pull/8320>`_
 
 New Features
