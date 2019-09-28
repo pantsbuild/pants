@@ -68,7 +68,6 @@ python_library(
     'src/python/pants/pantsd/service:pailgun_service',
     'src/python/pants/pantsd/service:scheduler_service',
     'src/python/pants/pantsd/service:store_gc_service',
-    'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:memo',
     ':process_manager',

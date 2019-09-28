@@ -11,7 +11,6 @@ from pants.console.stty_utils import STTYSettings
 from pants.java.nailgun_client import NailgunClient
 from pants.java.nailgun_protocol import NailgunProtocol
 from pants.pantsd.pants_daemon import PantsDaemon
-from pants.util.collections import combined_dict
 from pants.util.dirutil import maybe_read_file
 
 
@@ -140,9 +139,14 @@ class RemotePantsRunner:
     port = pantsd_handle.port
     # Merge the nailgun TTY capability environment variables with the passed environment dict.
     ng_env = NailgunProtocol.isatty_to_env(self._stdin, self._stdout, self._stderr)
-    modified_env = combined_dict(self._env, ng_env)
-    modified_env['PANTSD_RUNTRACKER_CLIENT_START_TIME'] = str(self._start_time)
-    modified_env['PANTSD_REQUEST_TIMEOUT_LIMIT'] = str(self._bootstrap_options.for_global_scope().pantsd_timeout_when_multiple_invocations)
+    modified_env = {
+      **self._env,
+      **ng_env,
+      "PANTSD_RUNTRACKER_CLIENT_START_TIME": str(self._start_time),
+      "PANTSD_REQUEST_TIMEOUT_LIMIT": str(
+        self._bootstrap_options.for_global_scope().pantsd_timeout_when_multiple_invocations
+      )
+    }
 
     assert isinstance(port, int), \
       'port {} is not an integer! It has type {}.'.format(port, type(port))

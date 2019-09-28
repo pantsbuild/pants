@@ -17,7 +17,8 @@ python_tests(
   coverage = ['pants.util.collections'],
   dependencies = [
     'src/python/pants/util:collections',
-  ]
+  ],
+  tags = {'type_checked'},
 )
 
 python_tests(
@@ -26,7 +27,7 @@ python_tests(
   coverage = ['pants.util.contextutil'],
   dependencies = [
     'src/python/pants/util:contextutil',
-  ]
+  ],
 )
 
 python_tests(
@@ -45,7 +46,7 @@ python_tests(
   sources = ['test_eval.py'],
   dependencies = [
     'src/python/pants/util:eval',
-  ]
+  ],
 )
 
 python_tests(
@@ -54,7 +55,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:contextutil',
     'src/python/pants/util:fileutil',
-  ]
+  ],
 )
 
 python_tests(
@@ -62,7 +63,7 @@ python_tests(
   sources = ['test_filtering.py'],
   dependencies = [
     'src/python/pants/util:filtering',
-  ]
+  ],
 )
 
 python_tests(
@@ -71,7 +72,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
-  ]
+  ],
 )
 
 python_tests(
@@ -80,7 +81,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:meta',
     'tests/python/pants_test:test_base',
-  ]
+  ],
 )
 
 python_tests(
@@ -88,7 +89,7 @@ python_tests(
   sources = ['test_netrc.py'],
   dependencies = [
     'src/python/pants/util:netrc',
-  ]
+  ],
 )
 
 python_tests(
@@ -98,7 +99,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:objects',
     'tests/python/pants_test:test_base',
-  ]
+  ],
 )
 
 python_tests(
@@ -107,7 +108,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:osutil',
     'tests/python/pants_test:test_base',
-  ]
+  ],
 )
 
 python_tests(
@@ -115,7 +116,7 @@ python_tests(
   sources = ['test_process_handler.py'],
   dependencies = [
     'src/python/pants/util:process_handler',
-  ]
+  ],
 )
 
 python_tests(
@@ -123,7 +124,7 @@ python_tests(
   sources = ['test_retry.py'],
   dependencies = [
     'src/python/pants/util:retry',
-  ]
+  ],
 )
 
 python_tests(
@@ -141,7 +142,7 @@ python_tests(
   coverage = ['pants.util.socket'],
   dependencies = [
     'src/python/pants/util:socket',
-  ]
+  ],
 )
 
 python_tests(
@@ -159,7 +160,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:dirutil',
     'src/python/pants/util:tarutil',
-  ]
+  ],
 )
 
 python_library(
@@ -167,7 +168,7 @@ python_library(
   sources = ['xml_test_base.py'],
   dependencies = [
     'src/python/pants/util:contextutil',
-  ]
+  ],
 )
 
 python_tests(
@@ -176,5 +177,5 @@ python_tests(
   dependencies = [
     'src/python/pants/util:xml_parser',
     'tests/python/pants_test/util:xml_test_base',
-  ]
+  ],
 )
