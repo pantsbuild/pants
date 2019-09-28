@@ -2,9 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import inspect
-from typing import Dict, Tuple, Type, TypeVar
+from typing import Dict, Optional, Tuple, Type, TypeVar, cast
 
 from pants.option.optionable import Optionable
+from pants.option.options import Options
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin, SubsystemDependency
 
@@ -72,18 +73,18 @@ class Subsystem(SubsystemClientMixin, Optionable):
 
   # The full Options object for this pants run.  Will be set after options are parsed.
   # TODO: A less clunky way to make option values available?
-  _options = None
+  _options: Optional[Options] = None
 
   @classmethod
-  def set_options(cls, options):
+  def set_options(cls, options: Options) -> None:
     cls._options = options
 
   @classmethod
-  def is_initialized(cls):
+  def is_initialized(cls) -> bool:
     return cls._options is not None
 
   # A cache of (cls, scope) -> the instance of cls tied to that scope.
-  _scoped_instances: Dict[Tuple["Subsystem", str], "Subsystem"] = {}
+  _scoped_instances: Dict[Tuple[Type["Subsystem"], str], "Subsystem"] = {}
 
   @classmethod
   def global_instance(cls: Type[_S]) -> _S:
@@ -93,7 +94,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
 
     :returns: The global subsystem instance.
     """
-    return cls._instance_for_scope(cls.options_scope)  # type: ignore
+    return cls._instance_for_scope(cls.options_scope)  # type: ignore[arg-type]
 
   @classmethod
   def scoped_instance(cls: Type[_S], optionable: Optionable) -> _S:
@@ -104,7 +105,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
     :param optionable: An optionable type or instance to scope this subsystem under.
     :returns: The scoped subsystem instance.
     """
-    if not isinstance(optionable, Optionable) and not issubclass(optionable, Optionable):
+    if not isinstance(optionable, Optionable) and not issubclass(optionable, Optionable):  # type: ignore[misc]
       raise TypeError('Can only scope an instance against an Optionable, given {} of type {}.'
                       .format(optionable, type(optionable)))
     return cls._instance_for_scope(cls.subscope(optionable.options_scope))
@@ -116,7 +117,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
     key = (cls, scope)
     if key not in cls._scoped_instances:
       cls._scoped_instances[key] = cls(scope, cls._options.for_scope(scope))
-    return cls._scoped_instances[key]
+    return cast(_S, cls._scoped_instances[key])
 
   @classmethod
   def reset(cls, reset_options: bool = True) -> None:
@@ -147,7 +148,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
   # that every Optionable has `options_scope` defined as a `str` in the __init__. This code is
   # complex, though, and may be worth refactoring.
   @property
-  def options_scope(self) -> str:  # type: ignore
+  def options_scope(self) -> str:  # type: ignore[override]
     return self._scope
 
   @property

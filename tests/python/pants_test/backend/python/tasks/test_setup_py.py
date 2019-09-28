@@ -535,7 +535,7 @@ def test_detect_namespace_packages():
   assert not has_ns('')
   assert not has_ns('add(1, 2); foo(__name__); self.shoot(__name__)')
   assert not has_ns('declare_namespace(bonk)')
-  assert has_ns('__import__("pkg_resources").declare_namespace(__name__)')
+  assert has_ns('__import__("pkg_resources").declare_namespace(__name__)  # type: ignore[attr-defined]')
   assert has_ns('import pkg_resources; pkg_resources.declare_namespace(__name__)')
   assert has_ns('from pkg_resources import declare_namespace; declare_namespace(__name__)')
 
@@ -555,7 +555,7 @@ class TestSetupPyFindPackages(SetupPyTestBase):
       for package in packages:
         write(package, '__init__.py', 'a = "b"; b = f"{a}"' if py3 else '')
       for package in namespace_packages:
-        write(package, '__init__.py', '__import__("pkg_resources").declare_namespace(__name__)')
+        write(package, '__init__.py', '__import__("pkg_resources").declare_namespace(__name__)  # type: ignore[attr-defined]')
       for package, resource_list in resources.items():
         for resource in resource_list:
           write(package, resource, 'asdfasdf')

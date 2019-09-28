@@ -56,7 +56,7 @@ class ExecuteProcessRequest:
     self.argv = argv
     self.input_files = input_files
     self.description = description
-    self.env = tuple(item for pair in env.items() for item in pair) if env is not None else ()  # type: ignore
+    self.env = tuple(item for pair in env.items() for item in pair) if env is not None else ()  # type: ignore[assignment]
     self.output_files = output_files or ()
     self.output_directories = output_directories or ()
     self.timeout_seconds = timeout_seconds

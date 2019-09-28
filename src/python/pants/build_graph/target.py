@@ -620,7 +620,7 @@ class Target(AbstractTarget):
     # N.B. This pattern turns this method into a non-yielding generator, which is helpful for
     # subclassing.
     return
-    yield
+    yield  # type: ignore[misc]
 
   @classmethod
   def compute_dependency_specs(cls, kwargs=None, payload=None):
@@ -643,7 +643,7 @@ class Target(AbstractTarget):
     # N.B. This pattern turns this method into a non-yielding generator, which is helpful for
     # subclassing.
     return
-    yield
+    yield  # type: ignore[misc]
 
   @property
   def dependencies(self):
