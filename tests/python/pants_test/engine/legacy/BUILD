@@ -66,9 +66,10 @@ python_tests(
   sources = [ 'test_console_rule_integration.py' ],
   dependencies = [
     'tests/python/pants_test/pantsd:pantsd_integration_test_base',
+    'examples/src/scala/org/pantsbuild/example:hello_directory',
   ],
   tags = {'integration'},
-  timeout = 300,
+  timeout = 270,
 )
 
 python_tests(

@@ -21,7 +21,6 @@ tests/python/pants_test/backend/python:integration
 tests/python/pants_test/engine/legacy:build_ignore_integration
 tests/python/pants_test/engine/legacy:bundle_integration
 tests/python/pants_test/engine/legacy:changed_integration
-tests/python/pants_test/engine/legacy:console_rule_integration
 tests/python/pants_test/engine/legacy:dependees_integration
 tests/python/pants_test/engine/legacy:filemap_integration
 tests/python/pants_test/engine/legacy:graph_integration
