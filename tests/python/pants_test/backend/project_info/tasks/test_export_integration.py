@@ -252,13 +252,14 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertEqual('compile test', json_data['targets'][synthetic_target]['scope'])
 
   @ensure_resolver
-  def test_export_is_target_roots(self):
+  def test_export_properly_marks_target_roots(self):
     with self.temporary_workdir() as workdir:
-      test_target = 'examples/tests/java/org/pantsbuild/example/::'
-      json_data = self.run_export(test_target, workdir, load_libs=False)
+      # We use this directory because it has subdirectories, so the `::` glob captures multiple
+      # targets, and it also depends on an examples/src/resources outside of the directory.
+      test_path = 'examples/src/java/org/pantsbuild/example/hello'
+      json_data = self.run_export(f"{test_path}::", workdir, load_libs=False)
       for target_address, attributes in json_data['targets'].items():
-        # Make sure all targets under `test_target`'s directory are target roots.
-        self.assertEqual(
-          attributes['is_target_root'],
-          target_address.startswith("examples/tests/java/org/pantsbuild/example")
-        )
+        if target_address.startswith(test_path):
+          self.assertTrue(attributes['is_target_root'])
+        else:
+          self.assertFalse(attributes['is_target_root'])
