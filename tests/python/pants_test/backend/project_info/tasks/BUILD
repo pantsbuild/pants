@@ -99,11 +99,21 @@ python_tests(
 )
 
 python_tests(
+  name = 'idea_plugin',
+  sources = ['test_idea_plugin.py'],
+  dependencies = [
+    'src/python/pants/backend/project_info/tasks:idea_plugin_gen',
+  ],
+)
+
+python_tests(
   name = 'idea_plugin_integration',
   sources = ['test_idea_plugin_integration.py'],
   dependencies = [
     'src/python/pants/backend/project_info/tasks:idea_plugin_gen',
     'tests/python/pants_test:int-test',
+    'examples/src/scala/org/pantsbuild/example:hello_directory',
+    'testprojects/src/python:antlr_directory',
   ],
   tags = {'integration'},
 )

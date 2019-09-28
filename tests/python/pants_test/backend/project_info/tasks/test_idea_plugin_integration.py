@@ -17,7 +17,9 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
                 incremental_import=None):
     """Check to see that the project contains the expected source folders."""
 
-    iws_file = os.path.join(project_dir_path, '{}.iws'.format(IdeaPluginGen.get_project_name(expected_targets)))
+    iws_file = os.path.join(
+      project_dir_path, f'{IdeaPluginGen.get_project_name(expected_targets)}.iws'
+    )
     self.assertTrue(os.path.exists(iws_file))
     dom = minidom.parse(iws_file)
     self.assertEqual(1, len(dom.getElementsByTagName("project")))
@@ -70,7 +72,7 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
     :param target_specs: list of target specs
     :return: n/a
     """
-    self.assertTrue("targets are empty", target_specs)
+    self.assertTrue(target_specs, "targets are empty")
     spec_parser = CmdLineSpecParser(get_buildroot())
     # project_path is always the directory of the first target,
     # which is where intellij is going to zoom in under project view.
@@ -80,55 +82,31 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
       with temporary_file(root_dir=workdir, cleanup=True) as output_file:
         args = [
             'idea-plugin',
-            '--output-file={}'.format(output_file.name),
+            f'--output-file={output_file.name}',
             '--no-open',
           ]
         if incremental_import is not None:
-          args.append('--incremental-import={}'.format(incremental_import))
+          args.append(f'--incremental-import={incremental_import}')
         pants_run = self.run_pants_with_workdir(args + target_specs, workdir)
         self.assert_success(pants_run)
 
         project_dir = self._get_project_dir(output_file.name)
-        self.assertTrue(os.path.exists(project_dir), "{} does not exist".format(project_dir))
+        self.assertTrue(os.path.exists(project_dir), f"{project_dir} does not exist")
         self._do_check(project_dir, project_path, target_specs, incremental_import=incremental_import)
 
   def test_idea_plugin_single_target(self):
     target = 'examples/src/scala/org/pantsbuild/example/hello:hello'
-
     self._run_and_check([target])
 
   def test_idea_plugin_single_directory(self):
     target = 'testprojects/src/python/antlr::'
-
     self._run_and_check([target])
 
   def test_idea_plugin_incremental_import(self):
     target = 'testprojects/src/python/antlr::'
-
     self._run_and_check([target], incremental_import=1337)
 
   def test_idea_plugin_multiple_targets(self):
     target_a = 'examples/src/scala/org/pantsbuild/example/hello:'
     target_b = 'testprojects/src/python/antlr::'
-
     self._run_and_check([target_a, target_b])
-
-  def test_idea_plugin_project_name(self):
-    self.assertEqual(
-      'examples.src.scala.org.pantsbuild.example.hello:__testprojects.src.python.antlr::',
-      IdeaPluginGen.get_project_name([
-        'examples/src/scala/org/pantsbuild/example/hello:',
-        'testprojects/src/python/antlr::'
-      ]
-      )
-    )
-
-  def test_idea_plugin_long_project_name(self):
-    list_run = self.run_pants(['-q', 'list', 'testprojects/tests/java/org/pantsbuild/testproject/::'])
-    self.assert_success(list_run)
-    self.assertGreater(len(list_run.stdout_data), IdeaPluginGen.PROJECT_NAME_LIMIT)
-
-    a_lot_of_targets = [l for l in list_run.stdout_data.splitlines() if l]
-
-    self.assertEqual(IdeaPluginGen.PROJECT_NAME_LIMIT, len(IdeaPluginGen.get_project_name(a_lot_of_targets)))
-    self._run_and_check(a_lot_of_targets)
