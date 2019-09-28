@@ -29,8 +29,8 @@ def fn_raises(x):
 
 
 @rule
-def nested_raise(b: B) -> A:
-  fn_raises(b)
+def nested_raise(x: B) -> A:
+  fn_raises(x)
 
 
 @rule
