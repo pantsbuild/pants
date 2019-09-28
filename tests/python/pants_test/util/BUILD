@@ -38,7 +38,8 @@ python_tests(
     '3rdparty/python:dataclasses',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-  ]
+  ],
+  tags = {'type_checked'},
 )
 
 python_tests(

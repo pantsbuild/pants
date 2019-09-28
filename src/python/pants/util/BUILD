@@ -43,6 +43,7 @@ python_library(
   dependencies = [
     ':strutil',
   ],
+  tags = {'type_checked'},
 )
 
 python_library(
