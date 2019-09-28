@@ -143,6 +143,7 @@ python_library(
 python_library(
   name = 'tarutil',
   sources = ['tarutil.py'],
+  tags = {'type_checked'},
 )
 
 python_library(
