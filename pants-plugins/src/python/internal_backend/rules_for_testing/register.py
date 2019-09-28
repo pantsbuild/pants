@@ -13,8 +13,10 @@ class ListAndDieForTesting(Goal):
   name = 'list-and-die-for-testing'
 
 
-@console_rule(ListAndDieForTesting, [Console, BuildFileAddresses])
-def fast_list_and_die_for_testing(console, addresses):
+@console_rule
+def fast_list_and_die_for_testing(
+  console: Console, addresses: BuildFileAddresses
+) -> ListAndDieForTesting:
   for address in addresses.dependencies:
     console.print_stdout(address.spec)
   yield ListAndDieForTesting(exit_code=42)

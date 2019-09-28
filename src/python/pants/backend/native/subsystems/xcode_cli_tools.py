@@ -161,23 +161,23 @@ class XCodeCLITools(Subsystem):
       extra_args=[MIN_OSX_VERSION_ARG])
 
 
-@rule(Assembler, [XCodeCLITools])
-def get_assembler(xcode_cli_tools):
+@rule
+def get_assembler(xcode_cli_tools: XCodeCLITools) -> Assembler:
   return xcode_cli_tools.assembler()
 
 
-@rule(Linker, [XCodeCLITools])
-def get_ld(xcode_cli_tools):
+@rule
+def get_ld(xcode_cli_tools: XCodeCLITools) -> Linker:
   return xcode_cli_tools.linker()
 
 
-@rule(CCompiler, [XCodeCLITools])
-def get_clang(xcode_cli_tools):
+@rule
+def get_clang(xcode_cli_tools: XCodeCLITools) -> CCompiler:
   return xcode_cli_tools.c_compiler()
 
 
-@rule(CppCompiler, [XCodeCLITools])
-def get_clang_plusplus(xcode_cli_tools):
+@rule
+def get_clang_plusplus(xcode_cli_tools: XCodeCLITools) -> CppCompiler:
   return xcode_cli_tools.cpp_compiler()
 
 

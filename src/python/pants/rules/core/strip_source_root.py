@@ -14,8 +14,10 @@ class SourceRootStrippedSources(datatype([('snapshot', Snapshot)])):
   """Wrapper for a snapshot of targets whose source roots have been stripped."""
 
 
-@rule(SourceRootStrippedSources, [HydratedTarget, SourceRootConfig])
-def strip_source_root(hydrated_target, source_root_config):
+@rule
+def strip_source_root(
+  hydrated_target: HydratedTarget, source_root_config: SourceRootConfig
+) -> SourceRootStrippedSources:
   """Relativize targets to their source root, e.g.
   `src/python/pants/util/strutil.py` -> `pants/util/strutil.py ."""
 

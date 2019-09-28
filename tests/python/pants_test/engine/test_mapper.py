@@ -135,8 +135,8 @@ class AddressFamilyTest(unittest.TestCase):
 HydratedStructs = Collection.of(HydratedStruct)
 
 
-@rule(HydratedStructs, [BuildFileAddresses])
-def unhydrated_structs(build_file_addresses):
+@rule
+def unhydrated_structs(build_file_addresses: BuildFileAddresses) -> HydratedStructs:
   tacs = yield [Get(HydratedStruct, Address, a) for a in build_file_addresses.addresses]
   yield HydratedStructs(tacs)
 

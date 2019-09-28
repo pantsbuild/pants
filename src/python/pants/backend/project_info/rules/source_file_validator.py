@@ -205,8 +205,10 @@ class MultiMatcher:
 
 # TODO: Switch this to `lint` once we figure out a good way for v1 tasks and v2 rules
 # to share goal names.
-@console_rule(Validate, [Console, HydratedTargets, Validate.Options])
-def validate(console, hydrated_targets, validate_options):
+@console_rule
+def validate(
+  console: Console, hydrated_targets: HydratedTargets, validate_options: Validate.Options
+) -> Validate:
   per_tgt_rmrs = yield [Get(RegexMatchResults, HydratedTarget, ht) for ht in hydrated_targets]
   regex_match_results = list(itertools.chain(*per_tgt_rmrs))
 
@@ -243,8 +245,10 @@ def validate(console, hydrated_targets, validate_options):
   yield Validate(exit_code)
 
 
-@rule(RegexMatchResults, [HydratedTarget, SourceFileValidation])
-def match_regexes_for_one_target(hydrated_target, source_file_validation):
+@rule
+def match_regexes_for_one_target(
+  hydrated_target: HydratedTarget, source_file_validation: SourceFileValidation
+) -> RegexMatchResults:
   multi_matcher = source_file_validation.get_multi_matcher()
   rmrs = []
   if hasattr(hydrated_target.adaptor, 'sources'):

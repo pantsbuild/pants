@@ -376,8 +376,8 @@ def union(cls):
   @union
   class UnionBase: pass
 
-  @rule(B, [X])
-  def get_some_union_type(x):
+  @rule
+  def get_some_union_type(x: X) -> B:
     result = yield Get(ResultType, UnionBase, x.f())
     # ...
 
