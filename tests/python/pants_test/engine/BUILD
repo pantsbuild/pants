@@ -193,6 +193,7 @@ python_tests(
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/build_graph',
     'src/python/pants/engine:scheduler',
+    'src/python/pants/util:objects',
     'tests/python/pants_test/engine/examples:scheduler_inputs',
     'tests/python/pants_test:test_base',
   ]

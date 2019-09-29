@@ -7,12 +7,12 @@ import unittest.mock
 from contextlib import contextmanager
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Any
 
 from pants.engine.native import Native
 from pants.engine.rules import RootRule, UnionRule, rule, union
 from pants.engine.scheduler import ExecutionError, SchedulerSession
 from pants.engine.selectors import Get, Params
+from pants.util.objects import datatype
 from pants_test.engine.util import assert_equal_with_printing, remove_locations_from_traceback
 from pants_test.test_base import TestBase
 
@@ -143,9 +143,8 @@ def c_unhashable(_: TypeCheckFailWrapper) -> C:
   yield C()
 
 
-@dataclass(frozen=True)
-class CollectionType:
-  items: Any
+class CollectionType(datatype(['items'])):
+  pass
 
 
 @rule
@@ -346,8 +345,8 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
 
     trace = remove_locations_from_traceback('\n'.join(self.scheduler.trace(request)))
     assert_equal_with_printing(self, dedent('''
-                     Computing Select(<pants_test.engine.test_scheduler.B object at 0xEEEEEEEEE>, A)
-                       Computing Task(nested_raise(), <pants_test.engine.test_scheduler.B object at 0xEEEEEEEEE>, A, true)
+                     Computing Select(B(), A)
+                       Computing Task(nested_raise(), B(), A, true)
                          Throw(An exception for B)
                            Traceback (most recent call last):
                              File LOCATION-INFO, in call

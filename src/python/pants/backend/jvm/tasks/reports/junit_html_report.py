@@ -141,7 +141,7 @@ class ReportTestSuite:
     return d
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, order=True)
 class ReportTestCase:
   """Data object for a JUnit test case"""
   name: Any
