@@ -61,6 +61,7 @@ python_tests(
   sources = [ 'test_owners_integration.py' ],
   dependencies = [
     'tests/python/pants_test:int-test',
+    'testprojects/tests/python:owners_integration_target',
   ],
   tags = {'integration'},
 )
