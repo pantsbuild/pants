@@ -389,7 +389,7 @@ class Options:
       else:
         dashed_scope = scope.replace('.', '-')
         scoped_arg = '--{}-{}'.format(dashed_scope, normalized_arg)
-      return super(Options._ScopedFlagNameForFuzzyMatching, cls).__new__(
+      return super().__new__(
         cls,
         scope=scope,
         arg=arg,

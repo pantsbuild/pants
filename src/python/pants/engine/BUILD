@@ -59,11 +59,11 @@ python_library(
   name='goal',
   sources=['goal.py'],
   dependencies=[
+    '3rdparty/python:dataclasses',
     'src/python/pants/cache',
     'src/python/pants/option',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
-    'src/python/pants/util:objects',
   ]
 )
 
@@ -90,9 +90,11 @@ python_library(
   name='mapper',
   sources=['mapper.py'],
   dependencies=[
+    '3rdparty/python:dataclasses',
     ':objects',
     ':parser',
     'src/python/pants/build_graph',
+    'src/python/pants/util:objects',
     'src/python/pants/util:memo',
   ]
 )
@@ -114,12 +116,12 @@ python_library(
   sources=['nodes.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:dataclasses',
     ':addressable',
     ':fs',
     ':struct',
     'src/python/pants/base:project_tree',
     'src/python/pants/build_graph',
-    'src/python/pants/util:objects',
   ]
 )
 
@@ -136,6 +138,7 @@ python_library(
   name='parser',
   sources=['parser.py'],
   dependencies=[
+    '3rdparty/python:dataclasses',
     ':addressable',
     ':objects',
     'src/python/pants/build_graph',
@@ -181,6 +184,7 @@ python_library(
   sources=['scheduler.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:dataclasses',
     ':fs',
     ':isolated_process',
     ':native',
@@ -191,7 +195,6 @@ python_library(
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
     'src/python/pants/rules/core:core',
-    'src/python/pants/util:objects',
   ]
 )
 

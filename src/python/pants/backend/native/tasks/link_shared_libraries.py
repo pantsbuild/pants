@@ -3,6 +3,8 @@
 
 import os
 import subprocess
+from dataclasses import dataclass
+from typing import Any, Tuple
 
 from pants.backend.native.config.environment import Linker, Platform
 from pants.backend.native.targets.native_artifact import NativeArtifact
@@ -13,21 +15,22 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.memo import memoized_property
-from pants.util.objects import datatype
 
 
-class SharedLibrary(datatype(['name', 'path'])): pass
+@dataclass(frozen=True)
+class SharedLibrary:
+  name: Any
+  path: Any
 
 
-class LinkSharedLibraryRequest(datatype([
-    ('linker', Linker),
-    ('object_files', tuple),
-    ('native_artifact', NativeArtifact),
-    'output_dir',
-    ('external_lib_dirs', tuple),
-    ('external_lib_names', tuple),
-])):
-  pass
+@dataclass(frozen=True)
+class LinkSharedLibraryRequest:
+  linker: Linker
+  object_files: Tuple
+  native_artifact: NativeArtifact
+  output_dir: Any
+  external_lib_dirs: Tuple
+  external_lib_names: Tuple
 
 
 class LinkSharedLibraries(NativeTask):

@@ -4,6 +4,7 @@
 python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:dataclasses',
     'src/python/pants/option',
   ],
 )

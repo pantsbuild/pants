@@ -8,12 +8,13 @@ import os
 import xml.etree.ElementTree as ET
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from dataclasses import dataclass
 from functools import total_ordering
+from typing import Any, Optional
 
 from pants.base.mustache import MustacheRenderer
 from pants.util.dirutil import safe_mkdir_for, safe_walk
 from pants.util.memo import memoized_property
-from pants.util.objects import datatype
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -140,11 +141,14 @@ class ReportTestSuite:
     return d
 
 
-class ReportTestCase(datatype(['name', 'time', 'failure', 'error', 'skipped'])):
+@dataclass(frozen=True)
+class ReportTestCase:
   """Data object for a JUnit test case"""
-
-  def __new__(cls, name, time, failure=None, error=None, skipped=False):
-    return super().__new__(cls, name, float(time), failure, error, skipped)
+  name: Any
+  time: float
+  failure: Optional[Any] = None
+  error: Optional[Any] = None
+  skipped: bool = False
 
   @memoized_property
   def icon_class(self):
@@ -244,7 +248,7 @@ class JUnitHtmlReport(JUnitHtmlReportInterface):
 
       testcases.append(ReportTestCase(
         testcase.attrib['name'],
-        testcase.attrib.get('time', 0),
+        float(testcase.attrib.get('time', 0)),
         failure,
         error,
         skipped

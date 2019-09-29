@@ -1,6 +1,9 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from dataclasses import dataclass
+from typing import Optional, Tuple
+
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.rules.hermetic_pex import HermeticPex
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
@@ -11,20 +14,19 @@ from pants.engine.isolated_process import ExecuteProcessResult, MultiPlatformExe
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import optionable_rule, rule
 from pants.engine.selectors import Get
-from pants.util.objects import datatype, hashable_string_list, string_optional, string_type
 
 
-class RequirementsPexRequest(datatype([
-  ('output_filename', string_type),
-  ('requirements', hashable_string_list),
-  ('interpreter_constraints', hashable_string_list),
-  ('entry_point', string_optional),
-])):
-  pass
+@dataclass(frozen=True)
+class RequirementsPexRequest:
+  output_filename: str
+  requirements: Tuple[str, ...]
+  interpreter_constraints: Tuple[str, ...]
+  entry_point: Optional[str]
 
 
-class RequirementsPex(HermeticPex, datatype([('directory_digest', Digest)])):
-  pass
+@dataclass(frozen=True)
+class RequirementsPex(HermeticPex):
+  directory_digest: Digest
 
 
 # TODO: This is non-hermetic because the requirements will be resolved on the fly by

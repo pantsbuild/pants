@@ -4,6 +4,7 @@
 python_library(
   dependencies=[
     '3rdparty/python:ansicolors',
+    '3rdparty/python:dataclasses',
     '3rdparty/python:python-Levenshtein',
     '3rdparty/python:PyYAML',
     '3rdparty/python:setuptools',

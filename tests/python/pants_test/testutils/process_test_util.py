@@ -2,10 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from contextlib import contextmanager
+from dataclasses import dataclass
+from typing import Any
 
 import psutil
-
-from pants.util.objects import datatype
 
 
 class ProcessStillRunning(AssertionError):
@@ -47,7 +47,11 @@ def no_lingering_process_by_command(name):
     )
 
 
-class TrackedProcessesContext(datatype(['name', 'before_processes'])):
+@dataclass(frozen=True)
+class TrackedProcessesContext:
+  name: Any
+  before_processes: Any
+
   def current_processes(self):
     """Returns the current set of matching processes created since the context was entered."""
     after_processes = set(_safe_iter_matching_processes(self.name))

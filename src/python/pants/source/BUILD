@@ -5,6 +5,7 @@ python_library(
   sources = globs('*.py', exclude=[globs('payload_fields.py')]),
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
+    '3rdparty/python:dataclasses',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:payload_field',
     'src/python/pants/base:project_tree',

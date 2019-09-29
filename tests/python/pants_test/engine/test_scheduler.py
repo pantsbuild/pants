@@ -5,21 +5,24 @@ import re
 import sys
 import unittest.mock
 from contextlib import contextmanager
+from dataclasses import dataclass
 from textwrap import dedent
+from typing import Any
 
 from pants.engine.native import Native
 from pants.engine.rules import RootRule, UnionRule, rule, union
 from pants.engine.scheduler import ExecutionError, SchedulerSession
 from pants.engine.selectors import Get, Params
-from pants.util.objects import datatype
 from pants_test.engine.util import assert_equal_with_printing, remove_locations_from_traceback
 from pants_test.test_base import TestBase
 
 
+@dataclass(frozen=True)
 class A:
   pass
 
 
+@dataclass(frozen=True)
 class B:
   pass
 
@@ -38,6 +41,7 @@ def consumes_a_and_b(a: A, b: B) -> str:
   return str('{} and {}'.format(a, b))
 
 
+@dataclass(frozen=True)
 class C:
   pass
 
@@ -47,8 +51,9 @@ def transitive_b_c(c: C) -> B:
   return B()
 
 
-class D(datatype([('b', B)])):
-  pass
+@dataclass(frozen=True)
+class D:
+  b: B
 
 
 @rule
@@ -138,8 +143,9 @@ def c_unhashable(_: TypeCheckFailWrapper) -> C:
   yield C()
 
 
-class CollectionType(datatype(['items'])):
-  pass
+@dataclass(frozen=True)
+class CollectionType:
+  items: Any
 
 
 @rule

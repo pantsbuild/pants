@@ -1,12 +1,19 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from dataclasses import dataclass
+from typing import Any
+
 from pants.subsystem.subsystem import Subsystem
-from pants.util.objects import datatype
 
 
-class ChangedRequest(datatype(['changes_since', 'diffspec', 'include_dependees', 'fast'])):
+@dataclass(frozen=True)
+class ChangedRequest:
   """Parameters required to compute a changed file/target set."""
+  changes_since: Any
+  diffspec: Any
+  include_dependees: Any
+  fast: Any
 
   @classmethod
   def from_options(cls, options):

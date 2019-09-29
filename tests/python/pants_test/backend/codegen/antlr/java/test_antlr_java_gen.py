@@ -4,7 +4,9 @@
 import os
 import re
 import time
+from dataclasses import dataclass
 from textwrap import dedent
+from typing import Any
 
 from twitter.common.dirutil.fileset import Fileset
 
@@ -13,11 +15,14 @@ from pants.backend.codegen.antlr.java.java_antlr_library import JavaAntlrLibrary
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.util.dirutil import safe_mkdtemp
-from pants.util.objects import datatype
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
-class DummyVersionedTarget(datatype(['target', 'results_dir'])):
+@dataclass(frozen=True)
+class DummyVersionedTarget:
+  target: Any
+  results_dir: Any
+
   @property
   def current_results_dir(self):
     return self.results_dir

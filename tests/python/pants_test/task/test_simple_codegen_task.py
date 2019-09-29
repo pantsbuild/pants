@@ -2,7 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from dataclasses import dataclass
 from textwrap import dedent
+from typing import Any
 
 from pants.base.payload import Payload
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -10,7 +12,6 @@ from pants.build_graph.register import build_file_aliases as register_core
 from pants.build_graph.target import Target
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdtemp
-from pants.util.objects import datatype
 from pants_test.task_test_base import TaskTestBase, ensure_cached
 
 
@@ -110,7 +111,11 @@ class DummyGen(SimpleCodegenTask):
     return ['copied']
 
 
-class DummyVersionedTarget(datatype(['target', 'results_dir'])):
+@dataclass(frozen=True)
+class DummyVersionedTarget:
+  target: Any
+  results_dir: Any
+
   @property
   def current_results_dir(self):
     return self.results_dir

@@ -39,7 +39,7 @@ python_library(
   name = 'nailgun_protocol',
   sources = ['nailgun_protocol.py'],
   dependencies = [
-    'src/python/pants/util:objects',
+    '3rdparty/python:dataclasses',
     'src/python/pants/util:osutil',
   ]
 )

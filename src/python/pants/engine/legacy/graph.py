@@ -4,7 +4,9 @@
 import logging
 from collections import defaultdict, deque
 from contextlib import contextmanager
+from dataclasses import dataclass
 from os.path import dirname
+from typing import Any, Tuple
 
 from twitter.common.collections import OrderedSet
 
@@ -29,7 +31,6 @@ from pants.engine.selectors import Get
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.source.filespec import any_matches_filespec
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
-from pants.util.objects import datatype
 
 
 logger = logging.getLogger(__name__)
@@ -44,11 +45,13 @@ def target_types_from_build_file_aliases(aliases):
   return target_types
 
 
-class _DestWrapper(datatype(['target_types'])):
+@dataclass(frozen=True)
+class _DestWrapper:
   """A wrapper for dest field of RemoteSources target.
 
   This is only used when instantiating RemoteSources target.
   """
+  target_types: Any
 
 
 class LegacyBuildGraph(BuildGraph):
@@ -339,12 +342,16 @@ class _DependentGraph(object):
     return result
 
 
-class HydratedTarget(datatype(['address', 'adaptor', 'dependencies'])):
+@dataclass(frozen=True)
+class HydratedTarget:
   """A wrapper for a fully hydrated TargetAdaptor object.
 
   Transitive graph walks collect ordered sets of TransitiveHydratedTargets which involve a huge amount
   of hashing: we implement eq/hash via direct usage of an Address field to speed that up.
   """
+  address: Any
+  adaptor: Any
+  dependencies: Any
 
   @property
   def addresses(self):
@@ -356,27 +363,31 @@ class HydratedTarget(datatype(['address', 'adaptor', 'dependencies'])):
 
 # TODO: add type-checking to datatype fields in this file! Tuple fields such as 'dependencies' need
 # some groundwork to be more ergonomic -- see #6936 for one possible implementation.
-class TransitiveHydratedTarget(datatype([('root', HydratedTarget), 'dependencies'])):
+@dataclass(frozen=True)
+class TransitiveHydratedTarget:
   """A recursive structure wrapping a HydratedTarget root and TransitiveHydratedTarget deps."""
+  root: HydratedTarget
+  dependencies: Any
 
 
-class TransitiveHydratedTargets(datatype(['roots', 'closure'])):
+@dataclass(frozen=True)
+class TransitiveHydratedTargets:
   """A set of HydratedTarget roots, and their transitive, flattened, de-duped closure."""
+  roots: Any
+  closure: Any
 
 
 class HydratedTargets(Collection.of(HydratedTarget)):
   """An intransitive set of HydratedTarget objects."""
 
 
-class OwnersRequest(datatype([
-  ('sources', tuple),
-  ('include_dependees', str),
-])):
-  """A request for the owners (and optionally, transitive dependees) of a set of file paths.
-
-  TODO: `include_dependees` should become an `enum` of the choices from the
-  `--changed-include-dependees` global option.
-  """
+@dataclass(frozen=True)
+class OwnersRequest:
+  """A request for the owners (and optionally, transitive dependees) of a set of file paths."""
+  sources: Tuple
+  # TODO: `include_dependees` should become an `enum` of the choices from the
+  # `--changed-include-dependees` global option.
+  include_dependees: str
 
 
 @rule
@@ -475,8 +486,11 @@ def hydrated_targets(build_file_addresses: BuildFileAddresses) -> HydratedTarget
   yield HydratedTargets(targets)
 
 
-class HydratedField(datatype(['name', 'value'])):
+@dataclass(frozen=True)
+class HydratedField:
   """A wrapper for a fully constructed replacement kwarg for a HydratedTarget."""
+  name: Any
+  value: Any
 
 
 @rule

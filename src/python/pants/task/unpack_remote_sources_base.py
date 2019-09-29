@@ -5,6 +5,8 @@ import logging
 import os
 import re
 from abc import ABCMeta, abstractmethod
+from dataclasses import dataclass
+from typing import Tuple
 
 from twitter.common.dirutil.fileset import fnmatch_translate_extended
 
@@ -12,16 +14,15 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.task.task import Task
 from pants.util.meta import classproperty
-from pants.util.objects import datatype
 
 
 logger = logging.getLogger(__name__)
 
 
-class UnpackedArchives(datatype([('found_files', tuple), ('rel_unpack_dir', str)])):
-
-  def __new__(cls, found_files, rel_unpack_dir):
-    return super().__new__(cls, tuple(found_files), rel_unpack_dir)
+@dataclass(frozen=True)
+class UnpackedArchives:
+  found_files: Tuple
+  rel_unpack_dir: str
 
 
 class UnpackRemoteSourcesBase(Task, metaclass=ABCMeta):
@@ -136,7 +137,7 @@ class UnpackRemoteSourcesBase(Task, metaclass=ABCMeta):
     found_files, rel_unpack_dir = self._traverse_unpacked_dir(unpack_dir)
     self.context.log.debug('target: {}, rel_unpack_dir: {}, found_files: {}'
                            .format(target, rel_unpack_dir, found_files))
-    self._unpacked_sources_product[target] = UnpackedArchives(found_files, rel_unpack_dir)
+    self._unpacked_sources_product[target] = UnpackedArchives(tuple(found_files), rel_unpack_dir)
 
   class MissingUnpackedDirsError(Exception):
     """Raised if a directory that is expected to be unpacked doesn't exist."""
