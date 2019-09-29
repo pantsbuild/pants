@@ -942,8 +942,11 @@ impl Task {
               .ok_or_else(|| match get.declared_subject {
                 Some(ty) if externs::is_union(ty) => {
                   let value = externs::get_value_from_type_id(ty);
-                  match externs::call_method(&value, "non_member_error_message",
-                                             &[externs::val_for(&get.subject)]) {
+                  match externs::call_method(
+                    &value,
+                    "non_member_error_message",
+                    &[externs::val_for(&get.subject)],
+                  ) {
                     Ok(err_msg) => throw(&externs::val_to_str(&err_msg)),
                     // If the non_member_error_message() call failed for any reason,
                     // fall back to a generic message.
@@ -951,7 +954,7 @@ impl Task {
                       "Type {} is not a member of the {} @union",
                       get.subject.type_id(),
                       ty
-                    ))
+                    )),
                   }
                 }
                 _ => throw(&format!(
