@@ -942,15 +942,17 @@ impl Task {
               .ok_or_else(|| match get.declared_subject {
                 Some(ty) if externs::is_union(ty) => {
                   let value = externs::get_value_from_type_id(ty);
-                  let description = externs::project_str(&value, "union_description");
-                  let address_spec = externs::project_str(
-                    &externs::project_ignoring_type(&externs::val_for(&get.subject), "address"),
-                    "spec");
-                  throw(&format!(
-                    "{} is not a {}.",
-                    address_spec,
-                    description
-                  ))
+                  match externs::call_method(&value, "non_member_error_message",
+                                             &[externs::val_for(&get.subject)]) {
+                    Ok(err_msg) => throw(&externs::val_to_str(&err_msg)),
+                    // If the non_member_error_message() call failed for any reason,
+                    // fall back to a generic message.
+                    Err(_e) => throw(&format!(
+                      "Type {} is not a member of the {} @union",
+                      get.subject.type_id(),
+                      ty
+                    ))
+                  }
                 }
                 _ => throw(&format!(
                   "{:?} did not declare a dependency on {:?}",
