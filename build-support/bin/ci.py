@@ -257,8 +257,8 @@ class TestTargetSets(NamedTuple):
       [
         "./pants.pex",
         f"--tag={'-' if test_type == TestType.unit else '+'}integration",
-        "--filter-type=python_tests",
         "filter",
+        "--type=python_tests",
         "src/python::",
         "tests/python::",
         "contrib::",
