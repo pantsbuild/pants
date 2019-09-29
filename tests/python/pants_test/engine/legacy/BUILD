@@ -105,9 +105,10 @@ python_tests(
   dependencies = [
     'src/python/pants/base:project_tree',
     'tests/python/pants_test:int-test',
+    'testprojects/src/python:sources_directory',
+    'testprojects/tests/python/pants:file_sets_directory',
   ],
   tags = {'integration'},
-  timeout = 180,
 )
 
 python_tests(
