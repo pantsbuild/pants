@@ -487,7 +487,7 @@ Exception message: {exception_message}{maybe_newline}
       # all the exception-related preamble.  A power-user/pants developer can still
       # get all the preamble info along with the backtrace, but the end user shouldn't
       # see that boilerplate by default.
-      error_msgs = getattr(exc, 'end_user_messages', lambda: [str(type(exc))])()
+      error_msgs = getattr(exc, 'end_user_messages', lambda: [str(exc)])()
       stderr_printed_error = '\n' + '\n'.join(f'ERROR: {msg}' for msg in error_msgs)
     cls._exit_with_failure(stderr_printed_error)
 
