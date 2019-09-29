@@ -72,7 +72,6 @@ python_tests(
   sources = ['test_export_integration.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    'build-support:pants-intellij_script',
     'examples/src/java/org/pantsbuild/example:hello_directory',
     'examples/src/scala/org/pantsbuild/example:scala_with_java_sources_directory',
     'examples/tests/java/org/pantsbuild/example:usethrift_directory',

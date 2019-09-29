@@ -4,7 +4,6 @@
 import json
 import os
 import re
-import subprocess
 
 from twitter.common.collections import maybe_list
 
@@ -213,32 +212,6 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       json_data = self.run_export(test_target, workdir)
       self.assertEqual('java7', json_data['targets'][test_target]['platform'])
       self.assertEqual('java8', json_data['targets'][test_target]['test_platform'])
-
-  @ensure_resolver
-  def test_intellij_integration(self):
-    with self.temporary_workdir() as workdir:
-      exported_file = os.path.join(workdir, "export_file.json")
-      p = subprocess.Popen(['build-support/pants-intellij.sh', '--export-output-file=' + exported_file],
-                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-      p.communicate()
-      self.assertEqual(p.returncode, 0)
-
-      with open(exported_file, 'r') as data_file:
-        json_data = json.load(data_file)
-
-      python_setup = json_data['python_setup']
-      self.assertIsNotNone(python_setup)
-      self.assertIsNotNone(python_setup['interpreters'])
-
-      default_interpreter = python_setup['default_interpreter']
-      self.assertIsNotNone(default_interpreter)
-      self.assertIsNotNone(python_setup['interpreters'][default_interpreter])
-      self.assertTrue(os.path.exists(python_setup['interpreters'][default_interpreter]['binary']))
-      self.assertTrue(os.path.exists(python_setup['interpreters'][default_interpreter]['chroot']))
-
-      python_target = json_data['targets']['src/python/pants/backend/python/targets:targets']
-      self.assertIsNotNone(python_target)
-      self.assertEqual(default_interpreter, python_target['python_interpreter'])
 
   @ensure_resolver
   def test_intransitive_and_scope(self):
