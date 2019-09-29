@@ -80,7 +80,10 @@ python_tests(
   name = 'dependees_integration',
   sources = ['test_dependees_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test'
+    'tests/python/pants_test:int-test',
+    'examples/src/scala/org/pantsbuild/example:hello_directory',
+    'examples/src/scala/org/pantsbuild/example:jvm_run_directory',
+    'examples/tests/scala/org/pantsbuild/example:hello_directory',
   ],
   tags = {'integration'},
 )

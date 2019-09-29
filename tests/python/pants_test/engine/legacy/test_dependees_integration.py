@@ -21,7 +21,7 @@ class DependeesIntegrationTest(PantsRunIntegrationTest):
   def test_dependees_basic(self):
     pants_stdout = self.run_dependees()
     expected = {
-      'examples/src/scala/org/pantsbuild/example:jvm-run-example-lib',
+      'examples/src/scala/org/pantsbuild/example/jvm_run:jvm-run-example-lib',
       'examples/src/scala/org/pantsbuild/example/hello/exe:exe',
       'examples/tests/scala/org/pantsbuild/example/hello/welcome:welcome'
     }
@@ -31,9 +31,9 @@ class DependeesIntegrationTest(PantsRunIntegrationTest):
   def test_dependees_transitive(self):
     pants_stdout = self.run_dependees('--dependees-transitive')
     self.assertEqual(
-      {'examples/src/scala/org/pantsbuild/example:jvm-run-example-lib',
+      {'examples/src/scala/org/pantsbuild/example/jvm_run:jvm-run-example-lib',
        'examples/src/scala/org/pantsbuild/example/hello:hello',
-       'examples/src/scala/org/pantsbuild/example:jvm-run-example',
+       'examples/src/scala/org/pantsbuild/example/jvm_run:jvm-run-example',
        'examples/src/scala/org/pantsbuild/example/hello/exe:exe',
        'examples/tests/scala/org/pantsbuild/example/hello/welcome:welcome'},
       set(pants_stdout.split())
@@ -43,7 +43,7 @@ class DependeesIntegrationTest(PantsRunIntegrationTest):
     pants_stdout = self.run_dependees('--dependees-closed')
     self.assertEqual(
       {'examples/src/scala/org/pantsbuild/example/hello/welcome:welcome',
-       'examples/src/scala/org/pantsbuild/example:jvm-run-example-lib',
+       'examples/src/scala/org/pantsbuild/example/jvm_run:jvm-run-example-lib',
        'examples/src/scala/org/pantsbuild/example/hello/exe:exe',
        'examples/tests/scala/org/pantsbuild/example/hello/welcome:welcome'},
       set(pants_stdout.split())
@@ -56,7 +56,7 @@ class DependeesIntegrationTest(PantsRunIntegrationTest):
       {
           "examples/src/scala/org/pantsbuild/example/hello/welcome:welcome": [
               "examples/src/scala/org/pantsbuild/example/hello/exe:exe",
-              "examples/src/scala/org/pantsbuild/example:jvm-run-example-lib",
+              "examples/src/scala/org/pantsbuild/example/jvm_run:jvm-run-example-lib",
               "examples/tests/scala/org/pantsbuild/example/hello/welcome:welcome"
           ]
       }""").lstrip('\n'),
