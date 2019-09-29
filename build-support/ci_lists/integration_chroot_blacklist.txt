@@ -17,7 +17,6 @@ tests/python/pants_test/backend/python/tasks:python_binary_integration
 tests/python/pants_test/backend/python/tasks:setup_py_integration
 tests/python/pants_test/backend/python:integration
 tests/python/pants_test/invalidation:strict_deps_invalidation_integration
-tests/python/pants_test/logging:test_native_engine_logging
 tests/python/pants_test/pantsd:pantsd_integration
 tests/python/pants_test/projects:testprojects_integration
 tests/python/pants_test/targets:jvm_app_integration

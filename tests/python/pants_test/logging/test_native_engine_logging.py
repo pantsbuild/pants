@@ -19,12 +19,12 @@ class NativeEngineLoggingTest(PantsRunIntegrationTest):
   def test_native_logging(self):
     expected_msg = "\[DEBUG\] engine::scheduler: Launching \d+ root"
     pants_run = self.run_pants([
-      "-linfo", "list", "src/scala::"
+      "-linfo", "list", "3rdparty::"
     ])
     self.assertNotRegex(pants_run.stderr_data, expected_msg)
 
     pants_run = self.run_pants([
-      "-ldebug", "list", "src/scala::"
+      "-ldebug", "list", "3rdparty::"
     ])
     self.assertRegex(pants_run.stderr_data, expected_msg)
 
