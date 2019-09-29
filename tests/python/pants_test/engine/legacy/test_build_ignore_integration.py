@@ -25,6 +25,11 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
       f"{target_path}:{target}"
       for target in ["ten-thousand", "once-upon-a-time", "lesser-of-two", "there-was-a-duck"]
     ]
+    # NB: We glob against all of testprojects, but when ran with --chroot or V2 test runner, there
+    # will only be a few testprojects actually there, specifically the ones declared in this test
+    # file's BUILD entry. We use the glob, rather than the more precise `target_path`, because
+    # `target_path` will no longer be valid once it gets ignored later in the test.
+    testprojects_glob = "testprojects/::"
 
     def output_to_list(output_filename):
       with open(output_filename, 'r') as results_file:
@@ -33,7 +38,7 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
     tempdir = tempfile.mkdtemp()
     tmp_output = os.path.join(tempdir, 'minimize-output1.txt')
     run_result = self.run_pants(
-      ['minimize', 'testprojects::', '--quiet', f'--minimize-output-file={tmp_output}']
+      ['minimize', testprojects_glob, '--quiet', f'--minimize-output-file={tmp_output}']
     )
     self.assert_success(run_result)
     results = output_to_list(tmp_output)
@@ -42,7 +47,7 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
 
     tmp_output = os.path.join(tempdir, 'minimize-output2.txt')
     run_result = self.run_pants(
-      ['minimize', 'testprojects::', '--quiet', f'--minimize-output-file={tmp_output}'],
+      ['minimize', testprojects_glob, '--quiet', f'--minimize-output-file={tmp_output}'],
       config={'DEFAULT': {'build_ignore': [target_path]}},
     )
     self.assert_success(run_result)
