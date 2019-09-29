@@ -31,6 +31,7 @@ python_tests(
   dependencies = [
     'src/python/pants/base:deprecated',
     'tests/python/pants_test:int-test',
+    'testprojects/src/java/org/pantsbuild/testproject:bundle_directory',
   ],
   tags = {'integration'},
   timeout = 240,
