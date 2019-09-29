@@ -51,6 +51,11 @@ files(
 )
 
 files(
+  name = 'sources_directory',
+  sources = rglobs('sources/*'),
+)
+
+files(
   name = 'unicode_directory',
   sources = rglobs('unicode/*'),
 )

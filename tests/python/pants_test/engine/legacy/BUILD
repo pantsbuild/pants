@@ -40,6 +40,7 @@ python_tests(
   name = 'changed_integration',
   sources = ['test_changed_integration.py'],
   dependencies = [
+    '//:gitignore',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
@@ -47,6 +48,9 @@ python_tests(
     'tests/python/pants_test/testutils:git_util',
     'tests/python/pants_test:test_base',
     'tests/python/pants_test:int-test',
+    'testprojects/src/python:python_targets_directory',
+    'testprojects/src/python:sources_directory',
+    'testprojects/tests/scala/org/pantsbuild/testproject:cp-directories_directory',
   ],
   tags = {'integration'},
   timeout = 600,
