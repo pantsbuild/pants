@@ -119,18 +119,18 @@ class LLVM(NativeTool):
 
 
 # TODO(#5663): use this over the XCode linker!
-@rule(Linker, [Platform, LLVM])
-def get_lld(platform, llvm):
+@rule
+def get_lld(platform: Platform, llvm: LLVM) -> Linker:
   return llvm.linker(platform)
 
 
-@rule(CCompiler, [LLVM])
-def get_clang(llvm):
+@rule
+def get_clang(llvm: LLVM) -> CCompiler:
   return llvm.c_compiler()
 
 
-@rule(CppCompiler, [LLVM])
-def get_clang_plusplus(llvm):
+@rule
+def get_clang_plusplus(llvm: LLVM) -> CppCompiler:
   return llvm.cpp_compiler()
 
 

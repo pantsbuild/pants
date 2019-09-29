@@ -154,13 +154,17 @@ stderr:
     super().__init__(msg)
 
 
-@rule(ProductDescription, [MultiPlatformExecuteProcessRequest])
-def get_multi_platform_request_description(req):
+@rule
+def get_multi_platform_request_description(
+  req: MultiPlatformExecuteProcessRequest
+) -> ProductDescription:
   return req.product_description
 
 
-@rule(MultiPlatformExecuteProcessRequest, [ExecuteProcessRequest])
-def upcast_execute_process_request(req):
+@rule
+def upcast_execute_process_request(
+  req: ExecuteProcessRequest
+) -> MultiPlatformExecuteProcessRequest:
   """This rule allows an ExecuteProcessRequest to be run as a
   platform compatible MultiPlatformExecuteProcessRequest.
   """
@@ -169,8 +173,10 @@ def upcast_execute_process_request(req):
   )
 
 
-@rule(ExecuteProcessResult, [FallibleExecuteProcessResult, ProductDescription])
-def fallible_to_exec_result_or_raise(fallible_result, description):
+@rule
+def fallible_to_exec_result_or_raise(
+  fallible_result: FallibleExecuteProcessResult, description: ProductDescription
+) -> ExecuteProcessResult:
   """Converts a FallibleExecuteProcessResult to a ExecuteProcessResult or raises an error."""
 
   if fallible_result.exit_code == 0:

@@ -39,8 +39,10 @@ class SubprocessEncodingEnvironment(datatype([
     }
 
 
-@rule(SubprocessEncodingEnvironment, [SubprocessEnvironment])
-def create_subprocess_encoding_environment(subprocess_environment):
+@rule
+def create_subprocess_encoding_environment(
+  subprocess_environment: SubprocessEnvironment
+) -> SubprocessEncodingEnvironment:
   return SubprocessEncodingEnvironment(
     lang=subprocess_environment.get_options().lang,
     lc_all=subprocess_environment.get_options().lc_all,

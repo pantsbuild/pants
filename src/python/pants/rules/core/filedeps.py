@@ -20,8 +20,12 @@ class Filedeps(LineOriented, Goal):
   name = 'fast-filedeps'
 
 
-@console_rule(Filedeps, [Console, Filedeps.Options, TransitiveHydratedTargets])
-def file_deps(console, filedeps_options, transitive_hydrated_targets):
+@console_rule
+def file_deps(
+  console: Console,
+  filedeps_options: Filedeps.Options,
+  transitive_hydrated_targets: TransitiveHydratedTargets
+) -> Filedeps:
 
   uniq_set = OrderedSet()
 

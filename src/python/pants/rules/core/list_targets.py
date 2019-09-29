@@ -28,8 +28,8 @@ class List(LineOriented, Goal):
              help='Print only targets that are documented with a description.')
 
 
-@console_rule(List, [Console, List.Options, Specs])
-def list_targets(console, list_options, specs):
+@console_rule
+def list_targets(console: Console, list_options: List.Options, specs: Specs) -> List:
   provides = list_options.values.provides
   provides_columns = list_options.values.provides_columns
   documented = list_options.values.documented

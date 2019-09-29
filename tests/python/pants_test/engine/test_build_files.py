@@ -189,8 +189,8 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
     address_mapper = AddressMapper(build_patterns=build_patterns,
                                    parser=parser)
 
-    @rule(SymbolTable, [])
-    def symbol_table_singleton():
+    @rule
+    def symbol_table_singleton() -> SymbolTable:
       return TEST_TABLE
     rules = create_fs_rules() + create_graph_rules(address_mapper) + [symbol_table_singleton]
     project_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples'))

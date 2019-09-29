@@ -336,16 +336,16 @@ class EngineInitializer:
                                    exclude_target_regexps=exclude_target_regexps,
                                    subproject_roots=subproject_roots)
 
-    @rule(GlobMatchErrorBehavior, [])
-    def glob_match_error_behavior_singleton():
+    @rule
+    def glob_match_error_behavior_singleton() -> GlobMatchErrorBehavior:
       return glob_match_error_behavior or GlobMatchErrorBehavior.ignore
 
-    @rule(BuildConfiguration, [])
-    def build_configuration_singleton():
+    @rule
+    def build_configuration_singleton() -> BuildConfiguration:
       return build_configuration
 
-    @rule(SymbolTable, [])
-    def symbol_table_singleton():
+    @rule
+    def symbol_table_singleton() -> SymbolTable:
       return symbol_table
 
     # Create a Scheduler containing graph and filesystem rules, with no installed goals. The

@@ -97,8 +97,8 @@ class WrapperType(datatype(['value'])):
   pass
 
 
-@rule(WrapperType, [RootType])
-def example_rule(root_type):
+@rule
+def example_rule(root_type: RootType) -> WrapperType:
   yield WrapperType(root_type.value)
 
 
@@ -106,8 +106,8 @@ class PluginProduct:
   pass
 
 
-@rule(PluginProduct, [RootType])
-def example_plugin_rule(root_type):
+@rule
+def example_plugin_rule(root_type: RootType) -> PluginProduct:
   yield PluginProduct()
 
 
