@@ -20,55 +20,40 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
     return False
 
   def test_build_ignore_patterns_pants_ini(self):
+    target_path = "testprojects/src/java/org/pantsbuild/testproject/phrases"
+    targets = [
+      f"{target_path}:{target}"
+      for target in ["ten-thousand", "once-upon-a-time", "lesser-of-two", "there-was-a-duck"]
+    ]
+
     def output_to_list(output_filename):
       with open(output_filename, 'r') as results_file:
         return {line.rstrip() for line in results_file.readlines()}
 
     tempdir = tempfile.mkdtemp()
     tmp_output = os.path.join(tempdir, 'minimize-output1.txt')
-    run_result = self.run_pants(['minimize',
-                                 'testprojects::',
-                                 '--quiet',
-                                 '--minimize-output-file={0}'.format(tmp_output)])
+    run_result = self.run_pants(
+      ['minimize', 'testprojects::', '--quiet', f'--minimize-output-file={tmp_output}']
+    )
     self.assert_success(run_result)
     results = output_to_list(tmp_output)
-    self.assertIn('testprojects/src/java/org/pantsbuild/testproject/phrases:ten-thousand',
-                  results)
-    self.assertIn('testprojects/src/java/org/pantsbuild/testproject/phrases:once-upon-a-time',
-                  results)
-    self.assertIn('testprojects/src/java/org/pantsbuild/testproject/phrases:lesser-of-two',
-                  results)
-    self.assertIn('testprojects/src/java/org/pantsbuild/testproject/phrases:there-was-a-duck',
-                  results)
+    for target in targets:
+      self.assertIn(target, results)
 
     tmp_output = os.path.join(tempdir, 'minimize-output2.txt')
-
-    run_result = self.run_pants(['minimize',
-                                 'testprojects::',
-                                 '--quiet',
-                                 '--minimize-output-file={0}'.format(tmp_output)],
-                                config={
-                                    'DEFAULT': {
-                                        'build_ignore': [
-                                            'testprojects/src/java/org/pantsbuild/testproject/phrases'
-                                        ]
-                                    }
-                                })
+    run_result = self.run_pants(
+      ['minimize', 'testprojects::', '--quiet', f'--minimize-output-file={tmp_output}'],
+      config={'DEFAULT': {'build_ignore': [target_path]}},
+    )
     self.assert_success(run_result)
     results = output_to_list(tmp_output)
-    self.assertNotIn('testprojects/src/java/org/pantsbuild/testproject/phrases:ten-thousand',
-                     results)
-    self.assertNotIn('testprojects/src/java/org/pantsbuild/testproject/phrases:once-upon-a-time',
-                     results)
-    self.assertNotIn('testprojects/src/java/org/pantsbuild/testproject/phrases:lesser-of-two',
-                     results)
-    self.assertNotIn('testprojects/src/java/org/pantsbuild/testproject/phrases:there-was-a-duck',
-                     results)
+    for target in targets:
+      self.assertNotIn(target, results)
 
   def test_build_ignore_dependency(self):
     run_result = self.run_pants(['-q',
                                  'dependencies',
-                                 'testprojects/tests/python/pants::'],
+                                 'testprojects/tests/python/pants/constants_only::'],
                                 config={
                                   'DEFAULT': {
                                     'build_ignore': [
@@ -84,7 +69,7 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
   def test_build_ignore_dependency_success(self):
     run_result = self.run_pants(['-q',
                                  'dependencies',
-                                 'testprojects/tests/python/pants::'],
+                                 'testprojects/tests/python/pants/constants_only::'],
                                 config={
                                   'DEFAULT': {
                                     'build_ignore': [

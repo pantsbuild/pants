@@ -21,6 +21,8 @@ python_tests(
   sources = [ 'test_build_ignore_integration.py' ],
   dependencies = [
     'tests/python/pants_test:int-test',
+    'testprojects/src/java/org/pantsbuild/testproject:phrases_directory',
+    'testprojects/tests/python/pants:constants_only_directory',
   ],
   tags = {'integration'},
 )
