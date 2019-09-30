@@ -11,8 +11,14 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.build_files import create_graph_rules
 from pants.engine.fs import create_fs_rules
-from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, DifferingFamiliesError,
-                                 DuplicateNameError, UnaddressableObjectError)
+from pants.engine.mapper import (
+  AddressFamily,
+  AddressMap,
+  AddressMapper,
+  DifferingFamiliesError,
+  DuplicateNameError,
+  UnaddressableObjectError,
+)
 from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct, SymbolTable
 from pants.engine.rules import rule
@@ -129,8 +135,8 @@ class AddressFamilyTest(unittest.TestCase):
 HydratedStructs = Collection.of(HydratedStruct)
 
 
-@rule(HydratedStructs, [BuildFileAddresses])
-def unhydrated_structs(build_file_addresses):
+@rule
+def unhydrated_structs(build_file_addresses: BuildFileAddresses) -> HydratedStructs:
   tacs = yield [Get(HydratedStruct, Address, a) for a in build_file_addresses.addresses]
   yield HydratedStructs(tacs)
 

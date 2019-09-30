@@ -22,7 +22,7 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
     scan_set = set()
 
     def should_ignore(file):
-      return file.endswith('.pyc')
+      return file.endswith('.pyc') or file.endswith('__init__.py')
 
     for root, dirs, files in project_tree.walk(''):
       scan_set.update({os.path.join(root, f) for f in files if not should_ignore(f)})
@@ -33,15 +33,14 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
     return '{}:{}'.format(self.PATH_PREFIX, test_name)
 
   def _extract_exclude_output(self, test_name):
-    stdout_data = self.do_command('filemap',
-                                  self._mk_target(test_name),
-                                  success=True).stdout_data
-
-    return {s.split(' ')[0].replace(self.PATH_PREFIX, '')
-            for s in stdout_data.split('\n') if s.startswith(self.PATH_PREFIX)}
-
-  def test_testprojects(self):
-    self.do_command('filemap', 'testprojects::', success=True)
+    stdout_data = self.do_command(
+      'filemap', self._mk_target(test_name), success=True
+    ).stdout_data
+    return {
+      s.split(' ')[0].replace(self.PATH_PREFIX, '')
+      for s in stdout_data.split('\n')
+      if s.startswith(self.PATH_PREFIX) and '__init__.py' not in s
+    }
 
   def test_python_sources(self):
     run = self.do_command('filemap',

@@ -17,11 +17,21 @@ from pants.engine.fs import FileContent
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.config import Config
 from pants.option.custom_types import UnsetBool, file_option, target_option
-from pants.option.errors import (BooleanOptionNameWithNo, FrozenRegistration, ImplicitValIsNone,
-                                 InvalidKwarg, InvalidMemberType, MemberTypeNotAllowed,
-                                 NoOptionNames, OptionAlreadyRegistered, OptionNameDash,
-                                 OptionNameDoubleDash, ParseError, RecursiveSubsystemOption,
-                                 Shadowing)
+from pants.option.errors import (
+  BooleanOptionNameWithNo,
+  FrozenRegistration,
+  ImplicitValIsNone,
+  InvalidKwarg,
+  InvalidMemberType,
+  MemberTypeNotAllowed,
+  NoOptionNames,
+  OptionAlreadyRegistered,
+  OptionNameDash,
+  OptionNameDoubleDash,
+  ParseError,
+  RecursiveSubsystemOption,
+  Shadowing,
+)
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.optionable import Optionable
 from pants.option.options import Options

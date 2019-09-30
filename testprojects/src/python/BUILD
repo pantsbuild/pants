@@ -4,6 +4,9 @@
 files(
   name = 'antlr_directory',
   sources = rglobs('antlr/*'),
+  dependencies = [
+    'testprojects/src/antlr/python:test_directory',
+  ],
 )
 
 files(
@@ -24,6 +27,11 @@ files(
 files(
   name = 'interpreter_selection_directory',
   sources = rglobs('interpreter_selection/*'),
+)
+
+files(
+  name = 'no_build_file_directory',
+  sources = rglobs('no_build_file/*'),
 )
 
 files(
@@ -48,6 +56,11 @@ files(
   dependencies = [
     'testprojects/src/python/python_targets:test',
   ],
+)
+
+files(
+  name = 'sources_directory',
+  sources = rglobs('sources/*'),
 )
 
 files(

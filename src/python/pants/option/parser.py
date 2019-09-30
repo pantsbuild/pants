@@ -14,14 +14,32 @@ import yaml
 from pants.base.deprecated import validate_deprecation_semver, warn_or_error
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.config import Config
-from pants.option.custom_types import (DictValueComponent, ListValueComponent, UnsetBool,
-                                       dict_option, dir_option, file_option, list_option,
-                                       target_option)
-from pants.option.errors import (BooleanOptionNameWithNo, FrozenRegistration, ImplicitValIsNone,
-                                 InvalidKwarg, InvalidKwargNonGlobalScope, InvalidMemberType,
-                                 MemberTypeNotAllowed, NoOptionNames, OptionAlreadyRegistered,
-                                 OptionNameDash, OptionNameDoubleDash, ParseError,
-                                 RecursiveSubsystemOption, Shadowing)
+from pants.option.custom_types import (
+  DictValueComponent,
+  ListValueComponent,
+  UnsetBool,
+  dict_option,
+  dir_option,
+  file_option,
+  list_option,
+  target_option,
+)
+from pants.option.errors import (
+  BooleanOptionNameWithNo,
+  FrozenRegistration,
+  ImplicitValIsNone,
+  InvalidKwarg,
+  InvalidKwargNonGlobalScope,
+  InvalidMemberType,
+  MemberTypeNotAllowed,
+  NoOptionNames,
+  OptionAlreadyRegistered,
+  OptionNameDash,
+  OptionNameDoubleDash,
+  ParseError,
+  RecursiveSubsystemOption,
+  Shadowing,
+)
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo

@@ -65,8 +65,8 @@ def fast_test(console: Console, targets: HydratedTargets, build_config: BuildCon
   yield Test(exit_code)
 
 
-@rule(TestResult, [HydratedTarget])
-def coordinator_of_tests(target):
+@rule
+def coordinator_of_tests(target: HydratedTarget) -> TestResult:
   # TODO(#6004): when streaming to live TTY, rely on V2 UI for this information. When not a
   # live TTY, periodically dump heavy hitters to stderr. See
   # https://github.com/pantsbuild/pants/issues/6004#issuecomment-492699898.

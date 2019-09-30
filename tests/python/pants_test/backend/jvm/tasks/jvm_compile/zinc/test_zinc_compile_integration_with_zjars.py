@@ -3,8 +3,9 @@
 
 
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
-from pants_test.backend.jvm.tasks.jvm_compile.zinc.zinc_compile_integration_base import \
-  BaseZincCompileIntegrationTest
+from pants_test.backend.jvm.tasks.jvm_compile.zinc.zinc_compile_integration_base import (
+  BaseZincCompileIntegrationTest,
+)
 
 
 class ZincCompileIntegrationWithZjars(BaseCompileIT, BaseZincCompileIntegrationTest):

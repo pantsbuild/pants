@@ -4,8 +4,13 @@
 import shlex
 import unittest
 
-from pants.option.arg_splitter import (ArgSplitter, NoGoalHelp, OptionsHelp, UnknownGoalHelp,
-                                       VersionHelp)
+from pants.option.arg_splitter import (
+  ArgSplitter,
+  NoGoalHelp,
+  OptionsHelp,
+  UnknownGoalHelp,
+  VersionHelp,
+)
 from pants.option.scope import ScopeInfo
 
 

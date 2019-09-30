@@ -4,11 +4,14 @@
 import random
 import unittest
 
-from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
-  CLASS_NOT_FOUND_ERROR_PATTERNS
-from pants.backend.jvm.tasks.jvm_compile.missing_dependency_finder import (ClassNotFoundError,
-                                                                           CompileErrorExtractor,
-                                                                           StringSimilarityRanker)
+from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import (
+  CLASS_NOT_FOUND_ERROR_PATTERNS,
+)
+from pants.backend.jvm.tasks.jvm_compile.missing_dependency_finder import (
+  ClassNotFoundError,
+  CompileErrorExtractor,
+  StringSimilarityRanker,
+)
 
 
 class CompileErrorExtractorTest(unittest.TestCase):

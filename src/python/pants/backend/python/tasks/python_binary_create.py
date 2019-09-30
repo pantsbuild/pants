@@ -7,10 +7,13 @@ from pex.interpreter import PythonInterpreter
 from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
-from pants.backend.python.subsystems.pex_build_util import (PexBuilderWrapper,
-                                                            has_python_requirements,
-                                                            has_python_sources, has_resources,
-                                                            is_python_target)
+from pants.backend.python.subsystems.pex_build_util import (
+  PexBuilderWrapper,
+  has_python_requirements,
+  has_python_sources,
+  has_resources,
+  is_python_target,
+)
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary

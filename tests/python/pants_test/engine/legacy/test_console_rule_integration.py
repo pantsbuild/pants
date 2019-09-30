@@ -13,29 +13,19 @@ from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegratio
 
 class TestConsoleRuleIntegration(PantsDaemonIntegrationTestBase):
 
+  list_target = 'examples/src/java/org/pantsbuild/example/hello::'
+
   @ensure_daemon
   def test_v2_list(self):
-    result = self.do_command(
-      '--no-v1',
-      '--v2',
-      'list',
-      '::',
-      success=True
-    )
-
+    result = self.do_command('list', self.list_target, success=True)
     output_lines = result.stdout_data.splitlines()
-    self.assertGreater(len(output_lines), 1000)
-    self.assertIn('3rdparty/python:psutil', output_lines)
+    self.assertEqual(len(output_lines), 5)
+    self.assertIn('examples/src/java/org/pantsbuild/example/hello/main:readme', output_lines)
 
   def test_v2_list_does_not_cache(self):
     with self.pantsd_successful_run_context() as (runner, checker, workdir, pantsd_config):
       def run_list():
-        command = ['--no-v1',
-                   '--v2',
-                   'list',
-                   'src/::',]
-
-        result = runner(command)
+        result = runner(['list', self.list_target])
         checker.assert_started()
         return result
 

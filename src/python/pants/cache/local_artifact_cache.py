@@ -8,8 +8,13 @@ from contextlib import contextmanager
 from pants.cache.artifact import TarballArtifact
 from pants.cache.artifact_cache import ArtifactCache, UnreadableArtifact
 from pants.util.contextutil import temporary_file
-from pants.util.dirutil import (safe_delete, safe_mkdir, safe_mkdir_for,
-                                safe_rm_oldest_items_in_dir, safe_rmtree)
+from pants.util.dirutil import (
+  safe_delete,
+  safe_mkdir,
+  safe_mkdir_for,
+  safe_rm_oldest_items_in_dir,
+  safe_rmtree,
+)
 
 
 logger = logging.getLogger(__name__)

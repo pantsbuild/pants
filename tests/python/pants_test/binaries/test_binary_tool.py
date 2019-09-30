@@ -4,8 +4,12 @@
 import os
 
 from pants.binaries.binary_tool import BinaryToolBase
-from pants.binaries.binary_util import (BinaryToolFetcher, BinaryToolUrlGenerator, BinaryUtil,
-                                        HostPlatform)
+from pants.binaries.binary_util import (
+  BinaryToolFetcher,
+  BinaryToolUrlGenerator,
+  BinaryUtil,
+  HostPlatform,
+)
 from pants.option.scope import GLOBAL_SCOPE
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump

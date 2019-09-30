@@ -7,8 +7,10 @@ from pants.base.build_environment import get_buildroot, pants_version
 from pants.build_graph.aliased_target import AliasTargetFactory
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.files import Files
-from pants.build_graph.intransitive_dependency import (IntransitiveDependencyFactory,
-                                                       ProvidedDependencyFactory)
+from pants.build_graph.intransitive_dependency import (
+  IntransitiveDependencyFactory,
+  ProvidedDependencyFactory,
+)
 from pants.build_graph.prep_command import PrepCommand
 from pants.build_graph.remote_sources import RemoteSources
 from pants.build_graph.resources import Resources

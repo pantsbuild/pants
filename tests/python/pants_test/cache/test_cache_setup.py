@@ -4,10 +4,17 @@
 import os
 from unittest.mock import Mock
 
-from pants.cache.cache_setup import (CacheFactory, CacheSetup, CacheSpec, CacheSpecFormatError,
-                                     EmptyCacheSpecError, InvalidCacheSpecError,
-                                     LocalCacheSpecRequiredError, RemoteCacheSpecRequiredError,
-                                     TooManyCacheSpecsError)
+from pants.cache.cache_setup import (
+  CacheFactory,
+  CacheSetup,
+  CacheSpec,
+  CacheSpecFormatError,
+  EmptyCacheSpecError,
+  InvalidCacheSpecError,
+  LocalCacheSpecRequiredError,
+  RemoteCacheSpecRequiredError,
+  TooManyCacheSpecsError,
+)
 from pants.cache.local_artifact_cache import LocalArtifactCache
 from pants.cache.resolver import Resolver
 from pants.cache.restful_artifact_cache import RESTfulArtifactCache

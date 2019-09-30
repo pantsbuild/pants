@@ -15,13 +15,19 @@ from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.classpath_products import ClasspathEntry
-from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
-  CLASS_NOT_FOUND_ERROR_PATTERNS
+from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import (
+  CLASS_NOT_FOUND_ERROR_PATTERNS,
+)
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
-from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
-                                                                 Job)
-from pants.backend.jvm.tasks.jvm_compile.missing_dependency_finder import (CompileErrorExtractor,
-                                                                           MissingDependencyFinder)
+from pants.backend.jvm.tasks.jvm_compile.execution_graph import (
+  ExecutionFailure,
+  ExecutionGraph,
+  Job,
+)
+from pants.backend.jvm.tasks.jvm_compile.missing_dependency_finder import (
+  CompileErrorExtractor,
+  MissingDependencyFinder,
+)
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
@@ -34,8 +40,14 @@ from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.option.ranked_value import RankedValue
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.contextutil import Timer, temporary_dir
-from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_file_dump, safe_mkdir,
-                                safe_rmtree)
+from pants.util.dirutil import (
+  fast_relpath,
+  read_file,
+  safe_delete,
+  safe_file_dump,
+  safe_mkdir,
+  safe_rmtree,
+)
 from pants.util.fileutil import create_size_estimators
 from pants.util.memo import memoized_method, memoized_property
 

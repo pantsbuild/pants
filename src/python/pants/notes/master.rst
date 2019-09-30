@@ -4,6 +4,69 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.22.0.dev0 (09/28/2019)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Support DRY type-annotated @rules. (#8330)
+  `PR #8330 <https://github.com/pantsbuild/pants/pull/8330>`_
+
+* Upgrade `spin` crate to patch a vulnerability. (#8320)
+  `PR #8320 <https://github.com/pantsbuild/pants/pull/8320>`_
+
+New Features
+~~~~~~~~~~~~
+
+* add --transitive flag to ConsoleTask! (#8224)
+  `PR #8224 <https://github.com/pantsbuild/pants/pull/8224>`_
+
+* Support mypy plugins and 3rdpary type definitions. (#8328)
+  `PR #8328 <https://github.com/pantsbuild/pants/pull/8328>`_
+
+* Enable incremental compile for zinc hermetic by adding scratch input digest for local ExecuteProcessRequest (#8282)
+  `PR #8282 <https://github.com/pantsbuild/pants/pull/8282>`_
+
+Bugfixes
+~~~~~~~~
+
+* Handle blank description in _print_goals_help (#8088)
+  `PR #8088 <https://github.com/pantsbuild/pants/pull/8088>`_
+
+* Make sure PEX executions are hermetic. (#8335)
+  `PR #8335 <https://github.com/pantsbuild/pants/pull/8335>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Modify isort config to prepare for black formatting (#8332)
+  `PR #8332 <https://github.com/pantsbuild/pants/pull/8332>`_
+
+* Use unwrap_or_else not unwrap_or (#8341)
+  `PR #8341 <https://github.com/pantsbuild/pants/pull/8341>`_
+
+* Use double quoted strings in __init__.py files to prepare for Black (#8333)
+  `PR #8333 <https://github.com/pantsbuild/pants/pull/8333>`_
+
+* allow `@rule`s to end in `yield Get(...)` (#8227)
+  `PR #8227 <https://github.com/pantsbuild/pants/pull/8227>`_
+
+* v2 rule for stripping source roots (#8326)
+  `PR #8326 <https://github.com/pantsbuild/pants/pull/8326>`_
+
+* Introduce `hash_utils.hash_dir`. (#8327)
+  `PR #8327 <https://github.com/pantsbuild/pants/pull/8327>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Fix number of "build wheels" shards in release doc. (#8325)
+  `PR #8325 <https://github.com/pantsbuild/pants/pull/8325>`_
+
+* Add project links so they show up in pypi. (#8322)
+  `PR #8322 <https://github.com/pantsbuild/pants/pull/8322>`_
+
 1.21.0rc0 (09/23/2019)
 ----------------------
 

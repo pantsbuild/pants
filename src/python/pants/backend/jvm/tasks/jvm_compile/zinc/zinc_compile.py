@@ -23,8 +23,12 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
-from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, DirectoryToMaterialize, PathGlobs,
-                             PathGlobsAndRoot)
+from pants.engine.fs import (
+  EMPTY_DIRECTORY_DIGEST,
+  DirectoryToMaterialize,
+  PathGlobs,
+  PathGlobsAndRoot,
+)
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath

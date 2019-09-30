@@ -155,8 +155,8 @@ class PexBuildEnvironment(datatype([
     }
 
 
-@rule(PexBuildEnvironment, [PythonNativeCode])
-def create_pex_native_build_environment(python_native_code):
+@rule
+def create_pex_native_build_environment(python_native_code: PythonNativeCode) -> PexBuildEnvironment:
   return PexBuildEnvironment(
     cpp_flags=python_native_code.get_options().cpp_flags,
     ld_flags=python_native_code.get_options().ld_flags,

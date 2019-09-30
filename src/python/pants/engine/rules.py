@@ -16,6 +16,7 @@ from typing import Any, Callable, Type, cast
 import asttokens
 from twitter.common.collections import OrderedSet
 
+from pants.base.deprecated import deprecated_conditional
 from pants.engine.goal import Goal
 from pants.engine.selectors import Get
 from pants.util.collections import assert_single_element
@@ -320,9 +321,18 @@ def _ensure_type_annotation(
 
 
 def rule(*args, cacheable=True) -> Callable:
+
+  deprecated_conditional(
+    predicate=lambda: len(args) == 2,
+    removal_version="1.23.0.dev0",
+    entity_description="Using the old style of annotating types for an @rule",
+    hint_message=(
+      "Remove all arguments to the @rule or @console_rule decorator, then move the types into "
+      f"type hints for the decorated function. Given {args}."
+    ),
+  )
+
   if len(args) == 2:
-    # TODO(John Sirois): Deprecate this form of @rule:
-    #   https://github.com/pantsbuild/pants/issues/8338
     return_type, parameter_types = args
     if not isinstance(return_type, type):
       raise ValueError(f'The return_type decorator parameter must be a type, '
@@ -335,30 +345,32 @@ def rule(*args, cacheable=True) -> Callable:
                          f'Element {index} (0-based) {parameter_type} is of type '
                          f'{type(parameter_type)}')
     return _make_rule(return_type, parameter_types, cacheable=cacheable)
-  elif len(args) == 1 and inspect.isfunction(args[0]):
-    func = args[0]
-    signature = inspect.signature(func)
-    func_id = f'@rule {func.__module__}:{func.__name__}'
-    return_type = _ensure_type_annotation(
-      annotation=signature.return_annotation,
-      name=f'{func_id} return',
-      empty_value=inspect.Signature.empty,
-      raise_type=MissingReturnTypeAnnotation
+
+  if len(args) != 1 and not inspect.isfunction(args[0]):
+    raise ValueError(
+      'The @rule decorator expects no arguments and for the function it decorates to be '
+      f'type-annotated. Given {args}.'
     )
-    parameter_types = tuple(
-      _ensure_type_annotation(
-        annotation=parameter.annotation,
-        name=f'{func_id} parameter {name}',
-        empty_value=inspect.Parameter.empty,
-        raise_type=MissingParameterTypeAnnotation
-      )
-      for name, parameter in signature.parameters.items()
+
+  func = args[0]
+  signature = inspect.signature(func)
+  func_id = f'@rule {func.__module__}:{func.__name__}'
+  return_type = _ensure_type_annotation(
+    annotation=signature.return_annotation,
+    name=f'{func_id} return',
+    empty_value=inspect.Signature.empty,
+    raise_type=MissingReturnTypeAnnotation
+  )
+  parameter_types = tuple(
+    _ensure_type_annotation(
+      annotation=parameter.annotation,
+      name=f'{func_id} parameter {name}',
+      empty_value=inspect.Parameter.empty,
+      raise_type=MissingParameterTypeAnnotation
     )
-    return _make_rule(return_type, parameter_types, cacheable=cacheable)(func)
-  else:
-    raise ValueError(f'The @rule decorator expects either no arguments when applied to a '
-                     f'type-annotated function or else two arguments: return_type: type, '
-                     f'parameter_types: Iterable[type]. Given {args}.')
+    for name, parameter in signature.parameters.items()
+  )
+  return _make_rule(return_type, parameter_types, cacheable=cacheable)(func)
 
 
 def console_rule(*args) -> Callable:
@@ -376,8 +388,8 @@ def union(cls):
   @union
   class UnionBase: pass
 
-  @rule(B, [X])
-  def get_some_union_type(x):
+  @rule
+  def get_some_union_type(x: X) -> B:
     result = yield Get(ResultType, UnionBase, x.f())
     # ...
 

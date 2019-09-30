@@ -1,26 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-scala_library(
-  name = 'jvm-run-example-lib',
-  dependencies = [
-    'examples/src/scala/org/pantsbuild/example/hello/welcome',
-  ],
-  sources = ['JvmRunExample.scala'],
-  provides = scala_artifact(
-    org='org.pantsbuild.example',
-    name='jvm-example-lib',
-    repo=public,
-  )
-)
-
-jvm_binary(name ='jvm-run-example',
-  main = 'org.pantsbuild.example.JvmRunExample',
-  dependencies = [
-    ':jvm-run-example-lib',
-  ]
-)
-
 page(
   name = 'readme',
   source = 'README.md',
@@ -40,6 +20,22 @@ files(
   dependencies = [
     'examples/src/java/org/pantsbuild/example:hello_directory',
     'examples/src/resources/org/pantsbuild/example:hello_directory',
+  ],
+)
+
+files(
+  name = 'jvm_run_directory',
+  sources = rglobs('jvm_run/*'),
+  dependencies = [
+    ':hello_directory',
+  ],
+)
+
+files(
+  name = 'scala_with_java_sources_directory',
+  sources = rglobs('scala_with_java_sources/*'),
+  dependencies = [
+    'examples/src/java/org/pantsbuild/example:java_sources_directory',
   ],
 )
 

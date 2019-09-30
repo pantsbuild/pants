@@ -13,8 +13,11 @@ from pants.base.worker_pool import Work
 from pants.build_graph.target_filter_subsystem import TargetFilter
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
 from pants.cache.cache_setup import CacheSetup
-from pants.invalidation.build_invalidator import (BuildInvalidator, CacheKeyGenerator,
-                                                  UncacheableCacheKeyGenerator)
+from pants.invalidation.build_invalidator import (
+  BuildInvalidator,
+  CacheKeyGenerator,
+  UncacheableCacheKeyGenerator,
+)
 from pants.invalidation.cache_manager import InvalidationCacheManager, InvalidationCheck
 from pants.option.optionable import Optionable
 from pants.option.options_fingerprinter import OptionsFingerprinter

@@ -8,8 +8,10 @@ from pants.backend.native.targets.native_library import CppLibrary, NativeLibrar
 from pants.backend.native.tasks.cpp_compile import CppCompile
 from pants.backend.native.tasks.native_compile import ObjectFiles
 from pants.option.ranked_value import RankedValue
-from pants_test.backend.native.tasks.native_task_test_base import (NativeCompileTestMixin,
-                                                                   NativeTaskTestBase)
+from pants_test.backend.native.tasks.native_task_test_base import (
+  NativeCompileTestMixin,
+  NativeTaskTestBase,
+)
 
 
 class CppCompileTest(NativeTaskTestBase, NativeCompileTestMixin):

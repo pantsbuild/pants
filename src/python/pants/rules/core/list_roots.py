@@ -16,8 +16,8 @@ class Roots(LineOriented, Goal):
   name = 'roots'
 
 
-@rule(AllSourceRoots, [SourceRootConfig])
-def all_roots(source_root_config):
+@rule
+def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
 
   source_roots = source_root_config.get_source_roots()
 
@@ -44,8 +44,8 @@ def all_roots(source_root_config):
   yield AllSourceRoots(all_source_roots)
 
 
-@console_rule(Roots, [Console, Roots.Options, AllSourceRoots])
-def list_roots(console, options, all_roots):
+@console_rule
+def list_roots(console: Console, options: Roots.Options, all_roots: AllSourceRoots) -> Roots:
   with Roots.line_oriented(options, console) as (print_stdout, print_stderr):
     for src_root in sorted(all_roots, key=lambda x: x.path):
       all_langs = ','.join(sorted(src_root.langs))

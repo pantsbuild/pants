@@ -4,8 +4,9 @@
 import os
 
 from pants.base.build_environment import get_buildroot
-from pants_test.backend.python.pants_requirement_integration_test_base import \
-  PantsRequirementIntegrationTestBase
+from pants_test.backend.python.pants_requirement_integration_test_base import (
+  PantsRequirementIntegrationTestBase,
+)
 
 
 class PantsRequirementIntegrationTest(PantsRequirementIntegrationTestBase):

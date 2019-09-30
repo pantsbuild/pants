@@ -379,8 +379,12 @@ class OwnersRequest(datatype([
   """
 
 
-@rule(BuildFileAddresses, [BuildConfiguration, AddressMapper, OwnersRequest])
-def find_owners(build_configuration, address_mapper, owners_request):
+@rule
+def find_owners(
+  build_configuration: BuildConfiguration,
+  address_mapper: AddressMapper,
+  owners_request: OwnersRequest
+) -> BuildFileAddresses:
   sources_set = OrderedSet(owners_request.sources)
   dirs_set = OrderedSet(dirname(source) for source in sources_set)
 
@@ -430,8 +434,10 @@ def find_owners(build_configuration, address_mapper, owners_request):
       yield BuildFileAddresses(tuple(graph.transitive_dependents_of_addresses(direct_owners)))
 
 
-@rule(TransitiveHydratedTargets, [BuildFileAddresses])
-def transitive_hydrated_targets(build_file_addresses):
+@rule
+def transitive_hydrated_targets(
+  build_file_addresses: BuildFileAddresses
+) -> TransitiveHydratedTargets:
   """Given BuildFileAddresses, kicks off recursion on expansion of TransitiveHydratedTargets.
 
   The TransitiveHydratedTarget struct represents a structure-shared graph, which we walk
@@ -456,14 +462,14 @@ def transitive_hydrated_targets(build_file_addresses):
   yield TransitiveHydratedTargets(tuple(tht.root for tht in transitive_hydrated_targets), closure)
 
 
-@rule(TransitiveHydratedTarget, [HydratedTarget])
-def transitive_hydrated_target(root):
+@rule
+def transitive_hydrated_target(root: HydratedTarget) -> TransitiveHydratedTarget:
   dependencies = yield [Get(TransitiveHydratedTarget, Address, d) for d in root.dependencies]
   yield TransitiveHydratedTarget(root, dependencies)
 
 
-@rule(HydratedTargets, [BuildFileAddresses])
-def hydrated_targets(build_file_addresses):
+@rule
+def hydrated_targets(build_file_addresses: BuildFileAddresses) -> HydratedTargets:
   """Requests HydratedTarget instances for BuildFileAddresses."""
   targets = yield [Get(HydratedTarget, Address, a) for a in build_file_addresses.addresses]
   yield HydratedTargets(targets)
@@ -473,8 +479,8 @@ class HydratedField(datatype(['name', 'value'])):
   """A wrapper for a fully constructed replacement kwarg for a HydratedTarget."""
 
 
-@rule(HydratedTarget, [HydratedStruct])
-def hydrate_target(hydrated_struct):
+@rule
+def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
   target_adaptor = hydrated_struct.value
   """Construct a HydratedTarget from a TargetAdaptor and hydrated versions of its adapted fields."""
   # Hydrate the fields of the adaptor and re-construct it.
@@ -502,8 +508,10 @@ def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
                               include_dirs=include_dirs)
 
 
-@rule(HydratedField, [SourcesField, GlobMatchErrorBehavior])
-def hydrate_sources(sources_field, glob_match_error_behavior):
+@rule
+def hydrate_sources(
+  sources_field: SourcesField, glob_match_error_behavior: GlobMatchErrorBehavior
+) -> HydratedField:
   """Given a SourcesField, request a Snapshot for its path_globs and create an EagerFilesetWithSpec.
   """
   # TODO(#5864): merge the target's selection of --glob-expansion-failure (which doesn't exist yet)
@@ -518,8 +526,10 @@ def hydrate_sources(sources_field, glob_match_error_behavior):
   yield HydratedField(sources_field.arg, fileset_with_spec)
 
 
-@rule(HydratedField, [BundlesField, GlobMatchErrorBehavior])
-def hydrate_bundles(bundles_field, glob_match_error_behavior):
+@rule
+def hydrate_bundles(
+  bundles_field: BundlesField, glob_match_error_behavior: GlobMatchErrorBehavior
+) -> HydratedField:
   """Given a BundlesField, request Snapshots for each of its filesets and create BundleAdaptors."""
   path_globs_with_match_errors = [
     pg.copy(glob_match_error_behavior=glob_match_error_behavior)

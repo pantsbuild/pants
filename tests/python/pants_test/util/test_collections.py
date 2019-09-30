@@ -3,8 +3,12 @@
 
 import unittest
 
-from pants.util.collections import (assert_single_element, combined_dict, factory_dict,
-                                    recursively_update)
+from pants.util.collections import (
+  assert_single_element,
+  combined_dict,
+  factory_dict,
+  recursively_update,
+)
 
 
 class TestCollections(unittest.TestCase):
