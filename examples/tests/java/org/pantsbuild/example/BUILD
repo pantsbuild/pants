@@ -9,3 +9,12 @@ files(
     'examples/src/resources/org/pantsbuild/example:hello_directory',
   ],
 )
+
+files(
+  name = 'usethrift_directory',
+  sources = rglobs('usethrift/*'),
+  dependencies = [
+    'examples/src/thrift/org/pantsbuild/example:distance_directory',
+    'examples/src/thrift/org/pantsbuild/example:precipitation_directory',
+  ],
+)

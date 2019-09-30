@@ -10,3 +10,8 @@ files(
   name='cucumber_directory',
   sources=rglobs('cucumber/*'),
 )
+
+files(
+  name='ivyclassifier_directory',
+  sources=rglobs('ivyclassifier/*'),
+)

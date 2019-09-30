@@ -4,6 +4,9 @@
 files(
   name = 'antlr_directory',
   sources = rglobs('antlr/*'),
+  dependencies = [
+    'testprojects/src/antlr/python:test_directory',
+  ],
 )
 
 files(

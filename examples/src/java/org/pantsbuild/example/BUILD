@@ -81,6 +81,11 @@ files(
 )
 
 files(
+  name = 'java_sources_directory',
+  sources = rglobs('java_sources/*'),
+)
+
+files(
   name = 'javac_directory',
   sources = rglobs('javac/*'),
 )

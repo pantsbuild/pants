@@ -32,6 +32,14 @@ files(
 )
 
 files(
+  name = 'scala_with_java_sources_directory',
+  sources = rglobs('scala_with_java_sources/*'),
+  dependencies = [
+    'examples/src/java/org/pantsbuild/example:java_sources_directory',
+  ],
+)
+
+files(
   name = 'scalac_directory',
   sources = rglobs('scalac/*'),
 )

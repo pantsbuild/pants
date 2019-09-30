@@ -106,8 +106,9 @@ class IdeaPluginGen(ConsoleTask):
 
   @classmethod
   def get_project_name(cls, target_specs):
+    escaped_name = re.sub('[^0-9a-zA-Z:_]+', '.', '__'.join(target_specs))
     # take up to PROJECT_NAME_LIMIT chars as project file name due to filesystem constraint.
-    return re.sub('[^0-9a-zA-Z:_]+', '.', '__'.join(target_specs))[:cls.PROJECT_NAME_LIMIT]
+    return escaped_name[:cls.PROJECT_NAME_LIMIT]
 
   # TODO: https://github.com/pantsbuild/pants/issues/3198
   def generate_project(self):
@@ -119,7 +120,7 @@ class IdeaPluginGen(ConsoleTask):
     configured_project = TemplateData(
       root_dir=get_buildroot(),
       outdir=outdir,
-      git_root=scm.worktree,
+      git_root=scm.worktree if scm else None,
       java=TemplateData(
         encoding=self.java_encoding,
         jdk=self.java_jdk,
