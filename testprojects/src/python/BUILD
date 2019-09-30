@@ -27,6 +27,11 @@ files(
 )
 
 files(
+  name = 'no_build_file_directory',
+  sources = rglobs('no_build_file/*'),
+)
+
+files(
   name = 'plugins_directory',
   sources = rglobs('plugins/*'),
 )
@@ -48,6 +53,11 @@ files(
   dependencies = [
     'testprojects/src/python/python_targets:test',
   ],
+)
+
+files(
+  name = 'sources_directory',
+  sources = rglobs('sources/*'),
 )
 
 files(

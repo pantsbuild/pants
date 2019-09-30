@@ -34,6 +34,11 @@ files(
 )
 
 files(
+  name = 'file_sets_directory',
+  sources = rglobs('file_sets/*'),
+)
+
+files(
   name = 'timeout_directory',
   sources = rglobs('timeout/*'),
 )

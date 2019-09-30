@@ -21,6 +21,8 @@ python_tests(
   sources = [ 'test_build_ignore_integration.py' ],
   dependencies = [
     'tests/python/pants_test:int-test',
+    'testprojects/src/java/org/pantsbuild/testproject:phrases_directory',
+    'testprojects/tests/python/pants:constants_only_directory',
   ],
   tags = {'integration'},
 )
@@ -31,6 +33,7 @@ python_tests(
   dependencies = [
     'src/python/pants/base:deprecated',
     'tests/python/pants_test:int-test',
+    'testprojects/src/java/org/pantsbuild/testproject:bundle_directory',
   ],
   tags = {'integration'},
   timeout = 240,
@@ -40,6 +43,7 @@ python_tests(
   name = 'changed_integration',
   sources = ['test_changed_integration.py'],
   dependencies = [
+    '//:gitignore',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
@@ -47,6 +51,9 @@ python_tests(
     'tests/python/pants_test/testutils:git_util',
     'tests/python/pants_test:test_base',
     'tests/python/pants_test:int-test',
+    'testprojects/src/python:python_targets_directory',
+    'testprojects/src/python:sources_directory',
+    'testprojects/tests/scala/org/pantsbuild/testproject:cp-directories_directory',
   ],
   tags = {'integration'},
   timeout = 600,
@@ -57,6 +64,7 @@ python_tests(
   sources = [ 'test_owners_integration.py' ],
   dependencies = [
     'tests/python/pants_test:int-test',
+    'testprojects/tests/python:owners_integration_target',
   ],
   tags = {'integration'},
 )
@@ -66,16 +74,20 @@ python_tests(
   sources = [ 'test_console_rule_integration.py' ],
   dependencies = [
     'tests/python/pants_test/pantsd:pantsd_integration_test_base',
+    'examples/src/scala/org/pantsbuild/example:hello_directory',
   ],
   tags = {'integration'},
-  timeout = 300,
+  timeout = 270,
 )
 
 python_tests(
   name = 'dependees_integration',
   sources = ['test_dependees_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test'
+    'tests/python/pants_test:int-test',
+    'examples/src/scala/org/pantsbuild/example:hello_directory',
+    'examples/src/scala/org/pantsbuild/example:jvm_run_directory',
+    'examples/tests/scala/org/pantsbuild/example:hello_directory',
   ],
   tags = {'integration'},
 )
@@ -97,9 +109,10 @@ python_tests(
   dependencies = [
     'src/python/pants/base:project_tree',
     'tests/python/pants_test:int-test',
+    'testprojects/src/python:sources_directory',
+    'testprojects/tests/python/pants:file_sets_directory',
   ],
   tags = {'integration'},
-  timeout = 180,
 )
 
 python_tests(
@@ -135,6 +148,9 @@ python_tests(
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/option',
     'tests/python/pants_test:int-test',
+    'testprojects/src/java/org/pantsbuild/testproject:bundle_directory',
+    'testprojects/src/python:no_build_file_directory',
+    'testprojects/src/python:sources_directory',
   ],
   tags = {'integration'},
   timeout = 180,
