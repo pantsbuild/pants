@@ -22,6 +22,7 @@ from pants.engine.selectors import Get
 from pants.rules.core.fmt import FmtResult, FmtTarget
 from pants.util.objects import datatype
 
+
 # Note: this is a workaround until https://github.com/pantsbuild/pants/issues/8343 is addressed
 # We have to write this type which basically represents a union of all various kinds of targets
 # containing python files so we can have one single type used as an input in the run_black rule.
