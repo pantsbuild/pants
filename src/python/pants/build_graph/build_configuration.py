@@ -170,17 +170,17 @@ class BuildConfiguration:
     return list(self._rules)
 
   def union_rules(self):
-    """Returns a mapping of registered union base types -> [a list of union member types].
+    """Returns a mapping of registered union base types -> [OrderedSet of union member types].
 
     :rtype: OrderedDict
     """
     return self._union_rules
 
-  def union_members(self, union_type, targets):
-    if union_type not in self._union_rules:
+  def is_union_member(self, union_type, tgt):
+    try:
+      return type(tgt.adaptor) in self._union_rules[union_type]
+    except KeyError:
       raise TypeError(f'Not a registered union type: {union_type}')
-    test_target_adaptors = set(self._union_rules[union_type])
-    return [tgt for tgt in targets if type(tgt.adaptor) in test_target_adaptors]
 
   @memoized_method
   def _get_addressable_factory(self, target_type, alias):

@@ -24,20 +24,19 @@ class Test(Goal):
 
 
 @console_rule
-def fast_test(console: Console, addresses: BuildFileAddresses,
-              build_config: BuildConfiguration) -> Test:
-  all_targets = yield Get(HydratedTargets, BuildFileAddresses, addresses)
-  filtered_targets = build_config.union_members(TestTarget, all_targets)
+def fast_test(console: Console, targets: HydratedTargets, build_config: BuildConfiguration) -> Test:
+  filtered_targets = [tgt for tgt in targets if build_config.is_union_member(TestTarget, tgt)]
   test_results = yield [Get(TestResult, HydratedTarget, tgt) for tgt in filtered_targets]
   did_any_fail = False
-  for address, test_result in zip(addresses, test_results):
+  for tgt, test_result in zip(filtered_targets, test_results):
     if test_result.status == Status.FAILURE:
       did_any_fail = True
     if test_result.stdout:
       console.write_stdout(
         "{} stdout:\n{}\n".format(
-          address.reference(),
-          console.red(test_result.stdout) if test_result.status == Status.FAILURE else test_result.stdout
+          tgt.address.reference(),
+          (console.red(test_result.stdout) if test_result.status == Status.FAILURE
+           else test_result.stdout)
         )
       )
     if test_result.stderr:
@@ -45,15 +44,17 @@ def fast_test(console: Console, addresses: BuildFileAddresses,
       # two streams.
       console.write_stdout(
         "{} stderr:\n{}\n".format(
-          address.reference(),
-          console.red(test_result.stderr) if test_result.status == Status.FAILURE else test_result.stderr
+          tgt.address.reference(),
+          (console.red(test_result.stderr) if test_result.status == Status.FAILURE
+           else test_result.stderr)
         )
       )
 
   console.write_stdout("\n")
 
-  for address, test_result in zip(addresses, test_results):
-    console.print_stdout('{0:80}.....{1:>10}'.format(address.reference(), test_result.status.value))
+  for tgt, test_result in zip(filtered_targets, test_results):
+    console.print_stdout('{0:80}.....{1:>10}'.format(
+      tgt.address.reference(), test_result.status.value))
 
   if did_any_fail:
     console.print_stderr(console.red('Tests failed'))
