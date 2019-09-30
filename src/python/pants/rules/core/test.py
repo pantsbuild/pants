@@ -4,15 +4,14 @@
 import logging
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
-from pants.build_graph.address import Address
+from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal
-from pants.engine.legacy.graph import HydratedTarget
+from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
 from pants.engine.rules import console_rule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.core_test_model import Status, TestResult, TestTarget
-
 
 # TODO(#6004): use proper Logging singleton, rather than static logger.
 logger = logging.getLogger(__name__)
@@ -25,8 +24,11 @@ class Test(Goal):
 
 
 @console_rule
-def fast_test(console: Console, addresses: BuildFileAddresses) -> Test:
-  test_results = yield [Get(TestResult, Address, address.to_address()) for address in addresses]
+def fast_test(console: Console, addresses: BuildFileAddresses,
+              build_config: BuildConfiguration) -> Test:
+  all_targets = yield Get(HydratedTargets, BuildFileAddresses, addresses)
+  filtered_targets = build_config.union_members(TestTarget, all_targets)
+  test_results = yield [Get(TestResult, HydratedTarget, tgt) for tgt in filtered_targets]
   did_any_fail = False
   for address, test_result in zip(addresses, test_results):
     if test_result.status == Status.FAILURE:
