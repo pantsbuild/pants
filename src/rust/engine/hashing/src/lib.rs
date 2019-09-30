@@ -264,7 +264,6 @@ mod fingerprint_tests {
       )],
     );
   }
-
 }
 
 #[cfg(test)]
