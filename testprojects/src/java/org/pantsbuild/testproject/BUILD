@@ -20,6 +20,15 @@ files(
 )
 
 files(
+  name = 'bundle_directory',
+  sources = rglobs('bundle/*'),
+  dependencies = [
+    'testprojects/src/resources/org/pantsbuild/testproject:bundleresources_directory',
+    'testprojects/tests/resources/org/pantsbuild/testproject:bundleresources_directory',
+  ],
+)
+
+files(
   name = 'compilation_warnings_directory',
   sources = rglobs('compilation_warnings/*'),
 )
