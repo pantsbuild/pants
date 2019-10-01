@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from dataclasses import dataclass
+from pathlib import Path
 
 from pants.base.build_environment import get_buildroot
 from pants.engine.console import Console
@@ -19,13 +21,11 @@ from pants.engine.selectors import Get
 from pants.util.objects import datatype
 
 
-class FmtResult(datatype([
-  ('digest', Digest),
-  ('stdout', str),
-  ('stderr', str),
-])):
-
-  pass
+@dataclass(frozen=True)
+class FmtResult:
+  digest: Digest
+  stdout: str
+  stderr: str
 
 
 @union
@@ -61,7 +61,7 @@ def fmt(console: Console, targets: HydratedTargets) -> Fmt:
     # once that is available on master.
     # Blocked on: https://github.com/pantsbuild/pants/pull/8329
     for file_content in files_content:
-      with open(os.path.join(get_buildroot(), file_content.path), "wb") as f:
+      with Path(get_buildroot(), file_content.path).open('wb') as f:
         f.write(file_content.content)
 
     if result.stdout:
@@ -69,7 +69,6 @@ def fmt(console: Console, targets: HydratedTargets) -> Fmt:
     if result.stderr:
       console.print_stderr(result.stderr)
 
-  # workspace.materialize_directories(tuple(digests))
   # Since we ran an ExecuteRequest, any failure would already have interrupted our flow
   exit_code = 0
   yield Fmt(exit_code)

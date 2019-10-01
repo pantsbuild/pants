@@ -3,6 +3,8 @@
 
 import os
 import re
+from pathlib import Path
+from typing import Set
 
 from pants.backend.python.rules.pex import CreatePex, Pex
 from pants.backend.python.subsystems.black import Black
@@ -65,14 +67,14 @@ def run_black(
   # The exclude option from Black only works on recursive invocations,
   # so call black with the directories in which the files are present
   # and passing the full file names with the include option
-  dirs = set()
+  dirs: Set[str] = set()
   for filename in target.sources.snapshot.files:
-    dirs.add(os.path.dirname(filename))
+    dirs.add(f"{Path(filename).parent}")
   pex_args= tuple(sorted(dirs))
   if config_path:
     pex_args += ("--config", config_path)
   if target.sources.snapshot.files:
-    pex_args += ("--include", "|".join(re.escape(file) for file in target.sources.snapshot.files))
+    pex_args += ("--include", "|".join(re.escape(f) for f in target.sources.snapshot.files))
 
   request = resolved_requirements_pex.create_execute_request(
     python_setup=python_setup,
