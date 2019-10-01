@@ -20,8 +20,8 @@ use sha2::Sha256;
 use store::{Snapshot, Store, StoreFileByDigest};
 use tokio_timer::Delay;
 
-use super::{
-  ExecuteProcessRequest, ExecuteProcessRequestMetadata, ExecutionStats,
+use crate::{
+  Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata, ExecutionStats,
   FallibleExecuteProcessResult, MultiPlatformExecuteProcessRequest, Platform,
 };
 use std;
@@ -151,10 +151,11 @@ impl CommandRunner {
   fn oneshot_execute(
     &self,
     execute_request: &Arc<bazel_protos::remote_execution::ExecuteRequest>,
+    build_id: String,
   ) -> BoxFuture<OperationOrStatus, String> {
     let stream = try_future!(self
       .execution_client
-      .execute_opt(&execute_request, self.call_option())
+      .execute_opt(&execute_request, try_future!(self.call_option(build_id)))
       .map_err(rpcerror_to_string));
     stream
       .take(1)
@@ -226,7 +227,7 @@ impl super::CommandRunner for CommandRunner {
   fn run(
     &self,
     req: MultiPlatformExecuteProcessRequest,
-    workunit_store: WorkUnitStore,
+    context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let compatible_underlying_request = self.extract_compatible_request(&req).unwrap();
     let operations_client = self.operations_client.clone();
@@ -255,7 +256,7 @@ impl super::CommandRunner for CommandRunner {
           .join(self.store_proto_locally(&action))
           .and_then({
             let store = store.clone();
-            let workunit_store = workunit_store.clone();
+            let workunit_store = context.workunit_store.clone();
             move |(command_digest, action_digest)| {
               store.ensure_remote_has_recursive(
                 vec![command_digest, action_digest, input_files],
@@ -266,6 +267,7 @@ impl super::CommandRunner for CommandRunner {
           .and_then({
             let execute_request = execute_request.clone();
             let command_runner = command_runner.clone();
+            let build_id = context.build_id.to_owned();
             move |summary| {
               history.current_attempt += summary;
               trace!(
@@ -274,7 +276,7 @@ impl super::CommandRunner for CommandRunner {
                 command
               );
               command_runner
-                .oneshot_execute(&execute_request)
+                .oneshot_execute(&execute_request, build_id)
                 .join(future::ok(history))
             }
           })
@@ -304,10 +306,11 @@ impl super::CommandRunner for CommandRunner {
                   let store = store.clone();
                   let operations_client = operations_client.clone();
                   let command_runner = command_runner.clone();
-                  let workunit_store = workunit_store.clone();
+                  let build_id = context.build_id.to_string();
+                  let workunit_store = context.workunit_store.clone();
 
                   let f = command_runner
-                    .extract_execute_response(operation, &mut history, workunit_store.clone());
+                    .extract_execute_response(operation, &mut history, context.workunit_store.clone());
                   f.then(move |value| {
                     match value {
                       Ok(result) => {
@@ -337,6 +340,7 @@ impl super::CommandRunner for CommandRunner {
                                   Ok(())
                                 }
                               }).to_boxed(),
+                              build_id,
                               history,
                               maybe_cancel_remote_exec_token,
                             )
@@ -351,6 +355,7 @@ impl super::CommandRunner for CommandRunner {
                             command_runner.retry_execution(
                               execute_request,
                               store.ensure_remote_has_recursive(missing_digests, workunit_store.clone()).map(|_| ()).to_boxed(),
+                              build_id,
                               history,
                               maybe_cancel_remote_exec_token,
                             )
@@ -396,18 +401,17 @@ impl super::CommandRunner for CommandRunner {
                                     )
                                   })
                                   .and_then(move |_| {
-                                    future::done(
-                                      operations_client
-                                          .get_operation_opt(
-                                            &operation_request,
-                                            command_runner.call_option(),
-                                          )
-                                          .or_else(move |err| {
-                                            rpcerror_recover_cancelled(operation_request.take_name(), err)
-                                          })
-                                          .map(OperationOrStatus::Operation)
-                                          .map_err(rpcerror_to_string),
-                                    )
+                              let call_option = command_runner.call_option(build_id)?;
+                              operations_client
+                                  .get_operation_opt(
+                                    &operation_request,
+                                    call_option,
+                                  )
+                                  .or_else(move |err| {
+                                    rpcerror_recover_cancelled(operation_request.take_name(), err)
+                                  }).map_err(rpcerror_to_string)
+                                  .map(OperationOrStatus::Operation)
+                            })
                                     .map(move |operation| {
                                       future::Loop::Continue((
                                         history,
@@ -416,8 +420,6 @@ impl super::CommandRunner for CommandRunner {
                                         iter_num + 1,
                                       ))
                                     })
-                                    .to_boxed()
-                                  })
                                   .to_boxed()
                             }
                           }
@@ -495,16 +497,33 @@ impl CommandRunner {
     }
   }
 
-  fn call_option(&self) -> grpcio::CallOption {
-    let mut call_option = grpcio::CallOption::default();
+  fn call_option(&self, build_id: String) -> Result<grpcio::CallOption, String> {
+    let mut builder = grpcio::MetadataBuilder::with_capacity(2);
     if let Some(ref authorization_header) = self.authorization_header {
-      let mut builder = grpcio::MetadataBuilder::with_capacity(1);
       builder
         .add_str("authorization", &authorization_header)
         .unwrap();
-      call_option = call_option.headers(builder.build());
     }
-    call_option
+    {
+      let mut metadata = bazel_protos::remote_execution::RequestMetadata::new();
+      metadata.set_tool_details({
+        let mut tool_details = bazel_protos::remote_execution::ToolDetails::new();
+        tool_details.set_tool_name(String::from("pants"));
+        tool_details
+      });
+      metadata.set_tool_invocation_id(build_id);
+      // TODO: Maybe set action_id too
+      let bytes = metadata
+        .write_to_bytes()
+        .map_err(|err| format!("Error serializing request metadata proto bytes: {}", err))?;
+      builder
+        .add_bytes(
+          "google.devtools.remoteexecution.v1test.requestmetadata-bin",
+          &bytes,
+        )
+        .map_err(|err| format!("Error setting request metadata header: {}", err))?;
+    }
+    Ok(grpcio::CallOption::default().headers(builder.build()))
   }
 
   fn store_proto_locally<P: protobuf::Message>(
@@ -743,6 +762,7 @@ impl CommandRunner {
     &self,
     execute_request: Arc<bazel_protos::remote_execution::ExecuteRequest>,
     prefix_future: BoxFuture<(), String>,
+    build_id: String,
     history: ExecutionHistory,
     maybe_cancel_remote_exec_token: Option<CancelRemoteExecutionToken>,
   ) -> BoxFuture<
@@ -773,7 +793,7 @@ impl CommandRunner {
 
     let command_runner = self.clone();
     prefix_future
-      .and_then(move |()| command_runner.oneshot_execute(&execute_request))
+      .and_then(move |()| command_runner.oneshot_execute(&execute_request, build_id))
       .map({
         let operations_client = self.operations_client.clone();
         let executor = self.executor.clone();
@@ -1227,11 +1247,11 @@ pub mod tests {
     CommandRunner, ExecuteProcessRequest, ExecuteProcessRequestMetadata, ExecutionError,
     ExecutionHistory, FallibleExecuteProcessResult, MultiPlatformExecuteProcessRequest,
   };
-  use crate::{CommandRunner as CommandRunnerTrait, Platform};
+  use crate::{CommandRunner as CommandRunnerTrait, Context, Platform};
   use maplit::hashset;
   use mock::execution_server::MockOperation;
   use protobuf::well_known_types::Timestamp;
-  use spectral::numeric::OrderedAssertions;
+  use spectral::prelude::*;
   use std::collections::{BTreeMap, BTreeSet};
   use std::iter::{self, FromIterator};
   use std::ops::Sub;
@@ -1912,6 +1932,68 @@ pub mod tests {
   }
 
   #[test]
+  pub fn sends_metadata_header() {
+    let execute_request = echo_foo_request();
+    let op_name = "gimme-foo".to_string();
+
+    let mock_server = {
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          vec![
+            make_incomplete_operation(&op_name),
+            make_successful_operation(
+              &op_name,
+              StdoutType::Raw("foo".to_owned()),
+              StderrType::Raw("".to_owned()),
+              0,
+            ),
+          ],
+        ),
+        None,
+      )
+    };
+    let cas = mock::StubCAS::empty();
+    let command_runner = create_command_runner(
+      mock_server.address(),
+      &cas,
+      Duration::from_millis(0),
+      Duration::from_secs(0),
+    );
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    let context = Context {
+      workunit_store: WorkUnitStore::default(),
+      build_id: String::from("marmosets"),
+    };
+    runtime
+      .block_on(command_runner.run(execute_request, context))
+      .expect("Execution failed");
+
+    let received_messages = mock_server.mock_responder.received_messages.lock();
+    let message_headers: Vec<_> = received_messages
+      .iter()
+      .map(|received_message| received_message.headers.clone())
+      .collect();
+    assert_that!(message_headers).has_length(2);
+    for headers in message_headers {
+      let want_key = String::from("google.devtools.remoteexecution.v1test.requestmetadata-bin");
+      assert_that!(headers).contains_key(&want_key);
+      let mut proto = bazel_protos::remote_execution::RequestMetadata::new();
+      proto
+        .merge_from_bytes(&headers[&want_key])
+        .expect("Failed to parse metadata proto");
+      assert_eq!(proto.get_tool_details().get_tool_name(), "pants");
+      assert_eq!(proto.get_tool_invocation_id(), "marmosets");
+    }
+  }
+
+  #[test]
   fn extract_response_with_digest_stdout() {
     let op_name = "gimme-foo".to_string();
     let testdata = TestData::roland();
@@ -2031,7 +2113,7 @@ pub mod tests {
       Duration::from_secs(0),
     );
     let result = runtime
-      .block_on(cmd_runner.run(echo_roland_request(), WorkUnitStore::new()))
+      .block_on(cmd_runner.run(echo_roland_request(), Context::default()))
       .unwrap();
     assert_eq!(
       result.without_execution_attempts(),
@@ -2226,7 +2308,7 @@ pub mod tests {
       execution_attempts: vec![],
     };
 
-    let run_future = command_runner.run(execute_request.into(), WorkUnitStore::new());
+    let run_future = command_runner.run(execute_request.into(), Context::default());
     let faster_future = Delay::new(Instant::now() + Duration::from_secs(1))
       .map_err(|err| format!("Error from timer: {}", err))
       .map({
@@ -2560,7 +2642,7 @@ pub mod tests {
     );
 
     let result = runtime
-      .block_on(command_runner.run(cat_roland_request(), WorkUnitStore::new()))
+      .block_on(command_runner.run(cat_roland_request(), Context::default()))
       .unwrap();
     assert_eq!(
       result.without_execution_attempts(),
@@ -2662,7 +2744,7 @@ pub mod tests {
       Duration::from_millis(0),
       Duration::from_secs(0),
     )
-    .run(cat_roland_request(), WorkUnitStore::new())
+    .run(cat_roland_request(), Context::default())
     .wait();
     assert_eq!(
       result,
@@ -2741,7 +2823,7 @@ pub mod tests {
     );
 
     let error = runtime
-      .block_on(runner.run(cat_roland_request(), WorkUnitStore::new()))
+      .block_on(runner.run(cat_roland_request(), Context::default()))
       .expect_err("Want error");
     assert_contains(&error, &format!("{}", missing_digest.0));
   }
@@ -2986,7 +3068,7 @@ pub mod tests {
       );
       let mut runtime = tokio::runtime::Runtime::new().unwrap();
       runtime
-        .block_on(command_runner.run(execute_request, WorkUnitStore::new()))
+        .block_on(command_runner.run(execute_request, Context::default()))
         .unwrap();
 
       let messages = mock_server.mock_responder.received_messages.lock();
@@ -3042,7 +3124,7 @@ pub mod tests {
       );
       let mut runtime = tokio::runtime::Runtime::new().unwrap();
       runtime
-        .block_on(command_runner.run(execute_request, WorkUnitStore::new()))
+        .block_on(command_runner.run(execute_request, Context::default()))
         .unwrap();
 
       let messages = mock_server.mock_responder.received_messages.lock();
@@ -3531,7 +3613,7 @@ pub mod tests {
       Duration::from_secs(0),
     );
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
-    runtime.block_on(command_runner.run(request, WorkUnitStore::new()))
+    runtime.block_on(command_runner.run(request, Context::default()))
   }
 
   fn create_command_runner(

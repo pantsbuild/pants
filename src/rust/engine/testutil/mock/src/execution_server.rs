@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::fmt::Debug;
 use std::iter::FromIterator;
 use std::ops::Deref;
@@ -154,6 +154,7 @@ pub struct ReceivedMessage {
   pub message_type: String,
   pub message: Box<dyn protobuf::Message>,
   pub received_at: Instant,
+  pub headers: HashMap<String, Vec<u8>>,
 }
 
 #[derive(Clone, Debug)]
@@ -172,11 +173,17 @@ impl MockResponder {
     }
   }
 
-  fn log<T: protobuf::Message + Sized>(&self, message: T) {
+  fn log<T: protobuf::Message + Sized>(&self, ctx: &grpcio::RpcContext, message: T) {
+    let headers = ctx
+      .request_headers()
+      .iter()
+      .map(|(name, value)| (name.to_string(), value.to_vec()))
+      .collect();
     self.received_messages.lock().push(ReceivedMessage {
       message_type: message.descriptor().name().to_string(),
       message: Box::new(message),
       received_at: Instant::now(),
+      headers,
     });
   }
 
@@ -262,7 +269,7 @@ impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
     req: bazel_protos::remote_execution::ExecuteRequest,
     sink: grpcio::ServerStreamingSink<bazel_protos::operations::Operation>,
   ) {
-    self.log(req.clone());
+    self.log(&ctx, req.clone());
 
     if self.mock_execution.execute_request != req {
       ctx.spawn(
@@ -295,11 +302,11 @@ impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
 impl bazel_protos::operations_grpc::Operations for MockResponder {
   fn get_operation(
     &self,
-    _: grpcio::RpcContext<'_>,
+    ctx: grpcio::RpcContext<'_>,
     req: bazel_protos::operations::GetOperationRequest,
     sink: grpcio::UnarySink<bazel_protos::operations::Operation>,
   ) {
-    self.log(req.clone());
+    self.log(&ctx, req.clone());
 
     self.send_next_operation_unary(sink)
   }
@@ -330,11 +337,11 @@ impl bazel_protos::operations_grpc::Operations for MockResponder {
 
   fn cancel_operation(
     &self,
-    _: grpcio::RpcContext<'_>,
+    ctx: grpcio::RpcContext<'_>,
     req: bazel_protos::operations::CancelOperationRequest,
     sink: grpcio::UnarySink<bazel_protos::empty::Empty>,
   ) {
-    self.log(req.clone());
+    self.log(&ctx, req.clone());
     self.cancelation_requests.lock().push(req);
     sink.success(bazel_protos::empty::Empty::new());
   }
