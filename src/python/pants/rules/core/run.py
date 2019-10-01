@@ -21,7 +21,7 @@ class RunResult:
 
 class Run(Goal):
   """Runs a runnable target."""
-  name = 'runv2'
+  name = 'run'
 
 
 @union
