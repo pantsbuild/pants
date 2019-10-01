@@ -64,6 +64,7 @@ class UnionBase:
 
 @union
 class UnionWithNonMemberErrorMsg:
+
   @staticmethod
   def non_member_error_message(subject):
     return f"specific error message for {type(subject).__name__} instance"
