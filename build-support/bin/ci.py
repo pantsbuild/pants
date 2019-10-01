@@ -223,9 +223,6 @@ class TestStrategy(Enum):
                         "--no-v1",
                         "--v2",
                         "--pants-config-files=pants.remote.ini",
-                        # We turn off speculation to reduce the risk of flakiness, where a test
-                        # passes either locally or remotely and fails in the other environment.
-                        "--process-execution-speculation-strategy=none",
                         f"--remote-oauth-bearer-token-path={oauth_token_path}",
                         "test",
                         *sorted(targets),
@@ -427,6 +424,7 @@ def run_unit_tests(*, oauth_token_path: Optional[str] = None) -> None:
   target_sets = TestTargetSets.calculate(
     test_type=TestType.unit, remote_execution_enabled=oauth_token_path is not None
   )
+  import multiprocessing; print("MULTIPROC CPU count: {}".format(multiprocessing.cpu_count()))
   if target_sets.v2_remote:
     _run_command(
       command=TestStrategy.v2_remote.pants_command(
