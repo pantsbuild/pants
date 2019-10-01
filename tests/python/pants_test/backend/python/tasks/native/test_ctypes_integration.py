@@ -5,9 +5,8 @@ import glob
 import os
 import re
 import subprocess
-import sys
 from functools import wraps
-from unittest import skip, skipIf
+from unittest import skip
 from zipfile import ZipFile
 
 from pants.backend.native.config.environment import Platform
@@ -30,10 +29,6 @@ def _toolchain_variants(func):
     for variant in ToolchainVariant.all_variants:
       func(*args, toolchain_variant=variant, **kwargs)
   return wrapper
-
-
-_IS_OSX = Platform.current == Platform.darwin
-_PYTHON_MAJOR_MINOR = sys.version_info[:2]
 
 
 class CTypesIntegrationTest(PantsRunIntegrationTest):
@@ -59,8 +54,6 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     'testprojects/src/python/python_distribution/ctypes_with_extra_compiler_flags:bin'
   )
 
-  @skipIf(_IS_OSX and _PYTHON_MAJOR_MINOR == (2, 7),
-          reason='Broken as described in https://github.com/pantsbuild/pants/issues/7763.')
   @_toolchain_variants
   def test_ctypes_binary_creation(self, toolchain_variant):
     """Create a python_binary() with all native toolchain variants, and test the result."""
