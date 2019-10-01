@@ -19,6 +19,7 @@ from pants.backend.python.subsystems.subprocess_environment import (
 )
 from pants.engine.fs import Digest, DirectoryToMaterialize, FileContent, InputFilesContent
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
+from pants.engine.platform import PlatformConstraint
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.util.collections import assert_single_element
@@ -64,7 +65,8 @@ class TestResolveRequirements(TestBase):
         request,
         PythonSetup.global_instance(),
         SubprocessEnvironment.global_instance(),
-        PythonNativeCode.global_instance()
+        PythonNativeCode.global_instance(),
+        PlatformConstraint.local_platform,
       )])
     )
     with temporary_dir() as tmp_dir:

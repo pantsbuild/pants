@@ -1,7 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.engine.rules import rule
+from pants.engine.rules import RootRule, rule
 from pants.util.memo import memoized_classproperty, memoized_property
 from pants.util.objects import enum
 from pants.util.osutil import all_normalized_os_names, get_normalized_os_name
@@ -36,4 +36,4 @@ def materialize_platform() -> Platform:
 
 
 def create_platform_rules():
-  return [materialize_platform]
+  return [materialize_platform, RootRule(PlatformConstraint)]

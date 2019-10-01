@@ -199,14 +199,17 @@ class LegacyGraphSession:
     :returns: An exit code.
     """
     subject = target_roots.specs
+    global_options = options_bootstrapper.bootstrap_options.for_global_scope()
     console = Console(
-      use_colors=options_bootstrapper.bootstrap_options.for_global_scope().colors
+      use_colors=global_options.colors
     )
+    target_platform_constraint = global_options.target_platform
     workspace = Workspace(self.scheduler_session)
 
     for goal in goals:
       goal_product = self.goal_map[goal]
-      params = Params(subject, options_bootstrapper, console, workspace)
+      params = Params(subject, options_bootstrapper, console,
+                      workspace, target_platform_constraint)
       logger.debug(f'requesting {goal_product} to satisfy execution of `{goal}` goal')
       try:
         exit_code = self.scheduler_session.run_console_rule(goal_product, params)

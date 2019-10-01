@@ -16,7 +16,7 @@ from pants.engine.fs import (
   DirectoryWithPrefixToAdd,
 )
 from pants.engine.isolated_process import ExecuteProcessResult, MultiPlatformExecuteProcessRequest
-from pants.engine.platform import Platform, PlatformConstraint
+from pants.engine.platform import PlatformConstraint
 from pants.engine.rules import optionable_rule, rule
 from pants.engine.selectors import Get
 
@@ -46,10 +46,14 @@ def create_pex(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
     pex_build_environment: PexBuildEnvironment,
-    platform: Platform
+    platform: PlatformConstraint
 ) -> Pex:
   """Returns a PEX with the given requirements, optional entry point, and optional
   interpreter constraints."""
+
+  # ignore none constraint if some rule pushes a constraint down as none.
+  if platform == PlatformConstraint.none:
+    platform = PlatformConstraint.local_platform
 
   interpreter_constraint_args = []
   for constraint in request.interpreter_constraints:
@@ -69,7 +73,7 @@ def create_pex(
   merged_digest = yield Get(Digest, DirectoriesToMerge(directories=all_inputs))
 
   # NB: PEX outputs are platform dependent so in order to get a PEX that we can use locally, without
-  # cross-building we specify that out PEX command be run on the current local platform. When we
+  # cross-building, we specify that our PEX command be run on the current local platform. When we
   # support cross-building through CLI flags we can configure requests that build a PEX for out
   # local platform that are able to execute on a different platform, but for now in order to
   # guarantee correct build we need to restrict this command to execute on the same platform type
@@ -79,7 +83,7 @@ def create_pex(
   # constraint`".
   execute_process_request = MultiPlatformExecuteProcessRequest(
     {
-      (PlatformConstraint(platform.value), PlatformConstraint(platform.value)):
+      (platform, platform):
         pex_bin.create_execute_request(
           python_setup=python_setup,
           subprocess_encoding_environment=subprocess_encoding_environment,
