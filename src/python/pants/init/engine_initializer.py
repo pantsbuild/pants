@@ -40,7 +40,7 @@ from pants.engine.legacy.structs import rules as structs_rules
 from pants.engine.mapper import AddressMapper
 from pants.engine.parser import SymbolTable
 from pants.engine.platform import create_platform_rules
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import RootRule, rule, UnionMembership
 from pants.engine.scheduler import Scheduler
 from pants.engine.selectors import Params
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
@@ -348,6 +348,10 @@ class EngineInitializer:
     def symbol_table_singleton() -> SymbolTable:
       return symbol_table
 
+    @rule
+    def union_membership_singleton() -> UnionMembership:
+      return UnionMembership(build_configuration.union_rules())
+
     # Create a Scheduler containing graph and filesystem rules, with no installed goals. The
     # LegacyBuildGraph will explicitly request the products it needs.
     rules = (
@@ -356,6 +360,7 @@ class EngineInitializer:
         glob_match_error_behavior_singleton,
         build_configuration_singleton,
         symbol_table_singleton,
+        union_membership_singleton,
       ] +
       create_legacy_graph_tasks() +
       create_fs_rules() +

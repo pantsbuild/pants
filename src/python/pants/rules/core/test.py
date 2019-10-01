@@ -4,12 +4,10 @@
 import logging
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
-from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
-from pants.engine.rules import console_rule, rule
+from pants.engine.rules import console_rule, rule, UnionMembership
 from pants.engine.selectors import Get
 from pants.rules.core.core_test_model import Status, TestResult, TestTarget
 
@@ -24,8 +22,10 @@ class Test(Goal):
 
 
 @console_rule
-def fast_test(console: Console, targets: HydratedTargets, build_config: BuildConfiguration) -> Test:
-  filtered_targets = [tgt for tgt in targets if build_config.is_union_member(TestTarget, tgt)]
+def fast_test(console: Console,
+              targets: HydratedTargets,
+              union_membership: UnionMembership) -> Test:
+  filtered_targets = [tgt for tgt in targets if union_membership.is_union_member(TestTarget, tgt)]
   test_results = yield [Get(TestResult, HydratedTarget, tgt) for tgt in filtered_targets]
   did_any_fail = False
   for tgt, test_result in zip(filtered_targets, test_results):

@@ -6,12 +6,12 @@ import inspect
 import itertools
 import logging
 import sys
-import typing
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from collections.abc import Iterable
+from dataclasses import dataclass
 from textwrap import dedent
-from typing import Any, Callable, Type, cast
+from typing import Any, Callable, Dict, Iterable, Type, cast
 
 import asttokens
 from twitter.common.collections import OrderedSet
@@ -211,7 +211,7 @@ def _get_starting_indent(source):
 
 
 def _make_rule(
-  return_type: type, parameter_types: typing.Iterable[type], cacheable: bool = True
+  return_type: type, parameter_types: Iterable[type], cacheable: bool = True
 ) -> Callable[[Callable], Callable]:
   """A @decorator that declares that a particular static function may be used as a TaskRule.
 
@@ -425,6 +425,17 @@ class UnionRule(datatype([
       raise cls.make_type_error('union_base must be a type annotated with @union: was {} (type {})'
                                 .format(union_base, type(union_base).__name__))
     return super().__new__(cls, union_base, union_member)
+
+
+@dataclass(frozen=True)
+class UnionMembership:
+  union_rules: Dict[type, Iterable[type]]
+
+  def is_union_member(self, union_type, tgt):
+    try:
+      return type(tgt.adaptor) in self.union_rules[union_type]
+    except KeyError:
+      raise TypeError(f'Not a registered union type: {union_type}')
 
 
 class Rule(ABC):
