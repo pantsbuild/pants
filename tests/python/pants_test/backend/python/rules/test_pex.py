@@ -75,7 +75,7 @@ class TestResolveRequirements(TestBase):
         with pex.open("PEX-INFO", "r") as pex_info:
           pex_info_content = pex_info.readline().decode()
           pex_list = pex.namelist()
-    return { 'pex': requirements_pex, 'info': json.loads(pex_info_content), 'files': pex_list }
+    return {'pex': requirements_pex, 'info': json.loads(pex_info_content), 'files': pex_list}
 
   def create_pex_and_get_pex_info(
     self, *, requirements=None, entry_point=None, interpreter_constraints=None,
