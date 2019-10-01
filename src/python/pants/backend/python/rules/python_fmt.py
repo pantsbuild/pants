@@ -94,27 +94,31 @@ def run_black(
     stderr=result.stderr.decode(),
   )
 
-
+# TODO: remove this workaround once https://github.com/pantsbuild/pants/issues/8343 is addressed
 @rule
 def target_adaptor(target: PythonTargetAdaptor) -> FormattablePythonTarget:
   yield FormattablePythonTarget(target)
 
 
+# TODO: remove this workaround once https://github.com/pantsbuild/pants/issues/8343 is addressed
 @rule
 def app_adaptor(target: PythonAppAdaptor) -> FormattablePythonTarget:
   yield FormattablePythonTarget(target)
 
 
+# TODO: remove this workaround once https://github.com/pantsbuild/pants/issues/8343 is addressed
 @rule
 def binary_adaptor(target: PythonBinaryAdaptor) -> FormattablePythonTarget:
   yield FormattablePythonTarget(target)
 
 
+# TODO: remove this workaround once https://github.com/pantsbuild/pants/issues/8343 is addressed
 @rule
 def tests_adaptor(target: PythonTestsAdaptor) -> FormattablePythonTarget:
   yield FormattablePythonTarget(target)
 
 
+# TODO: remove this workaround once https://github.com/pantsbuild/pants/issues/8343 is addressed
 @rule
 def plugin_adaptor(target: PantsPluginAdaptor) -> FormattablePythonTarget:
   yield FormattablePythonTarget(target)
