@@ -6,6 +6,8 @@ import types
 import unittest
 import uuid
 from contextlib import contextmanager
+from dataclasses import dataclass
+from typing import Any
 
 from pkg_resources import (
   Distribution,
@@ -32,7 +34,6 @@ from pants.init.extension_loader import (
 )
 from pants.subsystem.subsystem import Subsystem
 from pants.task.task import Task
-from pants.util.objects import datatype
 
 
 class MockMetadata(EmptyProvider):
@@ -89,12 +90,14 @@ class DummyTask(Task):
   def execute(self): return 42
 
 
-class RootType(datatype(['value'])):
-  pass
+@dataclass(frozen=True)
+class RootType:
+  value: Any
 
 
-class WrapperType(datatype(['value'])):
-  pass
+@dataclass(frozen=True)
+class WrapperType:
+  value: Any
 
 
 @rule

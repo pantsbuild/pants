@@ -7,6 +7,8 @@ import time
 import unittest
 import unittest.mock
 from contextlib import contextmanager
+from dataclasses import dataclass
+from typing import Any
 
 from pants.util import dirutil
 from pants.util.contextutil import pushd, temporary_dir
@@ -33,7 +35,6 @@ from pants.util.dirutil import (
   safe_rmtree,
   touch,
 )
-from pants.util.objects import datatype
 
 
 def strict_patch(target, **kwargs):
@@ -155,10 +156,15 @@ class DirutilTest(unittest.TestCase):
       with temporary_dir() as dst:
         yield root, dst
 
-  class Dir(datatype(['path'])):
-    pass
+  @dataclass(frozen=True)
+  class Dir:
+    path: Any
 
-  class File(datatype(['path', 'contents'])):
+  @dataclass(frozen=True)
+  class File:
+    file: Any
+    contents: Any
+
     @classmethod
     def empty(cls, path):
       return cls(path, contents='')
@@ -168,8 +174,9 @@ class DirutilTest(unittest.TestCase):
       with open(os.path.join(root, relpath), 'r') as fp:
         return cls(relpath, fp.read())
 
-  class Symlink(datatype(['path'])):
-    pass
+  @dataclass(frozen=True)
+  class Symlink:
+    path: Any
 
   def assert_tree(self, root, *expected):
     def collect_tree():

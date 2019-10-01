@@ -4,6 +4,7 @@
 python_library(
   dependencies=[
     ':plugins',
+    '3rdparty/python:dataclasses',
     '3rdparty/python:pex',
     '3rdparty/python:setuptools',
     '3rdparty/python:wheel',

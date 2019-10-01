@@ -1,5 +1,6 @@
 python_library(
   dependencies=[
+    '3rdparty/python:dataclasses',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/build_graph',
     'src/python/pants/engine/legacy:graph',
@@ -9,6 +10,5 @@ python_library(
     'src/python/pants/engine:selectors',
     'src/python/pants/rules/core',
     'src/python/pants/source:source',
-    'src/python/pants/util:objects',
   ],
 )

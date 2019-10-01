@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from operator import eq, ne
 from threading import Lock
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 
 from colors import strip_color
 
@@ -24,7 +24,6 @@ from pants.fs.archive import ZIP
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import fast_relpath, safe_mkdir, safe_mkdir_for, safe_open
-from pants.util.objects import datatype
 from pants.util.osutil import Pid
 from pants.util.process_handler import SubprocessProcessHandler
 from pants.util.strutil import ensure_binary
@@ -584,7 +583,13 @@ class PantsRunIntegrationTest(unittest.TestCase):
   @contextmanager
   def mock_buildroot(self, dirs_to_copy=None):
     """Construct a mock buildroot and return a helper object for interacting with it."""
-    class Manager(datatype(['write_file', 'pushd', 'new_buildroot'])): pass
+
+    @dataclass(frozen=True)
+    class Manager:
+      write_file: Any
+      pushd: Any
+      new_buildroot: Any
+
     # N.B. BUILD.tools, contrib, 3rdparty needs to be copied vs symlinked to avoid
     # symlink prefix check error in v1 and v2 engine.
     files_to_copy = ('BUILD.tools',)

@@ -5,6 +5,7 @@ import re
 import sys
 import unittest.mock
 from contextlib import contextmanager
+from dataclasses import dataclass
 from textwrap import dedent
 
 from pants.engine.native import Native
@@ -16,10 +17,12 @@ from pants_test.engine.util import assert_equal_with_printing, remove_locations_
 from pants_test.test_base import TestBase
 
 
+@dataclass(frozen=True)
 class A:
   pass
 
 
+@dataclass(frozen=True)
 class B:
   pass
 
@@ -38,6 +41,7 @@ def consumes_a_and_b(a: A, b: B) -> str:
   return str('{} and {}'.format(a, b))
 
 
+@dataclass(frozen=True)
 class C:
   pass
 
@@ -47,8 +51,9 @@ def transitive_b_c(c: C) -> B:
   return B()
 
 
-class D(datatype([('b', B)])):
-  pass
+@dataclass(frozen=True)
+class D:
+  b: B
 
 
 @rule
@@ -340,8 +345,8 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
 
     trace = remove_locations_from_traceback('\n'.join(self.scheduler.trace(request)))
     assert_equal_with_printing(self, dedent('''
-                     Computing Select(<pants_test.engine.test_scheduler.B object at 0xEEEEEEEEE>, A)
-                       Computing Task(nested_raise(), <pants_test.engine.test_scheduler.B object at 0xEEEEEEEEE>, A, true)
+                     Computing Select(B(), A)
+                       Computing Task(nested_raise(), B(), A, true)
                          Throw(An exception for B)
                            Traceback (most recent call last):
                              File LOCATION-INFO, in call

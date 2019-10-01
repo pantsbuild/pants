@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from dataclasses import dataclass
+from typing import Any
 
 from twitter.common.collections import OrderedSet
 
@@ -15,7 +17,6 @@ from pants.build_graph.bundle_mixin import BundleMixin
 from pants.build_graph.target_scopes import Scopes
 from pants.fs import archive
 from pants.util.dirutil import safe_mkdir
-from pants.util.objects import datatype
 
 
 class BundleCreate(BundleMixin, JvmBinaryTask):
@@ -51,8 +52,16 @@ class BundleCreate(BundleMixin, JvmBinaryTask):
   def product_types(cls):
     return ['jvm_archives', 'jvm_bundles', 'deployable_archives']
 
-  class App(datatype(['address', 'binary', 'bundles', 'id', 'deployjar', 'archive', 'target'])):
+  @dataclass(frozen=True)
+  class App:
     """A uniform interface to an app."""
+    address: Any
+    binary: Any
+    bundles: Any
+    id: Any
+    deployjar: Any
+    archive: Any
+    target: Any
 
     @staticmethod
     def is_app(target):

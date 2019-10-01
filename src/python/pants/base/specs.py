@@ -4,6 +4,8 @@
 import os
 import re
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any
 
 from pants.util.collections import assert_single_element
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
@@ -77,14 +79,17 @@ class Spec(ABC):
     return [os.path.join(spec_dir_path, pat) for pat in address_mapper.build_patterns]
 
 
-class SingleAddress(datatype(['directory', 'name']), Spec):
+@dataclass(frozen=True)
+class SingleAddress(Spec):
   """A Spec for a single address."""
+  directory: Any
+  name: Any
 
-  def __new__(cls, directory, name):
-    if directory is None or name is None:
-      raise ValueError('A SingleAddress must have both a directory and name. Got: '
-                       '{}:{}'.format(directory, name))
-    return super().__new__(cls, directory, name)
+  def __post_init__(self):
+    if self.directory is None or self.name is None:
+      raise ValueError(
+        f'A SingleAddress must have both a directory and name. Got: {self.directory}:{self.name}'
+      )
 
   def to_spec_string(self):
     return '{}:{}'.format(self.directory, self.name)
@@ -120,8 +125,10 @@ class SingleAddress(datatype(['directory', 'name']), Spec):
     return self.globs_in_single_dir(self.directory, address_mapper)
 
 
-class SiblingAddresses(datatype(['directory']), Spec):
+@dataclass(frozen=True)
+class SiblingAddresses(Spec):
   """A Spec representing all addresses located directly within the given directory."""
+  directory: Any
 
   def to_spec_string(self):
     return '{}:'.format(self.directory)
@@ -136,8 +143,10 @@ class SiblingAddresses(datatype(['directory']), Spec):
     return self.globs_in_single_dir(self.directory, address_mapper)
 
 
-class DescendantAddresses(datatype(['directory']), Spec):
+@dataclass(frozen=True)
+class DescendantAddresses(Spec):
   """A Spec representing all addresses located recursively under the given directory."""
+  directory: Any
 
   def to_spec_string(self):
     return '{}::'.format(self.directory)
@@ -158,8 +167,10 @@ class DescendantAddresses(datatype(['directory']), Spec):
     return [os.path.join(self.directory, '**', pat) for pat in address_mapper.build_patterns]
 
 
-class AscendantAddresses(datatype(['directory']), Spec):
+@dataclass(frozen=True)
+class AscendantAddresses(Spec):
   """A Spec representing all addresses located recursively _above_ the given directory."""
+  directory: Any
 
   def to_spec_string(self):
     return '{}^'.format(self.directory)

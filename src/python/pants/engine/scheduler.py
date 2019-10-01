@@ -7,8 +7,10 @@ import os
 import sys
 import time
 import traceback
+from dataclasses import dataclass
 from textwrap import dedent
 from types import GeneratorType
+from typing import Any
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
 from pants.base.project_tree import Dir, File, Link
@@ -37,14 +39,14 @@ from pants.engine.rules import RuleIndex, TaskRule
 from pants.engine.selectors import Params
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths
-from pants.util.objects import datatype
 from pants.util.strutil import pluralize
 
 
 logger = logging.getLogger(__name__)
 
 
-class ExecutionRequest(datatype(['roots', 'native'])):
+@dataclass(frozen=True)
+class ExecutionRequest:
   """Holds the roots for an execution, which might have been requested by a user.
 
   To create an ExecutionRequest, see `SchedulerSession.execution_request`.
@@ -52,6 +54,8 @@ class ExecutionRequest(datatype(['roots', 'native'])):
   :param roots: Roots for this request.
   :type roots: list of tuples of subject and product.
   """
+  roots: Any
+  native: Any
 
 
 class ExecutionError(Exception):

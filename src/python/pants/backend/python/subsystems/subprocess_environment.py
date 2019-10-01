@@ -2,10 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from dataclasses import dataclass
+from typing import Optional
 
 from pants.engine.rules import optionable_rule, rule
 from pants.subsystem.subsystem import Subsystem
-from pants.util.objects import datatype, string_optional
 
 
 class SubprocessEnvironment(Subsystem):
@@ -26,10 +27,10 @@ class SubprocessEnvironment(Subsystem):
              help='Override the `LC_ALL` environment variable for any forked subprocesses.')
 
 
-class SubprocessEncodingEnvironment(datatype([
-    ('lang', string_optional),
-    ('lc_all', string_optional),
-])):
+@dataclass(frozen=True)
+class SubprocessEncodingEnvironment:
+  lang: Optional[str]
+  lc_all: Optional[str]
 
   @property
   def invocation_environment_dict(self):

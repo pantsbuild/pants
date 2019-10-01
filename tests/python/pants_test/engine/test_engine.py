@@ -2,12 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import unittest
+from dataclasses import dataclass
 from textwrap import dedent
 
 from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get
-from pants.util.objects import datatype
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.engine.util import assert_equal_with_printing, remove_locations_from_traceback
 
@@ -37,7 +37,9 @@ def nested_raise(x: B) -> A:
   fn_raises(x)
 
 
-class Fib(datatype([('val', int)])): pass
+@dataclass(frozen=True)
+class Fib:
+  val: int
 
 
 @rule
@@ -48,10 +50,14 @@ def fib(n: int) -> Fib:
   yield Fib(x.val + y.val)
 
 
-class MyInt(datatype([('val', int)])): pass
+@dataclass(frozen=True)
+class MyInt:
+  val: int
 
 
-class MyFloat(datatype([('val', float)])): pass
+@dataclass(frozen=True)
+class MyFloat:
+  val: float
 
 
 @rule

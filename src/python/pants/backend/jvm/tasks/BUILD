@@ -122,6 +122,7 @@ python_library(
   sources = ['bundle_create.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:dataclasses',
     ':classpath_products',
     ':jvm_binary_task',
     'src/python/pants/backend/jvm/targets:jvm',
@@ -132,7 +133,6 @@ python_library(
     'src/python/pants/fs',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:fileutil',
-    'src/python/pants/util:objects',
   ],
 )
 

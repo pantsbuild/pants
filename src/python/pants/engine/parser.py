@@ -2,26 +2,28 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABC, abstractmethod
-
-from pants.util.objects import datatype
+from dataclasses import dataclass
+from typing import Any, Dict
 
 
 class ParseError(Exception):
   """Indicates an error parsing BUILD configuration."""
 
 
-class SymbolTable(datatype([
-  ('table', dict),
-])):
+@dataclass(frozen=True)
+class SymbolTable:
   """A symbol table dict mapping symbol name to implementation class."""
+  table: Dict
 
 
-class HydratedStruct(datatype(['value'])):
+@dataclass(frozen=True)
+class HydratedStruct:
   """A wrapper around a Struct subclass post hydration.
 
   This exists so that the rule graph can statically provide a struct for a target, and rules can depend on this
   without needing to depend on having a concrete instance of SymbolTable to register their input selectors.
   """
+  value: Any
 
 
 class Parser(ABC):

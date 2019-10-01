@@ -4,6 +4,7 @@
 
 python_library(
   dependencies=[
+    '3rdparty/python:dataclasses',
     'src/python/pants/backend/native/config',
     'src/python/pants/backend/native/subsystems',
     'src/python/pants/backend/native/subsystems/packaging',

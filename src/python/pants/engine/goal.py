@@ -3,6 +3,7 @@
 
 from abc import ABCMeta, abstractmethod
 from contextlib import contextmanager
+from dataclasses import dataclass
 
 from pants.cache.cache_setup import CacheSetup
 from pants.option.optionable import Optionable
@@ -10,10 +11,10 @@ from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.memo import memoized_classproperty
 from pants.util.meta import classproperty
-from pants.util.objects import datatype
 
 
-class Goal(datatype([('exit_code', int)]), metaclass=ABCMeta):
+@dataclass(frozen=True)
+class Goal(metaclass=ABCMeta):
   """The named product of a `@console_rule`.
 
   This abstract class should be subclassed and given a `Goal.name` that it will be referred to by
@@ -26,6 +27,7 @@ class Goal(datatype([('exit_code', int)]), metaclass=ABCMeta):
   Options values for a Goal can be retrived by declaring a dependency on the relevant `Goal.Options`
   class.
   """
+  exit_code: int
 
   @classproperty
   @abstractmethod

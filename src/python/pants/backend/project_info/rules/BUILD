@@ -1,5 +1,6 @@
 python_library(
   dependencies=[
+    '3rdparty/python:dataclasses',
     'src/python/pants/engine:console',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:objects',

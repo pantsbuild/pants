@@ -1,16 +1,19 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from dataclasses import dataclass
+
 from pants.engine.rules import RootRule, rule
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import Scope, ScopedOptions
-from pants.util.objects import datatype
 
 
-class _Options(datatype([('options', Options)])):
+@dataclass(frozen=True)
+class _Options:
   """A wrapper around bootstrapped options values: not for direct consumption."""
+  options: Options
 
 
 @rule
