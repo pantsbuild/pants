@@ -40,7 +40,7 @@ def run_black(
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
   ) -> FmtResult:
   config_path = black.get_options().config
-  config_snapshot = yield Get(Snapshot, PathGlobs, PathGlobs(include=(config_path,)))
+  config_snapshot = yield Get(Snapshot, PathGlobs(include=(config_path,)))
 
   resolved_requirements_pex = yield Get(
     Pex, CreatePex(
@@ -60,7 +60,6 @@ def run_black(
   ]
   merged_input_files = yield Get(
     Digest,
-    DirectoriesToMerge,
     DirectoriesToMerge(directories=tuple(all_input_digests)),
   )
 
