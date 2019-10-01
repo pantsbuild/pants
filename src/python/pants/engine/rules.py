@@ -431,11 +431,11 @@ class UnionRule(datatype([
 class UnionMembership:
   union_rules: Dict[type, Iterable[type]]
 
-  def is_union_member(self, union_type, tgt):
-    try:
-      return type(tgt.adaptor) in self.union_rules[union_type]
-    except KeyError:
+  def is_member(self, union_type, putative_member):
+    members = self.union_rules.get(union_type)
+    if members is None:
       raise TypeError(f'Not a registered union type: {union_type}')
+    return type(putative_member) in members
 
 
 class Rule(ABC):

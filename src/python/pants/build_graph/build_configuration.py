@@ -176,12 +176,6 @@ class BuildConfiguration:
     """
     return self._union_rules
 
-  def is_union_member(self, union_type, tgt):
-    try:
-      return type(tgt.adaptor) in self._union_rules[union_type]
-    except KeyError:
-      raise TypeError(f'Not a registered union type: {union_type}')
-
   @memoized_method
   def _get_addressable_factory(self, target_type, alias):
     return TargetAddressable.factory(target_type=target_type, alias=alias)

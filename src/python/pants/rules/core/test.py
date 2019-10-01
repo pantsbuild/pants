@@ -25,7 +25,7 @@ class Test(Goal):
 def fast_test(console: Console,
               targets: HydratedTargets,
               union_membership: UnionMembership) -> Test:
-  filtered_targets = [tgt for tgt in targets if union_membership.is_union_member(TestTarget, tgt)]
+  filtered_targets = [tgt for tgt in targets if union_membership.is_member(TestTarget, tgt.adaptor)]
   test_results = yield [Get(TestResult, HydratedTarget, tgt) for tgt in filtered_targets]
   did_any_fail = False
   for tgt, test_result in zip(filtered_targets, test_results):
