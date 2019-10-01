@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.rules.hermetic_pex import HermeticPex
+from pants.backend.python.rules.interpreter_constraints import PexInterpreterContraints
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
@@ -31,7 +32,7 @@ class CreatePex:
   """Represents a generic request to create a PEX from its inputs."""
   output_filename: str
   requirements: Tuple[str] = ()
-  interpreter_constraints: Tuple[str] = ()
+  interpreter_constraints: PexInterpreterContraints = PexInterpreterContraints()
   entry_point: Optional[str] = None
   input_files_digest: Optional[Digest] = None
 
@@ -57,9 +58,7 @@ def create_pex(
   """Returns a PEX with the given requirements, optional entry point, and optional
   interpreter constraints."""
 
-  interpreter_constraint_args = []
-  for constraint in request.interpreter_constraints:
-    interpreter_constraint_args.extend(["--interpreter-constraint", constraint])
+  interpreter_constraint_args = request.interpreter_constraints.generate_pex_arg_list()
 
   argv = ["--output-file", request.output_filename]
   if request.entry_point is not None:
@@ -118,7 +117,7 @@ class RunnablePex:
 # necessarily the interpreter that PEX will use to execute the generated .pex file.
 @rule
 def pex_execute_request(
-  runnable_pex: RunnablePex,
+  runnable_pex: RunnablePex, #TODO if this rule is a Pex the rule graph blows up wtf?
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
   python_setup: PythonSetup
   ) -> ExecuteProcessRequest:

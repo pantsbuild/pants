@@ -2,6 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.python.rules.inject_init import InjectedInitDigest
+from pants.backend.python.rules.interpreter_constraints import (
+  BuildConstraintsForAdaptors,
+  PexInterpreterContraints,
+)
 from pants.backend.python.rules.pex import CreatePex, RunnablePex
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -25,13 +29,9 @@ def run_python_binary(python_binary_target: PythonBinaryAdaptor,
   all_targets = transitive_hydrated_targets.closure
   all_target_adaptors = [t.adaptor for t in all_targets]
 
-  interpreter_constraints = {
-    constraint
-    for target_adaptor in all_target_adaptors
-    for constraint in python_setup.compatibility_or_constraints(
-      getattr(target_adaptor, 'compatibility', None)
-    )
-  }
+
+  interpreter_constraints = yield Get(PexInterpreterContraints,
+      BuildConstraintsForAdaptors(adaptors=tuple(all_target_adaptors)))
 
   source_root_stripped_sources = yield [
     Get(SourceRootStrippedSources, HydratedTarget, target_adaptor)
@@ -74,7 +74,7 @@ def run_python_binary(python_binary_target: PythonBinaryAdaptor,
   create_requirements_pex = CreatePex(
     output_filename=output_thirdparty_requirements_pex_filename,
     requirements=tuple(sorted(all_requirements)),
-    interpreter_constraints=tuple(sorted(interpreter_constraints)),
+    interpreter_constraints=interpreter_constraints,
     entry_point=entry_point,
     input_files_digest=merged_input_files,
   )

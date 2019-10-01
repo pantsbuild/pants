@@ -8,6 +8,7 @@ from pants.backend.python.python_requirements import PythonRequirements
 from pants.backend.python.rules import (
   download_pex_bin,
   inject_init,
+  interpreter_constraints,
   pex,
   python_run_binary,
   python_test_runner,
@@ -99,6 +100,7 @@ def rules():
   return (
     download_pex_bin.rules() +
     inject_init.rules() +
+    interpreter_constraints.rules() +
     python_test_runner.rules() +
     python_run_binary.rules() +
     python_native_code_rules() +
