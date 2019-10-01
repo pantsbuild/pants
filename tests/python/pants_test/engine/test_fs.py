@@ -15,8 +15,11 @@ from pants.engine.fs import (
   Digest,
   DirectoriesToMerge,
   DirectoryToMaterialize,
+  DirectoryWithPrefixToAdd,
   DirectoryWithPrefixToStrip,
+  FileContent,
   FilesContent,
+  InputFilesContent,
   PathGlobs,
   PathGlobsAndRoot,
   Snapshot,
@@ -371,6 +374,21 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
       with open(created_file, 'r') as f:
         content = f.read()
         self.assertEqual(content, "European Burmese")
+
+  def test_add_prefix(self):
+    input_files_content = InputFilesContent((
+      FileContent(path='main.py', content=b'print("from main")', is_executable=False),
+      FileContent(path='subdir/sub.py', content=b'print("from sub")', is_executable=False),
+    ))
+
+    digest, = self.scheduler.product_request(Digest, [input_files_content])
+
+    dpa = DirectoryWithPrefixToAdd(digest, "outer_dir")
+    output_digest, = self.scheduler.product_request(Digest, [dpa])
+    snapshot, = self.scheduler.product_request(Snapshot, [output_digest])
+
+    self.assertEqual(sorted(snapshot.files), ['outer_dir/main.py', 'outer_dir/subdir/sub.py'])
+    self.assertEqual(sorted(snapshot.dirs), ['outer_dir', 'outer_dir/subdir'])
 
   def test_strip_prefix(self):
     # Set up files:
