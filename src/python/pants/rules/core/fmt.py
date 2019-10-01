@@ -38,7 +38,7 @@ class Fmt(Goal):
 
   # TODO: make this "fmt"
   # Blocked on https://github.com/pantsbuild/pants/issues/8351
-  name = 'fmt_v2'
+  name = 'fmt-v2'
 
 
 @console_rule

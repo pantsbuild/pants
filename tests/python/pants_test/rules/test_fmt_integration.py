@@ -7,7 +7,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class FmtIntegrationTest(PantsRunIntegrationTest):
   def test_black_no_python_sources_should_noop(self):
     command = [
-      'fmt_v2',
+      'fmt-v2',
       'testprojects/tests/java/org/pantsbuild/testproject/dummies/::'
       ]
     pants_run = self.run_pants(command=command)
