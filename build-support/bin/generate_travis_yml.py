@@ -322,7 +322,6 @@ def osx_shard(
   setup = {
     "os": "osx",
     "language": "generic",
-    "addons": {"brew": {"packages": ["openssl"]}},
     "before_script": [
       "ulimit -c unlimited",
       "ulimit -n 8192",
@@ -578,14 +577,13 @@ def rust_tests_osx() -> Dict:
     "name": "Rust tests - OSX",
     "os": "osx",
     # Fuse actually works on this image. It hangs on many others.
-    "osx_image": "xcode8.3",
-    "addons": {"homebrew": {
-      # We must update or else Brew will complain that it is too outdated
-      # (See https://travis-ci.org/pantsbuild/pants/jobs/546948768#L278).
-      "update": True,
-      "packages": ["openssl"],
-      "casks": ["osxfuse"]
-    }},
+    "osx_image": "xcode11",
+    "addons": {
+      "homebrew": {
+        "packages": ["openssl"],
+        "casks": ["osxfuse"]
+      }
+    },
     "before_install": [
       './build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY36_VERSION}"',
     ],
