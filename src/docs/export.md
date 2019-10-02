@@ -107,15 +107,6 @@ The following is an abbreviated export file from a command in the pants repo:
         },
         "default_interpreter": "CPython-2.7.10"
     },
-    "scala_platform": {
-        "scala_version": "2.12",
-        "compiler_classpath": [
-          "/Users/dmcclanahan/tools/pants-v4/.pants.d/bootstrap/bootstrap-jvm-tools/a0ebe8e0b001/ivy/jars/org.scala-lang/scala-compiler/jars/scala-compiler-2.12.8.jar",
-          "/Users/dmcclanahan/tools/pants-v4/.pants.d/bootstrap/bootstrap-jvm-tools/a0ebe8e0b001/ivy/jars/org.scala-lang/scala-library/jars/scala-library-2.12.8.jar",
-          "/Users/dmcclanahan/tools/pants-v4/.pants.d/bootstrap/bootstrap-jvm-tools/a0ebe8e0b001/ivy/jars/org.scala-lang/scala-reflect/jars/scala-reflect-2.12.8.jar",
-          "/Users/dmcclanahan/tools/pants-v4/.pants.d/bootstrap/bootstrap-jvm-tools/a0ebe8e0b001/ivy/jars/org.scala-lang.modules/scala-xml_2.12/jars/scala-xml_2.12-1.0.6.jar"
-        ]
-    },
     "targets": {
         "examples/tests/java/org/pantsbuild/example/usethrift:usethrift": {
             "is_code_gen": false,
@@ -176,10 +167,6 @@ The following is an abbreviated export file from a command in the pants repo:
 
 
 # Export Format Changes
-
-## 1.0.11
-
-The 'scala_platform' field is added to the top-level keys, containing the 'scala_version' string (without patch version, e.g. "2.12") and the 'compiler_classpath' jars (a list of absolute paths to jar files).
 
 ## 1.0.10
 
