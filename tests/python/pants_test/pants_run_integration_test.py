@@ -328,7 +328,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
         ini.write(fp)
       args.append('--pants-config-files=' + ini_file_name)
 
-    Path('pyproject.toml').touch()
+    if not Path(get_buildroot()).samefile(Path(".")):
+      shutil.copy(str(Path(get_buildroot(), "pyproject.toml")), str(Path(".")))
 
     pants_script = [sys.executable, '-m', 'pants']
 

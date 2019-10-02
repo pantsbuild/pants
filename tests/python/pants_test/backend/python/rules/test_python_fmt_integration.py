@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from os.path import relpath
+from pathlib import Path
 
 from pants.util.contextutil import temporary_file, temporary_file_path
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
@@ -70,8 +71,7 @@ class PythonFmtIntegrationTest(PantsRunIntegrationTest):
         'examples/src/python/example/hello/greet:greet'
         ]
       pants_run = self.run_pants(command=command)
-      code = open(file_name)
-      formatted = code.read();
+      formatted = Path(file_name).read_text();
       self.assertEqual("x = 42\n", formatted)
     self.assert_success(pants_run)
     self.assertIn("1 file reformatted", pants_run.stderr_data)

@@ -45,11 +45,9 @@ python_tests(
   source='test_python_fmt_integration.py',
   dependencies=[
     'tests/python/pants_test:int-test',
-    '//:pyproject',
     'testprojects/src/python:unicode_directory',
     'examples/src/python/example:hello_directory',
   ],
   tags={'integration'},
-  timeout = 90,
 )
 

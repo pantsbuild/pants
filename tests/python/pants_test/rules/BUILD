@@ -44,10 +44,8 @@ python_tests(
   source='test_fmt_integration.py',
   dependencies=[
     'tests/python/pants_test:int-test',
-    '//:pyproject',
     'testprojects/tests/java/org/pantsbuild/testproject:dummies_directory',
   ],
   tags={'integration'},
-  timeout = 90,
 )
 
