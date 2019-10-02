@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from dataclasses import dataclass
 
 from pants.engine.objects import Collection
 from pants.engine.rules import RootRule
@@ -161,6 +162,12 @@ class DirectoryWithPrefixToStrip(datatype([('directory_digest', Digest), ('prefi
   pass
 
 
+@dataclass(frozen=True)
+class DirectoryWithPrefixToAdd:
+  directory_digest: Digest
+  prefix: str
+
+
 class DirectoryToMaterialize(datatype([('path', str), ('directory_digest', Digest)])):
   """A request to materialize the contents of a directory digest at the provided path."""
   pass
@@ -194,5 +201,6 @@ def create_fs_rules():
     RootRule(DirectoriesToMerge),
     RootRule(PathGlobs),
     RootRule(DirectoryWithPrefixToStrip),
+    RootRule(DirectoryWithPrefixToAdd),
     RootRule(UrlToFetch),
   ]

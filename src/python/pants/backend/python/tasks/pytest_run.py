@@ -11,8 +11,10 @@ import traceback
 import uuid
 from collections import OrderedDict
 from contextlib import contextmanager
+from dataclasses import dataclass
 from io import StringIO
 from textwrap import dedent
+from typing import Any
 
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.gather_sources import GatherSources
@@ -29,13 +31,16 @@ from pants.task.testrunner_task_mixin import PartitionedTestRunnerTaskMixin, Tes
 from pants.util.contextutil import environment_as, pushd, temporary_dir, temporary_file
 from pants.util.dirutil import mergetree, safe_mkdir, safe_mkdir_for
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.objects import datatype
 from pants.util.process_handler import SubprocessProcessHandler
 from pants.util.strutil import safe_shlex_join
 from pants.util.xml_parser import XmlParser
 
 
-class _Workdirs(datatype(['root_dir', 'partition'])):
+@dataclass(frozen=True)
+class _Workdirs:
+  root_dir: Any
+  partition: Any
+
   @classmethod
   def for_partition(cls, work_dir, partition):
     root_dir = os.path.join(work_dir, Target.maybe_readable_identify(partition))

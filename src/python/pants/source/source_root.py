@@ -2,13 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from typing import Optional, Sequence, Set
+from dataclasses import dataclass
+from typing import Any, Optional, Sequence, Set
 
 from pants.base.project_tree_factory import get_project_tree
 from pants.engine.objects import Collection
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.objects import datatype
 
 
 class SourceRootCategories:
@@ -19,8 +19,11 @@ class SourceRootCategories:
   ALL = [UNKNOWN, SOURCE, TEST, THIRDPARTY]
 
 
-class SourceRoot(datatype([('path', str), 'langs', ('category', str)])):
-  pass
+@dataclass(frozen=True)
+class SourceRoot:
+  path: str
+  langs: Any
+  category: str
 
 
 class AllSourceRoots(Collection.of(SourceRoot)):

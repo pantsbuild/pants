@@ -1,16 +1,19 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from dataclasses import dataclass
+
 from pants.backend.python.subsystems.pex_build_util import identify_missing_init_files
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest, Snapshot
 from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.engine.rules import rule
 from pants.engine.selectors import Get
-from pants.util.objects import datatype
 
 
 # TODO(#7710): Once this gets fixed, rename this to InitInjectedDigest.
-class InjectedInitDigest(datatype([('directory_digest', Digest)])): pass
+@dataclass(frozen=True)
+class InjectedInitDigest:
+  directory_digest: Digest
 
 
 @rule

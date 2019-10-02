@@ -10,6 +10,11 @@ files(
 )
 
 files(
+  name = 'bad_requirements_directory',
+  sources = rglobs('bad_requirements/*'),
+)
+
+files(
   name = 'build_file_imports_function_directory',
   sources = rglobs('build_file_imports_function/*'),
 )
@@ -27,6 +32,11 @@ files(
 files(
   name = 'interpreter_selection_directory',
   sources = rglobs('interpreter_selection/*'),
+)
+
+files(
+  name = 'nested_runs_directory',
+  sources = rglobs('nested_runs/*'),
 )
 
 files(

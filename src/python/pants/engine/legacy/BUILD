@@ -35,6 +35,7 @@ python_library(
   name='options_parsing',
   sources=['options_parsing.py'],
   dependencies=[
+    '3rdparty/python:dataclasses',
     'src/python/pants/build_graph',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:objects',
@@ -64,6 +65,7 @@ python_library(
   sources=['graph.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:dataclasses',
     ':address_mapper',
     ':structs',
     'src/python/pants/base:exceptions',
@@ -77,6 +79,5 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/source',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:objects',
   ],
 )

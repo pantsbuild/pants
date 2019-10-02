@@ -55,6 +55,7 @@ python_library(
   name = 'pants_daemon',
   sources = ['pants_daemon.py'],
   dependencies = [
+    '3rdparty/python:dataclasses',
     '3rdparty/python:setproctitle',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exception_sink',

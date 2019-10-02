@@ -136,6 +136,7 @@ python_library(
   name = 'specs',
   sources = ['specs.py'],
   dependencies = [
+    '3rdparty/python:dataclasses',
     'src/python/pants/util:collections',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:objects',
@@ -172,7 +173,7 @@ python_library(
   name = 'target_roots',
   sources = ['target_roots.py'],
   dependencies = [
-    'src/python/pants/util:objects',
+    '3rdparty/python:dataclasses',
   ],
 )
 

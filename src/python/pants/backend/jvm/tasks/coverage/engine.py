@@ -2,11 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.util.objects import datatype
 
 
 class CoverageEngine(ABC):
@@ -26,7 +27,8 @@ class CoverageEngine(ABC):
   is instantiated and used exactly once per `JUnitRun` task execution.
   """
 
-  class RunModifications(datatype(['classpath_prepend', 'extra_jvm_options'])):
+  @dataclass(frozen=True)
+  class RunModifications:
     """Modifications that should be made to the java command where code coverage is collected.
 
     The `classpath_prepend` field should be an iterable of classpath elements to prepend to java
@@ -35,6 +37,8 @@ class CoverageEngine(ABC):
     The `extra_jvm_options` should be a list of jvm options to include when executing the java
     command.
     """
+    classpath_prepend: Any
+    extra_jvm_options: Any
 
     @classmethod
     def create(cls, classpath_prepend=None, extra_jvm_options=None):

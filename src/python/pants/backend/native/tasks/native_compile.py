@@ -5,6 +5,8 @@ import os
 import subprocess
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
+from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.native.tasks.native_task import NativeTask
 from pants.base.build_environment import get_buildroot
@@ -12,22 +14,23 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import classproperty
-from pants.util.objects import datatype
 
 
-class NativeCompileRequest(datatype([
-    'compiler',
-    # TODO: add type checking for Collection.of(<type>)!
-    'include_dirs',
-    'sources',
-    'compiler_options',
-    'output_dir',
-    'header_file_extensions',
-])): pass
+@dataclass(frozen=True)
+class NativeCompileRequest:
+  compiler: Any
+  include_dirs: Any
+  sources: Any
+  compiler_options: Any
+  output_dir: Any
+  header_file_extensions: Any
 
 
 # TODO(#5950): perform all process execution in the v2 engine!
-class ObjectFiles(datatype(['root_dir', 'filenames'])):
+@dataclass(frozen=True)
+class ObjectFiles:
+  root_dir: Any
+  filenames: Any
 
   def file_paths(self):
     return [os.path.join(self.root_dir, fname) for fname in self.filenames]
@@ -88,7 +91,11 @@ class NativeCompile(NativeTask, metaclass=ABCMeta):
   def _include_dirs_for_target(self, target):
     return os.path.join(get_buildroot(), target.address.spec_path)
 
-  class NativeSourcesByType(datatype(['rel_root', 'headers', 'sources'])): pass
+  @dataclass(frozen=True)
+  class NativeSourcesByType:
+    rel_root: Any
+    headers: Any
+    sources: Any
 
   def get_sources_headers_for_target(self, target):
     """Return a list of file arguments to provide to the compiler.

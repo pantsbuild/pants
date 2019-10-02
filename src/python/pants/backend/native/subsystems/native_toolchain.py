@@ -1,6 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.native.config.environment import (
   Assembler,
@@ -21,7 +23,6 @@ from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
-from pants.util.objects import datatype
 
 
 class NativeToolchain(Subsystem):
@@ -69,7 +70,9 @@ class NativeToolchain(Subsystem):
     return LibcDev.scoped_instance(self)
 
 
-class LibcObjects(datatype(['crti_object_paths'])): pass
+@dataclass(frozen=True)
+class LibcObjects:
+  crti_object_paths: Any
 
 
 class LinkerWrapperMixin:
@@ -83,22 +86,34 @@ class LinkerWrapperMixin:
             .copy(exe_filename=compiler.exe_filename))
 
 
-class GCCLinker(datatype([('linker', Linker)]), LinkerWrapperMixin): pass
+@dataclass(frozen=True)
+class GCCLinker(LinkerWrapperMixin):
+  linker: Linker
 
 
-class LLVMLinker(datatype([('linker', Linker)]), LinkerWrapperMixin): pass
+@dataclass(frozen=True)
+class LLVMLinker(LinkerWrapperMixin):
+  linker: Linker
 
 
-class GCCCToolchain(datatype([('c_toolchain', CToolchain)])): pass
+@dataclass(frozen=True)
+class GCCCToolchain:
+  c_toolchain: CToolchain
 
 
-class GCCCppToolchain(datatype([('cpp_toolchain', CppToolchain)])): pass
+@dataclass(frozen=True)
+class GCCCppToolchain:
+  cpp_toolchain: CppToolchain
 
 
-class LLVMCToolchain(datatype([('c_toolchain', CToolchain)])): pass
+@dataclass(frozen=True)
+class LLVMCToolchain:
+  c_toolchain: CToolchain
 
 
-class LLVMCppToolchain(datatype([('cpp_toolchain', CppToolchain)])): pass
+@dataclass(frozen=True)
+class LLVMCppToolchain:
+  cpp_toolchain: CppToolchain
 
 
 @rule
@@ -120,11 +135,13 @@ def select_assembler(platform: Platform, native_toolchain: NativeToolchain) -> A
   yield assembler
 
 
-class BaseLinker(datatype([('linker', Linker)])):
+@dataclass(frozen=True)
+class BaseLinker:
   """A Linker which is not specific to any compiler yet.
 
   This represents Linker objects provided by subsystems, but may need additional information to be
   usable by a specific compiler."""
+  linker: Linker
 
 
 # TODO: select the appropriate `Platform` in the `@rule` decl using variants!
@@ -153,12 +170,14 @@ def select_llvm_linker(base_linker: BaseLinker) -> LLVMLinker:
   return LLVMLinker(base_linker.linker)
 
 
-class GCCInstallLocationForLLVM(datatype(['toolchain_dir'])):
+@dataclass(frozen=True)
+class GCCInstallLocationForLLVM:
   """This class is convertible into a list of command line arguments for clang and clang++.
 
   This is only used on Linux. The option --gcc-toolchain stops clang from searching for another gcc
   on the host system. The option appears to only exist on Linux clang and clang++.
   """
+  toolchain_dir: Any
 
   @property
   def as_clang_argv(self):
@@ -302,10 +321,10 @@ def select_gcc_cpp_toolchain(
   yield GCCCppToolchain(CppToolchain(working_cpp_compiler, working_linker))
 
 
-class ToolchainVariantRequest(datatype([
-    ('toolchain', NativeToolchain),
-    ('variant', ToolchainVariant),
-])): pass
+@dataclass(frozen=True)
+class ToolchainVariantRequest:
+  toolchain: NativeToolchain
+  variant: ToolchainVariant
 
 
 @rule

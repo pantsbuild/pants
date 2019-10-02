@@ -5,6 +5,7 @@ import functools
 import logging
 import os
 import re
+from dataclasses import dataclass
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext  # noqa
 from pants.backend.jvm.subsystems.rsc import Rsc
@@ -31,7 +32,7 @@ from pants.util.collections import assert_single_element
 from pants.util.contextutil import Timer
 from pants.util.dirutil import fast_relpath, fast_relpath_optional, safe_mkdir
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.objects import datatype, enum
+from pants.util.objects import enum
 from pants.util.strutil import safe_shlex_join
 
 
@@ -552,10 +553,10 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     all_jobs = cache_doublecheck_jobs + rsc_jobs + zinc_jobs + [write_to_cache_job]
     return (all_jobs, len(compile_jobs))
 
-  class RscZincMergedCompileContexts(datatype([
-      ('rsc_cc', RscCompileContext),
-      ('zinc_cc', CompileContext),
-  ])): pass
+  @dataclass(frozen=True)
+  class RscZincMergedCompileContexts:
+    rsc_cc: RscCompileContext
+    zinc_cc: CompileContext
 
   def select_runtime_context(self, merged_compile_context):
     return merged_compile_context.zinc_cc

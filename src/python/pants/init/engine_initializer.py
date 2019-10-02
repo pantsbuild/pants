@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.docgen.targets.doc import Page
 from pants.backend.jvm.targets.jvm_app import JvmApp
@@ -49,7 +51,6 @@ from pants.option.global_options import (
   ExecutionOptions,
   GlobMatchErrorBehavior,
 )
-from pants.util.objects import datatype
 
 
 logger = logging.getLogger(__name__)
@@ -158,16 +159,24 @@ def _make_target_adaptor(base_class, target_type):
   return GlobsHandlingTargetAdaptor
 
 
-class LegacyGraphScheduler(datatype(['scheduler', 'build_file_aliases', 'goal_map'])):
+@dataclass(frozen=True)
+class LegacyGraphScheduler:
   """A thin wrapper around a Scheduler configured with @rules for a symbol table."""
+  scheduler: Any
+  build_file_aliases: Any
+  goal_map: Any
 
   def new_session(self, zipkin_trace_v2, v2_ui=False):
     session = self.scheduler.new_session(zipkin_trace_v2, v2_ui)
     return LegacyGraphSession(session, self.build_file_aliases, self.goal_map)
 
 
-class LegacyGraphSession(datatype(['scheduler_session', 'build_file_aliases', 'goal_map'])):
+@dataclass(frozen=True)
+class LegacyGraphSession:
   """A thin wrapper around a SchedulerSession configured with @rules for a symbol table."""
+  scheduler_session: Any
+  build_file_aliases: Any
+  goal_map: Any
 
   class InvalidGoals(Exception):
     """Raised when invalid v2 goals are passed in a v2-only mode."""
