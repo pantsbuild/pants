@@ -13,6 +13,10 @@ remote_sources(
     lib_relpath='',
     native_lib_names = {
       'darwin': ['tensorflow_framework'],
+      # On Linux, the shared lib is literally named `libtensorflow_framework.so.1` in tensorflow
+      # 1.14. Adding a linker command line argument `-l:lib_tensorflow_framework.so.1` will tell the
+      # linker to search for and use a library literally named that filename, without any further
+      # trickery.
       'linux': [':libtensorflow_framework.so.1'],
     },
   ),
