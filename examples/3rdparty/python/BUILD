@@ -11,7 +11,10 @@ remote_sources(
   args=dict(
     include_relpath='include',
     lib_relpath='',
-    native_lib_names=['tensorflow_framework'],
+    native_lib_names = {
+      'darwin': ['tensorflow_framework'],
+      'linux': [':libtensorflow_framework.so.1'],
+    },
   ),
 )
 
@@ -21,7 +24,8 @@ unpacked_whls(
   module_name='tensorflow',
   include_patterns=[
     'include/**/*',
-    './*.so',
+    './*.so*',
+    './*.dylib*',
   ],
   within_data_subdir='purelib/tensorflow',
 )
