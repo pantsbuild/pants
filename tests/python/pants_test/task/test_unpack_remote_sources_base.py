@@ -41,6 +41,11 @@ class UnpackRemoteSourcesTest(TestBase):
                                      include_patterns=["foo/*.java"],
                                      exclude_patterns=["foo/x*.java"]))
 
+    # Validate that trailing globs match both the empty string and non-empty strings.
+    self.assertTrue(self._run_filter("foo.so", include_patterns=["*.so"]))
+    self.assertTrue(self._run_filter("foo.so", include_patterns=["*.so*"]))
+    self.assertTrue(self._run_filter("foo.so.1", include_patterns=["*.so*"]))
+
   @unittest.expectedFailure
   def test_problematic_cases(self):
     """These should pass, but don't"""
