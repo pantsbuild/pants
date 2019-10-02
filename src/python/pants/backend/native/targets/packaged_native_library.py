@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.base.payload import Payload
-from pants.base.payload_field import PrimitiveField, PrimitivesSetField
+from pants.base.payload_field import PrimitiveField
 from pants.build_graph.target import Target
 
 
