@@ -12,7 +12,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.base.deprecated import deprecated, deprecated_conditional
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.java.jar.jar_dependency import JarDependency
