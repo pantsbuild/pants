@@ -85,6 +85,13 @@ class ExportTest(ConsoleTaskTestBase):
     )
 
     self.make_target(
+      ':scalac_2_12',
+      JarLibrary,
+      jars=[JarDependency('org.scala-lang', 'scala-compiler', '2.12.8')]
+    )
+
+
+    self.make_target(
       ':scala-reflect',
       JarLibrary,
       jars=[JarDependency('org.scala-lang', 'scala-reflect', self._scala_toolchain_version)]
