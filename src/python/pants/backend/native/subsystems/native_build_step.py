@@ -3,6 +3,7 @@
 
 from abc import abstractmethod
 
+from pants.backend.native.config.environment import Platform
 from pants.build_graph.mirrored_target_option_mixin import MirroredTargetOptionMixin
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.subsystem.subsystem import Subsystem
@@ -34,9 +35,14 @@ class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsys
                   'for targets of this language.')
 
     register('--toolchain-variant', advanced=True,
-             default=ToolchainVariant.gnu, type=ToolchainVariant,
-             help="Whether to use gcc (gnu) or clang (llvm) to compile C and C++. Currently all "
-                  "linking is done with binutils ld on Linux, and the XCode CLI Tools on MacOS.")
+             default=Platform.current.resolve_for_enum_variant({
+               'darwin': ToolchainVariant.llvm,
+               'linux': ToolchainVariant.gnu,
+             }),
+             type=ToolchainVariant,
+             help="Whether to use gcc (gnu) or clang (llvm) to compile C and C++. Note that "
+                  "currently, despite the choice of toolchain, all linking is done with binutils "
+                  "ld on Linux, and the XCode CLI Tools on MacOS.")
 
   def get_compiler_option_sets_for_target(self, target):
     return self.get_scalar_mirrored_target_option('compiler_option_sets', target)
