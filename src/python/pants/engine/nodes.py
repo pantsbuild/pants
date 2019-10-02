@@ -3,8 +3,8 @@
 
 import logging
 from abc import ABC
-
-from pants.util.objects import datatype
+from dataclasses import dataclass
+from typing import Any
 
 
 logger = logging.getLogger(__name__)
@@ -35,8 +35,10 @@ class State(ABC):
     return (type(self),) + self._to_components()
 
 
-class Return(datatype(['value']), State):
+@dataclass(frozen=True)
+class Return(State):
   """Indicates that a Node successfully returned a value."""
+  value: Any
 
   @classmethod
   def _from_components(cls, components):
@@ -46,15 +48,21 @@ class Return(datatype(['value']), State):
     return (self.value,)
 
 
-class Throw(datatype(['exc']), State):
+@dataclass(frozen=True)
+class Throw(State):
   """Indicates that a Node should have been able to return a value, but failed."""
+  exc: Any
 
 
-class Runnable(datatype(['func', 'args', 'cacheable']), State):
+@dataclass(frozen=True)
+class Runnable(State):
   """Indicates that the Node is ready to run with the given closure.
 
   The return value of the Runnable will become the final state of the Node.
   """
+  func: Any
+  args: Any
+  cacheable: Any
 
   @classmethod
   def _from_components(cls, components):

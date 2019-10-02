@@ -400,7 +400,9 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     number_of_runs = 10
     max_memory_increase_fraction = 0.40 # TODO https://github.com/pantsbuild/pants/issues/7647
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir, config):
-      cmd = ['filter', 'testprojects::']
+      # NB: This doesn't actually run against all testprojects, only those that are in the chroot,
+      # i.e. explicitly declared in this test file's BUILD.
+      cmd = ['list', 'testprojects::']
       self.assert_success(pantsd_run(cmd))
       initial_memory_usage = checker.current_memory_usage()
       for _ in range(number_of_runs):

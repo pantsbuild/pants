@@ -6,6 +6,7 @@ python_library(
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:ansicolors',
+    '3rdparty/python:dataclasses',
     'contrib/go/src/python/pants/contrib/go/subsystems',
     'contrib/go/src/python/pants/contrib/go/targets',
     'src/python/pants/base:build_environment',

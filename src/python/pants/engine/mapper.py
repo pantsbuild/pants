@@ -3,6 +3,8 @@
 
 import re
 from collections import OrderedDict
+from dataclasses import dataclass
+from typing import Any
 
 from pants.build_graph.address import BuildFileAddress
 from pants.engine.objects import Serializable
@@ -22,7 +24,8 @@ class DuplicateNameError(MappingError):
   """Indicates more than one top-level object was found with the same name."""
 
 
-class AddressMap(datatype(['path', 'objects_by_name'])):
+@dataclass(frozen=True)
+class AddressMap:
   """Maps addressable Serializable objects from a byte source.
 
   To construct an AddressMap, use `parse`.
@@ -30,6 +33,8 @@ class AddressMap(datatype(['path', 'objects_by_name'])):
   :param path: The path to the byte source this address map's objects were pased from.
   :param objects_by_name: A dict mapping from object name to the parsed 'thin' addressable object.
   """
+  path: Any
+  objects_by_name: Any
 
   @classmethod
   def parse(cls, filepath, filecontent, parser):
@@ -71,7 +76,8 @@ class DifferingFamiliesError(MappingError):
   """Indicates an attempt was made to merge address maps from different families together."""
 
 
-class AddressFamily(datatype(['namespace', 'objects_by_name'])):
+@dataclass(frozen=True)
+class AddressFamily:
   """Represents the family of addressed objects in a namespace.
 
   To create an AddressFamily, use `create`.
@@ -83,6 +89,8 @@ class AddressFamily(datatype(['namespace', 'objects_by_name'])):
   :param namespace: The namespace path of this address family.
   :param objects_by_name: A dict mapping from object name to the parsed 'thin' addressable object.
   """
+  namespace: Any
+  objects_by_name: Any
 
   @classmethod
   def create(cls, spec_path, address_maps):

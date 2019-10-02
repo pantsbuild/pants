@@ -36,6 +36,7 @@ python_library(
     'process_test_util.py',
   ],
   dependencies = [
+    '3rdparty/python:dataclasses',
     '3rdparty/python:psutil',
   ],
 )

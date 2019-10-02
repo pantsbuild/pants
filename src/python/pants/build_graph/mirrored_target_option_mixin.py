@@ -2,17 +2,18 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any
 
 from pants.util.memo import memoized_property
-from pants.util.objects import datatype
 
 
-class MirroredTargetOptionDeclaration(datatype([
-    'options',
-    ('option_name', str),
-    'accessor',
-])):
+@dataclass(frozen=True)
+class MirroredTargetOptionDeclaration:
   """An interface for operations to perform on an option which may also be set on a target."""
+  options: Any
+  option_name: str
+  accessor: Any
 
   @memoized_property
   def is_flagged(self):

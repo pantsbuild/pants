@@ -319,7 +319,7 @@ python_tests(
     'tests/python/pants_test:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
   ],
-  timeout = 120,
+  timeout = 240,
   tags = {'integration'},
 )
 
@@ -466,7 +466,7 @@ python_tests(
     'testprojects/tests/java/org/pantsbuild/testproject:workdirs_directory',
   ],
   tags = {'integration'},
-  timeout = 240,
+  timeout = 1240,
 )
 
 python_tests(

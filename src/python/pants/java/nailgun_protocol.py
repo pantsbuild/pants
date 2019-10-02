@@ -9,8 +9,8 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
+from dataclasses import dataclass
 
-from pants.util.objects import datatype
 from pants.util.osutil import Pid
 
 
@@ -232,7 +232,10 @@ class NailgunProtocol:
       if timeout is not None:
         sock.settimeout(prev_timeout)
 
-  class TimeoutOptions(datatype([('start_time', float), ('interval', float)])): pass
+  @dataclass(frozen=True)
+  class TimeoutOptions:
+    start_time: float
+    interval: float
 
   class TimeoutProvider(ABC):
 

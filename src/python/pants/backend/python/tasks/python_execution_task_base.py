@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from dataclasses import dataclass
 from typing import Dict, Optional
 
 from pex.interpreter import PythonInterpreter
@@ -17,7 +18,6 @@ from pants.backend.python.tasks.resolve_requirements_task_base import ResolveReq
 from pants.build_graph.files import Files
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.util.contextutil import temporary_file
-from pants.util.objects import datatype
 
 
 def ensure_interpreter_search_path_env(interpreter):
@@ -64,8 +64,11 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     """
     return ()
 
-  class ExtraFile(datatype([('path', str), ('content', bytes)])):
+  @dataclass(frozen=True)
+  class ExtraFile:
     """Models an extra file to place in a PEX."""
+    path: str
+    content: bytes
 
     @classmethod
     def empty(cls, path):

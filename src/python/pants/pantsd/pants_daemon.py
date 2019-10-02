@@ -6,6 +6,7 @@ import os
 import sys
 import threading
 from contextlib import contextmanager
+from dataclasses import dataclass
 
 from setproctitle import setproctitle as set_process_title
 
@@ -30,7 +31,6 @@ from pants.pantsd.watchman_launcher import WatchmanLauncher
 from pants.util.collections import combined_dict
 from pants.util.contextutil import stdio_as
 from pants.util.memo import memoized_property
-from pants.util.objects import datatype
 from pants.util.strutil import ensure_text
 
 
@@ -99,12 +99,16 @@ class PantsDaemon(FingerprintedProcessManager):
   class RuntimeFailure(Exception):
     """Represents a pantsd failure at runtime, usually from an underlying service failure."""
 
-  class Handle(datatype([('pid', int), ('port', int), ('metadata_base_dir', str)])):
+  @dataclass(frozen=True)
+  class Handle:
     """A handle to a "probably running" pantsd instance.
 
     We attempt to verify that the pantsd instance is still running when we create a Handle, but
     after it has been created it is entirely process that the pantsd instance perishes.
     """
+    pid: int
+    port: int
+    metadata_base_dir: str
 
   class Factory:
     @classmethod

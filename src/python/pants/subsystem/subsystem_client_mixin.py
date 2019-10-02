@@ -2,27 +2,26 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
+from dataclasses import dataclass
+from typing import Any, Optional
+
 from twitter.common.collections import OrderedSet
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.optionable import OptionableFactory
 from pants.option.scope import ScopeInfo
-from pants.util.objects import datatype
 
 
 class SubsystemClientError(Exception): pass
 
 
-class SubsystemDependency(datatype([
-  'subsystem_cls',
-  'scope',
-  'removal_version',
-  'removal_hint',
-]), OptionableFactory):
+@dataclass(frozen=True)
+class SubsystemDependency(OptionableFactory):
   """Indicates intent to use an instance of `subsystem_cls` scoped to `scope`."""
-
-  def __new__(cls, subsystem_cls, scope, removal_version=None, removal_hint=None):
-    return super().__new__(cls, subsystem_cls, scope, removal_version, removal_hint)
+  subsystem_cls: Any
+  scope: Any
+  removal_version: Optional[Any] = None
+  removal_hint: Optional[Any] = None
 
   def is_global(self):
     return self.scope == GLOBAL_SCOPE

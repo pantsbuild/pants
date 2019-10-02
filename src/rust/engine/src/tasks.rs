@@ -159,6 +159,10 @@ impl Tasks {
         input: types.directory_with_prefix_to_strip,
       },
       Intrinsic {
+        product: types.directory_digest,
+        input: types.directory_with_prefix_to_add,
+      },
+      Intrinsic {
         product: types.process_result,
         input: types.multi_platform_process_request,
       },
