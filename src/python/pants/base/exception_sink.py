@@ -443,15 +443,18 @@ Exception message: {exception_message}{maybe_newline}
       maybe_newline=maybe_newline)
 
   _EXIT_FAILURE_TERMINAL_MESSAGE_FORMAT = """\
-{terminal_msg}{details_msg}
+{timestamp_msg}{terminal_msg}{details_msg}
 """
 
   @classmethod
   def _exit_with_failure(cls, terminal_msg):
+    timestamp_msg = (f'timestamp: {cls._iso_timestamp_for_now()}\n'
+                     if cls._should_print_backtrace_to_terminal else '')
     details_msg = ('' if cls._should_print_backtrace_to_terminal
                    else '\n\n(Use --print-exception-stacktrace to see more error details.)')
+    terminal_msg = terminal_msg or '<no exit reason provided>'
     formatted_terminal_msg = cls._EXIT_FAILURE_TERMINAL_MESSAGE_FORMAT.format(
-      terminal_msg=terminal_msg or '<no exit reason provided>', details_msg=details_msg)
+      timestamp_msg=timestamp_msg, terminal_msg=terminal_msg, details_msg=details_msg)
     # Exit with failure, printing a message to the terminal (or whatever the interactive stream is).
     cls._exiter.exit_and_fail(msg=formatted_terminal_msg, out=cls._interactive_output_stream)
 
