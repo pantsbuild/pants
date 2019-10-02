@@ -73,6 +73,16 @@ class UnpackRemoteSourcesBase(Task, metaclass=ABCMeta):
 
   @classmethod
   def compile_patterns(cls, patterns, field_name="Unknown", spec="Unknown"):
+    logger.debug(f'patterns before removing trailing stars: {patterns}')
+    # NB: `fnmatch_translate_extended()` will convert a '*' at the end into '([^/]+)' for some
+    # reason -- it should be '('[^/]*)'. This should be fixed upstream in general, but in the case
+    # where the star is at the end we can use this heuristic for now.
+    patterns.extend(
+      re.sub(r'\*$', '', p)
+      for p in patterns
+      if re.match(r'.*\*$', p)
+    )
+    logger.debug(f'patterns with any trailing stars have a version with a star removed: {patterns}')
     compiled_patterns = []
     for p in patterns:
       try:
