@@ -20,6 +20,7 @@ from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.project_info.tasks.export import Export
 from pants.backend.python.register import build_file_aliases as register_python
@@ -45,6 +46,9 @@ class ExportTest(ConsoleTaskTestBase):
   def alias_groups(cls):
     return register_core().merge(register_jvm()).merge(register_python())
 
+  # Version of the scala compiler and libraries used for this test.
+  _scala_toolchain_version = '2.10.5'
+
   def setUp(self):
     super().setUp()
 
@@ -57,9 +61,39 @@ class ExportTest(ConsoleTaskTestBase):
     init_subsystems([JUnit, ScalaPlatform, ScoveragePlatform], scala_options)
 
     self.make_target(
+      ':jar-tool',
+      JarLibrary,
+      jars=[JarDependency('org.pantsbuild', 'jar-tool', '0.0.10')]
+    )
+
+    self.make_target(
+      ':jarjar',
+      JarLibrary,
+      jars=[JarDependency(org='org.pantsbuild', name='jarjar', rev='1.7.2')]
+    )
+
+    self.make_target(
       ':scala-library',
       JarLibrary,
-      jars=[JarDependency('org.scala-lang', 'scala-library', '2.10.5')]
+      jars=[JarDependency('org.scala-lang', 'scala-library', self._scala_toolchain_version)]
+    )
+
+    self.make_target(
+      ':scalac',
+      JarLibrary,
+      jars=[JarDependency('org.scala-lang', 'scala-compiler', self._scala_toolchain_version)]
+    )
+
+    self.make_target(
+      ':scala-reflect',
+      JarLibrary,
+      jars=[JarDependency('org.scala-lang', 'scala-reflect', self._scala_toolchain_version)]
+    )
+
+    self.make_target(
+      ':scala-repl',
+      JarLibrary,
+      jars=[JarDependency('org.scala-lang', 'scala-repl', self._scala_toolchain_version)]
     )
 
     self.make_target(
@@ -181,17 +215,20 @@ class ExportTest(ConsoleTaskTestBase):
 
     self.add_to_build_file('src/python/has_reqs/BUILD', textwrap.dedent("""
        python_library(name="has_reqs", sources=globs("*.py"), dependencies=[':six'])
-       
+
        python_requirement_library(
          name='six',
          requirements=[
            python_requirement('six==1.9.0')
          ]
-       ) 
+       )
     """))
 
   def execute_export(self, *specs, **options_overrides):
     options = {
+      ScalaPlatform.options_scope: {
+        'version': 'custom'
+      },
       JvmResolveSubsystem.options_scope: {
         'resolver': 'ivy'
       },
@@ -204,10 +241,14 @@ class ExportTest(ConsoleTaskTestBase):
     }
     options.update(options_overrides)
 
+    BootstrapJvmTools.options_scope = 'bootstrap-jvm-tools'
     context = self.context(options=options, target_roots=[self.target(spec) for spec in specs],
-                           for_subsystems=[JvmPlatform])
+                           for_subsystems=[JvmPlatform],
+                           for_task_types=[BootstrapJvmTools])
     context.products.safe_create_data('compile_classpath',
                                       init_func=ClasspathProducts.init_func(self.pants_workdir))
+    bootstrap_task = BootstrapJvmTools(context, self.pants_workdir)
+    bootstrap_task.execute()
     task = self.create_task(context)
     return list(task.console_output(list(task.context.targets()),
                                     context.products.get_data('compile_classpath')))
@@ -249,7 +290,27 @@ class ExportTest(ConsoleTaskTestBase):
   def test_version(self):
     result = self.execute_export_json('project_info:first')
     # If you have to update this test, make sure export.md is updated with changelog notes
-    self.assertEqual('1.0.10', result['version'])
+    self.assertEqual('1.0.11', result['version'])
+
+  def test_scala_platform_custom(self):
+    result = self.execute_export_json('project_info:first')
+    scala_platform = result['scala_platform']
+    scala_version = scala_platform['scala_version']
+    self.assertEqual(scala_version, 'custom')
+    scala_jars = scala_platform['compiler_classpath']
+    self.assertTrue(any(self._scala_toolchain_version in jar_path for jar_path in scala_jars))
+
+  def test_scala_platform_standard(self):
+    result = self.execute_export_json('project_info:first', **{
+      ScalaPlatform.options_scope: {
+        'version': '2.12'
+      }
+    })
+    scala_platform = result['scala_platform']
+    scala_version = scala_platform['scala_version']
+    self.assertEqual(scala_version, '2.12')
+    scala_jars = scala_platform['compiler_classpath']
+    self.assertTrue(any('2.12' in jar_path for jar_path in scala_jars))
 
   def test_sources(self):
     self.set_options(sources=True)
