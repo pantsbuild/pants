@@ -80,7 +80,7 @@ class UnpackRemoteSourcesBase(Task, metaclass=ABCMeta):
     patterns.extend(
       re.sub(r'\*$', '', p)
       for p in patterns
-      if re.match(r'.*\*$', p)
+      if isinstance(p, str) and re.match(r'.*\*$', p)
     )
     logger.debug(f'patterns with any trailing stars have a version with a star removed: {patterns}')
     compiled_patterns = []
