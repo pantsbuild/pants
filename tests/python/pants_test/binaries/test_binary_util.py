@@ -6,8 +6,13 @@ import logging
 import os
 import unittest.mock
 
-from pants.binaries.binary_util import (BinaryRequest, BinaryToolFetcher, BinaryToolUrlGenerator,
-                                        BinaryUtil, select)
+from pants.binaries.binary_util import (
+  BinaryRequest,
+  BinaryToolFetcher,
+  BinaryToolUrlGenerator,
+  BinaryUtil,
+  select,
+)
 from pants.net.http.fetcher import Fetcher
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import environment_as, temporary_dir
@@ -24,7 +29,7 @@ class ExternalUrlGenerator(BinaryToolUrlGenerator):
     return ['https://www.pantsbuild.org/some-binary', 'https://www.pantsbuild.org/same-binary']
 
   # Make the __str__ deterministic, for testing exception messages.
-  def __str__(self):
+  def __repr__(self):
     return 'ExternalUrlGenerator(<example __str__()>)'
 
 
@@ -117,8 +122,8 @@ class BinaryUtilTest(TestBase):
 
     self.assertIn(BinaryUtil.NoBaseUrlsError.__name__, the_raised_exception_message)
     expected_msg = (
-      "Error resolving binary request BinaryRequest(supportdir=supportdir, version=version, "
-      "name=name, platform_dependent=False, external_url_generator=None, archiver=None): "
+      "Error resolving binary request BinaryRequest(supportdir='supportdir', version='version', "
+      "name='name', platform_dependent=False, external_url_generator=None, archiver=None): "
       "--binaries-baseurls is empty.")
     self.assertIn(expected_msg, the_raised_exception_message)
 
@@ -226,8 +231,8 @@ class BinaryUtilTest(TestBase):
 
     self.assertIn(BinaryUtil.MissingMachineInfo.__name__, the_raised_exception_message)
     expected_msg = (
-      "Error resolving binary request BinaryRequest(supportdir=supportdir, version=version, "
-      "name=name, platform_dependent=True, external_url_generator=None, archiver=None): "
+      "Error resolving binary request BinaryRequest(supportdir='supportdir', version='version', "
+      "name='name', platform_dependent=True, external_url_generator=None, archiver=None): "
       "Pants could not resolve binaries for the current host: platform 'vms' was not recognized. "
       "Recognized platforms are: [darwin, linux].")
     self.assertIn(expected_msg, the_raised_exception_message)
@@ -244,8 +249,8 @@ class BinaryUtilTest(TestBase):
 
     self.assertIn(BinaryUtil.MissingMachineInfo.__name__, the_raised_exception_message)
     expected_msg = (
-      "Error resolving binary request BinaryRequest(supportdir=mysupportdir, version=myversion, "
-      "name=myname, platform_dependent=True, external_url_generator=None, archiver=None): "
+      "Error resolving binary request BinaryRequest(supportdir='mysupportdir', version='myversion', "
+      "name='myname', platform_dependent=True, external_url_generator=None, archiver=None): "
       "Pants could not resolve binaries for the current host. Update --binaries-path-by-id to "
       "find binaries for the current host platform (\'linux\', "
       "\'quantum_computer\').\\n--binaries-path-by-id was:"
@@ -264,9 +269,9 @@ class BinaryUtilTest(TestBase):
 
     self.assertIn(BinaryUtil.MissingMachineInfo.__name__, the_raised_exception_message)
     expected_msg = (
-      "Error resolving binary request BinaryRequest(supportdir=mysupportdir, version=myversion, "
+      "Error resolving binary request BinaryRequest(supportdir='mysupportdir', version='myversion', "
       # platform_dependent=False when doing select_script()
-      "name=myname, platform_dependent=False, external_url_generator=None, archiver=None): Pants "
+      "name='myname', platform_dependent=False, external_url_generator=None, archiver=None): Pants "
       "could not resolve binaries for the current host. Update --binaries-path-by-id to find "
       "binaries for the current host platform (\'linux\', "
       "\'quantum_computer\').\\n--binaries-path-by-id was:"
@@ -303,13 +308,13 @@ class BinaryUtilTest(TestBase):
 
     self.assertIn(BinaryToolFetcher.BinaryNotFound.__name__, the_raised_exception_message)
     expected_msg = (
-      "Error resolving binary request BinaryRequest(supportdir=supportdir, version=version, "
-      "name=name, platform_dependent=False, "
+      "Error resolving binary request BinaryRequest(supportdir='supportdir', version='version', "
+      "name='name', platform_dependent=False, "
       "external_url_generator=ExternalUrlGenerator(<example __str__()>), archiver=None): "
       "Failed to fetch name binary from any source: (Failed to fetch binary from "
       "https://www.pantsbuild.org/some-binary: Fetch of https://www.pantsbuild.org/some-binary failed with "
       "status code 404, Failed to fetch binary from https://www.pantsbuild.org/same-binary: Fetch of "
-      "https://www.pantsbuild.org/same-binary failed with status code 404)'")
+      "https://www.pantsbuild.org/same-binary failed with status code 404)")
     self.assertIn(expected_msg, the_raised_exception_message)
 
   def test_disallowing_external_urls(self):
@@ -330,8 +335,8 @@ class BinaryUtilTest(TestBase):
 
     self.assertIn(BinaryUtil.NoBaseUrlsError.__name__, the_raised_exception_message)
     expected_msg = (
-      "Error resolving binary request BinaryRequest(supportdir=supportdir, version=version, "
-      "name=name, platform_dependent=False, "
+      "Error resolving binary request BinaryRequest(supportdir='supportdir', version='version', "
+      "name='name', platform_dependent=False, "
       "external_url_generator=ExternalUrlGenerator(<example __str__()>), archiver=None): "
       "--binaries-baseurls is empty.")
     self.assertIn(expected_msg, the_raised_exception_message)

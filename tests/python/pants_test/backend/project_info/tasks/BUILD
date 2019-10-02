@@ -72,7 +72,9 @@ python_tests(
   sources = ['test_export_integration.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':resolve_jars_test_mixin',
+    'examples/src/java/org/pantsbuild/example:hello_directory',
+    'examples/src/scala/org/pantsbuild/example:scala_with_java_sources_directory',
+    'examples/tests/java/org/pantsbuild/example:usethrift_directory',
     'src/python/pants/base:build_environment',
     'src/python/pants/build_graph',
     'src/python/pants/ivy',
@@ -80,6 +82,12 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:int-test',
+    'testprojects/maven_layout:provided_patching_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:exclude_directory',
+    'testprojects/src/scala/org/pantsbuild/testproject:unicode_directory',
+    'testprojects/tests/java/org/pantsbuild/testproject:ivyclassifier_directory',
+    'testprojects/tests/java/org/pantsbuild/testproject:testjvms_directory',
+    ':resolve_jars_test_mixin',
   ],
   tags = {'integration'},
   timeout = 480,
@@ -99,11 +107,21 @@ python_tests(
 )
 
 python_tests(
+  name = 'idea_plugin',
+  sources = ['test_idea_plugin.py'],
+  dependencies = [
+    'src/python/pants/backend/project_info/tasks:idea_plugin_gen',
+  ],
+)
+
+python_tests(
   name = 'idea_plugin_integration',
   sources = ['test_idea_plugin_integration.py'],
   dependencies = [
     'src/python/pants/backend/project_info/tasks:idea_plugin_gen',
     'tests/python/pants_test:int-test',
+    'examples/src/scala/org/pantsbuild/example:hello_directory',
+    'testprojects/src/python:antlr_directory',
   ],
   tags = {'integration'},
 )

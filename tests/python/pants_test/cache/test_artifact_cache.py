@@ -5,8 +5,11 @@ import os
 from contextlib import contextmanager
 
 from pants.cache.artifact import TarballArtifact
-from pants.cache.artifact_cache import (NonfatalArtifactCacheError, call_insert,
-                                        call_use_cached_files)
+from pants.cache.artifact_cache import (
+  NonfatalArtifactCacheError,
+  call_insert,
+  call_use_cached_files,
+)
 from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
 from pants.cache.pinger import BestUrlSelector, InvalidRESTfulCacheProtoError
 from pants.cache.restful_artifact_cache import RESTfulArtifactCache

@@ -3,6 +3,8 @@
 
 import itertools
 import re
+from dataclasses import dataclass
+from typing import Tuple
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.engine.console import Console
@@ -14,7 +16,7 @@ from pants.engine.rules import console_rule, optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
-from pants.util.objects import datatype, enum
+from pants.util.objects import enum
 
 
 class DetailLevel(enum(['none', 'summary', 'nonmatching', 'all'])):
@@ -80,10 +82,12 @@ class SourceFileValidation(Subsystem):
     return MultiMatcher(self.get_options().config)
 
 
-class RegexMatchResult(datatype([
-  ('path', str), ('matching', tuple), ('nonmatching', tuple)
-])):
+@dataclass(frozen=True)
+class RegexMatchResult:
   """The result of running regex matches on a source file."""
+  path: str
+  matching: Tuple
+  nonmatching: Tuple
 
 
 RegexMatchResults = Collection.of(RegexMatchResult)
@@ -205,8 +209,10 @@ class MultiMatcher:
 
 # TODO: Switch this to `lint` once we figure out a good way for v1 tasks and v2 rules
 # to share goal names.
-@console_rule(Validate, [Console, HydratedTargets, Validate.Options])
-def validate(console, hydrated_targets, validate_options):
+@console_rule
+def validate(
+  console: Console, hydrated_targets: HydratedTargets, validate_options: Validate.Options
+) -> Validate:
   per_tgt_rmrs = yield [Get(RegexMatchResults, HydratedTarget, ht) for ht in hydrated_targets]
   regex_match_results = list(itertools.chain(*per_tgt_rmrs))
 
@@ -243,8 +249,10 @@ def validate(console, hydrated_targets, validate_options):
   yield Validate(exit_code)
 
 
-@rule(RegexMatchResults, [HydratedTarget, SourceFileValidation])
-def match_regexes_for_one_target(hydrated_target, source_file_validation):
+@rule
+def match_regexes_for_one_target(
+  hydrated_target: HydratedTarget, source_file_validation: SourceFileValidation
+) -> RegexMatchResults:
   multi_matcher = source_file_validation.get_multi_matcher()
   rmrs = []
   if hasattr(hydrated_target.adaptor, 'sources'):

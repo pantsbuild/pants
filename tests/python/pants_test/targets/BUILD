@@ -43,6 +43,7 @@ python_tests(
   sources = ['test_jvm_app_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test',
+    'testprojects/src/java/org/pantsbuild/testproject:bundle_directory',
   ],
   tags = {'integration'},
   timeout = 180,

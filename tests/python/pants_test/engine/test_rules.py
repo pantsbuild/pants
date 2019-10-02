@@ -12,12 +12,23 @@ from pants.engine.console import Console
 from pants.engine.fs import create_fs_rules
 from pants.engine.goal import Goal
 from pants.engine.mapper import AddressMapper
-from pants.engine.rules import (MissingParameterTypeAnnotation, MissingReturnTypeAnnotation,
-                                RootRule, RuleIndex, _RuleVisitor, console_rule, rule)
+from pants.engine.rules import (
+  MissingParameterTypeAnnotation,
+  MissingReturnTypeAnnotation,
+  RootRule,
+  RuleIndex,
+  _RuleVisitor,
+  console_rule,
+  rule,
+)
 from pants.engine.selectors import Get
 from pants_test.engine.examples.parsers import JsonParser
-from pants_test.engine.util import (TARGET_TABLE, assert_equal_with_printing, create_scheduler,
-                                    run_rule)
+from pants_test.engine.util import (
+  TARGET_TABLE,
+  assert_equal_with_printing,
+  create_scheduler,
+  run_rule,
+)
 from pants_test.test_base import TestBase
 
 
@@ -67,8 +78,8 @@ class Example(Goal):
   name = 'example'
 
 
-@console_rule(Example, [Console])
-def a_console_rule_generator(console):
+@console_rule
+def a_console_rule_generator(console: Console) -> Example:
   a = yield Get(A, str('a str!'))
   console.print_stdout(str(a))
   yield Example(exit_code=0)
@@ -126,8 +137,8 @@ class RuleTypeAnnotationTest(unittest.TestCase):
 
 class RuleGraphTest(TestBase):
   def test_ruleset_with_missing_product_type(self):
-    @rule(A, [B])
-    def a_from_b_noop(b):
+    @rule
+    def a_from_b_noop(b: B) -> A:
       pass
 
     rules = _suba_root_rules + [a_from_b_noop]
@@ -143,16 +154,16 @@ class RuleGraphTest(TestBase):
                                     str(cm.exception))
 
   def test_ruleset_with_ambiguity(self):
-    @rule(A, [C, B])
-    def a_from_c_and_b(c, b):
+    @rule
+    def a_from_c_and_b(c: C, b: B) -> A:
       pass
 
-    @rule(A, [B, C])
-    def a_from_b_and_c(b, c):
+    @rule
+    def a_from_b_and_c(b: B, c: C) -> A:
       pass
 
-    @rule(D, [A])
-    def d_from_a(a):
+    @rule
+    def d_from_a(a: A) -> D:
       pass
 
 
@@ -181,8 +192,8 @@ class RuleGraphTest(TestBase):
       str(cm.exception))
 
   def test_ruleset_with_rule_with_two_missing_selects(self):
-    @rule(A, [B, C])
-    def a_from_b_and_c(b, c):
+    @rule
+    def a_from_b_and_c(b: B, c: C) -> A:
       pass
 
     rules = _suba_root_rules + [a_from_b_and_c]
@@ -198,20 +209,20 @@ class RuleGraphTest(TestBase):
       str(cm.exception))
 
   def test_ruleset_with_selector_only_provided_as_root_subject(self):
-    @rule(A, [B])
-    def a_from_b(b):
+    @rule
+    def a_from_b(b: B) -> A:
       pass
 
     rules = [RootRule(B), a_from_b]
     create_scheduler(rules)
 
   def test_ruleset_with_superclass_of_selected_type_produced_fails(self):
-    @rule(A, [B])
-    def a_from_b(b):
+    @rule
+    def a_from_b(b: B) -> A:
       pass
 
-    @rule(B, [SubA])
-    def b_from_suba(suba):
+    @rule
+    def b_from_suba(suba: SubA) -> B:
       pass
 
     rules = [
@@ -232,12 +243,12 @@ class RuleGraphTest(TestBase):
                                     str(cm.exception))
 
   def test_ruleset_with_failure_due_to_incompatible_subject_for_singleton(self):
-    @rule(D, [C])
-    def d_from_c(c):
+    @rule
+    def d_from_c(c: C) -> D:
       pass
 
-    @rule(B, [])
-    def b_singleton():
+    @rule
+    def b_singleton() -> B:
       return B()
 
     rules = [
@@ -261,16 +272,16 @@ class RuleGraphTest(TestBase):
     # If a rule depends on another rule+subject in two ways, and one of them is unfulfillable
     # Only the unfulfillable one should be in the errors.
 
-    @rule(B, [D])
-    def b_from_d(d):
+    @rule
+    def b_from_d(d: D) -> B:
       pass
 
-    @rule(D, [A, SubA])
-    def d_from_a_and_suba(a, suba):
+    @rule
+    def d_from_a_and_suba(a: A, suba: SubA) -> D:
       _ = yield Get(A, C, C())  # noqa: F841
 
-    @rule(A, [C])
-    def a_from_c(c):
+    @rule
+    def a_from_c(c: C) -> A:
       pass
 
     rules = _suba_root_rules + [
@@ -295,12 +306,12 @@ class RuleGraphTest(TestBase):
 
   def test_unreachable_rule(self):
     """Test that when one rule "shadows" another, we get an error."""
-    @rule(D, [])
-    def d_singleton():
+    @rule
+    def d_singleton() -> D:
       yield D()
 
-    @rule(D, [B])
-    def d_for_b(b):
+    @rule
+    def d_for_b(b: B) -> D:
       yield D()
 
     rules = [
@@ -321,8 +332,8 @@ class RuleGraphTest(TestBase):
       )
 
   def test_smallest_full_test(self):
-    @rule(A, [SubA])
-    def a_from_suba(suba):
+    @rule
+    def a_from_suba(suba: SubA) -> A:
       pass
 
     rules = _suba_root_rules + [
@@ -373,12 +384,12 @@ class RuleGraphTest(TestBase):
     self.assertTrue(12 < len(root_rule_lines)) # 2 lines per entry
 
   def test_smallest_full_test_multiple_root_subject_types(self):
-    @rule(A, [SubA])
-    def a_from_suba(suba):
+    @rule
+    def a_from_suba(suba: SubA) -> A:
       pass
 
-    @rule(B, [A])
-    def b_from_a(a):
+    @rule
+    def b_from_a(a: A) -> B:
       pass
 
     rules = [
@@ -409,8 +420,8 @@ class RuleGraphTest(TestBase):
                      fullgraph)
 
   def test_single_rule_depending_on_subject_selection(self):
-    @rule(A, [SubA])
-    def a_from_suba(suba):
+    @rule
+    def a_from_suba(suba: SubA) -> A:
       pass
 
     rules = [
@@ -431,12 +442,12 @@ class RuleGraphTest(TestBase):
       subgraph)
 
   def test_multiple_selects(self):
-    @rule(A, [SubA, B])
-    def a_from_suba_and_b(suba, b):
+    @rule
+    def a_from_suba_and_b(suba: SubA, b: B) -> A:
       pass
 
-    @rule(B, [])
-    def b():
+    @rule
+    def b() -> B:
       pass
 
     rules = [
@@ -466,16 +477,16 @@ class RuleGraphTest(TestBase):
     # This accounts for the fact that when someone uses Get (rather than Select), it's because
     # they intend for the Get's parameter to be consumed in the subgraph. Anything else would
     # be surprising.
-    @rule(A, [SubA])
-    def a(sub_a):
+    @rule
+    def a(sub_a: SubA) -> A:
       _ = yield Get(B, C())  # noqa: F841
 
-    @rule(B, [SubA])
-    def b_from_suba(suba):
+    @rule
+    def b_from_suba(suba: SubA) -> B:
       pass
 
-    @rule(SubA, [C])
-    def suba_from_c(c):
+    @rule
+    def suba_from_c(c: C) -> SubA:
       pass
 
     rules = [
@@ -503,12 +514,12 @@ class RuleGraphTest(TestBase):
       )
 
   def test_one_level_of_recursion(self):
-    @rule(A, [B])
-    def a_from_b(b):
+    @rule
+    def a_from_b(b: B) -> A:
       pass
 
-    @rule(B, [SubA])
-    def b_from_suba(suba):
+    @rule
+    def b_from_suba(suba: SubA) -> B:
       pass
 
     rules = [
@@ -531,16 +542,16 @@ class RuleGraphTest(TestBase):
       subgraph)
 
   def test_noop_removal_in_subgraph(self):
-    @rule(A, [C])
-    def a_from_c(c):
+    @rule
+    def a_from_c(c: C) -> A:
       pass
 
-    @rule(A, [])
-    def a():
+    @rule
+    def a() -> A:
       pass
 
-    @rule(B, [])
-    def b_singleton():
+    @rule
+    def b_singleton() -> B:
       return B()
 
     rules = [
@@ -563,12 +574,12 @@ class RuleGraphTest(TestBase):
       subgraph)
 
   def test_noop_removal_full_single_subject_type(self):
-    @rule(A, [C])
-    def a_from_c(c):
+    @rule
+    def a_from_c(c: C) -> A:
       pass
 
-    @rule(A, [])
-    def a():
+    @rule
+    def a() -> A:
       pass
 
     rules = _suba_root_rules + [
@@ -590,12 +601,12 @@ class RuleGraphTest(TestBase):
       fullgraph)
 
   def test_root_tuple_removed_when_no_matches(self):
-    @rule(A, [C])
-    def a_from_c(c):
+    @rule
+    def a_from_c(c: C) -> A:
       pass
 
-    @rule(B, [D, A])
-    def b_from_d_and_a(d, a):
+    @rule
+    def b_from_d_and_a(d: D, a: A) -> B:
       pass
 
     rules = [
@@ -625,16 +636,16 @@ class RuleGraphTest(TestBase):
     # If a noop-able rule has rules that depend on it,
     # they should be removed from the graph.
 
-    @rule(B, [C])
-    def b_from_c(c):
+    @rule
+    def b_from_c(c: C) -> B:
       pass
 
-    @rule(A, [B])
-    def a_from_b(b):
+    @rule
+    def a_from_b(b: B) -> A:
       pass
 
-    @rule(A, [])
-    def a():
+    @rule
+    def a() -> A:
       pass
 
     rules = [
@@ -656,12 +667,12 @@ class RuleGraphTest(TestBase):
       subgraph)
 
   def test_matching_singleton(self):
-    @rule(A, [SubA, B])
-    def a_from_suba(suba):
+    @rule
+    def a_from_suba(suba: SubA, b: B) -> A:
       return A()
 
-    @rule(B, [])
-    def b_singleton():
+    @rule
+    def b_singleton() -> B:
       return B()
 
     rules = [
@@ -684,16 +695,16 @@ class RuleGraphTest(TestBase):
       subgraph)
 
   def test_depends_on_multiple_one_noop(self):
-    @rule(B, [A])
-    def b_from_a(a):
+    @rule
+    def b_from_a(a: A) -> B:
       pass
 
-    @rule(A, [C])
-    def a_from_c(c):
+    @rule
+    def a_from_c(c: C) -> A:
       pass
 
-    @rule(A, [SubA])
-    def a_from_suba(suba):
+    @rule
+    def a_from_suba(suba: SubA) -> A:
       pass
 
     rules = [
@@ -717,16 +728,16 @@ class RuleGraphTest(TestBase):
       subgraph)
 
   def test_multiple_depend_on_same_rule(self):
-    @rule(B, [A])
-    def b_from_a(a):
+    @rule
+    def b_from_a(a: A) -> B:
       pass
 
-    @rule(C, [A])
-    def c_from_a(a):
+    @rule
+    def c_from_a(a: A) -> C:
       pass
 
-    @rule(A, [SubA])
-    def a_from_suba(suba):
+    @rule
+    def a_from_suba(suba: SubA) -> A:
       pass
 
     rules = _suba_root_rules + [
@@ -755,12 +766,12 @@ class RuleGraphTest(TestBase):
       subgraph)
 
   def test_get_simple(self):
-    @rule(A, [])
-    def a():
+    @rule
+    def a() -> A:
       _ = yield Get(B, D, D())  # noqa: F841
 
-    @rule(B, [D])
-    def b_from_d(d):
+    @rule
+    def b_from_d(d: D) -> B:
       pass
 
     rules = [
@@ -786,30 +797,30 @@ class RuleGraphTest(TestBase):
     with self.assertRaisesWithMessage(ValueError, """\
 Could not resolve type `XXX` in top level of module pants_test.engine.test_rules"""):
       class XXX: pass
-      @rule(A, [])
-      def f():
+      @rule
+      def f() -> A:
         a = yield Get(A, XXX, 3)
         yield a
 
     # This fails because the argument is defined in this file's module, but it is not a type.
     with self.assertRaisesWithMessage(ValueError, """\
 Expected a `type` constructor for `_this_is_not_a_type`, but got: 3 (type `int`)"""):
-      @rule(A, [])
-      def g():
+      @rule
+      def g() -> A:
         a = yield Get(A, _this_is_not_a_type, 3)
         yield a
 
   def test_validate_yield_statements_in_rule_body(self):
     with self.assertRaisesRegexp(_RuleVisitor.YieldVisitError, re.escape('yield A()')):
-      @rule(A, [])
-      def f():
+      @rule
+      def f() -> A:
         yield A()
         # The yield statement isn't at the end of this series of statements.
         return
 
     with self.assertRaises(_RuleVisitor.YieldVisitError) as cm:
-      @rule(A, [])
-      def h():
+      @rule
+      def h() -> A:
         yield A(
           1 + 2
         )
@@ -822,8 +833,8 @@ Expected a `type` constructor for `_this_is_not_a_type`, but got: 3 (type `int`)
 """, str(cm.exception))
 
     with self.assertRaises(_RuleVisitor.YieldVisitError) as cm:
-      @rule(A, [])
-      def g():
+      @rule
+      def g() -> A:
         # This is a yield statement without an assignment, and not at the end.
         yield Get(B, D, D())
         yield A()
@@ -846,8 +857,8 @@ test_rules.py:{lineno}:{col}
 
 The rule defined by function `g` begins at:
 test_rules.py:{rule_lineno}:{rule_col}
-      @rule(A, [])
-      def g():
+      @rule
+      def g() -> A:
         # This is a yield statement without an assignment, and not at the end.
         yield Get(B, D, D())
         yield A()
@@ -866,14 +877,14 @@ test_rules.py:{rule_lineno}:{rule_col}
       y_value: Y
 
     with self.assertRaisesWithMessageContaining(_RuleVisitor.YieldVisitError, '`yield Get(...)` in @rule is currently not allowed without an assignment.'):
-      @rule(X, [type(None)])
-      def final_yield(n):
+      @rule
+      def final_yield(n: type(None)) -> X:
         yield Get(X, Y(n))
 
     # Try a more complex example.
     with self.assertRaises(_RuleVisitor.YieldVisitError) as cm:
-      @rule(X, [type(None)])
-      def final_yield_within_if(n):
+      @rule
+      def final_yield_within_if(n: type(None)) -> X:
         if n is None:
           yield Get(X, Y(n))
     exc_msg = str(cm.exception)

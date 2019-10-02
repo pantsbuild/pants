@@ -2,12 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from contextlib import contextmanager
+from dataclasses import dataclass
 
 from pants.base.build_environment import get_buildroot
 from pants.base.workunit import WorkUnitLabel
 from pants.task.testrunner_task_mixin import PartitionedTestRunnerTaskMixin, TestResult
 from pants.util.memo import memoized_property
-from pants.util.objects import datatype
 from pants.util.process_handler import SubprocessProcessHandler
 from pants.util.strutil import create_path_env_var, safe_shlex_join, safe_shlex_split
 
@@ -44,10 +44,10 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
   def _validate_target(self, target):
     self.ensure_workspace(target)
 
-  class _GoTestTargetInfo(datatype([
-      ('import_path', str),
-      ('gopath', str),
-  ])): pass
+  @dataclass(frozen=True)
+  class _GoTestTargetInfo:
+    import_path: str
+    gopath: str
 
   def _generate_args_for_targets(self, targets):
     """

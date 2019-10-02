@@ -4,6 +4,7 @@
 
 python_tests(
   dependencies = [
+    '3rdparty/python:dataclasses',
     '3rdparty/python:parameterized',
     '3rdparty/python:pex',
     '3rdparty/python:setuptools',
@@ -20,7 +21,6 @@ python_tests(
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:objects',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:interpreter_selection_utils',
     'tests/python/pants_test:test_base',

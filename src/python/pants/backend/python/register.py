@@ -5,13 +5,13 @@ from pants.backend.python.pants_requirement import PantsRequirement
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_requirements import PythonRequirements
-from pants.backend.python.rules import (create_requirements_pex, download_pex_bin, inject_init,
-                                        python_test_runner)
+from pants.backend.python.rules import download_pex_bin, inject_init, pex, python_test_runner
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
 from pants.backend.python.subsystems.python_native_code import rules as python_native_code_rules
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
-from pants.backend.python.subsystems.subprocess_environment import \
-  rules as subprocess_environment_rules
+from pants.backend.python.subsystems.subprocess_environment import (
+  rules as subprocess_environment_rules,
+)
 from pants.backend.python.targets.python_app import PythonApp
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
@@ -19,13 +19,15 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.targets.unpacked_whls import UnpackedWheels
-from pants.backend.python.tasks.build_local_python_distributions import \
-  BuildLocalPythonDistributions
+from pants.backend.python.tasks.build_local_python_distributions import (
+  BuildLocalPythonDistributions,
+)
 from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.isort_prep import IsortPrep
 from pants.backend.python.tasks.isort_run import IsortRun
-from pants.backend.python.tasks.local_python_distribution_artifact import \
-  LocalPythonDistributionArtifact
+from pants.backend.python.tasks.local_python_distribution_artifact import (
+  LocalPythonDistributionArtifact,
+)
 from pants.backend.python.tasks.pytest_prep import PytestPrep
 from pants.backend.python.tasks.pytest_run import PytestRun
 from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
@@ -93,6 +95,6 @@ def rules():
     inject_init.rules() +
     python_test_runner.rules() +
     python_native_code_rules() +
-    create_requirements_pex.rules() +
+    pex.rules() +
     subprocess_environment_rules()
   )

@@ -79,7 +79,7 @@ class GCC(NativeTool):
       # c++config.h, which is why we bypass self._filemap() here.
       [self.select(), 'include/c++', self.version(), '*/bits/c++config.h'])
     # Get the directory that makes `#include <bits/c++config.h>` work.
-    plat_cpp_header_dir =  os.path.dirname(os.path.dirname(cpp_config_header_path))
+    plat_cpp_header_dir = os.path.dirname(os.path.dirname(cpp_config_header_path))
 
     return most_cpp_include_dirs + [plat_cpp_header_dir]
 
@@ -92,13 +92,13 @@ class GCC(NativeTool):
       extra_args=[])
 
 
-@rule(CCompiler, [GCC, Platform])
-def get_gcc(gcc, platform):
+@rule
+def get_gcc(gcc: GCC, platform: Platform) -> CCompiler:
   return gcc.c_compiler(platform)
 
 
-@rule(CppCompiler, [GCC, Platform])
-def get_gplusplus(gcc, platform):
+@rule
+def get_gplusplus(gcc: GCC, platform: Platform) -> CppCompiler:
   return gcc.cpp_compiler(platform)
 
 

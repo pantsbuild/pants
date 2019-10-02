@@ -9,7 +9,9 @@ import shutil
 import sys
 from abc import abstractmethod
 from contextlib import contextmanager
+from dataclasses import dataclass
 from functools import reduce
+from typing import Any, Optional, Tuple
 
 from twitter.common.collections import OrderedSet
 
@@ -23,19 +25,23 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_concurrent_creation, safe_open
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.objects import datatype
-from pants.util.osutil import (SUPPORTED_PLATFORM_NORMALIZED_NAMES,
-                               get_closest_mac_host_platform_pair)
+from pants.util.osutil import (
+  SUPPORTED_PLATFORM_NORMALIZED_NAMES,
+  get_closest_mac_host_platform_pair,
+)
 
 
 logger = logging.getLogger(__name__)
 
 
-class HostPlatform(datatype(['os_name', 'arch_or_version'])):
+@dataclass(frozen=True)
+class HostPlatform:
   """Describes a platform to resolve binaries for. Determines the binary's location on disk.
 
   :class:`BinaryToolUrlGenerator` instances receive this to generate download urls.
   """
+  os_name: Any
+  arch_or_version: Any
 
   def binary_path_components(self):
     """These strings are used as consecutive components of the path where a binary is fetched.
@@ -109,17 +115,15 @@ class PantsHosted(BinaryToolUrlGenerator):
 # TODO: Deprecate passing in an explicit supportdir? Seems like we should be able to
 # organize our binary hosting so that it's not needed. It's also used to calculate the binary
 # download location, though.
-class BinaryRequest(datatype([
-    'supportdir',
-    'version',
-    'name',
-    'platform_dependent',
-    # NB: this can be None!
-    'external_url_generator',
-    # NB: this can be None!
-    'archiver',
-])):
+@dataclass(frozen=True)
+class BinaryRequest:
   """Describes a request for a binary to download."""
+  supportdir: Any
+  version: Any
+  name: Any
+  platform_dependent: Any
+  external_url_generator: Optional[Any]
+  archiver: Optional[Any]
 
   def _full_name(self):
     if self.archiver:
@@ -135,24 +139,21 @@ class BinaryRequest(datatype([
     return os.path.join(*binary_path_components)
 
 
-class BinaryFetchRequest(datatype(['download_path', 'urls'])):
+@dataclass(frozen=True)
+class BinaryFetchRequest:
   """Describes a request to download a file."""
+  download_path: Any
+  urls: Tuple
+
+  def __post_init__(self):
+    if not self.urls:
+      raise self.NoDownloadUrlsError(f"No urls were provided to {self.__name__}: {self!r}.")
 
   @memoized_property
   def file_name(self):
     return os.path.basename(self.download_path)
 
   class NoDownloadUrlsError(ValueError): pass
-
-  def __new__(cls, download_path, urls):
-    this_object = super().__new__(cls, download_path, tuple(urls))
-
-    if not this_object.urls:
-      raise cls.NoDownloadUrlsError(
-        "No urls were provided to {cls_name}: {obj!r}."
-        .format(cls_name=cls.__name__, obj=this_object))
-
-    return this_object
 
 
 class BinaryToolFetcher:
@@ -406,9 +407,7 @@ class BinaryUtil:
       raise self.BinaryResolutionError(
         binary_request,
         TypeError("urls must be a list: was '{}'.".format(urls)))
-    fetch_request = BinaryFetchRequest(
-      download_path=download_path,
-      urls=urls)
+    fetch_request = BinaryFetchRequest(download_path=download_path, urls=tuple(urls))
 
     logger.debug("fetch_request: {!r}".format(fetch_request))
 

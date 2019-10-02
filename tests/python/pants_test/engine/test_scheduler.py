@@ -5,6 +5,7 @@ import re
 import sys
 import unittest.mock
 from contextlib import contextmanager
+from dataclasses import dataclass
 from textwrap import dedent
 
 from pants.engine.native import Native
@@ -16,10 +17,12 @@ from pants_test.engine.util import assert_equal_with_printing, remove_locations_
 from pants_test.test_base import TestBase
 
 
+@dataclass(frozen=True)
 class A:
   pass
 
 
+@dataclass(frozen=True)
 class B:
   pass
 
@@ -28,31 +31,33 @@ def fn_raises(x):
   raise Exception(f'An exception for {type(x).__name__}')
 
 
-@rule(A, [B])
-def nested_raise(x):
+@rule
+def nested_raise(x: B) -> A:
   fn_raises(x)
 
 
-@rule(str, [A, B])
-def consumes_a_and_b(a, b):
+@rule
+def consumes_a_and_b(a: A, b: B) -> str:
   return str('{} and {}'.format(a, b))
 
 
+@dataclass(frozen=True)
 class C:
   pass
 
 
-@rule(B, [C])
-def transitive_b_c(c):
+@rule
+def transitive_b_c(c: C) -> B:
   return B()
 
 
-class D(datatype([('b', B)])):
-  pass
+@dataclass(frozen=True)
+class D:
+  b: B
 
 
-@rule(D, [C])
-def transitive_coroutine_rule(c):
+@rule
+def transitive_coroutine_rule(c: C) -> D:
   b = yield Get(B, C, c)
   yield D(b)
 
@@ -79,8 +84,8 @@ class UnionA:
     return A()
 
 
-@rule(A, [UnionA])
-def select_union_a(union_a):
+@rule
+def select_union_a(union_a: UnionA) -> A:
   return union_a.a()
 
 
@@ -90,14 +95,14 @@ class UnionB:
     return A()
 
 
-@rule(A, [UnionB])
-def select_union_b(union_b):
+@rule
+def select_union_b(union_b: UnionB) -> A:
   return union_b.a()
 
 
 # TODO: add GetMulti testing for unions!
-@rule(A, [UnionWrapper])
-def a_union_test(union_wrapper):
+@rule
+def a_union_test(union_wrapper: UnionWrapper) -> A:
   union_a = yield Get(A, UnionBase, union_wrapper.inner)
   yield union_a
 
@@ -106,8 +111,8 @@ class UnionX:
   pass
 
 
-@rule(UnionX, [UnionWrapper])
-def no_docstring_test_rule(union_wrapper):
+@rule
+def no_docstring_test_rule(union_wrapper: UnionWrapper) -> UnionX:
   union_x = yield Get(UnionX, NoDocstringUnion, union_wrapper.inner)
   yield union_x
 
@@ -122,16 +127,16 @@ class TypeCheckFailWrapper:
     self.inner = inner
 
 
-@rule(A, [TypeCheckFailWrapper])
-def a_typecheck_fail_test(wrapper):
+@rule
+def a_typecheck_fail_test(wrapper: TypeCheckFailWrapper) -> A:
   # This `yield` would use the `nested_raise` rule, but it won't get to the point of raising since
   # the type check will fail at the Get.
   _ = yield Get(A, B, wrapper.inner) # noqa: F841
   yield A()
 
 
-@rule(C, [TypeCheckFailWrapper])
-def c_unhashable(_):
+@rule
+def c_unhashable(_: TypeCheckFailWrapper) -> C:
   # This `yield` would use the `nested_raise` rule, but it won't get to the point of raising since
   # the hashability check will fail.
   _ = yield Get(A, B, list()) # noqa: F841
@@ -142,8 +147,8 @@ class CollectionType(datatype(['items'])):
   pass
 
 
-@rule(C, [CollectionType])
-def c_unhashable_datatype(_):
+@rule
+def c_unhashable_datatype(_: CollectionType) -> C:
   # This `yield` would use the `nested_raise` rule, but it won't get to the point of raising since
   # the hashability check will fail.
   _ = yield Get(A, B, list()) # noqa: F841
@@ -340,8 +345,8 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
 
     trace = remove_locations_from_traceback('\n'.join(self.scheduler.trace(request)))
     assert_equal_with_printing(self, dedent('''
-                     Computing Select(<pants_test.engine.test_scheduler.B object at 0xEEEEEEEEE>, A)
-                       Computing Task(nested_raise(), <pants_test.engine.test_scheduler.B object at 0xEEEEEEEEE>, A, true)
+                     Computing Select(B(), A)
+                       Computing Task(nested_raise(), B(), A, true)
                          Throw(An exception for B)
                            Traceback (most recent call last):
                              File LOCATION-INFO, in call

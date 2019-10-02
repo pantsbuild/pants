@@ -6,8 +6,10 @@ from textwrap import dedent
 from pants.backend.native.targets.native_library import CLibrary
 from pants.backend.native.tasks.c_compile import CCompile
 from pants.backend.native.tasks.native_compile import ObjectFiles
-from pants_test.backend.native.tasks.native_task_test_base import (NativeCompileTestMixin,
-                                                                   NativeTaskTestBase)
+from pants_test.backend.native.tasks.native_task_test_base import (
+  NativeCompileTestMixin,
+  NativeTaskTestBase,
+)
 
 
 class CCompileTest(NativeTaskTestBase, NativeCompileTestMixin):

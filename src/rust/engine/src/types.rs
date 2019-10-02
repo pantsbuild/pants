@@ -12,6 +12,7 @@ pub struct Types {
   pub snapshot: TypeId,
   pub directories_to_merge: TypeId,
   pub directory_with_prefix_to_strip: TypeId,
+  pub directory_with_prefix_to_add: TypeId,
   pub files_content: TypeId,
   pub input_files_content: TypeId,
   pub dir: TypeId,

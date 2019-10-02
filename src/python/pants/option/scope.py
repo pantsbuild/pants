@@ -1,6 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from dataclasses import dataclass
 
 from pants.option.option_value_container import OptionValueContainer
 from pants.util.objects import datatype
@@ -54,8 +55,8 @@ class ScopeInfo(datatype([
     return getattr(self.optionable_cls, name) if self.optionable_cls else default
 
 
-class ScopedOptions(datatype([
-  ('scope', Scope),
-  ('options', OptionValueContainer),
-])):
+@dataclass(frozen=True)
+class ScopedOptions:
   """A wrapper around options selected for a particular Scope."""
+  scope: Scope
+  options: OptionValueContainer

@@ -4,16 +4,23 @@
 import multiprocessing
 import os
 import sys
+from dataclasses import dataclass
+from typing import Any
 
-from pants.base.build_environment import (get_buildroot, get_default_pants_config_file,
-                                          get_pants_cachedir, get_pants_configdir, pants_version)
+from pants.base.build_environment import (
+  get_buildroot,
+  get_default_pants_config_file,
+  get_pants_cachedir,
+  get_pants_configdir,
+  pants_version,
+)
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.custom_types import dir_option, file_option
 from pants.option.errors import OptionsError
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
-from pants.util.objects import datatype, enum
+from pants.util.objects import enum
 
 
 class GlobMatchErrorBehavior(enum(['ignore', 'warn', 'error'])):
@@ -24,32 +31,32 @@ class GlobMatchErrorBehavior(enum(['ignore', 'warn', 'error'])):
   """
 
 
-class ExecutionOptions(datatype([
-  'remote_execution',
-  'remote_store_server',
-  'remote_store_thread_count',
-  'remote_execution_server',
-  'remote_store_chunk_bytes',
-  'remote_store_chunk_upload_timeout_seconds',
-  'remote_store_rpc_retries',
-  'remote_store_connection_limit',
-  'process_execution_local_parallelism',
-  'process_execution_remote_parallelism',
-  'process_execution_cleanup_local_dirs',
-  'process_execution_speculation_delay',
-  'process_execution_speculation_strategy',
-  'process_execution_use_local_cache',
-  'remote_execution_process_cache_namespace',
-  'remote_instance_name',
-  'remote_ca_certs_path',
-  'remote_oauth_bearer_token_path',
-  'remote_execution_extra_platform_properties',
-])):
+@dataclass(frozen=True)
+class ExecutionOptions:
   """A collection of all options related to (remote) execution of processes.
 
   TODO: These options should move to a Subsystem once we add support for "bootstrap" Subsystems (ie,
   allowing Subsystems to be consumed before the Scheduler has been created).
   """
+  remote_execution: Any
+  remote_store_server: Any
+  remote_store_thread_count: Any
+  remote_execution_server: Any
+  remote_store_chunk_bytes: Any
+  remote_store_chunk_upload_timeout_seconds: Any
+  remote_store_rpc_retries: Any
+  remote_store_connection_limit: Any
+  process_execution_local_parallelism: Any
+  process_execution_remote_parallelism: Any
+  process_execution_cleanup_local_dirs: Any
+  process_execution_speculation_delay: Any
+  process_execution_speculation_strategy: Any
+  process_execution_use_local_cache: Any
+  remote_execution_process_cache_namespace: Any
+  remote_instance_name: Any
+  remote_ca_certs_path: Any
+  remote_oauth_bearer_token_path: Any
+  remote_execution_extra_platform_properties: Any
 
   @classmethod
   def from_bootstrap_options(cls, bootstrap_options):

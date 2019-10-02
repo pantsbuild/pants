@@ -60,6 +60,14 @@ files(
 )
 
 files(
+  name='ivyclassifier_directory',
+  sources=rglobs('ivyclassifier/*'),
+  dependencies = [
+    'testprojects/tests/resources/org/pantsbuild/testproject:ivyclassifier_directory',
+  ]
+)
+
+files(
   name='matcher_directory',
   sources=rglobs('matcher/*'),
 )

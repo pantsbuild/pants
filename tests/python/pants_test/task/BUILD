@@ -35,6 +35,7 @@ python_tests(
   name = 'simple_codegen_task',
   sources = ['test_simple_codegen_task.py'],
   dependencies = [
+    '3rdparty/python:dataclasses',
     'src/python/pants/base:payload',
     'src/python/pants/build_graph',
     'src/python/pants/task',

@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+from dataclasses import dataclass
+from typing import Any
 
 from pants.backend.docgen.targets.doc import Page
 from pants.backend.jvm.targets.jvm_app import JvmApp
@@ -24,10 +26,18 @@ from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_tasks
 from pants.engine.legacy.options_parsing import create_options_parsing_rules
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
-from pants.engine.legacy.structs import (JvmAppAdaptor, JvmBinaryAdaptor, PageAdaptor,
-                                         PantsPluginAdaptor, PythonAppAdaptor, PythonBinaryAdaptor,
-                                         PythonTargetAdaptor, PythonTestsAdaptor,
-                                         RemoteSourcesAdaptor, TargetAdaptor)
+from pants.engine.legacy.structs import (
+  JvmAppAdaptor,
+  JvmBinaryAdaptor,
+  PageAdaptor,
+  PantsPluginAdaptor,
+  PythonAppAdaptor,
+  PythonBinaryAdaptor,
+  PythonTargetAdaptor,
+  PythonTestsAdaptor,
+  RemoteSourcesAdaptor,
+  TargetAdaptor,
+)
 from pants.engine.legacy.structs import rules as structs_rules
 from pants.engine.mapper import AddressMapper
 from pants.engine.parser import SymbolTable
@@ -36,9 +46,11 @@ from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import Scheduler
 from pants.engine.selectors import Params
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
-from pants.option.global_options import (DEFAULT_EXECUTION_OPTIONS, ExecutionOptions,
-                                         GlobMatchErrorBehavior)
-from pants.util.objects import datatype
+from pants.option.global_options import (
+  DEFAULT_EXECUTION_OPTIONS,
+  ExecutionOptions,
+  GlobMatchErrorBehavior,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -147,16 +159,24 @@ def _make_target_adaptor(base_class, target_type):
   return GlobsHandlingTargetAdaptor
 
 
-class LegacyGraphScheduler(datatype(['scheduler', 'build_file_aliases', 'goal_map'])):
+@dataclass(frozen=True)
+class LegacyGraphScheduler:
   """A thin wrapper around a Scheduler configured with @rules for a symbol table."""
+  scheduler: Any
+  build_file_aliases: Any
+  goal_map: Any
 
   def new_session(self, zipkin_trace_v2, v2_ui=False):
     session = self.scheduler.new_session(zipkin_trace_v2, v2_ui)
     return LegacyGraphSession(session, self.build_file_aliases, self.goal_map)
 
 
-class LegacyGraphSession(datatype(['scheduler_session', 'build_file_aliases', 'goal_map'])):
+@dataclass(frozen=True)
+class LegacyGraphSession:
   """A thin wrapper around a SchedulerSession configured with @rules for a symbol table."""
+  scheduler_session: Any
+  build_file_aliases: Any
+  goal_map: Any
 
   class InvalidGoals(Exception):
     """Raised when invalid v2 goals are passed in a v2-only mode."""
@@ -325,16 +345,16 @@ class EngineInitializer:
                                    exclude_target_regexps=exclude_target_regexps,
                                    subproject_roots=subproject_roots)
 
-    @rule(GlobMatchErrorBehavior, [])
-    def glob_match_error_behavior_singleton():
+    @rule
+    def glob_match_error_behavior_singleton() -> GlobMatchErrorBehavior:
       return glob_match_error_behavior or GlobMatchErrorBehavior.ignore
 
-    @rule(BuildConfiguration, [])
-    def build_configuration_singleton():
+    @rule
+    def build_configuration_singleton() -> BuildConfiguration:
       return build_configuration
 
-    @rule(SymbolTable, [])
-    def symbol_table_singleton():
+    @rule
+    def symbol_table_singleton() -> SymbolTable:
       return symbol_table
 
     # Create a Scheduler containing graph and filesystem rules, with no installed goals. The

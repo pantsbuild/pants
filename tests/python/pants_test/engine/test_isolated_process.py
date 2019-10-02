@@ -4,10 +4,21 @@
 import os
 import unittest
 
-from pants.engine.fs import (EMPTY_DIRECTORY_DIGEST, Digest, FileContent, FilesContent,
-                             InputFilesContent, PathGlobs, Snapshot)
-from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult,
-                                           FallibleExecuteProcessResult, ProcessExecutionFailure)
+from pants.engine.fs import (
+  EMPTY_DIRECTORY_DIGEST,
+  Digest,
+  FileContent,
+  FilesContent,
+  InputFilesContent,
+  PathGlobs,
+  Snapshot,
+)
+from pants.engine.isolated_process import (
+  ExecuteProcessRequest,
+  ExecuteProcessResult,
+  FallibleExecuteProcessResult,
+  ProcessExecutionFailure,
+)
 from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get
@@ -63,8 +74,8 @@ class ShellCat(datatype([('binary_location', BinaryLocation)])):
 class CatExecutionRequest(datatype([('shell_cat', ShellCat), ('path_globs', PathGlobs)])): pass
 
 
-@rule(Concatted, [CatExecutionRequest])
-def cat_files_process_result_concatted(cat_exe_req):
+@rule
+def cat_files_process_result_concatted(cat_exe_req: CatExecutionRequest) -> Concatted:
   cat_bin = cat_exe_req.shell_cat
   cat_files_snapshot = yield Get(Snapshot, PathGlobs, cat_exe_req.path_globs)
   process_request = ExecuteProcessRequest(
@@ -98,8 +109,8 @@ class JavacVersionExecutionRequest(datatype([('binary_location', BinaryLocation)
 class JavacVersionOutput(datatype([('value', str)])): pass
 
 
-@rule(JavacVersionOutput, [JavacVersionExecutionRequest])
-def get_javac_version_output(javac_version_command):
+@rule
+def get_javac_version_output(javac_version_command: JavacVersionExecutionRequest) -> JavacVersionOutput:
   javac_version_proc_req = ExecuteProcessRequest(
     argv=javac_version_command.gen_argv(),
     description=javac_version_command.description,
@@ -148,8 +159,8 @@ class JavacCompileResult(datatype([
 # exhaustively correct java compilation.
 # This rule/test should be deleted when we have more real java rules (or anything else which serves
 # as a suitable rule-writing example).
-@rule(JavacCompileResult, [JavacCompileRequest])
-def javac_compile_process_result(javac_compile_req):
+@rule
+def javac_compile_process_result(javac_compile_req: JavacCompileRequest) -> JavacCompileResult:
   java_files = javac_compile_req.javac_sources.java_files
   for java_file in java_files:
     if not java_file.endswith(".java"):

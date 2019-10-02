@@ -34,13 +34,13 @@ class Binutils(NativeTool):
     )
 
 
-@rule(Assembler, [Binutils])
-def get_as(binutils):
+@rule
+def get_as(binutils: Binutils) -> Assembler:
   return binutils.assembler()
 
 
-@rule(Linker, [Binutils])
-def get_ld(binutils):
+@rule
+def get_ld(binutils: Binutils) -> Linker:
   return binutils.linker()
 
 

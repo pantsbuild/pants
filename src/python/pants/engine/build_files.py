@@ -34,8 +34,8 @@ def _key_func(entry):
   return key
 
 
-@rule(AddressFamily, [AddressMapper, Dir])
-def parse_address_family(address_mapper, directory):
+@rule
+def parse_address_family(address_mapper: AddressMapper, directory: Dir) -> AddressFamily:
   """Given an AddressMapper and a directory, return an AddressFamily.
 
   The AddressFamily may be empty, but it will not be None.
@@ -70,8 +70,8 @@ def _raise_did_you_mean(address_family, name, source=None):
     raise resolve_error
 
 
-@rule(HydratedStruct, [AddressMapper, Address])
-def hydrate_struct(address_mapper, address):
+@rule
+def hydrate_struct(address_mapper: AddressMapper, address: Address) -> HydratedStruct:
   """Given an AddressMapper and an Address, resolve a Struct from a BUILD file.
 
   Recursively collects any embedded addressables within the Struct, but will not walk into a
@@ -179,8 +179,10 @@ def _hydrate(item_type, spec_path, **kwargs):
   return item
 
 
-@rule(BuildFileAddresses, [AddressMapper, Specs])
-def addresses_from_address_families(address_mapper, specs):
+@rule
+def addresses_from_address_families(
+  address_mapper: AddressMapper, specs: Specs
+) -> BuildFileAddresses:
   """Given an AddressMapper and list of Specs, return matching BuildFileAddresses.
 
   :raises: :class:`ResolveError` if:
@@ -235,8 +237,8 @@ def create_graph_rules(address_mapper):
   :param symbol_table: A SymbolTable instance to provide symbols for Address lookups.
   """
 
-  @rule(AddressMapper, [])
-  def address_mapper_singleton():
+  @rule
+  def address_mapper_singleton() -> AddressMapper:
     return address_mapper
 
   return [

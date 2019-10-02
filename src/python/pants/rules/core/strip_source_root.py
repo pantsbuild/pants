@@ -1,21 +1,26 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from dataclasses import dataclass
+
 from pants.build_graph.files import Files
 from pants.engine.fs import EMPTY_SNAPSHOT, Digest, DirectoryWithPrefixToStrip, Snapshot
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.rules import optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.source.source_root import SourceRootConfig
-from pants.util.objects import datatype
 
 
-class SourceRootStrippedSources(datatype([('snapshot', Snapshot)])):
+@dataclass(frozen=True)
+class SourceRootStrippedSources:
   """Wrapper for a snapshot of targets whose source roots have been stripped."""
+  snapshot: Snapshot
 
 
-@rule(SourceRootStrippedSources, [HydratedTarget, SourceRootConfig])
-def strip_source_root(hydrated_target, source_root_config):
+@rule
+def strip_source_root(
+  hydrated_target: HydratedTarget, source_root_config: SourceRootConfig
+) -> SourceRootStrippedSources:
   """Relativize targets to their source root, e.g.
   `src/python/pants/util/strutil.py` -> `pants/util/strutil.py ."""
 

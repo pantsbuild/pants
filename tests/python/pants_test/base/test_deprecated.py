@@ -7,11 +7,18 @@ from contextlib import contextmanager
 
 from packaging.version import Version
 
-from pants.base.deprecated import (BadDecoratorNestingError, BadSemanticVersionError,
-                                   CodeRemovedError, InvalidSemanticVersionOrderingError,
-                                   MissingSemanticVersionError, NonDevSemanticVersionError,
-                                   deprecated, deprecated_conditional, deprecated_module,
-                                   warn_or_error)
+from pants.base.deprecated import (
+  BadDecoratorNestingError,
+  BadSemanticVersionError,
+  CodeRemovedError,
+  InvalidSemanticVersionOrderingError,
+  MissingSemanticVersionError,
+  NonDevSemanticVersionError,
+  deprecated,
+  deprecated_conditional,
+  deprecated_module,
+  warn_or_error,
+)
 from pants.util.collections import assert_single_element
 from pants_test.test_base import TestBase
 

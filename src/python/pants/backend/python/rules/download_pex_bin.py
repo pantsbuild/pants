@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from dataclasses import dataclass
 from typing import Any, Iterable
 
 from pants.backend.python.rules.hermetic_pex import HermeticPex
@@ -11,10 +12,12 @@ from pants.engine.fs import Digest, Snapshot, UrlToFetch
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.engine.rules import rule
 from pants.engine.selectors import Get
-from pants.util.objects import datatype
 
 
-class DownloadedPexBin(HermeticPex, datatype([('executable', str), ('directory_digest', Digest)])):
+@dataclass(frozen=True)
+class DownloadedPexBin(HermeticPex):
+  executable: str
+  directory_digest: Digest
 
   def create_execute_request(self,
     python_setup: PythonSetup,

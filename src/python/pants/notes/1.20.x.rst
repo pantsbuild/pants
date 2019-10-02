@@ -3,6 +3,12 @@
 
 This document describes releases leading up to the ``1.20.x`` ``stable`` series.
 
+1.20.0 (09/30/2019)
+-------------------
+
+The first stable release in the ``1.20.x`` series, with no changes since the previous rc!
+
+
 1.20.0rc2 (09/18/2019)
 ----------------------
 

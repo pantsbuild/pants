@@ -6,9 +6,17 @@ import types
 import unittest
 import uuid
 from contextlib import contextmanager
+from dataclasses import dataclass
+from typing import Any
 
-from pkg_resources import (Distribution, EmptyProvider, VersionConflict, WorkingSet, working_set,
-                           yield_lines)
+from pkg_resources import (
+  Distribution,
+  EmptyProvider,
+  VersionConflict,
+  WorkingSet,
+  working_set,
+  yield_lines,
+)
 
 from pants.base.exceptions import BuildConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
@@ -17,11 +25,15 @@ from pants.build_graph.target import Target
 from pants.engine.rules import RootRule, rule
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
-from pants.init.extension_loader import (PluginLoadOrderError, PluginNotFound, load_backend,
-                                         load_backends_and_plugins, load_plugins)
+from pants.init.extension_loader import (
+  PluginLoadOrderError,
+  PluginNotFound,
+  load_backend,
+  load_backends_and_plugins,
+  load_plugins,
+)
 from pants.subsystem.subsystem import Subsystem
 from pants.task.task import Task
-from pants.util.objects import datatype
 
 
 class MockMetadata(EmptyProvider):
@@ -78,16 +90,18 @@ class DummyTask(Task):
   def execute(self): return 42
 
 
-class RootType(datatype(['value'])):
-  pass
+@dataclass(frozen=True)
+class RootType:
+  value: Any
 
 
-class WrapperType(datatype(['value'])):
-  pass
+@dataclass(frozen=True)
+class WrapperType:
+  value: Any
 
 
-@rule(WrapperType, [RootType])
-def example_rule(root_type):
+@rule
+def example_rule(root_type: RootType) -> WrapperType:
   yield WrapperType(root_type.value)
 
 
@@ -95,8 +109,8 @@ class PluginProduct:
   pass
 
 
-@rule(PluginProduct, [RootType])
-def example_plugin_rule(root_type):
+@rule
+def example_plugin_rule(root_type: RootType) -> PluginProduct:
   yield PluginProduct()
 
 

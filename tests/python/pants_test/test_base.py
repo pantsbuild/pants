@@ -32,8 +32,15 @@ from pants.subsystem.subsystem import Subsystem
 from pants.task.goal_options_mixin import GoalOptionsMixin
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import (recursive_dirname, relative_symlink, safe_file_dump, safe_mkdir,
-                                safe_mkdtemp, safe_open, safe_rmtree)
+from pants.util.dirutil import (
+  recursive_dirname,
+  relative_symlink,
+  safe_file_dump,
+  safe_mkdir,
+  safe_mkdtemp,
+  safe_open,
+  safe_rmtree,
+)
 from pants.util.memo import memoized_method
 from pants.util.meta import classproperty
 from pants_test.base.context_utils import create_context_from_options

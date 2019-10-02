@@ -7,16 +7,34 @@ import time
 import unittest
 import unittest.mock
 from contextlib import contextmanager
+from dataclasses import dataclass
+from typing import Any
 
 from pants.util import dirutil
 from pants.util.contextutil import pushd, temporary_dir
-from pants.util.dirutil import (ExistingDirError, ExistingFileError, _mkdtemp_unregister_cleaner,
-                                absolute_symlink, check_no_overlapping_paths, fast_relpath,
-                                get_basedir, longest_dir_prefix, mergetree, read_file,
-                                relative_symlink, relativize_paths, rm_rf, safe_concurrent_creation,
-                                safe_file_dump, safe_mkdir, safe_mkdtemp, safe_open,
-                                safe_rm_oldest_items_in_dir, safe_rmtree, touch)
-from pants.util.objects import datatype
+from pants.util.dirutil import (
+  ExistingDirError,
+  ExistingFileError,
+  _mkdtemp_unregister_cleaner,
+  absolute_symlink,
+  check_no_overlapping_paths,
+  fast_relpath,
+  get_basedir,
+  longest_dir_prefix,
+  mergetree,
+  read_file,
+  relative_symlink,
+  relativize_paths,
+  rm_rf,
+  safe_concurrent_creation,
+  safe_file_dump,
+  safe_mkdir,
+  safe_mkdtemp,
+  safe_open,
+  safe_rm_oldest_items_in_dir,
+  safe_rmtree,
+  touch,
+)
 
 
 def strict_patch(target, **kwargs):
@@ -138,10 +156,15 @@ class DirutilTest(unittest.TestCase):
       with temporary_dir() as dst:
         yield root, dst
 
-  class Dir(datatype(['path'])):
-    pass
+  @dataclass(frozen=True)
+  class Dir:
+    path: Any
 
-  class File(datatype(['path', 'contents'])):
+  @dataclass(frozen=True)
+  class File:
+    file: Any
+    contents: Any
+
     @classmethod
     def empty(cls, path):
       return cls(path, contents='')
@@ -151,8 +174,9 @@ class DirutilTest(unittest.TestCase):
       with open(os.path.join(root, relpath), 'r') as fp:
         return cls(relpath, fp.read())
 
-  class Symlink(datatype(['path'])):
-    pass
+  @dataclass(frozen=True)
+  class Symlink:
+    path: Any
 
   def assert_tree(self, root, *expected):
     def collect_tree():

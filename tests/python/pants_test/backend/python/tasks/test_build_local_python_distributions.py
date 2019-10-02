@@ -10,8 +10,9 @@ from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants_test.backend.python.tasks.util.build_local_dists_test_base import \
-  BuildLocalPythonDistributionsTestBase
+from pants_test.backend.python.tasks.util.build_local_dists_test_base import (
+  BuildLocalPythonDistributionsTestBase,
+)
 
 
 class TestBuildLocalPythonDistributions(BuildLocalPythonDistributionsTestBase):
