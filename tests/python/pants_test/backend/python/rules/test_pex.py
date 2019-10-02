@@ -7,6 +7,7 @@ import zipfile
 from typing import Dict, List
 
 from pants.backend.python.rules.download_pex_bin import download_pex_bin
+from pants.backend.python.rules.interpreter_constraints import PexInterpreterContraints
 from pants.backend.python.rules.pex import CreatePex, Pex, create_pex
 from pants.backend.python.subsystems.python_native_code import (
   PythonNativeCode,
@@ -47,7 +48,9 @@ class TestResolveRequirements(TestBase):
     super().setUp()
     init_subsystems([PythonSetup, PythonNativeCode, SubprocessEnvironment])
 
-  def create_pex_and_get_all_data(self, *, requirements=None, entry_point=None, interpreter_constraints=None,
+  def create_pex_and_get_all_data(self, *, requirements=None,
+      entry_point=None,
+      interpreter_constraints=PexInterpreterContraints(),
       input_files: Digest = None) -> (Dict, List[str]):
     def hashify_optional_collection(iterable):
       return tuple(sorted(iterable)) if iterable is not None else tuple()
@@ -55,7 +58,7 @@ class TestResolveRequirements(TestBase):
     request = CreatePex(
       output_filename="test.pex",
       requirements=hashify_optional_collection(requirements),
-      interpreter_constraints=hashify_optional_collection(interpreter_constraints),
+      interpreter_constraints=interpreter_constraints,
       entry_point=entry_point,
       input_files_digest=input_files,
     )
@@ -78,7 +81,8 @@ class TestResolveRequirements(TestBase):
     return {'pex': requirements_pex, 'info': json.loads(pex_info_content), 'files': pex_list}
 
   def create_pex_and_get_pex_info(
-    self, *, requirements=None, entry_point=None, interpreter_constraints=None,
+    self, *, requirements=None, entry_point=None,
+    interpreter_constraints=PexInterpreterContraints(),
     input_files: Digest = None) -> Dict:
     return self.create_pex_and_get_all_data(requirements=requirements, entry_point=entry_point, interpreter_constraints=interpreter_constraints,
         input_files=input_files)['info']
@@ -119,6 +123,7 @@ class TestResolveRequirements(TestBase):
     self.assertEqual(pex_info["entry_point"], entry_point)
 
   def test_interpreter_constraints(self) -> None:
-    constraints = {"CPython>=2.7,<3", "CPython>=3.6,<4"}
+    constraints = PexInterpreterContraints(
+        constraint_set=frozenset(sorted({"CPython>=2.7,<3", "CPython>=3.6,<4"})))
     pex_info = self.create_pex_and_get_pex_info(interpreter_constraints=constraints)
-    self.assertEqual(set(pex_info["interpreter_constraints"]), constraints)
+    self.assertEqual(frozenset(pex_info["interpreter_constraints"]), constraints.constraint_set)
