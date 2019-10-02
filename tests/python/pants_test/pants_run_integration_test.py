@@ -12,7 +12,6 @@ import unittest
 from contextlib import contextmanager
 from dataclasses import dataclass
 from operator import eq, ne
-from pathlib import Path
 from threading import Lock
 from typing import Any, List, Optional, Union
 
@@ -328,9 +327,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
         ini.write(fp)
       args.append('--pants-config-files=' + ini_file_name)
 
-    if not Path(get_buildroot()).samefile(Path(".")):
-      shutil.copy(str(Path(get_buildroot(), "pyproject.toml")), str(Path(".")))
-
     pants_script = [sys.executable, '-m', 'pants']
 
     # Permit usage of shell=True and string-based commands to allow e.g. `./pants | head`.
@@ -604,6 +600,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
                      'pants-plugins',
                      'pants.ini',
                      'pants.travis-ci.ini',
+                     'pyproject.toml',
                      'rust-toolchain',
                      'src')
     dirs_to_copy = ('3rdparty', 'contrib') + tuple(dirs_to_copy or [])
