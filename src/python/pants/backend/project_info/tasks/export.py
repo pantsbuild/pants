@@ -56,7 +56,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
   #
   # Note format changes in src/docs/export.md and update the Changelog section.
   #
-  DEFAULT_EXPORT_VERSION = '1.0.10'
+  DEFAULT_EXPORT_VERSION = '1.0.11'
 
   @classmethod
   def subsystem_dependencies(cls):
