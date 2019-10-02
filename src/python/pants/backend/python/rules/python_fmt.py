@@ -3,8 +3,9 @@
 
 import os
 import re
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Set
+from typing import Any, Set
 
 from pants.backend.python.rules.pex import CreatePex, Pex
 from pants.backend.python.subsystems.black import Black
@@ -22,14 +23,14 @@ from pants.engine.legacy.structs import (
 from pants.engine.rules import UnionRule, optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.fmt import FmtResult, FmtTarget
-from pants.util.objects import datatype
 
 
 # Note: this is a workaround until https://github.com/pantsbuild/pants/issues/8343 is addressed
 # We have to write this type which basically represents a union of all various kinds of targets
 # containing python files so we can have one single type used as an input in the run_black rule.
-class FormattablePythonTarget(datatype(['target'])):
-  pass
+@dataclass(frozen=True)
+class FormattablePythonTarget:
+    target: Any
 
 
 @rule
