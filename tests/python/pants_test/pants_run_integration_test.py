@@ -12,6 +12,7 @@ import unittest
 from contextlib import contextmanager
 from dataclasses import dataclass
 from operator import eq, ne
+from pathlib import Path
 from threading import Lock
 from typing import Any, List, Optional, Union
 
@@ -326,6 +327,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
       with safe_open(ini_file_name, mode='w') as fp:
         ini.write(fp)
       args.append('--pants-config-files=' + ini_file_name)
+
+    Path('pyproject.toml').touch()
 
     pants_script = [sys.executable, '-m', 'pants']
 
