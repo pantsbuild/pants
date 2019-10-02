@@ -9,7 +9,6 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
-from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.jvm_app import JvmApp
@@ -56,7 +55,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
   #
   # Note format changes in src/docs/export.md and update the Changelog section.
   #
-  DEFAULT_EXPORT_VERSION = '1.0.11'
+  DEFAULT_EXPORT_VERSION = '1.0.10'
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -283,15 +282,6 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
     for target in targets:
       process_target(target)
 
-    scala_platform = ScalaPlatform.global_instance()
-    scala_platform_map = {
-      'scala_version': scala_platform.version,
-      'compiler_classpath': [
-        cp_entry.path
-        for cp_entry in scala_platform.compiler_classpath_entries(self.context.products)
-      ],
-    }
-
     jvm_platforms_map = {
       'default_platform' : JvmPlatform.global_instance().default_platform.name,
       'platforms': {
@@ -306,7 +296,6 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
       'version': self.DEFAULT_EXPORT_VERSION,
       'targets': targets_map,
       'jvm_platforms': jvm_platforms_map,
-      'scala_platform': scala_platform_map,
       # `jvm_distributions` are static distribution settings from config,
       # `preferred_jvm_distributions` are distributions that pants actually uses for the
       # given platform setting.
