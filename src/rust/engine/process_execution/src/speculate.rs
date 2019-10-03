@@ -38,13 +38,20 @@ impl SpeculatingCommandRunner {
     let delay = Delay::new(Instant::now() + self.speculation_timeout);
     let req2 = req.clone();
     let workunit_store2 = workunit_store.clone();
+    warn!(
+      "Running primary command. Num waiters is {:?}",
+      self.primary.num_waiters()
+    );
     self
       .primary
       .run(req, workunit_store)
       .select2({
         let command_runner = self.clone();
         delay.then(move |_| {
-          debug!("delay finished, running second command");
+          warn!(
+            "delay finished, running second command, num waiters are {:?}",
+            command_runner.secondary.num_waiters()
+          );
           command_runner.secondary.run(req2, workunit_store2)
         })
       })
@@ -53,7 +60,7 @@ impl SpeculatingCommandRunner {
           // split take out the homogeneous success type for either primary or
           // sec"ondary successes.
           match either_success {
-            Either::A(_) => debug!("First request SUCCEEDED"),
+            Either::A(_) => warn!("First request SUCCEEDED"),
             Either::B(_) => warn!("Second request SUCCEEDED"),
           };
           ok::<FallibleExecuteProcessResult, String>(either_success.split().0).to_boxed()

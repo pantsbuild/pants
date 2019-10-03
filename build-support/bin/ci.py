@@ -226,7 +226,7 @@ class TestStrategy(Enum):
                         f"--remote-oauth-bearer-token-path={oauth_token_path}",
                         "test",
                         *sorted(targets),
-                      ],
+                      ] + ["--", "-s"],
     }[self]
     if shard is not None and self in [self.v1_no_chroot, self.v1_chroot]:  # type: ignore
       result.insert(2, f"--test-pytest-test-shard={shard}")

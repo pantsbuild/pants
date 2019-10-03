@@ -32,6 +32,7 @@ use std::sync::Arc;
 use futures::future::Future;
 use futures::task::{self, Task};
 use futures::{Async, Poll};
+use log::warn;
 use parking_lot::Mutex;
 
 struct Inner {
@@ -52,6 +53,11 @@ impl AsyncSemaphore {
         available_permits: permits,
       })),
     }
+  }
+
+  pub fn num_waiters(&self) -> usize {
+    let inner = self.inner.lock();
+    inner.waiters.len()
   }
 
   ///
@@ -88,6 +94,7 @@ impl Drop for Permit {
       let mut inner = self.inner.lock();
       inner.available_permits += 1;
       if let Some(task) = inner.waiters.pop_front() {
+        warn!("dropped permit, num waiters is {:?}", inner.waiters.len());
         task
       } else {
         return;

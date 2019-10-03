@@ -7,4 +7,5 @@ publish = false
 
 [dependencies]
 futures = "^0.1.16"
+log = "0.4"
 parking_lot = "0.6"

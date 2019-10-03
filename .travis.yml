@@ -731,13 +731,8 @@ matrix:
     - '3.6'
     - '3.7'
     script:
-<<<<<<< 138746a3cfc5340c77c679714223a084a17a63c5
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
       --integration-tests-v2 --remote-execution-enabled --python-version 3.6
-=======
-    - ./build-support/bin/ci.py --integration-tests-v2 --remote-execution-enabled
-      --python-version 3.6
->>>>>>> only fail speculation if primary command fails. Turn speculation on in CI
     stage: Test Pants
     sudo: required
   - addons:
