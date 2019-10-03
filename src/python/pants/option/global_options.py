@@ -14,7 +14,6 @@ from pants.base.build_environment import (
   get_pants_configdir,
   pants_version,
 )
-from pants.engine.platform import PlatformConstraint
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.custom_types import dir_option, file_option
 from pants.option.errors import OptionsError
@@ -22,6 +21,7 @@ from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.objects import enum
+from pants.util.osutil import all_normalized_os_names, get_normalized_os_name
 
 
 class GlobMatchErrorBehavior(enum(['ignore', 'warn', 'error'])):
@@ -106,7 +106,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_ca_certs_path=None,
     remote_oauth_bearer_token_path=None,
     remote_execution_extra_platform_properties=[],
-    target_platform=PlatformConstraint.local_platform,
+    target_platform=get_normalized_os_name(),
   )
 
 
@@ -430,9 +430,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--process-execution-use-local-cache', type=bool, default=True, advanced=True,
              help='Whether to keep process executions in a local cache persisted to disk.')
 
-    register('--target-platform', type=PlatformConstraint, default=DEFAULT_EXECUTION_OPTIONS.target_platform, advanced=True,
+    register('--target-platform', type=str, default=DEFAULT_EXECUTION_OPTIONS.target_platform, advanced=True,
              help='Build binaries that are compatible, with a certain platform. Defaults is your local platform.',
-             choices=[PlatformConstraint.linux, PlatformConstraint.darwin])
+             choices=all_normalized_os_names())
 
   @classmethod
   def register_options(cls, register):
