@@ -38,7 +38,7 @@ use tokio::runtime::Runtime;
 #[derive(Clone)]
 pub struct Executor {
   runtime: Arc<Runtime>,
-  pub io_pool: futures_cpupool::CpuPool,
+  io_pool: futures_cpupool::CpuPool,
 }
 
 impl Executor {

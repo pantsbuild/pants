@@ -931,7 +931,7 @@ pub extern "C" fn materialize_directories(
       output
     });
 
-    scheduler.core.executor.io_pool.spawn(work_future).wait()
+    scheduler.core.executor.spawn_on_io_pool(work_future).wait()
   })
   .into()
 }
