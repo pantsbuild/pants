@@ -589,6 +589,7 @@ def rust_tests_osx() -> Dict:
       }
     },
     "before_install": [
+      'sudo /Library/Filesystems/osxfuse.fs/Contents/Resources/load_osxfuse',
       './build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"',
     ],
     "env": _osx_env_with_pyenv(python_version=PythonVersion.py36) + [
