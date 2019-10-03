@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from pants.engine.console import Console
@@ -14,48 +15,62 @@ from pants.engine.fs import (
   Workspace,
 )
 from pants.engine.goal import Goal
-from pants.engine.rules import console_rule
+from pants.engine.rules import RootRule, console_rule
 from pants.engine.selectors import Get
 from pants.util.contextutil import temporary_dir
 from pants_test.console_rule_test_base import ConsoleRuleTestBase
 from pants_test.test_base import TestBase
 
 
-class TestWorkspaceGoal(Goal):
-  name = 'test-workspace-goal'
+@dataclass(frozen=True)
+class MessageToConsoleRule:
+  tmp_dir: str
+  input_files_content: InputFilesContent
+
+
+class MockWorkspaceGoal(Goal):
+  name = 'mock-workspace-goal'
 
 
 @console_rule
-def workspace_console_rule(console: Console, workspace: Workspace) -> TestWorkspaceGoal:
-  input_files_content = InputFilesContent((
-    FileContent(path='a.txt', content=b'hello', is_executable=False),
+def workspace_console_rule(console: Console, workspace: Workspace, msg: MessageToConsoleRule) -> MockWorkspaceGoal:
+  digest = yield Get(Digest, InputFilesContent, msg.input_files_content)
+  output = workspace.materialize_directories((
+    DirectoryToMaterialize(path=msg.tmp_dir, directory_digest=digest),
   ))
-  digest = yield Get(Digest, InputFilesContent, input_files_content)
-  with temporary_dir() as tmp_dir:
-    output = workspace.materialize_directories((
-      DirectoryToMaterialize(path=tmp_dir, directory_digest=digest),
-    ))
-  result = output.dependencies[0]
-  console.print_stdout(f"Wrote file: {result.output_paths[0]}")
-  yield TestWorkspaceGoal(exit_code=0)
+  output_path = output.dependencies[0].output_paths[0]
+  console.print_stdout(str(Path(msg.tmp_dir, output_path)), end='')
+  yield MockWorkspaceGoal(exit_code=0)
 
 
 class WorkspaceInConsoleRuleTest(ConsoleRuleTestBase):
   """This test is meant to ensure that the Workspace type successfully
   invokes the rust FFI function to write to disk in the context of a @console_rule,
   without crashing or otherwise failing."""
-  goal_cls = TestWorkspaceGoal
+  goal_cls = MockWorkspaceGoal
 
   @classmethod
   def rules(cls):
-    return super().rules() + [workspace_console_rule]
+    return super().rules() + [RootRule(MessageToConsoleRule), workspace_console_rule]
 
-  def test_basic(self):
-    self.assert_console_output_contains("Wrote file: a.txt")
+  def test(self):
+    with temporary_dir() as tmp_dir:
+      input_files_content = InputFilesContent((
+        FileContent(path='a.txt', content=b'hello', is_executable=False),
+      ))
+
+      msg = MessageToConsoleRule(tmp_dir=tmp_dir, input_files_content=input_files_content)
+      output_path = str(Path(tmp_dir, 'a.txt'))
+      self.assert_console_output_contains(output_path, additional_params=[msg])
+      contents = open(output_path).read()
+      self.assertEqual(contents, 'hello')
 
 
+#TODO(gshuflin) - it would be nice if this test, which tests that the MaterializeDirectoryResults value
+# is valid, could be subsumed into the above @console_rule-based test, but it's a bit awkward
+# to get the MaterializeDirectoriesResult out of a @console_rule at the moment.
 class FileSystemTest(TestBase):
-  def test_materialize(self):
+  def test_workspace_materialize_directories_result(self):
     #TODO(#8336): at some point, this test should require that Workspace only be invoked from a console_role
     workspace = Workspace(self.scheduler)
 
