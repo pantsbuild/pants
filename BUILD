@@ -36,6 +36,11 @@ files(
   source = 'pants.ini',
 )
 
+files(
+  name = 'pyproject',
+  source = 'pyproject.toml',
+)
+
 # NB: This is used for integration tests. This is generated automatically via `./pants` and
 # `build-support/bin/bootstrap_pants_pex.sh`.
 files(
