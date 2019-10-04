@@ -61,7 +61,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
   @classmethod
   def subsystem_dependencies(cls):
     return super().subsystem_dependencies() + (
-      DistributionLocator, JvmPlatform, PythonInterpreterCache
+      DistributionLocator, JvmPlatform, PythonInterpreterCache, ScalaPlatform
     )
 
   class SourceRootTypes:
