@@ -26,3 +26,9 @@ class TestTarget:
 
   # Prevent this class from being detected by pytest as a test class.
   __test__ = False
+
+  @staticmethod
+  def non_member_error_message(subject):
+    if hasattr(subject, 'address'):
+      return f'{subject.address.reference()} is not a testable target.'
+    return None
