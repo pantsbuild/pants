@@ -111,6 +111,8 @@ pub struct CommandRunner {
   store: Store,
   platform: Platform,
   executor: task_executor::Executor,
+  backoff_incremental_wait: Duration,
+  backoff_max_wait: Duration,
 }
 
 #[derive(Debug, PartialEq)]
@@ -377,8 +379,8 @@ impl super::CommandRunner for CommandRunner {
                             operation_request.set_name(operation_name.clone());
 
                             let backoff_period = min(
-                              CommandRunner::BACKOFF_MAX_WAIT_MILLIS,
-                              (1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS,
+                              command_runner.backoff_max_wait,
+                              (1 + iter_num) * command_runner.backoff_incremental_wait,
                             );
 
                             // take the grpc result and cancel the op if too much time has passed.
@@ -404,7 +406,7 @@ impl super::CommandRunner for CommandRunner {
                                   .to_boxed()
                             } else {
                               // maybe the delay here should be the min of remaining time and the backoff period
-                              Delay::new(Instant::now() + Duration::from_millis(backoff_period))
+                              Delay::new(Instant::now() + backoff_period)
                                   .map_err(move |e| {
                                     format!(
                                       "Future-Delay errored at operation result polling for {}, {}: {}",
@@ -466,9 +468,6 @@ impl super::CommandRunner for CommandRunner {
 }
 
 impl CommandRunner {
-  const BACKOFF_INCR_WAIT_MILLIS: u64 = 500;
-  const BACKOFF_MAX_WAIT_MILLIS: u64 = 5000;
-
   pub fn new(
     address: &str,
     metadata: ExecuteProcessRequestMetadata,
@@ -477,6 +476,8 @@ impl CommandRunner {
     store: Store,
     platform: Platform,
     executor: task_executor::Executor,
+    backoff_incremental_wait: Duration,
+    backoff_max_wait: Duration,
   ) -> CommandRunner {
     let env = Arc::new(grpcio::EnvBuilder::new().build());
     let channel = {
@@ -507,6 +508,8 @@ impl CommandRunner {
       store,
       platform,
       executor,
+      backoff_incremental_wait,
+      backoff_max_wait,
     }
   }
 
@@ -1887,6 +1890,8 @@ pub mod tests {
       store,
       Platform::Linux,
       runtime.clone(),
+      Duration::from_millis(0),
+      Duration::from_secs(0),
     );
     let result = runtime
       .block_on(cmd_runner.run(echo_roland_request(), WorkUnitStore::new()))
@@ -2068,7 +2073,12 @@ pub mod tests {
       .file(&TestData::roland())
       .directory(&TestDirectory::containing_roland())
       .build();
-    let command_runner = create_command_runner(mock_server.address(), &cas);
+    let command_runner = create_command_runner(
+      mock_server.address(),
+      &cas,
+      Duration::from_millis(0),
+      Duration::from_secs(0),
+    );
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
     let successful_mock_result = FallibleExecuteProcessResult {
@@ -2408,6 +2418,8 @@ pub mod tests {
       store,
       Platform::Linux,
       runtime.clone(),
+      Duration::from_millis(0),
+      Duration::from_secs(0),
     );
 
     let result = runtime
@@ -2510,6 +2522,8 @@ pub mod tests {
       store,
       Platform::Linux,
       runtime.clone(),
+      Duration::from_millis(0),
+      Duration::from_secs(0),
     )
     .run(cat_roland_request(), WorkUnitStore::new())
     .wait();
@@ -2585,6 +2599,8 @@ pub mod tests {
       store,
       Platform::Linux,
       runtime.clone(),
+      Duration::from_millis(0),
+      Duration::from_secs(0),
     );
 
     let error = runtime
@@ -2797,7 +2813,7 @@ pub mod tests {
 
   #[test]
   fn wait_between_request_1_retry() {
-    // wait at least 500 milli for one retry
+    // wait at least 100 milli for one retry
     {
       let execute_request = echo_foo_request();
       let mock_server = {
@@ -2824,7 +2840,17 @@ pub mod tests {
           None,
         )
       };
-      run_command_remote(mock_server.address(), execute_request).unwrap();
+      let cas = mock::StubCAS::empty();
+      let command_runner = create_command_runner(
+        mock_server.address(),
+        &cas,
+        Duration::from_millis(100),
+        Duration::from_secs(1),
+      );
+      let mut runtime = tokio::runtime::Runtime::new().unwrap();
+      runtime
+        .block_on(command_runner.run(execute_request, WorkUnitStore::new()))
+        .unwrap();
 
       let messages = mock_server.mock_responder.received_messages.lock();
       assert!(messages.len() == 2);
@@ -2834,14 +2860,14 @@ pub mod tests {
           .unwrap()
           .received_at
           .sub(messages.get(0).unwrap().received_at)
-          >= Duration::from_millis(500)
+          >= Duration::from_millis(100)
       );
     }
   }
 
   #[test]
   fn wait_between_request_3_retry() {
-    // wait at least 500 + 1000 + 1500 = 3000 milli for 3 retries.
+    // wait at least 50 + 100 + 150 = 300 milli for 3 retries.
     {
       let execute_request = echo_foo_request();
       let mock_server = {
@@ -2870,7 +2896,17 @@ pub mod tests {
           None,
         )
       };
-      run_command_remote(mock_server.address(), execute_request).unwrap();
+      let cas = mock::StubCAS::empty();
+      let command_runner = create_command_runner(
+        mock_server.address(),
+        &cas,
+        Duration::from_millis(50),
+        Duration::from_secs(5),
+      );
+      let mut runtime = tokio::runtime::Runtime::new().unwrap();
+      runtime
+        .block_on(command_runner.run(execute_request, WorkUnitStore::new()))
+        .unwrap();
 
       let messages = mock_server.mock_responder.received_messages.lock();
       assert!(messages.len() == 4);
@@ -2880,7 +2916,7 @@ pub mod tests {
           .unwrap()
           .received_at
           .sub(messages.get(0).unwrap().received_at)
-          >= Duration::from_millis(500)
+          >= Duration::from_millis(50)
       );
       assert!(
         messages
@@ -2888,7 +2924,7 @@ pub mod tests {
           .unwrap()
           .received_at
           .sub(messages.get(1).unwrap().received_at)
-          >= Duration::from_millis(1000)
+          >= Duration::from_millis(100)
       );
       assert!(
         messages
@@ -2896,7 +2932,7 @@ pub mod tests {
           .unwrap()
           .received_at
           .sub(messages.get(2).unwrap().received_at)
-          >= Duration::from_millis(1500)
+          >= Duration::from_millis(150)
       );
     }
   }
@@ -3090,7 +3126,12 @@ pub mod tests {
       .file(&TestData::roland())
       .directory(&TestDirectory::containing_roland())
       .build();
-    let command_runner = create_command_runner("".to_owned(), &cas);
+    let command_runner = create_command_runner(
+      "".to_owned(),
+      &cas,
+      std::time::Duration::from_millis(0),
+      std::time::Duration::from_secs(0),
+    );
 
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
@@ -3327,12 +3368,22 @@ pub mod tests {
       .file(&TestData::roland())
       .directory(&TestDirectory::containing_roland())
       .build();
-    let command_runner = create_command_runner(address, &cas);
+    let command_runner = create_command_runner(
+      address,
+      &cas,
+      Duration::from_millis(0),
+      Duration::from_secs(0),
+    );
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(command_runner.run(request, WorkUnitStore::new()))
   }
 
-  fn create_command_runner(address: String, cas: &mock::StubCAS) -> CommandRunner {
+  fn create_command_runner(
+    address: String,
+    cas: &mock::StubCAS,
+    backoff_incremental_wait: Duration,
+    backoff_max_wait: Duration,
+  ) -> CommandRunner {
     let runtime = task_executor::Executor::new();
     let store_dir = TempDir::new().unwrap();
     let store = Store::with_remote(
@@ -3359,6 +3410,8 @@ pub mod tests {
       store,
       Platform::Linux,
       runtime.clone(),
+      backoff_incremental_wait,
+      backoff_max_wait,
     )
   }
 
@@ -3369,7 +3422,12 @@ pub mod tests {
       .file(&TestData::roland())
       .directory(&TestDirectory::containing_roland())
       .build();
-    let command_runner = create_command_runner("".to_owned(), &cas);
+    let command_runner = create_command_runner(
+      "".to_owned(),
+      &cas,
+      Duration::from_millis(0),
+      Duration::from_secs(0),
+    );
 
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
@@ -3387,7 +3445,12 @@ pub mod tests {
       .file(&TestData::roland())
       .directory(&TestDirectory::containing_roland())
       .build();
-    let command_runner = create_command_runner("".to_owned(), &cas);
+    let command_runner = create_command_runner(
+      "".to_owned(),
+      &cas,
+      Duration::from_millis(0),
+      Duration::from_secs(0),
+    );
 
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(super::extract_output_files(
