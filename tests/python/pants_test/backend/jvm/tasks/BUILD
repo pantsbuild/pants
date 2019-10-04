@@ -386,13 +386,17 @@ python_tests(
   name = 'jar_publish_integration',
   sources = ['test_jar_publish_integration.py'],
   dependencies = [
+    'examples/src/python/example:pants_publish_plugin_directory',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:int-test',
+    'tests/python/pants_test/tasks:jar_publish_resources_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:publish_directory',
+    'testprojects/src/scala/org/pantsbuild/testproject:publish_directory',
   ],
   tags = {'integration'},
-  timeout = 360,
+  timeout = 480,
 )
 
 python_tests(

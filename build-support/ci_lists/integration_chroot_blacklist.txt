@@ -1,5 +1,4 @@
 tests/python/pants_test/backend/jvm/tasks/jvm_compile/java:cache_compile_integration
-tests/python/pants_test/backend/jvm/tasks:jar_publish_integration
 tests/python/pants_test/backend/python/tasks/native:integration
 tests/python/pants_test/backend/python/tasks:build_local_python_distributions_integration
 tests/python/pants_test/backend/python/tasks:pytest_run_integration

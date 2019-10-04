@@ -55,3 +55,8 @@ python_tests(
   ],
   tags = {'integration'},
 )
+
+files(
+  name = 'jar_publish_resources_directory',
+  sources = rglobs('jar_publish_resources/*'),
+)
