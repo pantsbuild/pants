@@ -69,7 +69,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants([
         'resolve',
         '--resolve-ivy-args=-blablabla',
-        'examples/src/scala::'
+        'examples/src/scala/org/pantsbuild/example/hello::'
     ])
     self.assert_failure(pants_run)
     self.assertIn('Unrecognized option: -blablabla', pants_run.stdout_data)

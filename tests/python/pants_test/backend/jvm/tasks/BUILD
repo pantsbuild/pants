@@ -317,6 +317,8 @@ python_tests(
   name = 'ivy_resolve_integration',
   sources = ['test_ivy_resolve_integration.py'],
   dependencies = [
+    'examples/src/scala/org/pantsbuild/example:hello_directory',
+    'src/java/org/pantsbuild:junit_directory',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
