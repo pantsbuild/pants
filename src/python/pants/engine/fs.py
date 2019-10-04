@@ -3,7 +3,7 @@
 
 import os
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Any, Tuple
 
 from pants.engine.objects import Collection
 from pants.engine.rules import RootRule
@@ -187,11 +187,10 @@ class UrlToFetch(datatype([('url', str), ('digest', Digest)])):
   pass
 
 
+@dataclass(frozen=True)
 class Workspace:
   """Abstract handle for operations that touch the real local filesystem."""
-
-  def __init__(self, scheduler):
-    self._scheduler = scheduler
+  _scheduler: Any
 
   def materialize_directories(self, directories_to_materialize: Tuple[DirectoryToMaterialize]) -> MaterializeDirectoriesResult:
     return self._scheduler.materialize_directories(directories_to_materialize)
