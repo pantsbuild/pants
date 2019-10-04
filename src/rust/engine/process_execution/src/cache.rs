@@ -180,7 +180,10 @@ impl CommandRunner {
 
 #[cfg(test)]
 mod test {
-  use crate::{CommandRunner as CommandRunnerTrait, ExecuteProcessRequestMetadata};
+  use crate::{
+    CommandRunner as CommandRunnerTrait, ExecuteProcessRequestMetadata,
+    FallibleExecuteProcessResult,
+  };
   use crate::{ExecuteProcessRequest, Platform};
   use hashing::EMPTY_DIGEST;
   use sharded_lmdb::ShardedLmdb;
@@ -194,8 +197,13 @@ mod test {
   use testutil::data::TestData;
   use workunit_store::WorkUnitStore;
 
-  #[test]
-  fn roundtrip() {
+  struct RoundtripResults {
+    local: Result<FallibleExecuteProcessResult, String>,
+    uncached: Result<FallibleExecuteProcessResult, String>,
+    maybe_cached: Result<FallibleExecuteProcessResult, String>,
+  }
+
+  fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
     let runtime = task_executor::Executor::new();
     let work_dir = TempDir::new().unwrap();
     let store_dir = TempDir::new().unwrap();
@@ -213,8 +221,9 @@ mod test {
       .and_then(|mut file| {
         writeln!(
           file,
-          "echo -n {} > roland && echo Hello && echo >&2 World",
+          "echo -n {} > roland && echo Hello && echo >&2 World; exit {}",
           TestData::roland().string(),
+          script_exit_code
         )
       })
       .unwrap();
@@ -258,11 +267,32 @@ mod test {
     let uncached_result =
       runtime.block_on(caching.run(request.clone().into(), WorkUnitStore::new()));
 
-    assert_eq!(local_result, uncached_result);
-
+    // Removing the file means that were the command to be run again without any caching, it would
+    // fail due to a FileNotFound error. So, If the second run succeeds, that implies that the
+    // cache was successfully used.
     std::fs::remove_file(&script_path).unwrap();
-    let cached_result = runtime.block_on(caching.run(request.into(), WorkUnitStore::new()));
+    let maybe_cached_result = runtime.block_on(caching.run(request.into(), WorkUnitStore::new()));
 
-    assert_eq!(uncached_result, cached_result);
+    RoundtripResults {
+      local: local_result,
+      uncached: uncached_result,
+      maybe_cached: maybe_cached_result,
+    }
+  }
+
+  #[test]
+  fn cache_success() {
+    let results = run_roundtrip(0);
+    assert_eq!(results.local, results.uncached);
+    assert_eq!(results.uncached, results.maybe_cached);
+  }
+
+  #[test]
+  fn failures_not_cached() {
+    let results = run_roundtrip(1);
+    assert_eq!(results.local, results.uncached);
+    assert_ne!(results.uncached, results.maybe_cached);
+    assert_eq!(results.uncached.unwrap().exit_code, 1);
+    assert_eq!(results.maybe_cached.unwrap().exit_code, 127); // aka the return code for file not found
   }
 }
