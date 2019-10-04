@@ -291,7 +291,7 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
           File LOCATION-INFO, in identify
             hash_ = hash(obj)
           File LOCATION-INFO, in __hash__
-            .format(self, type(self).__name__, field_name, e))
+            self, type(self).__name__, field_name, e
         TypeError: For datatype object CollectionType(items=[1, 2, 3]) (type 'CollectionType'): in field 'items': unhashable type: 'list'
         """
                 ),
@@ -381,7 +381,7 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
                              File LOCATION-INFO, in nested_raise
                                fn_raises(x)
                              File LOCATION-INFO, in fn_raises
-                               raise Exception(f'An exception for {type(x).__name__}')
+                               raise Exception(f"An exception for {type(x).__name__}")
                            Exception: An exception for B"""
             ).lstrip()
             + "\n\n",  # Traces include two empty lines after.

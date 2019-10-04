@@ -855,9 +855,7 @@ Expected a `type` constructor for `_this_is_not_a_type`, but got: 3 (type `int`)
         # Test that the full indentation of multiple-line yields are represented in the output.
         self.assertIn(
             """\
-        yield A(
-          1 + 2
-        )
+                yield A(1 + 2)
 """,
             str(cm.exception),
         )
@@ -872,6 +870,7 @@ Expected a `type` constructor for `_this_is_not_a_type`, but got: 3 (type `int`)
 
         exc_msg = str(cm.exception)
         exc_msg_trimmed = re.sub(r"^.*?(test_rules\.py)", r"\1", exc_msg, flags=re.MULTILINE)
+        self.maxDiff = None
         self.assertEquals(
             exc_msg_trimmed,
             """\
@@ -887,20 +886,20 @@ supported. See https://github.com/pantsbuild/pants/pull/8227 for progress.
 
 The invalid statement was:
 test_rules.py:{lineno}:{col}
-        yield Get(B, D, D())
+                yield Get(B, D, D())
 
 The rule defined by function `g` begins at:
 test_rules.py:{rule_lineno}:{rule_col}
-      @rule
-      def g() -> A:
-        # This is a yield statement without an assignment, and not at the end.
-        yield Get(B, D, D())
-        yield A()
+            @rule
+            def g() -> A:
+                # This is a yield statement without an assignment, and not at the end.
+                yield Get(B, D, D())
+                yield A()
 """.format(
-                lineno=(sys._getframe().f_lineno - 26),
-                col=8,
-                rule_lineno=(sys._getframe().f_lineno - 31),
-                rule_col=6,
+                lineno=(sys._getframe().f_lineno - 31),
+                col=16,
+                rule_lineno=(sys._getframe().f_lineno - 36),
+                rule_col=12,
             ),
         )
 
@@ -939,8 +938,8 @@ test_rules.py:{rule_lineno}:{rule_col}
         self.assertIn(
             f"""\
 The invalid statement was:
-test_rules.py:{sys._getframe().f_lineno - 9}:10
-          yield Get(X, Y(n))
+test_rules.py:{sys._getframe().f_lineno - 13}:20
+                    yield Get(X, Y(n))
 """,
             exc_msg_trimmed,
         )
