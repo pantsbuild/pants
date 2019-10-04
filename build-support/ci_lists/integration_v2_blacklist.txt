@@ -1,3 +1,4 @@
+tests/python/pants_test/backend/jvm/subsystems:jar_dependency_management_integration
 tests/python/pants_test/backend/jvm/tasks/jvm_compile/java:java_compile_integration
 tests/python/pants_test/backend/jvm/tasks/jvm_compile/java:zinc_compile_integration
 tests/python/pants_test/backend/jvm/tasks/jvm_compile/rsc:rsc_compile_integration

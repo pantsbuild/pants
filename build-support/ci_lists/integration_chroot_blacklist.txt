@@ -1,4 +1,3 @@
-tests/python/pants_test/backend/jvm/subsystems:jar_dependency_management_integration
 tests/python/pants_test/backend/jvm/tasks/jvm_compile/java:cache_compile_integration
 tests/python/pants_test/backend/jvm/tasks:checkstyle_integration
 tests/python/pants_test/backend/jvm/tasks:ivy_resolve_integration
