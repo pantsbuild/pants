@@ -64,7 +64,7 @@ class MyPyWhitelistMechanismTest(TaskTestBase):
     t1 = self.make_python_target('t1')
     t2 = self.make_python_target('t2')
     captured_warnings = self.run_task_and_capture_warnings(target_roots=[t1, t2])
-    self.assert_warning(captured_warnings, expected_targets=[t1, t2])
+    self.assert_no_warning(captured_warnings)
 
   def test_whitelisted_dependency(self) -> None:
     t1 = self.make_python_target('t1', typed=True)
@@ -76,4 +76,10 @@ class MyPyWhitelistMechanismTest(TaskTestBase):
     t1 = self.make_python_target('t1')
     t2 = self.make_python_target('t2', typed=True, dependencies=[t1])
     captured_warnings = self.run_task_and_capture_warnings(target_roots=[t2])
+    self.assert_warning(captured_warnings, expected_targets=[t1])
+
+  def test_untyped_target_root_also_dependency(self) -> None:
+    t1 = self.make_python_target('t1')
+    t2 = self.make_python_target('t2', typed=True, dependencies=[t1])
+    captured_warnings = self.run_task_and_capture_warnings(target_roots=[t1, t2])
     self.assert_warning(captured_warnings, expected_targets=[t1])

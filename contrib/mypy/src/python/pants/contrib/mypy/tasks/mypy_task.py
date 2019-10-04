@@ -92,15 +92,23 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
   def is_python_target(target):
     return isinstance(target, PythonTarget)
 
-  def _warn_untagged_targets(self, untagged_targets: Iterable[Target], *, tag_name) -> None:
-    formatted_targets = "\n".join(tgt.address.spec for tgt in sorted(untagged_targets))
+  def _check_for_untagged_dependencies(
+    self, *, tagged_target_roots: Iterable[Target], tag_name: str
+  ) -> None:
+    untagged_dependencies = {
+      tgt for tgt in Target.closure_for_targets(target_roots=tagged_target_roots)
+      if tag_name not in tgt.tags and self.is_non_synthetic_python_target(tgt)
+    }
+    if not untagged_dependencies:
+      return
+    formatted_targets = "\n".join(tgt.address.spec for tgt in sorted(untagged_dependencies))
     self.context.log.warn(
       f"[WARNING]: The following targets are not marked with the tag name `{tag_name}`, "
-      f"meaning MyPy will not run over their sources. (Some of the targets may be "
-      f"dependencies for the ones that you explicitly specified.)\n{formatted_targets}"
+      f"but are dependencies of targets that are type checked because they have this tag. You are "
+      f"encouraged to type check these dependencies.\n{formatted_targets}"
     )
 
-  def _calculate_python_sources(self, target_roots: List[Target]) -> List[str]:
+  def _calculate_python_sources(self, target_roots: Iterable[Target]) -> List[str]:
     """Filter targets to generate a set of source files from the given targets."""
     all_targets = {
       tgt for tgt in Target.closure_for_targets(target_roots=target_roots)
@@ -112,10 +120,12 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
         tgt for tgt in all_targets
         if whitelist_tag_name in tgt.tags
       }
-      untagged_targets = all_targets - tagged_targets
-      if untagged_targets and self.get_options().verbose:
-        self._warn_untagged_targets(untagged_targets, tag_name=whitelist_tag_name)
       eval_targets = tagged_targets
+      if self.get_options().verbose:
+        self._check_for_untagged_dependencies(
+          tagged_target_roots={tgt for tgt in tagged_targets if tgt in target_roots},
+          tag_name=whitelist_tag_name,
+        )
     else:
       eval_targets = all_targets
 
