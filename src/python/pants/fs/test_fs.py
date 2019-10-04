@@ -95,4 +95,6 @@ class FileSystemTest(TestBase):
       self.assertEqual(type(output), MaterializeDirectoriesResult)
       materialize_result = output.dependencies[0]
       self.assertEqual(type(materialize_result), MaterializeDirectoryResult)
-      self.assertEqual(materialize_result.output_paths, ('a.txt', 'subdir/b.txt',))
+      self.assertEqual(materialize_result.output_paths,
+        (str(Path(tmp_dir, 'a.txt')), str(Path(tmp_dir, 'subdir/b.txt')),)
+      )

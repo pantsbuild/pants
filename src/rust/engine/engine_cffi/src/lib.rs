@@ -900,28 +900,37 @@ pub extern "C" fn materialize_directories(
       dir_and_digests
         .into_iter()
         .map(|(dir, digest)| {
-          scheduler
-            .core
-            .store()
-            .materialize_directory(dir, digest, workunit_store.clone())
+          let metadata = scheduler.core.store().materialize_directory(
+            dir.clone(),
+            digest,
+            workunit_store.clone(),
+          );
+          metadata.map(|m| (dir, m))
         })
         .collect::<Vec<_>>(),
     )
     .map(move |metadata_list| {
       let entries: Vec<Value> = metadata_list
         .iter()
-        .map(|metadata: &store::DirectoryMaterializeMetadata| {
-          let path_list = metadata.to_path_list();
-          let path_values: Vec<Value> = path_list
-            .into_iter()
-            .map(|path: String| externs::store_utf8(&path))
-            .collect();
+        .map(
+          |(output_dir, metadata): &(PathBuf, store::DirectoryMaterializeMetadata)| {
+            let path_list = metadata.to_path_list();
+            let path_values: Vec<Value> = path_list
+              .into_iter()
+              .map(|rel_path: String| {
+                let mut path = PathBuf::new();
+                path.push(output_dir);
+                path.push(rel_path);
+                externs::store_utf8(&path.to_string_lossy())
+              })
+              .collect();
 
-          externs::unsafe_call(
-            &construct_materialize_directory_result,
-            &[externs::store_tuple(&path_values)],
-          )
-        })
+            externs::unsafe_call(
+              &construct_materialize_directory_result,
+              &[externs::store_tuple(&path_values)],
+            )
+          },
+        )
         .collect();
 
       let output: Value = externs::unsafe_call(
