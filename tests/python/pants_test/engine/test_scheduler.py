@@ -64,13 +64,15 @@ def transitive_coroutine_rule(c: C) -> D:
 
 @union
 class UnionBase:
-  """Docstring for UnionBase"""
   pass
 
 
 @union
-class NoDocstringUnion:
-  pass
+class UnionWithNonMemberErrorMsg:
+
+  @staticmethod
+  def non_member_error_message(subject):
+    return f"specific error message for {type(subject).__name__} instance"
 
 
 class UnionWrapper:
@@ -112,8 +114,8 @@ class UnionX:
 
 
 @rule
-def no_docstring_test_rule(union_wrapper: UnionWrapper) -> UnionX:
-  union_x = yield Get(UnionX, NoDocstringUnion, union_wrapper.inner)
+def error_msg_test_rule(union_wrapper: UnionWrapper) -> UnionX:
+  union_x = yield Get(UnionX, UnionWithNonMemberErrorMsg, union_wrapper.inner)
   yield union_x
 
 
@@ -172,13 +174,13 @@ class SchedulerTest(TestBase):
       RootRule(B),
       RootRule(C),
       RootRule(UnionX),
-      no_docstring_test_rule,
+      error_msg_test_rule,
       consumes_a_and_b,
       transitive_b_c,
       transitive_coroutine_rule,
       RootRule(UnionWrapper),
       UnionRule(UnionBase, UnionA),
-      UnionRule(NoDocstringUnion, UnionX),
+      UnionRule(UnionWithNonMemberErrorMsg, UnionX),
       RootRule(UnionA),
       select_union_a,
       UnionRule(union_base=UnionBase, union_member=UnionB),
@@ -231,15 +233,13 @@ class SchedulerTest(TestBase):
     self.assertTrue(isinstance(a, A))
     # Fails due to no union relationship from A -> UnionBase.
     expected_msg = """\
-Type A is not a member of the UnionBase @union ("Docstring for UnionBase")
+Type A is not a member of the UnionBase @union
 """
     with self._assert_execution_error(expected_msg):
       self.scheduler.product_request(A, [Params(UnionWrapper(A()))])
 
   def test_union_rules_no_docstring(self):
-    expected_msg = """\
-Type UnionA is not a member of the NoDocstringUnion @union ("NoDocstringUnion")
-"""
+    expected_msg = "specific error message for UnionA instance"
     with self._assert_execution_error(expected_msg):
       self.scheduler.product_request(UnionX, [Params(UnionWrapper(UnionA()))])
 
