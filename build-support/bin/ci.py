@@ -458,7 +458,8 @@ def run_rust_tests() -> None:
   command = [
     "build-support/bin/native/cargo",
     "test",
-    "--all",
+    # Until we can run fuse tests in osx CI, we omit --all.
+    #"--all",
     # We pass --tests to skip doc tests, because our generated protos contain invalid doc tests in
     # their comments.
     "--tests",
