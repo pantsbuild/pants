@@ -102,8 +102,8 @@ class TestPythonTestRunnerIntegration(PantsRunIntegrationTest):
         __________________________________ test_fail ___________________________________
 
             def test_fail():
-        >     assert False
-        E     assert False
+        >       assert False
+        E       assert False
 
         pants/dummies/test_fail.py:2: AssertionError
         =========================== 1 failed in SOME_TEXT ===========================
@@ -138,8 +138,8 @@ class TestPythonTestRunnerIntegration(PantsRunIntegrationTest):
         __________________________________ test_fail ___________________________________
 
             def test_fail():
-        >     assert False
-        E     assert False
+        >       assert False
+        E       assert False
 
         pants/dummies/test_fail.py:2: AssertionError
         =========================== 1 failed in SOME_TEXT ===========================
