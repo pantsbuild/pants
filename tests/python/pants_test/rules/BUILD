@@ -38,3 +38,14 @@ python_tests(
     'tests/python/pants_test/engine:util',
   ]
 )
+
+python_tests(
+  name='fmt_integration',
+  source='test_fmt_integration.py',
+  dependencies=[
+    'tests/python/pants_test:int-test',
+    'testprojects/tests/java/org/pantsbuild/testproject:dummies_directory',
+  ],
+  tags={'integration'},
+)
+
