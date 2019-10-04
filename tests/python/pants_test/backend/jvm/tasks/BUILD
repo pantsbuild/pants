@@ -138,6 +138,8 @@ python_tests(
   dependencies = [
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
+    'examples/src/java/org/pantsbuild/example:hello_directory',
+    'testprojects/3rdparty:checkstyle_directory',
   ],
   tags = {'integration'},
   timeout = 240,
