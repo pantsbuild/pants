@@ -198,7 +198,6 @@ mod test {
   use workunit_store::WorkUnitStore;
 
   struct RoundtripResults {
-    local: Result<FallibleExecuteProcessResult, String>,
     uncached: Result<FallibleExecuteProcessResult, String>,
     maybe_cached: Result<FallibleExecuteProcessResult, String>,
   }
@@ -267,6 +266,8 @@ mod test {
     let uncached_result =
       runtime.block_on(caching.run(request.clone().into(), WorkUnitStore::new()));
 
+    assert_eq!(local_result, uncached_result);
+
     // Removing the file means that were the command to be run again without any caching, it would
     // fail due to a FileNotFound error. So, If the second run succeeds, that implies that the
     // cache was successfully used.
@@ -274,7 +275,6 @@ mod test {
     let maybe_cached_result = runtime.block_on(caching.run(request.into(), WorkUnitStore::new()));
 
     RoundtripResults {
-      local: local_result,
       uncached: uncached_result,
       maybe_cached: maybe_cached_result,
     }
@@ -283,14 +283,12 @@ mod test {
   #[test]
   fn cache_success() {
     let results = run_roundtrip(0);
-    assert_eq!(results.local, results.uncached);
     assert_eq!(results.uncached, results.maybe_cached);
   }
 
   #[test]
   fn failures_not_cached() {
     let results = run_roundtrip(1);
-    assert_eq!(results.local, results.uncached);
     assert_ne!(results.uncached, results.maybe_cached);
     assert_eq!(results.uncached.unwrap().exit_code, 1);
     assert_eq!(results.maybe_cached.unwrap().exit_code, 127); // aka the return code for file not found
