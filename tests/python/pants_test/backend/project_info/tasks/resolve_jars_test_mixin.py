@@ -76,10 +76,9 @@ class ResolveJarsTestMixin:
 
           targets = ['{0}:{1}'.format(os.path.join(source_dir, 'src'), name) for name in spec_names]
 
-          with temporary_dir() as ivy_temp_dir:
-            extra_args = ['--ivy-cache-dir={}'.format(ivy_temp_dir)]
-            self.evaluate_subtask(targets, workdir, load_all, extra_args=extra_args,
-                                  expected_jars=['org.pantsbuild:synthetic-test-jar:1.2.3'])
+          self.evaluate_subtask(targets, workdir, load_all,
+                                extra_args=[],
+                                expected_jars=['org.pantsbuild:synthetic-test-jar:1.2.3'])
 
   def test_jar_lib_with_url_resolve_default(self):
     self._test_jar_lib_with_url(False)
