@@ -403,14 +403,15 @@ def union(cls):
   """
   # TODO: Check that the union base type is used as a tag and nothing else (e.g. no attributes)!
   assert isinstance(cls, type)
-  if cls.__doc__:
-    union_description = cls.__doc__
-  else:
-    union_description = cls.__name__
+  def non_member_error_message(subject):
+    if hasattr(cls, 'non_member_error_message'):
+      return cls.non_member_error_message(subject)
+    desc = f' ("{cls.__doc__}")' if cls.__doc__ else ''
+    return f'Type {type(subject).__name__} is not a member of the {cls.__name__} @union{desc}'
 
   return type(cls.__name__, (cls,), {
     '_is_union': True,
-    'union_description': union_description,
+    'non_member_error_message': non_member_error_message,
   })
 
 

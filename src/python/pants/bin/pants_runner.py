@@ -49,7 +49,7 @@ class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
 
   @staticmethod
   def scrub_pythonpath():
-    # If PYTHONPATH was used to set up the Pants runtime environment, its entries our now on our
+    # If PYTHONPATH was used to set up the Pants runtime environment, its entries are now on our
     # `sys.path` allowing us to run. Do not propagate any of these Pants-specific sys.path entries
     # forward to our subprocesses.
     pythonpath = os.environ.pop('PYTHONPATH', None)

@@ -57,6 +57,7 @@ target(
     # on changes to those undeclared dependencies.
     'src/python/pants/bin:pants_local_binary',
     'src/rust/engine',
+    '//:pyproject',
   ],
 )
 

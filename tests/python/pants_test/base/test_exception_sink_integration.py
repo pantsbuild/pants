@@ -94,10 +94,7 @@ Exception message:.* 1 Exception encountered:
         print_exception_stacktrace=False)
       self.assert_failure(pants_run)
       self.assertRegex(pants_run.stderr_data, """\
-timestamp: ([^\n]+)
-Exception caught: \\(pants\\.engine\\.scheduler\\.ExecutionError\\) \\(backtrace omitted\\)
-Exception message: 1 Exception encountered:
-  ResolveError: "this-target-does-not-exist" was not found in namespace ""\\. Did you mean one of:
+ERROR: "this-target-does-not-exist" was not found in namespace ""\\. Did you mean one of:
 """)
       pid_specific_log_file, shared_log_file = self._get_log_file_paths(tmpdir, pants_run)
       self._assert_unhandled_exception_log_matches(

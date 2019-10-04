@@ -600,6 +600,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
                      'pants-plugins',
                      'pants.ini',
                      'pants.travis-ci.ini',
+                     'pyproject.toml',
                      'rust-toolchain',
                      'src')
     dirs_to_copy = ('3rdparty', 'contrib') + tuple(dirs_to_copy or [])
