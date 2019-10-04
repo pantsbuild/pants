@@ -136,40 +136,39 @@ pub enum Health {
   Unhealthy,
 }
 
-// Ideally this would use Durations when https://github.com/rust-lang/rust/issues/54361 stabilises.
 #[derive(Clone, Copy, Debug)]
 struct UnhealthyInfo {
   unhealthy_since: Instant,
-  next_attempt_after_millis: f64,
+  next_attempt_after: Duration,
 }
 
 impl UnhealthyInfo {
   fn new(backoff_config: BackoffConfig) -> UnhealthyInfo {
     UnhealthyInfo {
       unhealthy_since: Instant::now(),
-      next_attempt_after_millis: backoff_config.initial_lame_millis as f64,
+      next_attempt_after: backoff_config.initial_lame,
     }
   }
 
   fn healthy_at(&self) -> Instant {
-    self.unhealthy_since + Duration::from_millis(self.next_attempt_after_millis as u64)
+    self.unhealthy_since + self.next_attempt_after
   }
 
   fn increase_backoff(&mut self, backoff_config: BackoffConfig) {
     self.unhealthy_since = Instant::now();
-    self.next_attempt_after_millis = f64::min(
-      backoff_config.max_lame_millis,
-      self.next_attempt_after_millis * backoff_config.ratio,
-    );
+    self.next_attempt_after = Duration::from_secs_f64(f64::min(
+      backoff_config.max_lame.as_secs_f64(),
+      self.next_attempt_after.as_secs_f64() * backoff_config.ratio,
+    ));
   }
 
   fn decrease_backoff(mut self, backoff_config: BackoffConfig) -> Option<UnhealthyInfo> {
     self.unhealthy_since = Instant::now();
-    let next_value = self.next_attempt_after_millis / backoff_config.ratio;
-    if next_value < backoff_config.initial_lame_millis {
+    let next_value = self.next_attempt_after.as_secs_f64() / backoff_config.ratio;
+    if next_value < backoff_config.initial_lame.as_secs_f64() {
       None
     } else {
-      self.next_attempt_after_millis = next_value;
+      self.next_attempt_after = Duration::from_secs_f64(next_value);
       Some(self)
     }
   }
@@ -191,13 +190,12 @@ impl Backend {
   }
 }
 
-// Ideally this would use Durations when https://github.com/rust-lang/rust/issues/54361 stabilises.
 #[derive(Clone, Copy, Debug)]
 pub struct BackoffConfig {
   ///
   /// The time a backend will be skipped after it is first reported unhealthy.
   ///
-  initial_lame_millis: f64,
+  initial_lame: Duration,
 
   ///
   /// Ratio by which to multiply the most recent lame duration if a backend continues to be
@@ -209,7 +207,7 @@ pub struct BackoffConfig {
   ///
   /// Maximum duration to wait between attempts.
   ///
-  max_lame_millis: f64,
+  max_lame: Duration,
 }
 
 impl BackoffConfig {
@@ -225,15 +223,10 @@ impl BackoffConfig {
       ));
     }
 
-    let initial_lame_millis =
-      initial_lame.as_secs() as f64 * 1000_f64 + f64::from(initial_lame.subsec_millis());
-    let max_lame_millis =
-      max_lame.as_secs() as f64 * 1000_f64 + f64::from(max_lame.subsec_millis());
-
     Ok(BackoffConfig {
-      initial_lame_millis,
+      initial_lame,
       ratio,
-      max_lame_millis,
+      max_lame,
     })
   }
 }
