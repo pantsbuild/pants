@@ -42,7 +42,7 @@ from pants.engine.legacy.structs import rules as structs_rules
 from pants.engine.mapper import AddressMapper
 from pants.engine.parser import SymbolTable
 from pants.engine.platform import create_platform_rules
-from pants.engine.rules import RootRule, rule, UnionMembership
+from pants.engine.rules import RootRule, UnionMembership, rule
 from pants.engine.scheduler import Scheduler
 from pants.engine.selectors import Params
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer

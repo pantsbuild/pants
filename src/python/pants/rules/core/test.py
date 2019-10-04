@@ -7,9 +7,10 @@ from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.engine.console import Console
 from pants.engine.goal import Goal
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
-from pants.engine.rules import console_rule, rule, UnionMembership
+from pants.engine.rules import UnionMembership, console_rule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.core_test_model import Status, TestResult, TestTarget
+
 
 # TODO(#6004): use proper Logging singleton, rather than static logger.
 logger = logging.getLogger(__name__)
