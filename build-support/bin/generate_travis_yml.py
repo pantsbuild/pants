@@ -586,7 +586,6 @@ def rust_tests_osx() -> Dict:
     # Until that changes, no need to install osxfuse.
     # "addons": {
     #   "homebrew": {
-    #     "packages": ["openssl"],
     #     "casks": ["osxfuse"]
     #   }
     # },
