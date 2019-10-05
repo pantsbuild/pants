@@ -124,51 +124,38 @@ class TestProjectsIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator
       *simply_skip,
     ]
 
+  @property
+  def skipped_target_types(self) -> List[str]:
+    """We don't want to run over every single target, e.g. files() are only used for us to depend
+    on in ITs and it doesn't make sense to run `./pants test` against them."""
+    return [
+      "target",
+      # resources / loose files
+      "files",
+      "resources",
+      "page",
+      # 3rd-party dependencies
+      "jar_library",
+      "managed_jar_libraries",
+      "python_requirement_library",
+    ]
+
   @memoized_property
   def targets(self) -> List[str]:
     """A sequence of target name strings."""
 
     exclude_opts = [f'--exclude-target-regexp={target}' for target in self.skipped_targets]
+    skipped_targets_opt = f"--filter-type=-{','.join(self.skipped_target_types)}"
 
-    def get_targets_for_type(build_file_alias: str) -> Set[str]:
-      pants_run = self.run_pants([
-        'filter',
-        f'--type={build_file_alias}',
-        'testprojects::',
-        'examples::',
-        *exclude_opts
-      ])
-      self.assert_success(pants_run)
-      return set(pants_run.stdout_data.split())
-
-    targets = set()
-    # TODO: map these build_file_aliases to more targeted goals than `test`. Right now, we use
-    #  `test` to trigger side effects via the goal graph, such as compiling JVM code or generating
-    #  antlr code. Instead, we should run the specific command we are testing for that target type.
-    #  For example, `python_antlr_library` would only need `./pants gen`.
-    for bfa in [
-      # test targets
-      "python_tests",
-      "junit_tests",
-      # library targets
-      "python_library",
-      "java_library",
-      "scala_library",
-      # binary targets
-      "python_binary",
-      "jvm_binary",
-      # bundle targets
-      "jvm_app",
-      # codegen targets
-      "python_antlr_library",
-      "python_thrift_library",
-      "java_antlr_library",
-      "java_protobuf_library",
-      "java_thrift_library",
-      "java_wire_library",
-    ]:
-      targets.update(get_targets_for_type(bfa))
-    return list(sorted(targets))
+    pants_run = self.run_pants([
+      'filter',
+      skipped_targets_opt,
+      'testprojects::',
+      'examples::',
+      *exclude_opts
+    ])
+    self.assert_success(pants_run)
+    return list(sorted(pants_run.stdout_data.split()))
 
   def targets_for_shard(self, shard):
     if shard < 0 or shard >= self._SHARDS:
@@ -180,7 +167,9 @@ class TestProjectsIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator
 
   def run_shard(self, shard):
     targets = self.targets_for_shard(shard)
-    pants_run = self.run_pants(['test', *targets, '--jvm-platform-default-platform=java7'])
+    pants_run = self.run_pants([
+      'compile', 'lint', 'test', *targets, '--jvm-platform-default-platform=java7'
+    ])
     self.assert_success(pants_run)
 
   def test_self(self):
