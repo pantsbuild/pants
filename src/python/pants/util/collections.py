@@ -2,23 +2,21 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import collections
+from typing import Callable, DefaultDict, Iterable, MutableMapping, TypeVar
 
 
-def combined_dict(*dicts):
-  """Combine one or more dicts into a new, unified dict (dicts to the right take precedence)."""
-  return {k: v for d in dicts for k, v in d.items()}
+K = TypeVar('K')
+V = TypeVar('V')
 
 
-def factory_dict(value_factory, *args, **kwargs):
+def factory_dict(value_factory: Callable[[K], V], *args, **kwargs) -> DefaultDict:
   """A dict whose values are computed by `value_factory` when a `__getitem__` key is missing.
 
   Note that values retrieved by any other method will not be lazily computed; eg: via `get`.
 
   :param value_factory:
-  :type value_factory: A function from dict key to value.
   :param *args: Any positional args to pass through to `dict`.
   :param **kwrags: Any kwargs to pass through to `dict`.
-  :rtype: dict
   """
   class FactoryDict(collections.defaultdict):
     @staticmethod
@@ -37,7 +35,7 @@ def factory_dict(value_factory, *args, **kwargs):
   return FactoryDict()
 
 
-def recursively_update(d, d2):
+def recursively_update(d: MutableMapping, d2: MutableMapping) -> None:
   """dict.update but which merges child dicts (dict2 takes precedence where there's conflict)."""
   for k, v in d2.items():
     if k in d:
@@ -47,7 +45,10 @@ def recursively_update(d, d2):
     d[k] = v
 
 
-def assert_single_element(iterable):
+T = TypeVar('T')
+
+
+def assert_single_element(iterable: Iterable[T]) -> T:
   """Get the single element of `iterable`, or raise an error.
 
   :raise: :class:`StopIteration` if there is no element.

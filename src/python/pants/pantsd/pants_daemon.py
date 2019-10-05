@@ -28,7 +28,6 @@ from pants.pantsd.service.pants_service import PantsServices
 from pants.pantsd.service.scheduler_service import SchedulerService
 from pants.pantsd.service.store_gc_service import StoreGCService
 from pants.pantsd.watchman_launcher import WatchmanLauncher
-from pants.util.collections import combined_dict
 from pants.util.contextutil import stdio_as
 from pants.util.memo import memoized_property
 from pants.util.strutil import ensure_text
@@ -431,7 +430,7 @@ class PantsDaemon(FingerprintedProcessManager):
                              # this. NB: It will scrub PYTHONPATH once started to avoid infecting
                              # its own unrelated subprocesses.
                              PYTHONPATH=os.pathsep.join(sys.path))
-    exec_env = combined_dict(os.environ, spawn_control_env)
+    exec_env = {**os.environ, **spawn_control_env}
 
     # Pass all of sys.argv so that we can proxy arg flags e.g. `-ldebug`.
     cmd = [sys.executable] + sys.argv

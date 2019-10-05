@@ -20,6 +20,7 @@ python_library(
 python_library(
   name = 'collections',
   sources = ['collections.py'],
+  tags = {'type_checked'},
 )
 
 python_library(
@@ -41,7 +42,9 @@ python_library(
   sources = ['dirutil.py'],
   dependencies = [
     ':strutil',
+    '3rdparty/python:typing-extensions',
   ],
+  tags = {'type_checked'},
 )
 
 python_library(
@@ -117,7 +120,7 @@ python_library(
   sources = ['s3_log_aggregator.py'],
   dependencies = [
     '3rdparty/python:s3logparse'
-  ]
+  ],
 )
 
 python_binary(
@@ -125,7 +128,7 @@ python_binary(
   entry_point = 'pants.util.s3_log_aggregator',
   dependencies = [
     ':s3_log_aggregator'
-  ]
+  ],
 )
 
 python_library(
@@ -142,6 +145,7 @@ python_library(
 python_library(
   name = 'tarutil',
   sources = ['tarutil.py'],
+  tags = {'type_checked'},
 )
 
 python_library(
