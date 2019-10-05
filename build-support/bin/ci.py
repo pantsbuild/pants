@@ -455,10 +455,12 @@ def run_unit_tests(*, oauth_token_path: Optional[str] = None) -> None:
 
 
 def run_rust_tests() -> None:
+  is_macos = platform.system() == "Darwin"
   command = [
     "build-support/bin/native/cargo",
     "test",
-    "--all",
+    # Until we can run fuse tests on macos travis images, we omit --all on them.
+    *([] if is_macos else ["--all"]),
     # We pass --tests to skip doc tests, because our generated protos contain invalid doc tests in
     # their comments.
     "--tests",
@@ -466,7 +468,7 @@ def run_rust_tests() -> None:
     "--",
     "--nocapture"
   ]
-  if platform.system() == "Darwin":
+  if is_macos:
     # The osx travis environment has a low file descriptors ulimit, so we avoid running too many
     # tests in parallel.
     command.append("--test-threads=1")
