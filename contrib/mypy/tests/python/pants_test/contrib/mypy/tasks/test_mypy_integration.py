@@ -10,7 +10,8 @@ class MypyIntegrationTest(PantsRunIntegrationTest):
 
   cmdline = ['--backend-packages=pants.contrib.mypy', 'lint']
 
-  def target(self, name):
+  @classmethod
+  def target(cls, name):
     return f'contrib/mypy/examples/src/python/simple:{name}'
 
   def test_valid_type_hints(self):
