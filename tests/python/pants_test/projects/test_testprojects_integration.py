@@ -152,7 +152,6 @@ class TestProjectsIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator
       'examples::',
       *exclude_opts
     ])
-    import pdb; pdb.set_trace()
     self.assert_success(pants_run)
     return list(sorted(pants_run.stdout_data.split()))
 
