@@ -6,9 +6,22 @@ import subprocess
 
 
 def main() -> None:
-  subprocess.run(["./pants", "--backend-packages=pants.contrib.mypy", "--lint-mypy-verbose",
-                  "--lint-mypy-whitelist-tag-name=type_checked", "--tag=type_checked",
-                  "--lint-mypy-config-file=build-support/mypy/mypy.ini", "lint", "::"], check=True)
+  subprocess.run([
+    "./pants",
+    # We filter by tag to avoid irrelevant targets causing issues due to prerequisite goals against
+    # the lint goal.
+    "--tag=type_checked",
+    "--backend-packages=pants.contrib.mypy",
+    "lint",
+    "--lint-mypy-verbose",
+    "--lint-mypy-whitelist-tag-name=type_checked",
+    "--lint-mypy-config-file=build-support/mypy/mypy.ini",
+    "build-support::",
+    "contrib::",
+    "src/python::",
+    "tests/python::",
+    "pants-plugins::",
+  ], check=True)
 
 
 if __name__ == '__main__':

@@ -4,7 +4,7 @@
 import os
 from pathlib import Path
 from textwrap import dedent
-from typing import List
+from typing import Iterable, List
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -47,8 +47,6 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
 
   deprecated_options_scope = 'mypy'
   deprecated_options_scope_removal_version = '1.21.0.dev0'
-
-  WARNING_MESSAGE = "[WARNING]: Targets not currently whitelisted and may cause issues."
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -94,50 +92,51 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
   def is_python_target(target):
     return isinstance(target, PythonTarget)
 
-  def _is_tagged_target(self, target: Target) -> bool:
-    return self.get_options().whitelist_tag_name in target.tags
+  def _check_for_untagged_dependencies(
+    self, *, tagged_target_roots: Iterable[Target], tag_name: str
+  ) -> None:
+    untagged_dependencies = {
+      tgt for tgt in Target.closure_for_targets(target_roots=tagged_target_roots)
+      if tag_name not in tgt.tags and self.is_non_synthetic_python_target(tgt)
+    }
+    if not untagged_dependencies:
+      return
+    formatted_targets = "\n".join(tgt.address.spec for tgt in sorted(untagged_dependencies))
+    self.context.log.warn(
+      f"[WARNING]: The following targets are not marked with the tag name `{tag_name}`, "
+      f"but are dependencies of targets that are type checked. MyPy will check these dependencies, "
+      f"inferring `Any` where possible. You are encouraged to properly type check "
+      f"these dependencies.\n{formatted_targets}"
+    )
 
-  def _is_tagged_non_synthetic_python_target(self, target: Target) -> bool:
-    return (self.is_non_synthetic_python_target(target) and
-            self._is_tagged_target(target))
-
-  def _not_tagged_non_synthetic_python_target(self, target: Target) -> bool:
-    return (self.is_non_synthetic_python_target(target) and
-            not self._is_tagged_target(target))
-
-  def _all_targets_are_whitelisted(self, whitelisted_targets: List[Target], all_targets: List[Target]) -> bool:
-    return len(whitelisted_targets) == 0 or len(whitelisted_targets) == len(all_targets)
-
-  def _format_targets_not_whitelisted(self, targets: List[Target]) -> str:
-    output = ''
-    for target in targets:
-      output = output + f"{target.address.spec}\n"
-    return output
-
-  def _whitelist_warning(self, targets_not_whitelisted: List[Target]) -> None:
-    self.context.log.warn(self.WARNING_MESSAGE)
-    if self.get_options().verbose:
-      output = self._format_targets_not_whitelisted(targets_not_whitelisted)
-      self.context.log.warn(f"{output}")
-
-  def _calculate_python_sources(self, target_roots: List[Target]):
+  def _calculate_python_sources(self, target_roots: Iterable[Target]) -> List[str]:
     """Filter targets to generate a set of source files from the given targets."""
-    if self.get_options().whitelist_tag_name:
-      all_targets = self._filter_targets(Target.closure_for_targets([tgt for tgt in target_roots if self._is_tagged_target(tgt)]))
-      python_eval_targets = [tgt for tgt in all_targets if self._is_tagged_non_synthetic_python_target(tgt)]
-      if not self._all_targets_are_whitelisted(python_eval_targets, all_targets):
-        targets_not_whitelisted = [tgt for tgt in all_targets if self._not_tagged_non_synthetic_python_target(tgt)]
-        self._whitelist_warning(targets_not_whitelisted)
+    all_targets = {
+      tgt for tgt in Target.closure_for_targets(target_roots=target_roots)
+      if self.is_non_synthetic_python_target(tgt)
+    }
+    whitelist_tag_name = self.get_options().whitelist_tag_name
+    if whitelist_tag_name:
+      tagged_targets = {
+        tgt for tgt in all_targets
+        if whitelist_tag_name in tgt.tags
+      }
+      eval_targets = tagged_targets
+      if self.get_options().verbose:
+        self._check_for_untagged_dependencies(
+          tagged_target_roots={tgt for tgt in tagged_targets if tgt in target_roots},
+          tag_name=whitelist_tag_name,
+        )
     else:
-      python_eval_targets = self._filter_targets([tgt for tgt in Target.closure_for_targets(target_roots) if self.is_non_synthetic_python_target(tgt)])
+      eval_targets = all_targets
 
     sources = set()
-    for target in python_eval_targets:
+    for target in eval_targets:
       sources.update(
         source for source in target.sources_relative_to_buildroot()
         if os.path.splitext(source)[1] == self._PYTHON_SOURCE_EXTENSION
       )
-    return list(sources)
+    return list(sorted(sources))
 
   def _collect_source_roots(self):
     # Collect the set of directories in which there are Python sources (whether part of
