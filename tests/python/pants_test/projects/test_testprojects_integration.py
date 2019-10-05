@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import math
-from typing import List, Set
+from typing import List
 
 from pants.util.memo import memoized_property
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
