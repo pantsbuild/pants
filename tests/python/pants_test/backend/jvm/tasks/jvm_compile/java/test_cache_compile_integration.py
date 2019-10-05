@@ -292,13 +292,13 @@ class CacheCompileIntegrationTest(BaseCompileIT):
           zjar = os.path.join(zincpath, 'z.jar')
           self.assertTrue(os.path.exists(zjar))
           ZIP.extract(zjar, zinc_dir)
-          self.assertEqual(os.listdir(zinc_dir), ['compile_classpath'] + classfiles)
+          self.assertEqual(sorted(os.listdir(zinc_dir)), sorted(['compile_classpath', *classfiles]))
 
           rscpath = os.path.join(path, 'rsc')
           mjar = os.path.join(rscpath, 'm.jar')
           self.assertTrue(os.path.exists(mjar))
           ZIP.extract(mjar, rsc_dir)
-          self.assertEqual(os.listdir(rsc_dir), classfiles)
+          self.assertEqual(sorted(os.listdir(rsc_dir)), sorted(classfiles))
 
       ensure_classfiles("cachetestA", ["A.class"])
       ensure_classfiles("cachetestB", ["B.class"])
