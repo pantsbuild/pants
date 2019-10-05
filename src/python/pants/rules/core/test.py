@@ -26,7 +26,7 @@ class Test(Goal):
   name = 'test'
 
 
-@dataclass
+@dataclass(frozen=True)
 class AddressAndTestResult:
   address: BuildFileAddress
   test_result: Optional[TestResult]  # If None, target was not a test target.
