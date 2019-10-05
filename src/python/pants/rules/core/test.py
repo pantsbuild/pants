@@ -2,12 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+from dataclasses import dataclass
 from typing import Optional
 
-from dataclasses import dataclass
-
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
-from pants.build_graph.address import BuildFileAddress, Address
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal
@@ -15,6 +14,7 @@ from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.rules import UnionMembership, console_rule, rule
 from pants.engine.selectors import Get
 from pants.rules.core.core_test_model import Status, TestResult, TestTarget
+
 
 # TODO(#6004): use proper Logging singleton, rather than static logger.
 logger = logging.getLogger(__name__)
