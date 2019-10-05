@@ -104,8 +104,9 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
     formatted_targets = "\n".join(tgt.address.spec for tgt in sorted(untagged_dependencies))
     self.context.log.warn(
       f"[WARNING]: The following targets are not marked with the tag name `{tag_name}`, "
-      f"but are dependencies of targets that are type checked because they have this tag. You are "
-      f"encouraged to type check these dependencies.\n{formatted_targets}"
+      f"but are dependencies of targets that are type checked. MyPy will check these dependencies, "
+      f"inferring `Any` where possible. You are encouraged to properly type check "
+      f"these dependencies.\n{formatted_targets}"
     )
 
   def _calculate_python_sources(self, target_roots: Iterable[Target]) -> List[str]:
