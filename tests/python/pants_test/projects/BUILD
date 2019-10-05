@@ -10,5 +10,5 @@ python_tests(
     'tests/python/pants_test:test_base',
   ],
   tags = {'integration'},
-  timeout=950,
+  timeout=1400,
 )
