@@ -37,7 +37,7 @@ files(
   dependencies = [
     'testprojects/src/java/org/pantsbuild/testproject:javasources_directory',
     'testprojects/src/java/org/pantsbuild/testproject:publish_directory'
-  ]
+  ],
 )
 
 files(
@@ -48,6 +48,14 @@ files(
 files(
   name = 'procedure_syntax_directory',
   sources = rglobs('procedure_syntax/*'),
+)
+
+files(
+  name = 'publish_directory',
+  sources = rglobs('publish/*'),
+  dependencies = [
+    'testprojects/src/java/org/pantsbuild/testproject:publish_directory'
+  ],
 )
 
 files(

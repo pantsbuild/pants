@@ -138,6 +138,8 @@ python_tests(
   dependencies = [
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
+    'examples/src/java/org/pantsbuild/example:hello_directory',
+    'testprojects/3rdparty:checkstyle_directory',
   ],
   tags = {'integration'},
   timeout = 240,
@@ -315,6 +317,8 @@ python_tests(
   name = 'ivy_resolve_integration',
   sources = ['test_ivy_resolve_integration.py'],
   dependencies = [
+    'examples/src/scala/org/pantsbuild/example:hello_directory',
+    'src/java/org/pantsbuild:junit_directory',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
@@ -382,13 +386,17 @@ python_tests(
   name = 'jar_publish_integration',
   sources = ['test_jar_publish_integration.py'],
   dependencies = [
+    'examples/src/python/example:pants_publish_plugin_directory',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:int-test',
+    'tests/python/pants_test/tasks:jar_publish_resources_directory',
+    'testprojects/src/java/org/pantsbuild/testproject:publish_directory',
+    'testprojects/src/scala/org/pantsbuild/testproject:publish_directory',
   ],
   tags = {'integration'},
-  timeout = 360,
+  timeout = 480,
 )
 
 python_tests(

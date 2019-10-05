@@ -303,11 +303,17 @@ def linux_fuse_shard() -> Dict:
   }
 
 
-def _osx_env_with_pyenv(python_version: PythonVersion) -> List[str]:
+def _osx_env() -> List[str]:
   return [
     'PATH="/usr/local/opt/openssl/bin:${PATH}"',
     'LDFLAGS="-L/usr/local/opt/openssl/lib"',
     'CPPFLAGS="-I/usr/local/opt/openssl/include"',
+  ]
+
+
+def _osx_env_with_pyenv(python_version: PythonVersion) -> List[str]:
+  return [
+    *_osx_env(),
     'PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"',
     f'PATH="${{PYENV_ROOT}}/versions/${{PYENV_PY{python_version.number}_VERSION}}/bin:${{PATH}}"',
   ]
@@ -576,16 +582,16 @@ def rust_tests_osx() -> Dict:
     **_RUST_TESTS_BASE,
     "name": "Rust tests - OSX",
     "os": "osx",
-    # Fuse actually works on this image. It hangs on many others.
     "osx_image": "xcode11",
-    "addons": {
-      "homebrew": {
-        "packages": ["openssl"],
-        "casks": ["osxfuse"]
-      }
-    },
+    # We cannot currently run fuse tests in CI, as the osx_image doesn't support it.
+    # Until that changes, no need to install osxfuse.
+    # "addons": {
+    #   "homebrew": {
+    #     "casks": ["osxfuse"]
+    #   }
+    # },
     "before_install": [
-      './build-support/bin/install_python_for_ci.sh "${PYENV_PY27_VERSION}" "${PYENV_PY36_VERSION}"',
+      './build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"',
     ],
     "env": _osx_env_with_pyenv(python_version=PythonVersion.py36) + [
       "CACHE_NAME=rust_tests.osx"
