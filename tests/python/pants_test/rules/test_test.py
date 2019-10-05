@@ -9,8 +9,13 @@ from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.legacy.structs import PythonTestsAdaptor
 from pants.engine.rules import UnionMembership
 from pants.rules.core.core_test_model import TestTarget
-from pants.rules.core.test import Status, TestResult, coordinator_of_tests, fast_test, \
-  AddressAndTestResult
+from pants.rules.core.test import (
+  AddressAndTestResult,
+  Status,
+  TestResult,
+  coordinator_of_tests,
+  fast_test,
+)
 from pants_test.engine.util import MockConsole, run_rule
 from pants_test.test_base import TestBase
 
