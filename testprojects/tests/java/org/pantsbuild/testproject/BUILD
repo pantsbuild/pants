@@ -40,6 +40,11 @@ files(
 )
 
 files(
+  name='depman_directory',
+  sources=rglobs('depman/*'),
+)
+
+files(
   name='dummies_directory',
   sources=rglobs('dummies/*'),
 )

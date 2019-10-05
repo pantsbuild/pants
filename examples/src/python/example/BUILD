@@ -19,3 +19,8 @@ files(
   name='hello_directory',
   sources=rglobs('hello/*'),
 )
+
+files(
+  name='pants_publish_plugin_directory',
+  sources=rglobs('pants_publish_plugin/*'),
+)

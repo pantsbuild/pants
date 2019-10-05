@@ -102,7 +102,9 @@ python_tests(
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:depman_directory',
+    'testprojects/tests/java/org/pantsbuild/testproject:depman_directory',
+    'testprojects/3rdparty:managed_directory',
   ],
   tags = {'integration'},
-  timeout=600,
+  timeout=800,
 )
