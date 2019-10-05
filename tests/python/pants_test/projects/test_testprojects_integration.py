@@ -153,7 +153,6 @@ class TestProjectsIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator
       # library targets
       "python_library",
       "java_library",
-      "jar_library",
       "scala_library",
       # binary targets
       "python_binary",
