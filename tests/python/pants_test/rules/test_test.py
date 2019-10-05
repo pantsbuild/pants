@@ -7,7 +7,10 @@ from textwrap import dedent
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.legacy.graph import HydratedTarget
 from pants.engine.legacy.structs import PythonTestsAdaptor
-from pants.rules.core.test import Status, TestResult, coordinator_of_tests, fast_test
+from pants.engine.rules import UnionMembership
+from pants.rules.core.core_test_model import TestTarget
+from pants.rules.core.test import Status, TestResult, coordinator_of_tests, fast_test, \
+  AddressAndTestResult
 from pants_test.engine.util import MockConsole, run_rule
 from pants_test.test_base import TestBase
 
@@ -16,14 +19,16 @@ class TestTest(TestBase):
   def single_target_test(self, result, expected_console_output, success=True):
     console = MockConsole(use_colors=False)
 
-    res = run_rule(fast_test, console, (self.make_build_target_address("some/target"),), {
-      (TestResult, Address): lambda _: result,
+    addr = self.make_build_target_address("some/target")
+    res = run_rule(fast_test, console, (addr,), {
+      (AddressAndTestResult, Address): lambda _: AddressAndTestResult(addr, result),
     })
 
     self.assertEquals(console.stdout.getvalue(), expected_console_output)
     self.assertEquals(0 if success else 1, res.exit_code)
 
-  def make_build_target_address(self, spec):
+  @staticmethod
+  def make_build_target_address(spec):
     address = Address.parse(spec)
     return BuildFileAddress(
       build_file=None,
@@ -61,14 +66,15 @@ class TestTest(TestBase):
 
     def make_result(target):
       if target == target1:
-        return TestResult(status=Status.SUCCESS, stdout='I passed\n', stderr='')
+        tr = TestResult(status=Status.SUCCESS, stdout='I passed\n', stderr='')
       elif target == target2:
-        return TestResult(status=Status.FAILURE, stdout='I failed\n', stderr='')
+        tr = TestResult(status=Status.FAILURE, stdout='I failed\n', stderr='')
       else:
         raise Exception("Unrecognised target")
+      return AddressAndTestResult(target, tr)
 
     res = run_rule(fast_test, console, (target1, target2), {
-      (TestResult, Address): make_result,
+      (AddressAndTestResult, Address): make_result,
     })
 
     self.assertEqual(1, res.exit_code)
@@ -97,10 +103,19 @@ class TestTest(TestBase):
     )
 
   def test_coordinator_python_test(self):
+    addr = Address.parse("some/target")
     target_adaptor = PythonTestsAdaptor(type_alias='python_tests')
     with self.captured_logging(logging.INFO):
-      result = run_rule(coordinator_of_tests, HydratedTarget(Address.parse("some/target"), target_adaptor, ()), {
-        (TestResult, PythonTestsAdaptor): lambda _: TestResult(status=Status.FAILURE, stdout='foo', stderr=''),
-      })
+      result = run_rule(
+        coordinator_of_tests,
+        HydratedTarget(addr, target_adaptor, ()),
+        UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
+        {
+          (TestResult, PythonTestsAdaptor):
+            lambda _: TestResult(status=Status.FAILURE, stdout='foo', stderr=''),
+        })
 
-    self.assertEqual(result, TestResult(status=Status.FAILURE, stdout='foo', stderr=''))
+    self.assertEqual(
+      result,
+      AddressAndTestResult(addr, TestResult(status=Status.FAILURE, stdout='foo', stderr=''))
+    )
