@@ -210,9 +210,9 @@ class TestStrategy(Enum):
     if self == self.v2_remote and oauth_token_path is None:  # type: ignore
       raise ValueError("Must specify oauth_token_path.")
     result: List[str] = {  # type: ignore
-      self.v1_no_chroot: ["./pants.pex", "test"] + sorted(targets) + PYTEST_PASSTHRU_ARGS,
-      self.v1_chroot: ["./pants.pex", "--test-pytest-chroot", "test"] + sorted(targets) + PYTEST_PASSTHRU_ARGS,
-      self.v2_local: ["./pants.pex", "--no-v1", "--v2", "test"] + sorted(targets),
+      self.v1_no_chroot: ["./pants.pex", "test", *sorted(targets), *PYTEST_PASSTHRU_ARGS],
+      self.v1_chroot: ["./pants.pex", "--test-pytest-chroot", "test", *sorted(targets), *PYTEST_PASSTHRU_ARGS],
+      self.v2_local: ["./pants.pex", "--no-v1", "--v2", "test", *sorted(targets)],
       self.v2_remote: [
                         "./pants.pex",
                         "--no-v1",
@@ -222,8 +222,9 @@ class TestStrategy(Enum):
                         # passes either locally or remotely and fails in the other environment.
                         "--process-execution-speculation-strategy=none",
                         f"--remote-oauth-bearer-token-path={oauth_token_path}",
-                        "test"
-                      ] + sorted(targets),
+                        "test",
+                        *sorted(targets),
+                      ],
     }[self]
     if shard is not None and self in [self.v1_no_chroot, self.v1_chroot]:  # type: ignore
       result.insert(1, f"--test-pytest-test-shard={shard}")
@@ -343,7 +344,7 @@ def run_sanity_checks() -> None:
     print(f"* Executing `./pants.pex {' '.join(command)}` as a sanity check")
     try:
       subprocess.run(
-        ["./pants.pex"] + command,
+        ["./pants.pex", *command],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.STDOUT,
         check=True
@@ -369,7 +370,7 @@ def run_sanity_checks() -> None:
 def run_lint() -> None:
   targets = ["contrib::", "examples::", "src::", "tests::", "zinc::"]
   _run_command(
-    ["./pants.pex", "--tag=-nolint", "lint"] + targets,
+    ["./pants.pex", "--tag=-nolint", "lint", *targets],
     slug="Lint",
     start_message="Running lint checks",
     die_message="Lint check failure."
@@ -482,7 +483,7 @@ def run_rust_tests() -> None:
 def run_jvm_tests() -> None:
   targets = ["src/java::", "src/scala::", "tests/java::", "tests/scala::", "zinc::"]
   _run_command(
-    ["./pants.pex", "doc", "test"] + targets,
+    ["./pants.pex", "doc", "test", *targets],
     slug="CoreJVM",
     start_message="Running JVM tests",
     die_message="JVM test failure."
@@ -537,7 +538,8 @@ def run_plugin_tests() -> None:
      "test.pytest",
      "pants-plugins/src/python::",
      "pants-plugins/tests/python::",
-     ] + PYTEST_PASSTHRU_ARGS,
+     *PYTEST_PASSTHRU_ARGS,
+     ],
     slug="BackendTests",
     start_message="Running internal backend Python tests",
     die_message="Internal backend Python test failure."
@@ -549,8 +551,10 @@ def run_platform_specific_tests() -> None:
   _run_command(
     ["./pants.pex",
      "--tag=+platform_specific_behavior",
-     "test"
-     ] + targets + PYTEST_PASSTHRU_ARGS,
+     "test",
+     *targets,
+     *PYTEST_PASSTHRU_ARGS,
+     ],
     slug="PlatformSpecificTests",
     start_message=f"Running platform-specific tests on platform {platform.system()}",
     die_message="Pants platform-specific test failure."
