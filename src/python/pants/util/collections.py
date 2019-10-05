@@ -2,14 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import collections
-from typing import Callable, DefaultDict, Iterable, MutableMapping, Tuple, TypeVar
+from typing import Callable, DefaultDict, Iterable, MutableMapping, TypeVar
 
 
 K = TypeVar('K')
 V = TypeVar('V')
 
 
-def factory_dict(value_factory: Callable[[K], V], *args: Tuple, **kwargs) -> DefaultDict:
+def factory_dict(value_factory: Callable[[K], V], *args, **kwargs) -> DefaultDict:
   """A dict whose values are computed by `value_factory` when a `__getitem__` key is missing.
 
   Note that values retrieved by any other method will not be lazily computed; eg: via `get`.

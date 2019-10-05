@@ -14,7 +14,7 @@ class TestCollections(unittest.TestCase):
     def make_default_value(x: int) -> List[int]:
       return [x ** 3]
 
-    cubes = factory_dict(make_default_value, *((x, x ** 2) for x in range(3)), three=42)
+    cubes = factory_dict(make_default_value, ((x, x ** 2) for x in range(3)), three=42)
 
     # Check kwargs passed to the constructor
     self.assertEqual(42, cubes['three'])
