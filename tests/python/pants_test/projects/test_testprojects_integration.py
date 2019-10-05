@@ -129,14 +129,12 @@ class TestProjectsIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator
     """We don't want to run over every single target, e.g. files() are only used for us to depend
     on in ITs and it doesn't make sense to run `./pants test` against them."""
     return [
-      "target",
       # resources / loose files
       "files",
       "resources",
       "page",
       # 3rd-party dependencies
       "jar_library",
-      "managed_jar_libraries",
       "python_requirement_library",
     ]
 
@@ -154,6 +152,7 @@ class TestProjectsIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator
       'examples::',
       *exclude_opts
     ])
+    import pdb; pdb.set_trace()
     self.assert_success(pants_run)
     return list(sorted(pants_run.stdout_data.split()))
 
