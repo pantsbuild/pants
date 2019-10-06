@@ -35,6 +35,7 @@ python_tests(
     'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
     'src/python/pants/subsystem',
+    'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:task_test_base',
   ]
 )
@@ -102,6 +103,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/project_info/tasks:filedeps',
     'src/python/pants/build_graph',
+    'tests/python/pants_test:test_base',
     'tests/python/pants_test:task_test_base',
   ],
 )

@@ -26,7 +26,7 @@ python_tests(
     'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/subsystem',
+    'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:test_base',
   ],
 )
