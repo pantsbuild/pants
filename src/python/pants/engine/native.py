@@ -811,6 +811,8 @@ class Native(Singleton):
                     construct_file_content,
                     construct_files_content,
                     construct_process_result,
+                    construct_materialize_directory_result,
+                    construct_materialize_directories_results,
                     type_address,
                     type_path_globs,
                     type_directory_digest,
@@ -843,6 +845,8 @@ class Native(Singleton):
         func(construct_file_content),
         func(construct_files_content),
         func(construct_process_result),
+        func(construct_materialize_directory_result),
+        func(construct_materialize_directories_results),
         # Types.
         ti(type_address),
         ti(type_path_globs),

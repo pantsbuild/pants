@@ -2,8 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from io import StringIO
+from typing import Any, List
 
 from pants.engine.console import Console
+from pants.engine.fs import Workspace
 from pants.engine.goal import Goal
 from pants.engine.selectors import Params
 from pants.init.options_initializer import BuildConfigInitializer
@@ -35,7 +37,7 @@ class ConsoleRuleTestBase(TestBase):
     if not issubclass(self.goal_cls, Goal):
       raise AssertionError('goal_cls() must return a Goal subclass, got {}'.format(self.goal_cls))
 
-  def execute_rule(self, args=tuple(), env=tuple(), exit_code=0):
+  def execute_rule(self, args=tuple(), env=tuple(), exit_code=0, additional_params: List[Any]=[]):
     """Executes the @console_rule for this test class.
 
     :API: public
@@ -50,10 +52,12 @@ class ConsoleRuleTestBase(TestBase):
     full_options = options_bootstrapper.get_full_options(list(self.goal_cls.Options.known_scope_infos()))
     stdout, stderr = StringIO(), StringIO()
     console = Console(stdout=stdout, stderr=stderr)
+    scheduler = self.scheduler
+    workspace = Workspace(scheduler)
 
     # Run for the target specs parsed from the args.
     specs = TargetRootsCalculator.parse_specs(full_options.target_specs, self.build_root)
-    params = Params(specs, console, options_bootstrapper)
+    params = Params(specs, console, options_bootstrapper, workspace, *additional_params)
     actual_exit_code = self.scheduler.run_console_rule(self.goal_cls, params)
 
     # Flush and capture console output.

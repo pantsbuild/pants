@@ -87,6 +87,27 @@ pub struct DirectoryMaterializeMetadata {
   pub child_files: BTreeMap<String, LoadMetadata>,
 }
 
+impl DirectoryMaterializeMetadata {
+  pub fn to_path_list(&self) -> Vec<String> {
+    fn recurse(
+      outputs: &mut Vec<String>,
+      path_so_far: PathBuf,
+      current: &DirectoryMaterializeMetadata,
+    ) {
+      for (child, _) in current.child_files.iter() {
+        outputs.push(path_so_far.join(child).to_string_lossy().to_string())
+      }
+
+      for (dir, meta) in current.child_directories.iter() {
+        recurse(outputs, path_so_far.join(dir), &meta);
+      }
+    }
+    let mut output_paths: Vec<String> = vec![];
+    recurse(&mut output_paths, PathBuf::new(), self);
+    output_paths
+  }
+}
+
 #[derive(Debug)]
 struct DirectoryMaterializeMetadataBuilder {
   pub metadata: LoadMetadata,

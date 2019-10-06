@@ -181,6 +181,8 @@ pub extern "C" fn scheduler_create(
   construct_file_content: Function,
   construct_files_content: Function,
   construct_process_result: Function,
+  construct_materialize_directory_result: Function,
+  construct_materialize_directories_results: Function,
   type_address: TypeId,
   type_path_globs: TypeId,
   type_directory_digest: TypeId,
@@ -233,6 +235,8 @@ pub extern "C" fn scheduler_create(
     construct_file_content: construct_file_content,
     construct_files_content: construct_files_content,
     construct_process_result: construct_process_result,
+    construct_materialize_directories_results,
+    construct_materialize_directory_result,
     address: type_address,
     path_globs: type_path_globs,
     directory_digest: type_directory_digest,
@@ -889,20 +893,54 @@ pub extern "C" fn materialize_directories(
   };
   let workunit_store = with_session(session_ptr, |session| session.workunit_store());
   with_scheduler(scheduler_ptr, |scheduler| {
-    scheduler.core.executor.block_on(
-      futures::future::join_all(
-        dir_and_digests
-          .into_iter()
-          .map(|(dir, digest)| {
-            scheduler
-              .core
-              .store()
-              .materialize_directory(dir, digest, workunit_store.clone())
-          })
-          .collect::<Vec<_>>(),
-      )
-      .map(|_| ()),
+    let types = &scheduler.core.types;
+    let construct_materialize_directories_results = types.construct_materialize_directories_results;
+    let construct_materialize_directory_result = types.construct_materialize_directory_result;
+    let work_future = futures::future::join_all(
+      dir_and_digests
+        .into_iter()
+        .map(|(dir, digest)| {
+          let metadata = scheduler.core.store().materialize_directory(
+            dir.clone(),
+            digest,
+            workunit_store.clone(),
+          );
+          metadata.map(|m| (dir, m))
+        })
+        .collect::<Vec<_>>(),
     )
+    .map(move |metadata_list| {
+      let entries: Vec<Value> = metadata_list
+        .iter()
+        .map(
+          |(output_dir, metadata): &(PathBuf, store::DirectoryMaterializeMetadata)| {
+            let path_list = metadata.to_path_list();
+            let path_values: Vec<Value> = path_list
+              .into_iter()
+              .map(|rel_path: String| {
+                let mut path = PathBuf::new();
+                path.push(output_dir);
+                path.push(rel_path);
+                externs::store_utf8(&path.to_string_lossy())
+              })
+              .collect();
+
+            externs::unsafe_call(
+              &construct_materialize_directory_result,
+              &[externs::store_tuple(&path_values)],
+            )
+          },
+        )
+        .collect();
+
+      let output: Value = externs::unsafe_call(
+        &construct_materialize_directories_results,
+        &[externs::store_tuple(&entries)],
+      );
+      output
+    });
+
+    scheduler.core.executor.spawn_on_io_pool(work_future).wait()
   })
   .into()
 }

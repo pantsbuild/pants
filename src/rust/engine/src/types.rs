@@ -6,6 +6,8 @@ pub struct Types {
   pub construct_file_content: Function,
   pub construct_files_content: Function,
   pub construct_process_result: Function,
+  pub construct_materialize_directory_result: Function,
+  pub construct_materialize_directories_results: Function,
   pub address: TypeId,
   pub path_globs: TypeId,
   pub directory_digest: TypeId,

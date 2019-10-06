@@ -19,7 +19,7 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.build_files import create_graph_rules
 from pants.engine.console import Console
-from pants.engine.fs import create_fs_rules
+from pants.engine.fs import Workspace, create_fs_rules
 from pants.engine.goal import Goal
 from pants.engine.isolated_process import create_process_rules
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
@@ -202,9 +202,11 @@ class LegacyGraphSession:
     console = Console(
       use_colors=options_bootstrapper.bootstrap_options.for_global_scope().colors
     )
+    workspace = Workspace(self.scheduler_session)
+
     for goal in goals:
       goal_product = self.goal_map[goal]
-      params = Params(subject, options_bootstrapper, console)
+      params = Params(subject, options_bootstrapper, console, workspace)
       logger.debug(f'requesting {goal_product} to satisfy execution of `{goal}` goal')
       try:
         exit_code = self.scheduler_session.run_console_rule(goal_product, params)
