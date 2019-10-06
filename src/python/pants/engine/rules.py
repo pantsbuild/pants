@@ -10,8 +10,9 @@ import typing
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from collections.abc import Iterable
+from dataclasses import dataclass
 from textwrap import dedent
-from typing import Any, Callable, Type, cast
+from typing import Any, Callable, Dict, Type, cast
 
 import asttokens
 from twitter.common.collections import OrderedSet
@@ -426,6 +427,17 @@ class UnionRule(datatype([
       raise cls.make_type_error('union_base must be a type annotated with @union: was {} (type {})'
                                 .format(union_base, type(union_base).__name__))
     return super().__new__(cls, union_base, union_member)
+
+
+@dataclass(frozen=True)
+class UnionMembership:
+  union_rules: Dict[type, typing.Iterable[type]]
+
+  def is_member(self, union_type, putative_member):
+    members = self.union_rules.get(union_type)
+    if members is None:
+      raise TypeError(f'Not a registered union type: {union_type}')
+    return type(putative_member) in members
 
 
 class Rule(ABC):

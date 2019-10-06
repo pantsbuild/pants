@@ -170,7 +170,7 @@ class BuildConfiguration:
     return list(self._rules)
 
   def union_rules(self):
-    """Returns a mapping of registered union base types -> [a list of union member types].
+    """Returns a mapping of registered union base types -> [OrderedSet of union member types].
 
     :rtype: OrderedDict
     """
