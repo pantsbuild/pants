@@ -111,6 +111,8 @@ pub struct CommandRunner {
   store: Store,
   platform: Platform,
   executor: task_executor::Executor,
+  backoff_incremental_wait: Duration,
+  backoff_max_wait: Duration,
 }
 
 #[derive(Debug, PartialEq)]
@@ -121,12 +123,20 @@ enum ExecutionError {
   MissingDigests(Vec<Digest>),
   // String is the operation name which can be used to poll the GetOperation gRPC API.
   NotFinished(String),
+  // String is the error message.
+  Retryable(String),
 }
 
 #[derive(Default)]
 struct ExecutionHistory {
   attempts: Vec<ExecutionStats>,
   current_attempt: ExecutionStats,
+}
+
+impl ExecutionHistory {
+  fn total_attempt_count(&self) -> usize {
+    self.attempts.len() + 1
+  }
 }
 
 impl CommandRunner {
@@ -316,69 +326,43 @@ impl super::CommandRunner for CommandRunner {
                             }
                             future::err(err).to_boxed()
                           }
+                          ExecutionError::Retryable(message) => {
+                            command_runner.retry_execution(
+                              execute_request,
+                              future::done({
+                                if history.total_attempt_count() >= 5 {
+                                  Err(format!("Gave up retrying remote execution after {} retriable attempts; last failure: {}", history.total_attempt_count(), message))
+                                } else {
+                                  trace!("Got retryable error from server; retrying. Error: {}", message);
+                                  Ok(())
+                                }
+                              }).to_boxed(),
+                              history,
+                              maybe_cancel_remote_exec_token,
+                            )
+                          },
                           ExecutionError::MissingDigests(missing_digests) => {
-                            let ExecutionHistory {
-                              mut attempts,
-                              current_attempt,
-                            } = history;
-
                             trace!(
                               "Server reported missing digests ({:?}); trying to upload: {:?}",
-                              current_attempt,
+                              history.current_attempt,
                               missing_digests,
                             );
 
-                            attempts.push(current_attempt);
-                            let history = ExecutionHistory {
-                              attempts,
-                              current_attempt: ExecutionStats::default(),
-                            };
-
-                            store
-                                .ensure_remote_has_recursive(missing_digests, workunit_store.clone())
-                                .and_then({
-                                  let command_runner = command_runner.clone();
-                                  move |summary| {
-                                    let mut history = history;
-                                    history.current_attempt += summary;
-                                    command_runner
-                                        .oneshot_execute(&execute_request)
-                                        .join(future::ok(history))
-                                  }
-                                })
-                                .map({
-                                  let operations_client = operations_client.clone();
-                                  let executor = command_runner.executor.clone();
-                                  move |(operation, history)| {
-                                    let maybe_cancel_remote_exec_token = match operation {
-                                      OperationOrStatus::Operation(ref operation) => {
-                                        Some(CancelRemoteExecutionToken::new(
-                                          operations_client,
-                                          operation.name.clone(),
-                                          executor,
-                                        ))
-                                      }
-                                      _ => None,
-                                    };
-                                    // Reset `iter_num` on `MissingDigests`
-                                    future::Loop::Continue((
-                                      history,
-                                      operation,
-                                      maybe_cancel_remote_exec_token,
-                                      0,
-                                    ))
-                                  }
-                                })
-                                .to_boxed()
-                          }
+                            command_runner.retry_execution(
+                              execute_request,
+                              store.ensure_remote_has_recursive(missing_digests, workunit_store.clone()).map(|_| ()).to_boxed(),
+                              history,
+                              maybe_cancel_remote_exec_token,
+                            )
+                          },
                           ExecutionError::NotFinished(operation_name) => {
                             let mut operation_request =
                                 bazel_protos::operations::GetOperationRequest::new();
                             operation_request.set_name(operation_name.clone());
 
                             let backoff_period = min(
-                              CommandRunner::BACKOFF_MAX_WAIT_MILLIS,
-                              (1 + iter_num) * CommandRunner::BACKOFF_INCR_WAIT_MILLIS,
+                              command_runner.backoff_max_wait,
+                              (1 + iter_num) * command_runner.backoff_incremental_wait,
                             );
 
                             // take the grpc result and cancel the op if too much time has passed.
@@ -404,7 +388,7 @@ impl super::CommandRunner for CommandRunner {
                                   .to_boxed()
                             } else {
                               // maybe the delay here should be the min of remaining time and the backoff period
-                              Delay::new(Instant::now() + Duration::from_millis(backoff_period))
+                              Delay::new(Instant::now() + backoff_period)
                                   .map_err(move |e| {
                                     format!(
                                       "Future-Delay errored at operation result polling for {}, {}: {}",
@@ -421,7 +405,7 @@ impl super::CommandRunner for CommandRunner {
                                           .or_else(move |err| {
                                             rpcerror_recover_cancelled(operation_request.take_name(), err)
                                           })
-                                          .map( OperationOrStatus::Operation)
+                                          .map(OperationOrStatus::Operation)
                                           .map_err(rpcerror_to_string),
                                     )
                                     .map(move |operation| {
@@ -466,9 +450,6 @@ impl super::CommandRunner for CommandRunner {
 }
 
 impl CommandRunner {
-  const BACKOFF_INCR_WAIT_MILLIS: u64 = 500;
-  const BACKOFF_MAX_WAIT_MILLIS: u64 = 5000;
-
   pub fn new(
     address: &str,
     metadata: ExecuteProcessRequestMetadata,
@@ -477,6 +458,8 @@ impl CommandRunner {
     store: Store,
     platform: Platform,
     executor: task_executor::Executor,
+    backoff_incremental_wait: Duration,
+    backoff_max_wait: Duration,
   ) -> CommandRunner {
     let env = Arc::new(grpcio::EnvBuilder::new().build());
     let channel = {
@@ -507,6 +490,8 @@ impl CommandRunner {
       store,
       platform,
       executor,
+      backoff_incremental_wait,
+      backoff_max_wait,
     }
   }
 
@@ -644,11 +629,10 @@ impl CommandRunner {
           attempts.current_attempt.was_cache_hit = execute_response.cached_result;
         }
 
-        let mut execution_attempts = std::mem::replace(&mut attempts.attempts, vec![]);
-        execution_attempts.push(attempts.current_attempt);
-
         let status = execute_response.take_status();
         if grpcio::RpcStatusCode::from(status.get_code()) == grpcio::RpcStatusCode::Ok {
+          let mut execution_attempts = std::mem::replace(&mut attempts.attempts, vec![]);
+          execution_attempts.push(attempts.current_attempt);
           return populate_fallible_execution_result(
             self.store.clone(),
             execute_response,
@@ -735,14 +719,83 @@ impl CommandRunner {
         }
         future::err(ExecutionError::MissingDigests(missing_digests)).to_boxed()
       }
-      code => future::err(ExecutionError::Fatal(format!(
-        "Error from remote execution: {:?}: {:?}",
-        code,
-        status.get_message()
-      )))
-      .to_boxed(),
+      code => {
+        // Error we see from Google's RBE service if we use pre-emptable workers and one gets pre-empted.
+        if code == grpcio::RpcStatusCode::Aborted
+          && status.get_message() == "the bot running the task appears to be lost"
+        {
+          future::err(ExecutionError::Retryable(status.get_message().to_owned())).to_boxed()
+        } else {
+          future::err(ExecutionError::Fatal(format!(
+            "Error from remote execution: {:?}: {:?}",
+            code,
+            status.get_message()
+          )))
+          .to_boxed()
+        }
+      }
     }
     .to_boxed()
+  }
+
+  #[allow(clippy::type_complexity)]
+  fn retry_execution(
+    &self,
+    execute_request: Arc<bazel_protos::remote_execution::ExecuteRequest>,
+    prefix_future: BoxFuture<(), String>,
+    history: ExecutionHistory,
+    maybe_cancel_remote_exec_token: Option<CancelRemoteExecutionToken>,
+  ) -> BoxFuture<
+    futures::future::Loop<
+      FallibleExecuteProcessResult,
+      (
+        ExecutionHistory,
+        OperationOrStatus,
+        Option<CancelRemoteExecutionToken>,
+        u32,
+      ),
+    >,
+    String,
+  > {
+    if let Some(mut cancel_remote_exec_token) = maybe_cancel_remote_exec_token {
+      cancel_remote_exec_token.do_not_send_cancellation_on_drop();
+    }
+
+    let ExecutionHistory {
+      mut attempts,
+      current_attempt,
+    } = history;
+    attempts.push(current_attempt);
+    let history = ExecutionHistory {
+      attempts,
+      current_attempt: ExecutionStats::default(),
+    };
+
+    let command_runner = self.clone();
+    prefix_future
+      .and_then(move |()| command_runner.oneshot_execute(&execute_request))
+      .map({
+        let operations_client = self.operations_client.clone();
+        let executor = self.executor.clone();
+        move |operation| {
+          let maybe_cancel_remote_exec_token = match operation {
+            OperationOrStatus::Operation(ref operation) => Some(CancelRemoteExecutionToken::new(
+              operations_client,
+              operation.name.clone(),
+              executor,
+            )),
+            _ => None,
+          };
+          future::Loop::Continue((
+            history,
+            operation,
+            maybe_cancel_remote_exec_token,
+            // Reset `iter_num` for a new Execute attempt:
+            0,
+          ))
+        }
+      })
+      .to_boxed()
   }
 }
 
@@ -1772,6 +1825,93 @@ pub mod tests {
   }
 
   #[test]
+  fn retries_retriable_errors() {
+    let execute_request = echo_foo_request();
+    let op_name = "gimme-foo".to_string();
+
+    let mock_server = {
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          vec![
+            make_incomplete_operation(&op_name),
+            make_retryable_operation_failure(),
+            make_incomplete_operation(&op_name),
+            make_successful_operation(
+              &op_name,
+              StdoutType::Raw("foo".to_owned()),
+              StderrType::Raw("".to_owned()),
+              0,
+            ),
+          ],
+        ),
+        None,
+      )
+    };
+
+    let result = run_command_remote(mock_server.address(), execute_request).unwrap();
+
+    assert_eq!(
+      result.without_execution_attempts(),
+      FallibleExecuteProcessResult {
+        stdout: as_bytes("foo"),
+        stderr: as_bytes(""),
+        exit_code: 0,
+        output_directory: EMPTY_DIGEST,
+        execution_attempts: vec![],
+      }
+    );
+
+    assert_cancellation_requests(&mock_server, vec![]);
+  }
+
+  #[test]
+  fn gives_up_after_many_retriable_errors() {
+    let execute_request = echo_foo_request();
+    let op_name = "gimme-foo".to_string();
+
+    let mock_server = {
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
+          op_name.clone(),
+          super::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          vec![
+            make_incomplete_operation(&op_name),
+            make_retryable_operation_failure(),
+            make_incomplete_operation(&op_name),
+            make_retryable_operation_failure(),
+            make_incomplete_operation(&op_name),
+            make_retryable_operation_failure(),
+            make_incomplete_operation(&op_name),
+            make_retryable_operation_failure(),
+            make_incomplete_operation(&op_name),
+            make_retryable_operation_failure(),
+          ],
+        ),
+        None,
+      )
+    };
+
+    let err = run_command_remote(mock_server.address(), execute_request).unwrap_err();
+
+    assert_that!(err).contains("Gave up");
+    assert_that!(err).contains("appears to be lost");
+
+    assert_cancellation_requests(&mock_server, vec![]);
+  }
+
+  #[test]
   fn extract_response_with_digest_stdout() {
     let op_name = "gimme-foo".to_string();
     let testdata = TestData::roland();
@@ -1887,6 +2027,8 @@ pub mod tests {
       store,
       Platform::Linux,
       runtime.clone(),
+      Duration::from_millis(0),
+      Duration::from_secs(0),
     );
     let result = runtime
       .block_on(cmd_runner.run(echo_roland_request(), WorkUnitStore::new()))
@@ -2068,7 +2210,12 @@ pub mod tests {
       .file(&TestData::roland())
       .directory(&TestDirectory::containing_roland())
       .build();
-    let command_runner = create_command_runner(mock_server.address(), &cas);
+    let command_runner = create_command_runner(
+      mock_server.address(),
+      &cas,
+      Duration::from_millis(0),
+      Duration::from_secs(0),
+    );
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
     let successful_mock_result = FallibleExecuteProcessResult {
@@ -2408,6 +2555,8 @@ pub mod tests {
       store,
       Platform::Linux,
       runtime.clone(),
+      Duration::from_millis(0),
+      Duration::from_secs(0),
     );
 
     let result = runtime
@@ -2510,6 +2659,8 @@ pub mod tests {
       store,
       Platform::Linux,
       runtime.clone(),
+      Duration::from_millis(0),
+      Duration::from_secs(0),
     )
     .run(cat_roland_request(), WorkUnitStore::new())
     .wait();
@@ -2585,6 +2736,8 @@ pub mod tests {
       store,
       Platform::Linux,
       runtime.clone(),
+      Duration::from_millis(0),
+      Duration::from_secs(0),
     );
 
     let error = runtime
@@ -2797,7 +2950,7 @@ pub mod tests {
 
   #[test]
   fn wait_between_request_1_retry() {
-    // wait at least 500 milli for one retry
+    // wait at least 100 milli for one retry
     {
       let execute_request = echo_foo_request();
       let mock_server = {
@@ -2824,7 +2977,17 @@ pub mod tests {
           None,
         )
       };
-      run_command_remote(mock_server.address(), execute_request).unwrap();
+      let cas = mock::StubCAS::empty();
+      let command_runner = create_command_runner(
+        mock_server.address(),
+        &cas,
+        Duration::from_millis(100),
+        Duration::from_secs(1),
+      );
+      let mut runtime = tokio::runtime::Runtime::new().unwrap();
+      runtime
+        .block_on(command_runner.run(execute_request, WorkUnitStore::new()))
+        .unwrap();
 
       let messages = mock_server.mock_responder.received_messages.lock();
       assert!(messages.len() == 2);
@@ -2834,14 +2997,14 @@ pub mod tests {
           .unwrap()
           .received_at
           .sub(messages.get(0).unwrap().received_at)
-          >= Duration::from_millis(500)
+          >= Duration::from_millis(100)
       );
     }
   }
 
   #[test]
   fn wait_between_request_3_retry() {
-    // wait at least 500 + 1000 + 1500 = 3000 milli for 3 retries.
+    // wait at least 50 + 100 + 150 = 300 milli for 3 retries.
     {
       let execute_request = echo_foo_request();
       let mock_server = {
@@ -2870,7 +3033,17 @@ pub mod tests {
           None,
         )
       };
-      run_command_remote(mock_server.address(), execute_request).unwrap();
+      let cas = mock::StubCAS::empty();
+      let command_runner = create_command_runner(
+        mock_server.address(),
+        &cas,
+        Duration::from_millis(50),
+        Duration::from_secs(5),
+      );
+      let mut runtime = tokio::runtime::Runtime::new().unwrap();
+      runtime
+        .block_on(command_runner.run(execute_request, WorkUnitStore::new()))
+        .unwrap();
 
       let messages = mock_server.mock_responder.received_messages.lock();
       assert!(messages.len() == 4);
@@ -2880,7 +3053,7 @@ pub mod tests {
           .unwrap()
           .received_at
           .sub(messages.get(0).unwrap().received_at)
-          >= Duration::from_millis(500)
+          >= Duration::from_millis(50)
       );
       assert!(
         messages
@@ -2888,7 +3061,7 @@ pub mod tests {
           .unwrap()
           .received_at
           .sub(messages.get(1).unwrap().received_at)
-          >= Duration::from_millis(1000)
+          >= Duration::from_millis(100)
       );
       assert!(
         messages
@@ -2896,7 +3069,7 @@ pub mod tests {
           .unwrap()
           .received_at
           .sub(messages.get(2).unwrap().received_at)
-          >= Duration::from_millis(1500)
+          >= Duration::from_millis(150)
       );
     }
   }
@@ -3090,7 +3263,12 @@ pub mod tests {
       .file(&TestData::roland())
       .directory(&TestDirectory::containing_roland())
       .build();
-    let command_runner = create_command_runner("".to_owned(), &cas);
+    let command_runner = create_command_runner(
+      "".to_owned(),
+      &cas,
+      std::time::Duration::from_millis(0),
+      std::time::Duration::from_secs(0),
+    );
 
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
@@ -3181,6 +3359,25 @@ pub mod tests {
     op.set_name(operation_name.to_string());
     op.set_done(false);
     MockOperation::new(op)
+  }
+
+  fn make_retryable_operation_failure() -> MockOperation {
+    let mut status = bazel_protos::status::Status::new();
+    status.set_code(grpcio::RpcStatusCode::Aborted as i32);
+    status.set_message(String::from("the bot running the task appears to be lost"));
+
+    let mut operation = bazel_protos::operations::Operation::new();
+    operation.set_done(true);
+    operation.set_response(make_any_proto(&{
+      let mut response = bazel_protos::remote_execution::ExecuteResponse::new();
+      response.set_status(status);
+      response
+    }));
+
+    MockOperation {
+      op: Ok(Some(operation)),
+      duration: None,
+    }
   }
 
   fn make_delayed_incomplete_operation(operation_name: &str, delay: Duration) -> MockOperation {
@@ -3327,12 +3524,22 @@ pub mod tests {
       .file(&TestData::roland())
       .directory(&TestDirectory::containing_roland())
       .build();
-    let command_runner = create_command_runner(address, &cas);
+    let command_runner = create_command_runner(
+      address,
+      &cas,
+      Duration::from_millis(0),
+      Duration::from_secs(0),
+    );
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(command_runner.run(request, WorkUnitStore::new()))
   }
 
-  fn create_command_runner(address: String, cas: &mock::StubCAS) -> CommandRunner {
+  fn create_command_runner(
+    address: String,
+    cas: &mock::StubCAS,
+    backoff_incremental_wait: Duration,
+    backoff_max_wait: Duration,
+  ) -> CommandRunner {
     let runtime = task_executor::Executor::new();
     let store_dir = TempDir::new().unwrap();
     let store = Store::with_remote(
@@ -3359,6 +3566,8 @@ pub mod tests {
       store,
       Platform::Linux,
       runtime.clone(),
+      backoff_incremental_wait,
+      backoff_max_wait,
     )
   }
 
@@ -3369,7 +3578,12 @@ pub mod tests {
       .file(&TestData::roland())
       .directory(&TestDirectory::containing_roland())
       .build();
-    let command_runner = create_command_runner("".to_owned(), &cas);
+    let command_runner = create_command_runner(
+      "".to_owned(),
+      &cas,
+      Duration::from_millis(0),
+      Duration::from_secs(0),
+    );
 
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
@@ -3387,7 +3601,12 @@ pub mod tests {
       .file(&TestData::roland())
       .directory(&TestDirectory::containing_roland())
       .build();
-    let command_runner = create_command_runner("".to_owned(), &cas);
+    let command_runner = create_command_runner(
+      "".to_owned(),
+      &cas,
+      Duration::from_millis(0),
+      Duration::from_secs(0),
+    );
 
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
     runtime.block_on(super::extract_output_files(

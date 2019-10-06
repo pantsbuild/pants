@@ -336,6 +336,8 @@ fn main() {
         store.clone(),
         Platform::Linux,
         executor.clone(),
+        std::time::Duration::from_millis(500),
+        std::time::Duration::from_secs(5),
       )) as Box<dyn process_execution::CommandRunner>
     }
     None => Box::new(process_execution::local::CommandRunner::new(
