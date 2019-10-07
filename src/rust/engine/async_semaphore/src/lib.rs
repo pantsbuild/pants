@@ -116,6 +116,7 @@ impl Drop for Permit {
         return;
       }
     };
+    warn!("notifying task {:?}", task);
     task.notify();
   }
 }
@@ -126,28 +127,29 @@ pub struct PermitFuture {
   task_id: Option<u64>,
 }
 
-//impl Drop for PermitFuture {
-//  fn drop(&mut self) {
-//    // if task_id is Some then this PermitFuture was added to the waiters queue.
-//    // if inner is still Some then this task hasn't been popped and run yet.
-//    if self.task_id.is_some() && self.inner.is_some() {
-//      let task_id = self.task_id.unwrap();
-//      let inner = self.inner.take().unwrap();
-//      let mut inner = inner.lock();
-//      if let Some(task_index) = inner.waiters.iter().position(|task| task_id == task.id) {
-//        warn!("found index for task to drop {:?}", task_index);
-//        inner.waiters.remove(task_index);
-//      }
-//    }
-//  }
-//}
+impl Drop for PermitFuture {
+  fn drop(&mut self) {
+    // if task_id is Some then this PermitFuture was added to the waiters queue.
+    // if inner is still Some then this task hasn't been popped and run yet.
+    if self.task_id.is_some() {
+      let task_id = self.task_id.unwrap();
+      let inner = self.inner.take().unwrap();
+      let mut inner = inner.lock();
+      if let Some(task_index) = inner.waiters.iter().position(|task| task_id == task.id) {
+        warn!("found index for task to drop {:?}", task_index);
+        inner.waiters.remove(task_index);
+      }
+    }
+  }
+}
 
 impl Future for PermitFuture {
   type Item = Permit;
   type Error = ();
 
   fn poll(&mut self) -> Poll<Permit, ()> {
-    let inner = self.inner.take().expect("cannot poll PermitFuture twice");
+    warn!("polling task {:?}", task::current());
+    let inner = self.inner.clone().unwrap();
     let acquired = {
       let mut inner = inner.lock();
       if inner.available_permits == 0 {
@@ -173,7 +175,6 @@ impl Future for PermitFuture {
     if acquired {
       Ok(Async::Ready(Permit { inner }))
     } else {
-      self.inner = Some(inner);
       Ok(Async::NotReady)
     }
   }
