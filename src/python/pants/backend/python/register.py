@@ -8,6 +8,7 @@ from pants.backend.python.python_requirements import PythonRequirements
 from pants.backend.python.rules import (
   download_pex_bin,
   inject_init,
+  interpreter_constraints,
   pex,
   python_fmt,
   python_test_runner,
@@ -97,11 +98,12 @@ def register_goals():
 
 def rules():
   return (
-    download_pex_bin.rules() +
-    inject_init.rules() +
-    python_fmt.rules() +
-    python_test_runner.rules() +
-    python_native_code_rules() +
-    pex.rules() +
-    subprocess_environment_rules()
+    *download_pex_bin.rules(),
+    *inject_init.rules(),
+    *interpreter_constraints.rules(),
+    *python_fmt.rules(),
+    *python_test_runner.rules(),
+    *python_native_code_rules(),
+    *pex.rules(),
+    *subprocess_environment_rules(),
   )

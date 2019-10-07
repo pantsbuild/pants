@@ -2,6 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.python.rules.inject_init import InjectedInitDigest
+from pants.backend.python.rules.interpreter_constraints import (
+  BuildConstraintsForAdaptors,
+  PexInterpreterContraints,
+)
 from pants.backend.python.rules.pex import CreatePex, Pex
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
@@ -33,13 +37,8 @@ def run_python_test(
   )
   all_targets = transitive_hydrated_targets.closure
 
-  interpreter_constraints = {
-    constraint
-    for target_adaptor in all_targets
-    for constraint in python_setup.compatibility_or_constraints(
-      getattr(target_adaptor, 'compatibility', None)
-    )
-  }
+  interpreter_constraints = yield Get(PexInterpreterContraints,
+    BuildConstraintsForAdaptors(adaptors=tuple(all_targets)))
 
   # Produce a pex containing pytest and all transitive 3rdparty requirements.
   output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
@@ -58,7 +57,7 @@ def run_python_test(
     Pex, CreatePex(
       output_filename=output_pytest_requirements_pex_filename,
       requirements=tuple(sorted(all_requirements)),
-      interpreter_constraints=tuple(sorted(interpreter_constraints)),
+      interpreter_constraints=interpreter_constraints,
       entry_point="pytest:main",
     )
   )
