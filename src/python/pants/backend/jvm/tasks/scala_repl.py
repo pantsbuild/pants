@@ -16,8 +16,8 @@ from pants.task.repl_task_mixin import ReplTaskMixin
 class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):
     """Operations to create or launch Scala repls.
 
-  :API: public
-  """
+    :API: public
+    """
 
     _RUNNER_MAIN = "org.pantsbuild.tools.runner.PantsRunner"
 

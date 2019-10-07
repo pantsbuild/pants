@@ -18,9 +18,10 @@ from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
 class GoCompile(GoWorkspaceTask):
     """Compiles a Go package into either a library binary or executable binary.
 
-  GoCompile will populate the "bin/" and "pkg/" directories of each target's Go
-  workspace (see GoWorkspaceTask) with executables and library binaries respectively.
-  """
+    GoCompile will populate the "bin/" and "pkg/" directories of each
+    target's Go workspace (see GoWorkspaceTask) with executables and
+    library binaries respectively.
+    """
 
     @classmethod
     def implementation_version(cls):
@@ -84,11 +85,11 @@ class GoCompile(GoWorkspaceTask):
     @classmethod
     @memoized_method
     def _get_build_flags(cls, build_flags_from_option, is_flagged, target):
-        """Merge build flags with global < target < command-line order
+        """Merge build flags with global < target < command-line order.
 
-    Build flags can be defined as globals (in `pants.ini`), as arguments to a Target, and
-    via the command-line.
-    """
+        Build flags can be defined as globals (in `pants.ini`), as
+        arguments to a Target, and via the command-line.
+        """
         # If self.get_options().build_flags returns a quoted string, remove the outer quotes,
         # which happens for flags passed from the command-line.
         if (build_flags_from_option.startswith("'") and build_flags_from_option.endswith("'")) or (
@@ -123,20 +124,21 @@ class GoCompile(GoWorkspaceTask):
             raise TaskError("{} failed with exit code {}".format(go_cmd, result))
 
     def _sync_binary_dep_links(self, target, gopath, lib_binary_map):
-        """Syncs symlinks under gopath to the library binaries of target's transitive dependencies.
+        """Syncs symlinks under gopath to the library binaries of target's
+        transitive dependencies.
 
-    :param Target target: Target whose transitive dependencies must be linked.
-    :param str gopath: $GOPATH of target whose "pkg/" directory must be populated with links
-                       to library binaries.
-    :param dict<Target, str> lib_binary_map: Dictionary mapping a remote/local Go library to the
-                                             path of the compiled binary (the ".a" file) of the
-                                             library.
+        :param Target target: Target whose transitive dependencies must be linked.
+        :param str gopath: $GOPATH of target whose "pkg/" directory must be populated with links
+                           to library binaries.
+        :param dict<Target, str> lib_binary_map: Dictionary mapping a remote/local Go library to the
+                                                 path of the compiled binary (the ".a" file) of the
+                                                 library.
 
-    Required links to binary dependencies under gopath's "pkg/" dir are either created if
-    non-existent, or refreshed if the link is older than the underlying binary. Any pre-existing
-    links within gopath's "pkg/" dir that do not correspond to a transitive dependency of target
-    are deleted.
-    """
+        Required links to binary dependencies under gopath's "pkg/" dir are either created if
+        non-existent, or refreshed if the link is older than the underlying binary. Any pre-existing
+        links within gopath's "pkg/" dir that do not correspond to a transitive dependency of target
+        are deleted.
+        """
         required_links = set()
         for dep in target.closure():
             if dep == target:

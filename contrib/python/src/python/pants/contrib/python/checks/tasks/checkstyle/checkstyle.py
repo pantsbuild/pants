@@ -198,12 +198,12 @@ class Checkstyle(LintTaskMixin, Task):
     def checkstyle(self, interpreter, sources):
         """Iterate over sources and run checker on each file.
 
-    Files can be suppressed with a --suppress option which takes an xml file containing
-    file paths that have exceptions and the plugins they need to ignore.
+        Files can be suppressed with a --suppress option which takes an xml file containing
+        file paths that have exceptions and the plugins they need to ignore.
 
-    :param sources: iterable containing source file names.
-    :return: (int) number of failures
-    """
+        :param sources: iterable containing source file names.
+        :return: (int) number of failures
+        """
         checker = self.checker_pex(interpreter)
 
         args = [
@@ -239,11 +239,9 @@ class Checkstyle(LintTaskMixin, Task):
                 )
 
     def _constraints_are_whitelisted(self, constraint_tuple):
-        """
-    Detect whether a tuple of compatibility constraints
-    matches constraints imposed by the merged list of the global
-    constraints from PythonSetup and a user-supplied whitelist.
-    """
+        """Detect whether a tuple of compatibility constraints matches
+        constraints imposed by the merged list of the global constraints from
+        PythonSetup and a user-supplied whitelist."""
         if self._acceptable_interpreter_constraints == []:
             # The user wants to lint everything.
             return True

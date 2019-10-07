@@ -6,7 +6,8 @@ from pants.task.task import Task
 
 
 class DeprecationWarningTask(Task):
-    """Make a deprecation warning so that warning filters can be integration tested."""
+    """Make a deprecation warning so that warning filters can be integration
+    tested."""
 
     def execute(self):
         warn_or_error(

@@ -25,11 +25,13 @@ class TypeCheckError(TypeError):
 # TODO: remove the `.type_check_error_type` property in `DatatypeMixin` and just have mixers
 # override a class object!
 class TypedDatatypeInstanceConstructionError(TypeCheckError):
-    """Raised when a datatype()'s fields fail a type check upon construction."""
+    """Raised when a datatype()'s fields fail a type check upon
+    construction."""
 
 
 class DatatypeMixin(ABC):
-    """Decouple datatype logic from the way it's created to ease migration to python 3 dataclasses."""
+    """Decouple datatype logic from the way it's created to ease migration to
+    python 3 dataclasses."""
 
     @classproperty
     @abstractmethod
@@ -38,34 +40,39 @@ class DatatypeMixin(ABC):
 
     @classmethod
     def make_type_error(cls, msg, *args, **kwargs):
-        """A helper method to generate an exception type for type checking errors.
+        """A helper method to generate an exception type for type checking
+        errors.
 
-    This method uses `cls.type_check_error_type` to ensure that type checking errors can be caught
-    with a reliable exception type. The type returned by `cls.type_check_error_type` should ensure
-    that the exception messages are prefixed with enough context to be useful and *not* confusing.
-    """
+        This method uses `cls.type_check_error_type` to ensure that type
+        checking errors can be caught with a reliable exception type.
+        The type returned by `cls.type_check_error_type` should ensure
+        that the exception messages are prefixed with enough context to
+        be useful and *not* confusing.
+        """
         return cls.type_check_error_type(cls.__name__, msg, *args, **kwargs)
 
     @abstractmethod
     def copy(self, **kwargs):
-        """Return a new object of the same type, replacing specified fields with new values"""
+        """Return a new object of the same type, replacing specified fields
+        with new values."""
 
 
 # TODO(#7074): Migrate to python 3 dataclasses!
 def datatype(field_decls, superclass_name=None, **kwargs):
-    """A wrapper for `namedtuple` that accounts for the type of the object in equality.
+    """A wrapper for `namedtuple` that accounts for the type of the object in
+    equality.
 
-  Field declarations can be a string, which declares a field with that name and
-  no type checking. Field declarations can also be a tuple `('field_name',
-  field_type)`, which declares a field named `field_name` which is type-checked
-  at construction. If a type is given, the value provided to the constructor for
-  that field must be exactly that type (i.e. `type(x) == field_type`), and not
-  e.g. a subclass.
+    Field declarations can be a string, which declares a field with that name and
+    no type checking. Field declarations can also be a tuple `('field_name',
+    field_type)`, which declares a field named `field_name` which is type-checked
+    at construction. If a type is given, the value provided to the constructor for
+    that field must be exactly that type (i.e. `type(x) == field_type`), and not
+    e.g. a subclass.
 
-  :param field_decls: Iterable of field declarations.
-  :return: A type object which can then be subclassed.
-  :raises: :class:`TypeError`
-  """
+    :param field_decls: Iterable of field declarations.
+    :return: A type object which can then be subclassed.
+    :raises: :class:`TypeError`
+    """
     field_names = []
     fields_with_constraints = OrderedDict()
     for maybe_decl in field_decls:
@@ -183,15 +190,16 @@ def datatype(field_decls, superclass_name=None, **kwargs):
         def _asdict(self):
             """Return a new OrderedDict which maps field names to their values.
 
-      Overrides a namedtuple() method which calls __iter__.
-      """
+            Overrides a namedtuple() method which calls __iter__.
+            """
             return OrderedDict(zip(self._fields, self._super_iter()))
 
         def _replace(self, **kwargs):
-            """Return a new datatype object replacing specified fields with new values.
+            """Return a new datatype object replacing specified fields with new
+            values.
 
-      Overrides a namedtuple() method which calls __iter__.
-      """
+            Overrides a namedtuple() method which calls __iter__.
+            """
             field_dict = self._asdict()
             field_dict.update(**kwargs)
             return type(self)(**field_dict)
@@ -201,7 +209,10 @@ def datatype(field_decls, superclass_name=None, **kwargs):
 
         # NB: it is *not* recommended to rely on the ordering of the tuple returned by this method.
         def __getnewargs__(self):
-            """Return self as a plain tuple.  Used by copy and pickle."""
+            """Return self as a plain tuple.
+
+            Used by copy and pickle.
+            """
             return tuple(self._super_iter())
 
         def __repr__(self):
@@ -243,43 +254,47 @@ def datatype(field_decls, superclass_name=None, **kwargs):
 
 
 class EnumVariantSelectionError(TypeCheckError):
-    """Raised when an invalid variant for an enum() is constructed or matched against."""
+    """Raised when an invalid variant for an enum() is constructed or matched
+    against."""
 
 
 # TODO: look into merging this with pants.util.meta.Singleton!
 class ChoicesMixin(ABC):
-    """A mixin which declares that the type has a fixed set of possible instances."""
+    """A mixin which declares that the type has a fixed set of possible
+    instances."""
 
     @classproperty
     @abstractmethod
     def all_variants(cls):
-        """Return an iterable containing a de-duplicated list of all possible instances of this type."""
+        """Return an iterable containing a de-duplicated list of all possible
+        instances of this type."""
 
 
 def enum(all_values):
-    """A datatype which can take on a finite set of values. This method is experimental and unstable.
+    """A datatype which can take on a finite set of values. This method is
+    experimental and unstable.
 
-  Any enum subclass can be constructed with its create() classmethod. This method will use the first
-  element of `all_values` as the default value, but enum classes can override this behavior by
-  setting `default_value` in the class body.
+    Any enum subclass can be constructed with its create() classmethod. This method will use the first
+    element of `all_values` as the default value, but enum classes can override this behavior by
+    setting `default_value` in the class body.
 
-  If `all_values` contains only strings, then each variant is made into an attribute on the
-  generated enum class object. This allows code such as the following:
+    If `all_values` contains only strings, then each variant is made into an attribute on the
+    generated enum class object. This allows code such as the following:
 
-  class MyResult(enum(['success', 'not-success'])):
-    pass
+    class MyResult(enum(['success', 'not-success'])):
+      pass
 
-  MyResult.success # The same as: MyResult('success')
-  MyResult.not_success # The same as: MyResult('not-success')
+    MyResult.success # The same as: MyResult('success')
+    MyResult.not_success # The same as: MyResult('not-success')
 
-  Note that like with option names, hyphenated ('-') enum values are converted into attribute names
-  with underscores ('_').
+    Note that like with option names, hyphenated ('-') enum values are converted into attribute names
+    with underscores ('_').
 
-  :param Iterable all_values: A nonempty iterable of objects representing all possible values for
-                              the enum.  This argument must be a finite, non-empty iterable with
-                              unique values.
-  :raises: :class:`ValueError`
-  """
+    :param Iterable all_values: A nonempty iterable of objects representing all possible values for
+                                the enum.  This argument must be a finite, non-empty iterable with
+                                unique values.
+    :raises: :class:`ValueError`
+    """
     # namedtuple() raises a ValueError if you try to use a field with a leading underscore.
     field_name = "value"
 
@@ -305,32 +320,33 @@ def enum(all_values):
 
         @memoized_classproperty
         def _singletons(cls):
-            """Generate memoized instances of this enum wrapping each of this enum's allowed values.
+            """Generate memoized instances of this enum wrapping each of this
+            enum's allowed values.
 
-      NB: The implementation of enum() should use this property as the source of truth for allowed
-      values and enum instances from those values.
-      """
+            NB: The implementation of enum() should use this property as the source of truth for allowed
+            values and enum instances from those values.
+            """
             return OrderedDict((value, cls._make_singleton(value)) for value in all_values_realized)
 
         @classmethod
         def _make_singleton(cls, value):
-            """
-      We convert uses of the constructor to call create(), so we then need to go around __new__ to
-      bootstrap singleton creation from datatype()'s __new__.
-      """
+            """We convert uses of the constructor to call create(), so we then
+            need to go around __new__ to bootstrap singleton creation from
+            datatype()'s __new__."""
             return super().__new__(cls, value)
 
         @classproperty
         def _allowed_values(cls):
-            """The values provided to the enum() type constructor, for use in error messages."""
+            """The values provided to the enum() type constructor, for use in
+            error messages."""
             return list(cls._singletons.keys())
 
         def __new__(cls, value):
             """Create an instance of this enum.
 
-      :param value: Use this as the enum value. If `value` is an instance of this class, return it,
-                    otherwise it is checked against the enum's allowed values.
-      """
+            :param value: Use this as the enum value. If `value` is an instance of this class, return it,
+                          otherwise it is checked against the enum's allowed values.
+            """
             if isinstance(value, cls):
                 return value
 
@@ -346,7 +362,8 @@ def enum(all_values):
         # is a way to return something more conventional like `NotImplemented` here that maintains the
         # extra caution we're looking for.
         def __eq__(self, other):
-            """Redefine equality to avoid accidentally comparing against a non-enum."""
+            """Redefine equality to avoid accidentally comparing against a non-
+            enum."""
             if other is None:
                 return False
             if type(self) != type(other):
@@ -367,14 +384,15 @@ def enum(all_values):
             return super().__hash__()
 
         def resolve_for_enum_variant(self, mapping):
-            """Return the object in `mapping` with the key corresponding to the enum value.
+            """Return the object in `mapping` with the key corresponding to the
+            enum value.
 
-      `mapping` is a dict mapping enum variant value -> arbitrary object. All variant values must be
-      provided.
+            `mapping` is a dict mapping enum variant value -> arbitrary object. All variant values must be
+            provided.
 
-      NB: The objects in `mapping` should be made into lambdas if lazy execution is desired, as this
-      will "evaluate" all of the values in `mapping`.
-      """
+            NB: The objects in `mapping` should be made into lambdas if lazy execution is desired, as this
+            will "evaluate" all of the values in `mapping`.
+            """
             keys = frozenset(mapping.keys())
             if keys != frozenset(self._allowed_values):
                 raise self.make_type_error(
@@ -389,9 +407,9 @@ def enum(all_values):
         def all_variants(cls):
             """Iterate over all instances of this enum, in the declared order.
 
-      NB: resolve_for_enum_variant() should be used instead of this method for performing
-      conditional logic based on an enum instance's value.
-      """
+            NB: resolve_for_enum_variant() should be used instead of this method for performing
+            conditional logic based on an enum instance's value.
+            """
             return cls._singletons.values()
 
     # Python requires creating an explicit closure to save the value on each loop iteration.
@@ -413,26 +431,26 @@ class TypeConstraintError(TypeError):
 class TypeConstraint(ABC):
     """Represents a type constraint.
 
-  Not intended for direct use; instead, use one of :class:`SuperclassesOf`, :class:`Exactly` or
-  :class:`SubclassesOf`.
-  """
+    Not intended for direct use; instead, use one of :class:`SuperclassesOf`, :class:`Exactly` or
+    :class:`SubclassesOf`.
+    """
 
     def __init__(self, description):
         """Creates a type constraint centered around the given types.
 
-    The type constraint is satisfied as a whole if satisfied for at least one of the given types.
+        The type constraint is satisfied as a whole if satisfied for at least one of the given types.
 
-    :param str description: A concise, readable description of what the type constraint represents.
-                            Used directly as the __str__ implementation.
-    """
+        :param str description: A concise, readable description of what the type constraint represents.
+                                Used directly as the __str__ implementation.
+        """
         self._description = description
 
     @abstractmethod
     def satisfied_by(self, obj):
         """Return `True` if the given object satisfies this type constraint.
 
-    :rtype: bool
-    """
+        :rtype: bool
+        """
 
     def make_type_constraint_error(self, obj, constraint):
         return TypeConstraintError(
@@ -446,8 +464,8 @@ class TypeConstraint(ABC):
     def validate_satisfied_by(self, obj):
         """Return `obj` if the object satisfies this type constraint, or raise.
 
-    :raises: `TypeConstraintError` if `obj` does not satisfy the constraint.
-    """
+        :raises: `TypeConstraintError` if `obj` does not satisfy the constraint.
+        """
 
         if self.satisfied_by(obj):
             return obj
@@ -464,20 +482,23 @@ class TypeConstraint(ABC):
 class TypeOnlyConstraint(TypeConstraint):
     """A `TypeConstraint` predicated only on the object's type.
 
-  `TypeConstraint` subclasses may override `.satisfied_by()` to perform arbitrary validation on the
-  object itself -- however, this class implements `.satisfied_by()` with a guarantee that it will
-  only act on the object's `type` via `.satisfied_by_type()`. This kind of type checking is faster
-  and easier to understand than the more complex validation allowed by `.satisfied_by()`.
-  """
+    `TypeConstraint` subclasses may override `.satisfied_by()` to
+    perform arbitrary validation on the object itself -- however, this
+    class implements `.satisfied_by()` with a guarantee that it will
+    only act on the object's `type` via `.satisfied_by_type()`. This
+    kind of type checking is faster and easier to understand than the
+    more complex validation allowed by `.satisfied_by()`.
+    """
 
     def __init__(self, *types):
-        """Creates a type constraint based on some logic to match the given types.
+        """Creates a type constraint based on some logic to match the given
+        types.
 
-    NB: A `TypeOnlyConstraint` implementation should ensure that the type constraint is satisfied as
-    a whole if satisfied for at least one of the given `types`.
+        NB: A `TypeOnlyConstraint` implementation should ensure that the type constraint is satisfied as
+        a whole if satisfied for at least one of the given `types`.
 
-    :param type *types: The types this constraint will match in some way.
-    """
+        :param type *types: The types this constraint will match in some way.
+        """
 
         if not types:
             raise ValueError("Must supply at least one type")
@@ -505,8 +526,8 @@ class TypeOnlyConstraint(TypeConstraint):
     def satisfied_by_type(self, obj_type):
         """Return `True` if the given object satisfies this type constraint.
 
-    :rtype: bool
-    """
+        :rtype: bool
+        """
 
     def satisfied_by(self, obj):
         return self.satisfied_by_type(type(obj))
@@ -552,35 +573,39 @@ class SubclassesOf(TypeOnlyConstraint):
 
 
 class TypedCollection(TypeConstraint):
-    """A `TypeConstraint` which accepts a TypeOnlyConstraint and validates a collection."""
+    """A `TypeConstraint` which accepts a TypeOnlyConstraint and validates a
+    collection."""
 
     @memoized_classproperty
     def iterable_constraint(cls):
-        """Define what kind of collection inputs are accepted by this type constraint.
+        """Define what kind of collection inputs are accepted by this type
+        constraint.
 
-    :rtype: TypeConstraint
-    """
+        :rtype: TypeConstraint
+        """
         return SubclassesOf(Iterable)
 
     # TODO: extend TypeConstraint to specify includes and excludes in a single constraint!
     @classproperty
     def exclude_iterable_constraint(cls):
-        """Define what collection inputs are *not* accepted by this type constraint.
+        """Define what collection inputs are *not* accepted by this type
+        constraint.
 
-    Strings (unicode and byte) in Python are considered iterables of substrings, but we only want
-    to allow explicit collection types.
+        Strings (unicode and byte) in Python are considered iterables of substrings, but we only want
+        to allow explicit collection types.
 
-    :rtype: TypeConstraint
-    """
+        :rtype: TypeConstraint
+        """
         return SubclassesOf(str, bytes)
 
     def __init__(self, constraint):
-        """Create a `TypeConstraint` which validates each member of a collection with `constraint`.
+        """Create a `TypeConstraint` which validates each member of a
+        collection with `constraint`.
 
-    :param TypeOnlyConstraint constraint: the `TypeConstraint` to apply to each element. This is
-                                          currently required to be a `TypeOnlyConstraint` to avoid
-                                          complex prototypal type relationships.
-    """
+        :param TypeOnlyConstraint constraint: the `TypeConstraint` to apply to each element. This is
+                                              currently required to be a `TypeOnlyConstraint` to avoid
+                                              complex prototypal type relationships.
+        """
 
         if not isinstance(constraint, TypeOnlyConstraint):
             raise TypeError(

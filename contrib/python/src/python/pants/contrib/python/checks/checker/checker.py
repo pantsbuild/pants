@@ -54,8 +54,8 @@ class Checker(object):
     def _get_nits(self, filename):
         """Iterate over the instances style checker and yield Nits.
 
-    :param filename: str pointing to a file within the buildroot.
-    """
+        :param filename: str pointing to a file within the buildroot.
+        """
         try:
             python_file = PythonFile.parse(filename, root=self._root_dir)
         except CheckSyntaxError as e:
@@ -91,9 +91,9 @@ class Checker(object):
     def _check_file(self, filename):
         """Process python file looking for indications of problems.
 
-    :param filename: (str) Python source filename
-    :return: (int) number of failures
-    """
+        :param filename: (str) Python source filename
+        :return: (int) number of failures
+        """
         # If the user specifies an invalid severity use comment.
         log_threshold = Nit.SEVERITY.get(self._severity, Nit.COMMENT)
 
@@ -112,12 +112,12 @@ class Checker(object):
     def checkstyle(self, sources):
         """Iterate over sources and run checker on each file.
 
-    Files can be suppressed with a --suppress option which takes an xml file containing
-    file paths that have exceptions and the plugins they need to ignore.
+        Files can be suppressed with a --suppress option which takes an xml file containing
+        file paths that have exceptions and the plugins they need to ignore.
 
-    :param sources: iterable containing source file names.
-    :return: (int) number of failures
-    """
+        :param sources: iterable containing source file names.
+        :return: (int) number of failures
+        """
         failure_count = 0
         for filename in sources:
             failure_count += self._check_file(filename)
@@ -125,10 +125,11 @@ class Checker(object):
 
 
 def plugins():
-    """Returns a tuple of the plugin classes registered with the python style checker.
+    """Returns a tuple of the plugin classes registered with the python style
+    checker.
 
-  :rtype: tuple of :class:`pants.contrib.python.checks.checker.common.CheckstylePlugin` subtypes
-  """
+    :rtype: tuple of :class:`pants.contrib.python.checks.checker.common.CheckstylePlugin` subtypes
+    """
     return (
         ClassFactoring,
         ConstantLogic,

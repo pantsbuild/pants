@@ -22,10 +22,11 @@ class ThriftLinterTest(PantsRunIntegrationTest):
     def rename_build_file(func):
         """This decorator implements the TEST_BUILD pattern.
 
-    Because these tests use files that intentionally should fail linting, the goal `./pants lint ::`
-    we use in CI would complain about these files. To avoid this, we rename BUILD to TEST_BUILD.
+        Because these tests use files that intentionally should fail linting, the goal `./pants lint ::`
+        we use in CI would complain about these files. To avoid this, we rename BUILD to TEST_BUILD.
 
-    However, these tests require us to temporarily rename TEST_BUILD back to BUILD. """
+        However, these tests require us to temporarily rename TEST_BUILD back to BUILD.
+        """
 
         @wraps(func)
         def wrapper(self, *args, **kwargs):

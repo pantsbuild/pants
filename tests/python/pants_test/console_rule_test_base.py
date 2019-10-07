@@ -18,8 +18,8 @@ from pants_test.test_base import TestBase
 class ConsoleRuleTestBase(TestBase):
     """A baseclass useful for testing a Goal defined as a @console_rule.
 
-  :API: public
-  """
+    :API: public
+    """
 
     _implicit_args = tuple(["--pants-config-files=[]"])
 
@@ -27,8 +27,8 @@ class ConsoleRuleTestBase(TestBase):
     def goal_cls(cls):
         """Subclasses must return the Goal type to test.
 
-    :API: public
-    """
+        :API: public
+        """
         raise NotImplementedError()
 
     def setUp(self):
@@ -44,10 +44,10 @@ class ConsoleRuleTestBase(TestBase):
     ):
         """Executes the @console_rule for this test class.
 
-    :API: public
+        :API: public
 
-    Returns the text output of the task.
-    """
+        Returns the text output of the task.
+        """
         # Create an OptionsBootstrapper for these args/env, and a captured Console instance.
         args = self._implicit_args + (self.goal_cls.name,) + tuple(args)
         env = dict(env)
@@ -82,16 +82,17 @@ class ConsoleRuleTestBase(TestBase):
         return stdout
 
     def assert_entries(self, sep, *output, **kwargs):
-        """Verifies the expected output text is flushed by the console task under test.
+        """Verifies the expected output text is flushed by the console task
+        under test.
 
-    NB: order of entries is not tested, just presence.
+        NB: order of entries is not tested, just presence.
 
-    :API: public
+        :API: public
 
-    sep:      the expected output separator.
-    *output:  the output entries expected between the separators
-    **kwargs: additional kwargs passed to execute_rule.
-    """
+        sep:      the expected output separator.
+        *output:  the output entries expected between the separators
+        **kwargs: additional kwargs passed to execute_rule.
+        """
         # We expect each output line to be suffixed with the separator, so for , and [1,2,3] we expect:
         # '1,2,3,' - splitting this by the separator we should get ['1', '2', '3', ''] - always an extra
         # empty string if the separator is properly always a suffix and not applied just between
@@ -101,45 +102,49 @@ class ConsoleRuleTestBase(TestBase):
         )
 
     def assert_console_output(self, *output, **kwargs):
-        """Verifies the expected output entries are emitted by the console task under test.
+        """Verifies the expected output entries are emitted by the console task
+        under test.
 
-    NB: order of entries is not tested, just presence.
+        NB: order of entries is not tested, just presence.
 
-    :API: public
+        :API: public
 
-    *output:  the expected output entries
-    **kwargs: additional kwargs passed to execute_rule.
-    """
+        *output:  the expected output entries
+        **kwargs: additional kwargs passed to execute_rule.
+        """
         self.assertEqual(sorted(output), sorted(self.execute_rule(**kwargs).splitlines()))
 
     def assert_console_output_contains(self, output, **kwargs):
-        """Verifies the expected output string is emitted by the console task under test.
+        """Verifies the expected output string is emitted by the console task
+        under test.
 
-    :API: public
+        :API: public
 
-    output:  the expected output entry(ies)
-    **kwargs: additional kwargs passed to execute_rule.
-    """
+        output:  the expected output entry(ies)
+        **kwargs: additional kwargs passed to execute_rule.
+        """
         self.assertIn(output, self.execute_rule(**kwargs))
 
     def assert_console_output_ordered(self, *output, **kwargs):
-        """Verifies the expected output entries are emitted by the console task under test.
+        """Verifies the expected output entries are emitted by the console task
+        under test.
 
-    NB: order of entries is tested.
+        NB: order of entries is tested.
 
-    :API: public
+        :API: public
 
-    *output:  the expected output entries in expected order
-    **kwargs: additional kwargs passed to execute_rule.
-    """
+        *output:  the expected output entries in expected order
+        **kwargs: additional kwargs passed to execute_rule.
+        """
         self.assertEqual(list(output), self.execute_rule(**kwargs).splitlines())
 
     def assert_console_raises(self, exception, **kwargs):
-        """Verifies the expected exception is raised by the console task under test.
+        """Verifies the expected exception is raised by the console task under
+        test.
 
-    :API: public
+        :API: public
 
-    **kwargs: additional kwargs are passed to execute_rule.
-    """
+        **kwargs: additional kwargs are passed to execute_rule.
+        """
         with self.assertRaises(exception):
             self.execute_rule(**kwargs)

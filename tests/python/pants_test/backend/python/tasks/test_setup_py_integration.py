@@ -155,10 +155,10 @@ class SetupPyIntegrationTest(PantsRequirementIntegrationTestBase):
     def test_setup_py_unregistered_pants_plugin(self):
         """setup-py should succeed on a pants plugin target that:
 
-    1. uses a pants_requirement() instead of linking directly to targets in the
-       pants codebase.
-    2. is not on the pythonpath nor registered as a backend package.
-    """
+        1. uses a pants_requirement() instead of linking directly to targets in the
+           pants codebase.
+        2. is not on the pythonpath nor registered as a backend package.
+        """
 
         self.maxDiff = None
 

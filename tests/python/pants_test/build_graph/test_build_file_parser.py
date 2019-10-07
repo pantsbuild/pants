@@ -92,7 +92,8 @@ class BuildFileParserBasicsTest(TestWithBuildFileParser):
         self.assertEqual(len(address_map), 0)
 
     def test_invalid_unicode_in_build_file(self):
-        """Demonstrate that unicode characters causing parse errors raise real parse errors."""
+        """Demonstrate that unicode characters causing parse errors raise real
+        parse errors."""
         self.add_to_build_file(
             "BUILD",
             dedent(
@@ -108,7 +109,8 @@ class BuildFileParserBasicsTest(TestWithBuildFileParser):
         self.assert_parser_error(build_file, "invalid character")
 
     def test_unicode_string_in_build_file(self):
-        """Demonstrates that a string containing unicode should work in a BUILD file."""
+        """Demonstrates that a string containing unicode should work in a BUILD
+        file."""
         self.add_to_build_file(
             "BUILD",
             dedent(
@@ -453,9 +455,9 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(TestWithBuildFileParse
             self.build_file_parser.parse_build_file(build_file)
 
     def test_build_file_parser_error_hierarcy(self):
-        """Exception handling code depends on the fact that all explicit exceptions from BuildFileParser
-    are subclassed from the BuildFileParserError base class.
-    """
+        """Exception handling code depends on the fact that all explicit
+        exceptions from BuildFileParser are subclassed from the
+        BuildFileParserError base class."""
 
         def assert_build_file_parser_error(e):
             self.assertIsInstance(e, BuildFileParser.BuildFileParserError)

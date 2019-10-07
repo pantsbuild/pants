@@ -14,15 +14,15 @@ from pants.contrib.python.checks.checker.common import CheckstylePlugin
 class ImportType(object):
     """Enforce a consistent import order.
 
-  Imports are currently grouped into five separate groups:
-    stdlib
-    twitter
-    gen
-    package-local
-    third-party
+    Imports are currently grouped into five separate groups:
+      stdlib
+      twitter
+      gen
+      package-local
+      third-party
 
-  Imports should be in this order and separated by a single space.
-  """
+    Imports should be in this order and separated by a single space.
+    """
 
     STDLIB = 1
     TWITTER = 2
@@ -91,14 +91,14 @@ class ImportOrder(CheckstylePlugin):
 
     @classmethod
     def is_module_on_std_lib_path(cls, module):
-        """
-    Sometimes .py files are symlinked to the real python files, such as the case of virtual
-    env. However the .pyc files are created under the virtual env directory rather than
-    the path in cls.STANDARD_LIB_PATH. Hence this function checks for both.
+        """Sometimes .py files are symlinked to the real python files, such as
+        the case of virtual env. However the .pyc files are created under the
+        virtual env directory rather than the path in cls.STANDARD_LIB_PATH.
+        Hence this function checks for both.
 
-    :param module: a module
-    :return: True if module is on interpreter's stdlib path. False otherwise.
-    """
+        :param module: a module
+        :return: True if module is on interpreter's stdlib path. False otherwise.
+        """
         module_file_real_path = os.path.realpath(module.__file__)
         if module_file_real_path.startswith(cls.STANDARD_LIB_PATH):
             return True
@@ -129,34 +129,33 @@ class ImportOrder(CheckstylePlugin):
         return errors
 
     def classify_imports(self, chunk):
+        """Possible import statements:
+
+        import name
+        from name import subname
+        from name import subname1 as subname2
+        from name import *
+        from name import tuple
+
+        AST representations:
+
+        ImportFrom:
+           module=name
+           names=[alias(name, asname), ...]
+                      name can be '*'
+
+        Import:
+          names=[alias(name, asname), ...]
+
+        Imports are classified into 5 classes:
+          stdlib      => Python standard library
+          twitter.*   => Twitter internal / standard library
+          gen.*       => Thrift gen namespaces
+          .*          => Package-local imports
+          3rdparty    => site-packages or third party
+
+        classify_imports classifies the import into one of these forms.
         """
-      Possible import statements:
-
-      import name
-      from name import subname
-      from name import subname1 as subname2
-      from name import *
-      from name import tuple
-
-      AST representations:
-
-      ImportFrom:
-         module=name
-         names=[alias(name, asname), ...]
-                    name can be '*'
-
-      Import:
-        names=[alias(name, asname), ...]
-
-      Imports are classified into 5 classes:
-        stdlib      => Python standard library
-        twitter.*   => Twitter internal / standard library
-        gen.*       => Thrift gen namespaces
-        .*          => Package-local imports
-        3rdparty    => site-packages or third party
-
-      classify_imports classifies the import into one of these forms.
-    """
         errors = []
         all_module_types = set()
         for node in chunk:

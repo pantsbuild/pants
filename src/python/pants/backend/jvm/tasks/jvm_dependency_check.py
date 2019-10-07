@@ -21,7 +21,8 @@ from pants.util.memo import memoized_property
 
 
 class JvmDependencyCheck(Task):
-    """Checks true dependencies of a JVM target and ensures that they are consistent with BUILD files."""
+    """Checks true dependencies of a JVM target and ensures that they are
+    consistent with BUILD files."""
 
     @classmethod
     def register_options(cls, register):
@@ -64,7 +65,8 @@ class JvmDependencyCheck(Task):
 
     @staticmethod
     def _skip(options):
-        """Return true if the task should be entirely skipped, and thus have no product requirements."""
+        """Return true if the task should be entirely skipped, and thus have no
+        product requirements."""
         values = [options.missing_direct_deps, options.unnecessary_deps]
         return all(v == "off" for v in values)
 
@@ -127,8 +129,8 @@ class JvmDependencyCheck(Task):
     def check(self, src_tgt, actual_deps):
         """Check for missing deps.
 
-    See docstring for _compute_missing_deps for details.
-    """
+        See docstring for _compute_missing_deps for details.
+        """
         if self._check_missing_direct_deps or self._check_unnecessary_deps:
             missing_file_deps, missing_direct_tgt_deps = self._compute_missing_deps(
                 src_tgt, actual_deps
@@ -180,31 +182,32 @@ class JvmDependencyCheck(Task):
                     raise TaskError("Unnecessary deps.")
 
     def _compute_missing_deps(self, src_tgt, actual_deps):
-        """Computes deps that are used by the compiler but not specified in a BUILD file.
+        """Computes deps that are used by the compiler but not specified in a
+        BUILD file.
 
-    These deps are bugs waiting to happen: the code may happen to compile because the dep was
-    brought in some other way (e.g., by some other root target), but that is obviously fragile.
+        These deps are bugs waiting to happen: the code may happen to compile because the dep was
+        brought in some other way (e.g., by some other root target), but that is obviously fragile.
 
-    Note that in practice we're OK with reliance on indirect deps that are only brought in
-    transitively. E.g., in Scala type inference can bring in such a dep subtly. Fortunately these
-    cases aren't as fragile as a completely missing dependency. It's still a good idea to have
-    explicit direct deps where relevant, so we optionally warn about indirect deps, to make them
-    easy to find and reason about.
+        Note that in practice we're OK with reliance on indirect deps that are only brought in
+        transitively. E.g., in Scala type inference can bring in such a dep subtly. Fortunately these
+        cases aren't as fragile as a completely missing dependency. It's still a good idea to have
+        explicit direct deps where relevant, so we optionally warn about indirect deps, to make them
+        easy to find and reason about.
 
-    - actual_deps: a map src -> list of actual deps (source, class or jar file) as noted by the
-      compiler.
+        - actual_deps: a map src -> list of actual deps (source, class or jar file) as noted by the
+          compiler.
 
-    Returns a tuple (missing_file_deps, missing_direct_tgt_deps) where:
+        Returns a tuple (missing_file_deps, missing_direct_tgt_deps) where:
 
-    - missing_file_deps: a list of dep_files where src_tgt requires dep_file, and we're unable
-      to map to a target (because its target isn't in the total set of targets in play,
-      and we don't want to parse every BUILD file in the workspace just to find it).
+        - missing_file_deps: a list of dep_files where src_tgt requires dep_file, and we're unable
+          to map to a target (because its target isn't in the total set of targets in play,
+          and we don't want to parse every BUILD file in the workspace just to find it).
 
-    - missing_direct_tgt_deps: a list of dep_tgts where src_tgt is missing a direct dependency
-                               on dep_tgt but has a transitive dep on it.
+        - missing_direct_tgt_deps: a list of dep_tgts where src_tgt is missing a direct dependency
+                                   on dep_tgt but has a transitive dep on it.
 
-    All paths in the input and output are absolute.
-    """
+        All paths in the input and output are absolute.
+        """
         analyzer = self._analyzer
 
         def must_be_explicit_dep(dep):
@@ -281,8 +284,8 @@ class JvmDependencyCheck(Task):
     def _compute_unnecessary_deps(self, target, actual_deps):
         """Computes unused deps for the given Target.
 
-    :returns: A dict of directly declared but unused targets, to sets of suggested replacements.
-    """
+        :returns: A dict of directly declared but unused targets, to sets of suggested replacements.
+        """
         # Flatten the product deps of this target.
         product_deps = set()
         # TODO update actual deps will just be a list, not a dict when switching to

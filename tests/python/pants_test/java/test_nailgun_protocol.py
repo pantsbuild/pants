@@ -106,7 +106,8 @@ class TestNailgunProtocol(unittest.TestCase):
         self.assertEqual((chunk_type, payload), (ChunkType.COMMAND, self.TEST_COMMAND))
 
     def test_read_chunk_truncated_during_header(self):
-        """Construct a chunk and truncate to the first 3 bytes ([:3]), an incomplete header."""
+        """Construct a chunk and truncate to the first 3 bytes ([:3]), an
+        incomplete header."""
         truncated_chunk = NailgunProtocol.construct_chunk(ChunkType.STDOUT, self.TEST_OUTPUT)[:3]
         self.server_sock.sendall(truncated_chunk)
         self.server_sock.close()
@@ -115,7 +116,8 @@ class TestNailgunProtocol(unittest.TestCase):
             NailgunProtocol.read_chunk(self.client_sock)
 
     def test_read_chunk_truncated_before_payload(self):
-        """Construct a chunk and send exactly the header (first 5 bytes) and truncate the remainder."""
+        """Construct a chunk and send exactly the header (first 5 bytes) and
+        truncate the remainder."""
         truncated_chunk = NailgunProtocol.construct_chunk(ChunkType.STDOUT, self.TEST_OUTPUT)[:5]
         self.server_sock.sendall(truncated_chunk)
         self.server_sock.close()
@@ -124,7 +126,8 @@ class TestNailgunProtocol(unittest.TestCase):
             NailgunProtocol.read_chunk(self.client_sock)
 
     def test_read_chunk_truncated_during_payload(self):
-        """Construct a chunk and truncate the last 3 bytes of the payload ([:-3])."""
+        """Construct a chunk and truncate the last 3 bytes of the payload
+        ([:-3])."""
         truncated_chunk = NailgunProtocol.construct_chunk(ChunkType.STDOUT, self.TEST_OUTPUT)[:-3]
         self.server_sock.sendall(truncated_chunk)
         self.server_sock.close()

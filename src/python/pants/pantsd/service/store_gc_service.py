@@ -10,9 +10,10 @@ from pants.pantsd.service.pants_service import PantsService
 class StoreGCService(PantsService):
     """Store Garbage Collection Service.
 
-  This service both ensures that in-use files continue to be present in the engine's Store, and
-  performs occasional garbage collection to bound the size of the engine's Store.
-  """
+    This service both ensures that in-use files continue to be present
+    in the engine's Store, and performs occasional garbage collection to
+    bound the size of the engine's Store.
+    """
 
     _LEASE_EXTENSION_INTERVAL_SECONDS = 30 * 60
     _GARBAGE_COLLECTION_INTERVAL_SECONDS = 4 * 60 * 60
@@ -48,7 +49,10 @@ class StoreGCService(PantsService):
         self._set_next_gc()
 
     def run(self):
-        """Main service entrypoint. Called via Thread.start() via PantsDaemon.run()."""
+        """Main service entrypoint.
+
+        Called via Thread.start() via PantsDaemon.run().
+        """
         while not self._state.is_terminating:
             self._maybe_garbage_collect()
             self._maybe_extend_lease()

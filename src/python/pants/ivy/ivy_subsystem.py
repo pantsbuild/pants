@@ -11,8 +11,8 @@ from pants.subsystem.subsystem import Subsystem
 class IvySubsystem(Subsystem):
     """Common configuration items for ivy tasks.
 
-  :API: public
-  """
+    :API: public
+    """
 
     options_scope = "ivy"
 
@@ -82,8 +82,8 @@ class IvySubsystem(Subsystem):
     def http_proxy(self):
         """Set ivy to use an http proxy.
 
-    Expects a string of the form http://<host>:<port>
-    """
+        Expects a string of the form http://<host>:<port>
+        """
         if os.getenv("HTTP_PROXY"):
             return os.getenv("HTTP_PROXY")
         if os.getenv("http_proxy"):
@@ -93,8 +93,8 @@ class IvySubsystem(Subsystem):
     def https_proxy(self):
         """Set ivy to use an https proxy.
 
-    Expects a string of the form http://<host>:<port>
-    """
+        Expects a string of the form http://<host>:<port>
+        """
         if os.getenv("HTTPS_PROXY"):
             return os.getenv("HTTPS_PROXY")
         if os.getenv("https_proxy"):

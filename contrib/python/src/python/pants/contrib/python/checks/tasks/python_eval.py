@@ -108,24 +108,24 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
     def _compile_target(self, vt):
         """'Compiles' a python target.
 
-    'Compiling' means forming an isolated chroot of its sources and transitive deps and then
-    attempting to import each of the target's sources in the case of a python library or else the
-    entry point in the case of a python binary.
+        'Compiling' means forming an isolated chroot of its sources and transitive deps and then
+        attempting to import each of the target's sources in the case of a python library or else the
+        entry point in the case of a python binary.
 
-    For a library with sources lib/core.py and lib/util.py a "compiler" main file would look like:
+        For a library with sources lib/core.py and lib/util.py a "compiler" main file would look like:
 
-      if __name__ == '__main__':
-        import lib.core
-        import lib.util
+          if __name__ == '__main__':
+            import lib.core
+            import lib.util
 
-    For a binary with entry point lib.bin:main the "compiler" main file would look like:
+        For a binary with entry point lib.bin:main the "compiler" main file would look like:
 
-      if __name__ == '__main__':
-        from lib.bin import main
+          if __name__ == '__main__':
+            from lib.bin import main
 
-    In either case the main file is executed within the target chroot to reveal missing BUILD
-    dependencies.
-    """
+        In either case the main file is executed within the target chroot to reveal missing BUILD
+        dependencies.
+        """
         target = vt.target
         with self.context.new_workunit(name=target.address.spec):
             modules = self._get_modules(target)

@@ -26,14 +26,14 @@ from pants.source.source_root import SourceRootConfig
 class Context:
     """Contains the context for a single run of pants.
 
-  Task implementations can access configuration data from pants.ini and any flags they have exposed
-  here as well as information about the targets involved in the run.
+    Task implementations can access configuration data from pants.ini and any flags they have exposed
+    here as well as information about the targets involved in the run.
 
-  Advanced uses of the context include adding new targets to it for upstream or downstream goals to
-  operate on and mapping of products a goal creates to the targets the products are associated with.
+    Advanced uses of the context include adding new targets to it for upstream or downstream goals to
+    operate on and mapping of products a goal creates to the targets the products are associated with.
 
-  :API: public
-  """
+    :API: public
+    """
 
     # TODO: Figure out a more structured way to construct and use context than this big flat
     # repository of attributes?
@@ -88,60 +88,61 @@ class Context:
     def options(self):
         """Returns the new-style options.
 
-    :API: public
-    """
+        :API: public
+        """
         return self._options
 
     @property
     def log(self):
         """Returns the preferred logger for goals to use.
 
-    :API: public
-    """
+        :API: public
+        """
         return self._log
 
     @property
     def products(self):
         """Returns the Products manager for the current run.
 
-    :API: public
-    """
+        :API: public
+        """
         return self._products
 
     @property
     def source_roots(self):
-        """Returns the :class:`pants.source.source_root.SourceRoots` instance for the current run.
+        """Returns the :class:`pants.source.source_root.SourceRoots` instance
+        for the current run.
 
-    :API: public
-    """
+        :API: public
+        """
         return self._source_roots
 
     @property
     def target_roots(self):
         """Returns the targets specified on the command line.
 
-    This set is strictly a subset of all targets in play for the run as returned by self.targets().
-    Note that for a command line invocation that uses wildcard selectors : or ::, the targets
-    globbed by the wildcards are considered to be target roots.
+        This set is strictly a subset of all targets in play for the run as returned by self.targets().
+        Note that for a command line invocation that uses wildcard selectors : or ::, the targets
+        globbed by the wildcards are considered to be target roots.
 
-    :API: public
-    """
+        :API: public
+        """
         return self._target_roots
 
     @property
     def console_outstream(self):
         """Returns the output stream to write console messages to.
 
-    :API: public
-    """
+        :API: public
+        """
         return self._console_outstream
 
     @property
     def scm(self):
         """Returns the current workspace's scm, if any.
 
-    :API: public
-    """
+        :API: public
+        """
         return self._scm
 
     @property
@@ -159,13 +160,15 @@ class Context:
 
     @contextmanager
     def executing(self):
-        """A contextmanager that sets metrics in the context of a (v1) engine execution."""
+        """A contextmanager that sets metrics in the context of a (v1) engine
+        execution."""
         self._set_target_root_count_in_runtracker()
         yield
         self._set_affected_target_count_in_runtracker()
 
     def _set_target_root_count_in_runtracker(self):
-        """Sets the target root count in the run tracker's daemon stats object."""
+        """Sets the target root count in the run tracker's daemon stats
+        object."""
         # N.B. `self._target_roots` is always an expanded list of `Target` objects as
         # provided by `GoalRunner`.
         target_count = len(self._target_roots)
@@ -173,7 +176,8 @@ class Context:
         return target_count
 
     def _set_affected_target_count_in_runtracker(self):
-        """Sets the realized target count in the run tracker's daemon stats object."""
+        """Sets the realized target count in the run tracker's daemon stats
+        object."""
         target_count = len(self.build_graph)
         self.run_tracker.pantsd_stats.set_affected_targets_size(target_count)
         return target_count
@@ -205,18 +209,18 @@ class Context:
     def background_worker_pool(self):
         """Returns the pool to which tasks can submit background work.
 
-    :API: public
-    """
+        :API: public
+        """
         return self.run_tracker.background_worker_pool()
 
     def subproc_map(self, f, items):
         """Map function `f` over `items` in subprocesses and return the result.
 
-      :API: public
+        :API: public
 
-      :param f: A multiproc-friendly (importable) work function.
-      :param items: A iterable of pickleable arguments to f.
-    """
+        :param f: A multiproc-friendly (importable) work function.
+        :param items: A iterable of pickleable arguments to f.
+        """
         try:
             # Pool.map (and async_map().get() w/o timeout) can miss SIGINT.
             # See: http://stackoverflow.com/a/1408476, http://bugs.python.org/issue8844
@@ -236,29 +240,30 @@ class Context:
     def new_workunit(self, name, labels=None, cmd="", log_config=None):
         """Create a new workunit under the calling thread's current workunit.
 
-    :API: public
-    """
+        :API: public
+        """
         with self.run_tracker.new_workunit(
             name=name, labels=labels, cmd=cmd, log_config=log_config
         ) as workunit:
             yield workunit
 
     def acquire_lock(self):
-        """ Acquire the global lock for the root directory associated with this context. When
-    a goal requires serialization, it will call this to acquire the lock.
+        """Acquire the global lock for the root directory associated with this
+        context. When a goal requires serialization, it will call this to
+        acquire the lock.
 
-    :API: public
-    """
+        :API: public
+        """
         if self.options.for_global_scope().lock:
             if not self._lock.acquired:
                 self._lock.acquire()
 
     def release_lock(self):
-        """Release the global lock if it's held.
-    Returns True if the lock was held before this call.
+        """Release the global lock if it's held. Returns True if the lock was
+        held before this call.
 
-    :API: public
-    """
+        :API: public
+        """
         if not self._lock.acquired:
             return False
         else:
@@ -268,8 +273,8 @@ class Context:
     def is_unlocked(self):
         """Whether the global lock object is actively holding the lock.
 
-    :API: public
-    """
+        :API: public
+        """
         return not self._lock.acquired
 
     def _replace_targets(self, target_roots):
@@ -286,10 +291,11 @@ class Context:
         self._clear_target_cache()
 
     def _clear_target_cache(self):
-        """A callback for cases where the graph or target roots have been mutated.
+        """A callback for cases where the graph or target roots have been
+        mutated.
 
-    See BuildGraph.add_invalidation_callback.
-    """
+        See BuildGraph.add_invalidation_callback.
+        """
         self._targets_cache.clear()
 
     def add_new_target(
@@ -297,11 +303,11 @@ class Context:
     ):
         """Creates a new target, adds it to the context and returns it.
 
-    This method ensures the target resolves files against the given target_base, creating the
-    directory if needed and registering a source root.
+        This method ensures the target resolves files against the given target_base, creating the
+        directory if needed and registering a source root.
 
-    :API: public
-    """
+        :API: public
+        """
         self._clear_target_cache()
         rel_target_base = target_base or address.spec_path
         abs_target_base = os.path.join(get_buildroot(), rel_target_base)
@@ -328,21 +334,22 @@ class Context:
         return new_target
 
     def targets(self, predicate=None, **kwargs):
-        """Selects targets in-play in this run from the target roots and their transitive dependencies.
+        """Selects targets in-play in this run from the target roots and their
+        transitive dependencies.
 
-    Also includes any new synthetic targets created from the target roots or their transitive
-    dependencies during the course of the run.
+        Also includes any new synthetic targets created from the target roots or their transitive
+        dependencies during the course of the run.
 
-    See Target.closure_for_targets for remaining parameters.
+        See Target.closure_for_targets for remaining parameters.
 
-    :API: public
+        :API: public
 
-    :param predicate: If specified, the predicate will be used to narrow the scope of targets
-                      returned.
-    :param bool postorder: `True` to gather transitive dependencies with a postorder traversal;
-                          `False` or preorder by default.
-    :returns: A list of matching targets.
-    """
+        :param predicate: If specified, the predicate will be used to narrow the scope of targets
+                          returned.
+        :param bool postorder: `True` to gather transitive dependencies with a postorder traversal;
+                              `False` or preorder by default.
+        :returns: A list of matching targets.
+        """
         targets_cache_key = tuple(sorted(kwargs))
         targets = self._targets_cache.get(targets_cache_key)
         if targets is None:
@@ -364,11 +371,11 @@ class Context:
         return target_set
 
     def dependents(self, on_predicate=None, from_predicate=None):
-        """Returns  a map from targets that satisfy the from_predicate to targets they depend on that
-      satisfy the on_predicate.
+        """Returns  a map from targets that satisfy the from_predicate to
+        targets they depend on that satisfy the on_predicate.
 
-    :API: public
-    """
+        :API: public
+        """
         core = set(self.targets(on_predicate))
         dependees = defaultdict(set)
         for target in self.targets(from_predicate):
@@ -380,22 +387,22 @@ class Context:
     def resolve(self, spec):
         """Returns an iterator over the target(s) the given address points to.
 
-    :API: public
-    """
+        :API: public
+        """
         return self.build_graph.resolve(spec)
 
     def scan(self, root=None):
         """Scans and parses all BUILD files found under ``root``.
 
-    Only BUILD files found under ``root`` are parsed as roots in the graph, but any dependencies of
-    targets parsed in the root tree's BUILD files will be followed and this may lead to BUILD files
-    outside of ``root`` being parsed and included in the returned build graph.
+        Only BUILD files found under ``root`` are parsed as roots in the graph, but any dependencies of
+        targets parsed in the root tree's BUILD files will be followed and this may lead to BUILD files
+        outside of ``root`` being parsed and included in the returned build graph.
 
-    :API: public
+        :API: public
 
-    :param string root: The path to scan; by default, the build root.
-    :returns: A new build graph encapsulating the targets found.
-    """
+        :param string root: The path to scan; by default, the build root.
+        :returns: A new build graph encapsulating the targets found.
+        """
         build_graph = self.build_graph.clone_new()
         for address in self.address_mapper.scan_addresses(root):
             build_graph.inject_address_closure(address)
@@ -404,15 +411,16 @@ class Context:
     def execute_process_synchronously_without_raising(
         self, execute_process_request, name, labels=None
     ):
-        """Executes a process (possibly remotely), and returns information about its output.
+        """Executes a process (possibly remotely), and returns information
+        about its output.
 
-    :param execute_process_request: The ExecuteProcessRequest to run.
-    :param name: A descriptive name representing the process being executed.
-    :param labels: A tuple of WorkUnitLabels.
-    :return: An ExecuteProcessResult with information about the execution.
+        :param execute_process_request: The ExecuteProcessRequest to run.
+        :param name: A descriptive name representing the process being executed.
+        :param labels: A tuple of WorkUnitLabels.
+        :return: An ExecuteProcessResult with information about the execution.
 
-    Note that this is an unstable, experimental API, which is subject to change with no notice.
-    """
+        Note that this is an unstable, experimental API, which is subject to change with no notice.
+        """
         with self.new_workunit(
             name=name, labels=labels, cmd=" ".join(execute_process_request.argv)
         ) as workunit:
@@ -425,10 +433,11 @@ class Context:
             return result
 
     def execute_process_synchronously_or_raise(self, execute_process_request, name, labels=None):
-        """Execute process synchronously, and throw if the return code is not 0.
+        """Execute process synchronously, and throw if the return code is not
+        0.
 
-    See execute_process_synchronously for the api docs.
-    """
+        See execute_process_synchronously for the api docs.
+        """
         fallible_result = self.execute_process_synchronously_without_raising(
             execute_process_request, name, labels
         )

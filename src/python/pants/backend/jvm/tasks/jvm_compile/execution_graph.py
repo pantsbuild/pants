@@ -14,9 +14,9 @@ from pants.base.worker_pool import Work
 class Job:
     """A unit of scheduling for the ExecutionGraph.
 
-  The ExecutionGraph represents a DAG of dependent work. A Job a node in the graph along with the
-  keys of its dependent jobs.
-  """
+    The ExecutionGraph represents a DAG of dependent work. A Job a node
+    in the graph along with the keys of its dependent jobs.
+    """
 
     def __init__(
         self, key, fn, dependencies, size=0, on_success=None, on_failure=None, run_asap=False
@@ -74,7 +74,8 @@ class StatusTable:
         self.mark_as(QUEUED, key)
 
     def unfinished_items(self):
-        """Returns a list of (name, status) tuples, only including entries marked as unfinished."""
+        """Returns a list of (name, status) tuples, only including entries
+        marked as unfinished."""
         return [(key, stat) for key, stat in self._statuses.items() if stat not in self.DONE_STATES]
 
     def failed_keys(self):
@@ -97,7 +98,7 @@ class StatusTable:
 
 
 class ExecutionFailure(Exception):
-    """Raised when work units fail during execution"""
+    """Raised when work units fail during execution."""
 
     def __init__(self, message, cause=None):
         if cause:
@@ -107,7 +108,8 @@ class ExecutionFailure(Exception):
 
 
 class UnexecutableGraphError(Exception):
-    """Base exception class for errors that make an ExecutionGraph not executable"""
+    """Base exception class for errors that make an ExecutionGraph not
+    executable."""
 
     def __init__(self, msg):
         super().__init__("Unexecutable graph: {}".format(msg))
@@ -153,9 +155,9 @@ class ThreadSafeCounter:
 class ExecutionGraph:
     """A directed acyclic graph of work to execute.
 
-  This is currently only used within jvm compile, but the intent is to unify it with the future
-  global execution graph.
-  """
+    This is currently only used within jvm compile, but the intent is to
+    unify it with the future global execution graph.
+    """
 
     def __init__(self, job_list, print_stack_trace):
         """
@@ -207,8 +209,9 @@ class ExecutionGraph:
             self._dependees[dependency_key].append(key)
 
     def _compute_job_priorities(self, job_list):
-        """Walks the dependency graph breadth-first, starting from the most dependent tasks,
-     and computes the job priority as the sum of the jobs sizes along the critical path."""
+        """Walks the dependency graph breadth-first, starting from the most
+        dependent tasks, and computes the job priority as the sum of the jobs
+        sizes along the critical path."""
 
         job_size = {job.key: job.size for job in job_list}
         job_priority = defaultdict(int)
@@ -242,26 +245,27 @@ class ExecutionGraph:
         return job_priority
 
     def execute(self, pool, log):
-        """Runs scheduled work, ensuring all dependencies for each element are done before execution.
+        """Runs scheduled work, ensuring all dependencies for each element are
+        done before execution.
 
-    :param pool: A WorkerPool to run jobs on
-    :param log: logger for logging debug information and progress
+        :param pool: A WorkerPool to run jobs on
+        :param log: logger for logging debug information and progress
 
-    submits all the work without any dependencies to the worker pool
-    when a unit of work finishes,
-      if it is successful
-        calls success callback
-        checks for dependees whose dependencies are all successful, and submits them
-      if it fails
-        calls failure callback
-        marks dependees as failed and queues them directly into the finished work queue
-    when all work is either successful or failed,
-      cleans up the work pool
-    if there's an exception on the main thread,
-      calls failure callback for unfinished work
-      aborts work pool
-      re-raises
-    """
+        submits all the work without any dependencies to the worker pool
+        when a unit of work finishes,
+          if it is successful
+            calls success callback
+            checks for dependees whose dependencies are all successful, and submits them
+          if it fails
+            calls failure callback
+            marks dependees as failed and queues them directly into the finished work queue
+        when all work is either successful or failed,
+          cleans up the work pool
+        if there's an exception on the main thread,
+          calls failure callback for unfinished work
+          aborts work pool
+          re-raises
+        """
         log.debug(self.format_dependee_graph())
 
         status_table = StatusTable(

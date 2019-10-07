@@ -34,7 +34,8 @@ from pants_test.engine.util import Target, run_rule
 
 class ParseAddressFamilyTest(unittest.TestCase):
     def test_empty(self):
-        """Test that parsing an empty BUILD file results in an empty AddressFamily."""
+        """Test that parsing an empty BUILD file results in an empty
+        AddressFamily."""
         address_mapper = AddressMapper(JsonParser(TEST_TABLE))
         af = run_rule(
             parse_address_family,
@@ -104,7 +105,8 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
         self.assertEqual(targets.dependencies[0].spec, "root:b")
 
     def test_fails_on_nonexistent_specs(self):
-        """Test that specs referring to nonexistent targets raise a ResolveError."""
+        """Test that specs referring to nonexistent targets raise a
+        ResolveError."""
         address_family = AddressFamily("root", {"a": ("root/BUILD", TargetAdaptor())})
         specs = Specs([SingleAddress("root", "b"), SingleAddress("root", "a")])
 
@@ -143,7 +145,8 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
         self.assertEqual(targets.dependencies[0].spec, "root:not_me")
 
     def test_exclude_pattern_with_single_address(self):
-        """Test that single address targets are filtered based on exclude patterns."""
+        """Test that single address targets are filtered based on exclude
+        patterns."""
         specs = Specs([SingleAddress("root", "not_me")], exclude_patterns=tuple(["root.*"]))
         address_family = AddressFamily("root", {"not_me": ("root/BUILD", TargetAdaptor())})
 
@@ -220,7 +223,8 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
         return self.create(build_patterns=("*.BUILD.json",), parser=JsonParser(TEST_TABLE))
 
     def _populate(self, scheduler, address):
-        """Perform an ExecutionRequest to parse the given Address into a Struct."""
+        """Perform an ExecutionRequest to parse the given Address into a
+        Struct."""
         request = scheduler.execution_request([HydratedStruct], [address])
         returns, throws = scheduler.execute(request)
         if returns:

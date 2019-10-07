@@ -11,8 +11,8 @@ from pants.build_graph.target import Target
 class PythonRequirementLibrary(Target):
     """A set of pip requirements.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(self, payload=None, requirements=None, **kwargs):
         """

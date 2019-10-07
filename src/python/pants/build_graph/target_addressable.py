@@ -12,9 +12,9 @@ class TargetAddressable(Addressable):
     def factory(cls, target_type, alias=None):
         """Creates an addressable factory for the given target type and alias.
 
-    :returns: A factory that can capture :class:`TargetAddressable` instances.
-    :rtype: :class:`Addressable.Factory`
-    """
+        :returns: A factory that can capture :class:`TargetAddressable` instances.
+        :rtype: :class:`Addressable.Factory`
+        """
 
         class Factory(Addressable.Factory):
             @property
@@ -74,9 +74,9 @@ class TargetAddressable(Addressable):
     def dependency_specs(self):
         """The captured dependency specs from the proxied target alias call.
 
-    :returns: A list of dependency address specs.
-    :rtype: list of strings
-    """
+        :returns: A list of dependency address specs.
+        :rtype: list of strings
+        """
         return self._dependency_specs
 
     def instantiate(self, build_graph, address):

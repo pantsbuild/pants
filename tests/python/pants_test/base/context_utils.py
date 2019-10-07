@@ -16,26 +16,26 @@ from pants.goal.run_tracker import RunTrackerLogger
 class TestContext(Context):
     """A Context to use during unittesting.
 
-  :API: public
+    :API: public
 
-  Stubs out various dependencies that we don't want to introduce in unit tests.
+    Stubs out various dependencies that we don't want to introduce in unit tests.
 
-  TODO: Instead of extending the runtime Context class, create a Context interface and have
-  TestContext and a runtime Context implementation extend that. This will also allow us to
-  isolate the parts of the interface that a Task is allowed to use vs. the parts that the
-  task-running machinery is allowed to use.
-  """
+    TODO: Instead of extending the runtime Context class, create a Context interface and have
+    TestContext and a runtime Context implementation extend that. This will also allow us to
+    isolate the parts of the interface that a Task is allowed to use vs. the parts that the
+    task-running machinery is allowed to use.
+    """
 
     class DummyWorkUnit:
         """A workunit stand-in that sends all output to stderr.
 
-   These outputs are typically only used by subprocesses spawned by code under test, not
-   the code under test itself, and would otherwise go into some reporting black hole.  The
-   testing framework will only display the stderr output when a test fails.
+        These outputs are typically only used by subprocesses spawned by code under test, not
+        the code under test itself, and would otherwise go into some reporting black hole.  The
+        testing framework will only display the stderr output when a test fails.
 
-   Provides no other tracking/labeling/reporting functionality. Does not require "opening"
-   or "closing".
-   """
+        Provides no other tracking/labeling/reporting functionality. Does not require "opening"
+        or "closing".
+        """
 
         def output(self, name):
             return sys.stderr
@@ -66,8 +66,9 @@ class TestContext(Context):
     class TestLogger(logging.getLoggerClass()):
         """A logger that converts our structured records into flat ones.
 
-    This is so we can use a regular logger in tests instead of our reporting machinery.
-    """
+        This is so we can use a regular logger in tests instead of our
+        reporting machinery.
+        """
 
         def makeRecord(self, name, lvl, fn, lno, msg, args, exc_info, *pos_args, **kwargs):
             # Python 2 and Python 3 have different arguments for makeRecord().
@@ -132,10 +133,10 @@ def create_context_from_options(
 ):
     """Creates a ``Context`` with the given options and no targets by default.
 
-  :param options: An :class:`pants.option.options.Option`-alike object that supports read methods.
+    :param options: An :class:`pants.option.options.Option`-alike object that supports read methods.
 
-  Other params are as for ``Context``.
-  """
+    Other params are as for ``Context``.
+    """
     run_tracker = TestContext.DummyRunTracker()
     target_roots = maybe_list(target_roots, Target) if target_roots else []
     return TestContext(

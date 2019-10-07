@@ -34,11 +34,12 @@ from pants.version import VERSION
 
 
 class RunTrackerOptionEncoder(CoercingOptionEncoder):
-    """Use the json encoder we use for making options hashable to support datatypes.
+    """Use the json encoder we use for making options hashable to support
+    datatypes.
 
-  This encoder also explicitly allows OrderedDict inputs, as we accept more than just option values
-  when encoding stats to json.
-  """
+    This encoder also explicitly allows OrderedDict inputs, as we accept
+    more than just option values when encoding stats to json.
+    """
 
     def default(self, o):
         if isinstance(o, OrderedDict):
@@ -49,23 +50,23 @@ class RunTrackerOptionEncoder(CoercingOptionEncoder):
 class RunTracker(Subsystem):
     """Tracks and times the execution of a pants run.
 
-  Also manages background work.
+    Also manages background work.
 
-  Use like this:
+    Use like this:
 
-  run_tracker.start()
-  with run_tracker.new_workunit('compile'):
-    with run_tracker.new_workunit('java'):
-      ...
-    with run_tracker.new_workunit('scala'):
-      ...
-  run_tracker.close()
+    run_tracker.start()
+    with run_tracker.new_workunit('compile'):
+      with run_tracker.new_workunit('java'):
+        ...
+      with run_tracker.new_workunit('scala'):
+        ...
+    run_tracker.close()
 
-  Can track execution against multiple 'roots', e.g., one for the main thread and another for
-  background threads.
+    Can track execution against multiple 'roots', e.g., one for the main thread and another for
+    background threads.
 
-  :API: public
-  """
+    :API: public
+    """
 
     options_scope = "run-tracker"
 
@@ -217,8 +218,9 @@ class RunTracker(Subsystem):
     def register_thread(self, parent_workunit):
         """Register the parent workunit for all work in the calling thread.
 
-    Multiple threads may have the same parent (e.g., all the threads in a pool).
-    """
+        Multiple threads may have the same parent (e.g., all the threads
+        in a pool).
+        """
         self._threadlocal.current_workunit = parent_workunit
 
     def is_under_background_root(self, workunit):
@@ -234,8 +236,8 @@ class RunTracker(Subsystem):
     def initialize(self, all_options):
         """Create run_info and relevant directories, and return the run id.
 
-    Must be called before `start`.
-    """
+        Must be called before `start`.
+        """
         if self.run_info:
             raise AssertionError("RunTracker.initialize must not be called multiple times.")
 
@@ -282,12 +284,12 @@ class RunTracker(Subsystem):
     def start(self, report, run_start_time=None):
         """Start tracking this pants run using the given Report.
 
-    `RunTracker.initialize` must have been called first to create the run_info_dir and
-    run_info. TODO: This lifecycle represents a delicate dance with the `Reporting.initialize`
-    method, and portions of the `RunTracker` should likely move to `Reporting` instead.
+        `RunTracker.initialize` must have been called first to create the run_info_dir and
+        run_info. TODO: This lifecycle represents a delicate dance with the `Reporting.initialize`
+        method, and portions of the `RunTracker` should likely move to `Reporting` instead.
 
-    report: an instance of pants.reporting.Report.
-    """
+        report: an instance of pants.reporting.Report.
+        """
         if not self.run_info:
             raise AssertionError("RunTracker.initialize must be called before RunTracker.start.")
 
@@ -318,7 +320,8 @@ class RunTracker(Subsystem):
             self.log(Report.INFO, "(To run a reporting server: ./pants server)")
 
     def set_root_outcome(self, outcome):
-        """Useful for setup code that doesn't have a reference to a workunit."""
+        """Useful for setup code that doesn't have a reference to a
+        workunit."""
         self._main_root_workunit.set_outcome(outcome)
 
     @property
@@ -327,27 +330,28 @@ class RunTracker(Subsystem):
 
     @contextmanager
     def new_workunit(self, name, labels=None, cmd="", log_config=None):
-        """Creates a (hierarchical) subunit of work for the purpose of timing and reporting.
+        """Creates a (hierarchical) subunit of work for the purpose of timing
+        and reporting.
 
-    - name: A short name for this work. E.g., 'resolve', 'compile', 'scala', 'zinc'.
-    - labels: An optional iterable of labels. The reporters can use this to decide how to
-              display information about this work.
-    - cmd: An optional longer string representing this work.
-           E.g., the cmd line of a compiler invocation.
-    - log_config: An optional tuple WorkUnit.LogConfig of task-level options affecting reporting.
+        - name: A short name for this work. E.g., 'resolve', 'compile', 'scala', 'zinc'.
+        - labels: An optional iterable of labels. The reporters can use this to decide how to
+                  display information about this work.
+        - cmd: An optional longer string representing this work.
+               E.g., the cmd line of a compiler invocation.
+        - log_config: An optional tuple WorkUnit.LogConfig of task-level options affecting reporting.
 
-    Use like this:
+        Use like this:
 
-    with run_tracker.new_workunit(name='compile', labels=[WorkUnitLabel.TASK]) as workunit:
-      <do scoped work here>
-      <set the outcome on workunit if necessary>
+        with run_tracker.new_workunit(name='compile', labels=[WorkUnitLabel.TASK]) as workunit:
+          <do scoped work here>
+          <set the outcome on workunit if necessary>
 
-    Note that the outcome will automatically be set to failure if an exception is raised
-    in a workunit, and to success otherwise, so usually you only need to set the
-    outcome explicitly if you want to set it to warning.
+        Note that the outcome will automatically be set to failure if an exception is raised
+        in a workunit, and to success otherwise, so usually you only need to set the
+        outcome explicitly if you want to set it to warning.
 
-    :API: public
-    """
+        :API: public
+        """
         parent = self._threadlocal.current_workunit
         with self.new_workunit_under_parent(
             name, parent=parent, labels=labels, cmd=cmd, log_config=log_config
@@ -360,19 +364,20 @@ class RunTracker(Subsystem):
 
     @contextmanager
     def new_workunit_under_parent(self, name, parent, labels=None, cmd="", log_config=None):
-        """Creates a (hierarchical) subunit of work for the purpose of timing and reporting.
+        """Creates a (hierarchical) subunit of work for the purpose of timing
+        and reporting.
 
-    - name: A short name for this work. E.g., 'resolve', 'compile', 'scala', 'zinc'.
-    - parent: The new workunit is created under this parent.
-    - labels: An optional iterable of labels. The reporters can use this to decide how to
-              display information about this work.
-    - cmd: An optional longer string representing this work.
-           E.g., the cmd line of a compiler invocation.
+        - name: A short name for this work. E.g., 'resolve', 'compile', 'scala', 'zinc'.
+        - parent: The new workunit is created under this parent.
+        - labels: An optional iterable of labels. The reporters can use this to decide how to
+                  display information about this work.
+        - cmd: An optional longer string representing this work.
+               E.g., the cmd line of a compiler invocation.
 
-    Task code should not typically call this directly.
+        Task code should not typically call this directly.
 
-    :API: public
-    """
+        :API: public
+        """
         workunit = WorkUnit(
             run_info_dir=self.run_info_dir,
             parent=parent,
@@ -413,8 +418,8 @@ class RunTracker(Subsystem):
     def post_stats(cls, stats_url, stats, timeout=2, auth_provider=None, stats_version=1):
         """POST stats to the given url.
 
-    :return: True if upload was successful, False otherwise.
-    """
+        :return: True if upload was successful, False otherwise.
+        """
 
         def error(msg):
             # Report aleady closed, so just print error.
@@ -519,7 +524,8 @@ class RunTracker(Subsystem):
             }
 
     def store_stats(self):
-        """Store stats about this run in local and optionally remote stats dbs."""
+        """Store stats about this run in local and optionally remote stats
+        dbs."""
         stats = self._stats()
 
         # Write stats to user-defined json file.
@@ -547,10 +553,10 @@ class RunTracker(Subsystem):
     def end(self):
         """This pants run is over, so stop tracking it.
 
-    Note: If end() has been called once, subsequent calls are no-ops.
+        Note: If end() has been called once, subsequent calls are no-ops.
 
-    :return: PANTS_SUCCEEDED_EXIT_CODE or PANTS_FAILED_EXIT_CODE
-    """
+        :return: PANTS_SUCCEEDED_EXIT_CODE or PANTS_FAILED_EXIT_CODE
+        """
         if self._end_memoized_result is not None:
             return self._end_memoized_result
         if self._background_worker_pool:
@@ -615,9 +621,8 @@ class RunTracker(Subsystem):
             self.outcomes[path] = workunit.outcome_string(workunit.outcome())
 
     def get_critical_path_timings(self):
-        """
-    Get the cumulative timings of each goal and all of the goals it (transitively) depended on.
-    """
+        """Get the cumulative timings of each goal and all of the goals it
+        (transitively) depended on."""
         setup_workunit = WorkUnitLabel.SETUP.lower()
         transitive_dependencies = dict()
         for goal_info in self._sorted_goal_infos:
@@ -676,8 +681,9 @@ class RunTracker(Subsystem):
     def shutdown_worker_pool(self):
         """Shuts down the SubprocPool.
 
-    N.B. This exists only for internal use and to afford for fork()-safe operation in pantsd.
-    """
+        N.B. This exists only for internal use and to afford for
+        fork()-safe operation in pantsd.
+        """
         SubprocPool.shutdown(self._aborted)
 
     def _get_options_to_record(self):
@@ -688,12 +694,13 @@ class RunTracker(Subsystem):
         return recorded_options
 
     def _get_option_to_record(self, scope, option=None):
-        """Looks up an option scope (and optionally option therein) in the options parsed by Pants.
+        """Looks up an option scope (and optionally option therein) in the
+        options parsed by Pants.
 
-    Returns a dict of of all options in the scope, if option is None.
-    Returns the specific option if option is not None.
-    Raises ValueError if scope or option could not be found.
-    """
+        Returns a dict of of all options in the scope, if option is
+        None. Returns the specific option if option is not None. Raises
+        ValueError if scope or option could not be found.
+        """
         scope_to_look_up = scope if scope != "GLOBAL" else ""
         try:
             value = self._all_options.for_scope(
@@ -711,19 +718,20 @@ class RunTracker(Subsystem):
 
     @classmethod
     def _create_dict_with_nested_keys_and_val(cls, keys, value):
-        """Recursively constructs a nested dictionary with the keys pointing to the value.
+        """Recursively constructs a nested dictionary with the keys pointing to
+        the value.
 
-    For example:
-    Given the list of keys ['a', 'b', 'c', 'd'] and a primitive
-    value 'hello world', the method will produce the nested dictionary
-    {'a': {'b': {'c': {'d': 'hello world'}}}}. The number of keys in the list
-    defines the depth of the nested dict. If the list of keys is ['a'] and
-    the value is 'hello world', then the result would be {'a': 'hello world'}.
+        For example:
+        Given the list of keys ['a', 'b', 'c', 'd'] and a primitive
+        value 'hello world', the method will produce the nested dictionary
+        {'a': {'b': {'c': {'d': 'hello world'}}}}. The number of keys in the list
+        defines the depth of the nested dict. If the list of keys is ['a'] and
+        the value is 'hello world', then the result would be {'a': 'hello world'}.
 
-    :param list of string keys: A list of keys to be nested as a dictionary.
-    :param primitive value: The value of the information being stored.
-    :return: dict of nested keys leading to the value.
-    """
+        :param list of string keys: A list of keys to be nested as a dictionary.
+        :param primitive value: The value of the information being stored.
+        :return: dict of nested keys leading to the value.
+        """
 
         if len(keys) > 1:
             new_keys = keys[:-1]
@@ -736,25 +744,26 @@ class RunTracker(Subsystem):
 
     @classmethod
     def _merge_list_of_keys_into_dict(cls, data, keys, value, index=0):
-        """Recursively merge list of keys that points to the given value into data.
+        """Recursively merge list of keys that points to the given value into
+        data.
 
-    Will override a primitive value with another primitive value, but will not
-    override a primitive with a dictionary.
+        Will override a primitive value with another primitive value, but will not
+        override a primitive with a dictionary.
 
-    For example:
-    Given the dictionary {'a': {'b': {'c': 1}}, {'x': {'y': 100}}}, the keys
-    ['a', 'b', 'd'] and the value 2, the updated dictionary would be
-    {'a': {'b': {'c': 1, 'd': 2}}, {'x': {'y': 100}}}. Given this newly updated
-    dictionary, the keys ['a', 'x', 'y', 'z'] and the value 200, the method would raise
-    an error because we would be trying to override the primitive value 100 with the
-    dict {'z': 200}.
+        For example:
+        Given the dictionary {'a': {'b': {'c': 1}}, {'x': {'y': 100}}}, the keys
+        ['a', 'b', 'd'] and the value 2, the updated dictionary would be
+        {'a': {'b': {'c': 1, 'd': 2}}, {'x': {'y': 100}}}. Given this newly updated
+        dictionary, the keys ['a', 'x', 'y', 'z'] and the value 200, the method would raise
+        an error because we would be trying to override the primitive value 100 with the
+        dict {'z': 200}.
 
-    :param dict data: Dictionary to be updated.
-    :param list of string keys: The keys that point to where the value should be stored.
-           Will recursively find the correct place to store in the nested dicts.
-    :param primitive value: The value of the information being stored.
-    :param int index: The index into the list of keys (starting from the beginning).
-    """
+        :param dict data: Dictionary to be updated.
+        :param list of string keys: The keys that point to where the value should be stored.
+               Will recursively find the correct place to store in the nested dicts.
+        :param primitive value: The value of the information being stored.
+        :param int index: The index into the list of keys (starting from the beginning).
+        """
         if len(keys) == 0 or index < 0 or index >= len(keys):
             raise ValueError(
                 "Keys must contain at least one key and index must be"
@@ -780,26 +789,26 @@ class RunTracker(Subsystem):
     def report_target_info(self, scope, target, keys, val):
         """Add target information to run_info under target_data.
 
-    Will Recursively construct a nested dict with the keys provided.
+        Will Recursively construct a nested dict with the keys provided.
 
-    Primitive values can be overwritten with other primitive values,
-    but a primitive value cannot be overwritten with a dictionary.
+        Primitive values can be overwritten with other primitive values,
+        but a primitive value cannot be overwritten with a dictionary.
 
-    For example:
-    Where the dictionary being updated is {'a': {'b': 16}}, reporting the value
-    15 with the key list ['a', 'b'] will result in {'a': {'b':15}};
-    but reporting the value 20 with the key list ['a', 'b', 'c'] will throw
-    an error.
+        For example:
+        Where the dictionary being updated is {'a': {'b': 16}}, reporting the value
+        15 with the key list ['a', 'b'] will result in {'a': {'b':15}};
+        but reporting the value 20 with the key list ['a', 'b', 'c'] will throw
+        an error.
 
-    :param string scope: The scope for which we are reporting the information.
-    :param target: The target for which we want to store information.
-    :type target: :class:`pants.build_graph.target.Target`
-    :param list of string keys: The keys that will be recursively
-           nested and pointing to the information being stored.
-    :param primitive val: The value of the information being stored.
+        :param string scope: The scope for which we are reporting the information.
+        :param target: The target for which we want to store information.
+        :type target: :class:`pants.build_graph.target.Target`
+        :param list of string keys: The keys that will be recursively
+               nested and pointing to the information being stored.
+        :param primitive val: The value of the information being stored.
 
-    :API: public
-    """
+        :API: public
+        """
         new_key_list = [target.address.spec, scope]
         new_key_list += keys
         self._merge_list_of_keys_into_dict(self._target_to_data, new_key_list, val, 0)

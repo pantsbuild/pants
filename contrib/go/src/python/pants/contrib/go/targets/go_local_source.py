@@ -15,18 +15,20 @@ from pants.contrib.go.targets.go_target import GoTarget
 class GoLocalSource(GoTarget):
     @classmethod
     def is_go_source(cls, path):
-        """Returns `True` if the file at the given `path` is a go source file."""
+        """Returns `True` if the file at the given `path` is a go source
+        file."""
         return path.endswith(".go") and os.path.isfile(path)
 
     @classmethod
     def local_import_path(cls, source_root, address):
-        """Returns the Go import path for the given address housed under the given source root.
+        """Returns the Go import path for the given address housed under the
+        given source root.
 
-    :param string source_root: The path of the source root the address is found within.
-    :param address: The target address of a GoLocalSource target.
-    :type: :class:`pants.build_graph.address.Address`
-    :raises: `ValueError` if the address does not reside within the source root.
-    """
+        :param string source_root: The path of the source root the address is found within.
+        :param address: The target address of a GoLocalSource target.
+        :type: :class:`pants.build_graph.address.Address`
+        :raises: `ValueError` if the address does not reside within the source root.
+        """
         return cls.package_path(source_root, address.spec_path)
 
     @classmethod
@@ -62,7 +64,8 @@ class GoLocalSource(GoTarget):
 
     @property
     def import_path(self):
-        """The import path as used in import statements in `.go` source files."""
+        """The import path as used in import statements in `.go` source
+        files."""
         return self.local_import_path(self.target_base, self.address)
 
     # From `go help test`, ignore files beginning with "_" or ".", but otherwise match the glob

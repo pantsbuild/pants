@@ -5,9 +5,8 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 def ensure_experimental(test_fn):
-    """Decorator for running once with and once without the --use-experimental-runner flag.
-
-  """
+    """Decorator for running once with and once without the --use-experimental-
+    runner flag."""
 
     def wrapper(self, *args, **kwargs):
         JunitTestsConcurrencyIntegrationTest.USE_EXPERIMENTAL_RUNNER = True
@@ -21,9 +20,10 @@ def ensure_experimental(test_fn):
 class JunitTestsConcurrencyIntegrationTest(PantsRunIntegrationTest):
     """Run tests with different concurrency settings.
 
-  Note that each of these tests is intended to be annotated with @ensure_experimental and run twice,
-  once with the experimental runner enabled and once with it off.
-  """
+    Note that each of these tests is intended to be annotated with
+    @ensure_experimental and run twice, once with the experimental
+    runner enabled and once with it off.
+    """
 
     USE_EXPERIMENTAL_RUNNER = False
 
@@ -34,7 +34,8 @@ class JunitTestsConcurrencyIntegrationTest(PantsRunIntegrationTest):
 
     @ensure_experimental
     def test_parallel_target(self):
-        """Checks the 'concurrency=parallel_classes' setting in the junit_tests() target"""
+        """Checks the 'concurrency=parallel_classes' setting in the
+        junit_tests() target."""
         with self.temporary_workdir() as workdir:
             pants_run = self.run_pants_with_workdir(
                 ["test", "testprojects/tests/java/org/pantsbuild/testproject/parallel"], workdir
@@ -44,7 +45,8 @@ class JunitTestsConcurrencyIntegrationTest(PantsRunIntegrationTest):
 
     @ensure_experimental
     def test_parallel_cmdline(self):
-        """Checks the --test-junit-default-concurrency=PARALLEL_CLASSES option."""
+        """Checks the --test-junit-default-concurrency=PARALLEL_CLASSES
+        option."""
         with self.temporary_workdir() as workdir:
             pants_run = self.run_pants_with_workdir(
                 [
@@ -127,7 +129,8 @@ class JunitTestsConcurrencyIntegrationTest(PantsRunIntegrationTest):
 
     @ensure_experimental
     def test_parallel_both_cmdline(self):
-        """Checks the --test-junit-default_concurrency=PARALLEL_CLASSES_AND_METHODS setting."""
+        """Checks the --test-junit-
+        default_concurrency=PARALLEL_CLASSES_AND_METHODS setting."""
         with self.temporary_workdir() as workdir:
             pants_run = self.run_pants_with_workdir(
                 [
@@ -166,7 +169,8 @@ class ExperimentalOnlyJunitTestsConcurrencyIntegrationTest(PantsRunIntegrationTe
     """The following tests only work with the experimental runner."""
 
     def test_concurrency_annotated_test_serial_parallel_both(self):
-        """Checks the @TestSerial annotation with --test-junit-default-concurrency=PARALLEL_CLASSES_AND_METHODS."""
+        """Checks the @TestSerial annotation with --test-junit-default-
+        concurrency=PARALLEL_CLASSES_AND_METHODS."""
         with self.temporary_workdir() as workdir:
             pants_run = self.run_pants_with_workdir(
                 [
@@ -198,7 +202,8 @@ class ExperimentalOnlyJunitTestsConcurrencyIntegrationTest(PantsRunIntegrationTe
             self.assertIn("OK (4 tests)", pants_run.stdout_data)
 
     def test_parallel_methods_cmdline(self):
-        """Checks the --test-junit-default_concurrency=PARALLEL_METHODS setting."""
+        """Checks the --test-junit-default_concurrency=PARALLEL_METHODS
+        setting."""
         with self.temporary_workdir() as workdir:
             pants_run = self.run_pants_with_workdir(
                 [

@@ -8,38 +8,40 @@ from pants.base.payload_field import PrimitiveField
 
 
 class JvmPrepCommand(JvmTarget):
-    """A command (defined in a Java target) that must be run before other tasks in a goal.
+    """A command (defined in a Java target) that must be run before other tasks
+    in a goal.
 
-  For example, you can use `jvm_prep_command()` to execute a script that sets up tunnels to database
-  servers. These tunnels could then be leveraged by integration tests.
+    For example, you can use `jvm_prep_command()` to execute a script that sets up tunnels to database
+    servers. These tunnels could then be leveraged by integration tests.
 
-  You can define a jvm_prep_command() target as follows:
+    You can define a jvm_prep_command() target as follows:
 
-    jvm_prep_command(
-      name='foo',
-      goal='test',
-      mainclass='com.example.myproject.BeforeTestMain',
-      args=['--foo', 'bar'],
-      jvm_options=['-Xmx256M', '-Dmy.property=baz'],
-      dependencies=[
-        'myproject/src/main/java:lib',
-      ],
-    )
+      jvm_prep_command(
+        name='foo',
+        goal='test',
+        mainclass='com.example.myproject.BeforeTestMain',
+        args=['--foo', 'bar'],
+        jvm_options=['-Xmx256M', '-Dmy.property=baz'],
+        dependencies=[
+          'myproject/src/main/java:lib',
+        ],
+      )
 
-  Pants will execute the `jvm_prep_command()` when processing the specified goal.  They will be
-  triggered when running targets that depend on the `prep_command()` target or when the
-  target is referenced from the command line.
+    Pants will execute the `jvm_prep_command()` when processing the specified goal.  They will be
+    triggered when running targets that depend on the `prep_command()` target or when the
+    target is referenced from the command line.
 
-  See also prep_command for running shell commands.
+    See also prep_command for running shell commands.
 
-  :API: public
-  """
+    :API: public
+    """
 
     _goals = frozenset()
 
     @staticmethod
     def add_goal(goal):
-        """Add a named goal to the list of valid goals for the 'goal' parameter."""
+        """Add a named goal to the list of valid goals for the 'goal'
+        parameter."""
         JvmPrepCommand._goals = frozenset(list(JvmPrepCommand._goals) + [goal])
 
     @classmethod

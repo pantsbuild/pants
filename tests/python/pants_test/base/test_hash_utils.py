@@ -190,9 +190,10 @@ class JsonHashingTest(unittest.TestCase):
     def test_known_checksums(self):
         """Check a laundry list of supported inputs to stable_json_sha1().
 
-    This checks both that the method can successfully handle the type of input object, but also that
-    the hash of specific objects remains stable.
-    """
+        This checks both that the method can successfully handle the
+        type of input object, but also that the hash of specific objects
+        remains stable.
+        """
         self.assertEqual(stable_json_sha1({}), "bf21a9e8fbc5a3846fb05b4fa0859e0917b2202f")
         self.assertEqual(stable_json_sha1(()), "97d170e1550eee4afc0af065b78cda302a97674c")
         self.assertEqual(stable_json_sha1([]), "97d170e1550eee4afc0af065b78cda302a97674c")

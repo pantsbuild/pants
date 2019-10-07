@@ -11,13 +11,15 @@ from pants.base.mustache import MustacheRenderer
 # TODO(benjy): Get rid of this class? It just adds complexity, and a regular dict should be fine.
 # Unfortunately we first have to fix external uses of this should-be-internal-only class.
 class TemplateData(dict):
-    """Encapsulates mustache template arguments as a property-addressable read-only object."""
+    """Encapsulates mustache template arguments as a property-addressable read-
+    only object."""
 
     def __init__(self, **kwargs):
         super().__init__(MustacheRenderer.expand(kwargs))
 
     def extend(self, **kwargs):
-        """Returns a new instance with this instance's data overlayed by the key-value args."""
+        """Returns a new instance with this instance's data overlayed by the
+        key-value args."""
 
         props = self.copy()
         props.update(kwargs)
@@ -40,7 +42,8 @@ class TemplateData(dict):
 
 # TODO(benjy): Get rid of this class? It adds basically nothing over the MustacheRenderer.
 class Generator:
-    """Generates pants intermediary output files using a configured mustache template."""
+    """Generates pants intermediary output files using a configured mustache
+    template."""
 
     def __init__(self, template_text, **template_data):
         self._template = MustacheRenderer.parse_template(template_text)
@@ -51,7 +54,7 @@ class Generator:
         return pystache.render(self._template, self.template_data)
 
     def write(self, stream):
-        """Applies the template to the template data and writes the result to the given file-like
-    stream."""
+        """Applies the template to the template data and writes the result to
+        the given file-like stream."""
 
         stream.write(self.render())

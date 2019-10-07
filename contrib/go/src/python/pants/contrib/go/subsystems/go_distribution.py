@@ -37,13 +37,14 @@ class GoDistribution(NativeTool):
     def goroot(self):
         """Returns the $GOROOT for this go distribution.
 
-    :returns: The Go distribution $GOROOT.
-    :rtype: string
-    """
+        :returns: The Go distribution $GOROOT.
+        :rtype: string
+        """
         return os.path.join(self.select(), "go")
 
     def go_env(self, gopath=None):
-        """Return an env dict that represents a proper Go environment mapping for this distribution."""
+        """Return an env dict that represents a proper Go environment mapping
+        for this distribution."""
         # Forcibly nullify the GOPATH if the command does not need one - this can prevent bad user
         # GOPATHs from erroring out commands; see: https://github.com/pantsbuild/pants/issues/2321.
         # NB: As of go 1.8, when GOPATH is unset (set to ''), it defaults to ~/go (assuming HOME is
@@ -75,12 +76,12 @@ class GoDistribution(NativeTool):
         def check_output(self, env=None, **kwargs):
             """Returns the output of the executed Go command.
 
-      :param dict env: A custom environment to launch the Go command in.  If `None` the current
-                       environment is used.
-      :param kwargs: Keyword arguments to pass through to `subprocess.check_output`.
-      :return str: Output of Go command.
-      :raises subprocess.CalledProcessError: Raises if Go command fails.
-      """
+            :param dict env: A custom environment to launch the Go command in.  If `None` the current
+                             environment is used.
+            :param kwargs: Keyword arguments to pass through to `subprocess.check_output`.
+            :return str: Output of Go command.
+            :raises subprocess.CalledProcessError: Raises if Go command fails.
+            """
             env = (env or os.environ).copy()
             env.update(self.env)
             return subprocess.check_output(self.cmdline, env=env, **kwargs)
@@ -95,13 +96,13 @@ class GoDistribution(NativeTool):
     def create_go_cmd(self, cmd, gopath=None, args=None):
         """Creates a Go command that is optionally targeted to a Go workspace.
 
-    :param string cmd: Go command to execute, e.g. 'test' for `go test`
-    :param string gopath: An optional $GOPATH which points to a valid Go workspace from which to run
-                          the command.
-    :param list args: A list of arguments and flags to pass to the Go command.
-    :returns: A go command that can be executed later.
-    :rtype: :class:`GoDistribution.GoCommand`
-    """
+        :param string cmd: Go command to execute, e.g. 'test' for `go test`
+        :param string gopath: An optional $GOPATH which points to a valid Go workspace from which to run
+                              the command.
+        :param list args: A list of arguments and flags to pass to the Go command.
+        :returns: A go command that can be executed later.
+        :rtype: :class:`GoDistribution.GoCommand`
+        """
         return self.GoCommand._create(
             self.goroot, cmd, go_env=self.go_env(gopath=gopath), args=args
         )
@@ -119,21 +120,21 @@ class GoDistribution(NativeTool):
     ):
         """Runs a Go command that is optionally targeted to a Go workspace.
 
-    If a `workunit_factory` is supplied the command will run in a work unit context.
+        If a `workunit_factory` is supplied the command will run in a work unit context.
 
-    :param string cmd: Go command to execute, e.g. 'test' for `go test`
-    :param string gopath: An optional $GOPATH which points to a valid Go workspace from which to run
-                          the command.
-    :param list args: An optional list of arguments and flags to pass to the Go command.
-    :param dict env: A custom environment to launch the Go command in.  If `None` the current
-                     environment is used.
-    :param workunit_factory: An optional callable that can produce a `WorkUnit` context
-    :param string workunit_name: An optional name for the work unit; defaults to the `cmd`
-    :param list workunit_labels: An optional sequence of labels for the work unit.
-    :param kwargs: Keyword arguments to pass through to `subprocess.Popen`.
-    :returns: A tuple of the exit code and the go command that was run.
-    :rtype: (int, :class:`GoDistribution.GoCommand`)
-    """
+        :param string cmd: Go command to execute, e.g. 'test' for `go test`
+        :param string gopath: An optional $GOPATH which points to a valid Go workspace from which to run
+                              the command.
+        :param list args: An optional list of arguments and flags to pass to the Go command.
+        :param dict env: A custom environment to launch the Go command in.  If `None` the current
+                         environment is used.
+        :param workunit_factory: An optional callable that can produce a `WorkUnit` context
+        :param string workunit_name: An optional name for the work unit; defaults to the `cmd`
+        :param list workunit_labels: An optional sequence of labels for the work unit.
+        :param kwargs: Keyword arguments to pass through to `subprocess.Popen`.
+        :returns: A tuple of the exit code and the go command that was run.
+        :rtype: (int, :class:`GoDistribution.GoCommand`)
+        """
         go_cmd = self.create_go_cmd(cmd, gopath=gopath, args=args)
         if workunit_factory is None:
             return go_cmd.spawn(**kwargs).wait()

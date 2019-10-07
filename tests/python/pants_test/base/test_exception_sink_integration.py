@@ -184,7 +184,8 @@ Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
             yield (workdir, waiter_run)
 
     def test_dumps_logs_on_signal(self):
-        """Send signals which are handled, but don't get converted into a KeyboardInterrupt."""
+        """Send signals which are handled, but don't get converted into a
+        KeyboardInterrupt."""
         signal_names = {signal.SIGQUIT: "SIGQUIT", signal.SIGTERM: "SIGTERM"}
         for (signum, signame) in signal_names.items():
             with self._send_signal_to_waiter_handle(signum) as (workdir, waiter_run):
@@ -264,7 +265,8 @@ Current thread [^\n]+ \\(most recent call first\\):
         return lifecycle_stub_cmdline
 
     def test_reset_exiter(self):
-        """Test that when reset_exiter() is used that sys.excepthook uses the new Exiter."""
+        """Test that when reset_exiter() is used that sys.excepthook uses the
+        new Exiter."""
         lifecycle_stub_cmdline = self._lifecycle_stub_cmdline()
 
         # The normal Exiter will print the exception message on an unhandled exception.

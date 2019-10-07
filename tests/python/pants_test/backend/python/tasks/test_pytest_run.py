@@ -65,7 +65,8 @@ class PytestTestBase(PythonTaskTestBase, DeclarativeTaskTestMixin):
         return new_options
 
     def run_tests(self, targets, *passthru_args, **options):
-        """Run the tests in the specified targets, with the specified PytestRun task options."""
+        """Run the tests in the specified targets, with the specified PytestRun
+        task options."""
         self.set_options(**self._augment_options(options))
         with pushd(self.build_root):
             result = self.invoke_tasks(target_roots=targets, passthru_args=list(passthru_args))
@@ -477,7 +478,8 @@ python_tests(
 
     @ensure_cached(PytestRun, expected_num_artifacts=0)
     def test_error(self):
-        """Test that a test that errors rather than fails shows up in ErrorWhileTesting."""
+        """Test that a test that errors rather than fails shows up in
+        ErrorWhileTesting."""
 
         self.run_failing_tests(
             targets=[self.red, self.green, self.error], failed_targets=[self.red, self.error]

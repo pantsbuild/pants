@@ -12,9 +12,10 @@ class ReportingError(Exception):
 class EmitterThread(threading.Thread):
     """Periodically flush the report buffers.
 
-  This thread wakes up periodically and flushes the reporting buffers from memory to
-  make sure that the output of long running workunits can be monitored.
-  """
+    This thread wakes up periodically and flushes the reporting buffers
+    from memory to make sure that the output of long running workunits
+    can be monitored.
+    """
 
     def __init__(self, report, name):
         super().__init__(name=name)
@@ -101,9 +102,9 @@ class Report:
     def log(self, workunit, level, *msg_elements):
         """Log a message.
 
-    Each element of msg_elements is either a message or a (message, detail) pair, i.e. of type
-    Union[str, bytes, Tuple[str, str]].
-    """
+        Each element of msg_elements is either a message or a (message,
+        detail) pair, i.e. of type Union[str, bytes, Tuple[str, str]].
+        """
         # TODO(6742): Once we have enough MyPy coverage, we can rely on MyPy to catch any issues for us,
         # rather than this runtime check.
         # TODO(6071): No longer allow bytes once Py2 is removed.

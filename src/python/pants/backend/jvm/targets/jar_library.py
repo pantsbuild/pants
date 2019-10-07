@@ -12,8 +12,8 @@ from pants.java.jar.jar_dependency import JarDependency
 class JarLibrary(Target):
     """A set of external JAR files.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(self, payload=None, jars=None, managed_dependencies=None, **kwargs):
         """
@@ -37,10 +37,11 @@ class JarLibrary(Target):
 
     @property
     def managed_dependencies(self):
-        """The managed_jar_dependencies target this jar_library specifies, or None.
+        """The managed_jar_dependencies target this jar_library specifies, or
+        None.
 
-    :API: public
-    """
+        :API: public
+        """
         if self.payload.managed_dependencies:
             address = Address.parse(
                 self.payload.managed_dependencies, relative_to=self.address.spec_path

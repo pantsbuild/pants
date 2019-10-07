@@ -17,8 +17,9 @@ from pants.util.dirutil import read_file, safe_file_dump
 def replace_in_file(workspace, src_file_path, from_str, to_str):
     """Replace from_str with to_str in the name and content of the given file.
 
-  If any edits were necessary, returns the new filename (which may be the same as the old filename).
-  """
+    If any edits were necessary, returns the new filename (which may be
+    the same as the old filename).
+    """
     from_bytes = from_str.encode("ascii")
     to_bytes = to_str.encode("ascii")
     data = read_file(os.path.join(workspace, src_file_path), binary_mode=True)
@@ -51,8 +52,8 @@ def locate_dist_info_dir(workspace):
 def fingerprint_file(workspace, filename):
     """Given a relative filename located in a workspace, fingerprint the file.
 
-  Returns a tuple of fingerprint string and size string.
-  """
+    Returns a tuple of fingerprint string and size string.
+    """
     content = read_file(os.path.join(workspace, filename), binary_mode=True)
     fingerprint = hashlib.sha256(content)
     b64_encoded = base64.b64encode(fingerprint.digest())
@@ -60,11 +61,12 @@ def fingerprint_file(workspace, filename):
 
 
 def rewrite_record_file(workspace, src_record_file, mutated_file_tuples):
-    """Given a RECORD file and list of mutated file tuples, update the RECORD file in place.
+    """Given a RECORD file and list of mutated file tuples, update the RECORD
+    file in place.
 
-  The RECORD file should always be a member of the mutated files, due to both containing
-  versions, and having a version in its filename.
-  """
+    The RECORD file should always be a member of the mutated files, due
+    to both containing versions, and having a version in its filename.
+    """
     mutated_files = set()
     dst_record_file = None
     for src, dst in mutated_file_tuples:
@@ -152,11 +154,13 @@ def reversion(args):
 
 
 def main():
-    """Given an input whl file and target version, create a copy of the whl with that version.
+    """Given an input whl file and target version, create a copy of the whl
+    with that version.
 
-  This is accomplished via string replacement in files matching a list of globs. Pass the
-  optional `--glob` argument to add additional globs: ie  `--glob='thing-to-match*.txt'`.
-  """
+    This is accomplished via string replacement in files matching a list
+    of globs. Pass the optional `--glob` argument to add additional
+    globs: ie  `--glob='thing-to-match*.txt'`.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("whl_file", help="The input whl file.")
     parser.add_argument("dest_dir", help="The destination directory for the output whl.")

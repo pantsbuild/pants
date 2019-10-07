@@ -29,22 +29,23 @@ def stable_option_fingerprint(obj):
 class OptionsFingerprinter:
     """Handles fingerprinting options under a given build_graph.
 
-  :API: public
-  """
+    :API: public
+    """
 
     @classmethod
     def combined_options_fingerprint_for_scope(cls, scope, options, build_graph=None, **kwargs):
-        """Given options and a scope, compute a combined fingerprint for the scope.
+        """Given options and a scope, compute a combined fingerprint for the
+        scope.
 
-    :param string scope: The scope to fingerprint.
-    :param Options options: The `Options` object to fingerprint.
-    :param BuildGraph build_graph: A `BuildGraph` instance, only needed if fingerprinting
-                                   target options.
-    :param dict **kwargs: Keyword parameters passed on to
-                          `Options#get_fingerprintable_for_scope`.
-    :return: Hexadecimal string representing the fingerprint for all `options`
-             values in `scope`.
-    """
+        :param string scope: The scope to fingerprint.
+        :param Options options: The `Options` object to fingerprint.
+        :param BuildGraph build_graph: A `BuildGraph` instance, only needed if fingerprinting
+                                       target options.
+        :param dict **kwargs: Keyword parameters passed on to
+                              `Options#get_fingerprintable_for_scope`.
+        :return: Hexadecimal string representing the fingerprint for all `options`
+                 values in `scope`.
+        """
         fingerprinter = cls(build_graph)
         hasher = sha1()
         pairs = options.get_fingerprintable_for_scope(scope, **kwargs)
@@ -64,10 +65,10 @@ class OptionsFingerprinter:
     def fingerprint(self, option_type, option_val):
         """Returns a hash of the given option_val based on the option_type.
 
-    :API: public
+        :API: public
 
-    Returns None if option_val is None.
-    """
+        Returns None if option_val is None.
+        """
         if option_val is None:
             return None
 
@@ -90,7 +91,8 @@ class OptionsFingerprinter:
             return self._fingerprint_primitives(option_val)
 
     def _fingerprint_target_specs(self, specs):
-        """Returns a fingerprint of the targets resolved from given target specs."""
+        """Returns a fingerprint of the targets resolved from given target
+        specs."""
         assert (
             self._build_graph is not None
         ), "cannot fingerprint specs `{}` without a `BuildGraph`".format(specs)
@@ -106,8 +108,8 @@ class OptionsFingerprinter:
     def _assert_in_buildroot(self, filepath):
         """Raises an error if the given filepath isn't in the buildroot.
 
-    Returns the normalized, absolute form of the path.
-    """
+        Returns the normalized, absolute form of the path.
+        """
         filepath = os.path.normpath(filepath)
         root = get_buildroot()
         if not os.path.abspath(filepath) == filepath:
@@ -125,11 +127,12 @@ class OptionsFingerprinter:
             return filepath
 
     def _fingerprint_dirs(self, dirpaths, topdown=True, onerror=None, followlinks=False):
-        """Returns a fingerprint of the given file directories and all their sub contents.
+        """Returns a fingerprint of the given file directories and all their
+        sub contents.
 
-    This assumes that the file directories are of reasonable size
-    to cause memory or performance issues.
-    """
+        This assumes that the file directories are of reasonable size to
+        cause memory or performance issues.
+        """
         # Note that we don't sort the dirpaths, as their order may have meaning.
         filepaths = []
         for dirpath in dirpaths:
@@ -147,8 +150,8 @@ class OptionsFingerprinter:
     def _fingerprint_files(self, filepaths):
         """Returns a fingerprint of the given filepaths and their contents.
 
-    This assumes the files are small enough to be read into memory.
-    """
+        This assumes the files are small enough to be read into memory.
+        """
         hasher = sha1()
         # Note that we don't sort the filepaths, as their order may have meaning.
         for filepath in filepaths:
@@ -164,21 +167,24 @@ class OptionsFingerprinter:
     def _fingerprint_dict_with_files(self, option_val):
         """Returns a fingerprint of the given dictionary containing file paths.
 
-    Any value which is a file path which exists on disk will be fingerprinted by that file's
-    contents rather than by its path.
+        Any value which is a file path which exists on disk will be fingerprinted by that file's
+        contents rather than by its path.
 
-    This assumes the files are small enough to be read into memory.
+        This assumes the files are small enough to be read into memory.
 
-    NB: The keys of the dict are assumed to be strings -- if they are not, the dict should be
-    converted to encode its keys with `stable_option_fingerprint()`, as is done in the `fingerprint()`
-    method.
-    """
+        NB: The keys of the dict are assumed to be strings -- if they are not, the dict should be
+        converted to encode its keys with `stable_option_fingerprint()`, as is done in the `fingerprint()`
+        method.
+        """
         return stable_option_fingerprint(
             {k: self._expand_possible_file_value(v) for k, v in option_val.items()}
         )
 
     def _expand_possible_file_value(self, value):
-        """If the value is a file, returns its contents. Otherwise return the original value."""
+        """If the value is a file, returns its contents.
+
+        Otherwise return the original value.
+        """
         if value and os.path.isfile(str(value)):
             with open(value, "r") as f:
                 return f.read()

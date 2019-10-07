@@ -15,21 +15,21 @@ logger = logging.getLogger(__name__)
 
 
 class Buildozer(Task):
-    """Enables interaction with the Buildozer Go binary
+    """Enables interaction with the Buildozer Go binary.
 
-  Behavior:
-  1. `./pants buildozer --add-dependencies=<dependencies>`
-      will add the dependency to the context's relative BUILD file.
+    Behavior:
+    1. `./pants buildozer --add-dependencies=<dependencies>`
+        will add the dependency to the context's relative BUILD file.
 
-      Example: `./pants buildozer --add-dependencies='a/b b/c' //tmp:tmp`
+        Example: `./pants buildozer --add-dependencies='a/b b/c' //tmp:tmp`
 
-  2. `./pants buildozer --remove-dependencies=<dependencies>`
-      will remove the dependency from the context's BUILD file.
+    2. `./pants buildozer --remove-dependencies=<dependencies>`
+        will remove the dependency from the context's BUILD file.
 
-      Example: `./pants buildozer --remove-dependencies='a/b b/c' //tmp:tmp`
+        Example: `./pants buildozer --remove-dependencies='a/b b/c' //tmp:tmp`
 
-    Note that buildozer assumes that BUILD files contain a name field for the target.
-  """
+      Note that buildozer assumes that BUILD files contain a name field for the target.
+    """
 
     options_scope = "buildozer"
 

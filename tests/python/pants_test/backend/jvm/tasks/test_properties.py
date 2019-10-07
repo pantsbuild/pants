@@ -12,8 +12,8 @@ from pants.backend.jvm.tasks.properties import Properties
 class PropertiesTest(unittest.TestCase):
     """Exercise pants.backend.jvm.tasks.properties.Properties.
 
-  Copied from https://github.com/twitter/commons/blob/master/tests/python/twitter/common/config/properties_test.py
-  """
+    Copied from https://github.com/twitter/commons/blob/master/tests/python/twitter/common/config/properties_test.py
+    """
 
     def test_empty(self):
         self.assertLoaded("", {})

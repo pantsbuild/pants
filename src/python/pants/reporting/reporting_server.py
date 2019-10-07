@@ -238,8 +238,9 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
     def _handle_latest_runid(self, relpath, params):
         """Handle request for the latest run id.
 
-    Used by client-side javascript to detect when there's a new run to display.
-    """
+        Used by client-side javascript to detect when there's a new run
+        to display.
+        """
         latest_runinfo = self._get_run_info_dict("latest")
         if latest_runinfo is None:
             self._send_content(b"none", "text/plain")
@@ -326,8 +327,8 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
     def _serve_file(self, abspath, params):
         """Show a file.
 
-    The actual content of the file is rendered by _handle_content.
-    """
+        The actual content of the file is rendered by _handle_content.
+        """
         relpath = os.path.relpath(abspath, self._root)
         breadcrumbs = self._create_breadcrumbs(relpath)
         link_path = urlunparse(["", "", relpath, "", urlencode(params), ""])
@@ -378,8 +379,9 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
     def _create_breadcrumbs(self, relpath):
         """Create filesystem browsing breadcrumb navigation.
 
-    That is, make each path segment into a clickable element that takes you to that dir.
-    """
+        That is, make each path segment into a clickable element that
+        takes you to that dir.
+        """
         if relpath == ".":
             breadcrumbs = []
         else:
@@ -417,14 +419,14 @@ class ReportingServer:
     ):
         """Reporting server settings.
 
-       info_dir: path to dir containing RunInfo files.
-       template_dir: location of mustache template files. If None, the templates
-                     embedded in our package are used.
-       assets_dir: location of assets (js, css etc.) If None, the assets
-                   embedded in our package are used.
-       root: build root.
-       allowed_clients: list of ips or ['ALL'].
-    """
+        info_dir: path to dir containing RunInfo files.
+        template_dir: location of mustache template files. If None, the templates
+                      embedded in our package are used.
+        assets_dir: location of assets (js, css etc.) If None, the assets
+                    embedded in our package are used.
+        root: build root.
+        allowed_clients: list of ips or ['ALL'].
+        """
 
     def __init__(self, port, settings):
         renderer = MustacheRenderer(settings.template_dir, __name__)

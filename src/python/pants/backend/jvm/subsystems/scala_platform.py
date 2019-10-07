@@ -33,8 +33,8 @@ scala_style_jar = JarDependency("org.scalastyle", "scalastyle_2.11", "0.8.0")
 class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem):
     """A scala platform.
 
-  :API: public
-  """
+    :API: public
+    """
 
     options_scope = "scala"
 
@@ -181,8 +181,9 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem
     def suffix_version(self, name):
         """Appends the platform version to the given artifact name.
 
-    Also validates that the name doesn't already end with the version.
-    """
+        Also validates that the name doesn't already end with the
+        version.
+        """
         if self.version == "custom":
             suffix = self.get_options().suffix_version
             if suffix:

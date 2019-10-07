@@ -81,30 +81,32 @@ class InvalidationReport:
         return task_report
 
     def add_vts(self, task_name, targets, cache_key, valid, phase):
-        """ Add a single VersionedTargetSet entry to the report.
-    :param InvalidationCacheManager cache_manager:
-    :param CacheKey cache_key:
-    :param bool valid:
-    :param string phase:
-    """
+        """Add a single VersionedTargetSet entry to the report.
+
+        :param InvalidationCacheManager cache_manager:
+        :param CacheKey cache_key:
+        :param bool valid:
+        :param string phase:
+        """
         if task_name not in self._task_reports:
             self.add_task(task_name)
         self._task_reports[task_name].add(targets, cache_key, valid, phase)
 
     def report(self, filename=None):
-        """ Write details of each versioned target to file
-    :param string filename: file to write out the report to
+        """Write details of each versioned target to file.
 
-    Fields in the report:
-      invocation_id: A sequence number that increases each time a task is invoked
-      task_name: The name of the task
-      targets_hash: an id from a hash of all target ids to identify a VersionedTargetSet
-      target_id: target id
-      cache_key_id: the Id for the cache key
-      cache_key_hash: computed hash for the cache key
-      phase: What part of the validation check the values were captured
-      valid: True if the cache is valid for the VersionedTargetSet
-    """
+        :param string filename: file to write out the report to
+
+        Fields in the report:
+          invocation_id: A sequence number that increases each time a task is invoked
+          task_name: The name of the task
+          targets_hash: an id from a hash of all target ids to identify a VersionedTargetSet
+          target_id: target id
+          cache_key_id: the Id for the cache key
+          cache_key_hash: computed hash for the cache key
+          phase: What part of the validation check the values were captured
+          valid: True if the cache is valid for the VersionedTargetSet
+        """
         # TODO(zundel) set report to stream to the file
         filename = filename or self._filename
         if filename:

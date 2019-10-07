@@ -14,11 +14,11 @@ from pants.util.dirutil import safe_mkdir
 
 
 class Ivy:
-    """Encapsulates the ivy cli taking care of the basic invocation letting you just worry about the
-  args to pass to the cli itself.
+    """Encapsulates the ivy cli taking care of the basic invocation letting you
+    just worry about the args to pass to the cli itself.
 
-  :API: public
-  """
+    :API: public
+    """
 
     class Error(Exception):
         """Indicates an error executing an ivy command."""
@@ -26,12 +26,13 @@ class Ivy:
     def __init__(
         self, classpath, ivy_settings=None, ivy_resolution_cache_dir=None, extra_jvm_options=None
     ):
-        """Configures an ivy wrapper for the ivy distribution at the given classpath.
+        """Configures an ivy wrapper for the ivy distribution at the given
+        classpath.
 
-    :param ivy_settings: path to find settings.xml file
-    :param ivy_resolution_cache_dir: path to store downloaded ivy artifacts
-    :param extra_jvm_options: list of strings to add to command line when invoking Ivy
-    """
+        :param ivy_settings: path to find settings.xml file
+        :param ivy_resolution_cache_dir: path to store downloaded ivy artifacts
+        :param extra_jvm_options: list of strings to add to command line when invoking Ivy
+        """
         self._classpath = maybe_list(classpath)
         self._ivy_settings = ivy_settings
         if self._ivy_settings and not isinstance(self._ivy_settings, str):
@@ -58,9 +59,9 @@ class Ivy:
     def ivy_settings(self):
         """Returns the ivysettings.xml path used by this `Ivy` instance.
 
-    May be None if ivy's built in default ivysettings.xml of standard public resolvers is being
-    used.
-    """
+        May be None if ivy's built in default ivysettings.xml of
+        standard public resolvers is being used.
+        """
         return self._ivy_settings
 
     @property
@@ -86,9 +87,9 @@ class Ivy:
     ):
         """Executes the ivy commandline client with the given args.
 
-    Raises Ivy.Error if the command fails for any reason.
-    :param executor: Java executor to run ivy with.
-    """
+        Raises Ivy.Error if the command fails for any reason.
+        :param executor: Java executor to run ivy with.
+        """
         # NB(gmalmquist): It should be OK that we can't declare a subsystem_dependency in this file
         # (because it's just a plain old object), because Ivy is only constructed by Bootstrapper, which
         # makes an explicit call to IvySubsystem.global_instance() in its constructor, which in turn has

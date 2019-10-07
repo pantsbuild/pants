@@ -5,10 +5,11 @@ from pants.task.noop_exec_task import NoopExecTask
 
 
 class NoopCompile(NoopExecTask):
-    """A no-op that provides a product type that can be used to force scheduling.
+    """A no-op that provides a product type that can be used to force
+    scheduling.
 
-  :API: public
-  """
+    :API: public
+    """
 
     @classmethod
     def product_types(cls):
@@ -16,10 +17,11 @@ class NoopCompile(NoopExecTask):
 
 
 class NoopTest(NoopExecTask):
-    """A no-op that provides a product type that can be used to force scheduling.
+    """A no-op that provides a product type that can be used to force
+    scheduling.
 
-  :API: public
-  """
+    :API: public
+    """
 
     @classmethod
     def product_types(cls):

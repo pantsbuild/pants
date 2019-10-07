@@ -18,11 +18,12 @@ class JvmServiceFingerprintStrategy(DefaultFingerprintStrategy):
 
 
 class PrepareServices(ResourcesTask):
-    """Generates service provider configuration for targets that host service implementations.
+    """Generates service provider configuration for targets that host service
+    implementations.
 
-  This automates maintenance of jvm service provider configuration files as described here:
-  https://docs.oracle.com/javase/6/docs/api/java/util/ServiceLoader.html
-  """
+    This automates maintenance of jvm service provider configuration files as described here:
+    https://docs.oracle.com/javase/6/docs/api/java/util/ServiceLoader.html
+    """
 
     @staticmethod
     def service_info_path(service):

@@ -24,20 +24,21 @@ from pants.util.objects import enum
 
 
 class GlobMatchErrorBehavior(enum(["ignore", "warn", "error"])):
-    """Describe the action to perform when matching globs in BUILD files to source files.
+    """Describe the action to perform when matching globs in BUILD files to
+    source files.
 
-  NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
-  be aware of any changes to this object's definition.
-  """
+    NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
+    be aware of any changes to this object's definition.
+    """
 
 
 @dataclass(frozen=True)
 class ExecutionOptions:
     """A collection of all options related to (remote) execution of processes.
 
-  TODO: These options should move to a Subsystem once we add support for "bootstrap" Subsystems (ie,
-  allowing Subsystems to be consumed before the Scheduler has been created).
-  """
+    TODO: These options should move to a Subsystem once we add support for "bootstrap" Subsystems (ie,
+    allowing Subsystems to be consumed before the Scheduler has been created).
+    """
 
     remote_execution: Any
     remote_store_server: Any
@@ -115,16 +116,16 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     def register_bootstrap_options(cls, register):
         """Register bootstrap options.
 
-    "Bootstrap options" are a small set of options whose values are useful when registering other
-    options. Therefore we must bootstrap them early, before other options are registered, let
-    alone parsed.
+        "Bootstrap options" are a small set of options whose values are useful when registering other
+        options. Therefore we must bootstrap them early, before other options are registered, let
+        alone parsed.
 
-    Bootstrap option values can be interpolated into the config file, and can be referenced
-    programatically in registration code, e.g., as register.bootstrap.pants_workdir.
+        Bootstrap option values can be interpolated into the config file, and can be referenced
+        programatically in registration code, e.g., as register.bootstrap.pants_workdir.
 
-    Note that regular code can also access these options as normal global-scope options. Their
-    status as "bootstrap options" is only pertinent during option registration.
-    """
+        Note that regular code can also access these options as normal global-scope options. Their
+        status as "bootstrap options" is only pertinent during option registration.
+        """
         buildroot = get_buildroot()
         default_distdir_name = "dist"
         default_rel_distdir = f"/{default_distdir_name}/"
@@ -849,14 +850,15 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
 
     @classmethod
     def validate_instance(cls, opts):
-        """Validates an instance of global options for cases that are not prohibited via registration.
+        """Validates an instance of global options for cases that are not
+        prohibited via registration.
 
-    For example: mutually exclusive options may be registered by passing a `mutually_exclusive_group`,
-    but when multiple flags must be specified together, it can be necessary to specify post-parse
-    checks.
+        For example: mutually exclusive options may be registered by passing a `mutually_exclusive_group`,
+        but when multiple flags must be specified together, it can be necessary to specify post-parse
+        checks.
 
-    Raises pants.option.errors.OptionsError on validation failure.
-    """
+        Raises pants.option.errors.OptionsError on validation failure.
+        """
         if opts.loop and (not opts.v2 or opts.v1):
             raise OptionsError(
                 "The `--loop` option only works with @console_rules, and thus requires "

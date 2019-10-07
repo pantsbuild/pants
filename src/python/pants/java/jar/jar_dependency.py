@@ -16,20 +16,20 @@ from pants.util.objects import datatype
 class JarDependencyParseContextWrapper:
     """A pre-built Maven repository dependency.
 
-  Examples:
+    Examples:
 
-    # The typical use case.
-    jar('com.puppycrawl.tools', 'checkstyle', '1.2')
+      # The typical use case.
+      jar('com.puppycrawl.tools', 'checkstyle', '1.2')
 
-    # Test external dependency locally.
-    jar('org.foobar', 'foobar', '1.2-SNAPSHOT',
-        url='file:///Users/pantsdev/workspace/project/jars/checkstyle/checkstyle.jar')
+      # Test external dependency locally.
+      jar('org.foobar', 'foobar', '1.2-SNAPSHOT',
+          url='file:///Users/pantsdev/workspace/project/jars/checkstyle/checkstyle.jar')
 
-    # Test external dependency locally using relative path (with respect to the path
-    # of the belonging BUILD file)
-    jar('org.foobar', 'foobar', '1.2-SNAPSHOT',
-        url='file:../checkstyle/checkstyle.jar')
-  """
+      # Test external dependency locally using relative path (with respect to the path
+      # of the belonging BUILD file)
+      jar('org.foobar', 'foobar', '1.2-SNAPSHOT',
+          url='file:../checkstyle/checkstyle.jar')
+    """
 
     def __init__(self, parse_context):
         """
@@ -109,17 +109,17 @@ class JarDependency(
 ):
     """A pre-built Maven repository dependency.
 
-  This is the developer facing api, compared to the context wrapper class
-  `JarDependencyParseContextWrapper`, which exposes api through build file to users.
+    This is the developer facing api, compared to the context wrapper class
+    `JarDependencyParseContextWrapper`, which exposes api through build file to users.
 
-  The only additional parameter `base_path` here is so that we can retrieve the file URL
-  in its absolute (for ivy) or relative (for fingerprinting) form. The context wrapper class
-  determines the `base_path` from where `jar` is defined at.
+    The only additional parameter `base_path` here is so that we can retrieve the file URL
+    in its absolute (for ivy) or relative (for fingerprinting) form. The context wrapper class
+    determines the `base_path` from where `jar` is defined at.
 
-  If a relative file url is provided, its absolute form will be (`buildroot` + `base_path` + relative url).
+    If a relative file url is provided, its absolute form will be (`buildroot` + `base_path` + relative url).
 
-  :API: public
-  """
+    :API: public
+    """
 
     @staticmethod
     def _prepare_excludes(excludes):
@@ -196,7 +196,8 @@ class JarDependency(
         return not self.intransitive
 
     def copy(self, **replacements):
-        """Returns a clone of this JarDependency with the given replacements kwargs overlaid."""
+        """Returns a clone of this JarDependency with the given replacements
+        kwargs overlaid."""
         cls = type(self)
         kwargs = self._asdict()
         for key, val in replacements.items():
@@ -214,8 +215,8 @@ class JarDependency(
     def coordinate(self):
         """Returns the maven coordinate of this jar.
 
-    :rtype: :class:`pants.java.jar.M2Coordinate`
-    """
+        :rtype: :class:`pants.java.jar.M2Coordinate`
+        """
         return M2Coordinate(
             org=self.org, name=self.name, rev=self.rev, classifier=self.classifier, ext=self.ext
         )

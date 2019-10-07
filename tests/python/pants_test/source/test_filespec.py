@@ -8,7 +8,8 @@ from pants_test.test_base import TestBase
 
 class FilespecTest(TestBase):
     def assert_rule_match(self, glob, expected_matches, negate=False):
-        """Tests that in-memory glob matching matches lazy-filesystem traversing globs."""
+        """Tests that in-memory glob matching matches lazy-filesystem
+        traversing globs."""
         if negate:
             assertMatch, match_state = self.assertFalse, "erroneously matches"
         else:

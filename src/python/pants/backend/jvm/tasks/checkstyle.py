@@ -18,8 +18,8 @@ from pants.util.dirutil import safe_open
 class Checkstyle(LintTaskMixin, NailgunTask):
     """Check Java code for style violations.
 
-  :API: public
-  """
+    :API: public
+    """
 
     _CHECKSTYLE_MAIN = "com.puppycrawl.tools.checkstyle.Main"
 

@@ -18,15 +18,18 @@ from pants.subsystem.subsystem import Subsystem
 
 
 class SyntheticTargetNotFound(Exception):
-    """Exports were resolved for a thrift target which hasn't had a synthetic target generated yet."""
+    """Exports were resolved for a thrift target which hasn't had a synthetic
+    target generated yet."""
 
 
 class DependencyContext(Subsystem, DependencyContextBase):
-    """Implements calculating `exports` and exception (compiler-plugin) aware dependencies.
+    """Implements calculating `exports` and exception (compiler-plugin) aware
+    dependencies.
 
-  This is a subsystem because in future the compiler plugin types should be injected
-  via subsystem or option dependencies rather than declared statically.
-  """
+    This is a subsystem because in future the compiler plugin types
+    should be injected via subsystem or option dependencies rather than
+    declared statically.
+    """
 
     options_scope = "jvm-dependency-context"
 
@@ -50,13 +53,13 @@ class DependencyContext(Subsystem, DependencyContextBase):
     def defaulted_property(self, target, option_name):
         """Computes a language property setting for the given JvmTarget.
 
-    :param selector A function that takes a target or platform and returns the boolean value of the
-                    property for that target or platform, or None if that target or platform does
-                    not directly define the property.
+        :param selector A function that takes a target or platform and returns the boolean value of the
+                        property for that target or platform, or None if that target or platform does
+                        not directly define the property.
 
-    If the target does not override the language property, returns true iff the property
-    is true for any of the matched languages for the target.
-    """
+        If the target does not override the language property, returns true iff the property
+        is true for any of the matched languages for the target.
+        """
         if target.has_sources(".java"):
             matching_subsystem = Java.global_instance()
         elif target.has_sources(".scala"):
@@ -75,7 +78,8 @@ class DependencyContext(Subsystem, DependencyContextBase):
 
 
 class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
-    """Task fingerprint strategy that also includes the resolved coordinates of dependent jars."""
+    """Task fingerprint strategy that also includes the resolved coordinates of
+    dependent jars."""
 
     def __init__(self, classpath_products, dep_context):
         super().__init__()

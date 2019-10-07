@@ -6,7 +6,8 @@ from pants_test.task_test_base import ConsoleTaskTestBase
 
 
 class MockedBashCompletion(BashCompletion):
-    """A version of the BashCompletion, with the help introspection mocked out."""
+    """A version of the BashCompletion, with the help introspection mocked
+    out."""
 
     def get_autocomplete_options_by_scope(self):
         return {"": []}

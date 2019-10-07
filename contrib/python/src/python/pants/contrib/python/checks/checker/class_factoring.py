@@ -12,14 +12,15 @@ from pants.contrib.python.checks.checker.common import CheckstylePlugin
 class ClassFactoring(CheckstylePlugin):
     """Enforces recommendations for accessing class attributes.
 
-  Within classes, if you see:
-    class Distiller(object):
-      CONSTANT = "Foo"
-      def foo(self, value):
-         return os.path.join(Distiller.CONSTANT, value)
+    Within classes, if you see:
+      class Distiller(object):
+        CONSTANT = "Foo"
+        def foo(self, value):
+           return os.path.join(Distiller.CONSTANT, value)
 
-  recommend using self.CONSTANT instead of Distiller.CONSTANT as otherwise
-  it makes subclassing impossible."""
+    recommend using self.CONSTANT instead of Distiller.CONSTANT as otherwise
+    it makes subclassing impossible.
+    """
 
     @classmethod
     def name(cls):

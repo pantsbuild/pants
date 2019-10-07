@@ -147,8 +147,9 @@ class BundleCreate(BundleMixin, JvmBinaryTask):
     def bundle(self, app, results_dir):
         """Create a self-contained application bundle.
 
-    The bundle will contain the target classes, dependencies and resources.
-    """
+        The bundle will contain the target classes, dependencies and
+        resources.
+        """
         assert isinstance(app, BundleCreate.App)
 
         bundle_dir = self.get_bundle_dir(app.id, results_dir)
@@ -193,7 +194,10 @@ class BundleCreate(BundleMixin, JvmBinaryTask):
         return bundle_dir
 
     def check_basename_conflicts(self, targets):
-        """Apps' basenames are used as bundle directory names. Ensure they are all unique."""
+        """Apps' basenames are used as bundle directory names.
+
+        Ensure they are all unique.
+        """
 
         basename_seen = {}
         for target in targets:

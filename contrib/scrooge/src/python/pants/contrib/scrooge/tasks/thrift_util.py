@@ -11,10 +11,10 @@ INCLUDE_PARSER = re.compile(r'^\s*include\s+"([^"]+)"\s*([\/\/|\#].*)*$')
 def find_includes(basedirs, source, log=None):
     """Finds all thrift files included by the given thrift source.
 
-  :basedirs: A set of thrift source file base directories to look for includes in.
-  :source: The thrift source file to scan for includes.
-  :log: An optional logger
-  """
+    :basedirs: A set of thrift source file base directories to look for includes in.
+    :source: The thrift source file to scan for includes.
+    :log: An optional logger
+    """
 
     all_basedirs = [os.path.dirname(source)]
     all_basedirs.extend(basedirs)
@@ -43,12 +43,13 @@ def find_includes(basedirs, source, log=None):
 
 
 def find_root_thrifts(basedirs, sources, log=None):
-    """Finds the root thrift files in the graph formed by sources and their recursive includes.
+    """Finds the root thrift files in the graph formed by sources and their
+    recursive includes.
 
-  :basedirs: A set of thrift source file base directories to look for includes in.
-  :sources: Seed thrift files to examine.
-  :log: An optional logger.
-  """
+    :basedirs: A set of thrift source file base directories to look for includes in.
+    :sources: Seed thrift files to examine.
+    :log: An optional logger.
+    """
 
     root_sources = set(sources)
     for source in sources:
@@ -59,11 +60,11 @@ def find_root_thrifts(basedirs, sources, log=None):
 def calculate_include_paths(targets, is_thrift_target):
     """Calculates the set of import paths for the given targets.
 
-  :targets: The targets to examine.
-  :is_thrift_target: A predicate to pick out thrift targets for consideration in the analysis.
+    :targets: The targets to examine.
+    :is_thrift_target: A predicate to pick out thrift targets for consideration in the analysis.
 
-  :returns: Include basedirs for the target.
-  """
+    :returns: Include basedirs for the target.
+    """
 
     basedirs = set()
 

@@ -5,7 +5,8 @@ from pants.subsystem.subsystem import Subsystem
 
 
 class PythonToolBase(Subsystem):
-    """Base class for subsystems that configure a python tool to be invoked out-of-process."""
+    """Base class for subsystems that configure a python tool to be invoked
+    out-of-process."""
 
     # Subclasses must set.
     default_requirements = None

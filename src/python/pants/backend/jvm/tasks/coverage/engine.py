@@ -13,30 +13,31 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 class CoverageEngine(ABC):
     """The interface JVM code coverage processors must support.
 
-  This is a stateful interface that will be called via the following sequence:
+    This is a stateful interface that will be called via the following sequence:
 
-  1. instrument
-  2. run_modifications
-  3. report
+    1. instrument
+    2. run_modifications
+    3. report
 
-  In this sequence, the `run_modifications` call in step 2 may occur multiple times if coverage data
-  is being collected in parts. The `report` call in step 3 should be able to merge the results of
-  these multiple runs.
+    In this sequence, the `run_modifications` call in step 2 may occur multiple times if coverage data
+    is being collected in parts. The `report` call in step 3 should be able to merge the results of
+    these multiple runs.
 
-  The coverage engine will be discarded after one exercise of this sequence; ie: a coverage engine
-  is instantiated and used exactly once per `JUnitRun` task execution.
-  """
+    The coverage engine will be discarded after one exercise of this sequence; ie: a coverage engine
+    is instantiated and used exactly once per `JUnitRun` task execution.
+    """
 
     @dataclass(frozen=True)
     class RunModifications:
-        """Modifications that should be made to the java command where code coverage is collected.
+        """Modifications that should be made to the java command where code
+        coverage is collected.
 
-    The `classpath_prepend` field should be an iterable of classpath elements to prepend to java
-    command classpath.
+        The `classpath_prepend` field should be an iterable of classpath elements to prepend to java
+        command classpath.
 
-    The `extra_jvm_options` should be a list of jvm options to include when executing the java
-    command.
-    """
+        The `extra_jvm_options` should be a list of jvm options to include when executing the java
+        command.
+        """
 
         classpath_prepend: Any
         extra_jvm_options: Any
@@ -51,28 +52,29 @@ class CoverageEngine(ABC):
     def instrument(self, output_dir):
         """Instruments JVM bytecode for coverage tracking.
 
-    :param str output_dir: The path where report data should be generated under.
-    """
+        :param str output_dir: The path where report data should be generated under.
+        """
 
     @abstractmethod
     def run_modifications(self, output_dir):
-        """Describe modifications needed to the java command line that will run the instrumented code.
+        """Describe modifications needed to the java command line that will run
+        the instrumented code.
 
-    :param str output_dir: The path where report data should be generated under.
-    :returns: A description of run modifications.
-    :rtype: :class:`CoverageEngine.RunModifications`
-    """
+        :param str output_dir: The path where report data should be generated under.
+        :returns: A description of run modifications.
+        :rtype: :class:`CoverageEngine.RunModifications`
+        """
 
     @abstractmethod
     def report(self, output_dir, execution_failed_exception=None):
         """Generate a report of code coverage.
 
-    :param str output_dir: The path where report data should be generated under.
-    :param Exception execution_failed_exception: If execution of the instrumented code failed, the
-                                                 exception describing the failure.
-    :returns: The path to the generated report iff it should be opened for the end user.
-    :rtype: str
-    """
+        :param str output_dir: The path where report data should be generated under.
+        :param Exception execution_failed_exception: If execution of the instrumented code failed, the
+                                                     exception describing the failure.
+        :returns: The path to the generated report iff it should be opened for the end user.
+        :rtype: str
+        """
 
     @staticmethod
     def is_coverage_target(tgt):
@@ -86,7 +88,8 @@ class CoverageEngine(ABC):
 
 
 class NoCoverage(CoverageEngine):
-    """A JVM code coverage processor that collects no code coverage data at all."""
+    """A JVM code coverage processor that collects no code coverage data at
+    all."""
 
     _NO_MODIFICATIONS = CoverageEngine.RunModifications.create()
 

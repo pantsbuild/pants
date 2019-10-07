@@ -27,11 +27,12 @@ class State(ABC):
         return cls._from_components(remainder)
 
     def to_components(self):
-        """Return a flat tuple containing individual pickleable components of the State.
+        """Return a flat tuple containing individual pickleable components of
+        the State.
 
-    TODO: Consider https://docs.python.org/2.7/library/pickle.html#pickling-and-unpickling-external-objects
-    for this usecase?
-    """
+        TODO: Consider https://docs.python.org/2.7/library/pickle.html#pickling-and-unpickling-external-objects
+        for this usecase?
+        """
         return (type(self),) + self._to_components()
 
 
@@ -51,7 +52,8 @@ class Return(State):
 
 @dataclass(frozen=True)
 class Throw(State):
-    """Indicates that a Node should have been able to return a value, but failed."""
+    """Indicates that a Node should have been able to return a value, but
+    failed."""
 
     exc: Any
 
@@ -60,8 +62,9 @@ class Throw(State):
 class Runnable(State):
     """Indicates that the Node is ready to run with the given closure.
 
-  The return value of the Runnable will become the final state of the Node.
-  """
+    The return value of the Runnable will become the final state of the
+    Node.
+    """
 
     func: Any
     args: Any

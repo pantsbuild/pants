@@ -83,7 +83,8 @@ class TestPailgunServer(unittest.TestCase):
         mock_shutdown_request.assert_called_once_with(self.server, mock_request)
 
     def test_ensure_request_is_exclusive(self):
-        """Launch many requests, assert that every one is trying to enter the critical section, and assert that only one is doing so at a time."""
+        """Launch many requests, assert that every one is trying to enter the
+        critical section, and assert that only one is doing so at a time."""
         self.threads_to_start = 10
 
         # Queues are thread safe (https://docs.python.org/2/library/queue.html)
@@ -99,7 +100,8 @@ class TestPailgunServer(unittest.TestCase):
         self.threads_running = 0
 
         def handle_thread_tried_to_handle_request():
-            """Mark a thread as started, and block until every thread has been marked as starting."""
+            """Mark a thread as started, and block until every thread has been
+            marked as starting."""
             self.threads_running_cond.acquire()
             self.threads_running += 1
             if self.threads_running == self.threads_to_start:
@@ -116,7 +118,8 @@ class TestPailgunServer(unittest.TestCase):
             self.threads_running_cond.release()
 
         def handle_thread_finished():
-            """Mark a thread as finished, and block until there are no more threads running."""
+            """Mark a thread as finished, and block until there are no more
+            threads running."""
             self.threads_running_cond.acquire()
             self.threads_running -= 1
             print("Handle_thread_finished, threads_running are {}".format(self.threads_running))
@@ -162,7 +165,11 @@ class TestPailgunServer(unittest.TestCase):
 
         # Wrap ensure_request_is_exclusive to notify when we acquire and release the lock.
         def mock_ensure_request_is_exclusive(request_lock_under_test):
-            """Wrap the lock under test. Every thread that calls this function has reached the critical section."""
+            """Wrap the lock under test.
+
+            Every thread that calls this function has reached the
+            critical section.
+            """
 
             @contextmanager
             def wrapper(environment, request):

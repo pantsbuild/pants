@@ -50,13 +50,14 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class ExecutionRequest:
-    """Holds the roots for an execution, which might have been requested by a user.
+    """Holds the roots for an execution, which might have been requested by a
+    user.
 
-  To create an ExecutionRequest, see `SchedulerSession.execution_request`.
+    To create an ExecutionRequest, see `SchedulerSession.execution_request`.
 
-  :param roots: Roots for this request.
-  :type roots: list of tuples of subject and product.
-  """
+    :param roots: Roots for this request.
+    :type roots: list of tuples of subject and product.
+    """
 
     roots: Any
     native: Any
@@ -294,7 +295,8 @@ class Scheduler:
         return self._from_value(self._native.lib.scheduler_metrics(self._scheduler, session))
 
     def with_fork_context(self, func):
-        """See the rustdocs for `scheduler_fork_context` for more information."""
+        """See the rustdocs for `scheduler_fork_context` for more
+        information."""
         res = self._native.lib.scheduler_fork_context(self._scheduler, Function(self._to_key(func)))
         return self._raise_or_return(res)
 
@@ -340,9 +342,9 @@ _DirectoriesToMaterialize = Collection.of(DirectoryToMaterialize)
 class SchedulerSession:
     """A handle to a shared underlying Scheduler and a unique Session.
 
-  Generally a Session corresponds to a single run of pants: some metrics are specific to
-  a Session.
-  """
+    Generally a Session corresponds to a single run of pants: some
+    metrics are specific to a Session.
+    """
 
     execution_error_type = ExecutionError
 
@@ -355,15 +357,16 @@ class SchedulerSession:
         return self._scheduler.graph_len()
 
     def trace(self, execution_request):
-        """Yields a stringified 'stacktrace' starting from the scheduler's roots."""
+        """Yields a stringified 'stacktrace' starting from the scheduler's
+        roots."""
         for line in self._scheduler.graph_trace(execution_request.native):
             yield line
 
     def visualize_graph_to_file(self, filename):
         """Visualize a graph walk by writing graphviz `dot` output to a file.
 
-    :param str filename: The filename to output the graphviz output to.
-    """
+        :param str filename: The filename to output the graphviz output to.
+        """
         self._scheduler.visualize_graph_to_file(self._session, filename)
 
     def visualize_rule_graph_to_file(self, filename):
@@ -376,26 +379,28 @@ class SchedulerSession:
         return ExecutionRequest(request_specs, native_execution_request)
 
     def execution_request(self, products, subjects):
-        """Create and return an ExecutionRequest for the given products and subjects.
+        """Create and return an ExecutionRequest for the given products and
+        subjects.
 
-    The resulting ExecutionRequest object will contain keys tied to this scheduler's product Graph,
-    and so it will not be directly usable with other scheduler instances without being re-created.
+        The resulting ExecutionRequest object will contain keys tied to this scheduler's product Graph,
+        and so it will not be directly usable with other scheduler instances without being re-created.
 
-    NB: This method does a "cross product", mapping all subjects to all products. To create a
-    request for just the given list of subject -> product tuples, use `execution_request_literal()`!
+        NB: This method does a "cross product", mapping all subjects to all products. To create a
+        request for just the given list of subject -> product tuples, use `execution_request_literal()`!
 
-    :param products: A list of product types to request for the roots.
-    :type products: list of types
-    :param subjects: A list of Spec and/or PathGlobs objects.
-    :type subject: list of :class:`pants.base.specs.Spec`, `pants.build_graph.Address`, and/or
-      :class:`pants.engine.fs.PathGlobs` objects.
-    :returns: An ExecutionRequest for the given products and subjects.
-    """
+        :param products: A list of product types to request for the roots.
+        :type products: list of types
+        :param subjects: A list of Spec and/or PathGlobs objects.
+        :type subject: list of :class:`pants.base.specs.Spec`, `pants.build_graph.Address`, and/or
+          :class:`pants.engine.fs.PathGlobs` objects.
+        :returns: An ExecutionRequest for the given products and subjects.
+        """
         roots = tuple((s, p) for s in subjects for p in products)
         return self.execution_request_literal(roots)
 
     def invalidate_files(self, direct_filenames):
-        """Invalidates the given filenames in an internal product Graph instance."""
+        """Invalidates the given filenames in an internal product Graph
+        instance."""
         invalidated = self._scheduler.invalidate_files(direct_filenames)
         self._maybe_visualize()
         return invalidated
@@ -410,7 +415,8 @@ class SchedulerSession:
         return self._scheduler.graph_len()
 
     def metrics(self):
-        """Returns metrics for this SchedulerSession as a dict of metric name to metric value."""
+        """Returns metrics for this SchedulerSession as a dict of metric name
+        to metric value."""
         return self._scheduler._metrics(self._session)
 
     @staticmethod
@@ -427,10 +433,11 @@ class SchedulerSession:
             self.visualize_graph_to_file(os.path.join(self._scheduler.visualize_to_dir(), name))
 
     def execute(self, execution_request):
-        """Invoke the engine for the given ExecutionRequest, returning Return and Throw states.
+        """Invoke the engine for the given ExecutionRequest, returning Return
+        and Throw states.
 
-    :return: A tuple of (root, Return) tuples and (root, Throw) tuples.
-    """
+        :return: A tuple of (root, Return) tuples and (root, Throw) tuples.
+        """
         start_time = time.time()
         roots = list(
             zip(
@@ -488,12 +495,13 @@ class SchedulerSession:
         return state.value.exit_code
 
     def product_request(self, product, subjects):
-        """Executes a request for a single product for some subjects, and returns the products.
+        """Executes a request for a single product for some subjects, and
+        returns the products.
 
-    :param class product: A product type for the request.
-    :param list subjects: A list of subjects or Params instances for the request.
-    :returns: A list of the requested products, with length match len(subjects).
-    """
+        :param class product: A product type for the request.
+        :param list subjects: A list of subjects or Params instances for the request.
+        :returns: A list of the requested products, with length match len(subjects).
+        """
         request = None
         raised_exception = None
         try:
@@ -572,14 +580,15 @@ class SchedulerSession:
         return [ret.value for _, ret in returns]
 
     def capture_snapshots(self, path_globs_and_roots):
-        """Synchronously captures Snapshots for each matching PathGlobs rooted at a its root directory.
+        """Synchronously captures Snapshots for each matching PathGlobs rooted
+        at a its root directory.
 
-    This is a blocking operation, and should be avoided where possible.
+        This is a blocking operation, and should be avoided where possible.
 
-    :param path_globs_and_roots tuple<PathGlobsAndRoot>: The PathGlobs to capture, and the root
-           directory relative to which each should be captured.
-    :returns: A tuple of Snapshots.
-    """
+        :param path_globs_and_roots tuple<PathGlobsAndRoot>: The PathGlobs to capture, and the root
+               directory relative to which each should be captured.
+        :returns: A tuple of Snapshots.
+        """
         result = self._scheduler._native.lib.capture_snapshots(
             self._scheduler._scheduler,
             self._session,
@@ -590,9 +599,9 @@ class SchedulerSession:
     def merge_directories(self, directory_digests):
         """Merges any number of directories.
 
-    :param directory_digests: Tuple of DirectoryDigests.
-    :return: A Digest.
-    """
+        :param directory_digests: Tuple of DirectoryDigests.
+        :return: A Digest.
+        """
         result = self._scheduler._native.lib.merge_directories(
             self._scheduler._scheduler,
             self._session,
@@ -602,10 +611,11 @@ class SchedulerSession:
 
     def materialize_directories(self, directories_paths_and_digests):
         """Creates the specified directories on the file system.
-    :param directories_paths_and_digests tuple<DirectoryToMaterialize>: Tuple of the path and
-           digest of the directories to materialize.
-    :returns: Nothing or an error.
-    """
+
+        :param directories_paths_and_digests tuple<DirectoryToMaterialize>: Tuple of the path and
+               digest of the directories to materialize.
+        :returns: Nothing or an error.
+        """
         # Ensure there isn't more than one of the same directory paths and paths do not have the same prefix.
         dir_list = [dpad.path for dpad in directories_paths_and_digests]
         check_no_overlapping_paths(dir_list)

@@ -11,9 +11,9 @@ from pants.contrib.go.targets.go_binary import GoBinary
 class GoBinaryFingerprintStrategy(FingerprintStrategy):
     """Build flags aware fingerprint strategy.
 
-  This enables support for runtime merging of build flags (e.g.: config file, per-target, CLI),
-  which impact the output binary.
-  """
+    This enables support for runtime merging of build flags (e.g.:
+    config file, per-target, CLI), which impact the output binary.
+    """
 
     def __init__(self, get_build_flags_func):
         """

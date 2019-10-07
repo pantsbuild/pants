@@ -56,7 +56,8 @@ class ExcludeTargetRegexpIntegrationTest(PantsRunIntegrationTest):
 
     @contextmanager
     def _handle_bundles(self, names):
-        """Makes sure bundles don't exist to begin with, and deletes them afterward."""
+        """Makes sure bundles don't exist to begin with, and deletes them
+        afterward."""
         paths = [self._bundle_path(name) for name in names]
         jars = ["{name}.jar".format(name=name) for name in names]
         yield (paths, jars)

@@ -20,26 +20,27 @@ from pants.util.objects import SubclassesOf
 
 
 def run_rule(rule, *args):
-    """A test helper function that runs an @rule with a set of arguments and Get providers.
+    """A test helper function that runs an @rule with a set of arguments and
+    Get providers.
 
-  An @rule named `my_rule` that takes one argument and makes no `Get` requests can be invoked
-  like so (although you could also just invoke it directly):
-  ```
-  return_value = run_rule(my_rule, arg1)
-  ```
+    An @rule named `my_rule` that takes one argument and makes no `Get` requests can be invoked
+    like so (although you could also just invoke it directly):
+    ```
+    return_value = run_rule(my_rule, arg1)
+    ```
 
-  In the case of an @rule that makes Get requests, things get more interesting: an extra argument
-  is required that represents a dict mapping (product, subject) type pairs to one argument functions
-  that take a subject value and return a product value.
+    In the case of an @rule that makes Get requests, things get more interesting: an extra argument
+    is required that represents a dict mapping (product, subject) type pairs to one argument functions
+    that take a subject value and return a product value.
 
-  So in the case of an @rule named `my_co_rule` that takes one argument and makes Get requests
-  for product and subject types (Listing, Dir), the invoke might look like:
-  ```
-  return_value = run_rule(my_co_rule, arg1, {(Listing, Dir): lambda x: Listing(..)})
-  ```
+    So in the case of an @rule named `my_co_rule` that takes one argument and makes Get requests
+    for product and subject types (Listing, Dir), the invoke might look like:
+    ```
+    return_value = run_rule(my_co_rule, arg1, {(Listing, Dir): lambda x: Listing(..)})
+    ```
 
-  :returns: The return value of the completed @rule.
-  """
+    :returns: The return value of the completed @rule.
+    """
 
     task_rule = getattr(rule, "rule", None)
     if task_rule is None:
@@ -121,16 +122,17 @@ TARGET_TABLE = SymbolTable({"struct": Struct, "target": Target})
 
 
 def assert_equal_with_printing(test_case, expected, actual):
-    """Asserts equality, but also prints the values so they can be compared on failure.
+    """Asserts equality, but also prints the values so they can be compared on
+    failure.
 
-  Usage:
+    Usage:
 
-     class FooTest(unittest.TestCase):
-       assert_equal_with_printing = assert_equal_with_printing
+       class FooTest(unittest.TestCase):
+         assert_equal_with_printing = assert_equal_with_printing
 
-       def test_foo(self):
-         self.assert_equal_with_printing("a", "b")
-  """
+         def test_foo(self):
+           self.assert_equal_with_printing("a", "b")
+    """
     str_actual = str(actual)
     print("Expected:")
     print(expected)
@@ -148,7 +150,8 @@ def remove_locations_from_traceback(trace):
 
 
 class MockConsole:
-    """An implementation of pants.engine.console.Console which captures output."""
+    """An implementation of pants.engine.console.Console which captures
+    output."""
 
     def __init__(self, use_colors=True):
         self.stdout = StringIO()

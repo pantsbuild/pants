@@ -43,31 +43,32 @@ class PackageManager:
     def _get_installation_args(self, install_optional, production_only, force, frozen_lockfile):
         """Returns command line args for installing package.
 
-    :param install_optional: True to request install optional dependencies.
-    :param production_only: True to only install production dependencies, i.e.
-      ignore devDependencies.
-    :param force: True to force re-download dependencies.
-    :param frozen_lockfile: True to disallow automatic update of lock files.
-    :rtype: list of strings
-    """
+        :param install_optional: True to request install optional dependencies.
+        :param production_only: True to only install production dependencies, i.e.
+          ignore devDependencies.
+        :param force: True to force re-download dependencies.
+        :param frozen_lockfile: True to disallow automatic update of lock files.
+        :rtype: list of strings
+        """
         raise NotImplementedError
 
     def _get_run_script_args(self):
         """Returns command line args to run a package.json script.
 
-    :rtype: list of strings
-    """
+        :rtype: list of strings
+        """
         raise NotImplementedError
 
     def _get_add_package_args(self, package, type_option, version_option):
         """Returns command line args to add a node pacakge.
 
-    :rtype: list of strings
-    """
+        :rtype: list of strings
+        """
         raise NotImplementedError()
 
     def run_command(self, args=None, node_paths=None):
-        """Returns a command that when executed will run an arbitury command via package manager."""
+        """Returns a command that when executed will run an arbitury command
+        via package manager."""
         return command_gen(self.tool_installations, self.name, args=args, node_paths=node_paths)
 
     def install_module(
@@ -80,14 +81,14 @@ class PackageManager:
     ):
         """Returns a command that when executed will install node package.
 
-    :param install_optional: True to install optional dependencies.
-    :param production_only: True to only install production dependencies, i.e.
-      ignore devDependencies.
-    :param force: True to force re-download dependencies.
-    :param frozen_lockfile: True to disallow automatic update of lock files.
-    :param node_paths: A list of path that should be included in $PATH when
-      running installation.
-    """
+        :param install_optional: True to install optional dependencies.
+        :param production_only: True to only install production dependencies, i.e.
+          ignore devDependencies.
+        :param force: True to force re-download dependencies.
+        :param frozen_lockfile: True to disallow automatic update of lock files.
+        :param node_paths: A list of path that should be included in $PATH when
+          running installation.
+        """
         args = self._get_installation_args(
             install_optional=install_optional,
             production_only=production_only,
@@ -99,12 +100,12 @@ class PackageManager:
     def run_script(self, script_name, script_args=None, node_paths=None):
         """Returns a command to execute a package.json script.
 
-    :param script_name: Name of the script to name.  Note that script name 'test'
-      can be used to run node tests.
-    :param script_args: Args to be passed to package.json script.
-    :param node_paths: A list of path that should be included in $PATH when
-      running the script.
-    """
+        :param script_name: Name of the script to name.  Note that script name 'test'
+          can be used to run node tests.
+        :param script_args: Args to be passed to package.json script.
+        :param node_paths: A list of path that should be included in $PATH when
+          running the script.
+        """
         # TODO: consider add a pants.util function to manipulate command line.
         package_manager_args = self._get_run_script_args()
         package_manager_args.append(script_name)
@@ -120,25 +121,27 @@ class PackageManager:
         type_option=PackageInstallationTypeOption.PROD,
         version_option=None,
     ):
-        """Returns a command that when executed will add a node package to current node module.
+        """Returns a command that when executed will add a node package to
+        current node module.
 
-    :param package: string.  A valid npm/yarn package description.  The accepted forms are
-      package-name, package-name@version, package-name@tag, file:/folder, file:/path/to.tgz
-      https://url/to.tgz
-    :param node_paths: A list of path that should be included in $PATH when
-      running the script.
-    :param type_option: A value from PackageInstallationTypeOption that indicates the type
-      of package to be installed. Default to 'prod', which is a production dependency.
-    :param version_option: A value from PackageInstallationVersionOption that indicates how
-      to match version. Default to None, which uses package manager default.
-    """
+        :param package: string.  A valid npm/yarn package description.  The accepted forms are
+          package-name, package-name@version, package-name@tag, file:/folder, file:/path/to.tgz
+          https://url/to.tgz
+        :param node_paths: A list of path that should be included in $PATH when
+          running the script.
+        :param type_option: A value from PackageInstallationTypeOption that indicates the type
+          of package to be installed. Default to 'prod', which is a production dependency.
+        :param version_option: A value from PackageInstallationVersionOption that indicates how
+          to match version. Default to None, which uses package manager default.
+        """
         args = self._get_add_package_args(
             package, type_option=type_option, version_option=version_option
         )
         return self.run_command(args=args, node_paths=node_paths)
 
     def run_cli(self, cli, args=None, node_paths=None):
-        """Returns a command that when executed will run an installed cli via package manager."""
+        """Returns a command that when executed will run an installed cli via
+        package manager."""
         cli_args = [cli]
         if args:
             cli_args.append("--")

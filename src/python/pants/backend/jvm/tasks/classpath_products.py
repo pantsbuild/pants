@@ -65,29 +65,29 @@ class ClasspathProducts:
     ):
         """Create a stable classpath of symlinks with standardized names.
 
-    By default symlinks are created for each target under `basedir` based on its `target.id`.
-    Unique suffixes are added to further disambiguate classpath products from the same target.
+        By default symlinks are created for each target under `basedir` based on its `target.id`.
+        Unique suffixes are added to further disambiguate classpath products from the same target.
 
-    It also optionally saves the classpath products to be used externally (by intellij plugin),
-    one output file for each target.
+        It also optionally saves the classpath products to be used externally (by intellij plugin),
+        one output file for each target.
 
-    Note calling this function will refresh the symlinks and output files for the target under
-    `basedir` if they exist, but it will NOT delete/cleanup the contents for *other* targets.
-    Caller wants that behavior can make the similar calls for other targets or just remove
-    the `basedir` first.
+        Note calling this function will refresh the symlinks and output files for the target under
+        `basedir` if they exist, but it will NOT delete/cleanup the contents for *other* targets.
+        Caller wants that behavior can make the similar calls for other targets or just remove
+        the `basedir` first.
 
-    :param classpath_products: Classpath products.
-    :param targets: Targets to create canonical classpath for.
-    :param basedir: Directory to create symlinks.
-    :param save_classpath_file: An optional file with original classpath entries that symlinks
-      are created from.
-    :param internal_classpath_only: whether to create symlinks just for internal classpath or
-       all classpath.
-    :param excludes: classpath entries should be excluded.
+        :param classpath_products: Classpath products.
+        :param targets: Targets to create canonical classpath for.
+        :param basedir: Directory to create symlinks.
+        :param save_classpath_file: An optional file with original classpath entries that symlinks
+          are created from.
+        :param internal_classpath_only: whether to create symlinks just for internal classpath or
+           all classpath.
+        :param excludes: classpath entries should be excluded.
 
-    :returns: Converted canonical classpath.
-    :rtype: list of strings
-    """
+        :returns: Converted canonical classpath.
+        :rtype: list of strings
+        """
 
         def delete_old_target_output_files(classpath_prefix):
             """Delete existing output files or symlinks for target."""
@@ -104,11 +104,13 @@ class ClasspathProducts:
                     safe_delete(path)
 
         def prepare_target_output_folder(basedir, target):
-            """Prepare directory that will contain canonical classpath for the target.
+            """Prepare directory that will contain canonical classpath for the
+            target.
 
-      This includes creating directories if it does not already exist, cleaning up
-      previous classpath output related to the target.
-      """
+            This includes creating directories if it does not already
+            exist, cleaning up previous classpath output related to the
+            target.
+            """
             output_dir = basedir
             # TODO(peiyu) improve readability once we deprecate the old naming style.
             # For example, `-` is commonly placed in string format as opposed to here.
@@ -181,14 +183,14 @@ class ClasspathProducts:
     def copy(self):
         """Returns a copy of this ClasspathProducts.
 
-    Edits to the copy's classpaths or exclude associations will not affect the classpaths or
-    excludes in the original. The copy is shallow though, so edits to the copy's product values
-    will mutate the original's product values.  See `UnionProducts.copy`.
+        Edits to the copy's classpaths or exclude associations will not affect the classpaths or
+        excludes in the original. The copy is shallow though, so edits to the copy's product values
+        will mutate the original's product values.  See `UnionProducts.copy`.
 
-    :API: public
+        :API: public
 
-    :rtype: :class:`ClasspathProducts`
-    """
+        :rtype: :class:`ClasspathProducts`
+        """
         return ClasspathProducts(
             pants_workdir=self._pants_workdir,
             classpaths=self._classpaths.copy(),
@@ -196,27 +198,28 @@ class ClasspathProducts:
         )
 
     def add_for_targets(self, targets, classpath_elements):
-        """Adds classpath path elements to the products of all the provided targets."""
+        """Adds classpath path elements to the products of all the provided
+        targets."""
         for target in targets:
             self.add_for_target(target, classpath_elements)
 
     def add_for_target(self, target, classpath_elements):
         """Adds classpath path elements to the products of the provided target.
 
-    :param target: The target for which to add the classpath elements.
-    :param classpath_elements: List of tuples, either (conf, filename) or
-                               (conf, pants.backend.jvm.tasks.ClasspathEntry)
-    """
+        :param target: The target for which to add the classpath elements.
+        :param classpath_elements: List of tuples, either (conf, filename) or
+                                   (conf, pants.backend.jvm.tasks.ClasspathEntry)
+        """
         self._add_elements_for_target(target, self._wrap_path_elements(classpath_elements))
 
     def add_jars_for_targets(self, targets, conf, resolved_jars):
         """Adds jar classpath elements to the products of the provided targets.
 
-    The resolved jars are added in a way that works with excludes.
-    :param targets: The targets to add the jars for.
-    :param conf: The configuration.
-    :param resolved_jars: A list of ResolvedJars.
-    """
+        The resolved jars are added in a way that works with excludes.
+        :param targets: The targets to add the jars for.
+        :param conf: The configuration.
+        :param resolved_jars: A list of ResolvedJars.
+        """
         classpath_entries = []
         for jar in resolved_jars:
             if not jar.pants_path:
@@ -232,11 +235,11 @@ class ClasspathProducts:
     def add_excludes_for_targets(self, targets):
         """Add excludes from the provided targets.
 
-    Does not look up transitive excludes.
+        Does not look up transitive excludes.
 
-    :param targets: The targets to add excludes for.
-    :type targets: list of :class:`pants.build_graph.target.Target`
-    """
+        :param targets: The targets to add excludes for.
+        :type targets: list of :class:`pants.build_graph.target.Target`
+        """
         for target in targets:
             self._add_excludes_for_target(target)
 
@@ -247,38 +250,38 @@ class ClasspathProducts:
     def get_for_target(self, target):
         """Gets the classpath products for the given target.
 
-    Products are returned in order, respecting target excludes.
+        Products are returned in order, respecting target excludes.
 
-    :param target: The target to lookup classpath products for.
-    :returns: The ordered (conf, path) tuples, with paths being either classfile directories or
-              jars.
-    :rtype: list of (string, string)
-    """
+        :param target: The target to lookup classpath products for.
+        :returns: The ordered (conf, path) tuples, with paths being either classfile directories or
+                  jars.
+        :rtype: list of (string, string)
+        """
         return self.get_for_targets([target])
 
     def get_for_targets(self, targets):
         """Gets the classpath products for the given targets.
 
-    Products are returned in order, respecting target excludes.
+        Products are returned in order, respecting target excludes.
 
-    :param targets: The targets to lookup classpath products for.
-    :returns: The ordered (conf, path) tuples, with paths being either classfile directories or
-              jars.
-    :rtype: list of (string, string)
-    """
+        :param targets: The targets to lookup classpath products for.
+        :returns: The ordered (conf, path) tuples, with paths being either classfile directories or
+                  jars.
+        :rtype: list of (string, string)
+        """
         cp_entries = self.get_classpath_entries_for_targets(targets)
         return [(conf, cp_entry.path) for conf, cp_entry in cp_entries]
 
     def get_classpath_entries_for_targets(self, targets, respect_excludes=True):
         """Gets the classpath products for the given targets.
 
-    Products are returned in order, optionally respecting target excludes.
+        Products are returned in order, optionally respecting target excludes.
 
-    :param targets: The targets to lookup classpath products for.
-    :param bool respect_excludes: `True` to respect excludes; `False` to ignore them.
-    :returns: The ordered (conf, classpath entry) tuples.
-    :rtype: list of (string, :class:`ClasspathEntry`)
-    """
+        :param targets: The targets to lookup classpath products for.
+        :param bool respect_excludes: `True` to respect excludes; `False` to ignore them.
+        :returns: The ordered (conf, classpath entry) tuples.
+        :rtype: list of (string, :class:`ClasspathEntry`)
+        """
 
         # remove the duplicate, preserve the ordering.
         return list(
@@ -293,14 +296,15 @@ class ClasspathProducts:
         )
 
     def get_product_target_mappings_for_targets(self, targets, respect_excludes=True):
-        """Gets the classpath products-target associations for the given targets.
+        """Gets the classpath products-target associations for the given
+        targets.
 
-    Product-target tuples are returned in order, optionally respecting target excludes.
+        Product-target tuples are returned in order, optionally respecting target excludes.
 
-    :param targets: The targets to lookup classpath products for.
-    :param bool respect_excludes: `True` to respect excludes; `False` to ignore them.
-    :returns: The ordered (classpath products, target) tuples.
-    """
+        :param targets: The targets to lookup classpath products for.
+        :param bool respect_excludes: `True` to respect excludes; `False` to ignore them.
+        :returns: The ordered (classpath products, target) tuples.
+        """
         classpath_target_tuples = self._classpaths.get_product_target_mappings_for_targets(targets)
         if respect_excludes:
             return self._filter_by_excludes(classpath_target_tuples, targets)
@@ -310,14 +314,14 @@ class ClasspathProducts:
     def get_artifact_classpath_entries_for_targets(self, targets, respect_excludes=True):
         """Gets the artifact classpath products for the given targets.
 
-    Products are returned in order, optionally respecting target excludes, and the products only
-    include external artifact classpath elements (ie: resolved jars).
+        Products are returned in order, optionally respecting target excludes, and the products only
+        include external artifact classpath elements (ie: resolved jars).
 
-    :param targets: The targets to lookup classpath products for.
-    :param bool respect_excludes: `True` to respect excludes; `False` to ignore them.
-    :returns: The ordered (conf, classpath entry) tuples.
-    :rtype: list of (string, :class:`ArtifactClasspathEntry`)
-    """
+        :param targets: The targets to lookup classpath products for.
+        :param bool respect_excludes: `True` to respect excludes; `False` to ignore them.
+        :returns: The ordered (conf, classpath entry) tuples.
+        :rtype: list of (string, :class:`ArtifactClasspathEntry`)
+        """
         classpath_tuples = self.get_classpath_entries_for_targets(
             targets, respect_excludes=respect_excludes
         )
@@ -330,14 +334,14 @@ class ClasspathProducts:
     def get_internal_classpath_entries_for_targets(self, targets, respect_excludes=True):
         """Gets the internal classpath products for the given targets.
 
-    Products are returned in order, optionally respecting target excludes, and the products only
-    include internal artifact classpath elements (ie: no resolved jars).
+        Products are returned in order, optionally respecting target excludes, and the products only
+        include internal artifact classpath elements (ie: no resolved jars).
 
-    :param targets: The targets to lookup classpath products for.
-    :param bool respect_excludes: `True` to respect excludes; `False` to ignore them.
-    :returns: The ordered (conf, classpath entry) tuples.
-    :rtype: list of (string, :class:`ClasspathEntry`)
-    """
+        :param targets: The targets to lookup classpath products for.
+        :param bool respect_excludes: `True` to respect excludes; `False` to ignore them.
+        :returns: The ordered (conf, classpath entry) tuples.
+        :rtype: list of (string, :class:`ClasspathEntry`)
+        """
         classpath_tuples = self.get_classpath_entries_for_targets(
             targets, respect_excludes=respect_excludes
         )
@@ -395,13 +399,14 @@ class ClasspathProducts:
         self._classpaths.add_for_target(target, elements)
 
     def _validate_classpath_tuples(self, classpath, target):
-        """Validates that all files are located within the working directory, to simplify relativization.
+        """Validates that all files are located within the working directory,
+        to simplify relativization.
 
-    :param classpath: The list of classpath tuples. Each tuple is a 2-tuple of ivy_conf and
-                      ClasspathEntry.
-    :param target: The target that the classpath tuple is being registered for.
-    :raises: `TaskError` when the path is outside the work directory
-    """
+        :param classpath: The list of classpath tuples. Each tuple is a 2-tuple of ivy_conf and
+                          ClasspathEntry.
+        :param target: The target that the classpath tuple is being registered for.
+        :raises: `TaskError` when the path is outside the work directory
+        """
         for classpath_tuple in classpath:
             conf, classpath_entry = classpath_tuple
             path = classpath_entry.path

@@ -27,12 +27,12 @@ class FilesetWithSpec(ABC):
 
     @abstractmethod
     def matches(self, path_from_buildroot):
-        """
-    Takes in any relative path from build root, and return whether it belongs to this filespec
+        """Takes in any relative path from build root, and return whether it
+        belongs to this filespec.
 
-    :param path_from_buildroot: path relative to build root
-    :return: True if the path matches, else False.
-    """
+        :param path_from_buildroot: path relative to build root
+        :return: True if the path matches, else False.
+        """
 
     def __init__(self, rel_root, filespec):
         """
@@ -59,7 +59,8 @@ class FilesetWithSpec(ABC):
     @property
     @abstractmethod
     def files(self):
-        """Return the concrete set of files matched by this FilesetWithSpec, relative to `self.rel_root`."""
+        """Return the concrete set of files matched by this FilesetWithSpec,
+        relative to `self.rel_root`."""
 
     @property
     @abstractmethod
@@ -73,7 +74,8 @@ class FilesetWithSpec(ABC):
         return self.files[index]
 
     def paths_from_buildroot_iter(self):
-        """An alternative `__iter__` that joins files with the relative root."""
+        """An alternative `__iter__` that joins files with the relative
+        root."""
         for f in self:
             yield os.path.join(self.rel_root, f)
 
@@ -259,13 +261,14 @@ class FilesetRelPathWrapper(ABC):
 
     @classmethod
     def to_filespec(cls, args, root="", exclude=None):
-        """Return a dict representation of this glob list, relative to the buildroot.
+        """Return a dict representation of this glob list, relative to the
+        buildroot.
 
-    The format of the dict is {'globs': [ 'list', 'of' , 'strings' ]
-                    (optional) 'exclude' : [{'globs' : ... }, ...] }
+        The format of the dict is {'globs': [ 'list', 'of' , 'strings' ]
+                        (optional) 'exclude' : [{'globs' : ... }, ...] }
 
-    The globs are in zglobs format.
-    """
+        The globs are in zglobs format.
+        """
         result = {"globs": [os.path.join(root, arg) for arg in args]}
         if exclude:
             result["exclude"] = []
@@ -280,9 +283,9 @@ class FilesetRelPathWrapper(ABC):
 class Files(FilesetRelPathWrapper):
     """Matches literal files, _without_ confirming that they exist.
 
-  TODO: This exists as-is for historical reasons: we should add optional validation of the
-  existence of matched files at some point.
-  """
+    TODO: This exists as-is for historical reasons: we should add optional validation of the
+    existence of matched files at some point.
+    """
 
     @staticmethod
     def _literal_files(*args, **kwargs):
@@ -299,10 +302,10 @@ class Files(FilesetRelPathWrapper):
 class Globs(FilesetRelPathWrapper):
     """Matches files in the BUILD file's directory.
 
-  E.g., - ``sources = globs('*java'),`` to get .java files in this directory.
-        - ``globs('*',exclude=[globs('*.java'), 'foo.py'])`` to get all files in this directory
-          except ``.java`` files and ``foo.py``.
-  """
+    E.g., - ``sources = globs('*java'),`` to get .java files in this directory.
+          - ``globs('*',exclude=[globs('*.java'), 'foo.py'])`` to get all files in this directory
+            except ``.java`` files and ``foo.py``.
+    """
 
     wrapped_fn = Fileset.globs
     validate_files = True
@@ -311,9 +314,9 @@ class Globs(FilesetRelPathWrapper):
 class RGlobs(FilesetRelPathWrapper):
     """Matches files recursively under the BUILD file's directory.
 
-  E.g., ``bundle(fileset=rglobs('config/*'))`` to bundle up all files in the config,
-        config/foo, config/foo/bar directories.
-  """
+    E.g., ``bundle(fileset=rglobs('config/*'))`` to bundle up all files
+    in the config,       config/foo, config/foo/bar directories.
+    """
 
     @staticmethod
     def rglobs_following_symlinked_dirs_by_default(*globspecs, **kw):
@@ -353,7 +356,8 @@ class RGlobs(FilesetRelPathWrapper):
 
 
 class ZGlobs(FilesetRelPathWrapper):
-    """Matches files in the BUILD file's dir using zsh-style globs, including ``**/`` to recurse."""
+    """Matches files in the BUILD file's dir using zsh-style globs, including
+    ``**/`` to recurse."""
 
     @staticmethod
     def zglobs_following_symlinked_dirs_by_default(*globspecs, **kw):

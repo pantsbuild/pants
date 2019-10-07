@@ -54,17 +54,19 @@ class GoInteropTask(QuietTaskMixin, GoWorkspaceTask):
 
     @abstractmethod
     def execute_with_go_env(self, go_path, import_paths, args, **kwargs):
-        """Subclasses should execute the go interop task in the given environment.
+        """Subclasses should execute the go interop task in the given
+        environment.
 
-    :param string go_path: The pre-formatted $GOPATH for the environment.
-    :param list import_paths: The import paths for all the go targets specified in the environment.
-    :param list args: The pass through arguments for the command to run in the go environment.
-    :param **kwargs: Any additional `subprocess` keyword-args; for testing.
-    """
+        :param string go_path: The pre-formatted $GOPATH for the environment.
+        :param list import_paths: The import paths for all the go targets specified in the environment.
+        :param list args: The pass through arguments for the command to run in the go environment.
+        :param **kwargs: Any additional `subprocess` keyword-args; for testing.
+        """
 
 
 class GoEnv(GoInteropTask):
-    """Runs an arbitrary command in a go workspace defined by zero or more go targets."""
+    """Runs an arbitrary command in a go workspace defined by zero or more go
+    targets."""
 
     def execute_with_go_env(self, go_path, import_paths, args, **kwargs):
         cmd = " ".join(args)

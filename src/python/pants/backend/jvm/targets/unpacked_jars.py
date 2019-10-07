@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 class UnpackedJars(ImportJarsMixin, Target):
     """A set of sources extracted from JAR files.
 
-  :API: public
-  """
+    :API: public
+    """
 
     imported_target_kwargs_field = "libraries"
     imported_target_payload_field = "library_specs"

@@ -588,7 +588,8 @@ class ClasspathProductsTest(TestBase):
                 self._test_canonical_classpath_helper(classpath_products, [a], base_dir, [], {})
 
     def test_create_canonical_classpath_no_duplicate_entry(self):
-        """Test no more than one symlink are created for the same classpath entry."""
+        """Test no more than one symlink are created for the same classpath
+        entry."""
         jar_path = "ivy/jars/org.x/lib/x-1.0.jar"
         resolved_jar = ResolvedJar(
             M2Coordinate(org="org", name="x", rev="1.0"),
@@ -627,15 +628,15 @@ class ClasspathProductsTest(TestBase):
         expected_classspath_files,
         excludes=None,
     ):
-        """
-    Helper method to call `create_canonical_classpath` and verify generated canonical classpath.
+        """Helper method to call `create_canonical_classpath` and verify
+        generated canonical classpath.
 
-    :param ClasspathProducts classpath_products: Classpath products.
-    :param list targets: List of targets to generate canonical classpath from.
-    :param string libs_dir: Directory where canonical classpath are to be generated.
-    :param list expected_canonical_classpath: List of canonical classpath relative to a base directory.
-    :param dict expected_classspath_files: A dict of classpath.txt path to its expected content.
-    """
+        :param ClasspathProducts classpath_products: Classpath products.
+        :param list targets: List of targets to generate canonical classpath from.
+        :param string libs_dir: Directory where canonical classpath are to be generated.
+        :param list expected_canonical_classpath: List of canonical classpath relative to a base directory.
+        :param dict expected_classspath_files: A dict of classpath.txt path to its expected content.
+        """
         canonical_classpath = ClasspathProducts.create_canonical_classpath(
             classpath_products,
             targets,

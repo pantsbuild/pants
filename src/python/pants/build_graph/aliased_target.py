@@ -40,11 +40,13 @@ class AliasTargetMacro(TargetMacro):
 
 
 class AliasTargetFactory(TargetMacro.Factory):
-    """Creates an alias for a target, so that it can be referred to with another spec.
+    """Creates an alias for a target, so that it can be referred to with
+    another spec.
 
-  Note that this does not current work with deferred source (from_target()); you must still use the
-  target's actual address in that case.
-  """
+    Note that this does not current work with deferred source
+    (from_target()); you must still use the target's actual address in
+    that case.
+    """
 
     @property
     def target_types(self):

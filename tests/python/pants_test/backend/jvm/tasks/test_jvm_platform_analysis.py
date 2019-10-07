@@ -9,10 +9,12 @@ from pants_test.task_test_base import TaskTestBase
 
 
 class JvmPlatformAnalysisTestMixin:
-    """Common helper methods for testing JvmPlatformValidate and JvmPlatformExplain.
+    """Common helper methods for testing JvmPlatformValidate and
+    JvmPlatformExplain.
 
-  Mostly for building sets of targets that are interesting for testing.
-  """
+    Mostly for building sets of targets that are interesting for
+    testing.
+    """
 
     def _java(self, name, platform=None, deps=None):
         return self.make_target(
@@ -24,7 +26,8 @@ class JvmPlatformAnalysisTestMixin:
         )
 
     def _plain(self, name, deps=None):
-        """Make a non-jvm target, useful for testing non-jvm intermediate dependencies."""
+        """Make a non-jvm target, useful for testing non-jvm intermediate
+        dependencies."""
         return self.make_target(
             spec="java:{}".format(name), target_type=Target, dependencies=deps or []
         )
@@ -116,19 +119,20 @@ class JvmPlatformValidateTest(JvmPlatformAnalysisTestMixin, TaskTestBase):
         self.assert_warning(self.bad_targets(), check="warn", children_before_parents=True)
 
     def construct_interesting_graph(self):
-        """Constructs an "interesting" transitive graph, with a mix of jvm and non-jvm targets.
+        """Constructs an "interesting" transitive graph, with a mix of jvm and
+        non-jvm targets.
 
-    Drawn in ascii below, with '->' indicating dependencies, with capital letters indicating
-    JvmTargets and lower-case letters indicating non-JvmTargets.
+        Drawn in ascii below, with '->' indicating dependencies, with capital letters indicating
+        JvmTargets and lower-case letters indicating non-JvmTargets.
 
-    A -> B
-      -> c -> D -> l -> N
-           -> f -> G
-           -> e -> q
+        A -> B
+          -> c -> D -> l -> N
+               -> f -> G
+               -> e -> q
 
-    Constructed to demonstrate the behavior of jvm_dependency_map on dependency
-    graphs that include many intermediate dependencies which are not JvmTargets.
-    """
+        Constructed to demonstrate the behavior of jvm_dependency_map on dependency
+        graphs that include many intermediate dependencies which are not JvmTargets.
+        """
         q = self._plain("q")
         e = self._plain("e", deps=[q])
         n = self._java("n")
@@ -182,7 +186,8 @@ class JvmPlatformValidateTest(JvmPlatformAnalysisTestMixin, TaskTestBase):
         self.assert_depmaps_equal(expected, jvm_deps)
 
     def test_full_transitivity(self):
-        """Tests the behavior of jvm_dependency_map when including all transitive dependencies."""
+        """Tests the behavior of jvm_dependency_map when including all
+        transitive dependencies."""
         expected = {
             "n": "",
             "g": "",

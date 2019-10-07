@@ -34,50 +34,51 @@ class AbstractTarget:
     def subsystems(cls):
         """The subsystems this target uses.
 
-    Targets always use the global subsystem instance. They have no notion of any other scope.
+        Targets always use the global subsystem instance. They have no notion of any other scope.
 
-    :API: public
+        :API: public
 
-    :return: A tuple of subsystem types.
-    """
+        :return: A tuple of subsystem types.
+        """
         return tuple()
 
     @classmethod
     def alias(cls):
         """Subclasses should return their desired BUILD file alias.
 
-    :rtype: string
-    """
+        :rtype: string
+        """
         raise NotImplementedError()
 
 
 class Target(AbstractTarget):
     """A generic target used to group dependencies.
 
-  The baseclass for all pants targets.
+    The baseclass for all pants targets.
 
-  Handles registration of a target amongst all parsed targets as well as location of the target
-  parse context.
+    Handles registration of a target amongst all parsed targets as well as location of the target
+    parse context.
 
-  :API: public
-  """
+    :API: public
+    """
 
     class RecursiveDepthError(AddressLookupError):
-        """Raised when there are too many recursive calls to calculate the fingerprint."""
+        """Raised when there are too many recursive calls to calculate the
+        fingerprint."""
 
     _MAX_RECURSION_DEPTH = 250
 
     class WrongNumberOfAddresses(Exception):
-        """Internal error, too many elements in Addresses
+        """Internal error, too many elements in Addresses.
 
-    :API: public
-    """
+        :API: public
+        """
 
     class IllegalArgument(TargetDefinitionException):
         """Argument that isn't allowed supplied to Target.
 
-    :API: public
-    """
+        :API: public
+        """
 
     class Arguments(Subsystem):
         """Options relating to handling target arguments."""
@@ -140,7 +141,8 @@ class Target(AbstractTarget):
                 )
 
     class TagAssignments(Subsystem):
-        """Tags to add to targets in addition to any defined in their BUILD files."""
+        """Tags to add to targets in addition to any defined in their BUILD
+        files."""
 
         options_scope = "target-tag-assignments"
 
@@ -200,18 +202,18 @@ class Target(AbstractTarget):
     def identify(cls, targets):
         """Generates an id for a set of targets.
 
-    :API: public
-    """
+        :API: public
+        """
         return cls.combine_ids(target.id for target in targets)
 
     @classmethod
     def maybe_readable_identify(cls, targets):
         """Generates an id for a set of targets.
 
-    If the set is a single target, just use that target's id.
+        If the set is a single target, just use that target's id.
 
-    :API: public
-    """
+        :API: public
+        """
         return cls.maybe_readable_combine_ids([target.id for target in targets])
 
     @classmethod
@@ -223,16 +225,17 @@ class Target(AbstractTarget):
     def combine_ids(ids):
         """Generates a combined id for a set of ids.
 
-    :API: public
-    """
+        :API: public
+        """
         return hash_all(sorted(ids))  # We sort so that the id isn't sensitive to order.
 
     @classmethod
     def maybe_readable_combine_ids(cls, ids):
-        """Generates combined id for a set of ids, but if the set is a single id, just use that.
+        """Generates combined id for a set of ids, but if the set is a single
+        id, just use that.
 
-    :API: public
-    """
+        :API: public
+        """
         ids = list(ids)  # We can't len a generator.
         return ids[0] if len(ids) == 1 else cls.combine_ids(ids)
 
@@ -267,21 +270,22 @@ class Target(AbstractTarget):
         postorder=None,
         respect_intransitive=False,
     ):
-        """Computes the closure of the given targets respecting the given input scopes.
+        """Computes the closure of the given targets respecting the given input
+        scopes.
 
-    :API: public
+        :API: public
 
-    :param list target_roots: The list of Targets to start from. These targets will always be
-      included in the closure, regardless of scope settings.
-    :param Scope exclude_scopes: If present and non-empty, only dependencies which have none of the
-      scope names in this Scope will be traversed.
-    :param Scope include_scopes: If present and non-empty, only dependencies which have at least one
-      of the scope names in this Scope will be traversed.
-    :param bool bfs: Whether to traverse in breadth-first or depth-first order. (Defaults to True).
-    :param bool respect_intransitive: If True, any dependencies which have the 'intransitive' scope
-      will not be included unless they are direct dependencies of one of the root targets. (Defaults
-      to False).
-    """
+        :param list target_roots: The list of Targets to start from. These targets will always be
+          included in the closure, regardless of scope settings.
+        :param Scope exclude_scopes: If present and non-empty, only dependencies which have none of the
+          scope names in this Scope will be traversed.
+        :param Scope include_scopes: If present and non-empty, only dependencies which have at least one
+          of the scope names in this Scope will be traversed.
+        :param bool bfs: Whether to traverse in breadth-first or depth-first order. (Defaults to True).
+        :param bool respect_intransitive: If True, any dependencies which have the 'intransitive' scope
+          will not be included unless they are direct dependencies of one of the root targets. (Defaults
+          to False).
+        """
         target_roots = list(target_roots)  # Sometimes generators are passed into this function.
         if not target_roots:
             return OrderedSet()
@@ -397,16 +401,16 @@ class Target(AbstractTarget):
     def type_alias(self):
         """Returns the type alias this target was constructed via.
 
-    For a target read from a BUILD file, this will be target alias, like 'java_library'.
-    For a target constructed in memory, this will be the simple class name, like 'JavaLibrary'.
+        For a target read from a BUILD file, this will be target alias, like 'java_library'.
+        For a target constructed in memory, this will be the simple class name, like 'JavaLibrary'.
 
-    The end result is that the type alias should be the most natural way to refer to this target's
-    type to the author of the target instance.
+        The end result is that the type alias should be the most natural way to refer to this target's
+        type to the author of the target instance.
 
-    :API: public
+        :API: public
 
-    :rtype: string
-    """
+        :rtype: string
+        """
         return self._type_alias or type(self).__name__
 
     @property
@@ -456,12 +460,13 @@ class Target(AbstractTarget):
     """
 
     def mark_invalidation_hash_dirty(self):
-        """Invalidates memoized fingerprints for this target, including those in payloads.
+        """Invalidates memoized fingerprints for this target, including those
+        in payloads.
 
-    Exposed for testing.
+        Exposed for testing.
 
-    :API: public
-    """
+        :API: public
+        """
         self._cached_fingerprint_map = {}
         self._cached_all_transitive_fingerprint_map = {}
         self._cached_direct_transitive_fingerprint_map = {}
@@ -563,14 +568,15 @@ class Target(AbstractTarget):
         return SourcesField(sources=FilesetWithSpec.empty(self.address.spec_path))
 
     def has_sources(self, extension=None):
-        """Return `True` if this target owns sources; optionally of the given `extension`.
+        """Return `True` if this target owns sources; optionally of the given
+        `extension`.
 
-    :API: public
+        :API: public
 
-    :param string extension: Optional suffix of filenames to test for.
-    :return: `True` if the target contains sources that match the optional extension suffix.
-    :rtype: bool
-    """
+        :param string extension: Optional suffix of filenames to test for.
+        :return: `True` if the target contains sources that match the optional extension suffix.
+        :rtype: bool
+        """
         source_paths = self._sources_field.source_paths
         if not source_paths:
             return False
@@ -614,31 +620,30 @@ class Target(AbstractTarget):
         return len(self._sources_field.sources.files)
 
     def sources_snapshot(self, scheduler=None):
-        """
-    Get a Snapshot of the sources attribute of this target.
+        """Get a Snapshot of the sources attribute of this target.
 
-    This API is experimental, and is subject to change.
-    """
+        This API is experimental, and is subject to change.
+        """
         return self._sources_field.snapshot(scheduler=scheduler)
 
     @property
     def derived_from(self):
         """Returns the target this target was derived from.
 
-    If this target was not derived from another, returns itself.
+        If this target was not derived from another, returns itself.
 
-    :API: public
-    """
+        :API: public
+        """
         return self._build_graph.get_derived_from(self.address)
 
     @property
     def derived_from_chain(self):
         """Returns all targets that this target was derived from.
 
-    If this target was not derived from another, returns an empty sequence.
+        If this target was not derived from another, returns an empty sequence.
 
-    :API: public
-    """
+        :API: public
+        """
         cur = self
         while cur.derived_from is not cur:
             cur = cur.derived_from
@@ -646,13 +651,14 @@ class Target(AbstractTarget):
 
     @property
     def concrete_derived_from(self):
-        """Returns the concrete target this target was (directly or indirectly) derived from.
+        """Returns the concrete target this target was (directly or indirectly)
+        derived from.
 
-    The returned target is guaranteed to not have been derived from any other target, and is thus
-    guaranteed to be a 'real' target from a BUILD file, not a programmatically injected target.
+        The returned target is guaranteed to not have been derived from any other target, and is thus
+        guaranteed to be a 'real' target from a BUILD file, not a programmatically injected target.
 
-    :API: public
-    """
+        :API: public
+        """
         return self._build_graph.get_concrete_derived_from(self.address)
 
     @staticmethod
@@ -667,15 +673,16 @@ class Target(AbstractTarget):
 
     @classmethod
     def compute_injectable_specs(cls, kwargs=None, payload=None):
-        """Given either pre-Target.__init__() kwargs or a post-Target.__init__() payload, compute the
-    specs to inject as non-dependencies in the same vein as the prior `traversable_specs`.
+        """Given either pre-Target.__init__() kwargs or a post-
+        Target.__init__() payload, compute the specs to inject as non-
+        dependencies in the same vein as the prior `traversable_specs`.
 
-    :API: public
+        :API: public
 
-    :param dict kwargs: The pre-Target.__init__() kwargs dict.
-    :param Payload payload: The post-Target.__init__() Payload object.
-    :yields: Spec strings representing dependencies of this target.
-    """
+        :param dict kwargs: The pre-Target.__init__() kwargs dict.
+        :param Payload payload: The post-Target.__init__() Payload object.
+        :yields: Spec strings representing dependencies of this target.
+        """
         cls._validate_target_representation_args(kwargs, payload)
         # N.B. This pattern turns this method into a non-yielding generator, which is helpful for
         # subclassing.
@@ -684,21 +691,22 @@ class Target(AbstractTarget):
 
     @classmethod
     def compute_dependency_specs(cls, kwargs=None, payload=None):
-        """Given either pre-Target.__init__() kwargs or a post-Target.__init__() payload, compute the
-    full set of dependency specs in the same vein as the prior `traversable_dependency_specs`.
+        """Given either pre-Target.__init__() kwargs or a post-
+        Target.__init__() payload, compute the full set of dependency specs in
+        the same vein as the prior `traversable_dependency_specs`.
 
-    N.B. This is a temporary bridge to span the gap between v2 "Fields" products vs v1 `BuildGraph`
-    `Target` object representations. See:
+        N.B. This is a temporary bridge to span the gap between v2 "Fields" products vs v1 `BuildGraph`
+        `Target` object representations. See:
 
-      https://github.com/pantsbuild/pants/issues/3560
-      https://github.com/pantsbuild/pants/issues/3561
+          https://github.com/pantsbuild/pants/issues/3560
+          https://github.com/pantsbuild/pants/issues/3561
 
-    :API: public
+        :API: public
 
-    :param dict kwargs: The pre-Target.__init__() kwargs dict.
-    :param Payload payload: The post-Target.__init__() Payload object.
-    :yields: Spec strings representing dependencies of this target.
-    """
+        :param dict kwargs: The pre-Target.__init__() kwargs dict.
+        :param Payload payload: The post-Target.__init__() Payload object.
+        :yields: Spec strings representing dependencies of this target.
+        """
         cls._validate_target_representation_args(kwargs, payload)
         # N.B. This pattern turns this method into a non-yielding generator, which is helpful for
         # subclassing.
@@ -837,12 +845,13 @@ class Target(AbstractTarget):
 
     @memoized_property
     def id(self):
-        """A unique and unix safe identifier for the Target.
-    Since other classes use this id to generate new file names and unix system has 255 character
-    limitation on a file name, 200-character limit is chosen as a safe measure.
+        """A unique and unix safe identifier for the Target. Since other
+        classes use this id to generate new file names and unix system has 255
+        character limitation on a file name, 200-character limit is chosen as a
+        safe measure.
 
-    :API: public
-    """
+        :API: public
+        """
         return self.compute_target_id(self.address)
 
     @property
@@ -853,20 +862,20 @@ class Target(AbstractTarget):
         return self.id
 
     def walk(self, work, predicate=None):
-        """Walk of this target's dependency graph, DFS preorder traversal, visiting each node exactly
-    once.
+        """Walk of this target's dependency graph, DFS preorder traversal,
+        visiting each node exactly once.
 
-    If a predicate is supplied it will be used to test each target before handing the target to
-    work and descending. Work can return targets in which case these will be added to the walk
-    candidate set if not already walked.
+        If a predicate is supplied it will be used to test each target before handing the target to
+        work and descending. Work can return targets in which case these will be added to the walk
+        candidate set if not already walked.
 
-    :API: public
+        :API: public
 
-    :param work: Callable that takes a :py:class:`pants.build_graph.target.Target`
-      as its single argument.
-    :param predicate: Callable that takes a :py:class:`pants.build_graph.target.Target`
-      as its single argument and returns True if the target should passed to ``work``.
-    """
+        :param work: Callable that takes a :py:class:`pants.build_graph.target.Target`
+          as its single argument.
+        :param predicate: Callable that takes a :py:class:`pants.build_graph.target.Target`
+          as its single argument and returns True if the target should passed to ``work``.
+        """
         if not callable(work):
             raise ValueError("work must be callable but was {}".format(work))
         if predicate and not callable(predicate):
@@ -876,12 +885,12 @@ class Target(AbstractTarget):
     def closure(self, *vargs, **kwargs):
         """Returns this target's transitive dependencies.
 
-    The walk will be depth-first in preorder, or breadth first if bfs=True is specified.
+        The walk will be depth-first in preorder, or breadth first if bfs=True is specified.
 
-    See Target.closure_for_targets().
+        See Target.closure_for_targets().
 
-    :API: public
-    """
+        :API: public
+        """
         return self.closure_for_targets([self], *vargs, **kwargs)
 
     def __lt__(self, other):
@@ -911,22 +920,24 @@ class Target(AbstractTarget):
 
     @classmethod
     def supports_default_sources(cls):
-        """Whether this target type can provide default sources if none were specified explicitly."""
+        """Whether this target type can provide default sources if none were
+        specified explicitly."""
         return cls.default_sources_globs is not None
 
     # TODO: Inline this as SourcesField(sources=sources) when all callers are guaranteed to pass an
     # EagerFilesetWithSpec.
     def create_sources_field(self, sources, sources_rel_path, key_arg=None):
-        """Factory method to create a SourcesField appropriate for the type of the sources object.
+        """Factory method to create a SourcesField appropriate for the type of
+        the sources object.
 
-    Note that this method is called before the call to Target.__init__ so don't expect fields to
-    be populated!
+        Note that this method is called before the call to Target.__init__ so don't expect fields to
+        be populated!
 
-    :API: public
+        :API: public
 
-    :return: a payload field object representing the sources parameter
-    :rtype: SourcesField
-    """
+        :return: a payload field object representing the sources parameter
+        :rtype: SourcesField
+        """
         if not sources:
             sources = FilesetWithSpec.empty(sources_rel_path)
         elif not isinstance(sources, FilesetWithSpec):

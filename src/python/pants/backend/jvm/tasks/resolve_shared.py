@@ -13,11 +13,12 @@ class JvmResolverBase(TaskBase):
     """Common methods for both Ivy and Coursier resolves."""
 
     def add_directory_digests_for_jars(self, targets_and_jars):
-        """For each target, get DirectoryDigests for its jars and return them zipped with the jars.
+        """For each target, get DirectoryDigests for its jars and return them
+        zipped with the jars.
 
-    :param targets_and_jars: List of tuples of the form (Target, [pants.java.jar.jar_dependency_utils.ResolveJar])
-    :return: list[tuple[(Target, list[pants.java.jar.jar_dependency_utils.ResolveJar])]
-    """
+        :param targets_and_jars: List of tuples of the form (Target, [pants.java.jar.jar_dependency_utils.ResolveJar])
+        :return: list[tuple[(Target, list[pants.java.jar.jar_dependency_utils.ResolveJar])]
+        """
 
         targets_and_jars = list(targets_and_jars)
 

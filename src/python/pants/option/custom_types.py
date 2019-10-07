@@ -11,13 +11,14 @@ from pants.util.objects import enum
 
 
 class UnsetBool:
-    """A type that can be used as the default value for a bool typed option to indicate un-set.
+    """A type that can be used as the default value for a bool typed option to
+    indicate un-set.
 
-  In other words, `bool`-typed options with a `default=UnsetBool` that are not explicitly set will
-  have the value `None`, enabling a tri-state.
+    In other words, `bool`-typed options with a `default=UnsetBool` that are not explicitly set will
+    have the value `None`, enabling a tri-state.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(self):
         raise NotImplementedError(
@@ -28,100 +29,103 @@ class UnsetBool:
 def dict_option(s):
     """An option of type 'dict'.
 
-  The value (on the command-line, in an env var or in the config file) must be eval'able to a dict.
+    The value (on the command-line, in an env var or in the config file) must be eval'able to a dict.
 
-  :API: public
-  """
+    :API: public
+    """
     return DictValueComponent.create(s)
 
 
 def list_option(s):
     """An option of type 'list'.
 
-  The value (on the command-line, in an env var or in the config file) must be one of:
+    The value (on the command-line, in an env var or in the config file) must be one of:
 
-  1. A string eval'able to a list or tuple, which will replace any previous values.
-  2. A plus sign followed by a string eval'able to a list or a tuple, whose values will be
-     appended to any previous values (e.g., those from lower-ranked sources).
-  3. A scalar, that will be appended to any previous values.
+    1. A string eval'able to a list or tuple, which will replace any previous values.
+    2. A plus sign followed by a string eval'able to a list or a tuple, whose values will be
+       appended to any previous values (e.g., those from lower-ranked sources).
+    3. A scalar, that will be appended to any previous values.
 
 
-  :API: public
-  """
+    :API: public
+    """
     return ListValueComponent.create(s)
 
 
 def target_option(s):
     """Same type as 'str', but indicates a single target spec.
 
-  :API: public
+    :API: public
 
-  TODO(stuhood): Eagerly convert these to Addresses: see https://rbcommons.com/s/twitter/r/2937/
-  """
+    TODO(stuhood): Eagerly convert these to Addresses: see https://rbcommons.com/s/twitter/r/2937/
+    """
     return s
 
 
 # TODO: Replace target_list_option with type=list, member_type=target_option.
 # Then we'll get all the goodies from list_option (e.g., appending) free.
 def target_list_option(s):
-    """Same type as 'list_option', but indicates list contents are target specs.
+    """Same type as 'list_option', but indicates list contents are target
+    specs.
 
-  :API: public
+    :API: public
 
-  TODO(stuhood): Eagerly convert these to Addresses: see https://rbcommons.com/s/twitter/r/2937/
-  """
+    TODO(stuhood): Eagerly convert these to Addresses: see https://rbcommons.com/s/twitter/r/2937/
+    """
     return _convert(s, (list, tuple))
 
 
 def _normalize_directory_separators(s):
-    """Coalesce runs of consecutive instances of `os.sep` in `s`, e.g. '//' -> '/' on POSIX.
+    """Coalesce runs of consecutive instances of `os.sep` in `s`, e.g. '//' ->
+    '/' on POSIX.
 
-  The engine will use paths or target addresses either to form globs or to string-match against, and
-  including the directory separator '/' multiple times in a row e.g. '//' produces an equivalent
-  glob as with a single '/', but produces a different actual string, which will cause the engine to
-  fail to glob file paths or target specs correctly.
+    The engine will use paths or target addresses either to form globs or to string-match against, and
+    including the directory separator '/' multiple times in a row e.g. '//' produces an equivalent
+    glob as with a single '/', but produces a different actual string, which will cause the engine to
+    fail to glob file paths or target specs correctly.
 
-  TODO: give the engine more control over matching paths so we don't have to sanitize the input!
-  """
+    TODO: give the engine more control over matching paths so we don't have to sanitize the input!
+    """
     return os.path.normpath(s)
 
 
 def dir_option(s):
     """Same type as 'str', but indicates string represents a directory path.
 
-  :API: public
-  """
+    :API: public
+    """
     return _normalize_directory_separators(s)
 
 
 def file_option(s):
     """Same type as 'str', but indicates string represents a filepath.
 
-  :API: public
-  """
+    :API: public
+    """
     return _normalize_directory_separators(s)
 
 
 def dict_with_files_option(s):
-    """Same as 'dict', but fingerprints the file contents of any values which are file paths.
+    """Same as 'dict', but fingerprints the file contents of any values which
+    are file paths.
 
-  For any value which matches the path of a file on disk, the file path is not fingerprinted -- only
-  its contents.
+    For any value which matches the path of a file on disk, the file path is not fingerprinted -- only
+    its contents.
 
-  :API: public
-  """
+    :API: public
+    """
     return dict_option(s)
 
 
 def _convert(val, acceptable_types):
     """Ensure that val is one of the acceptable types, converting it if needed.
 
-  :param val: The value we're parsing (either a string or one of the acceptable types).
-  :param acceptable_types: A tuple of expected types for val.
-  :returns: The parsed value.
-  :raises :class:`pants.options.errors.ParseError`: if there was a problem parsing the val as an
-                                                    acceptable type.
-  """
+    :param val: The value we're parsing (either a string or one of the acceptable types).
+    :param acceptable_types: A tuple of expected types for val.
+    :returns: The parsed value.
+    :raises :class:`pants.options.errors.ParseError`: if there was a problem parsing the val as an
+                                                      acceptable type.
+    """
     if isinstance(val, acceptable_types):
         return val
     return parse_expression(val, acceptable_types, raise_type=ParseError)
@@ -130,14 +134,14 @@ def _convert(val, acceptable_types):
 class ListValueComponent:
     """A component of the value of a list-typed option.
 
-  One or more instances of this class can be merged to form a list value.
+    One or more instances of this class can be merged to form a list value.
 
-  A component consists of values to append and values to filter while constructing the final list.
+    A component consists of values to append and values to filter while constructing the final list.
 
-  Each component may either replace or modify the preceding component.  So that, e.g., a config
-  file can append to and/or filter the default value list, instead of having to repeat most
-  of the contents of the default value list.
-  """
+    Each component may either replace or modify the preceding component.  So that, e.g., a config
+    file can append to and/or filter the default value list, instead of having to repeat most
+    of the contents of the default value list.
+    """
 
     REPLACE = "REPLACE"
     MODIFY = "MODIFY"
@@ -166,14 +170,15 @@ class ListValueComponent:
 
     @classmethod
     def merge(cls, components):
-        """Merges components into a single component, applying their actions appropriately.
+        """Merges components into a single component, applying their actions
+        appropriately.
 
-    This operation is associative:  M(M(a, b), c) == M(a, M(b, c)) == M(a, b, c).
+        This operation is associative:  M(M(a, b), c) == M(a, M(b, c)) == M(a, b, c).
 
-    :param list components: an iterable of instances of ListValueComponent.
-    :return: An instance representing the result of merging the components.
-    :rtype: `ListValueComponent`
-    """
+        :param list components: an iterable of instances of ListValueComponent.
+        :return: An instance representing the result of merging the components.
+        :rtype: `ListValueComponent`
+        """
         # Note that action of the merged component is MODIFY until the first REPLACE is encountered.
         # This guarantees associativity.
         action = cls.MODIFY
@@ -206,16 +211,17 @@ class ListValueComponent:
 
     @classmethod
     def create(cls, value):
-        """Interpret value as either a list or something to extend another list with.
+        """Interpret value as either a list or something to extend another list
+        with.
 
-    Note that we accept tuple literals, but the internal value is always a list.
+        Note that we accept tuple literals, but the internal value is always a list.
 
-    :param value: The value to convert.  Can be an instance of ListValueComponent, a list, a tuple,
-                  a string representation of a list or tuple (possibly prefixed by + or -
-                  indicating modification instead of replacement), or any allowed member_type.
-                  May also be a comma-separated sequence of modifications.
-    :rtype: `ListValueComponent`
-    """
+        :param value: The value to convert.  Can be an instance of ListValueComponent, a list, a tuple,
+                      a string representation of a list or tuple (possibly prefixed by + or -
+                      indicating modification instead of replacement), or any allowed member_type.
+                      May also be a comma-separated sequence of modifications.
+        :rtype: `ListValueComponent`
+        """
         if isinstance(value, bytes):
             value = value.decode()
 
@@ -254,25 +260,26 @@ class ListValueComponent:
 class DictValueComponent:
     """A component of the value of a dict-typed option.
 
-  One or more instances of this class can be merged to form a dict value.
+    One or more instances of this class can be merged to form a dict value.
 
-  Each component may either replace or extend the preceding component.  So that, e.g., a config
-  file can extend the default value of a dict, instead of having to repeat it.
-  """
+    Each component may either replace or extend the preceding component.  So that, e.g., a config
+    file can extend the default value of a dict, instead of having to repeat it.
+    """
 
     REPLACE = "REPLACE"
     EXTEND = "EXTEND"
 
     @classmethod
     def merge(cls, components):
-        """Merges components into a single component, applying their actions appropriately.
+        """Merges components into a single component, applying their actions
+        appropriately.
 
-    This operation is associative:  M(M(a, b), c) == M(a, M(b, c)) == M(a, b, c).
+        This operation is associative:  M(M(a, b), c) == M(a, M(b, c)) == M(a, b, c).
 
-    :param list components: an iterable of instances of DictValueComponent.
-    :return: An instance representing the result of merging the components.
-    :rtype: `DictValueComponent`
-    """
+        :param list components: an iterable of instances of DictValueComponent.
+        :return: An instance representing the result of merging the components.
+        :rtype: `DictValueComponent`
+        """
         # Note that action of the merged component is EXTEND until the first REPLACE is encountered.
         # This guarantees associativity.
         action = cls.EXTEND
@@ -293,12 +300,13 @@ class DictValueComponent:
 
     @classmethod
     def create(cls, value):
-        """Interpret value as either a dict or something to extend another dict with.
+        """Interpret value as either a dict or something to extend another dict
+        with.
 
-    :param value: The value to convert.  Can be an instance of DictValueComponent, a dict,
-                  or a string representation (possibly prefixed by +) of a dict.
-    :rtype: `DictValueComponent`
-    """
+        :param value: The value to convert.  Can be an instance of DictValueComponent, a dict,
+                      or a string representation (possibly prefixed by +) of a dict.
+        :rtype: `DictValueComponent`
+        """
         if isinstance(value, bytes):
             value = value.decode()
         if isinstance(value, cls):  # Ensure idempotency.
@@ -322,8 +330,9 @@ class DictValueComponent:
 
 
 class GlobExpansionConjunction(enum(["any_match", "all_match"])):
-    """Describe whether to require that only some or all glob strings match in a target's sources.
+    """Describe whether to require that only some or all glob strings match in
+    a target's sources.
 
-  NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
-  be aware of any changes to this object's definition.
-  """
+    NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
+    be aware of any changes to this object's definition.
+    """

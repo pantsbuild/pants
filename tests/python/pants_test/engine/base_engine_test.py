@@ -13,33 +13,33 @@ class EngineTestBase(TestBase):
 
     @classmethod
     def as_goal(cls, goal_name):
-        """Returns a ``Goal`` object of the given name
+        """Returns a ``Goal`` object of the given name.
 
-    :API: public
-    """
+        :API: public
+        """
         return Goal.by_name(goal_name)
 
     @classmethod
     def as_goals(cls, *goal_names):
         """Converts the given goal names to a list of ``Goal`` objects.
 
-    :API: public
-    """
+        :API: public
+        """
         return [cls.as_goal(goal_name) for goal_name in goal_names]
 
     @classmethod
     def install_task(cls, name, action=None, dependencies=None, goal=None):
         """Creates and installs a task with the given name.
 
-    :API: public
+        :API: public
 
-    :param string name: The task name.
-    :param action: The task's action.
-    :param list dependencies: The list of goal names the task depends on, if any.
-    :param string goal: The name of the goal to install the task in, if different from the task
-                        name.
-    :returns The ``Goal`` object with task installed.
-    """
+        :param string name: The task name.
+        :param action: The task's action.
+        :param list dependencies: The list of goal names the task depends on, if any.
+        :param string goal: The name of the goal to install the task in, if different from the task
+                            name.
+        :returns The ``Goal`` object with task installed.
+        """
         return TaskRegistrar(
             name, action=action or (lambda: None), dependencies=dependencies or []
         ).install(goal if goal is not None else None)

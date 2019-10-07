@@ -11,21 +11,23 @@ from pants.util.contextutil import temporary_dir
 
 
 class JvmPlatformIntegrationMixin:
-    """Mixin providing lots of JvmPlatform-related integration tests to java compilers (eg, zinc)."""
+    """Mixin providing lots of JvmPlatform-related integration tests to java
+    compilers (eg, zinc)."""
 
     def get_pants_compile_args(self):
         """List of arguments to pants that determine what compiler to use.
 
-    The compiling task must be the last argument (eg, compile.rsc).
-    """
+        The compiling task must be the last argument (eg, compile.rsc).
+        """
         raise NotImplementedError
 
     def determine_version(self, path):
-        """Given the filepath to a class file, invokes the 'file' commandline to find its java version.
+        """Given the filepath to a class file, invokes the 'file' commandline
+        to find its java version.
 
-    :param str path: filepath (eg, tempdir/Foo.class)
-    :return: A java version string (eg, '1.6').
-    """
+        :param str path: filepath (eg, tempdir/Foo.class)
+        :return: A java version string (eg, '1.6').
+        """
         # Map of target version numbers to their equivalent class file versions, which are different.
         version_map = {"50.0": "1.6", "51.0": "1.7", "52.0": "1.8"}
         p = Popen(["file", path], stdout=PIPE, stderr=PIPE)

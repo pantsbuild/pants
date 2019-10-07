@@ -6,7 +6,8 @@ from pants.util.memo import memoized_property
 
 
 class ResolvedJar:
-    """Represents an artifact resolved from the dependency resolution process."""
+    """Represents an artifact resolved from the dependency resolution
+    process."""
 
     def __init__(self, coordinate, cache_path, pants_path=None, directory_digest=None):
         """
@@ -42,8 +43,8 @@ class ResolvedJar:
 class M2Coordinate(object):
     """Represents a fully qualified name of an artifact.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(self, org, name, rev=None, classifier=None, ext=None):
         """
@@ -70,15 +71,16 @@ class M2Coordinate(object):
 
     @classmethod
     def create(cls, jar):
-        """Creates an actual M2Coordinate from the given M2Coordinate-like object (eg a JarDependency).
+        """Creates an actual M2Coordinate from the given M2Coordinate-like
+        object (eg a JarDependency).
 
-    :API: public
+        :API: public
 
-    :param JarDependency jar: the input coordinate.
-    :return: A new M2Coordinate, unless the input is already an M2Coordinate in which case it just
-      returns the input unchanged.
-    :rtype: M2Coordinate
-    """
+        :param JarDependency jar: the input coordinate.
+        :return: A new M2Coordinate, unless the input is already an M2Coordinate in which case it just
+          returns the input unchanged.
+        :rtype: M2Coordinate
+        """
         if isinstance(jar, cls):
             return jar
         return cls(org=jar.org, name=jar.name, rev=jar.rev, classifier=jar.classifier, ext=jar.ext)
@@ -87,10 +89,10 @@ class M2Coordinate(object):
     def unversioned(cls, coord):
         """The coordinate without the version.
 
-    :param M2Coordinate coord: an M2Coordinate or JarDependency.
-    :return: the coordinate without the version.
-    :rtype: M2Coordinate
-    """
+        :param M2Coordinate coord: an M2Coordinate or JarDependency.
+        :return: the coordinate without the version.
+        :rtype: M2Coordinate
+        """
         coord = cls.create(coord)
         if coord.rev is None:
             return coord
@@ -100,12 +102,13 @@ class M2Coordinate(object):
 
     @memoized_property
     def artifact_filename(self):
-        """Returns the canonical maven-style filename for an artifact pointed at by this coordinate.
+        """Returns the canonical maven-style filename for an artifact pointed
+        at by this coordinate.
 
-    :API: public
+        :API: public
 
-    :rtype: string
-    """
+        :rtype: string
+        """
 
         def maybe_compenent(component):
             return "-{}".format(component) if component else ""
@@ -134,11 +137,11 @@ class M2Coordinate(object):
 
     @property
     def simple_coord(self):
-        """
-    A simple version of coordinate representation with org:name:version without classifier or ext
+        """A simple version of coordinate representation with org:name:version
+        without classifier or ext.
 
-    :return: org:name:version
-    """
+        :return: org:name:version
+        """
         return "{}:{}:{}".format(self.org, self.name, self.rev)
 
     def __eq__(self, other):
@@ -169,7 +172,8 @@ class M2Coordinate(object):
         )
 
     def copy(self, **replacements):
-        """Returns a clone of this M2Coordinate with the given replacements kwargs overlaid."""
+        """Returns a clone of this M2Coordinate with the given replacements
+        kwargs overlaid."""
         cls = type(self)
         kwargs = {
             "org": self.org,

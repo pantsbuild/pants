@@ -54,8 +54,9 @@ class CppBinaryCreate(CppTask):
 
     def _libname(self, libpath):
         """Converts a full library filepath to the library's name.
-    Ex: /path/to/libhello.a --> hello
-    """
+
+        Ex: /path/to/libhello.a --> hello
+        """
         # Cut off 'lib' at the beginning of filename, and '.a' at end.
         return os.path.basename(libpath)[3:-2]
 

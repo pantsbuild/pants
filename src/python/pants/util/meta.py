@@ -44,7 +44,8 @@ with an @classproperty decorator.""".format(
 
 
 def classproperty(func):
-    """Use as a decorator on a method definition to make it a class-level attribute.
+    """Use as a decorator on a method definition to make it a class-level
+    attribute.
 
   This decorator can be applied to a method, a classmethod, or a staticmethod. This decorator will
   bind the first argument to the class object.
@@ -62,7 +63,7 @@ def classproperty(func):
 
   The docstring of the classproperty `x` for a class `C` can be obtained by
   `C.__dict__['x'].__doc__`.
-  """
+    """
     doc = func.__doc__
 
     if not isinstance(func, (classmethod, staticmethod)):
@@ -72,7 +73,8 @@ def classproperty(func):
 
 
 def staticproperty(func):
-    """Use as a decorator on a method definition to make it a class-level attribute (without binding).
+    """Use as a decorator on a method definition to make it a class-level
+    attribute (without binding).
 
   This decorator can be applied to a method or a staticmethod. This decorator does not bind any
   arguments.
@@ -91,7 +93,7 @@ def staticproperty(func):
 
   The docstring of the classproperty `x` for a class `C` can be obtained by
   `C.__dict__['x'].__doc__`.
-  """
+    """
     doc = func.__doc__
 
     if not isinstance(func, staticmethod):

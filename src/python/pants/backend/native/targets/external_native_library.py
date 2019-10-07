@@ -23,14 +23,15 @@ class ConanRequirement(
         [("pkg_spec", str), ("include_relpath", str), ("lib_relpath", str), ("lib_names", tuple)]
     )
 ):
-    """A specification for a conan package to be resolved against a remote repository.
+    """A specification for a conan package to be resolved against a remote
+    repository.
 
-  Example `pkg_spec`: 'lzo/2.10@twitter/stable'
+    Example `pkg_spec`: 'lzo/2.10@twitter/stable'
 
-  The include and lib dirs default to 'include/' and 'lib/', but as this is a convention, they can
-  be overridden for the specific package to be resolved. See
-  https://docs.conan.io/en/latest/using_packages/conanfile_txt.html#imports for more info.
-  """
+    The include and lib dirs default to 'include/' and 'lib/', but as this is a convention, they can
+    be overridden for the specific package to be resolved. See
+    https://docs.conan.io/en/latest/using_packages/conanfile_txt.html#imports for more info.
+    """
 
     @classmethod
     def alias(cls):
@@ -63,23 +64,23 @@ class ConanRequirement(
 
     @memoized_property
     def directory_path(self):
+        """A helper method for converting Conan to package specifications to
+        the data directory path that Conan creates for each package.
+
+        Example package specification:
+          "my_library/1.0.0@pants/stable"
+        Example of the direcory path that Conan downloads pacakge data for this package to:
+          "my_library/1.0.0/pants/stable"
+
+        For more info on Conan package specifications, see:
+          https://docs.conan.io/en/latest/introduction.html
         """
-    A helper method for converting Conan to package specifications to the data directory
-    path that Conan creates for each package.
-
-    Example package specification:
-      "my_library/1.0.0@pants/stable"
-    Example of the direcory path that Conan downloads pacakge data for this package to:
-      "my_library/1.0.0/pants/stable"
-
-    For more info on Conan package specifications, see:
-      https://docs.conan.io/en/latest/introduction.html
-    """
         return self.pkg_spec.replace("@", "/")
 
 
 class ExternalNativeLibrary(Target):
-    """A set of Conan package strings to be passed to the Conan package manager."""
+    """A set of Conan package strings to be passed to the Conan package
+    manager."""
 
     @classmethod
     def alias(cls):

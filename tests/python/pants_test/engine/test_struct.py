@@ -10,7 +10,8 @@ from pants.engine.struct import Struct
 
 class StructTest(unittest.TestCase):
     def test_attribute_error_raised_in_property(self):
-        """This tests that Struct#__getattr__ doesn't prevent correct attribution of AttributeErrors."""
+        """This tests that Struct#__getattr__ doesn't prevent correct
+        attribution of AttributeErrors."""
 
         class StructWithProperty(Struct):
             @property

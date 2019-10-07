@@ -28,9 +28,9 @@ Suggested use:
 def beautiful_soup(*args, **kwargs):
     """Indirection function so we can lazy-import bs4.
 
-  It's an expensive import that invokes re.compile a lot, so we don't want to incur that cost
-  unless we must.
-  """
+    It's an expensive import that invokes re.compile a lot, so we don't
+    want to incur that cost unless we must.
+    """
     import bs4
 
     return bs4.BeautifulSoup(*args, **kwargs)
@@ -110,16 +110,17 @@ class PrecomputedPageInfo:
 
 
 def precompute_pantsrefs(soups):
-    """Return links for <a pantsmark="foo"> tags. Mutates soups to give needed ids.
+    """Return links for <a pantsmark="foo"> tags. Mutates soups to give needed
+    ids.
 
-  If we see <a pantsref="foo">something</a>, that's a link whose destination is
-  a <a pantsmark="foo"> </a> tag, perhaps on some other tag. To stitch these
-  together, we scan the docset to find all the pantsmarks. If an pantsmark does not
-  yet have an id to anchor, we give it one.
+    If we see <a pantsref="foo">something</a>, that's a link whose destination is
+    a <a pantsmark="foo"> </a> tag, perhaps on some other tag. To stitch these
+    together, we scan the docset to find all the pantsmarks. If an pantsmark does not
+    yet have an id to anchor, we give it one.
 
-  Return value dictionary maps pantsrefs to locations:
-  { "foo": "path/to/foo.html#fooref", "bar": "other/page.html#barref", ...}
-  """
+    Return value dictionary maps pantsrefs to locations:
+    { "foo": "path/to/foo.html#fooref", "bar": "other/page.html#barref", ...}
+    """
     accumulator = {}
     for (page, soup) in soups.items():
         existing_anchors = find_existing_anchors(soup)
@@ -151,7 +152,8 @@ def precompute_pantsrefs(soups):
 
 
 def precompute(config, soups):
-    """Return info we want to compute (and preserve) before we mutate things."""
+    """Return info we want to compute (and preserve) before we mutate
+    things."""
     show_toc = config.get("show_toc", {})
     page = {}
     pantsrefs = precompute_pantsrefs(soups)
@@ -164,9 +166,10 @@ def precompute(config, soups):
 def fixup_internal_links(config, soups):
     """Find href="..." links that link to pages in our docset; fix them up.
 
-  We don't preserve relative paths between files as we copy-transform them
-  from source to dest. So adjust the paths to work with new locations.
-  """
+    We don't preserve relative paths between files as we copy-transform
+    them from source to dest. So adjust the paths to work with new
+    locations.
+    """
     # Pages can come from different dirs; they can go to different dirs.
     # Thus, there's some relative-path-computing here.
     reverse_directory = {}
@@ -191,8 +194,8 @@ _heading_re = re.compile(r"^h[1-6]$")  # match heading tag names h1,h2,h3,...
 
 
 def rel_href(src: str, dst: str) -> str:
-    """For src='foo/bar.html', dst='garply.html#frotz' return relative link '../garply.html#frotz'.
-  """
+    """For src='foo/bar.html', dst='garply.html#frotz' return relative link
+    '../garply.html#frotz'."""
     src_dir = Path(src).parent
     return os.path.relpath(dst, src_dir)
 
@@ -210,8 +213,8 @@ def find_existing_anchors(soup):
 def ensure_headings_linkable(soups):
     """foreach soup, foreach h1,h2,etc, if no id=... or name=..., give it one.
 
-  Enables tables of contents.
-  """
+    Enables tables of contents.
+    """
     for soup in soups.values():
         ensure_page_headings_linkable(soup)
 
@@ -234,7 +237,8 @@ def ensure_page_headings_linkable(soup):
 
 
 def link_pantsrefs(soups, precomputed):
-    """Transorm soups: <a pantsref="foo"> becomes <a href="../foo_page.html#foo">"""
+    """Transorm soups: <a pantsref="foo"> becomes <a
+    href="../foo_page.html#foo">"""
     for (page, soup) in soups.items():
         for a in soup.find_all("a"):
             if not a.has_attr("pantsref"):
@@ -258,7 +262,7 @@ def transform_soups(config, soups, precomputed):
 
 
 def get_title(soup):
-    """Given a soup, pick out a title"""
+    """Given a soup, pick out a title."""
     if soup.title:
         return soup.title.string
     if soup.h1:
@@ -341,8 +345,9 @@ def generate_site_toc(config, precomputed, here):
 def hdepth(tag):
     """Compute an h tag's "outline depth".
 
-  E.g., h1 at top level is 1, h1 in a section is 2, h2 at top level is 2.
-  """
+    E.g., h1 at top level is 1, h1 in a section is 2, h2 at top level is
+    2.
+    """
     if not _heading_re.search(tag.name):
         raise TaskError(f"Can't compute heading depth of non-heading {tag}")
     depth = int(tag.name[1], 10)  # get the 2 from 'h2'
@@ -361,7 +366,7 @@ def generate_page_tocs(soups, precomputed):
 
 
 def generate_page_toc(soup):
-    """Return page-level (~list of headings) TOC template data for soup"""
+    """Return page-level (~list of headings) TOC template data for soup."""
     # Maybe we don't want to show all the headings. E.g., it's common for a page
     # to have just one H1, a title at the top. Our heuristic: if a page has just
     # one heading of some outline level, don't show it.
@@ -428,5 +433,5 @@ def copy_extras(config):
 
 
 def load_template(config):
-    """Return text of template file specified in config"""
+    """Return text of template file specified in config."""
     return Path(config["template"]).read_text()

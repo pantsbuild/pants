@@ -24,16 +24,16 @@ class JvmTaskTestBase(TaskTestBase):
         self.set_options_for_scope("resolver", resolver="ivy")
 
     def populate_runtime_classpath(self, context, classpath=None):
+        """Helps actual test cases to populate the 'runtime_classpath' products
+        data mapping in the context, which holds the classpath value for
+        targets.
+
+        :API: public
+
+        :param context: The execution context where the products data mapping lives.
+        :param classpath: a list of classpath strings. If not specified,
+                          [os.path.join(self.buildroot, 'none')] will be used.
         """
-    Helps actual test cases to populate the 'runtime_classpath' products data mapping
-    in the context, which holds the classpath value for targets.
-
-    :API: public
-
-    :param context: The execution context where the products data mapping lives.
-    :param classpath: a list of classpath strings. If not specified,
-                      [os.path.join(self.buildroot, 'none')] will be used.
-    """
         classpath = classpath or []
         runtime_classpath = self.get_runtime_classpath(context)
         runtime_classpath.add_for_targets(
@@ -41,10 +41,11 @@ class JvmTaskTestBase(TaskTestBase):
         )
 
     def add_to_runtime_classpath(self, context, tgt, files_dict):
-        """Creates and adds the given files to the classpath for the given target under a temp path.
+        """Creates and adds the given files to the classpath for the given
+        target under a temp path.
 
-    :API: public
-    """
+        :API: public
+        """
         runtime_classpath = self.get_runtime_classpath(context)
         # Create a temporary directory under the target id, then dump all files.
         target_dir = os.path.join(self.test_workdir, tgt.id)

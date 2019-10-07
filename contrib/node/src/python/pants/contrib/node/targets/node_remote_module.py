@@ -26,6 +26,6 @@ class NodeRemoteModule(NodePackage):
     def version(self):
         """The version constraint of the remote package.
 
-    :rtype: string
-    """
+        :rtype: string
+        """
         return self.payload.version

@@ -18,7 +18,8 @@ from pants.util.memo import memoized_property
 
 
 class AnalysisExtraction(NailgunTask):
-    """A task that handles extracting product and dependency information from zinc analysis."""
+    """A task that handles extracting product and dependency information from
+    zinc analysis."""
 
     # The output JSON created by this task is not localized, but is used infrequently enough
     # that re-computing it from the zinc analysis (which _is_ cached) when necessary is fine.
@@ -42,10 +43,11 @@ class AnalysisExtraction(NailgunTask):
         return ["product_deps_by_target"]
 
     def _create_products_if_should_run(self):
-        """If this task should run, initialize empty products that it will populate.
+        """If this task should run, initialize empty products that it will
+        populate.
 
-    Returns true if the task should run.
-    """
+        Returns true if the task should run.
+        """
 
         should_run = False
         if self.context.products.is_required_data("product_deps_by_target"):
@@ -64,20 +66,17 @@ class AnalysisExtraction(NailgunTask):
 
     @contextmanager
     def aliased_classpaths(self, classpaths):
-        """
-    Create unique names for each classpath entry as symlinks in
-    a temporary directory.  returns: dict[str -> classpath entry]
-    which maps string paths of symlinks to classpaths.
+        """Create unique names for each classpath entry as symlinks in a
+        temporary directory.  returns: dict[str -> classpath entry] which maps
+        string paths of symlinks to classpaths.
 
-    ClasspathEntries generally point to a .jar of
-    the .class files generated for java_library targets.
-    These jars all have the same basename, z.jar, which
-    confuses the `jdeps` tool. Jdeps expects unique, and
-    descriptive, basenames for jars. When all basenames are
-    the same the deps collide in the jdeps output, some
-    .class files can't be found and the summary output
-    is not complete.
-    """
+        ClasspathEntries generally point to a .jar of the .class files
+        generated for java_library targets. These jars all have the same
+        basename, z.jar, which confuses the `jdeps` tool. Jdeps expects
+        unique, and descriptive, basenames for jars. When all basenames
+        are the same the deps collide in the jdeps output, some .class
+        files can't be found and the summary output is not complete.
+        """
         with temporary_dir() as tempdir:
             aliases = {}
             for i, cp in enumerate(classpaths):

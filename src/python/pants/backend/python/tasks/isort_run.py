@@ -20,11 +20,11 @@ from pants.util.contextutil import pushd
 class IsortRun(FmtTaskMixin, Task):
     """Autoformats Python source files with isort.
 
-  Behavior:
-  ./pants fmt.isort <targets> -- <args, e.g. "--recursive ."> will sort the files only related
-    to specified targets, but the way of finding the config(s) is vanilla. If no target is
-    specified or no python source file is found in <targets>, it would be a no-op.
-  """
+    Behavior:
+    ./pants fmt.isort <targets> -- <args, e.g. "--recursive ."> will sort the files only related
+      to specified targets, but the way of finding the config(s) is vanilla. If no target is
+      specified or no python source file is found in <targets>, it would be a no-op.
+    """
 
     NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE = "No-op: no Python source file found in target(s)."
 

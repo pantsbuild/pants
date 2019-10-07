@@ -17,8 +17,8 @@ from pants.build_graph.target import Target
 class PythonTarget(Target):
     """Base class for all Python targets.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(
         self, address=None, payload=None, sources=None, provides=None, compatibility=None, **kwargs

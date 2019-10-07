@@ -16,7 +16,8 @@ class STTYSettings:
     @classmethod
     @contextmanager
     def preserved(cls):
-        """Run potentially stty-modifying operations, e.g., REPL execution, in this contextmanager."""
+        """Run potentially stty-modifying operations, e.g., REPL execution, in
+        this contextmanager."""
         inst = cls()
         inst.save_tty_flags()
         try:

@@ -34,10 +34,11 @@ class GoProtobufLibrary(Target):
 
     @property
     def protoc_plugins(self):
-        """The names of protoc plugins to use when generating code from this target.
+        """The names of protoc plugins to use when generating code from this
+        target.
 
-    :rtype: list of strings.
-    """
+        :rtype: list of strings.
+        """
         return self.payload.protoc_plugins
 
 
@@ -57,5 +58,6 @@ class GoProtobufGenLibrary(GoTarget):
 
     @property
     def import_path(self):
-        """The import path as used in import statements in `.go` source files."""
+        """The import path as used in import statements in `.go` source
+        files."""
         return GoLocalSource.local_import_path(self.target_base, self.address)

@@ -37,7 +37,8 @@ FILE_TEXT = """
 
 
 class MinimalCheckstylePlugin(CheckstylePlugin):
-    """Minimal Checkstyle plugin used to test PythonFile interactions in Plugin."""
+    """Minimal Checkstyle plugin used to test PythonFile interactions in
+    Plugin."""
 
     def nits(self):
         return []
@@ -88,8 +89,9 @@ class CommonTest(unittest.TestCase):
     def test_python_file_index_offset(self):
         """Test that we can not index into a python file with 0.
 
-    PythonFile is offset by one to match users expectations with file line numbering.
-    """
+        PythonFile is offset by one to match users expectations with
+        file line numbering.
+        """
         with self.assertRaises(IndexError):
             self._python_file_for_testing()[0]
 
@@ -121,7 +123,8 @@ class CommonTest(unittest.TestCase):
         self.assertEqual(expected, [self._python_file_for_testing()[x] for x in range(1, 17)])
 
     def test_rejoin(self):
-        """Test that when we stitch the PythonFile back up we get back our input."""
+        """Test that when we stitch the PythonFile back up we get back our
+        input."""
         self.assertEqual(self._statement_for_testing(), "\n".join(self._python_file_for_testing()))
 
     def test_off_by_one_enumeration(self):
@@ -162,9 +165,9 @@ class CommonTest(unittest.TestCase):
     def test_style_error(self):
         """Test error with actual AST node.
 
-    Verify that when we fetch a node form AST and create an error we get the
-    same result as generating the error manually.
-    """
+        Verify that when we fetch a node form AST and create an error we
+        get the same result as generating the error manually.
+        """
         plugin = MinimalCheckstylePlugin({}, PythonFile.from_statement(FILE_TEXT))
         import_from = None
         for node in ast.walk(self._python_file_for_testing().tree):

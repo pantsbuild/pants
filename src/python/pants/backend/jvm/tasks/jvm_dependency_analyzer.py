@@ -18,9 +18,10 @@ from pants.util.memo import memoized_method, memoized_property
 class JvmDependencyAnalyzer:
     """Helper class for tasks which need to analyze source dependencies.
 
-  Primary purpose is to provide a classfile --> target mapping, which subclasses can use in
-  determining which targets correspond to the actual source dependencies of any given target.
-  """
+    Primary purpose is to provide a classfile --> target mapping, which
+    subclasses can use in determining which targets correspond to the
+    actual source dependencies of any given target.
+    """
 
     def __init__(self, buildroot, distribution, runtime_classpath):
         self.buildroot = buildroot
@@ -29,11 +30,12 @@ class JvmDependencyAnalyzer:
 
     @memoized_method
     def files_for_target(self, target):
-        """Yields a sequence of abs path of source, class or jar files provided by the target.
+        """Yields a sequence of abs path of source, class or jar files provided
+        by the target.
 
-    The runtime classpath for a target must already have been finalized for a target in order
-    to compute its provided files.
-    """
+        The runtime classpath for a target must already have been
+        finalized for a target in order to compute its provided files.
+        """
 
         def gen():
             # Compute src -> target.
@@ -58,13 +60,16 @@ class JvmDependencyAnalyzer:
         return set(gen())
 
     def targets_by_file(self, targets):
-        """Returns a map from abs path of source, class or jar file to an OrderedSet of targets.
+        """Returns a map from abs path of source, class or jar file to an
+        OrderedSet of targets.
 
-    The value is usually a singleton, because a source or class file belongs to a single target.
-    However a single jar may be provided (transitively or intransitively) by multiple JarLibrary
-    targets. But if there is a JarLibrary target that depends on a jar directly, then that
-    "canonical" target will be the first one in the list of targets.
-    """
+        The value is usually a singleton, because a source or class file
+        belongs to a single target. However a single jar may be provided
+        (transitively or intransitively) by multiple JarLibrary targets.
+        But if there is a JarLibrary target that depends on a jar
+        directly, then that "canonical" target will be the first one in
+        the list of targets.
+        """
         targets_by_file = defaultdict(OrderedSet)
 
         for target in targets:
@@ -74,7 +79,8 @@ class JvmDependencyAnalyzer:
         return targets_by_file
 
     def targets_for_class(self, target, classname):
-        """Search which targets from `target`'s transitive dependencies contain `classname`."""
+        """Search which targets from `target`'s transitive dependencies contain
+        `classname`."""
         targets_with_class = set()
         for target in target.closure():
             for one_class in self._target_classes(target):
@@ -88,8 +94,8 @@ class JvmDependencyAnalyzer:
     def _target_classes(self, target):
         """Set of target's provided classes.
 
-    Call at the target level is to memoize efficiently.
-    """
+        Call at the target level is to memoize efficiently.
+        """
         target_classes = set()
         contents = ClasspathUtil.classpath_contents((target,), self.runtime_classpath)
         for f in contents:
@@ -170,14 +176,14 @@ class JvmDependencyAnalyzer:
     def resolve_aliases(self, target, scope=None):
         """Resolve aliases in the direct dependencies of the target.
 
-    :param target: The direct dependencies of this target are included.
-    :param scope: When specified, only deps with this scope are included. This is more
-      than a filter, because it prunes the subgraphs represented by aliases with
-      un-matched scopes.
-    :returns: An iterator of (resolved_dependency, resolved_from) tuples.
-      `resolved_from` is the top level target alias that depends on `resolved_dependency`,
-      and `None` if `resolved_dependency` is not a dependency of a target alias.
-    """
+        :param target: The direct dependencies of this target are included.
+        :param scope: When specified, only deps with this scope are included. This is more
+          than a filter, because it prunes the subgraphs represented by aliases with
+          un-matched scopes.
+        :returns: An iterator of (resolved_dependency, resolved_from) tuples.
+          `resolved_from` is the top level target alias that depends on `resolved_dependency`,
+          and `None` if `resolved_dependency` is not a dependency of a target alias.
+        """
         for declared in target.dependencies:
             if scope is not None and declared.scope != scope:
                 # Only `DEFAULT` scoped deps are eligible for the unused dep check.

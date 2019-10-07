@@ -301,18 +301,19 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
         success_expected=True,
         assert_publish_config_contents=False,
     ):
-        """Tests that publishing the given target results in the expected output.
+        """Tests that publishing the given target results in the expected
+        output.
 
-    :param target: Target to test.
-    :param artifacts: A map from directories to a list of expected filenames.
-    :param pushdb_files: list of pushdb files that would be created if this weren't a local publish
-    :param extra_options: Extra command-line options to the pants run.
-    :param extra_config: Extra pants.ini configuration for the pants run.
-    :param extra_env: Extra environment variables for the pants run.
-    :param assert_publish_config_contents: Test the contents of the generated ivy and pom file.
-           If set to True, compares the generated ivy.xml and pom files in
-           tests/python/pants_test/tasks/jar_publish_resources/<package_name>/<artifact_name>/
-    """
+        :param target: Target to test.
+        :param artifacts: A map from directories to a list of expected filenames.
+        :param pushdb_files: list of pushdb files that would be created if this weren't a local publish
+        :param extra_options: Extra command-line options to the pants run.
+        :param extra_config: Extra pants.ini configuration for the pants run.
+        :param extra_env: Extra environment variables for the pants run.
+        :param assert_publish_config_contents: Test the contents of the generated ivy and pom file.
+               If set to True, compares the generated ivy.xml and pom files in
+               tests/python/pants_test/tasks/jar_publish_resources/<package_name>/<artifact_name>/
+        """
 
         with temporary_dir() as publish_dir:
             options = ["--local={}".format(publish_dir), "--no-dryrun", "--force"]
@@ -350,12 +351,12 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                             self.compare_file_contents(artifact_path, directory)
 
     def compare_file_contents(self, artifact_path, directory):
+        """Tests the ivy.xml and pom.
+
+        :param artifact_path: Path of the artifact
+        :param directory: Directory where the artifact resides.
+        :return:
         """
-    Tests the ivy.xml and pom
-    :param artifact_path: Path of the artifact
-    :param directory: Directory where the artifact resides.
-    :return:
-    """
         # Strip away the version number
         [package_dir, artifact_name, version] = directory.rsplit(os.path.sep, 2)
         file_name = os.path.basename(artifact_path)

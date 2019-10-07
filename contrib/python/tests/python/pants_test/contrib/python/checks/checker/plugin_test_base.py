@@ -18,7 +18,8 @@ class CheckstylePluginTestBase(unittest.TestCase):
 
     @property
     def file_required(self):
-        """Override and return `True` if the plugin needs to operate on a file on disk."""
+        """Override and return `True` if the plugin needs to operate on a file
+        on disk."""
         return False
 
     def create_python_file(self, file_content):

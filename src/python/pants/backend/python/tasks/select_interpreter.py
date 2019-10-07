@@ -35,7 +35,8 @@ class PythonInterpreterFingerprintStrategy(DefaultFingerprintHashingMixin, Finge
 
 
 class SelectInterpreter(Task):
-    """Select an Python interpreter that matches the constraints of all targets in the working set."""
+    """Select an Python interpreter that matches the constraints of all targets
+    in the working set."""
 
     @classmethod
     def implementation_version(cls):

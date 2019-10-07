@@ -31,22 +31,23 @@ class SyntheticDummyLibrary(DummyTargetBase):
 
 
 class DummyLibrary(DummyTargetBase):
-    """Library of .dummy files, which are just text files which generate empty java files.
+    """Library of .dummy files, which are just text files which generate empty
+    java files.
 
-  As the name implies, this is purely for testing the behavior of the simple_codegen_task.
+    As the name implies, this is purely for testing the behavior of the simple_codegen_task.
 
-  For example, a .dummy file with the contents:
-  org.company.package Main
-  org.company.package Foobar
-  org.company.other Barfoo
+    For example, a .dummy file with the contents:
+    org.company.package Main
+    org.company.package Foobar
+    org.company.other Barfoo
 
-  Would generate the files:
-  org/company/package/Main.java,
-  org/company/package/Foobar.java,
-  org/company/other/Barfoo.java,
+    Would generate the files:
+    org/company/package/Main.java,
+    org/company/package/Foobar.java,
+    org/company/other/Barfoo.java,
 
-  Which would compile, but do nothing.
-  """
+    Which would compile, but do nothing.
+    """
 
     pass
 
@@ -54,10 +55,11 @@ class DummyLibrary(DummyTargetBase):
 class DummyGen(SimpleCodegenTask):
     """Task which generates .java files for DummyLibraries.
 
-  In addition to fulfilling the bare-minimum requirements of being a SimpleCodegenTask subclass,
-  the methods in this class perform some validation to ensure that they are being called correctly
-  by SimpleCodegenTask.
-  """
+    In addition to fulfilling the bare-minimum requirements of being a
+    SimpleCodegenTask subclass, the methods in this class perform some
+    validation to ensure that they are being called correctly by
+    SimpleCodegenTask.
+    """
 
     sources_globs = ("**/*.java",)
 
@@ -70,8 +72,8 @@ class DummyGen(SimpleCodegenTask):
     def setup_for_testing(self, test_case):
         """Gets this dummy generator class ready for testing.
 
-    :param TaskTestBase test_case: the 'parent' test-case using this task. Used for asserts, etc.
-    """
+        :param TaskTestBase test_case: the 'parent' test-case using this task. Used for asserts, etc.
+        """
         self._test_case = test_case
 
     def is_gentarget(self, target):

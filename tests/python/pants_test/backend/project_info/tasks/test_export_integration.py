@@ -21,15 +21,15 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
     ):
         """Runs ./pants export ... and returns its json output.
 
-    :param string|list test_target: spec of the targets to run on.
-    :param string workdir: working directory to run pants with.
-    :param bool load_libs: whether to load external libraries (of any conf).
-    :param bool only_default: if loading libraries, whether to only resolve the default conf, or to
-      additionally resolve sources and javadocs.
-    :param list extra_args: list of extra arguments for the pants invocation.
-    :return: the json output of the console task.
-    :rtype: dict
-    """
+        :param string|list test_target: spec of the targets to run on.
+        :param string workdir: working directory to run pants with.
+        :param bool load_libs: whether to load external libraries (of any conf).
+        :param bool only_default: if loading libraries, whether to only resolve the default conf, or to
+          additionally resolve sources and javadocs.
+        :param list extra_args: list of extra arguments for the pants invocation.
+        :return: the json output of the console task.
+        :rtype: dict
+        """
         export_out_file = os.path.join(workdir, "export_out.txt")
         args = ["export", "--output-file={out_file}".format(out_file=export_out_file)] + maybe_list(
             test_target

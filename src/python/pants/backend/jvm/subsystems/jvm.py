@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 class JVM(Subsystem):
     """A JVM invocation.
 
-  :API: public
-  """
+    :API: public
+    """
 
     options_scope = "jvm"
 
@@ -74,10 +74,10 @@ class JVM(Subsystem):
     def get_jvm_options(self):
         """Return the options to run this JVM with.
 
-    These are options to the JVM itself, such as -Dfoo=bar, -Xmx=1g, -XX:-UseParallelGC and so on.
+        These are options to the JVM itself, such as -Dfoo=bar, -Xmx=1g, -XX:-UseParallelGC and so on.
 
-    Thus named because get_options() already exists (and returns this object's Pants options).
-    """
+        Thus named because get_options() already exists (and returns this object's Pants options).
+        """
         ret = []
         for opt in self.get_options().options:
             ret.extend(safe_shlex_split(opt))
@@ -94,8 +94,9 @@ class JVM(Subsystem):
     def get_program_args(self):
         """Get the program args to run this JVM with.
 
-    These are the arguments passed to main() and are program-specific.
-    """
+        These are the arguments passed to main() and are program-
+        specific.
+        """
         ret = []
         for arg in self.get_options().program_args:
             ret.extend(safe_shlex_split(arg))

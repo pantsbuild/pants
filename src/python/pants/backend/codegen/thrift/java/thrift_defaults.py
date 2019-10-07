@@ -6,7 +6,8 @@ from pants.subsystem.subsystem import Subsystem
 
 
 class ThriftDefaults(Subsystem):
-    """Tracks defaults for java thrift target attributes that influence code generation."""
+    """Tracks defaults for java thrift target attributes that influence code
+    generation."""
 
     options_scope = "thrift-defaults"
 
@@ -63,55 +64,55 @@ class ThriftDefaults(Subsystem):
     def compiler(self, target):
         """Returns the thrift compiler to use for the given target.
 
-    :param target: The target to extract the thrift compiler from.
-    :type target: :class:`pants.backend.codegen.thrift.java.java_thrift_library.JavaThriftLibrary`
-    :returns: The thrift compiler to use.
-    :rtype: string
-    """
+        :param target: The target to extract the thrift compiler from.
+        :type target: :class:`pants.backend.codegen.thrift.java.java_thrift_library.JavaThriftLibrary`
+        :returns: The thrift compiler to use.
+        :rtype: string
+        """
         self._check_target(target)
         return target.compiler or self._default_compiler
 
     def language(self, target):
         """Returns the target language to generate thrift stubs for.
 
-    :param target: The target to extract the target language from.
-    :type target: :class:`pants.backend.codegen.thrift.java.java_thrift_library.JavaThriftLibrary`
-    :returns: The target language to generate stubs for.
-    :rtype: string
-    """
+        :param target: The target to extract the target language from.
+        :type target: :class:`pants.backend.codegen.thrift.java.java_thrift_library.JavaThriftLibrary`
+        :returns: The target language to generate stubs for.
+        :rtype: string
+        """
         self._check_target(target)
         return target.language or self._default_language
 
     def namespace_map(self, target):
         """Returns the namespace_map used for Thrift generation.
 
-    :param target: The target to extract the namespace_map from.
-    :type target: :class:`pants.backend.codegen.targets.java_thrift_library.JavaThriftLibrary`
-    :returns: The namespaces to remap (old to new).
-    :rtype: dictionary
-    """
+        :param target: The target to extract the namespace_map from.
+        :type target: :class:`pants.backend.codegen.targets.java_thrift_library.JavaThriftLibrary`
+        :returns: The namespaces to remap (old to new).
+        :rtype: dictionary
+        """
         self._check_target(target)
         return target.namespace_map or self._default_namespace_map
 
     def compiler_args(self, target):
         """Returns the compiler_args used for Thrift generation.
 
-    :param target: The target to extract the compiler args from.
-    :type target: :class:`pants.backend.codegen.targets.java_thrift_library.JavaThriftLibrary`
-    :returns: Extra arguments for the thrift compiler
-    :rtype: list
-    """
+        :param target: The target to extract the compiler args from.
+        :type target: :class:`pants.backend.codegen.targets.java_thrift_library.JavaThriftLibrary`
+        :returns: Extra arguments for the thrift compiler
+        :rtype: list
+        """
         self._check_target(target)
         return target.compiler_args or self._default_compiler_args
 
     def default_java_namespace(self, target):
         """Returns the default_java_namespace used for Thrift generation.
 
-    :param target: The target to extract the default_java_namespace from.
-    :type target: :class:`pants.backend.codegen.targets.java_thrift_library.JavaThriftLibrary`
-    :returns: The default Java namespace used when not specified in the IDL.
-    :rtype: string
-    """
+        :param target: The target to extract the default_java_namespace from.
+        :type target: :class:`pants.backend.codegen.targets.java_thrift_library.JavaThriftLibrary`
+        :returns: The default Java namespace used when not specified in the IDL.
+        :rtype: string
+        """
         self._check_target(target)
         return target.default_java_namespace or self._default_default_java_namespace
 

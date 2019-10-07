@@ -18,10 +18,11 @@ from pants.backend.jvm.tasks.jar_task import JarTask
 class ExtraTestJarExample(JarTask):
     """Example of a pants publish plugin.
 
-  For every JarLibrary target in the build graph, this plugin will create an 'example.txt' file,
-  which will be placed in an additional jar. During publishing, this additional jar will be published
-  along with the target.
-  """
+    For every JarLibrary target in the build graph, this plugin will
+    create an 'example.txt' file, which will be placed in an additional
+    jar. During publishing, this additional jar will be published along
+    with the target.
+    """
 
     def __init__(self, context, workdir):
         # Constructor for custom task. Setup things that you need at pants initialization time.

@@ -35,11 +35,12 @@ def _toolchain_variants(func):
 class CTypesIntegrationTest(PantsRunIntegrationTest):
     @classmethod
     def use_pantsd_env_var(cls):
+        """Some of the tests here expect to read the standard error after an
+        intentional failure.
+
+        However, when pantsd is enabled, these errors are logged to
+        logs/exceptions.<pid>.log So stderr appears empty. (see #7320)
         """
-    Some of the tests here expect to read the standard error after an intentional failure.
-    However, when pantsd is enabled, these errors are logged to logs/exceptions.<pid>.log
-    So stderr appears empty. (see #7320)
-    """
         return False
 
     _binary_target_dir = "testprojects/src/python/python_distribution/ctypes"
@@ -56,7 +57,8 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
     @_toolchain_variants
     def test_ctypes_binary_creation(self, toolchain_variant):
-        """Create a python_binary() with all native toolchain variants, and test the result."""
+        """Create a python_binary() with all native toolchain variants, and
+        test the result."""
         with temporary_dir() as tmp_dir:
             pants_run = self.run_pants(
                 command=["binary", self._binary_target],
@@ -204,12 +206,14 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
             self.assertIn("Test worked!\n", pants_run.stdout_data)
 
     def test_pants_native_source_detection_for_local_ctypes_dists_for_current_platform_only(self):
-        """Test that `./pants run` respects platforms when the closure contains native sources.
+        """Test that `./pants run` respects platforms when the closure contains
+        native sources.
 
-    To do this, we need to setup a pants.ini that contains two platform defaults: (1) "current" and
-    (2) a different platform than the one we are currently running on. The python_binary() target
-    below is declared with `platforms="current"`.
-    """
+        To do this, we need to setup a pants.ini that contains two
+        platform defaults: (1) "current" and (2) a different platform
+        than the one we are currently running on. The python_binary()
+        target below is declared with `platforms="current"`.
+        """
         command = ["run", "testprojects/src/python/python_distribution/ctypes:bin"]
         # TODO(#6848): we need to provide the libstdc++.so.6.dylib which comes with gcc on osx in the
         # DYLD_LIBRARY_PATH during the 'run' goal somehow.
@@ -225,11 +229,12 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
     @_toolchain_variants
     def test_native_compiler_option_sets_integration(self, toolchain_variant):
-        """Test that native compilation includes extra compiler flags from target definitions.
+        """Test that native compilation includes extra compiler flags from
+        target definitions.
 
-    This target uses the ndebug and asdf option sets.
-    If either of these are not present (disabled), this test will fail.
-    """
+        This target uses the ndebug and asdf option sets. If either of
+        these are not present (disabled), this test will fail.
+        """
         # TODO(#6848): this fails when run with gcc on osx as it requires gcc's libstdc++.so.6.dylib to
         # be available on the runtime library path.
         attempt_pants_run = Platform.current.resolve_for_enum_variant(

@@ -8,8 +8,8 @@ from pants.backend.python.targets.python_tests import PythonTests
 class PythonLibrary(PythonTarget):
     """A Python library.
 
-  :API: public
-  """
+    :API: public
+    """
 
     @classmethod
     def alias(cls):

@@ -13,16 +13,18 @@ from pants.util.memo import memoized_method
 
 
 class VersionedTargetSet:
-    """Represents a list of targets, a corresponding CacheKey, and a flag determining whether the
-  list of targets is currently valid.
+    """Represents a list of targets, a corresponding CacheKey, and a flag
+    determining whether the list of targets is currently valid.
 
-  When invalidating a single target, this can be used to represent that target as a singleton.
-  When checking the artifact cache, this can also be used to represent a list of targets that are
-  built together into a single artifact.
-  """
+    When invalidating a single target, this can be used to represent
+    that target as a singleton. When checking the artifact cache, this
+    can also be used to represent a list of targets that are built
+    together into a single artifact.
+    """
 
     class IllegalResultsDir(Exception):
-        """Indicate a problem interacting with a versioned target results directory."""
+        """Indicate a problem interacting with a versioned target results
+        directory."""
 
     @staticmethod
     def from_versioned_targets(versioned_targets):
@@ -73,11 +75,12 @@ class VersionedTargetSet:
 
     @property
     def cacheable(self):
-        """Indicates whether artifacts associated with this target set should be cached.
+        """Indicates whether artifacts associated with this target set should
+        be cached.
 
-    :return: `True` if this target set's associated artifacts can be cached.
-    :rtype: bool
-    """
+        :return: `True` if this target set's associated artifacts can be cached.
+        :rtype: bool
+        """
         return self._cache_manager.cacheable(self.cache_key)
 
     def update(self):
@@ -102,36 +105,39 @@ class VersionedTargetSet:
     def results_dir(self):
         """The directory that stores results for these targets.
 
-    The results_dir is represented by a stable symlink to the current_results_dir: consumers
-    should generally prefer to access the stable directory.
-    """
+        The results_dir is represented by a stable symlink to the
+        current_results_dir: consumers should generally prefer to access
+        the stable directory.
+        """
         if self._results_dir is None:
             raise ValueError("No results_dir was created for {}".format(self))
         return self._results_dir
 
     @property
     def current_results_dir(self):
-        """A unique directory that stores results for this version of these targets.
-    """
+        """A unique directory that stores results for this version of these
+        targets."""
         if self._current_results_dir is None:
             raise ValueError("No results_dir was created for {}".format(self))
         return self._current_results_dir
 
     @property
     def previous_results_dir(self):
-        """The directory that stores results for the previous version of these targets.
+        """The directory that stores results for the previous version of these
+        targets.
 
-    Only valid if is_incremental is true.
+        Only valid if is_incremental is true.
 
-    TODO: Exposing old results is a bit of an abstraction leak, because ill-behaved Tasks could
-    mutate them.
-    """
+        TODO: Exposing old results is a bit of an abstraction leak, because ill-behaved Tasks could
+        mutate them.
+        """
         if not self.has_previous_results_dir:
             raise ValueError("There is no previous_results_dir for: {}".format(self))
         return self._previous_results_dir
 
     def ensure_legal(self):
-        """Return True as long as the state does not break any internal contracts."""
+        """Return True as long as the state does not break any internal
+        contracts."""
         # Do our best to provide complete feedback, it's easy to imagine the frustration of flipping between error states.
         if self._results_dir:
             errors = ""
@@ -152,7 +158,8 @@ class VersionedTargetSet:
         return True
 
     def live_dirs(self):
-        """Yields directories that must exist for this VersionedTarget to function."""
+        """Yields directories that must exist for this VersionedTarget to
+        function."""
         # The only caller of this function is the workdir cleaning pipeline. It is not clear that the previous_results_dir
         # should be returned for that purpose. And, by the time this is called, the contents have already been copied.
         if self.has_results_dir:
@@ -175,8 +182,8 @@ class VersionedTargetSet:
 class VersionedTarget(VersionedTargetSet):
     """This class represents a singleton VersionedTargetSet.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(self, cache_manager, target, cache_key):
         """
@@ -195,15 +202,17 @@ class VersionedTarget(VersionedTargetSet):
 
     @property
     def cacheable(self):
-        """Indicates whether artifacts associated with this target should be cached.
+        """Indicates whether artifacts associated with this target should be
+        cached.
 
-    :return: `True` if this target's associated artifacts can be cached.
-    :rtype: bool
-    """
+        :return: `True` if this target's associated artifacts can be cached.
+        :rtype: bool
+        """
         return super().cacheable and not self.target.no_cache
 
     def create_results_dir(self):
-        """Ensure that the empty results directory and a stable symlink exist for these versioned targets."""
+        """Ensure that the empty results directory and a stable symlink exist
+        for these versioned targets."""
         self._current_results_dir = self._cache_manager._results_dir_path(
             self.cache_key, stable=False
         )
@@ -217,11 +226,12 @@ class VersionedTarget(VersionedTargetSet):
         self.ensure_legal()
 
     def copy_previous_results(self):
-        """Use the latest valid results_dir as the starting contents of the current results_dir.
+        """Use the latest valid results_dir as the starting contents of the
+        current results_dir.
 
-    Should be called after the cache is checked, since previous_results are not useful if there is
-    a cached artifact.
-    """
+        Should be called after the cache is checked, since
+        previous_results are not useful if there is a cached artifact.
+        """
         # TODO(mateo): This should probably be managed by the task, which manages the rest of the
         # incremental support.
         if not self.previous_cache_key:
@@ -243,12 +253,12 @@ class VersionedTarget(VersionedTargetSet):
 class InvalidationCheck:
     """The result of calling check() on a CacheManager.
 
-  Each member is a list of VersionedTargetSet objects.  Sorting of the targets depends
-  on how you order the InvalidationCheck from the InvalidationCacheManager.
+    Each member is a list of VersionedTargetSet objects.  Sorting of the targets depends
+    on how you order the InvalidationCheck from the InvalidationCacheManager.
 
-  Tasks may need to perform no, some or all operations on either of these, depending on how they
-  are implemented.
-  """
+    Tasks may need to perform no, some or all operations on either of these, depending on how they
+    are implemented.
+    """
 
     def __init__(self, all_vts, invalid_vts):
         """
@@ -263,10 +273,12 @@ class InvalidationCheck:
 
 
 class InvalidationCacheManager:
-    """Manages cache checks, updates and invalidation keeping track of basic change
-  and invalidation statistics.
-  Note that this is distinct from the ArtifactCache concept, and should probably be renamed.
-  """
+    """Manages cache checks, updates and invalidation keeping track of basic
+    change and invalidation statistics.
+
+    Note that this is distinct from the ArtifactCache concept, and
+    should probably be renamed.
+    """
 
     class CacheValidationError(Exception):
         """Indicates a problem accessing the cache."""
@@ -305,7 +317,8 @@ class InvalidationCacheManager:
         relative_symlink(self._results_dir_prefix, stable_prefix)
 
     def update(self, vts):
-        """Mark a changed or invalidated VersionedTargetSet as successfully processed."""
+        """Mark a changed or invalidated VersionedTargetSet as successfully
+        processed."""
         for vt in vts.versioned_targets:
             vt.ensure_legal()
             if not vt.valid:
@@ -327,15 +340,16 @@ class InvalidationCacheManager:
         vts.valid = False
 
     def check(self, targets, topological_order=False):
-        """Checks whether each of the targets has changed and invalidates it if so.
+        """Checks whether each of the targets has changed and invalidates it if
+        so.
 
-    Returns a list of VersionedTargetSet objects (either valid or invalid). The returned sets
-    'cover' the input targets, with one caveat: if the FingerprintStrategy
-    opted out of fingerprinting a target because it doesn't contribute to invalidation, then that
-    target will be excluded from all_vts and invalid_vts.
+        Returns a list of VersionedTargetSet objects (either valid or invalid). The returned sets
+        'cover' the input targets, with one caveat: if the FingerprintStrategy
+        opted out of fingerprinting a target because it doesn't contribute to invalidation, then that
+        target will be excluded from all_vts and invalid_vts.
 
-    Callers can inspect these vts and rebuild the invalid ones, for example.
-    """
+        Callers can inspect these vts and rebuild the invalid ones, for example.
+        """
         all_vts = self.wrap_targets(targets, topological_order=topological_order)
         invalid_vts = [vt for vt in all_vts if not vt.valid]
         return InvalidationCheck(all_vts, invalid_vts)
@@ -347,10 +361,10 @@ class InvalidationCacheManager:
     def _results_dir_path(self, key, stable):
         """Return a results directory path for the given key.
 
-    :param key: A CacheKey to generate an id for.
-    :param stable: True to use a stable subdirectory, false to use a portion of the cache key to
-      generate a path unique to the key.
-    """
+        :param key: A CacheKey to generate an id for.
+        :param stable: True to use a stable subdirectory, false to use a portion of the cache key to
+          generate a path unique to the key.
+        """
         # TODO: Shorten cache_key hashes in general?
         return os.path.join(
             self._results_dir_prefix,
@@ -361,11 +375,11 @@ class InvalidationCacheManager:
     def wrap_targets(self, targets, topological_order=False):
         """Wrap targets and their computed cache keys in VersionedTargets.
 
-    If the FingerprintStrategy opted out of providing a fingerprint for a target, that target will not
-    have an associated VersionedTarget returned.
+        If the FingerprintStrategy opted out of providing a fingerprint for a target, that target will not
+        have an associated VersionedTarget returned.
 
-    Returns a list of VersionedTargets, each representing one input target.
-    """
+        Returns a list of VersionedTargets, each representing one input target.
+        """
 
         def vt_iter():
             if topological_order:
@@ -381,11 +395,12 @@ class InvalidationCacheManager:
         return list(vt_iter())
 
     def cacheable(self, cache_key):
-        """Indicates whether artifacts associated with the given `cache_key` should be cached.
+        """Indicates whether artifacts associated with the given `cache_key`
+        should be cached.
 
-    :return: `True` if the `cache_key` represents a cacheable set of target artifacts.
-    :rtype: bool
-    """
+        :return: `True` if the `cache_key` represents a cacheable set of target artifacts.
+        :rtype: bool
+        """
         return self._invalidator.cacheable(cache_key)
 
     def previous_key(self, cache_key):

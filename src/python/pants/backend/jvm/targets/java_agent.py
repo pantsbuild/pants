@@ -70,29 +70,34 @@ class JavaAgent(JavaLibrary):
     def premain(self):
         """The launch time agent fully qualified class name.
 
-    Either ``agent_class`` or ``premain`` will be defined and the other will be `None`.
-    """
+        Either ``agent_class`` or ``premain`` will be defined and the
+        other will be `None`.
+        """
         return self._premain
 
     @property
     def agent_class(self):
         """The post-launch-time agent fully qualified class name.
 
-    Either ``agent_class`` or ``premain`` will be defined and the other will be `None`.
-    """
+        Either ``agent_class`` or ``premain`` will be defined and the
+        other will be `None`.
+        """
         return self._agent_class
 
     @property
     def can_redefine(self):
-        """Returns `True` if the ability to redefine classes is needed by this agent."""
+        """Returns `True` if the ability to redefine classes is needed by this
+        agent."""
         return self._can_redefine
 
     @property
     def can_retransform(self):
-        """Returns `True` if the ability to retransform classes is needed by this agent."""
+        """Returns `True` if the ability to retransform classes is needed by
+        this agent."""
         return self._can_retransform
 
     @property
     def can_set_native_method_prefix(self):
-        """Returns `True` if the ability to set he native method prefix is needed by this agent."""
+        """Returns `True` if the ability to set he native method prefix is
+        needed by this agent."""
         return self._can_set_native_method_prefix

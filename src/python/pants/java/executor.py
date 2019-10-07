@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 class Executor(ABC):
     """Executes java programs.
 
-  :API: public
-  """
+    :API: public
+    """
 
     @staticmethod
     def _scrub_args(classpath, main, jvm_options, args):
@@ -34,11 +34,12 @@ class Executor(ABC):
     class Error(Exception):
         """Indicates an error launching a java program.
 
-    :API: public
-    """
+        :API: public
+        """
 
     class InvalidDistribution(ValueError):
-        """Indicates an invalid Distribution was used to construct this runner."""
+        """Indicates an invalid Distribution was used to construct this
+        runner."""
 
     class Runner:
         """A re-usable executor that can run a configured java command line."""
@@ -51,47 +52,49 @@ class Executor(ABC):
 
         @property
         def cmd(self):
-            """Returns a string representation of the command that will be run."""
+            """Returns a string representation of the command that will be
+            run."""
             return " ".join(self.command)
 
         @property
         @abstractmethod
         def command(self):
-            """Returns a copy of the command line that will be run as a list of command line tokens."""
+            """Returns a copy of the command line that will be run as a list of
+            command line tokens."""
             raise NotImplementedError
 
         @abstractmethod
         def run(self, stdout=None, stderr=None, stdin=None, cwd=None):
             """Runs the configured java command.
 
-      If there is a problem executing tha java program subclasses should raise Executor.Error.
-      Its guaranteed that all arguments are valid as documented in `execute`
+            If there is a problem executing tha java program subclasses should raise Executor.Error.
+            Its guaranteed that all arguments are valid as documented in `execute`
 
-      :param stdout: An optional stream to pump stdout to; defaults to `sys.stdout`.
-      :param stderr: An optional stream to pump stderr to; defaults to `sys.stderr`.
-      :param stdin:  An optional stream to receive stdin from; stdin is not propagated
-        by default.
-      :param string cwd: optionally set the working directory
-      """
+            :param stdout: An optional stream to pump stdout to; defaults to `sys.stdout`.
+            :param stderr: An optional stream to pump stderr to; defaults to `sys.stderr`.
+            :param stdin:  An optional stream to receive stdin from; stdin is not propagated
+              by default.
+            :param string cwd: optionally set the working directory
+            """
             raise NotImplementedError
 
         @abstractmethod
         def spawn(self, stdout=None, stderr=None, stdin=None, cwd=None):
             """Spawns the configured java command.
 
-      :param stdout: An optional stream to pump stdout to; defaults to `sys.stdout`.
-      :param stderr: An optional stream to pump stderr to; defaults to `sys.stderr`.
-      :param stdin:  An optional stream to receive stdin from; stdin is not propagated
-        by default.
-      :param string cwd: optionally set the working directory
-      """
+            :param stdout: An optional stream to pump stdout to; defaults to `sys.stdout`.
+            :param stderr: An optional stream to pump stderr to; defaults to `sys.stderr`.
+            :param stdin:  An optional stream to receive stdin from; stdin is not propagated
+              by default.
+            :param string cwd: optionally set the working directory
+            """
             raise NotImplementedError
 
     def __init__(self, distribution):
         """Constructs an Executor that can be used to launch java programs.
 
-    :param distribution: a validated java distribution to use when launching java programs.
-    """
+        :param distribution: a validated java distribution to use when launching java programs.
+        """
         if not hasattr(distribution, "java") or not hasattr(distribution, "validate"):
             raise self.InvalidDistribution(
                 "A valid distribution is required, given: {}".format(distribution)
@@ -114,21 +117,22 @@ class Executor(ABC):
     ):
         """Launches the java program defined by the classpath and main.
 
-    :param list classpath: the classpath for the java program
-    :param string main: the fully qualified class name of the java program's entry point
-    :param list jvm_options: an optional sequence of options for the underlying jvm
-    :param list args: an optional sequence of args to pass to the java program
-    :param string cwd: optionally set the working directory
+        :param list classpath: the classpath for the java program
+        :param string main: the fully qualified class name of the java program's entry point
+        :param list jvm_options: an optional sequence of options for the underlying jvm
+        :param list args: an optional sequence of args to pass to the java program
+        :param string cwd: optionally set the working directory
 
-    Returns the exit code of the java program.
-    Raises Executor.Error if there was a problem launching java itself.
-    """
+        Returns the exit code of the java program.
+        Raises Executor.Error if there was a problem launching java itself.
+        """
         runner = self.runner(classpath=classpath, main=main, jvm_options=jvm_options, args=args)
         return runner.run(stdout=stdout, stderr=stderr, cwd=cwd)
 
     @abstractmethod
     def _runner(self, classpath, main, jvm_options, args):
-        """Subclasses should return a `Runner` that can execute the given java main."""
+        """Subclasses should return a `Runner` that can execute the given java
+        main."""
 
     def _create_command(self, classpath, main, jvm_options, args):
         cmd = [self._distribution.java]
@@ -173,8 +177,8 @@ class CommandLineGrabber(Executor):
 class SubprocessExecutor(Executor):
     """Executes java programs by launching a jvm in a subprocess.
 
-  :API: public
-  """
+    :API: public
+    """
 
     _SCRUBBED_ENV = {
         # We attempt to control the classpath for correctness, caching and invalidation reasons and
@@ -221,14 +225,15 @@ class SubprocessExecutor(Executor):
         return Runner()
 
     def spawn(self, classpath, main, jvm_options=None, args=None, cwd=None, **subprocess_args):
-        """Spawns the java program passing any extra subprocess kwargs on to subprocess.Popen.
+        """Spawns the java program passing any extra subprocess kwargs on to
+        subprocess.Popen.
 
-    Returns the Popen process object handle to the spawned java program subprocess.
+        Returns the Popen process object handle to the spawned java program subprocess.
 
-    :API: public
+        :API: public
 
-    :raises: :class:`Executor.Error` if there is a problem spawning the subprocess.
-    """
+        :raises: :class:`Executor.Error` if there is a problem spawning the subprocess.
+        """
         classpath, main, jvm_options, args = self._scrub_args(classpath, main, jvm_options, args)
         cmd = self._create_command(classpath, main, jvm_options, args)
         return self._spawn(cmd, cwd=cwd, **subprocess_args)

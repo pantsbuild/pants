@@ -43,12 +43,12 @@ class MustacheRenderer:
     def __init__(self, template_dir=None, package_name=None):
         """Create a renderer that finds templates by name in one of two ways.
 
-    * If template_dir is specified, finds template foo in the file foo.mustache in that dir.
-    * Otherwise, if package_name is specified, finds template foo embedded in that
-      package under templates/foo.mustache.
-    * Otherwise will not find templates by name, so can only be used with an existing
-      template string.
-    """
+        * If template_dir is specified, finds template foo in the file foo.mustache in that dir.
+        * Otherwise, if package_name is specified, finds template foo embedded in that
+          package under templates/foo.mustache.
+        * Otherwise will not find templates by name, so can only be used with an existing
+          template string.
+        """
         self._template_dir = template_dir
         self._package_name = package_name
         if self._package_name is not None:

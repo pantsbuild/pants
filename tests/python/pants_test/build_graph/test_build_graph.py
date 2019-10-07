@@ -16,13 +16,14 @@ from pants_test.test_base import TestBase
 # TODO(Eric Ayers) There are many untested methods in BuildGraph left to be tested.
 class BuildGraphTest(TestBase):
     def inject_graph(self, root_spec, graph_dict):
-        """Given a root spec, injects relevant targets from the graph represented by graph_dict.
+        """Given a root spec, injects relevant targets from the graph
+        represented by graph_dict.
 
-    graph_dict should contain address specs, keyed by sources with lists of value destinations.
-    Each created target will be a simple `target` alias.
+        graph_dict should contain address specs, keyed by sources with lists of value destinations.
+        Each created target will be a simple `target` alias.
 
-    Returns the parsed Address for the root_spec.
-    """
+        Returns the parsed Address for the root_spec.
+        """
         for src, targets in graph_dict.items():
             src_path, src_name = parse_spec(src)
             if not src_path:
@@ -336,7 +337,8 @@ class BuildGraphTest(TestBase):
             self.inject_address_closure("//:a")
 
     def test_synthetic_address(self):
-        """Verify that synthetic targets don't raise an exception on inject_address_closure"""
+        """Verify that synthetic targets don't raise an exception on
+        inject_address_closure."""
         self.build_graph.inject_synthetic_target(
             Address.parse("//:synth_library_address"),
             JarLibrary,

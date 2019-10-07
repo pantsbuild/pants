@@ -34,11 +34,12 @@ class SourceRootFactory:
     """Creates source roots that respect language canonicalizations."""
 
     def __init__(self, lang_canonicalizations):
-        """Creates a source root factory that enforces the given `lang_canonicalizations`.
+        """Creates a source root factory that enforces the given
+        `lang_canonicalizations`.
 
-    :param dict lang_canonicalizations: a mapping from language nicknames to the canonical language
-                                        names the nickname could represent.
-    """
+        :param dict lang_canonicalizations: a mapping from language nicknames to the canonical language
+                                            names the nickname could represent.
+        """
         self._lang_canonicalizations = lang_canonicalizations
 
     def _canonicalize_langs(self, langs):
@@ -48,10 +49,11 @@ class SourceRootFactory:
                 yield canonical
 
     def create(self, relpath, langs, category):
-        """Return a source root at the given `relpath` for the given `langs` and `category`.
+        """Return a source root at the given `relpath` for the given `langs`
+        and `category`.
 
-    :returns: :class:`SourceRoot`.
-    """
+        :returns: :class:`SourceRoot`.
+        """
         return SourceRoot(relpath, tuple(sorted(self._canonicalize_langs(langs))), category)
 
 
@@ -61,37 +63,39 @@ class SourceRoots:
     def __init__(self, source_root_config):
         """Create an object for querying source roots via patterns in a trie.
 
-    :param source_root_config: The SourceRootConfig for the source root patterns to query against.
+        :param source_root_config: The SourceRootConfig for the source root patterns to query against.
 
-    Non-test code should not instantiate directly. See SourceRootConfig.get_source_roots().
-    """
+        Non-test code should not instantiate directly. See SourceRootConfig.get_source_roots().
+        """
         self._trie = source_root_config.create_trie()
         self._source_root_factory = source_root_config.source_root_factory
         self._options = source_root_config.get_options()
 
     def add_source_root(self, path, langs=tuple(), category=SourceRootCategories.UNKNOWN):
-        """Add the specified fixed source root, which must be relative to the buildroot.
+        """Add the specified fixed source root, which must be relative to the
+        buildroot.
 
-    Useful in a limited set of circumstances, e.g., when unpacking sources from a jar with
-    unknown structure.  Tests should prefer to use dirs that match our source root patterns
-    instead of explicitly setting source roots here.
-    """
+        Useful in a limited set of circumstances, e.g., when unpacking
+        sources from a jar with unknown structure.  Tests should prefer
+        to use dirs that match our source root patterns instead of
+        explicitly setting source roots here.
+        """
         self._trie.add_fixed(path, langs, category)
 
     def find(self, target) -> Optional[SourceRoot]:
         """Find the source root for the given target, or None.
 
-    :param target: Find the source root for this target.
-    """
+        :param target: Find the source root for this target.
+        """
         return self.find_by_path(target.address.spec_path)
 
     def find_by_path(self, path: str) -> Optional[SourceRoot]:
         """Find the source root for the given path, or None.
 
-    :param path: Find the source root for this path, relative to the buildroot.
-    :return: A SourceRoot instance, or None if the path is not located under a source root
-             and `unmatched==fail`.
-    """
+        :param path: Find the source root for this path, relative to the buildroot.
+        :return: A SourceRoot instance, or None if the path is not located under a source root
+                 and `unmatched==fail`.
+        """
         matched = self._trie.find(path)
         if matched:
             return matched
@@ -108,12 +112,12 @@ class SourceRoots:
     def all_roots(self):
         """Return all known source roots.
 
-    Returns a generator over (source root, list of langs, category) triples.
+        Returns a generator over (source root, list of langs, category) triples.
 
-    Note: Requires a directory walk to match actual directories against patterns.
-    However we don't descend into source roots, once found, so this should be fast in practice.
-    Note: Does not follow symlinks.
-    """
+        Note: Requires a directory walk to match actual directories against patterns.
+        However we don't descend into source roots, once found, so this should be fast in practice.
+        Note: Does not follow symlinks.
+        """
         project_tree = get_project_tree(self._options)
 
         fixed_roots = set()
@@ -133,39 +137,39 @@ class SourceRoots:
 class SourceRootConfig(Subsystem):
     """Configuration for roots of source trees.
 
-  We detect source roots based on a list of source root patterns.  E.g., if we have src/java
-  as a pattern then any directory that ends with src/java will be considered a source root:
-  src/java, my/project/src/java etc.
+    We detect source roots based on a list of source root patterns.  E.g., if we have src/java
+    as a pattern then any directory that ends with src/java will be considered a source root:
+    src/java, my/project/src/java etc.
 
-  A source root may be associated with one or more 'languages'. E.g., src/java can be associated
-  with java, and src/jvm can be associated with java and scala. Note that this is a generalized
-  concept of 'language'. For example 'resources' is a language in this sense.
+    A source root may be associated with one or more 'languages'. E.g., src/java can be associated
+    with java, and src/jvm can be associated with java and scala. Note that this is a generalized
+    concept of 'language'. For example 'resources' is a language in this sense.
 
-  We specify source roots in three ways:
+    We specify source roots in three ways:
 
-  1. We autoconstruct patterns by appending language names to parent dirs. E.g., for languages
-     'java' and 'python', and parents 'src' and 'example/src', we construct the patterns
-     'src/java', 'src/python', 'example/src/java' and 'example/src/python'.  These are of course
-     associated with the appropriate language.
+    1. We autoconstruct patterns by appending language names to parent dirs. E.g., for languages
+       'java' and 'python', and parents 'src' and 'example/src', we construct the patterns
+       'src/java', 'src/python', 'example/src/java' and 'example/src/python'.  These are of course
+       associated with the appropriate language.
 
-  2. We can explicitly specify a mapping from source root pattern to language(s). E.g.,
-     {
-       'src/jvm': ['java', 'scala'],
-       'src/py': ['python']
-     }
+    2. We can explicitly specify a mapping from source root pattern to language(s). E.g.,
+       {
+         'src/jvm': ['java', 'scala'],
+         'src/py': ['python']
+       }
 
-  3. We can also bypass the pattern mechanism altogether and specify a list of fixed source roots.
-     E.g., src/java will match just <buildroot>/src/java, and not <buildroot>/some/dir/src/java.
+    3. We can also bypass the pattern mechanism altogether and specify a list of fixed source roots.
+       E.g., src/java will match just <buildroot>/src/java, and not <buildroot>/some/dir/src/java.
 
-  Note that we distinguish between 'source roots' and 'test roots'. All the above holds for both.
-  We don't currently use this distinction in a useful way, but we may in the future, and we don't
-  want to then require everyone to modify their source root declarations, so we implement the
-  distinction now.
+    Note that we distinguish between 'source roots' and 'test roots'. All the above holds for both.
+    We don't currently use this distinction in a useful way, but we may in the future, and we don't
+    want to then require everyone to modify their source root declarations, so we implement the
+    distinction now.
 
-  Note also that there's no harm in specifying source root patterns that don't exist in your repo,
-  within reason.  This means that in most cases the defaults below will be sufficient and repo
-  owners will not need to explicitly specify source root patterns at all.
-  """
+    Note also that there's no harm in specifying source root patterns that don't exist in your repo,
+    within reason.  This means that in most cases the defaults below will be sufficient and repo
+    owners will not need to explicitly specify source root patterns at all.
+    """
 
     options_scope = "source"
 
@@ -297,8 +301,8 @@ class SourceRootConfig(Subsystem):
     def create_trie(self):
         """Create a trie of source root patterns from options.
 
-    :returns: :class:`SourceRootTrie`
-    """
+        :returns: :class:`SourceRootTrie`
+        """
         trie = SourceRootTrie(self.source_root_factory)
         options = self.get_options()
 
@@ -316,21 +320,21 @@ class SourceRootConfig(Subsystem):
     def source_root_factory(self):
         """Creates source roots that respects language canonicalizations.
 
-    :returns: :class:`SourceRootFactory`
-    """
+        :returns: :class:`SourceRootFactory`
+        """
         return SourceRootFactory(self.get_options().lang_canonicalizations)
 
 
 class SourceRootTrie:
     """A trie for efficiently finding the source root for a path.
 
-  Finds the first outermost pattern that matches. E.g., the pattern src/* will match
-  my/project/src/python/src/java/java.py on src/python, not on src/java.
+    Finds the first outermost pattern that matches. E.g., the pattern src/* will match
+    my/project/src/python/src/java/java.py on src/python, not on src/java.
 
-  Implements fixed source roots by prepending a '^/' to them, and then prepending a '^' key to
-  the path we're matching. E.g., ^/src/java/foo/bar will match both the fixed root ^/src/java and
-  the pattern src/java, but ^/my/project/src/java/foo/bar will match only the pattern.
-  """
+    Implements fixed source roots by prepending a '^/' to them, and then prepending a '^' key to
+    the path we're matching. E.g., ^/src/java/foo/bar will match both the fixed root ^/src/java and
+    the pattern src/java, but ^/my/project/src/java/foo/bar will match only the pattern.
+    """
 
     class InvalidPath(Exception):
         def __init__(self, path, reason):
@@ -351,11 +355,12 @@ class SourceRootTrie:
             # but not a leaf.
 
         def get_child(self, key, langs):
-            """Return the child node for the given key, or None if no such child.
+            """Return the child node for the given key, or None if no such
+            child.
 
-      :param key: The child to return.
-      :param langs: An output parameter which we update with any langs associated with the child.
-      """
+            :param key: The child to return.
+            :param langs: An output parameter which we update with any langs associated with the child.
+            """
             # An exact match takes precedence over a wildcard match, to support situations such as
             # src/* and src/main/*.
             ret = self.children.get(key)

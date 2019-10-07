@@ -28,9 +28,10 @@ class Work:
 class WorkerPool:
     """A pool of workers.
 
-  Workers are threads, and so are subject to GIL constraints. Submitting CPU-bound work
-  may not be effective. Use this class primarily for IO-bound work.
-  """
+    Workers are threads, and so are subject to GIL constraints.
+    Submitting CPU-bound work may not be effective. Use this class
+    primarily for IO-bound work.
+    """
 
     def __init__(self, parent_workunit, run_tracker, num_workers, thread_name_prefix):
         self._run_tracker = run_tracker
@@ -62,19 +63,19 @@ class WorkerPool:
     def submit_async_work(self, work, workunit_parent=None, on_success=None, on_failure=None):
         """Submit work to be executed in the background.
 
-    :param work: The work to execute.
-    :param workunit_parent: If specified, work is accounted for under this workunit.
-    :param on_success: If specified, a callable taking a single argument, which will be a list
-                  of return values of each invocation, in order. Called only if all work succeeded.
-    :param on_failure: If specified, a callable taking a single argument, which is an exception
-                  thrown in the work.
+        :param work: The work to execute.
+        :param workunit_parent: If specified, work is accounted for under this workunit.
+        :param on_success: If specified, a callable taking a single argument, which will be a list
+                      of return values of each invocation, in order. Called only if all work succeeded.
+        :param on_failure: If specified, a callable taking a single argument, which is an exception
+                      thrown in the work.
 
-    :return: `multiprocessing.pool.MapResult`
+        :return: `multiprocessing.pool.MapResult`
 
-    Don't do work in on_success: not only will it block the result handling thread, but
-    that thread is not a worker and doesn't have a logging context etc. Use it just to
-    submit further work to the pool.
-    """
+        Don't do work in on_success: not only will it block the result handling thread, but
+        that thread is not a worker and doesn't have a logging context etc. Use it just to
+        submit further work to the pool.
+        """
         if work is None or len(work.args_tuples) == 0:  # map_async hangs on 0-length iterables.
             if on_success:
                 on_success([])
@@ -94,13 +95,13 @@ class WorkerPool:
     def submit_async_work_chain(self, work_chain, workunit_parent, done_hook=None):
         """Submit work to be executed in the background.
 
-    - work_chain: An iterable of Work instances. Will be invoked serially. Each instance may
-                  have a different cardinality. There is no output-input chaining: the argument
-                  tuples must already be present in each work instance.  If any work throws an
-                  exception no subsequent work in the chain will be attempted.
-    - workunit_parent: Work is accounted for under this workunit.
-    - done_hook: If not None, invoked with no args after all work is done, or on error.
-    """
+        - work_chain: An iterable of Work instances. Will be invoked serially. Each instance may
+                      have a different cardinality. There is no output-input chaining: the argument
+                      tuples must already be present in each work instance.  If any work throws an
+                      exception no subsequent work in the chain will be attempted.
+        - workunit_parent: Work is accounted for under this workunit.
+        - done_hook: If not None, invoked with no args after all work is done, or on error.
+        """
 
         def done():
             if done_hook:
@@ -138,13 +139,14 @@ class WorkerPool:
             raise
 
     def submit_work_and_wait(self, work, workunit_parent=None):
-        """Submit work to be executed on this pool, but wait for it to complete.
+        """Submit work to be executed on this pool, but wait for it to
+        complete.
 
-    - work: The work to execute.
-    - workunit_parent: If specified, work is accounted for under this workunit.
+        - work: The work to execute.
+        - workunit_parent: If specified, work is accounted for under this workunit.
 
-    Returns a list of return values of each invocation, in order.  Throws if any invocation does.
-    """
+        Returns a list of return values of each invocation, in order.  Throws if any invocation does.
+        """
         if work is None or len(work.args_tuples) == 0:  # map hangs on 0-length iterables.
             return []
         else:
@@ -198,21 +200,21 @@ class WorkerPool:
 
 
 class SubprocPool:
-    """Singleton for managing multiprocessing.Pool instances
+    """Singleton for managing multiprocessing.Pool instances.
 
-  Subprocesses (including multiprocessing.Pool workers) can inherit locks in poorly written
-  libraries (eg zlib) if other threads in the parent process happen to be holding them at the
-  moment the worker is fork()'ed. Thus it is important to create any subprocesses BEFORE
-  starting any threads, or they may deadlock mysteriously when sent a particular piece of work.
+    Subprocesses (including multiprocessing.Pool workers) can inherit locks in poorly written
+    libraries (eg zlib) if other threads in the parent process happen to be holding them at the
+    moment the worker is fork()'ed. Thus it is important to create any subprocesses BEFORE
+    starting any threads, or they may deadlock mysteriously when sent a particular piece of work.
 
-  This is accomplished in pants by these initializing pools early, when creating the RunTracker.
+    This is accomplished in pants by these initializing pools early, when creating the RunTracker.
 
-  However, in tests, RunTrackers are created repeatedly, as part of creating Contexts that
-  are used briefly and discarded. Creating a new subprocess pool every time is expensive, and will
-  lead to os.fork failing once too many processes are spawned.
+    However, in tests, RunTrackers are created repeatedly, as part of creating Contexts that
+    are used briefly and discarded. Creating a new subprocess pool every time is expensive, and will
+    lead to os.fork failing once too many processes are spawned.
 
-  To avoid this, the pools themselves are kept in this singleton and new RunTrackers re-use them.
-  """
+    To avoid this, the pools themselves are kept in this singleton and new RunTrackers re-use them.
+    """
 
     _pool = None
     _lock = threading.Lock()

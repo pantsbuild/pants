@@ -10,35 +10,37 @@ from pants.task.task import Task
 
 
 class MutexTaskMixin(Task):
-    """A mixin that can be subclassed to form a mutual exclusion group of tasks.
+    """A mixin that can be subclassed to form a mutual exclusion group of
+    tasks.
 
-  Generally, you'd subclass MutexTaskMixin and override `mutex_base` to return the (abstract) type
-  of your mutual exclusion group tasks, for example::
+    Generally, you'd subclass MutexTaskMixin and override `mutex_base` to return the (abstract) type
+    of your mutual exclusion group tasks, for example::
 
-      class LogViewerTaskMixin(MutexTaskMixin):
-        '''Pops up an interactive log viewing console.
+        class LogViewerTaskMixin(MutexTaskMixin):
+          '''Pops up an interactive log viewing console.
 
-        Log viewers pop up their console for binary targets they know how to execute and scrape
-        logs from.
-        '''
-        @classmethod
-        def mutex_base(cls):
-          return LogViewerTaskMixin
+          Log viewers pop up their console for binary targets they know how to execute and scrape
+          logs from.
+          '''
+          @classmethod
+          def mutex_base(cls):
+            return LogViewerTaskMixin
 
-  Then all tasks that implemented an interactive log viewer would mix in LogViewerTaskMixin and
-  provide concrete implementations for `select_targets` that pick out the binary targets they know
-  how to handle and `execute_for` to execute those binaries and scrape their logs.
+    Then all tasks that implemented an interactive log viewer would mix in LogViewerTaskMixin and
+    provide concrete implementations for `select_targets` that pick out the binary targets they know
+    how to handle and `execute_for` to execute those binaries and scrape their logs.
 
-  Assuming all these tasks were registered under the `logview` goal then each task could be assured
-  it would be executed to the exclusion of all other LogViewerTaskMixins in any
-  `./pants logview ...` run.
-  """
+    Assuming all these tasks were registered under the `logview` goal then each task could be assured
+    it would be executed to the exclusion of all other LogViewerTaskMixins in any
+    `./pants logview ...` run.
+    """
 
     class NoActivationsError(TaskError):
         """Indicates a mutexed task group had no tasks run."""
 
     class IncompatibleActivationsError(TaskError):
-        """Indicates a mutexed task group had more than one task eligible to run."""
+        """Indicates a mutexed task group had more than one task eligible to
+        run."""
 
     _implementations = defaultdict(set)
 
@@ -46,17 +48,17 @@ class MutexTaskMixin(Task):
     def reset_implementations(cls):
         """Resets all mutex implementation registrations.
 
-    Only intended for testing.
-    """
+        Only intended for testing.
+        """
         cls._implementations.clear()
 
     @classmethod
     def mutex_base(cls):
         """Returns the root class in a mutex group.
 
-    Members of the group will all mix in this class and it should implement this method concretely
-    to return itself.
-    """
+        Members of the group will all mix in this class and it should
+        implement this method concretely to return itself.
+        """
         raise NotImplementedError()
 
     @classmethod
@@ -66,7 +68,8 @@ class MutexTaskMixin(Task):
 
     @classmethod
     def select_targets(cls, target):
-        """Returns `True` if the given target is operated on by this mutex group member."""
+        """Returns `True` if the given target is operated on by this mutex
+        group member."""
         raise NotImplementedError()
 
     @classmethod
@@ -80,12 +83,12 @@ class MutexTaskMixin(Task):
     def execute_for(self, targets):
         """Executes the current mutex member with its selected targets.
 
-    When this method is called, its an indication that the current mutex member is the only member
-    active in this pants run.
+        When this method is called, its an indication that the current mutex member is the only member
+        active in this pants run.
 
-    :param targets: All the targets reachable in this run selected by this mutex member's
-                    `select_targets` method.
-    """
+        :param targets: All the targets reachable in this run selected by this mutex member's
+                        `select_targets` method.
+        """
 
     def execute(self):
         targets = self._require_homogeneous_roots(self.select_targets, self._selected_by_other_impl)
@@ -94,15 +97,16 @@ class MutexTaskMixin(Task):
         # Else a single other mutex impl is executing.
 
     def _require_homogeneous_roots(self, accept_predicate, reject_predicate):
-        """Ensures that there is no ambiguity in the context according to the given predicates.
+        """Ensures that there is no ambiguity in the context according to the
+        given predicates.
 
-    If any targets in the context satisfy the accept_predicate, and no targets satisfy the
-    reject_predicate, returns the accepted targets.
+        If any targets in the context satisfy the accept_predicate, and no targets satisfy the
+        reject_predicate, returns the accepted targets.
 
-    If no targets satisfy the accept_predicate, returns None.
+        If no targets satisfy the accept_predicate, returns None.
 
-    Otherwise throws TaskError.
-    """
+        Otherwise throws TaskError.
+        """
         if len(self.context.target_roots) == 0:
             raise self.NoActivationsError("No target specified.")
 

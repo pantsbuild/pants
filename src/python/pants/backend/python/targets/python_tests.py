@@ -9,8 +9,8 @@ from pants.backend.python.targets.python_target import PythonTarget
 class PythonTests(PythonTarget):
     """Python tests.
 
-  :API: public
-  """
+    :API: public
+    """
 
     # These are the patterns matched by pytest's test discovery, plus pytest's config hook file.
     default_sources_globs = ("test_*.py", "*_test.py", "conftest.py")

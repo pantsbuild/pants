@@ -38,7 +38,8 @@ class AntlrJavaGen(SimpleCodegenTask, NailgunTask):
     sources_globs = ("**/*.java",)
 
     class AmbiguousPackageError(TaskError):
-        """Raised when a java package cannot be unambiguously determined for a JavaAntlrLibrary."""
+        """Raised when a java package cannot be unambiguously determined for a
+        JavaAntlrLibrary."""
 
     # TODO: Do we need this?
     def find_sources(self, target, target_dir):
@@ -131,11 +132,11 @@ class AntlrJavaGen(SimpleCodegenTask, NailgunTask):
     def _rearrange_output_for_package(self, target_workdir, java_package):
         """Rearrange the output files to match a standard Java structure.
 
-    Antlr emits a directory structure based on the relative path provided
-    for the grammar file. If the source root of the file is different from
-    the Pants build root, then the Java files end up with undesired parent
-    directories.
-    """
+        Antlr emits a directory structure based on the relative path
+        provided for the grammar file. If the source root of the file is
+        different from the Pants build root, then the Java files end up
+        with undesired parent directories.
+        """
         package_dir_rel = java_package.replace(".", os.path.sep)
         package_dir = os.path.join(target_workdir, package_dir_rel)
         safe_mkdir(package_dir)
@@ -154,7 +155,8 @@ class AntlrJavaGen(SimpleCodegenTask, NailgunTask):
                     os.rmdir(full_dir)
 
     def _scrub_generated_timestamps(self, target_workdir):
-        """Remove the first line of comment from each file if it contains a timestamp."""
+        """Remove the first line of comment from each file if it contains a
+        timestamp."""
         for root, _, filenames in safe_walk(target_workdir):
             for filename in filenames:
                 source = os.path.join(root, filename)

@@ -10,7 +10,8 @@ from pants.util.objects import SubclassesOf, SuperclassesOf
 
 
 def _normalize_utf8_keys(kwargs):
-    """When kwargs are passed literally in a source file, their keys are ascii: normalize."""
+    """When kwargs are passed literally in a source file, their keys are ascii:
+    normalize."""
     if any(type(key) is bytes for key in kwargs.keys()):
         # This is to preserve the original dict type for kwargs.
         dict_type = type(kwargs)
@@ -21,9 +22,10 @@ def _normalize_utf8_keys(kwargs):
 class Struct(Serializable, SerializableFactory, Validatable):
     """A serializable object.
 
-  A Struct is composed of basic python builtin types and other high-level Structs.
-  Structs can carry a name in which case they become addressable and can be reused.
-  """
+    A Struct is composed of basic python builtin types and other high-
+    level Structs. Structs can carry a name in which case they become
+    addressable and can be reused.
+    """
 
     # Fields dealing with inheritance.
     _INHERITANCE_FIELDS = {"extends", "merges"}
@@ -39,36 +41,36 @@ class Struct(Serializable, SerializableFactory, Validatable):
     def __init__(self, abstract=False, extends=None, merges=None, type_alias=None, **kwargs):
         """Creates a new struct data blob.
 
-    By default Structs are anonymous (un-named), concrete (not `abstract`), and they neither
-    inherit nor merge another Struct.
+        By default Structs are anonymous (un-named), concrete (not `abstract`), and they neither
+        inherit nor merge another Struct.
 
-    Inheritance is allowed via the `extends` and `merges` channels.  An object inherits all
-    attributes from the object it extends, overwriting any attributes in common with the extended
-    object with its own.  The relationship is an "overlay".  For the merges, the same rules apply
-    for as for extends working left to right such that the rightmost merges attribute will overwrite
-    any similar attribute from merges to its left where the main object does not itself define the
-    attribute.  The primary difference is in handling of lists and dicts.  These are merged and not
-    over-written; again working from left to right with the main object's collection serving as the
-    seed when present.
+        Inheritance is allowed via the `extends` and `merges` channels.  An object inherits all
+        attributes from the object it extends, overwriting any attributes in common with the extended
+        object with its own.  The relationship is an "overlay".  For the merges, the same rules apply
+        for as for extends working left to right such that the rightmost merges attribute will overwrite
+        any similar attribute from merges to its left where the main object does not itself define the
+        attribute.  The primary difference is in handling of lists and dicts.  These are merged and not
+        over-written; again working from left to right with the main object's collection serving as the
+        seed when present.
 
-    A Struct can be semantically abstract without setting `abstract=True`. The `abstract`
-    value can serve as documentation, or, for subclasses that provide an implementation for
-    `validate_concrete`, it allows skipping validation for abstract instances.
+        A Struct can be semantically abstract without setting `abstract=True`. The `abstract`
+        value can serve as documentation, or, for subclasses that provide an implementation for
+        `validate_concrete`, it allows skipping validation for abstract instances.
 
-    :param bool abstract: `True` to mark this struct as abstract, in which case no
-                          validation is performed (see `validate_concrete`); `False` by default.
-    :param extends: The struct instance to inherit field values from.  Any shared fields are
-                    over-written with this instances values.
-    :type extends: An addressed or concrete struct instance that is a type compatible with
-                   this struct or this structs superclasses.
-    :param merges: The struct instances to merge this instance's field values with.  Merging
-                   is like extension except for containers, which are extended instead of replaced;
-                   ie: any `dict` values are updated with this instances items and any `list` values
-                   are extended with this instances items.
-    :type merges: An addressed or concrete struct instance that is a type compatible with
-                  this struct or this structs superclasses.
-    :param **kwargs: The struct parameters.
-    """
+        :param bool abstract: `True` to mark this struct as abstract, in which case no
+                              validation is performed (see `validate_concrete`); `False` by default.
+        :param extends: The struct instance to inherit field values from.  Any shared fields are
+                        over-written with this instances values.
+        :type extends: An addressed or concrete struct instance that is a type compatible with
+                       this struct or this structs superclasses.
+        :param merges: The struct instances to merge this instance's field values with.  Merging
+                       is like extension except for containers, which are extended instead of replaced;
+                       ie: any `dict` values are updated with this instances items and any `list` values
+                       are extended with this instances items.
+        :type merges: An addressed or concrete struct instance that is a type compatible with
+                      this struct or this structs superclasses.
+        :param **kwargs: The struct parameters.
+        """
         kwargs = _normalize_utf8_keys(kwargs)
 
         self._kwargs = kwargs
@@ -93,50 +95,52 @@ class Struct(Serializable, SerializableFactory, Validatable):
             self._kwargs["name"] = target_name
 
     def kwargs(self):
-        """Returns a dict of the kwargs for this Struct which were not interpreted by the baseclass.
+        """Returns a dict of the kwargs for this Struct which were not
+        interpreted by the baseclass.
 
-    This excludes fields like `extends`, `merges`, and `abstract`, which are consumed by
-    SerializableFactory.create and Validatable.validate.
-    """
+        This excludes fields like `extends`, `merges`, and `abstract`,
+        which are consumed by SerializableFactory.create and
+        Validatable.validate.
+        """
         return {k: v for k, v in self._kwargs.items() if k not in self._INTERNAL_FIELDS}
 
     @property
     def name(self):
         """Return the name of this object, if any.
 
-    In general structs need not be named, in which case they are generally embedded
-    objects; ie: attributes values of enclosing named structs.  Any top-level
-    struct object, though, will carry a unique name (in the struct object's enclosing
-    namespace) that can be used to address it.
+        In general structs need not be named, in which case they are generally embedded
+        objects; ie: attributes values of enclosing named structs.  Any top-level
+        struct object, though, will carry a unique name (in the struct object's enclosing
+        namespace) that can be used to address it.
 
-    :rtype: string
-    """
+        :rtype: string
+        """
         return self._kwargs.get("name")
 
     @property
     def address(self):
         """Return the address of this object, if any.
 
-    In general structs need not be identified by an address, in which case they are
-    generally embedded objects; ie: attributes values of enclosing named structs.
-    Any top-level struct, though, will be identifiable via a unique address.
+        In general structs need not be identified by an address, in which case they are
+        generally embedded objects; ie: attributes values of enclosing named structs.
+        Any top-level struct, though, will be identifiable via a unique address.
 
-    :rtype: :class:`pants.build_graph.address.Address`
-    """
+        :rtype: :class:`pants.build_graph.address.Address`
+        """
         return self._kwargs.get("address")
 
     @property
     def type_alias(self):
         """Return the type alias this target was constructed via.
 
-    For a target read from a BUILD file, this will be target alias, like 'java_library'.
-    For a target constructed in memory, this will be the simple class name, like 'JavaLibrary'.
+        For a target read from a BUILD file, this will be target alias, like 'java_library'.
+        For a target constructed in memory, this will be the simple class name, like 'JavaLibrary'.
 
-    The end result is that the type alias should be the most natural way to refer to this target's
-    type to the author of the target instance.
+        The end result is that the type alias should be the most natural way to refer to this target's
+        type to the author of the target instance.
 
-    :rtype: string
-    """
+        :rtype: string
+        """
         type_alias = self._kwargs.get(self._TYPE_ALIAS_FIELD, None)
         return type_alias if type_alias is not None else type(self).__name__
 
@@ -144,10 +148,10 @@ class Struct(Serializable, SerializableFactory, Validatable):
     def abstract(self):
         """Return `True` if this object has been marked as abstract.
 
-    Abstract objects are not validated. See: `validate_concrete`.
+        Abstract objects are not validated. See: `validate_concrete`.
 
-    :rtype: bool
-    """
+        :rtype: bool
+        """
         return self._kwargs.get("abstract", False)
 
     # It only makes sense to inherit a subset of our own fields (we should not inherit new fields!),
@@ -168,15 +172,15 @@ class Struct(Serializable, SerializableFactory, Validatable):
     def extends(self):
         """Return the object this object extends, if any.
 
-    :rtype: :class:`Serializable`
-    """
+        :rtype: :class:`Serializable`
+        """
 
     @addressable_list(SuperclassesOf)
     def merges(self):
         """Return the objects this object merges in, if any.
 
-    :rtype: list of :class:`Serializable`
-    """
+        :rtype: list of :class:`Serializable`
+        """
 
     def _asdict(self):
         return self._kwargs
@@ -237,20 +241,20 @@ class Struct(Serializable, SerializableFactory, Validatable):
     def report_validation_error(self, message):
         """Raises a properly identified validation error.
 
-    :param string message: An error message describing the validation error.
-    :raises: :class:`pants.engine.objects.ValidationError`
-    """
+        :param string message: An error message describing the validation error.
+        :raises: :class:`pants.engine.objects.ValidationError`
+        """
         raise ValidationError(self.address, message)
 
     def validate_concrete(self):
         """Subclasses can override to implement validation logic.
 
-    The object will be fully hydrated state and it's guaranteed the object will be concrete, aka.
-    not `abstract`.  If an error is found in the struct's fields, a validation error should
-    be raised by calling `report_validation_error`.
+        The object will be fully hydrated state and it's guaranteed the object will be concrete, aka.
+        not `abstract`.  If an error is found in the struct's fields, a validation error should
+        be raised by calling `report_validation_error`.
 
-    :raises: :class:`pants.engine.objects.ValidationError`
-    """
+        :raises: :class:`pants.engine.objects.ValidationError`
+        """
 
     def __getattr__(self, item):
         if item in self._kwargs:
@@ -317,5 +321,5 @@ class StructWithDeps(Struct):
     def dependencies(self):
         """The direct dependencies of this target.
 
-    :rtype: list
-    """
+        :rtype: list
+        """

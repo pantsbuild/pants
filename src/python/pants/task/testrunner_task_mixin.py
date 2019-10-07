@@ -33,13 +33,13 @@ class TestResult:
     def _map_exit_code(cls, value):
         """Potentially transform test process exit codes.
 
-    Subclasses can override this classmethod if they know the test process emits non-standard
-    success (0) error codes. By default, no mapping is done and the `value` simply passes through.
+        Subclasses can override this classmethod if they know the test process emits non-standard
+        success (0) error codes. By default, no mapping is done and the `value` simply passes through.
 
-    :param int value: The test process exit code.
-    :returns: A potentially re-mapped exit code.
-    :rtype: int
-    """
+        :param int value: The test process exit code.
+        :returns: A potentially re-mapped exit code.
+        :rtype: int
+        """
         return value
 
     @classmethod
@@ -75,12 +75,13 @@ class TestResult:
         return self._failed_targets
 
     def checked(self):
-        """Raise if this result was unsuccessful and otherwise return this result unchanged.
+        """Raise if this result was unsuccessful and otherwise return this
+        result unchanged.
 
-    :returns: this instance if successful
-    :rtype: :class:`TestResult`
-    :raises: :class:`ErrorWhileTesting` if this result represents a failure
-    """
+        :returns: this instance if successful
+        :rtype: :class:`TestResult`
+        :raises: :class:`ErrorWhileTesting` if this result represents a failure
+        """
         if not self.success:
             raise ErrorWhileTesting(
                 self._msg, exit_code=self._rc, failed_targets=self._failed_targets
@@ -91,9 +92,10 @@ class TestResult:
 class TestRunnerTaskMixin:
     """A mixin to combine with test runner tasks.
 
-  The intent is to migrate logic over time out of JUnitRun and PytestRun, so the functionality
-  expressed can support both languages, and any additional languages that are added to pants.
-  """
+    The intent is to migrate logic over time out of JUnitRun and
+    PytestRun, so the functionality expressed can support both
+    languages, and any additional languages that are added to pants.
+    """
 
     @classmethod
     def register_options(cls, register):
@@ -161,15 +163,15 @@ class TestRunnerTaskMixin:
     def report_all_info_for_single_test(self, scope, target, test_name, test_info):
         """Add all of the test information for a single test.
 
-    Given the dict of test information
-    {'time': 0.124, 'result_code': 'success', 'classname': 'some.test.class'}
-    iterate through each item and report the single item with _report_test_info.
+        Given the dict of test information
+        {'time': 0.124, 'result_code': 'success', 'classname': 'some.test.class'}
+        iterate through each item and report the single item with _report_test_info.
 
-    :param string scope: The scope for which we are reporting the information.
-    :param Target target: The target that we want to store the test information under.
-    :param string test_name: The test's name.
-    :param dict test_info: The test's information, including run duration and result.
-    """
+        :param string scope: The scope for which we are reporting the information.
+        :param Target target: The target that we want to store the test information under.
+        :param string test_name: The test's name.
+        :param dict test_info: The test's information, including run duration and result.
+        """
         for test_info_key, test_info_val in test_info.items():
             key_list = [test_name, test_info_key]
             self._report_test_info(scope, target, key_list, test_info_val)
@@ -177,11 +179,11 @@ class TestRunnerTaskMixin:
     def _report_test_info(self, scope, target, keys, test_info):
         """Add test information to target information.
 
-    :param string scope: The scope for which we are reporting information.
-    :param Target target: The target that we want to store the test information under.
-    :param list of string keys: The keys that will point to the information being stored.
-    :param primitive test_info: The information being stored.
-    """
+        :param string scope: The scope for which we are reporting information.
+        :param Target target: The target that we want to store the test information under.
+        :param list of string keys: The keys that will point to the information being stored.
+        :param primitive test_info: The information being stored.
+        """
         if target and scope:
             target_type = target.type_alias
             self.context.run_tracker.report_target_info(
@@ -193,19 +195,19 @@ class TestRunnerTaskMixin:
     def parse_test_info(xml_path, error_handler, additional_testcase_attributes=None):
         """Parses the junit file for information needed about each test.
 
-    Will include:
-      - test name
-      - test result
-      - test run time duration or None if not a parsable float
+        Will include:
+          - test name
+          - test result
+          - test run time duration or None if not a parsable float
 
-    If additional test case attributes are defined, then it will include those as well.
+        If additional test case attributes are defined, then it will include those as well.
 
-    :param string xml_path: The path of the xml file to be parsed.
-    :param function error_handler: The error handler function.
-    :param list of string additional_testcase_attributes: A list of additional attributes belonging
-           to each testcase that should be included in test information.
-    :return: A dictionary of test information.
-    """
+        :param string xml_path: The path of the xml file to be parsed.
+        :param function error_handler: The error handler function.
+        :param list of string additional_testcase_attributes: A list of additional attributes belonging
+               to each testcase that should be included in test information.
+        :return: A dictionary of test information.
+        """
         tests_in_path = {}
         testcase_attributes = additional_testcase_attributes or []
 
@@ -264,9 +266,9 @@ class TestRunnerTaskMixin:
     def spawn_and_wait(self, test_targets, *args, **kwargs):
         """Spawn the actual test runner process, and wait for it to complete.
 
-    Other than the required positional test_targets argument, all args and kwargs are passed through
-    to spawn.
-    """
+        Other than the required positional test_targets argument, all
+        args and kwargs are passed through to spawn.
+        """
 
         timeout = self._timeout_for_targets(test_targets)
 
@@ -306,8 +308,8 @@ class TestRunnerTaskMixin:
     def _spawn(self, *args, **kwargs):
         """Spawn the actual test runner process.
 
-    :rtype: ProcessHandler
-    """
+        :rtype: ProcessHandler
+        """
 
     def _timeout_for_target(self, target):
         timeout = getattr(target, "timeout", None)
@@ -324,22 +326,23 @@ class TestRunnerTaskMixin:
         return timeout
 
     def _timeout_for_targets(self, targets):
-        """Calculate the total timeout based on the timeout configuration for all the targets.
+        """Calculate the total timeout based on the timeout configuration for
+        all the targets.
 
-    Because the timeout wraps all the test targets rather than individual tests, we have to somehow
-    aggregate all the target specific timeouts into one value that will cover all the tests. If some
-    targets have no timeout configured (or set to 0), their timeout will be set to the default
-    timeout. If there is no default timeout, or if it is set to zero, there will be no timeout, if
-    any of the test targets have a timeout set to 0 or no timeout configured.
+        Because the timeout wraps all the test targets rather than individual tests, we have to somehow
+        aggregate all the target specific timeouts into one value that will cover all the tests. If some
+        targets have no timeout configured (or set to 0), their timeout will be set to the default
+        timeout. If there is no default timeout, or if it is set to zero, there will be no timeout, if
+        any of the test targets have a timeout set to 0 or no timeout configured.
 
-    TODO(sbrenn): This behavior where timeout=0 is the same as timeout=None has turned out to be
-    very confusing, and should change so that timeout=0 actually sets the timeout to 0, and only
-    timeout=None should set the timeout to the default timeout. This will require a deprecation
-    cycle.
+        TODO(sbrenn): This behavior where timeout=0 is the same as timeout=None has turned out to be
+        very confusing, and should change so that timeout=0 actually sets the timeout to 0, and only
+        timeout=None should set the timeout to the default timeout. This will require a deprecation
+        cycle.
 
-    :param targets: list of test targets
-    :return: timeout to cover all the targets, in seconds
-    """
+        :param targets: list of test targets
+        :return: timeout to cover all the targets, in seconds
+        """
 
         if not self.get_options().timeouts:
             return None
@@ -366,8 +369,8 @@ class TestRunnerTaskMixin:
     def _get_targets(self):
         """This is separated out so it can be overridden for testing purposes.
 
-    :return: list of targets
-    """
+        :return: list of targets
+        """
         return self.get_targets()
 
     def _get_test_targets(self):
@@ -378,42 +381,45 @@ class TestRunnerTaskMixin:
 
     @abstractmethod
     def _test_target_filter(self):
-        """A filter to run on targets to see if they are relevant to this test task.
+        """A filter to run on targets to see if they are relevant to this test
+        task.
 
-    :return: function from target->boolean
-    """
+        :return: function from target->boolean
+        """
         raise NotImplementedError
 
     @abstractmethod
     def _validate_target(self, target):
-        """Ensures that this target is valid. Raises TargetDefinitionException if the target is invalid.
+        """Ensures that this target is valid. Raises TargetDefinitionException
+        if the target is invalid.
 
-    We don't need the type check here because _get_targets() combines with _test_target_type to
-    filter the list of targets to only the targets relevant for this test task.
+        We don't need the type check here because _get_targets() combines with _test_target_type to
+        filter the list of targets to only the targets relevant for this test task.
 
-    :param target: the target to validate
-    :raises: TargetDefinitionException
-    """
+        :param target: the target to validate
+        :raises: TargetDefinitionException
+        """
         raise NotImplementedError
 
     @abstractmethod
     def _execute(self, all_targets):
         """Actually goes ahead and runs the tests for the targets.
 
-    :param all_targets: list of the targets whose tests are to be run
-    """
+        :param all_targets: list of the targets whose tests are to be run
+        """
         raise NotImplementedError
 
 
 class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
-    """A mixin for test tasks that support running tests over both individual targets and batches.
+    """A mixin for test tasks that support running tests over both individual
+    targets and batches.
 
-  Provides support for partitioning via `--fast` (batches) and `--no-fast` (per target) options and
-  helps ensure correct caching behavior in either mode.
+    Provides support for partitioning via `--fast` (batches) and `--no-fast` (per target) options and
+    helps ensure correct caching behavior in either mode.
 
-  It's expected that mixees implement proper chrooting (see `run_tests_in_chroot`) to support
-  correct successful test result caching.
-  """
+    It's expected that mixees implement proper chrooting (see `run_tests_in_chroot`) to support
+    correct successful test result caching.
+    """
 
     @classmethod
     def register_options(cls, register):
@@ -455,11 +461,11 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
     def run_tests_in_chroot(self):
         """Return `True` if tests should be run in a chroot.
 
-    Chrooted tests are expected to be run with $PWD set to a directory with only files explicitly
-    (transitively) depended on by the test targets present.
+        Chrooted tests are expected to be run with $PWD set to a directory with only files explicitly
+        (transitively) depended on by the test targets present.
 
-    :rtype: bool
-    """
+        :rtype: bool
+        """
         return self.get_options().chroot
 
     @staticmethod
@@ -621,51 +627,52 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
     def result_class(self):
         """Return the test result type returned by `run_tests`.
 
-    :returns: The test result class to use.
-    :rtype: type that is a subclass of :class:`TestResult`
-    """
+        :returns: The test result class to use.
+        :rtype: type that is a subclass of :class:`TestResult`
+        """
         return TestResult
 
     def fingerprint_strategy(self):
         """Return a fingerprint strategy for target fingerprinting.
 
-    :returns: A fingerprint strategy instance; by default, `None`; ie let the invalidation and
-              caching framework use the default target fingerprinter.
-    :rtype: :class:`pants.base.fingerprint_strategy.FingerprintStrategy`
-    """
+        :returns: A fingerprint strategy instance; by default, `None`; ie let the invalidation and
+                  caching framework use the default target fingerprinter.
+        :rtype: :class:`pants.base.fingerprint_strategy.FingerprintStrategy`
+        """
         return None
 
     @abstractmethod
     def partitions(self, per_target, all_targets, test_targets):
-        """Return a context manager that can be called to iterate of target partitions.
+        """Return a context manager that can be called to iterate of target
+        partitions.
 
-    The iterator should return a 2-tuple with the partitions targets in the first slot and a tuple
-    of extra arguments needed to `run_tests` and `collect_files`.
+        The iterator should return a 2-tuple with the partitions targets in the first slot and a tuple
+        of extra arguments needed to `run_tests` and `collect_files`.
 
-    :rtype: A context manager that is callable with no arguments; returning an iterator over
-            (partition, tuple(args))
-    """
+        :rtype: A context manager that is callable with no arguments; returning an iterator over
+                (partition, tuple(args))
+        """
 
     @abstractmethod
     def run_tests(self, fail_fast, test_targets, *args):
         """Runs tests in the given invalid test targets.
 
-    :param bool fail_fast: `True` if the test run should fail as fast as possible.
-    :param test_targets: The test targets to run tests for.
-    :type test_targets: list of :class:`pants.build_graph.target.Target`s of the type iterated by
-                        `partitions`.
-    :param *args: Extra args associated with the partition of test targets being run as returned by
-                  the `partitions` iterator.
-    :returns: A test result summarizing the result of this test run.
-    :rtype: :class:`TestResult`
-    """
+        :param bool fail_fast: `True` if the test run should fail as fast as possible.
+        :param test_targets: The test targets to run tests for.
+        :type test_targets: list of :class:`pants.build_graph.target.Target`s of the type iterated by
+                            `partitions`.
+        :param *args: Extra args associated with the partition of test targets being run as returned by
+                      the `partitions` iterator.
+        :returns: A test result summarizing the result of this test run.
+        :rtype: :class:`TestResult`
+        """
 
     @abstractmethod
     def collect_files(self, *args):
         """Collects output files from a test run that should be cached.
 
-    :param *args: Extra args associated with the partition of test targets being run as returned by
-                  the `partitions` iterator.
-    :returns: A list of paths to files that should be cached.
-    :rtype: list of str
-    """
+        :param *args: Extra args associated with the partition of test targets being run as returned by
+                      the `partitions` iterator.
+        :returns: A list of paths to files that should be cached.
+        :rtype: list of str
+        """

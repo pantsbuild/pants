@@ -224,7 +224,8 @@ class JavaCompileIntegrationTest(BaseCompileIT):
             self.assertEqual(len(os.listdir(guava_16_artifact_dir)), 2)
 
     def test_java_compile_with_corrupt_remote(self):
-        """Tests that a corrupt artifact in the remote cache still results in a successful compile."""
+        """Tests that a corrupt artifact in the remote cache still results in a
+        successful compile."""
         with self.temporary_workdir() as workdir, temporary_dir() as cachedir:
             with cache_server(cache_root=cachedir) as server:
                 target = "testprojects/tests/java/org/pantsbuild/testproject/matcher"

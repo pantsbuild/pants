@@ -22,7 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 
 @total_ordering
 class ReportTestSuite:
-    """Data object for a JUnit test suite"""
+    """Data object for a JUnit test suite."""
 
     class MergeError(Exception):
         def __init__(self, suites, test_cases):
@@ -37,20 +37,21 @@ class ReportTestSuite:
 
     @classmethod
     def merged(cls, report_test_suites, error_on_conflict=True, logger=None):
-        """Merges any like-named test suites into one test suite encompasing all the suite's test cases.
+        """Merges any like-named test suites into one test suite encompasing
+        all the suite's test cases.
 
-    :param report_test_suites: A sequence of test suites to merge results from.
-    :type report_test_suites: :class:`collections.Iterable` of :class:`ReportTestSuite`
-    :param bool error_on_conflict: `True` to raise when two or more test cases in a given test suite
-                                   have the same name; otherwise the conflict is logged and the 1st
-                                   encountered duplicate is used.
-    :param logger: An optional logger to use for logging merge conflicts.
-    :type logger: :class:`logging.Logger`
-    :raises: :class:`ReportTestSuite.MergeError` if configured to do so on merge errors.
-    :yields: One test suite per unique test suite name in `report_test_suites` with the results of
-             all like-named test suites merged.
-    :rtype: iter of :class:`ReportTestSuite`
-    """
+        :param report_test_suites: A sequence of test suites to merge results from.
+        :type report_test_suites: :class:`collections.Iterable` of :class:`ReportTestSuite`
+        :param bool error_on_conflict: `True` to raise when two or more test cases in a given test suite
+                                       have the same name; otherwise the conflict is logged and the 1st
+                                       encountered duplicate is used.
+        :param logger: An optional logger to use for logging merge conflicts.
+        :type logger: :class:`logging.Logger`
+        :raises: :class:`ReportTestSuite.MergeError` if configured to do so on merge errors.
+        :yields: One test suite per unique test suite name in `report_test_suites` with the results of
+                 all like-named test suites merged.
+        :rtype: iter of :class:`ReportTestSuite`
+        """
 
         logger = logger or _LOGGER
 
@@ -156,7 +157,7 @@ class ReportTestSuite:
 
 @dataclass(frozen=True, order=True)
 class ReportTestCase:
-    """Data object for a JUnit test case"""
+    """Data object for a JUnit test case."""
 
     name: Any
     time: float
@@ -189,11 +190,11 @@ class JUnitHtmlReportInterface(ABC):
 
     @abstractmethod
     def report(self, output_dir):
-        """Generate the junit test result report
+        """Generate the junit test result report.
 
-    :returns: The generated report path iff it should be opened for the user.
-    :rtype: str
-    """
+        :returns: The generated report path iff it should be opened for the user.
+        :rtype: str
+        """
 
 
 class NoJunitHtmlReport(JUnitHtmlReportInterface):
@@ -204,7 +205,7 @@ class NoJunitHtmlReport(JUnitHtmlReportInterface):
 
 
 class JUnitHtmlReport(JUnitHtmlReportInterface):
-    """Generates an HTML report from JUnit TEST-*.xml files"""
+    """Generates an HTML report from JUnit TEST-*.xml files."""
 
     @classmethod
     def create(cls, xml_dir, open_report=False, logger=None, error_on_conflict=True):

@@ -8,25 +8,25 @@ from collections import OrderedDict
 class Properties:
     """A Python reader for java.util.Properties formatted data.
 
-  Based on:
-  http://download.oracle.com/javase/6/docs/api/java/util/Properties.html#load(java.io.Reader)
+    Based on:
+    http://download.oracle.com/javase/6/docs/api/java/util/Properties.html#load(java.io.Reader)
 
-  Originally copied from:
-  https://github.com/twitter/commons/blob/master/src/python/twitter/common/config/properties.py
+    Originally copied from:
+    https://github.com/twitter/commons/blob/master/src/python/twitter/common/config/properties.py
 
-  :API: public
-  """
+    :API: public
+    """
 
     @staticmethod
     def load(data):
         """Loads properties from an open stream or the contents of a string.
 
-    :API: public
+        :API: public
 
-    :param (str | open stream) data: An open stream or a string.
-    :returns: A dict of parsed property data.
-    :rtype: dict
-    """
+        :param (str | open stream) data: An open stream or a string.
+        :returns: A dict of parsed property data.
+        :rtype: dict
+        """
 
         if hasattr(data, "read") and callable(data.read):
             contents = data.read()
@@ -91,10 +91,11 @@ class Properties:
 
     @staticmethod
     def dump(props, output):
-        """Dumps a dict of properties to the specified open stream or file path.
+        """Dumps a dict of properties to the specified open stream or file
+        path.
 
-    :API: public
-    """
+        :API: public
+        """
 
         def escape(token):
             return re.sub(r"([=:\s])", r"\\\1", token)

@@ -32,8 +32,8 @@ def _make_process_table(processes):
 
 @contextmanager
 def no_lingering_process_by_command(name):
-    """Asserts that no process exists for a given command with a helpful error, excluding
-  existing processes outside of the scope of the contextmanager."""
+    """Asserts that no process exists for a given command with a helpful error,
+    excluding existing processes outside of the scope of the contextmanager."""
     context = TrackedProcessesContext(name, set(_safe_iter_matching_processes(name)))
     yield context
     delta_processes = context.current_processes()
@@ -51,6 +51,7 @@ class TrackedProcessesContext:
     before_processes: Any
 
     def current_processes(self):
-        """Returns the current set of matching processes created since the context was entered."""
+        """Returns the current set of matching processes created since the
+        context was entered."""
         after_processes = set(_safe_iter_matching_processes(self.name))
         return after_processes.difference(self.before_processes)

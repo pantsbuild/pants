@@ -15,15 +15,16 @@ from pants.util.meta import classproperty
 class ConsoleTask(QuietTaskMixin, HasTransitiveOptionMixin, Task):
     """A task whose only job is to print information to the console.
 
-  ConsoleTasks are not intended to modify build state.
-  """
+    ConsoleTasks are not intended to modify build state.
+    """
 
     @classproperty
     def _register_console_transitivity_option(cls):
-        """Some tasks register their own --transitive option, which act differently.
+        """Some tasks register their own --transitive option, which act
+        differently.
 
-    TODO: This method is temporary and should be removed in 1.22.0.dev0.
-    """
+        TODO: This method is temporary and should be removed in 1.22.0.dev0.
+        """
         return True
 
     @classmethod

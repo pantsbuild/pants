@@ -16,8 +16,9 @@ from pants.pantsd.service.pants_service import PantsService
 class SchedulerService(PantsService):
     """The pantsd scheduler service.
 
-  This service holds an online Scheduler instance that is primed via watchman filesystem events.
-  """
+    This service holds an online Scheduler instance that is primed via
+    watchman filesystem events.
+    """
 
     QUEUE_SIZE = 64
 
@@ -57,7 +58,7 @@ class SchedulerService(PantsService):
         self._loop_condition = LoopCondition()
 
     def _get_snapshot(self):
-        """Returns a Snapshot of the input globs"""
+        """Returns a Snapshot of the input globs."""
         return self._scheduler_session.product_request(
             Snapshot, subjects=[PathGlobs(self._invalidation_globs)]
         )[0]
@@ -83,7 +84,11 @@ class SchedulerService(PantsService):
             )
 
     def _enqueue_fs_event(self, event):
-        """Watchman filesystem event handler for BUILD/requirements.txt updates. Called via a thread."""
+        """Watchman filesystem event handler for BUILD/requirements.txt
+        updates.
+
+        Called via a thread.
+        """
         self._logger.info(
             "enqueuing {} changes for subscription {}".format(
                 len(event["files"]), event["subscription"]
@@ -115,7 +120,8 @@ class SchedulerService(PantsService):
             self.terminate()
 
     def _check_pid_changed(self):
-        """Reads pidfile and returns False if its PID is ours, else a printable (maybe falsey) value."""
+        """Reads pidfile and returns False if its PID is ours, else a printable
+        (maybe falsey) value."""
         try:
             with open(os.path.join(self._build_root, self._pantsd_pidfile), "r") as f:
                 pid_from_file = f.read()
@@ -136,7 +142,7 @@ class SchedulerService(PantsService):
         self._maybe_invalidate_scheduler_batch()
 
     def _process_event_queue(self):
-        """File event notification queue processor. """
+        """File event notification queue processor."""
         try:
             event = self._event_queue.get(timeout=0.05)
         except queue.Empty:
@@ -177,18 +183,18 @@ class SchedulerService(PantsService):
     def product_graph_len(self):
         """Provides the size of the captive product graph.
 
-    :returns: The node count for the captive product graph.
-    """
+        :returns: The node count for the captive product graph.
+        """
         return self._scheduler.graph_len()
 
     def prepare_v1_graph_run_v2(self, options, options_bootstrapper):
-        """For v1 (and v2): computing TargetRoots for a later v1 run
+        """For v1 (and v2): computing TargetRoots for a later v1 run.
 
-    For v2: running an entire v2 run
-    The exit_code in the return indicates whether any issue was encountered
+        For v2: running an entire v2 run
+        The exit_code in the return indicates whether any issue was encountered
 
-    :returns: `(LegacyGraphSession, TargetRoots, exit_code)`
-    """
+        :returns: `(LegacyGraphSession, TargetRoots, exit_code)`
+        """
         # If any nodes exist in the product graph, wait for the initial watchman event to avoid
         # racing watchman startup vs invalidation events.
         graph_len = self._scheduler.graph_len()
@@ -260,10 +266,11 @@ class SchedulerService(PantsService):
 
 
 class LoopCondition:
-    """A wrapped condition variable to handle deciding when loop consumers should re-run.
+    """A wrapped condition variable to handle deciding when loop consumers
+    should re-run.
 
-  Any number of threads may wait and/or notify the condition.
-  """
+    Any number of threads may wait and/or notify the condition.
+    """
 
     def __init__(self):
         super().__init__()
@@ -277,10 +284,11 @@ class LoopCondition:
             self._condition.notify_all()
 
     def wait(self, timeout):
-        """Waits for the condition for at most the given timeout and returns True if the condition triggered.
+        """Waits for the condition for at most the given timeout and returns
+        True if the condition triggered.
 
-    Generally called in a loop until the condition triggers.
-    """
+        Generally called in a loop until the condition triggers.
+        """
 
         with self._condition:
             previous_iteration = self._iteration

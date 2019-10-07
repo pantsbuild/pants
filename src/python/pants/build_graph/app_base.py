@@ -20,7 +20,8 @@ from pants.util.memo import memoized_property
 
 
 class RelativeToMapper:
-    """A mapper that maps filesystem paths specified relative to a base directory."""
+    """A mapper that maps filesystem paths specified relative to a base
+    directory."""
 
     def __init__(self, base):
         """The base directory paths should be mapped from."""
@@ -37,17 +38,19 @@ class RelativeToMapper:
 
 
 class DirectoryReMapper:
-    """A mapper that maps files relative to a base directory into a destination directory."""
+    """A mapper that maps files relative to a base directory into a destination
+    directory."""
 
     class NonexistentBaseError(Exception):
         pass
 
     def __init__(self, base, dest):
-        """The base directory files should be mapped from, and the dest they should be mapped to.
+        """The base directory files should be mapped from, and the dest they
+        should be mapped to.
 
-    :param string base: the relative path to get_buildroot()
-    :param string dest: the dest path in the bundle
-    """
+        :param string base: the relative path to get_buildroot()
+        :param string dest: the dest path in the bundle
+        """
         self.base = os.path.abspath(os.path.join(get_buildroot(), base))
         if not os.path.isdir(self.base):
             raise DirectoryReMapper.NonexistentBaseError(
@@ -101,28 +104,27 @@ class BundleProps(namedtuple("_BundleProps", ["rel_path", "mapper", "fileset"]))
 class Bundle:
     """A set of files to include in an application bundle.
 
-  To learn about application bundles, see
-  `bundles <JVMProjects.html#jvm-bundles>`_.
-  Looking for Java-style resources accessible via the ``Class.getResource`` API?
-  Those are `resources <build_dictionary.html#resources>`_.
+    To learn about application bundles, see
+    `bundles <JVMProjects.html#jvm-bundles>`_.
+    Looking for Java-style resources accessible via the ``Class.getResource`` API?
+    Those are `resources <build_dictionary.html#resources>`_.
 
-  Files added to the bundle will be included when bundling an application target.
-  By default relative paths are preserved. For example, to include ``config``
-  and ``scripts`` directories: ::
+    Files added to the bundle will be included when bundling an application target.
+    By default relative paths are preserved. For example, to include ``config``
+    and ``scripts`` directories: ::
 
-    bundles=[
-      bundle(fileset=[rglobs('config/*', 'scripts/*'), 'my.cfg']),
-    ]
+      bundles=[
+        bundle(fileset=[rglobs('config/*', 'scripts/*'), 'my.cfg']),
+      ]
 
-  To include files relative to some path component use the ``relative_to`` parameter.
-  The following places the contents of ``common/config`` in a  ``config`` directory
-  in the bundle. ::
+    To include files relative to some path component use the ``relative_to`` parameter.
+    The following places the contents of ``common/config`` in a  ``config`` directory
+    in the bundle. ::
 
-    bundles=[
-      bundle(relative_to='common', fileset=globs('common/config/*'))
-    ]
-
-  """
+      bundles=[
+        bundle(relative_to='common', fileset=globs('common/config/*'))
+      ]
+    """
 
     def __init__(self, parse_context):
         self._parse_context = parse_context
@@ -184,8 +186,8 @@ class Bundle:
 class BundleField(tuple, PayloadField):
     """A tuple subclass that mixes in PayloadField.
 
-  Must be initialized with an iterable of Bundle instances.
-  """
+    Must be initialized with an iterable of Bundle instances.
+    """
 
     @staticmethod
     def _hash_bundle(bundle):
@@ -207,18 +209,18 @@ class BundleField(tuple, PayloadField):
 
 
 class AppBase(Target):
-    """A base class for deployable application targets
+    """A base class for deployable application targets.
 
-  Invoking the ``bundle`` goal on one of these targets creates a
-  self-contained artifact suitable for deployment on some other machine.
-  The artifact contains the executable, its dependencies, and
-  extra files like config files, startup scripts, etc.
+    Invoking the ``bundle`` goal on one of these targets creates a
+    self-contained artifact suitable for deployment on some other machine.
+    The artifact contains the executable, its dependencies, and
+    extra files like config files, startup scripts, etc.
 
-  :API: public
-  """
+    :API: public
+    """
 
     class InvalidArchiveType(Exception):
-        """Raised when archive type defined in Target is invalid"""
+        """Raised when archive type defined in Target is invalid."""
 
     def __init__(
         self,

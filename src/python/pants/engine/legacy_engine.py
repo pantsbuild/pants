@@ -10,13 +10,14 @@ class Engine(ABC):
     """An engine for running a pants command line."""
 
     def execute(self, context, goals):
-        """Executes the supplied goals and their dependencies against the given context.
+        """Executes the supplied goals and their dependencies against the given
+        context.
 
-    :param context: The pants run context.
-    :param list goals: A list of ``Goal`` objects representing the command line goals explicitly
-                       requested.
-    :returns int: An exit code of 0 upon success and non-zero otherwise.
-    """
+        :param context: The pants run context.
+        :param list goals: A list of ``Goal`` objects representing the command line goals explicitly
+                           requested.
+        :returns int: An exit code of 0 upon success and non-zero otherwise.
+        """
         try:
             self.attempt(context, goals)
             return 0
@@ -30,9 +31,10 @@ class Engine(ABC):
 
     @abstractmethod
     def attempt(self, context, goals):
-        """Given the target context and command line goals, attempt to achieve all goals.
+        """Given the target context and command line goals, attempt to achieve
+        all goals.
 
-    :param context: The pants run context.
-    :param list goals: A list of ``Goal`` objects representing the command line goals explicitly
-                       requested.
-    """
+        :param context: The pants run context.
+        :param list goals: A list of ``Goal`` objects representing the command line goals explicitly
+                           requested.
+        """

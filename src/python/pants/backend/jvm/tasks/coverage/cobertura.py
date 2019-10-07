@@ -122,12 +122,12 @@ class Cobertura(CoverageEngine):
 
     @staticmethod
     def initialize_instrument_classpath(output_dir, settings, targets, instrumentation_classpath):
-        """Clones the existing runtime_classpath and corresponding binaries to instrumentation specific
-    paths.
+        """Clones the existing runtime_classpath and corresponding binaries to
+        instrumentation specific paths.
 
-    :param targets: the targets for which we should create an instrumentation_classpath entry based
-    on their runtime_classpath entry.
-    """
+        :param targets: the targets for which we should create an instrumentation_classpath entry based
+        on their runtime_classpath entry.
+        """
         instrument_dir = os.path.join(output_dir, "coverage", "classes")
         settings.safe_makedir(instrument_dir, clean=True)
 

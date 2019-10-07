@@ -17,41 +17,45 @@ from pants.util.meta import classproperty
 class Goal(metaclass=ABCMeta):
     """The named product of a `@console_rule`.
 
-  This abstract class should be subclassed and given a `Goal.name` that it will be referred to by
-  when invoked from the command line. The `Goal.name` also acts as the options_scope for the `Goal`.
+    This abstract class should be subclassed and given a `Goal.name` that it will be referred to by
+    when invoked from the command line. The `Goal.name` also acts as the options_scope for the `Goal`.
 
-  Since `@console_rules` always run in order to produce side effects (generally: console output), they
-  are not cacheable, and the `Goal` product of a `@console_rule` contains only a exit_code value to
-  indicate whether the rule exited cleanly.
+    Since `@console_rules` always run in order to produce side effects (generally: console output), they
+    are not cacheable, and the `Goal` product of a `@console_rule` contains only a exit_code value to
+    indicate whether the rule exited cleanly.
 
-  Options values for a Goal can be retrived by declaring a dependency on the relevant `Goal.Options`
-  class.
-  """
+    Options values for a Goal can be retrived by declaring a dependency on the relevant `Goal.Options`
+    class.
+    """
 
     exit_code: int
 
     @classproperty
     @abstractmethod
     def name(cls):
-        """The name used to select this Goal on the commandline, and for its options."""
+        """The name used to select this Goal on the commandline, and for its
+        options."""
 
     @classproperty
     def deprecated_cache_setup_removal_version(cls):
-        """Optionally defines a deprecation version for a CacheSetup dependency.
+        """Optionally defines a deprecation version for a CacheSetup
+        dependency.
 
-    If this Goal should have an associated deprecated instance of `CacheSetup` (which was implicitly
-    required by all v1 Tasks), subclasses may set this to a valid deprecation version to create
-    that association.
-    """
+        If this Goal should have an associated deprecated instance of
+        `CacheSetup` (which was implicitly required by all v1 Tasks),
+        subclasses may set this to a valid deprecation version to create
+        that association.
+        """
         return None
 
     @classmethod
     def register_options(cls, register):
         """Register options for the `Goal.Options` of this `Goal`.
 
-    Subclasses may override and call register(*args, **kwargs). Callers can retrieve the resulting
-    options values by declaring a dependency on the `Goal.Options` class.
-    """
+        Subclasses may override and call register(*args, **kwargs).
+        Callers can retrieve the resulting options values by declaring a
+        dependency on the `Goal.Options` class.
+        """
 
     @memoized_classproperty
     def Options(cls):
@@ -108,11 +112,13 @@ class Goal(metaclass=ABCMeta):
 
 
 class _GoalOptions(object):
-    """A marker trait for the anonymous inner `Goal.Options` classes for `Goal`s."""
+    """A marker trait for the anonymous inner `Goal.Options` classes for
+    `Goal`s."""
 
 
 class LineOriented:
-    """A mixin for Goal that adds Options to support the `line_oriented` context manager."""
+    """A mixin for Goal that adds Options to support the `line_oriented`
+    context manager."""
 
     @classmethod
     def register_options(cls, register):
@@ -132,10 +138,12 @@ class LineOriented:
     @classmethod
     @contextmanager
     def line_oriented(cls, line_oriented_options, console):
-        """Given Goal.Options and a Console, yields functions for writing to stdout and stderr, respectively.
+        """Given Goal.Options and a Console, yields functions for writing to
+        stdout and stderr, respectively.
 
-    The passed options instance will generally be the `Goal.Options` of a `LineOriented` `Goal`.
-    """
+        The passed options instance will generally be the `Goal.Options`
+        of a `LineOriented` `Goal`.
+        """
         if type(line_oriented_options) != cls.Options:
             raise AssertionError(
                 "Expected Options for `{}`, got: {}".format(cls.__name__, line_oriented_options)

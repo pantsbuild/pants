@@ -82,17 +82,18 @@ class NpmResolver(Subsystem, NodeResolverBase):
         frozen_lockfile=None,
         **kwargs
     ):
-        """Installs the node_package target in the results directory copying sources if necessary.
+        """Installs the node_package target in the results directory copying
+        sources if necessary.
 
-    :param Task node_task: The task executing this method.
-    :param Target target: The target being resolve.
-    :param String results_dir: The output location where this target will be resolved.
-    :param NodePaths node_paths: A mapping of targets and their resolved location, if resolved.
-    :param Boolean resolve_locally: If true, the sources do not have to be copied.
-    :param Boolean install_optional: If true, install optional dependencies.
-    :param Boolean force: If true, rebuild dependencies even if already built.
-    :param Boolean frozen_lockfile: Preserve lock file and fails if a change is detected.
-    """
+        :param Task node_task: The task executing this method.
+        :param Target target: The target being resolve.
+        :param String results_dir: The output location where this target will be resolved.
+        :param NodePaths node_paths: A mapping of targets and their resolved location, if resolved.
+        :param Boolean resolve_locally: If true, the sources do not have to be copied.
+        :param Boolean install_optional: If true, install optional dependencies.
+        :param Boolean force: If true, rebuild dependencies even if already built.
+        :param Boolean frozen_lockfile: Preserve lock file and fails if a change is detected.
+        """
         if self.get_options().force_option_override:
             install_optional = self.get_options().install_optional
             production_only = self.get_options().install_production
@@ -225,10 +226,10 @@ class NpmResolver(Subsystem, NodeResolverBase):
     def _scoped_package_name(node_task, package_name, node_scope):
         """Apply a node_scope to the package name.
 
-    Overrides any existing package_name if already in a scope
+        Overrides any existing package_name if already in a scope
 
-    :return: A package_name with prepended with a node scope via '@'
-    """
+        :return: A package_name with prepended with a node scope via '@'
+        """
 
         if not node_scope:
             return package_name

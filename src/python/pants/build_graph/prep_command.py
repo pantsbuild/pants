@@ -11,23 +11,24 @@ from pants.util.memo import memoized_property
 class PrepCommand(Target):
     """A shell command to be run prior to running a goal.
 
-  For example, you can use `prep_command()` to execute a script that sets up tunnels to database
-  servers. These tunnels could then be leveraged by integration tests.
+    For example, you can use `prep_command()` to execute a script that sets up tunnels to database
+    servers. These tunnels could then be leveraged by integration tests.
 
-  Pants will only execute the `prep_command()` under the specified goal, when processing targets
-  that depend on the `prep_command()` target.  If not otherwise specified, prep_commands
-  execute in the test goal.
+    Pants will only execute the `prep_command()` under the specified goal, when processing targets
+    that depend on the `prep_command()` target.  If not otherwise specified, prep_commands
+    execute in the test goal.
 
-  See also jvm_prep_command for running tasks defined by a JVM language.
+    See also jvm_prep_command for running tasks defined by a JVM language.
 
-  :API: public
-  """
+    :API: public
+    """
 
     _goals = frozenset()
 
     @staticmethod
     def add_allowed_goal(goal):
-        """Add a named goal to the list of valid goals for the 'goal' parameter."""
+        """Add a named goal to the list of valid goals for the 'goal'
+        parameter."""
         PrepCommand._goals = frozenset(list(PrepCommand._goals) + [goal])
 
     @classmethod

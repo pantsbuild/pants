@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 
 class FetcherFactory(Subsystem):
-    """A fetcher that retrieves and unpacks remote libraries from archive files."""
+    """A fetcher that retrieves and unpacks remote libraries from archive
+    files."""
 
     options_scope = "go-fetchers"
 

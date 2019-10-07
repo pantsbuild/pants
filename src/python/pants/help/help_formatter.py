@@ -33,9 +33,9 @@ class HelpFormatter:
     def format_options(self, scope, description, option_registrations_iter):
         """Return a help message for the specified options.
 
-    :param option_registrations_iter: An iterator over (args, kwargs) pairs, as passed in to
-                                      options registration.
-    """
+        :param option_registrations_iter: An iterator over (args, kwargs) pairs, as passed in to
+                                          options registration.
+        """
         oshi = HelpInfoExtracter(self._scope).get_option_scope_help_info(option_registrations_iter)
         lines = []
 
@@ -63,10 +63,10 @@ class HelpFormatter:
     def format_option(self, ohi):
         """Format the help output for a single option.
 
-    :param OptionHelpInfo ohi: Extracted information for option to print
-    :return: Formatted help text for this option
-    :rtype: list of string
-    """
+        :param OptionHelpInfo ohi: Extracted information for option to print
+        :return: Formatted help text for this option
+        :rtype: list of string
+        """
         lines = []
         choices = "one of: [{}] ".format(ohi.choices) if ohi.choices else ""
         arg_line = "{args} {dflt}".format(

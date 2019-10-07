@@ -16,10 +16,11 @@ from pants.version import PANTS_SEMVER
 class ExplainOptionsTask(ConsoleTask):
     """Display meta-information about options.
 
-  This "meta-information" includes what values options have, and what values they *used* to have
-  before they were overridden by a higher-rank value (eg, a HARDCODED value overridden by a CONFIG
-  value and then a cli FLAG value).
-  """
+    This "meta-information" includes what values options have, and what
+    values they *used* to have before they were overridden by a higher-
+    rank value (eg, a HARDCODED value overridden by a CONFIG value and
+    then a cli FLAG value).
+    """
 
     @classmethod
     def register_options(cls, register):

@@ -63,15 +63,16 @@ class JsonParser(Parser):
         return JSONDecoder(object_hook=decoder, strict=True)
 
     def parse(self, filepath, filecontent):
-        """Parse the given json encoded string into a list of top-level objects found.
+        """Parse the given json encoded string into a list of top-level objects
+        found.
 
-    The parser accepts both blank lines and comment lines (those beginning with optional whitespace
-    followed by the '#' character) as well as more than one top-level JSON object.
+        The parser accepts both blank lines and comment lines (those beginning with optional whitespace
+        followed by the '#' character) as well as more than one top-level JSON object.
 
-    The parse also supports a simple protocol for serialized types that have an `_asdict` method.
-    This includes `namedtuple` subtypes as well as any custom class with an `_asdict` method defined;
-    see :class:`pants.engine.serializable.Serializable`.
-    """
+        The parse also supports a simple protocol for serialized types that have an `_asdict` method.
+        This includes `namedtuple` subtypes as well as any custom class with an `_asdict` method defined;
+        see :class:`pants.engine.serializable.Serializable`.
+        """
         json = ensure_text(filecontent)
 
         decoder = self._decoder
@@ -189,27 +190,29 @@ def _object_encoder(obj, inline):
 def encode_json(obj, inline=False, **kwargs):
     """Encode the given object as json.
 
-  Supports objects that follow the `_asdict` protocol.  See `parse_json` for more information.
+    Supports objects that follow the `_asdict` protocol.  See `parse_json` for more information.
 
-  :param obj: A serializable object.
-  :param bool inline: `True` to inline all resolvable objects as nested JSON objects, `False` to
-                      serialize those objects' addresses instead; `False` by default.
-  :param **kwargs: Any kwargs accepted by :class:`json.JSONEncoder` besides `encoding` and
-                   `default`.
-  :returns: A UTF-8 json encoded blob representing the object.
-  :rtype: string
-  :raises: :class:`ParseError` if there were any problems encoding the given `obj` in json.
-  """
+    :param obj: A serializable object.
+    :param bool inline: `True` to inline all resolvable objects as nested JSON objects, `False` to
+                        serialize those objects' addresses instead; `False` by default.
+    :param **kwargs: Any kwargs accepted by :class:`json.JSONEncoder` besides `encoding` and
+                     `default`.
+    :returns: A UTF-8 json encoded blob representing the object.
+    :rtype: string
+    :raises: :class:`ParseError` if there were any problems encoding the given `obj` in json.
+    """
     encoder = JSONEncoder(default=functools.partial(_object_encoder, inline=inline), **kwargs)
     return encoder.encode(obj)
 
 
 class PythonAssignmentsParser(Parser):
-    """A parser that parses the given python code into a list of top-level objects found.
+    """A parser that parses the given python code into a list of top-level
+    objects found.
 
-  Only Serializable objects assigned to top-level variables will be collected and returned.  These
-  objects will be addressable via their top-level variable names in the parsed namespace.
-  """
+    Only Serializable objects assigned to top-level variables will be
+    collected and returned.  These objects will be addressable via their
+    top-level variable names in the parsed namespace.
+    """
 
     def __init__(self, symbol_table):
         super().__init__()
@@ -258,11 +261,13 @@ class PythonAssignmentsParser(Parser):
 
 
 class PythonCallbacksParser(Parser):
-    """A parser that parses the given python code into a list of top-level objects found.
+    """A parser that parses the given python code into a list of top-level
+    objects found.
 
-  Only Serializable objects with `name`s will be collected and returned.  These objects will be
-  addressable via their name in the parsed namespace.
-  """
+    Only Serializable objects with `name`s will be collected and
+    returned.  These objects will be addressable via their name in the
+    parsed namespace.
+    """
 
     def __init__(self, symbol_table):
         super().__init__()

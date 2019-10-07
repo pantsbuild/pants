@@ -12,13 +12,14 @@ from pants.contrib.go.tasks.go_task import GoTask
 
 
 class GoWorkspaceTask(GoTask):
-    """Sets up a standard Go workspace and links Go source code to the workspace.
+    """Sets up a standard Go workspace and links Go source code to the
+    workspace.
 
-  Enables the use of Go tools which require a $GOPATH and correctly organized
-  "src/", "pkg/", and "bin/" directories (e.g. `go install` or `go test`).
+    Enables the use of Go tools which require a $GOPATH and correctly organized
+    "src/", "pkg/", and "bin/" directories (e.g. `go install` or `go test`).
 
-  Intended as a super class for tasks which require and maintain a Go workspace.
-  """
+    Intended as a super class for tasks which require and maintain a Go workspace.
+    """
 
     @classmethod
     def prepare(cls, options, round_manager):
@@ -32,9 +33,10 @@ class GoWorkspaceTask(GoTask):
     def ensure_workspace(self, target):
         """Ensures that an up-to-date Go workspace exists for the given target.
 
-    Creates any necessary symlinks to source files based on the target and its transitive
-    dependencies, and removes any symlinks which do not correspond to any needed dep.
-    """
+        Creates any necessary symlinks to source files based on the
+        target and its transitive dependencies, and removes any symlinks
+        which do not correspond to any needed dep.
+        """
         gopath = self.get_gopath(target)
         for d in ("bin", "pkg", "src"):
             safe_mkdir(os.path.join(gopath, d))
@@ -50,12 +52,13 @@ class GoWorkspaceTask(GoTask):
 
     @staticmethod
     def remove_unused_links(dirpath, required_links):
-        """Recursively remove any links in dirpath which are not contained in required_links.
+        """Recursively remove any links in dirpath which are not contained in
+        required_links.
 
-    :param str dirpath: Absolute path of directory to search.
-    :param container required_links: Container of "in use" links which should not be removed,
-                                     where each link is an absolute path.
-    """
+        :param str dirpath: Absolute path of directory to search.
+        :param container required_links: Container of "in use" links which should not be removed,
+                                         where each link is an absolute path.
+        """
         for root, dirs, files in os.walk(dirpath):
             for p in chain(dirs, files):
                 p = os.path.join(root, p)
@@ -63,13 +66,14 @@ class GoWorkspaceTask(GoTask):
                     os.unlink(p)
 
     def _symlink_local_src(self, gopath, go_local_src, required_links):
-        """Creates symlinks from the given gopath to the source files of the given local package.
+        """Creates symlinks from the given gopath to the source files of the
+        given local package.
 
-    Also duplicates directory structure leading to source files of package within
-    gopath, in order to provide isolation to the package.
+        Also duplicates directory structure leading to source files of package within
+        gopath, in order to provide isolation to the package.
 
-    Adds the symlinks to the source files to required_links.
-    """
+        Adds the symlinks to the source files to required_links.
+        """
         source_list = [
             os.path.join(get_buildroot(), src)
             for src in go_local_src.sources_relative_to_buildroot()
@@ -79,13 +83,14 @@ class GoWorkspaceTask(GoTask):
         return self._symlink_lib(gopath, go_local_src, source_iter, required_links)
 
     def _symlink_remote_lib(self, gopath, go_remote_lib, required_links):
-        """Creates symlinks from the given gopath to the source files of the given remote lib.
+        """Creates symlinks from the given gopath to the source files of the
+        given remote lib.
 
-    Also duplicates directory structure leading to source files of package within
-    gopath, in order to provide isolation to the package.
+        Also duplicates directory structure leading to source files of package within
+        gopath, in order to provide isolation to the package.
 
-    Adds the symlinks to the source files to required_links.
-    """
+        Adds the symlinks to the source files to required_links.
+        """
 
         def source_iter():
             remote_lib_source_dir = self.context.products.get_data("go_remote_lib_src")[

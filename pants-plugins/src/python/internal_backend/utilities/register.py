@@ -18,14 +18,14 @@ from pants.version import PANTS_SEMVER, VERSION
 def pants_setup_py(name, description, additional_classifiers=None, **kwargs):
     """Creates the setup_py for a pants artifact.
 
-  :param str name: The name of the package.
-  :param str description: A brief description of what the package provides.
-  :param list additional_classifiers: Any additional trove classifiers that apply to the package,
-                                      see: https://pypi.org/pypi?%3Aaction=list_classifiers
-  :param kwargs: Any additional keyword arguments to be passed to `setuptools.setup
-                 <https://pythonhosted.org/setuptools/setuptools.html>`_.
-  :returns: A setup_py suitable for building and publishing pants components.
-  """
+    :param str name: The name of the package.
+    :param str description: A brief description of what the package provides.
+    :param list additional_classifiers: Any additional trove classifiers that apply to the package,
+                                        see: https://pypi.org/pypi?%3Aaction=list_classifiers
+    :param kwargs: Any additional keyword arguments to be passed to `setuptools.setup
+                   <https://pythonhosted.org/setuptools/setuptools.html>`_.
+    :returns: A setup_py suitable for building and publishing pants components.
+    """
     if not name.startswith("pantsbuild.pants"):
         raise ValueError(
             f"Pants distribution package names must start with 'pantsbuild.pants', given {name}"
@@ -67,14 +67,14 @@ def pants_setup_py(name, description, additional_classifiers=None, **kwargs):
 def contrib_setup_py(name, description, additional_classifiers=None, **kwargs):
     """Creates the setup_py for a pants contrib plugin artifact.
 
-  :param str name: The name of the package; must start with 'pantsbuild.pants.contrib.'.
-  :param str description: A brief description of what the plugin provides.
-  :param list additional_classifiers: Any additional trove classifiers that apply to the plugin,
-                                      see: https://pypi.org/pypi?%3Aaction=list_classifiers
-  :param kwargs: Any additional keyword arguments to be passed to `setuptools.setup
-                 <https://pythonhosted.org/setuptools/setuptools.html>`_.
-  :returns: A setup_py suitable for building and publishing pants components.
-  """
+    :param str name: The name of the package; must start with 'pantsbuild.pants.contrib.'.
+    :param str description: A brief description of what the plugin provides.
+    :param list additional_classifiers: Any additional trove classifiers that apply to the plugin,
+                                        see: https://pypi.org/pypi?%3Aaction=list_classifiers
+    :param kwargs: Any additional keyword arguments to be passed to `setuptools.setup
+                   <https://pythonhosted.org/setuptools/setuptools.html>`_.
+    :returns: A setup_py suitable for building and publishing pants components.
+    """
     if not name.startswith("pantsbuild.pants.contrib."):
         raise ValueError(
             f"Contrib plugin package names must start with 'pantsbuild.pants.contrib.', given {name}"
@@ -111,9 +111,9 @@ class PantsReleases(Subsystem):
     def _branch_name(cls, version):
         """Defines a mapping between versions and branches.
 
-    In particular, `-dev` suffixed releases always live on master. Any other (modern) release
-    lives in a branch.
-    """
+        In particular, `-dev` suffixed releases always live on master.
+        Any other (modern) release lives in a branch.
+        """
         suffix = version.public[len(version.base_version) :]
         components = version.base_version.split(".") + [suffix]
         if suffix == "" or suffix.startswith("rc"):
@@ -128,9 +128,9 @@ class PantsReleases(Subsystem):
     def notes_for_version(self, version) -> str:
         """Given the parsed Version of pants, return its release notes.
 
-    TODO: This method should parse out the specific version from the resulting file:
-      see https://github.com/pantsbuild/pants/issues/1708
-    """
+        TODO: This method should parse out the specific version from the resulting file:
+          see https://github.com/pantsbuild/pants/issues/1708
+        """
         branch_name = self._branch_name(version)
         branch_notes_file = self._branch_notes.get(branch_name, None)
         if branch_notes_file is None:

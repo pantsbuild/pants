@@ -91,7 +91,8 @@ class RemotePantsRunner:
 
     @contextmanager
     def _trapped_signals(self, client):
-        """A contextmanager that handles SIGINT (control-c) and SIGQUIT (control-\\) remotely."""
+        """A contextmanager that handles SIGINT (control-c) and SIGQUIT
+        (control-\\) remotely."""
         signal_handler = PailgunClientSignalHandler(
             client, timeout=self._bootstrap_options.for_global_scope().pantsd_pailgun_quit_timeout
         )
@@ -106,8 +107,8 @@ class RemotePantsRunner:
     def _run_pants_with_retry(self, pantsd_handle, retries=3):
         """Runs pants remotely with retry and recovery for nascent executions.
 
-    :param PantsDaemon.Handle pantsd_handle: A Handle for the daemon to connect to.
-    """
+        :param PantsDaemon.Handle pantsd_handle: A Handle for the daemon to connect to.
+        """
         attempt = 1
         while 1:
             logger.debug(
@@ -176,11 +177,13 @@ class RemotePantsRunner:
         self._exiter.exit(result)
 
     def _extract_remote_exception(self, pantsd_pid, nailgun_error):
-        """Given a NailgunError, returns a Terminated exception with additional info (where possible).
+        """Given a NailgunError, returns a Terminated exception with additional
+        info (where possible).
 
-    This method will include the entire exception log for either the `pid` in the NailgunError, or
-    failing that, the `pid` of the pantsd instance.
-    """
+        This method will include the entire exception log for either the
+        `pid` in the NailgunError, or failing that, the `pid` of the
+        pantsd instance.
+        """
         sources = [pantsd_pid]
         if nailgun_error.pid is not None:
             sources = [abs(nailgun_error.pid)] + sources

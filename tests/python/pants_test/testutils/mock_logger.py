@@ -9,10 +9,10 @@ from pants.reporting.report import Report
 class MockLogger:
     """A standalone logger that writes to stderr.
 
-  :API: public
+    :API: public
 
-  Useful for testing without requiring the full RunTracker reporting framework.
-  """
+    Useful for testing without requiring the full RunTracker reporting framework.
+    """
 
     def __init__(self, level=Report.INFO):
         self._level = level

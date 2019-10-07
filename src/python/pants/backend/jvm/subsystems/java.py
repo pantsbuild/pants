@@ -11,10 +11,11 @@ from pants.subsystem.subsystem import Subsystem
 
 # TODO: Sort out JVM compile config model: https://github.com/pantsbuild/pants/issues/4483.
 class Java(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem):
-    """A subsystem to encapsulate compile-time settings and features for the Java language.
+    """A subsystem to encapsulate compile-time settings and features for the
+    Java language.
 
-  Runtime options are captured by the JvmPlatform subsystem.
-  """
+    Runtime options are captured by the JvmPlatform subsystem.
+    """
 
     options_scope = "java"
 
@@ -80,12 +81,14 @@ class Java(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem):
 
     @classmethod
     def global_javac_classpath(cls, products):
-        """Returns a classpath entry for the java compiler library, useable as a tool.
+        """Returns a classpath entry for the java compiler library, useable as
+        a tool.
 
-    If no javac library is specified, will return an empty list.  The caller must handle
-    this case by defaulting to the JDK's tools.jar.  We can't provide that jar here
-    because we'd have to know about a Distribution.
-    """
+        If no javac library is specified, will return an empty list.
+        The caller must handle this case by defaulting to the JDK's
+        tools.jar.  We can't provide that jar here because we'd have to
+        know about a Distribution.
+        """
         return cls.global_instance().javac_classpath(products)
 
     def __init__(self, *args, **kwargs):

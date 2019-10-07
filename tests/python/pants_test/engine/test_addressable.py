@@ -68,8 +68,8 @@ class AddressableTest(unittest.TestCase):
         def age(self):
             """Return the person's age in years.
 
-      :rtype int
-      """
+            :rtype int
+            """
 
     def test_none(self):
         person = self.Person(None)
@@ -125,8 +125,8 @@ class AddressableListTest(unittest.TestCase):
         def values(self):
             """Return this series' values.
 
-      :rtype list of int or float
-      """
+            :rtype list of int or float
+            """
 
     def test_none(self):
         series = self.Series(None)
@@ -196,8 +196,8 @@ class AddressableDictTest(unittest.TestCase):
         def varz(self):
             """Return a snapshot of the current /varz.
 
-      :rtype dict of string -> int or float
-      """
+            :rtype dict of string -> int or float
+            """
 
     def test_none(self):
         varz = self.Varz(None)

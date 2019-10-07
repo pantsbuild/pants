@@ -9,27 +9,30 @@ from pants.java.jar.jar_dependency import JarDependency
 class Jarable(ABC):
     """A mixin that identifies a target as one that can provide a jar.
 
-  :API: public
-  """
+    :API: public
+    """
 
     @property
     @abstractmethod
     def identifier(self):
-        """Subclasses should return a stable unique identifier for the jarable target."""
+        """Subclasses should return a stable unique identifier for the jarable
+        target."""
 
     @property
     def provides(self):
-        """Returns an optional :class:`pants.backend.jvm.targets.artifact.Artifact` if this target is exportable.
+        """Returns an optional
+        :class:`pants.backend.jvm.targets.artifact.Artifact` if this target is
+        exportable.
 
-    Subclasses should override to provide an artifact descriptor when one applies, by default None
-    is supplied.
-    """
+        Subclasses should override to provide an artifact descriptor
+        when one applies, by default None is supplied.
+        """
         return None
 
     def get_artifact_info(self):
         """Returns a tuple composed of a :class:`pants.java.jar.JarDependency`
-    describing the jar for this target and a bool indicating if this target is exportable.
-    """
+        describing the jar for this target and a bool indicating if this target
+        is exportable."""
         exported = bool(self.provides)
 
         org = self.provides.org if exported else "internal"

@@ -34,7 +34,8 @@ class CreatePex:
 
 @dataclass(frozen=True)
 class Pex(HermeticPex):
-    """Wrapper for a digest containing a pex file created with some filename."""
+    """Wrapper for a digest containing a pex file created with some
+    filename."""
 
     directory_digest: Digest
 
@@ -50,8 +51,8 @@ def create_pex(
     pex_build_environment: PexBuildEnvironment,
     platform: Platform,
 ) -> Pex:
-    """Returns a PEX with the given requirements, optional entry point, and optional
-  interpreter constraints."""
+    """Returns a PEX with the given requirements, optional entry point, and
+    optional interpreter constraints."""
 
     interpreter_constraint_args = []
     for constraint in request.interpreter_constraints:

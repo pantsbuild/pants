@@ -17,7 +17,8 @@ def is_tools_jar(target):
 
 
 class ProvideToolsJar(JvmToolTaskMixin):
-    """Symlinks and adds the tools.jar as a classpath entry for ToolsJar targets."""
+    """Symlinks and adds the tools.jar as a classpath entry for ToolsJar
+    targets."""
 
     @classmethod
     def product_types(cls):
@@ -52,7 +53,8 @@ class ProvideToolsJar(JvmToolTaskMixin):
                 )
 
     def _tools_classpath_pairs(self, dest_dir):
-        """Given a destination directory, returns a list of tuples of (src, dst) symlink pairs."""
+        """Given a destination directory, returns a list of tuples of (src,
+        dst) symlink pairs."""
         tools_classpath = self._tools_classpath
         return [
             (entry, os.path.join(dest_dir, "{}-{}".format(idx, os.path.basename(entry))))
@@ -61,10 +63,12 @@ class ProvideToolsJar(JvmToolTaskMixin):
 
     @memoized_property
     def _tools_classpath(self):
-        """Returns a classpath representing the (equivalent of the) `tools.jar`.
+        """Returns a classpath representing the (equivalent of the)
+        `tools.jar`.
 
-    If `javac` has been set explicitly, it is used. Otherwise, searches the current distribution.
-    """
+        If `javac` has been set explicitly, it is used. Otherwise,
+        searches the current distribution.
+        """
 
         javac_classpath = Java.global_javac_classpath(self.context.products)
         if javac_classpath:

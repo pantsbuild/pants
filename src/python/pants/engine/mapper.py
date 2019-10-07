@@ -21,18 +21,19 @@ class UnaddressableObjectError(MappingError):
 
 
 class DuplicateNameError(MappingError):
-    """Indicates more than one top-level object was found with the same name."""
+    """Indicates more than one top-level object was found with the same
+    name."""
 
 
 @dataclass(frozen=True)
 class AddressMap:
     """Maps addressable Serializable objects from a byte source.
 
-  To construct an AddressMap, use `parse`.
+    To construct an AddressMap, use `parse`.
 
-  :param path: The path to the byte source this address map's objects were pased from.
-  :param objects_by_name: A dict mapping from object name to the parsed 'thin' addressable object.
-  """
+    :param path: The path to the byte source this address map's objects were pased from.
+    :param objects_by_name: A dict mapping from object name to the parsed 'thin' addressable object.
+    """
 
     path: Any
     objects_by_name: Any
@@ -41,17 +42,17 @@ class AddressMap:
     def parse(cls, filepath, filecontent, parser):
         """Parses a source for addressable Serializable objects.
 
-    No matter the parser used, the parsed and mapped addressable objects are all 'thin'; ie: any
-    objects they point to in other namespaces or even in the same namespace but from a seperate
-    source are left as unresolved pointers.
+        No matter the parser used, the parsed and mapped addressable objects are all 'thin'; ie: any
+        objects they point to in other namespaces or even in the same namespace but from a seperate
+        source are left as unresolved pointers.
 
-    :param string filepath: The path to the byte source containing serialized objects.
-    :param string filecontent: The content of byte source containing serialized objects to be parsed.
-    :param symbol_table: The symbol table cls to expose a symbol table dict.
-    :type symbol_table: Instance of :class:`pants.engine.parser.SymbolTable`.
-    :param parser: The parser cls to use.
-    :type parser: A :class:`pants.engine.parser.Parser`.
-    """
+        :param string filepath: The path to the byte source containing serialized objects.
+        :param string filecontent: The content of byte source containing serialized objects to be parsed.
+        :param symbol_table: The symbol table cls to expose a symbol table dict.
+        :type symbol_table: Instance of :class:`pants.engine.parser.SymbolTable`.
+        :param parser: The parser cls to use.
+        :type parser: A :class:`pants.engine.parser.Parser`.
+        """
         try:
             objects = parser.parse(filepath, filecontent)
         except Exception as e:
@@ -76,22 +77,23 @@ class AddressMap:
 
 
 class DifferingFamiliesError(MappingError):
-    """Indicates an attempt was made to merge address maps from different families together."""
+    """Indicates an attempt was made to merge address maps from different
+    families together."""
 
 
 @dataclass(frozen=True)
 class AddressFamily:
     """Represents the family of addressed objects in a namespace.
 
-  To create an AddressFamily, use `create`.
+    To create an AddressFamily, use `create`.
 
-  An address family can be composed of the addressed objects from zero or more underlying address
-  sources. An "empty" AddressFamily is legal, and is the result when there are not build files in a
-  particular namespace.
+    An address family can be composed of the addressed objects from zero or more underlying address
+    sources. An "empty" AddressFamily is legal, and is the result when there are not build files in a
+    particular namespace.
 
-  :param namespace: The namespace path of this address family.
-  :param objects_by_name: A dict mapping from object name to the parsed 'thin' addressable object.
-  """
+    :param namespace: The namespace path of this address family.
+    :param objects_by_name: A dict mapping from object name to the parsed 'thin' addressable object.
+    """
 
     namespace: Any
     objects_by_name: Any
@@ -100,13 +102,13 @@ class AddressFamily:
     def create(cls, spec_path, address_maps):
         """Creates an address family from the given set of address maps.
 
-    :param spec_path: The directory prefix shared by all address_maps.
-    :param address_maps: The family of maps that form this namespace.
-    :type address_maps: :class:`collections.Iterable` of :class:`AddressMap`
-    :returns: a new address family.
-    :rtype: :class:`AddressFamily`
-    :raises: :class:`MappingError` if the given address maps do not form a family.
-    """
+        :param spec_path: The directory prefix shared by all address_maps.
+        :param address_maps: The family of maps that form this namespace.
+        :type address_maps: :class:`collections.Iterable` of :class:`AddressMap`
+        :returns: a new address family.
+        :rtype: :class:`AddressFamily`
+        :raises: :class:`MappingError` if the given address maps do not form a family.
+        """
         if spec_path == ".":
             spec_path = ""
         for address_map in address_maps:
@@ -143,11 +145,12 @@ class AddressFamily:
 
     @memoized_property
     def addressables(self):
-        """Return a mapping from BuildFileAddress to thin addressable objects in this namespace.
+        """Return a mapping from BuildFileAddress to thin addressable objects
+        in this namespace.
 
-    :rtype: dict from :class:`pants.build_graph.address.BuildFileAddress` to thin addressable
-            objects.
-    """
+        :rtype: dict from :class:`pants.build_graph.address.BuildFileAddress` to thin addressable
+                objects.
+        """
         return {
             BuildFileAddress(rel_path=path, target_name=name): obj
             for name, (path, obj) in self.objects_by_name.items()
@@ -189,16 +192,16 @@ class AddressMapper(
     ):
         """Create an AddressMapper.
 
-    Both the set of files that define a mappable BUILD files and the parser used to parse those
-    files can be customized.  See the `pants.engine.parsers` module for example parsers.
+        Both the set of files that define a mappable BUILD files and the parser used to parse those
+        files can be customized.  See the `pants.engine.parsers` module for example parsers.
 
-    :param parser: The BUILD file parser to use.
-    :type parser: An instance of :class:`pants.engine.parser.Parser`.
-    :param tuple build_patterns: A tuple of fnmatch-compatible patterns for identifying BUILD files
-                                 used to resolve addresses.
-    :param list build_ignore_patterns: A list of path ignore patterns used when searching for BUILD files.
-    :param list exclude_target_regexps: A list of regular expressions for excluding targets.
-    """
+        :param parser: The BUILD file parser to use.
+        :type parser: An instance of :class:`pants.engine.parser.Parser`.
+        :param tuple build_patterns: A tuple of fnmatch-compatible patterns for identifying BUILD files
+                                     used to resolve addresses.
+        :param list build_ignore_patterns: A list of path ignore patterns used when searching for BUILD files.
+        :param list exclude_target_regexps: A list of regular expressions for excluding targets.
+        """
         build_patterns = tuple(build_patterns or ["BUILD", "BUILD.*"])
         build_ignore_patterns = tuple(build_ignore_patterns or [])
         exclude_target_regexps = tuple(exclude_target_regexps or [])

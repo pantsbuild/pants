@@ -20,17 +20,17 @@ def _validate_string(name, item):
 class Scm:
     """Corresponds to the maven POM <scm/> element.
 
-  Refer to the schema here: http://maven.apache.org/maven-v4_0_0.xsd
-  """
+    Refer to the schema here: http://maven.apache.org/maven-v4_0_0.xsd
+    """
 
     @classmethod
     def github(cls, user, repo):
         """Creates an `Scm` for a github repo.
 
-    :param string user: The github user or organization name the repo is hosted under.
-    :param string repo: The repository name.
-    :returns: An `Scm` representing the github repo.
-    """
+        :param string user: The github user or organization name the repo is hosted under.
+        :param string repo: The repository name.
+        :returns: An `Scm` representing the github repo.
+        """
         # For the url format, see: http://maven.apache.org/scm/git.html
         params = dict(user=user, repo=repo)
         connection = "scm:git:git@github.com:{user}/{repo}.git".format(**params)
@@ -38,29 +38,31 @@ class Scm:
         return cls(connection=connection, developer_connection=connection, url=url)
 
     def __init__(self, connection, developer_connection, url, tag=None):
-        """See http://maven.apache.org/scm/scms-overview.html for valid connection formats for your scm.
+        """See http://maven.apache.org/scm/scms-overview.html for valid
+        connection formats for your scm.
 
-    :param string connection: The scm connection string for read-only access to the scm.
-    :param string developer_connection: The scm connection string for read-write access to the scm.
-    :param string url: An url pointing to a browseable web interface for the scm.
-    :param string tag: An optional tag corresponding to the published release.  This will be
-                       populated by pants during publish runs.
-    """
+        :param string connection: The scm connection string for read-only access to the scm.
+        :param string developer_connection: The scm connection string for read-write access to the scm.
+        :param string url: An url pointing to a browseable web interface for the scm.
+        :param string tag: An optional tag corresponding to the published release.  This will be
+                           populated by pants during publish runs.
+        """
         self.connection = _validate_string("connection", connection)
         self.developer_connection = _validate_string("developer_connection", developer_connection)
         self.url = _validate_string("url", url)
         self.tag = _validate_maybe_string("tag", tag)
 
     def tagged(self, tag):
-        """Creates a new `Scm` identical to this `Scm` but with the given `tag`."""
+        """Creates a new `Scm` identical to this `Scm` but with the given
+        `tag`."""
         return Scm(self.connection, self.developer_connection, self.url, tag=tag)
 
 
 class License:
     """Corresponds to the maven POM <license/> element.
 
-  Refer to the schema here: http://maven.apache.org/maven-v4_0_0.xsd
-  """
+    Refer to the schema here: http://maven.apache.org/maven-v4_0_0.xsd
+    """
 
     def __init__(self, name, url, comments=None):
         """
@@ -76,8 +78,8 @@ class License:
 class Developer:
     """Corresponds to the maven POM <developer/> element.
 
-  Refer to the schema here: http://maven.apache.org/maven-v4_0_0.xsd
-  """
+    Refer to the schema here: http://maven.apache.org/maven-v4_0_0.xsd
+    """
 
     def __init__(
         self,
@@ -89,18 +91,19 @@ class Developer:
         organization_url=None,
         roles=None,
     ):
-        """One of `user_id`, `name`, or `email` is required, all other parameters are optional.
+        """One of `user_id`, `name`, or `email` is required, all other
+        parameters are optional.
 
-    :param string user_id: The user id of the developer; typically the one used to access the scm.
-    :param string name: The developer's full name.
-    :param string email: the developer's email address.
-    :param string url: An optional url pointing to more information about the developer.
-    :param string organization: An optional name for the organization the developer works on the
-                                library for.
-    :param string organization_url: An optional url pointing to more information about the
-                                    developer's organization.
-    :param list roles: An optional list of role names that apply to this developer on this project.
-    """
+        :param string user_id: The user id of the developer; typically the one used to access the scm.
+        :param string name: The developer's full name.
+        :param string email: the developer's email address.
+        :param string url: An optional url pointing to more information about the developer.
+        :param string organization: An optional name for the organization the developer works on the
+                                    library for.
+        :param string organization_url: An optional url pointing to more information about the
+                                        developer's organization.
+        :param list roles: An optional list of role names that apply to this developer on this project.
+        """
         if not (user_id or name or email):
             raise ValueError(
                 "At least one of 'user_id', 'name' or 'email' must be specified for each "
@@ -126,20 +129,21 @@ class Developer:
 class OSSRHPublicationMetadata(PublicationMetadata):
     """Corresponds to the Sonatype required fields for jars published to OSSRH.
 
-  See: http://central.sonatype.org/pages/requirements.html#sufficient-metadata
-  """
+    See: http://central.sonatype.org/pages/requirements.html#sufficient-metadata
+    """
 
     def __init__(self, description, url, licenses, developers, scm, name=None):
-        """All parameters are required except for `name` to pass OSSRH requirements.
+        """All parameters are required except for `name` to pass OSSRH
+        requirements.
 
-    :param string description: A description of the library.
-    :param string url: An url pointing to more information about the library.
-    :param list licenses: The licenses that apply to the library.
-    :param list developers:  The developers who work on the library.
-    :param scm: The primary scm system hosting the library source code.
-    :param string name: The optional full name of the library.  If not supplied an appropriate name
-                        will be synthesized.
-    """
+        :param string description: A description of the library.
+        :param string url: An url pointing to more information about the library.
+        :param list licenses: The licenses that apply to the library.
+        :param list developers:  The developers who work on the library.
+        :param scm: The primary scm system hosting the library source code.
+        :param string name: The optional full name of the library.  If not supplied an appropriate name
+                            will be synthesized.
+        """
 
         def validate_nonempty_list(list_name, item, expected_type):
             assert_list(

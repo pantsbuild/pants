@@ -146,9 +146,9 @@ class NodeDistribution(NativeTool):
     def _install_node(self):
         """Install the Node distribution from pants support binaries.
 
-    :returns: The Node distribution bin path.
-    :rtype: string
-    """
+        :returns: The Node distribution bin path.
+        :rtype: string
+        """
         node_package_path = self.select()
         # Todo: https://github.com/pantsbuild/pants/issues/4431
         # This line depends on repacked node distribution.
@@ -164,9 +164,9 @@ class NodeDistribution(NativeTool):
     def _install_yarnpkg(self):
         """Install the Yarnpkg distribution from pants support binaries.
 
-    :returns: The Yarnpkg distribution bin path.
-    :rtype: string
-    """
+        :returns: The Yarnpkg distribution bin path.
+        :rtype: string
+        """
         yarnpkg_package_path = YarnpkgDistribution.scoped_instance(self).select()
         yarnpkg_bin_path = os.path.join(yarnpkg_package_path, "dist", "bin")
         if not is_readable_dir(yarnpkg_bin_path):
@@ -178,11 +178,11 @@ class NodeDistribution(NativeTool):
     def node_command(self, args=None, node_paths=None):
         """Creates a command that can run `node`, passing the given args to it.
 
-    :param list args: An optional list of arguments to pass to `node`.
-    :param list node_paths: An optional list of paths to node_modules.
-    :returns: A `node` command that can be run later.
-    :rtype: :class:`NodeDistribution.Command`
-    """
+        :param list args: An optional list of arguments to pass to `node`.
+        :param list node_paths: An optional list of paths to node_modules.
+        :returns: A `node` command that can be run later.
+        :rtype: :class:`NodeDistribution.Command`
+        """
         # NB: We explicitly allow no args for the `node` command unlike the `npm` command since running
         # `node` with no arguments is useful, it launches a REPL.
         return command_gen([self._install_node], "node", args=args, node_paths=node_paths)
@@ -200,12 +200,12 @@ class NodeDistribution(NativeTool):
     _eslint_required_files = ["yarn.lock", "package.json"]
 
     def eslint_supportdir(self, task_workdir):
-        """ Returns the path where the ESLint is bootstrapped.
+        """Returns the path where the ESLint is bootstrapped.
 
-    :param string task_workdir: The task's working directory
-    :returns: The path where ESLint is bootstrapped and whether or not it is configured
-    :rtype: (string, bool)
-    """
+        :param string task_workdir: The task's working directory
+        :returns: The path where ESLint is bootstrapped and whether or not it is configured
+        :rtype: (string, bool)
+        """
         bootstrapped_support_path = os.path.join(task_workdir, "eslint")
 
         # TODO(nsaechao): Should only have to check if the "eslint" dir exists in the task_workdir

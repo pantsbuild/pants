@@ -27,14 +27,14 @@ class NodeTest(Target):
     def script_name(self):
         """The script name in package.json that runs the tests.
 
-    :rtype: string
-    """
+        :rtype: string
+        """
         return self.payload.script_name
 
     @property
     def timeout(self):
         """The test target timeout.
 
-    :rtype: int
-    """
+        :rtype: int
+        """
         return self.payload.timeout

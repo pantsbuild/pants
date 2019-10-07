@@ -244,7 +244,8 @@ class IvyFetchStep(IvyResolutionStep):
 
 
 class IvyResolveStep(IvyResolutionStep):
-    """Resolves ivy artifacts and produces a cacheable file containing the resulting coordinates."""
+    """Resolves ivy artifacts and produces a cacheable file containing the
+    resulting coordinates."""
 
     def required_load_files_exist(self):
         return all(
@@ -310,14 +311,15 @@ class IvyResolveStep(IvyResolutionStep):
 class FrozenResolution:
     """Contains the abstracted results of a resolve.
 
-  With this we can do a simple fetch.
-  """
+    With this we can do a simple fetch.
+    """
 
     # TODO(nh): include full dependency graph in here.
     # So that we can inject it into the build graph if we want to.
 
     class MissingTarget(Exception):
-        """Thrown when a loaded resolution has a target spec for a target that doesn't exist."""
+        """Thrown when a loaded resolution has a target spec for a target that
+        doesn't exist."""
 
     def __init__(self):
         self.target_to_resolved_coordinates = defaultdict(OrderedSet)
@@ -436,9 +438,10 @@ class FrozenResolution:
 class IvyResolveResult:
     """The result of an Ivy resolution.
 
-  The result data includes the list of resolved artifacts, the relationships between those artifacts
-  and the targets that requested them and the hash name of the resolve.
-  """
+    The result data includes the list of resolved artifacts, the
+    relationships between those artifacts and the targets that requested
+    them and the hash name of the resolve.
+    """
 
     def __init__(self, resolved_artifact_paths, hardlink_map, resolve_hash_name, reports_by_conf):
         self._reports_by_conf = reports_by_conf
@@ -452,7 +455,8 @@ class IvyResolveResult:
         return self.resolve_hash_name is not None
 
     def all_linked_artifacts_exist(self):
-        """All of the artifact paths for this resolve point to existing files."""
+        """All of the artifact paths for this resolve point to existing
+        files."""
         if not self.has_resolved_artifacts:
             return False
         for path in self.resolved_artifact_paths:
@@ -464,8 +468,8 @@ class IvyResolveResult:
     def report_for_conf(self, conf):
         """Returns the path to the ivy report for the provided conf.
 
-     Returns None if there is no path.
-    """
+        Returns None if there is no path.
+        """
         return self._reports_by_conf.get(conf)
 
     def get_frozen_resolutions_by_conf(self, targets):
@@ -480,13 +484,13 @@ class IvyResolveResult:
     def resolved_jars_for_each_target(self, conf, targets):
         """Yields the resolved jars for each passed JarLibrary.
 
-    If there is no report for the requested conf, yields nothing.
+        If there is no report for the requested conf, yields nothing.
 
-    :param conf: The ivy conf to load jars for.
-    :param targets: The collection of JarLibrary targets to find resolved jars for.
-    :yield: target, resolved_jars
-    :raises IvyTaskMixin.UnresolvedJarError
-    """
+        :param conf: The ivy conf to load jars for.
+        :param targets: The collection of JarLibrary targets to find resolved jars for.
+        :yield: target, resolved_jars
+        :raises IvyTaskMixin.UnresolvedJarError
+        """
         ivy_info = self._ivy_info_for(conf)
 
         if not ivy_info:
@@ -551,7 +555,8 @@ class IvyResolveResult:
 
 
 class IvyFetchResolveResult(IvyResolveResult):
-    """A resolve result that uses the frozen resolution to look up dependencies."""
+    """A resolve result that uses the frozen resolution to look up
+    dependencies."""
 
     def __init__(
         self,
@@ -586,7 +591,8 @@ logger = logging.getLogger(__name__)
 
 
 class IvyResolveMappingError(Exception):
-    """Raised when there is a failure mapping the ivy resolve results to pants objects."""
+    """Raised when there is a failure mapping the ivy resolve results to pants
+    objects."""
 
 
 @total_ordering
@@ -634,21 +640,25 @@ class IvyModuleRef:
 
     @property
     def caller_key(self):
-        """This returns an identifier for an IvyModuleRef that only retains the caller org and name.
+        """This returns an identifier for an IvyModuleRef that only retains the
+        caller org and name.
 
-    Ivy represents dependees as `<caller/>`'s with just org and name and rev information.
-    This method returns a `<caller/>` representation of the current ref.
-    """
+        Ivy represents dependees as `<caller/>`'s with just org and name
+        and rev information. This method returns a `<caller/>`
+        representation of the current ref.
+        """
         return IvyModuleRef(name=self.name, org=self.org, rev=self._ANY_REV)
 
     @property
     def unversioned(self):
-        """This returns an identifier for an IvyModuleRef without version information.
+        """This returns an identifier for an IvyModuleRef without version
+        information.
 
-    It's useful because ivy might return information about a different version of a dependency than
-    the one we request, and we want to ensure that all requesters of any version of that dependency
-    are able to learn about it.
-    """
+        It's useful because ivy might return information about a
+        different version of a dependency than the one we request, and
+        we want to ensure that all requesters of any version of that
+        dependency are able to learn about it.
+        """
         return IvyModuleRef(
             name=self.name,
             org=self.org,
@@ -716,16 +726,16 @@ class IvyInfo:
         return acc
 
     def traverse_dependency_graph(self, ref, collector, memo=None):
-        """Traverses module graph, starting with ref, collecting values for each ref into the sets
-    created by the collector function.
+        """Traverses module graph, starting with ref, collecting values for
+        each ref into the sets created by the collector function.
 
-    :param ref an IvyModuleRef to start traversing the ivy dependency graph
-    :param collector a function that takes a ref and returns a new set of values to collect for
-           that ref, which will also be updated with all the dependencies accumulated values
-    :param memo is a dict of ref -> set that memoizes the results of each node in the graph.
-           If provided, allows for retaining cache across calls.
-    :returns the accumulated set for ref
-    """
+        :param ref an IvyModuleRef to start traversing the ivy dependency graph
+        :param collector a function that takes a ref and returns a new set of values to collect for
+               that ref, which will also be updated with all the dependencies accumulated values
+        :param memo is a dict of ref -> set that memoizes the results of each node in the graph.
+               If provided, allows for retaining cache across calls.
+        :returns the accumulated set for ref
+        """
 
         resolved_ref = self.refs_by_unversioned_refs.get(ref.unversioned)
         if resolved_ref:
@@ -738,18 +748,18 @@ class IvyInfo:
     def get_resolved_jars_for_coordinates(self, coordinates, memo=None):
         """Collects jars for the passed coordinates.
 
-    Because artifacts are only fetched for the "winning" version of a module, the artifacts
-    will not always represent the version originally declared by the library.
+        Because artifacts are only fetched for the "winning" version of a module, the artifacts
+        will not always represent the version originally declared by the library.
 
-    This method is transitive within the passed coordinates dependencies.
+        This method is transitive within the passed coordinates dependencies.
 
-    :param coordinates collections.Iterable: Collection of coordinates to collect transitive
-                                             resolved jars for.
-    :param memo: See `traverse_dependency_graph`.
-    :returns: All the artifacts for all of the jars for the provided coordinates,
-              including transitive dependencies.
-    :rtype: list of :class:`pants.java.jar.ResolvedJar`
-    """
+        :param coordinates collections.Iterable: Collection of coordinates to collect transitive
+                                                 resolved jars for.
+        :param memo: See `traverse_dependency_graph`.
+        :returns: All the artifacts for all of the jars for the provided coordinates,
+                  including transitive dependencies.
+        :rtype: list of :class:`pants.java.jar.ResolvedJar`
+        """
 
         def to_resolved_jar(jar_ref, jar_path):
             return ResolvedJar(
@@ -785,8 +795,8 @@ class IvyInfo:
 class IvyUtils:
     """Useful methods related to interaction with ivy.
 
-  :API: public
-  """
+    :API: public
+    """
 
     # Protects ivy executions.
     _ivy_lock = threading.RLock()
@@ -839,25 +849,26 @@ class IvyUtils:
         workunit_factory,
         workunit_name,
     ):
-        """Execute Ivy with the given ivy.xml and copies all relevant files into the workdir.
+        """Execute Ivy with the given ivy.xml and copies all relevant files
+        into the workdir.
 
-    This method does an Ivy resolve, which may be either a Pants resolve or a Pants fetch depending
-    on whether there is an existing frozen resolution.
+        This method does an Ivy resolve, which may be either a Pants resolve or a Pants fetch depending
+        on whether there is an existing frozen resolution.
 
-    After it is run, the Ivy reports are copied into the workdir at the paths specified by
-    workdir_report_paths_by_conf along with a file containing a list of all the requested artifacts
-    and their transitive dependencies.
+        After it is run, the Ivy reports are copied into the workdir at the paths specified by
+        workdir_report_paths_by_conf along with a file containing a list of all the requested artifacts
+        and their transitive dependencies.
 
-    :param executor: A JVM executor to use to invoke ivy.
-    :param extra_args: Extra arguments to pass to ivy.
-    :param ivyxml: The input ivy.xml containing the dependencies to resolve.
-    :param jvm_options: A list of jvm option strings to use for the ivy invoke, or None.
-    :param workdir_report_paths_by_conf: A dict mapping confs to report paths in the workdir.
-    :param confs: The confs used in the resolve.
-    :param resolve_hash_name: The hash to use as the module name for finding the ivy report file.
-    :param workunit_factory: A workunit factory for the ivy invoke, or None.
-    :param workunit_name: A workunit name for the ivy invoke, or None.
-    """
+        :param executor: A JVM executor to use to invoke ivy.
+        :param extra_args: Extra arguments to pass to ivy.
+        :param ivyxml: The input ivy.xml containing the dependencies to resolve.
+        :param jvm_options: A list of jvm option strings to use for the ivy invoke, or None.
+        :param workdir_report_paths_by_conf: A dict mapping confs to report paths in the workdir.
+        :param confs: The confs used in the resolve.
+        :param resolve_hash_name: The hash to use as the module name for finding the ivy report file.
+        :param workunit_factory: A workunit factory for the ivy invoke, or None.
+        :param workunit_name: A workunit name for the ivy invoke, or None.
+        """
         ivy = Bootstrapper.default_ivy(bootstrap_workunit_factory=workunit_factory)
 
         with safe_concurrent_creation(
@@ -964,12 +975,14 @@ class IvyUtils:
 
     @classmethod
     def _hardlink_cachepath(cls, ivy_repository_cache_dir, inpath, hardlink_dir, outpath):
-        """hardlinks all paths listed in inpath that are under ivy_repository_cache_dir into hardlink_dir.
+        """hardlinks all paths listed in inpath that are under
+        ivy_repository_cache_dir into hardlink_dir.
 
-    If there is an existing hardlink for a file under inpath, it is used rather than creating
-    a new hardlink. Preserves all other paths. Writes the resulting paths to outpath.
-    Returns a map of path -> hardlink to that path.
-    """
+        If there is an existing hardlink for a file under inpath, it is
+        used rather than creating a new hardlink. Preserves all other
+        paths. Writes the resulting paths to outpath. Returns a map of
+        path -> hardlink to that path.
+        """
         safe_mkdir(hardlink_dir)
         # The ivy_repository_cache_dir might itself be a hardlink. In this case, ivy may return paths that
         # reference the realpath of the .jar file after it is resolved in the cache dir. To handle
@@ -1007,15 +1020,15 @@ class IvyUtils:
     def xml_report_path(cls, resolution_cache_dir, resolve_hash_name, conf):
         """The path to the xml report ivy creates after a retrieve.
 
-    :API: public
+        :API: public
 
-    :param string cache_dir: The path of the ivy cache dir used for resolves.
-    :param string resolve_hash_name: Hash from the Cache key from the VersionedTargetSet used for
-                                     resolution.
-    :param string conf: The ivy conf name (e.g. "default").
-    :returns: The report path.
-    :rtype: string
-    """
+        :param string cache_dir: The path of the ivy cache dir used for resolves.
+        :param string resolve_hash_name: Hash from the Cache key from the VersionedTargetSet used for
+                                         resolution.
+        :param string conf: The ivy conf name (e.g. "default").
+        :returns: The report path.
+        :rtype: string
+        """
         return os.path.join(
             resolution_cache_dir,
             "{}-{}-{}.xml".format(IvyUtils.INTERNAL_ORG_NAME, resolve_hash_name, conf),
@@ -1025,14 +1038,14 @@ class IvyUtils:
     def parse_xml_report(cls, conf, path):
         """Parse the ivy xml report corresponding to the name passed to ivy.
 
-    :API: public
+        :API: public
 
-    :param string conf: the ivy conf name (e.g. "default")
-    :param string path: The path to the ivy report file.
-    :returns: The info in the xml report.
-    :rtype: :class:`IvyInfo`
-    :raises: :class:`IvyResolveMappingError` if no report exists.
-    """
+        :param string conf: the ivy conf name (e.g. "default")
+        :param string path: The path to the ivy report file.
+        :returns: The info in the xml report.
+        :rtype: :class:`IvyInfo`
+        :raises: :class:`IvyResolveMappingError` if no report exists.
+        """
         if not os.path.exists(path):
             raise cls.IvyResolveReportError("Missing expected ivy output file {}".format(path))
 
@@ -1154,7 +1167,8 @@ class IvyUtils:
 
     @classmethod
     def generate_fetch_ivy(cls, jars, ivyxml, confs, resolve_hash_name):
-        """Generates an ivy xml with all jars marked as intransitive using the all conflict manager."""
+        """Generates an ivy xml with all jars marked as intransitive using the
+        all conflict manager."""
         org = IvyUtils.INTERNAL_ORG_NAME
         name = resolve_hash_name
 
@@ -1187,15 +1201,16 @@ class IvyUtils:
 
     @classmethod
     def calculate_classpath(cls, targets):
-        """Creates a consistent classpath and list of excludes for the passed targets.
+        """Creates a consistent classpath and list of excludes for the passed
+        targets.
 
-    It also modifies the JarDependency objects' excludes to contain all the jars excluded by
-    provides.
+        It also modifies the JarDependency objects' excludes to contain all the jars excluded by
+        provides.
 
-    :param iterable targets: List of targets to collect JarDependencies and excludes from.
+        :param iterable targets: List of targets to collect JarDependencies and excludes from.
 
-    :returns: A pair of a list of JarDependencies, and a set of excludes to apply globally.
-    """
+        :returns: A pair of a list of JarDependencies, and a set of excludes to apply globally.
+        """
         jars = OrderedDict()
         global_excludes = set()
         provide_excludes = set()

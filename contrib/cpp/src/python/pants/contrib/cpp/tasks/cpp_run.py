@@ -8,7 +8,7 @@ from pants.contrib.cpp.tasks.cpp_task import CppTask
 
 
 class CppRun(CppTask):
-    """Runs a cpp binary"""
+    """Runs a cpp binary."""
 
     @classmethod
     def register_options(cls, register):

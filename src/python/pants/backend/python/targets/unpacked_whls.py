@@ -17,10 +17,10 @@ logger = logging.getLogger(__name__)
 class UnpackedWheels(ImportWheelsMixin, Target):
     """A set of sources extracted from JAR files.
 
-  NB: Currently, wheels are always resolved for the 'current' platform.
+    NB: Currently, wheels are always resolved for the 'current' platform.
 
-  :API: public
-  """
+    :API: public
+    """
 
     imported_target_kwargs_field = "libraries"
     imported_target_payload_field = "library_specs"

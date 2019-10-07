@@ -86,7 +86,8 @@ def create_isolated_git_repo():
             return create_file_in(worktree, path, content)
 
         def copy_into(path, to_path=None):
-            """Copies a file from the real git repo into the isolated git repo."""
+            """Copies a file from the real git repo into the isolated git
+            repo."""
             write_path = os.path.join(worktree, to_path or path)
             if os.path.isfile(path):
                 safe_mkdir(os.path.dirname(write_path))
@@ -272,7 +273,8 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
 
     @classmethod
     def generate_tests(cls):
-        """Generates tests on the class for better reporting granularity than an opaque for loop test."""
+        """Generates tests on the class for better reporting granularity than
+        an opaque for loop test."""
 
         def safe_filename(f):
             return f.replace("/", "_").replace(".", "_")

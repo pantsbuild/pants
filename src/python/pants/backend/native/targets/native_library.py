@@ -12,7 +12,8 @@ from pants.build_graph.target import Target
 
 
 class NativeLibrary(Target, metaclass=ABCMeta):
-    """A class wrapping targets containing sources for C-family languages and related code."""
+    """A class wrapping targets containing sources for C-family languages and
+    related code."""
 
     # TODO: replace this awkward classmethod with a mixin!
     @classmethod
@@ -75,11 +76,12 @@ class NativeLibrary(Target, metaclass=ABCMeta):
 
     @property
     def compiler_option_sets(self):
-        """For every element in this list, enable the corresponding flags on compilation
-    of targets.
-    :return: See constructor.
-    :rtype: list
-    """
+        """For every element in this list, enable the corresponding flags on
+        compilation of targets.
+
+        :return: See constructor.
+        :rtype: list
+        """
         return self.payload.compiler_option_sets
 
     @property

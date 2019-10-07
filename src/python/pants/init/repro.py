@@ -37,11 +37,12 @@ class Reproducer(Subsystem):
         )
 
     def create_repro(self):
-        """Return a Repro instance for capturing a repro of the current workspace state.
+        """Return a Repro instance for capturing a repro of the current
+        workspace state.
 
-    :return: a Repro instance, or None if no repro was requested.
-    :rtype: `pants.bin.repro.Repro`
-    """
+        :return: a Repro instance, or None if no repro was requested.
+        :rtype: `pants.bin.repro.Repro`
+        """
         path = self.get_options().capture
         if path is None:
             return None
@@ -58,10 +59,10 @@ class Repro:
     def __init__(self, path, buildroot, ignore):
         """Create a Repro instance.
 
-    :param string path: Write the captured repro data to this path.
-    :param string buildroot: Capture the workspace at this buildroot.
-    :param ignore: Ignore these top-level files/dirs under buildroot.
-    """
+        :param string path: Write the captured repro data to this path.
+        :param string buildroot: Capture the workspace at this buildroot.
+        :param ignore: Ignore these top-level files/dirs under buildroot.
+        """
         path = os.path.expanduser(path)
         if os.path.realpath(path).startswith(buildroot):
             raise ReproError("Repro capture file location must be outside the build root.")

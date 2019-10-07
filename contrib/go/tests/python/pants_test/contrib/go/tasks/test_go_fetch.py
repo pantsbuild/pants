@@ -103,10 +103,12 @@ class GoFetchTest(TaskTestBase):
         )
 
     def _init_dep_graph_files(self, src, zipdir, dep_graph):
-        """Given a dependency graph, initializes the corresponding BUILD/packages/zip files.
+        """Given a dependency graph, initializes the corresponding
+        BUILD/packages/zip files.
 
-    Packages are placed in src, and their zipped contents are placed in zipdir.
-    """
+        Packages are placed in src, and their zipped contents are placed
+        in zipdir.
+        """
         for t, deps in dep_graph.items():
             self._create_package(src, t, deps)
             self._create_zip(src, zipdir, t)
@@ -123,7 +125,8 @@ class GoFetchTest(TaskTestBase):
         return context
 
     def _assert_dependency_graph(self, root_target, dep_map):
-        """Recursively assert that the dependency graph starting at root_target matches dep_map."""
+        """Recursively assert that the dependency graph starting at root_target
+        matches dep_map."""
         if root_target.name not in dep_map:
             return
 

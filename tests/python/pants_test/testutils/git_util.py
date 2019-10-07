@@ -15,7 +15,7 @@ MIN_REQUIRED_GIT_VERSION = Revision.semver("1.7.10")
 
 
 def git_version() -> Revision:
-    """Get a Version() based on installed command-line git's version"""
+    """Get a Version() based on installed command-line git's version."""
     stdout = subprocess.run(
         ["git", "--version"], stdout=subprocess.PIPE, encoding="utf-8", check=True
     ).stdout
@@ -30,13 +30,13 @@ def git_version() -> Revision:
 def initialize_repo(worktree: str, *, gitdir: Optional[str] = None) -> Iterator[Git]:
     """Initialize a git repository for the given `worktree`.
 
-  NB: The given `worktree` must contain at least one file which will be committed to form an initial
-  commit.
+    NB: The given `worktree` must contain at least one file which will be committed to form an initial
+    commit.
 
-  :param worktree: The path to the git work tree.
-  :param gitdir: An optional path to the `.git` dir to use.
-  :returns: A `Git` repository object that can be used to interact with the repo.
-  """
+    :param worktree: The path to the git work tree.
+    :param gitdir: An optional path to the `.git` dir to use.
+    :returns: A `Git` repository object that can be used to interact with the repo.
+    """
 
     @contextmanager
     def use_gitdir() -> Iterator[str]:

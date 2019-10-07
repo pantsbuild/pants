@@ -34,14 +34,16 @@ def swallow_psutil_exceptions():
 
 
 class ProcessGroup:
-    """Wraps a logical group of processes and provides convenient access to ProcessManager objects."""
+    """Wraps a logical group of processes and provides convenient access to
+    ProcessManager objects."""
 
     def __init__(self, name, metadata_base_dir=None):
         self._name = name
         self._metadata_base_dir = metadata_base_dir
 
     def _instance_from_process(self, process):
-        """Default converter from psutil.Process to process instance classes for subclassing."""
+        """Default converter from psutil.Process to process instance classes
+        for subclassing."""
         return ProcessManager(
             name=process.name(),
             pid=process.pid,
@@ -50,12 +52,14 @@ class ProcessGroup:
         )
 
     def iter_processes(self, proc_filter=None):
-        """Yields processes from psutil.process_iter with an optional filter and swallows psutil errors.
+        """Yields processes from psutil.process_iter with an optional filter
+        and swallows psutil errors.
 
-    If a psutil exception is raised during execution of the filter, that process will not be
-    yielded but subsequent processes will. On the other hand, if psutil.process_iter raises
-    an exception, no more processes will be yielded.
-    """
+        If a psutil exception is raised during execution of the filter,
+        that process will not be yielded but subsequent processes will.
+        On the other hand, if psutil.process_iter raises an exception,
+        no more processes will be yielded.
+        """
         with swallow_psutil_exceptions():  # process_iter may raise
             for proc in psutil.process_iter():
                 with swallow_psutil_exceptions():  # proc_filter may raise
@@ -92,14 +96,15 @@ class ProcessMetadataManager:
 
     @staticmethod
     def _maybe_cast(item, caster):
-        """Given a casting function, attempt to cast to that type while masking common cast exceptions.
+        """Given a casting function, attempt to cast to that type while masking
+        common cast exceptions.
 
-    N.B. This is mostly suitable for casting string types to numeric types - e.g. a port number
-    read from disk into an int.
+        N.B. This is mostly suitable for casting string types to numeric types - e.g. a port number
+        read from disk into an int.
 
-    :param func caster: A casting callable (e.g. `int`).
-    :returns: The result of caster(item) or item if TypeError or ValueError are raised during cast.
-    """
+        :param func caster: A casting callable (e.g. `int`).
+        :returns: The result of caster(item) or item if TypeError or ValueError are raised during cast.
+        """
         try:
             return caster(item)
         except (TypeError, ValueError):
@@ -115,20 +120,21 @@ class ProcessMetadataManager:
         wait_interval=WAIT_INTERVAL_SEC,
         info_interval=INFO_INTERVAL_SEC,
     ):
-        """Execute a function/closure repeatedly until a True condition or timeout is met.
+        """Execute a function/closure repeatedly until a True condition or
+        timeout is met.
 
-    :param func closure: the function/closure to execute (should not block for long periods of time
-                         and must return True on success).
-    :param str action_msg: a description of the action that is being executed, to be rendered as
-                           info while we wait, and as part of any rendered exception.
-    :param float timeout: the maximum amount of time to wait for a true result from the closure in
-                          seconds. N.B. this is timing based, so won't be exact if the runtime of
-                          the closure exceeds the timeout.
-    :param float wait_interval: the amount of time to sleep between closure invocations.
-    :param float info_interval: the amount of time to wait before and between reports via info
-                                logging that we're still waiting for the closure to succeed.
-    :raises: :class:`ProcessManager.Timeout` on execution timeout.
-    """
+        :param func closure: the function/closure to execute (should not block for long periods of time
+                             and must return True on success).
+        :param str action_msg: a description of the action that is being executed, to be rendered as
+                               info while we wait, and as part of any rendered exception.
+        :param float timeout: the maximum amount of time to wait for a true result from the closure in
+                              seconds. N.B. this is timing based, so won't be exact if the runtime of
+                              the closure exceeds the timeout.
+        :param float wait_interval: the amount of time to sleep between closure invocations.
+        :param float info_interval: the amount of time to wait before and between reports via info
+                                    logging that we're still waiting for the closure to succeed.
+        :raises: :class:`ProcessManager.Timeout` on execution timeout.
+        """
         now = time.time()
         deadline = now + timeout
         info_deadline = now + info_interval
@@ -152,7 +158,8 @@ class ProcessMetadataManager:
 
     @classmethod
     def _wait_for_file(cls, filename, timeout=FAIL_WAIT_SEC, want_content=True):
-        """Wait up to timeout seconds for filename to appear with a non-zero size or raise Timeout()."""
+        """Wait up to timeout seconds for filename to appear with a non-zero
+        size or raise Timeout()."""
 
         def file_waiter():
             return os.path.exists(filename) and (not want_content or os.path.getsize(filename))
@@ -164,12 +171,14 @@ class ProcessMetadataManager:
     def _get_metadata_dir_by_name(name, metadata_base_dir):
         """Retrieve the metadata dir by name.
 
-    This should always live outside of the workdir to survive a clean-all.
-    """
+        This should always live outside of the workdir to survive a
+        clean-all.
+        """
         return os.path.join(metadata_base_dir, name)
 
     def _maybe_init_metadata_dir_by_name(self, name):
-        """Initialize the metadata directory for a named identity if it doesn't exist."""
+        """Initialize the metadata directory for a named identity if it doesn't
+        exist."""
         safe_mkdir(self.__class__._get_metadata_dir_by_name(name, self._metadata_base_dir))
 
     def _metadata_file_path(self, name, metadata_key):
@@ -182,10 +191,10 @@ class ProcessMetadataManager:
     def read_metadata_by_name(self, name, metadata_key, caster=None):
         """Read process metadata using a named identity.
 
-    :param string name: The ProcessMetadataManager identity/name (e.g. 'pantsd').
-    :param string metadata_key: The metadata key (e.g. 'pid').
-    :param func caster: A casting callable to apply to the read value (e.g. `int`).
-    """
+        :param string name: The ProcessMetadataManager identity/name (e.g. 'pantsd').
+        :param string metadata_key: The metadata key (e.g. 'pid').
+        :param func caster: A casting callable to apply to the read value (e.g. `int`).
+        """
         file_path = self._metadata_file_path(name, metadata_key)
         try:
             metadata = read_file(file_path).strip()
@@ -196,10 +205,10 @@ class ProcessMetadataManager:
     def write_metadata_by_name(self, name, metadata_key, metadata_value):
         """Write process metadata using a named identity.
 
-    :param string name: The ProcessMetadataManager identity/name (e.g. 'pantsd').
-    :param string metadata_key: The metadata key (e.g. 'pid').
-    :param string metadata_value: The metadata value (e.g. '1729').
-    """
+        :param string name: The ProcessMetadataManager identity/name (e.g. 'pantsd').
+        :param string metadata_key: The metadata key (e.g. 'pid').
+        :param string metadata_value: The metadata value (e.g. '1729').
+        """
         self._maybe_init_metadata_dir_by_name(name)
         file_path = self._metadata_file_path(name, metadata_key)
         safe_file_dump(file_path, metadata_value)
@@ -207,13 +216,13 @@ class ProcessMetadataManager:
     def await_metadata_by_name(self, name, metadata_key, timeout, caster=None):
         """Block up to a timeout for process metadata to arrive on disk.
 
-    :param string name: The ProcessMetadataManager identity/name (e.g. 'pantsd').
-    :param string metadata_key: The metadata key (e.g. 'pid').
-    :param int timeout: The deadline to write metadata.
-    :param type caster: A type-casting callable to apply to the read value (e.g. int, str).
-    :returns: The value of the metadata key (read from disk post-write).
-    :raises: :class:`ProcessMetadataManager.Timeout` on timeout.
-    """
+        :param string name: The ProcessMetadataManager identity/name (e.g. 'pantsd').
+        :param string metadata_key: The metadata key (e.g. 'pid').
+        :param int timeout: The deadline to write metadata.
+        :param type caster: A type-casting callable to apply to the read value (e.g. int, str).
+        :returns: The value of the metadata key (read from disk post-write).
+        :raises: :class:`ProcessMetadataManager.Timeout` on timeout.
+        """
         file_path = self._metadata_file_path(name, metadata_key)
         self._wait_for_file(file_path, timeout=timeout)
         return self.read_metadata_by_name(name, metadata_key, caster)
@@ -221,8 +230,8 @@ class ProcessMetadataManager:
     def purge_metadata_by_name(self, name):
         """Purge a processes metadata directory.
 
-    :raises: `ProcessManager.MetadataError` when OSError is encountered on metadata dir removal.
-    """
+        :raises: `ProcessManager.MetadataError` when OSError is encountered on metadata dir removal.
+        """
         meta_dir = self._get_metadata_dir_by_name(name, self._metadata_base_dir)
         logger.debug("purging metadata directory: {}".format(meta_dir))
         try:
@@ -234,7 +243,10 @@ class ProcessMetadataManager:
 
 
 class ProcessManager(ProcessMetadataManager):
-    """Subprocess/daemon management mixin/superclass. Not intended to be thread-safe."""
+    """Subprocess/daemon management mixin/superclass.
+
+    Not intended to be thread-safe.
+    """
 
     class InvalidCommandOutput(Exception):
         pass
@@ -289,12 +301,16 @@ class ProcessManager(ProcessMetadataManager):
 
     @property
     def process_name(self):
-        """The logical process name. If defined, this is compared to exe_name for stale pid checking."""
+        """The logical process name.
+
+        If defined, this is compared to exe_name for stale pid checking.
+        """
         return self._process_name
 
     @memoized_property
     def lifecycle_lock(self):
-        """An identity-keyed inter-process lock for safeguarding lifecycle and other operations."""
+        """An identity-keyed inter-process lock for safeguarding lifecycle and
+        other operations."""
         safe_mkdir(self._metadata_base_dir)
         return OwnerPrintingInterProcessFileLock(
             # N.B. This lock can't key into the actual named metadata dir (e.g. `.pids/pantsd/lock`
@@ -307,8 +323,8 @@ class ProcessManager(ProcessMetadataManager):
     def cmdline(self):
         """The process commandline. e.g. ['/usr/bin/python2.7', 'pants.pex'].
 
-    :returns: The command line or else `None` if the underlying process has died.
-    """
+        :returns: The command line or else `None` if the underlying process has died.
+        """
         with swallow_psutil_exceptions():
             process = self._as_process()
             if process:
@@ -317,11 +333,12 @@ class ProcessManager(ProcessMetadataManager):
 
     @property
     def cmd(self):
-        """The first element of the process commandline e.g. '/usr/bin/python2.7'.
+        """The first element of the process commandline e.g.
+        '/usr/bin/python2.7'.
 
-    :returns: The first element of the process command line or else `None` if the underlying
-              process has died.
-    """
+        :returns: The first element of the process command line or else `None` if the underlying
+                  process has died.
+        """
         return (self.cmdline or [None])[0]
 
     @property
@@ -338,11 +355,11 @@ class ProcessManager(ProcessMetadataManager):
     def get_subprocess_output(cls, command, ignore_stderr=True, **kwargs):
         """Get the output of an executed command.
 
-    :param command: An iterable representing the command to execute (e.g. ['ls', '-al']).
-    :param ignore_stderr: Whether or not to ignore stderr output vs interleave it with stdout.
-    :raises: `ProcessManager.ExecutionError` on `OSError` or `CalledProcessError`.
-    :returns: The output of the command.
-    """
+        :param command: An iterable representing the command to execute (e.g. ['ls', '-al']).
+        :param ignore_stderr: Whether or not to ignore stderr output vs interleave it with stdout.
+        :raises: `ProcessManager.ExecutionError` on `OSError` or `CalledProcessError`.
+        :returns: The output of the command.
+        """
         if ignore_stderr is False:
             kwargs.setdefault("stderr", subprocess.STDOUT)
 
@@ -361,16 +378,18 @@ class ProcessManager(ProcessMetadataManager):
         return self.await_metadata_by_name(self._name, "socket", timeout, self._socket_type)
 
     def write_pid(self, pid=None):
-        """Write the current processes PID to the pidfile location"""
+        """Write the current processes PID to the pidfile location."""
         pid = pid or os.getpid()
         self.write_metadata_by_name(self._name, "pid", str(pid))
 
     def write_socket(self, socket_info):
-        """Write the local processes socket information (TCP port or UNIX socket)."""
+        """Write the local processes socket information (TCP port or UNIX
+        socket)."""
         self.write_metadata_by_name(self._name, "socket", str(socket_info))
 
     def write_named_socket(self, socket_name, socket_info):
-        """A multi-tenant, named alternative to ProcessManager.write_socket()."""
+        """A multi-tenant, named alternative to
+        ProcessManager.write_socket()."""
         self.write_metadata_by_name(self._name, "socket_{}".format(socket_name), str(socket_info))
 
     def read_named_socket(self, socket_name, socket_type):
@@ -380,14 +399,14 @@ class ProcessManager(ProcessMetadataManager):
     def _as_process(self):
         """Returns a psutil `Process` object wrapping our pid.
 
-    NB: Even with a process object in hand, subsequent method calls against it can always raise
-    `NoSuchProcess`.  Care is needed to document the raises in the public API or else trap them and
-    do something sensible for the API.
+        NB: Even with a process object in hand, subsequent method calls against it can always raise
+        `NoSuchProcess`.  Care is needed to document the raises in the public API or else trap them and
+        do something sensible for the API.
 
-    :returns: a psutil Process object or else None if we have no pid.
-    :rtype: :class:`psutil.Process`
-    :raises: :class:`psutil.NoSuchProcess` if the process identified by our pid has died.
-    """
+        :returns: a psutil Process object or else None if we have no pid.
+        :rtype: :class:`psutil.Process`
+        :raises: :class:`psutil.NoSuchProcess` if the process identified by our pid has died.
+        """
         if self._process is None and self.pid:
             self._process = psutil.Process(self.pid)
         return self._process
@@ -399,11 +418,11 @@ class ProcessManager(ProcessMetadataManager):
     def is_alive(self, extended_check=None):
         """Return a boolean indicating whether the process is running or not.
 
-    :param func extended_check: An additional callable that will be invoked to perform an extended
-                                liveness check. This callable should take a single argument of a
-                                `psutil.Process` instance representing the context-local process
-                                and return a boolean True/False to indicate alive vs not alive.
-    """
+        :param func extended_check: An additional callable that will be invoked to perform an extended
+                                    liveness check. This callable should take a single argument of a
+                                    `psutil.Process` instance representing the context-local process
+                                    and return a boolean True/False to indicate alive vs not alive.
+        """
         try:
             process = self._as_process()
             return not (
@@ -424,12 +443,13 @@ class ProcessManager(ProcessMetadataManager):
             return False
 
     def purge_metadata(self, force=False):
-        """Instance-based version of ProcessMetadataManager.purge_metadata_by_name() that checks
-    for process liveness before purging metadata.
+        """Instance-based version of
+        ProcessMetadataManager.purge_metadata_by_name() that checks for process
+        liveness before purging metadata.
 
-    :param bool force: If True, skip process liveness check before purging metadata.
-    :raises: `ProcessManager.MetadataError` when OSError is encountered on metadata dir removal.
-    """
+        :param bool force: If True, skip process liveness check before purging metadata.
+        :raises: `ProcessManager.MetadataError` when OSError is encountered on metadata dir removal.
+        """
         if not force and self.is_alive():
             raise ProcessMetadataManager.MetadataError(
                 "cannot purge metadata for a running process!"
@@ -443,7 +463,8 @@ class ProcessManager(ProcessMetadataManager):
             os.kill(self.pid, kill_sig)
 
     def terminate(self, signal_chain=KILL_CHAIN, kill_wait=KILL_WAIT_SEC, purge=True):
-        """Ensure a process is terminated by sending a chain of kill signals (SIGTERM, SIGKILL)."""
+        """Ensure a process is terminated by sending a chain of kill signals
+        (SIGTERM, SIGKILL)."""
         alive = self.is_alive()
         if alive:
             logger.debug("terminating {}".format(self._name))
@@ -487,24 +508,25 @@ class ProcessManager(ProcessMetadataManager):
         fork_context=None,
         write_pid=True,
     ):
-        """Perform a double-fork, execute callbacks and write the child pid file.
+        """Perform a double-fork, execute callbacks and write the child pid
+        file.
 
-    The double-fork here is necessary to truly daemonize the subprocess such that it can never
-    take control of a tty. The initial fork and setsid() creates a new, isolated process group
-    and also makes the first child a session leader (which can still acquire a tty). By forking a
-    second time, we ensure that the second child can never acquire a controlling terminal because
-    it's no longer a session leader - but it now has its own separate process group.
+        The double-fork here is necessary to truly daemonize the subprocess such that it can never
+        take control of a tty. The initial fork and setsid() creates a new, isolated process group
+        and also makes the first child a session leader (which can still acquire a tty). By forking a
+        second time, we ensure that the second child can never acquire a controlling terminal because
+        it's no longer a session leader - but it now has its own separate process group.
 
-    Additionally, a normal daemon implementation would typically perform an os.umask(0) to reset
-    the processes file mode creation mask post-fork. We do not do this here (and in daemon_spawn
-    below) due to the fact that the daemons that pants would run are typically personal user
-    daemons. Having a disparate umask from pre-vs-post fork causes files written in each phase to
-    differ in their permissions without good reason - in this case, we want to inherit the umask.
+        Additionally, a normal daemon implementation would typically perform an os.umask(0) to reset
+        the processes file mode creation mask post-fork. We do not do this here (and in daemon_spawn
+        below) due to the fact that the daemons that pants would run are typically personal user
+        daemons. Having a disparate umask from pre-vs-post fork causes files written in each phase to
+        differ in their permissions without good reason - in this case, we want to inherit the umask.
 
-    :param fork_context: A function which accepts and calls a function that will call fork. This
-      is not a contextmanager/generator because that would make interacting with native code more
-      challenging. If no fork_context is passed, the fork function is called directly.
-    """
+        :param fork_context: A function which accepts and calls a function that will call fork. This
+          is not a contextmanager/generator because that would make interacting with native code more
+          challenging. If no fork_context is passed, the fork function is called directly.
+        """
 
         def double_fork():
             logger.debug("forking %s", self)
@@ -550,13 +572,16 @@ class ProcessManager(ProcessMetadataManager):
     def daemon_spawn(
         self, pre_fork_opts=None, post_fork_parent_opts=None, post_fork_child_opts=None
     ):
-        """Perform a single-fork to run a subprocess and write the child pid file.
+        """Perform a single-fork to run a subprocess and write the child pid
+        file.
 
-    Use this if your post_fork_child block invokes a subprocess via subprocess.Popen(). In this
-    case, a second fork such as used in daemonize() is extraneous given that Popen() also forks.
-    Using this daemonization method vs daemonize() leaves the responsibility of writing the pid
-    to the caller to allow for library-agnostic flexibility in subprocess execution.
-    """
+        Use this if your post_fork_child block invokes a subprocess via
+        subprocess.Popen(). In this case, a second fork such as used in
+        daemonize() is extraneous given that Popen() also forks. Using
+        this daemonization method vs daemonize() leaves the
+        responsibility of writing the pid to the caller to allow for
+        library-agnostic flexibility in subprocess execution.
+        """
         self.purge_metadata()
         self.pre_fork(**pre_fork_opts or {})
         pid = os.fork()
@@ -588,7 +613,8 @@ class ProcessManager(ProcessMetadataManager):
 
 
 class FingerprintedProcessManager(ProcessManager):
-    """A `ProcessManager` subclass that provides a general strategy for process fingerprinting."""
+    """A `ProcessManager` subclass that provides a general strategy for process
+    fingerprinting."""
 
     FINGERPRINT_KEY = "fingerprint"
     FINGERPRINT_CMD_KEY = None
@@ -598,13 +624,13 @@ class FingerprintedProcessManager(ProcessManager):
     def fingerprint(self):
         """The fingerprint of the current process.
 
-    This can either read the current fingerprint from the running process's psutil.Process.cmdline
-    (if the managed process supports that) or from the `ProcessManager` metadata.
+        This can either read the current fingerprint from the running process's psutil.Process.cmdline
+        (if the managed process supports that) or from the `ProcessManager` metadata.
 
-    :returns: The fingerprint of the running process as read from the process table, ProcessManager
-              metadata or `None`.
-    :rtype: string
-    """
+        :returns: The fingerprint of the running process as read from the process table, ProcessManager
+                  metadata or `None`.
+        :rtype: string
+        """
         return self.parse_fingerprint(self.cmdline) or self.read_metadata_by_name(
             self.name, self.FINGERPRINT_KEY
         )
@@ -612,12 +638,12 @@ class FingerprintedProcessManager(ProcessManager):
     def parse_fingerprint(self, cmdline, key=None, sep=None):
         """Given a psutil.Process.cmdline, parse and return a fingerprint.
 
-    :param list cmdline: The psutil.Process.cmdline of the current process.
-    :param string key: The key for fingerprint discovery.
-    :param string sep: The key/value separator for fingerprint discovery.
-    :returns: The parsed fingerprint or `None`.
-    :rtype: string or `None`
-    """
+        :param list cmdline: The psutil.Process.cmdline of the current process.
+        :param string key: The key for fingerprint discovery.
+        :param string sep: The key/value separator for fingerprint discovery.
+        :returns: The parsed fingerprint or `None`.
+        :rtype: string or `None`
+        """
         key = key or self.FINGERPRINT_CMD_KEY
         if key:
             sep = sep or self.FINGERPRINT_CMD_SEP
@@ -627,17 +653,19 @@ class FingerprintedProcessManager(ProcessManager):
                     return cmd_part.split(sep)[1]
 
     def has_current_fingerprint(self, fingerprint):
-        """Determines if a new fingerprint is the current fingerprint of the running process.
+        """Determines if a new fingerprint is the current fingerprint of the
+        running process.
 
-    :param string fingerprint: The new fingerprint to compare to.
-    :rtype: bool
-    """
+        :param string fingerprint: The new fingerprint to compare to.
+        :rtype: bool
+        """
         return fingerprint == self.fingerprint
 
     def needs_restart(self, fingerprint):
-        """Determines if the current ProcessManager needs to be started or restarted.
+        """Determines if the current ProcessManager needs to be started or
+        restarted.
 
-    :param string fingerprint: The new fingerprint to compare to.
-    :rtype: bool
-    """
+        :param string fingerprint: The new fingerprint to compare to.
+        :rtype: bool
+        """
         return self.is_dead() or not self.has_current_fingerprint(fingerprint)

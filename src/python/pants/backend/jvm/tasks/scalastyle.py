@@ -40,10 +40,10 @@ class FileExcluder:
 class Scalastyle(LintTaskMixin, NailgunTask):
     """Checks scala source files to ensure they're stylish.
 
-  Scalastyle only checks scala sources in non-synthetic targets.
+    Scalastyle only checks scala sources in non-synthetic targets.
 
-  :API: public
-  """
+    :API: public
+    """
 
     class UnspecifiedConfig(TaskError):
         def __init__(self):

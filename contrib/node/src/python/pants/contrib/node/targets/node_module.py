@@ -98,16 +98,17 @@ class NodeModule(NodePackage):
     def style_ignore_path(self):
         """The name of the ignore path file.
 
-    :rtype: string
-    """
+        :rtype: string
+        """
         return self.payload.style_ignore_path
 
     @property
     def bin_executables(self):
-        """A normalized map of bin executable names and local path to an executable
+        """A normalized map of bin executable names and local path to an
+        executable.
 
-    :rtype: dict
-    """
+        :rtype: dict
+        """
         if isinstance(self.payload.bin_executables, str):
             # In this case, the package_name is the bin name
             return {self.package_name: self.payload.bin_executables}

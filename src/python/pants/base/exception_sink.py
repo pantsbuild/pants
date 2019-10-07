@@ -25,13 +25,13 @@ logger = logging.getLogger(__name__)
 class SignalHandler:
     """A specification for how to handle a fixed set of nonfatal signals.
 
-  This is subclassed and registered with ExceptionSink.reset_signal_handler() whenever the signal
-  handling behavior is modified for different pants processes, for example in the remote client when
-  pantsd is enabled. The default behavior is to exit "gracefully" by leaving a detailed log of which
-  signal was received, then exiting with failure.
+    This is subclassed and registered with ExceptionSink.reset_signal_handler() whenever the signal
+    handling behavior is modified for different pants processes, for example in the remote client when
+    pantsd is enabled. The default behavior is to exit "gracefully" by leaving a detailed log of which
+    signal was received, then exiting with failure.
 
-  Note that the terminal will convert a ctrl-c from the user into a SIGINT.
-  """
+    Note that the terminal will convert a ctrl-c from the user into a SIGINT.
+    """
 
     @property
     def signal_handler_mapping(self):
@@ -79,12 +79,15 @@ class SignalHandler:
     # TODO(#7406): figure out how to let sys.exit work in a signal handler instead of having to raise
     # this exception!
     class SignalHandledNonLocalExit(Exception):
-        """Raised in handlers for non-fatal signals to overcome Python limitations.
+        """Raised in handlers for non-fatal signals to overcome Python
+        limitations.
 
-    When waiting on a subprocess and in a signal handler, sys.exit appears to be ignored, and causes
-    the signal handler to return. We want to (eventually) exit after these signals, not ignore them,
-    so we raise this exception instead and check it in our sys.excepthook override.
-    """
+        When waiting on a subprocess and in a signal handler, sys.exit
+        appears to be ignored, and causes the signal handler to return.
+        We want to (eventually) exit after these signals, not ignore
+        them, so we raise this exception instead and check it in our
+        sys.excepthook override.
+        """
 
         def __init__(self, signum, signame):
             self.signum = signum
@@ -100,7 +103,8 @@ class SignalHandler:
 
 
 class ExceptionSink:
-    """A mutable singleton object representing where exceptions should be logged to."""
+    """A mutable singleton object representing where exceptions should be
+    logged to."""
 
     # NB: see the bottom of this file where we call reset_log_location() and other mutators in order
     # to properly setup global state.
@@ -130,11 +134,12 @@ class ExceptionSink:
 
     @classmethod
     def reset_should_print_backtrace_to_terminal(cls, should_print_backtrace):
-        """Set whether a backtrace gets printed to the terminal error stream on a fatal error.
+        """Set whether a backtrace gets printed to the terminal error stream on
+        a fatal error.
 
-    Class state:
-    - Overwrites `cls._should_print_backtrace_to_terminal`.
-    """
+        Class state:
+        - Overwrites `cls._should_print_backtrace_to_terminal`.
+        """
         cls._should_print_backtrace_to_terminal = should_print_backtrace
 
     # All reset_* methods are ~idempotent!
@@ -142,16 +147,16 @@ class ExceptionSink:
     def reset_log_location(cls, new_log_location):
         """Re-acquire file handles to error logs based in the new location.
 
-    Class state:
-    - Overwrites `cls._log_dir`, `cls._pid_specific_error_fileobj`, and
-      `cls._shared_error_fileobj`.
-    OS state:
-    - May create a new directory.
-    - Overwrites signal handlers for many fatal and non-fatal signals (but not SIGUSR2).
+        Class state:
+        - Overwrites `cls._log_dir`, `cls._pid_specific_error_fileobj`, and
+          `cls._shared_error_fileobj`.
+        OS state:
+        - May create a new directory.
+        - Overwrites signal handlers for many fatal and non-fatal signals (but not SIGUSR2).
 
-    :raises: :class:`ExceptionSink.ExceptionSinkError` if the directory does not exist or is not
-             writable.
-    """
+        :raises: :class:`ExceptionSink.ExceptionSinkError` if the directory does not exist or is not
+                 writable.
+        """
         # We could no-op here if the log locations are the same, but there's no reason not to have the
         # additional safety of re-acquiring file descriptors each time (and erroring out early if the
         # location is no longer writable).
@@ -191,10 +196,10 @@ class ExceptionSink:
     def exiter_as(cls, new_exiter_fun: Callable[[Exiter], Exiter]) -> None:
         """Temporarily override the global exiter.
 
-    NB: We don't want to try/finally here, because we want exceptions to propagate
-    with the most recent exiter installed in sys.excepthook.
-    If we wrap this in a try:finally, exceptions will be caught and exiters unset.
-    """
+        NB: We don't want to try/finally here, because we want exceptions to propagate
+        with the most recent exiter installed in sys.excepthook.
+        If we wrap this in a try:finally, exceptions will be caught and exiters unset.
+        """
         previous_exiter = cls._exiter
         new_exiter = new_exiter_fun(previous_exiter)
         cls._reset_exiter(new_exiter)
@@ -204,7 +209,8 @@ class ExceptionSink:
     @classmethod
     @contextmanager
     def exiter_as_until_exception(cls, new_exiter_fun: Callable[[Exiter], Exiter]) -> None:
-        """Temporarily override the global exiter, except this will unset it when an exception happens."""
+        """Temporarily override the global exiter, except this will unset it
+        when an exception happens."""
         previous_exiter = cls._exiter
         new_exiter = new_exiter_fun(previous_exiter)
         try:
@@ -215,12 +221,12 @@ class ExceptionSink:
 
     @classmethod
     def _reset_exiter(cls, exiter: Exiter) -> None:
+        """Class state:
+
+        - Overwrites `cls._exiter`.
+        Python state:
+        - Overwrites sys.excepthook.
         """
-    Class state:
-    - Overwrites `cls._exiter`.
-    Python state:
-    - Overwrites sys.excepthook.
-    """
         assert isinstance(exiter, Exiter)
         logger.debug(f"overriding the global exiter with {exiter} (from {cls._exiter})")
         # NB: mutate the class variables! This is done before mutating the exception hook, because the
@@ -233,15 +239,15 @@ class ExceptionSink:
     def reset_interactive_output_stream(
         cls, interactive_output_stream, override_faulthandler_destination=True
     ):
-        """
-    Class state:
-    - Overwrites `cls._interactive_output_stream`.
-    OS state:
-    - Overwrites the SIGUSR2 handler.
+        """Class state:
 
-    This method registers a SIGUSR2 handler, which permits a non-fatal `kill -31 <pants pid>` for
-    stacktrace retrieval. This is also where the the error message on fatal exit will be printed to.
-    """
+        - Overwrites `cls._interactive_output_stream`.
+        OS state:
+        - Overwrites the SIGUSR2 handler.
+
+        This method registers a SIGUSR2 handler, which permits a non-fatal `kill -31 <pants pid>` for
+        stacktrace retrieval. This is also where the the error message on fatal exit will be printed to.
+        """
         try:
             # NB: mutate process-global state!
             # This permits a non-fatal `kill -31 <pants pid>` for stacktrace retrieval.
@@ -259,7 +265,8 @@ class ExceptionSink:
 
     @classmethod
     def exceptions_log_path(cls, for_pid=None, in_dir=None):
-        """Get the path to either the shared or pid-specific fatal errors log file."""
+        """Get the path to either the shared or pid-specific fatal errors log
+        file."""
         if for_pid is None:
             intermediate_filename_component = ""
         else:
@@ -272,10 +279,11 @@ class ExceptionSink:
 
     @classmethod
     def log_exception(cls, msg):
-        """Try to log an error message to this process's error log and the shared error log.
+        """Try to log an error message to this process's error log and the
+        shared error log.
 
-    NB: Doesn't raise (logs an error instead).
-    """
+        NB: Doesn't raise (logs an error instead).
+        """
         pid = os.getpid()
         fatal_error_log_entry = cls._format_exception_message(msg, pid)
 
@@ -303,10 +311,12 @@ class ExceptionSink:
 
     @classmethod
     def _try_write_with_flush(cls, fileobj, payload):
-        """This method is here so that it can be patched to simulate write errors.
+        """This method is here so that it can be patched to simulate write
+        errors.
 
-    This is because mock can't patch primitive objects like file objects.
-    """
+        This is because mock can't patch primitive objects like file
+        objects.
+        """
         fileobj.write(payload)
         fileobj.flush()
 
@@ -347,17 +357,17 @@ class ExceptionSink:
 
     @classmethod
     def reset_signal_handler(cls, signal_handler):
+        """Class state:
+
+        - Overwrites `cls._signal_handler`.
+        OS state:
+        - Overwrites signal handlers for SIGINT, SIGQUIT, and SIGTERM.
+
+        NB: This method calls signal.signal(), which will crash if not called from the main thread!
+
+        :returns: The :class:`SignalHandler` that was previously registered, or None if this is
+                  the first time this method was called.
         """
-    Class state:
-    - Overwrites `cls._signal_handler`.
-    OS state:
-    - Overwrites signal handlers for SIGINT, SIGQUIT, and SIGTERM.
-
-    NB: This method calls signal.signal(), which will crash if not called from the main thread!
-
-    :returns: The :class:`SignalHandler` that was previously registered, or None if this is
-              the first time this method was called.
-    """
         assert isinstance(signal_handler, SignalHandler)
         # NB: Modify process-global state!
         for signum, handler in signal_handler.signal_handler_mapping.items():
@@ -375,11 +385,10 @@ class ExceptionSink:
     @classmethod
     @contextmanager
     def trapped_signals(cls, new_signal_handler):
-        """
-    A contextmanager which temporarily overrides signal handling.
+        """A contextmanager which temporarily overrides signal handling.
 
-    NB: This method calls signal.signal(), which will crash if not called from the main thread!
-    """
+        NB: This method calls signal.signal(), which will crash if not called from the main thread!
+        """
         try:
             previous_signal_handler = cls.reset_signal_handler(new_signal_handler)
             yield
@@ -389,15 +398,15 @@ class ExceptionSink:
     @classmethod
     @contextmanager
     def ignoring_sigint(cls):
+        """A contextmanager which disables handling sigint in the current
+        signal handler. This allows threads that are not the main thread to
+        ignore sigint.
+
+        NB: Only use this if you can't use ExceptionSink.trapped_signals().
+
+        Class state:
+        - Toggles `self._ignore_sigint` in `cls._signal_handler`.
         """
-    A contextmanager which disables handling sigint in the current signal handler.
-    This allows threads that are not the main thread to ignore sigint.
-
-    NB: Only use this if you can't use ExceptionSink.trapped_signals().
-
-    Class state:
-    - Toggles `self._ignore_sigint` in `cls._signal_handler`.
-    """
         with cls._signal_handler._ignoring_sigint():
             yield
 
@@ -482,7 +491,8 @@ Exception message: {exception_message}{maybe_newline}
     def _log_unhandled_exception_and_exit(
         cls, exc_class=None, exc=None, tb=None, add_newline=False
     ):
-        """A sys.excepthook implementation which logs the error and exits with failure."""
+        """A sys.excepthook implementation which logs the error and exits with
+        failure."""
         exc_class = exc_class or sys.exc_info()[0]
         exc = exc or sys.exc_info()[1]
         tb = tb or sys.exc_info()[2]
@@ -525,7 +535,8 @@ Signal {signum} ({signame}) was raised. Exiting with failure.{formatted_tracebac
 
     @classmethod
     def _handle_signal_gracefully(cls, signum, signame, traceback_lines):
-        """Signal handler for non-fatal signals which raises or logs an error and exits with failure."""
+        """Signal handler for non-fatal signals which raises or logs an error
+        and exits with failure."""
         # Extract the stack, and format an entry to be written to the exception log.
         formatted_traceback = cls._format_traceback(
             traceback_lines=traceback_lines, should_print_backtrace=True

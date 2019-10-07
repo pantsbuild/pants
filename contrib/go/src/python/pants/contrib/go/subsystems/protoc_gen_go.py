@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 class ProtocGenGo(Subsystem):
     """A compiled protobuf plugin that generates Go code.
 
-  For details, see https://github.com/golang/protobuf
-  """
+    For details, see https://github.com/golang/protobuf
+    """
 
     options_scope = "protoc-gen-go"
 

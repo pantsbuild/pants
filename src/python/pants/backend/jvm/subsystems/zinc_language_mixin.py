@@ -49,22 +49,27 @@ class ZincLanguageMixin(MirroredTargetOptionMixin):
 
     @property
     def strict_deps(self):
-        """When True, limits compile time deps to those that are directly declared by a target.
-    :rtype: bool
-    """
+        """When True, limits compile time deps to those that are directly
+        declared by a target.
+
+        :rtype: bool
+        """
         return self.get_options().strict_deps
 
     @property
     def compiler_option_sets(self):
-        """For every element in this list, enable the corresponding flags on compilation
-    of targets.
-    :rtype: list
-    """
+        """For every element in this list, enable the corresponding flags on
+        compilation of targets.
+
+        :rtype: list
+        """
         return self.get_options().compiler_option_sets
 
     @property
     def zinc_file_manager(self):
-        """If false, the default file manager will be used instead of the zinc provided one.
-    :rtype: bool
-    """
+        """If false, the default file manager will be used instead of the zinc
+        provided one.
+
+        :rtype: bool
+        """
         return self.get_options().zinc_file_manager

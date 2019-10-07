@@ -354,10 +354,12 @@ class FetcherRedirectTest(unittest.TestCase):
                 httpd_thread.join()
 
     def test_download_redirect(self):
-        """Make sure that a server that returns a redirect is actually followed.
+        """Make sure that a server that returns a redirect is actually
+        followed.
 
-    Test with a real HTTP server that redirects from one URL to another.
-    """
+        Test with a real HTTP server that redirects from one URL to
+        another.
+        """
 
         fetcher = Fetcher("/unused/root/dir")
         with self.setup_server() as base_url:

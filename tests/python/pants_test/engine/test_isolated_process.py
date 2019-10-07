@@ -46,13 +46,16 @@ class BinaryLocation(datatype([("bin_path", str)])):
 
 
 class ShellCat(datatype([("binary_location", BinaryLocation)])):
-    """Wrapper class to show an example of using an auxiliary class (which wraps
-  an executable) to generate an argv instead of doing it all in
-  CatExecutionRequest. This can be used to encapsulate operations such as
-  sanitizing command-line arguments which are specific to the executable, which
-  can reduce boilerplate for generating ExecuteProcessRequest instances if the
-  executable is used in different ways across multiple different types of
-  process execution requests."""
+    """Wrapper class to show an example of using an auxiliary class (which
+    wraps an executable) to generate an argv instead of doing it all in
+    CatExecutionRequest.
+
+    This can be used to encapsulate operations such as sanitizing
+    command-line arguments which are specific to the executable, which
+    can reduce boilerplate for generating ExecuteProcessRequest
+    instances if the executable is used in different ways across
+    multiple different types of process execution requests.
+    """
 
     @property
     def bin_path(self):
@@ -128,12 +131,12 @@ def get_javac_version_output(
 class JavacSources(datatype([("java_files", tuple)])):
     """Wrapper for the paths to include for Java source files.
 
-  This shows an example of making a custom type to wrap generic types such as str to add usage
-  context.
+    This shows an example of making a custom type to wrap generic types such as str to add usage
+    context.
 
-  See CatExecutionRequest and rules above for an example of using PathGlobs
-  which does not introduce this additional layer of indirection.
-  """
+    See CatExecutionRequest and rules above for an example of using PathGlobs
+    which does not introduce this additional layer of indirection.
+    """
 
 
 class JavacCompileRequest(

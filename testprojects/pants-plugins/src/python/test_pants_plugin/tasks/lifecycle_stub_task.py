@@ -24,7 +24,8 @@ class MessagingExiter(Exiter):
 
 
 class LifecycleStubTask(Task):
-    """A task which raises an Exception on execution which is used to test Pants shutdown behavior."""
+    """A task which raises an Exception on execution which is used to test
+    Pants shutdown behavior."""
 
     @classmethod
     def subsystem_dependencies(cls):

@@ -12,9 +12,10 @@ from pants.engine.rules import console_rule
 class Filedeps(LineOriented, Goal):
     """List all source and BUILD files a target transitively depends on.
 
-  Files may be listed with absolute or relative paths and any BUILD files implied in the transitive
-  closure of targets are also included.
-  """
+    Files may be listed with absolute or relative paths and any BUILD
+    files implied in the transitive closure of targets are also
+    included.
+    """
 
     # TODO: Until this implements more of the options of `filedeps`, it can't claim the name!
     name = "fast-filedeps"

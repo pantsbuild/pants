@@ -37,7 +37,8 @@ class BinaryUtilTest(TestBase):
     """Tests binary_util's binaries_baseurls handling."""
 
     class MapFetcher:
-        """Class which pretends to be a pants.net.http.Fetcher, but is actually a dictionary."""
+        """Class which pretends to be a pants.net.http.Fetcher, but is actually
+        a dictionary."""
 
         def __init__(self, read_map):
             self._map = read_map
@@ -125,7 +126,8 @@ class BinaryUtilTest(TestBase):
         )
 
     def test_no_base_urls_error(self):
-        """Tests exception handling if build support urls are improperly specified."""
+        """Tests exception handling if build support urls are improperly
+        specified."""
         binary_util = self._gen_binary_util()
 
         with self.assertRaises(BinaryUtil.BinaryResolutionError) as cm:
@@ -178,9 +180,9 @@ class BinaryUtilTest(TestBase):
     def test_support_url_fallback(self):
         """Tests fallback behavior with multiple support baseurls.
 
-    Mocks up some dummy baseurls and then swaps out the URL reader to make sure urls are accessed
-    and others are not.
-    """
+        Mocks up some dummy baseurls and then swaps out the URL reader
+        to make sure urls are accessed and others are not.
+        """
         fake_base, fake_url = self._fake_base, self._fake_url
         bases = [fake_base("apple"), fake_base("orange"), fake_base("banana")]
 

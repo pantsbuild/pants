@@ -31,29 +31,29 @@ from pants.util.meta import classproperty
 
 
 class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
-    """Defines a lifecycle that prepares a task for execution and provides the base machinery
-  needed to execute it.
+    """Defines a lifecycle that prepares a task for execution and provides the
+    base machinery needed to execute it.
 
-  Provides the base lifecycle methods that allow a task to interact with the command line, other
-  tasks and the user.  The lifecycle is linear and run via the following sequence:
-  1. register_options - declare options configurable via cmd-line flag or config file.
-  2. product_types - declare the product types your task is capable of producing.
-  3. alternate_target_roots - propose a different set of target roots to use than those specified
-                              via the CLI for the active pants run.
-  4. prepare - request any products needed from other tasks.
-  5. __init__ - distill configuration into the information needed to execute.
+    Provides the base lifecycle methods that allow a task to interact with the command line, other
+    tasks and the user.  The lifecycle is linear and run via the following sequence:
+    1. register_options - declare options configurable via cmd-line flag or config file.
+    2. product_types - declare the product types your task is capable of producing.
+    3. alternate_target_roots - propose a different set of target roots to use than those specified
+                                via the CLI for the active pants run.
+    4. prepare - request any products needed from other tasks.
+    5. __init__ - distill configuration into the information needed to execute.
 
-  Provides access to the current run context for scoping work.
+    Provides access to the current run context for scoping work.
 
-  Also provides the basic facilities for doing work efficiently including providing a work directory
-  for scratch space on disk, an invalidator for checking which targets need work done on, and an
-  artifact cache for re-using previously cached work.
+    Also provides the basic facilities for doing work efficiently including providing a work directory
+    for scratch space on disk, an invalidator for checking which targets need work done on, and an
+    artifact cache for re-using previously cached work.
 
-  #TODO(John Sirois):  Lifecycle is currently split between TaskBase and Task and lifecycle
-  (interface) and helpers (utility) are currently conflated.  Tease these apart and narrow the scope
-  of the helpers.  Ideally console tasks don't inherit a workdir, invalidator or build cache for
-  example.
-  """
+    #TODO(John Sirois):  Lifecycle is currently split between TaskBase and Task and lifecycle
+    (interface) and helpers (utility) are currently conflated.  Tease these apart and narrow the scope
+    of the helpers.  Ideally console tasks don't inherit a workdir, invalidator or build cache for
+    example.
+    """
 
     options_scope_category = ScopeInfo.TASK
 
@@ -82,10 +82,11 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     def stable_name(cls):
         """The stable name of this task type.
 
-    We synthesize subclasses of the task types at runtime, and these synthesized subclasses
-    may have random names (e.g., in tests), so this gives us a stable name to use across runs,
-    e.g., in artifact cache references.
-    """
+        We synthesize subclasses of the task types at runtime, and these
+        synthesized subclasses may have random names (e.g., in tests),
+        so this gives us a stable name to use across runs, e.g., in
+        artifact cache references.
+        """
         return cls._stable_name or cls._compute_stable_name()
 
     @classmethod
@@ -102,22 +103,22 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
 
     @classmethod
     def product_types(cls):
-        """The list of products this Task produces. Set the product type(s) for this
-    task i.e. the product type(s) this task creates e.g ['classes'].
+        """The list of products this Task produces. Set the product type(s) for
+        this task i.e. the product type(s) this task creates e.g ['classes'].
 
-    By default, each task is considered as creating a unique product type(s).
-    Subclasses that create products, should override this to specify their unique product type(s).
+        By default, each task is considered as creating a unique product type(s).
+        Subclasses that create products, should override this to specify their unique product type(s).
 
-    :API: public
-    """
+        :API: public
+        """
         return []
 
     @classmethod
     def supports_passthru_args(cls):
         """Subclasses may override to indicate that they can use passthru args.
 
-    :API: public
-    """
+        :API: public
+        """
         return False
 
     @classmethod
@@ -145,15 +146,16 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
 
     @classmethod
     def alternate_target_roots(cls, options, address_mapper, build_graph):
-        """Allows a Task to propose alternate target roots from those specified on the CLI.
+        """Allows a Task to propose alternate target roots from those specified
+        on the CLI.
 
-    At most 1 unique proposal is allowed amongst all tasks involved in the run.  If more than 1
-    unique list of target roots is proposed an error is raised during task scheduling.
+        At most 1 unique proposal is allowed amongst all tasks involved in the run.  If more than 1
+        unique list of target roots is proposed an error is raised during task scheduling.
 
-    :API: public
+        :API: public
 
-    :returns list: The new target roots to use or None to accept the CLI specified target roots.
-    """
+        :returns list: The new target roots to use or None to accept the CLI specified target roots.
+        """
 
     @classmethod
     def invoke_prepare(cls, options, round_manager):
@@ -164,28 +166,28 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     def prepare(cls, options, round_manager):
         """Prepares a task for execution.
 
-    Called before execution and prior to any tasks that may be (indirectly) depended upon.
+        Called before execution and prior to any tasks that may be (indirectly) depended upon.
 
-    Typically a task that requires products from other goals would register interest in those
-    products here and then retrieve the requested product mappings when executed.
+        Typically a task that requires products from other goals would register interest in those
+        products here and then retrieve the requested product mappings when executed.
 
-    :API: public
-    """
+        :API: public
+        """
 
     def __init__(self, context, workdir):
         """Subclass __init__ methods, if defined, *must* follow this idiom:
 
-    class MyTask(Task):
-      def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        ...
+        class MyTask(Task):
+          def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            ...
 
-    This allows us to change Task.__init__()'s arguments without
-    changing every subclass. If the subclass does not need its own
-    initialization, this method can (and should) be omitted entirely.
+        This allows us to change Task.__init__()'s arguments without
+        changing every subclass. If the subclass does not need its own
+        initialization, this method can (and should) be omitted entirely.
 
-    :API: public
-    """
+        :API: public
+        """
         super().__init__()
         self.context = context
         self._workdir = workdir
@@ -202,15 +204,15 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     def get_options(self):
         """Returns the option values for this task's scope.
 
-    :API: public
-    """
+        :API: public
+        """
         return self.context.options.for_scope(self.options_scope)
 
     def get_passthru_args(self):
         """Returns the passthru args for this task, if it supports them.
 
-    :API: public
-    """
+        :API: public
+        """
         if not self.supports_passthru_args():
             raise TaskError("{} Does not support passthru args.".format(self.stable_name()))
 
@@ -223,50 +225,51 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     def skip_execution(self):
         """Whether this task should be skipped.
 
-    Tasks can override to specify skipping behavior (e.g., based on an option).
+        Tasks can override to specify skipping behavior (e.g., based on an option).
 
-    :API: public
-    """
+        :API: public
+        """
         return False
 
     @property
     def act_transitively(self):
-        """Whether this task should act on the transitive closure of the target roots.
+        """Whether this task should act on the transitive closure of the target
+        roots.
 
-    Tasks can override to specify transitivity behavior (e.g., based on an option).
-    Note that this property is consulted by get_targets(), but tasks that bypass that
-    method must make their own decision on whether to act transitively or not.
+        Tasks can override to specify transitivity behavior (e.g., based on an option).
+        Note that this property is consulted by get_targets(), but tasks that bypass that
+        method must make their own decision on whether to act transitively or not.
 
-    :API: public
-    """
+        :API: public
+        """
         return True
 
     @classproperty
     def target_filtering_enabled(cls):
         """Whether this task should apply configured filters against targets.
 
-    Tasks can override to enable target filtering (e.g. based on tags) and must
-    access targets via get_targets()
+        Tasks can override to enable target filtering (e.g. based on tags) and must
+        access targets via get_targets()
 
-    :API: public
-    """
+        :API: public
+        """
         return False
 
     def get_targets(self, predicate=None):
         """Returns the candidate targets this task should act on.
 
-    This method is a convenience for processing optional transitivity. Tasks may bypass it
-    and make their own decisions on which targets to act on.
+        This method is a convenience for processing optional transitivity. Tasks may bypass it
+        and make their own decisions on which targets to act on.
 
-    NOTE: This method was introduced in 2018, so at the time of writing few tasks consult it.
-          Instead, they query self.context.targets directly.
-    TODO: Fix up existing targets to consult this method, for uniformity.
+        NOTE: This method was introduced in 2018, so at the time of writing few tasks consult it.
+              Instead, they query self.context.targets directly.
+        TODO: Fix up existing targets to consult this method, for uniformity.
 
-    Note that returned targets have not been checked for invalidation. The caller should do
-    so as needed, typically by calling self.invalidated().
+        Note that returned targets have not been checked for invalidation. The caller should do
+        so as needed, typically by calling self.invalidated().
 
-    :API: public
-    """
+        :API: public
+        """
         initial_targets = (
             self.context.targets(predicate)
             if self.act_transitively
@@ -293,23 +296,24 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     def workdir(self):
         """A scratch-space for this task that will be deleted by `clean-all`.
 
-    It's guaranteed that no other task has been given this workdir path to use and that the workdir
-    exists.
+        It's guaranteed that no other task has been given this workdir path to use and that the workdir
+        exists.
 
-    :API: public
-    """
+        :API: public
+        """
         safe_mkdir(self._workdir)
         return self._workdir
 
     @memoized_property
     def versioned_workdir(self):
-        """The Task.workdir suffixed with a fingerprint of the Task implementation version.
+        """The Task.workdir suffixed with a fingerprint of the Task
+        implementation version.
 
-    When choosing whether to store values directly in `self.workdir` or below it in
-    the directory returned by this property, you should generally prefer this value.
+        When choosing whether to store values directly in `self.workdir` or below it in
+        the directory returned by this property, you should generally prefer this value.
 
-    :API: public
-    """
+        :API: public
+        """
         versioned_workdir = os.path.join(self.workdir, self.implementation_version_slug())
         safe_mkdir(versioned_workdir)
         return versioned_workdir
@@ -330,12 +334,12 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     def fingerprint(self):
         """Returns a fingerprint for the identity of the task.
 
-    A task fingerprint is composed of the options the task is currently running under.
-    Useful for invalidating unchanging targets being executed beneath changing task
-    options that affect outputted artifacts.
+        A task fingerprint is composed of the options the task is currently running under.
+        Useful for invalidating unchanging targets being executed beneath changing task
+        options that affect outputted artifacts.
 
-    A task's fingerprint is only valid after the task has been fully initialized.
-    """
+        A task's fingerprint is only valid after the task has been fully initialized.
+        """
         hasher = sha1()
         hasher.update(self.stable_name().encode())
         hasher.update(self._options_fingerprint(self.options_scope).encode())
@@ -356,52 +360,56 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
 
     @property
     def create_target_dirs(self):
-        """Whether to create a results_dir per VersionedTarget in the workdir of the Task.
+        """Whether to create a results_dir per VersionedTarget in the workdir
+        of the Task.
 
-    This defaults to the value of `self.cache_target_dirs` (as caching them requires
-    creating them), but may be overridden independently to create the dirs without caching
-    them.
+        This defaults to the value of `self.cache_target_dirs` (as caching them requires
+        creating them), but may be overridden independently to create the dirs without caching
+        them.
 
-    :API: public
-    """
+        :API: public
+        """
         return self.cache_target_dirs
 
     @property
     def cache_target_dirs(self):
-        """Whether to cache files in VersionedTarget's results_dir after exiting an invalidated block.
+        """Whether to cache files in VersionedTarget's results_dir after
+        exiting an invalidated block.
 
-    Subclasses may override this method to return True if they wish to use this style
-    of "automated" caching, where each VersionedTarget is given an associated results directory,
-    which will automatically be uploaded to the cache. Tasks should place the output files
-    for each VersionedTarget in said results directory. It is highly suggested to follow this
-    schema for caching, rather than manually making updates to the artifact cache.
+        Subclasses may override this method to return True if they wish to use this style
+        of "automated" caching, where each VersionedTarget is given an associated results directory,
+        which will automatically be uploaded to the cache. Tasks should place the output files
+        for each VersionedTarget in said results directory. It is highly suggested to follow this
+        schema for caching, rather than manually making updates to the artifact cache.
 
-    :API: public
-    """
+        :API: public
+        """
         return False
 
     @property
     def incremental(self):
-        """Whether this Task implements incremental building of individual targets.
+        """Whether this Task implements incremental building of individual
+        targets.
 
-    Incremental tasks with `cache_target_dirs` set will have the results_dir of the previous build
-    for a target cloned into the results_dir for the current build (where possible). This
-    copy-on-write behaviour allows for immutability of the results_dir once a target has been
-    marked valid.
+        Incremental tasks with `cache_target_dirs` set will have the results_dir of the previous build
+        for a target cloned into the results_dir for the current build (where possible). This
+        copy-on-write behaviour allows for immutability of the results_dir once a target has been
+        marked valid.
 
-    :API: public
-    """
+        :API: public
+        """
         return False
 
     @property
     def cache_incremental(self):
-        """For incremental tasks, indicates whether the results of incremental builds should be cached.
+        """For incremental tasks, indicates whether the results of incremental
+        builds should be cached.
 
-    Deterministic per-target incremental compilation is a relatively difficult thing to implement,
-    so this property provides an escape hatch to avoid caching things in that riskier case.
+        Deterministic per-target incremental compilation is a relatively difficult thing to implement,
+        so this property provides an escape hatch to avoid caching things in that riskier case.
 
-    :API: public
-    """
+        :API: public
+        """
         return False
 
     @contextmanager
@@ -415,24 +423,24 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     ):
         """Checks targets for invalidation, first checking the artifact cache.
 
-    Subclasses call this to figure out what to work on.
+        Subclasses call this to figure out what to work on.
 
-    :API: public
+        :API: public
 
-    :param targets: The targets to check for changes.
-    :param invalidate_dependents: If True then any targets depending on changed targets are
-                                  invalidated.
-    :param silent: If true, suppress logging information about target invalidation.
-    :param fingerprint_strategy: A FingerprintStrategy instance, which can do per task,
-                                finer grained fingerprinting of a given Target.
-    :param topological_order: Whether to invalidate in dependency order.
+        :param targets: The targets to check for changes.
+        :param invalidate_dependents: If True then any targets depending on changed targets are
+                                      invalidated.
+        :param silent: If true, suppress logging information about target invalidation.
+        :param fingerprint_strategy: A FingerprintStrategy instance, which can do per task,
+                                    finer grained fingerprinting of a given Target.
+        :param topological_order: Whether to invalidate in dependency order.
 
-    If no exceptions are thrown by work in the block, the build cache is updated for the targets.
-    Note: the artifact cache is not updated. That must be done manually.
+        If no exceptions are thrown by work in the block, the build cache is updated for the targets.
+        Note: the artifact cache is not updated. That must be done manually.
 
-    :returns: Yields an InvalidationCheck object reflecting the targets.
-    :rtype: InvalidationCheck
-    """
+        :returns: Yields an InvalidationCheck object reflecting the targets.
+        :rtype: InvalidationCheck
+        """
         invalidation_check = self._do_invalidation_check(
             fingerprint_strategy, invalidate_dependents, targets, topological_order
         )
@@ -573,7 +581,8 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
             safe_rm_oldest_items_in_dir(root_dir, max_entries_per_target, excludes=live_dirs)
 
     def _should_cache_target_dir(self, vt):
-        """Return true if the given vt should be written to a cache (if configured)."""
+        """Return true if the given vt should be written to a cache (if
+        configured)."""
         return (
             self.cache_target_dirs
             and vt.cacheable
@@ -582,7 +591,8 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
         )
 
     def _maybe_create_results_dirs(self, vts):
-        """If `cache_target_dirs`, create results_dirs for the given versioned targets."""
+        """If `cache_target_dirs`, create results_dirs for the given versioned
+        targets."""
         if self.create_target_dirs:
             for vt in vts:
                 vt.create_results_dir()
@@ -590,27 +600,31 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     def check_artifact_cache_for(self, invalidation_check):
         """Decides which VTS to check the artifact cache for.
 
-    By default we check for each invalid target. Can be overridden, e.g., to
-    instead check only for a single artifact for the entire target set.
-    """
+        By default we check for each invalid target. Can be overridden,
+        e.g., to instead check only for a single artifact for the entire
+        target set.
+        """
         return invalidation_check.invalid_vts
 
     def check_artifact_cache(self, vts):
-        """Checks the artifact cache for the specified list of VersionedTargetSets.
+        """Checks the artifact cache for the specified list of
+        VersionedTargetSets.
 
-    Returns a tuple (cached, uncached, uncached_causes) of VersionedTargets that were
-    satisfied/unsatisfied from the cache. Uncached VTS are also attached with their
-    causes for the miss: `False` indicates a legit miss while `UnreadableArtifact`
-    is due to either local or remote cache failures.
-    """
+        Returns a tuple (cached, uncached, uncached_causes) of
+        VersionedTargets that were satisfied/unsatisfied from the cache.
+        Uncached VTS are also attached with their causes for the miss:
+        `False` indicates a legit miss while `UnreadableArtifact` is due
+        to either local or remote cache failures.
+        """
         return self.do_check_artifact_cache(vts)
 
     def do_check_artifact_cache(self, vts, post_process_cached_vts=None):
-        """Checks the artifact cache for the specified list of VersionedTargetSets.
+        """Checks the artifact cache for the specified list of
+        VersionedTargetSets.
 
-    Returns a tuple (cached, uncached, uncached_causes) of VersionedTargets that were
-    satisfied/unsatisfied from the cache.
-    """
+        Returns a tuple (cached, uncached, uncached_causes) of
+        VersionedTargets that were satisfied/unsatisfied from the cache.
+        """
         if not vts:
             return [], [], []
 
@@ -647,10 +661,10 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     def update_artifact_cache(self, vts_artifactfiles_pairs):
         """Write to the artifact cache, if we're configured to.
 
-    vts_artifactfiles_pairs - a list of pairs (vts, artifactfiles) where
-      - vts is single VersionedTargetSet.
-      - artifactfiles is a list of absolute paths to artifacts for the VersionedTargetSet.
-    """
+        vts_artifactfiles_pairs - a list of pairs (vts, artifactfiles) where
+          - vts is single VersionedTargetSet.
+          - artifactfiles is a list of absolute paths to artifacts for the VersionedTargetSet.
+        """
         update_artifact_cache_work = self._get_update_artifact_cache_work(vts_artifactfiles_pairs)
         if update_artifact_cache_work:
             self.context.submit_background_work_chain(
@@ -658,12 +672,13 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
             )
 
     def _get_update_artifact_cache_work(self, vts_artifactfiles_pairs):
-        """Create a Work instance to update an artifact cache, if we're configured to.
+        """Create a Work instance to update an artifact cache, if we're
+        configured to.
 
-    vts_artifactfiles_pairs - a list of pairs (vts, artifactfiles) where
-      - vts is single VersionedTargetSet.
-      - artifactfiles is a list of paths to artifacts for the VersionedTargetSet.
-    """
+        vts_artifactfiles_pairs - a list of pairs (vts, artifactfiles) where
+          - vts is single VersionedTargetSet.
+          - artifactfiles is a list of paths to artifacts for the VersionedTargetSet.
+        """
         cache = self._cache_factory.get_write_cache()
         if cache:
             if len(vts_artifactfiles_pairs) == 0:
@@ -702,12 +717,13 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
         logger(*msg_elements)
 
     def require_single_root_target(self):
-        """If a single target was specified on the cmd line, returns that target.
+        """If a single target was specified on the cmd line, returns that
+        target.
 
-    Otherwise throws TaskError.
+        Otherwise throws TaskError.
 
-    :API: public
-    """
+        :API: public
+        """
         target_roots = self.context.target_roots
         if len(target_roots) == 0:
             raise TaskError("No target specified.")
@@ -720,8 +736,8 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     def determine_target_roots(self, goal_name):
         """Helper for tasks that scan for default target roots.
 
-    :param string goal_name: The goal name to use for any warning emissions.
-    """
+        :param string goal_name: The goal name to use for any warning emissions.
+        """
         if not self.context.target_roots:
             print(
                 "WARNING: No targets were matched in goal `{}`.".format(goal_name), file=sys.stderr
@@ -735,30 +751,30 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
 class Task(TaskBase):
     """An executable task.
 
-  Tasks form the atoms of work done by pants and when executed generally produce artifacts as a
-  side effect whether these be files on disk (for example compilation outputs) or characters output
-  to the terminal (for example dependency graph metadata).
-
-  :API: public
-  """
-
-    def __init__(self, context, workdir):
-        """
-    Add pass-thru Task Constructor for public API visibility.
+    Tasks form the atoms of work done by pants and when executed generally produce artifacts as a
+    side effect whether these be files on disk (for example compilation outputs) or characters output
+    to the terminal (for example dependency graph metadata).
 
     :API: public
     """
+
+    def __init__(self, context, workdir):
+        """Add pass-thru Task Constructor for public API visibility.
+
+        :API: public
+        """
         super().__init__(context, workdir)
 
     @abstractmethod
     def execute(self):
         """Executes this task.
 
-    :API: public
-    """
+        :API: public
+        """
 
 
 class QuietTaskMixin:
-    """A mixin to signal that pants shouldn't print verbose progress information for this task."""
+    """A mixin to signal that pants shouldn't print verbose progress
+    information for this task."""
 
     pass

@@ -54,15 +54,16 @@ class PluginSubsystemBase(Subsystem):
 
 @memoized
 def default_subsystem_for_plugin(plugin_type):
-    """Create a singleton PluginSubsystemBase subclass for the given plugin type.
+    """Create a singleton PluginSubsystemBase subclass for the given plugin
+    type.
 
-  The singleton enforcement is useful in cases where dependent Tasks are installed multiple times,
-  to avoid creating duplicate types which would have option scope collisions.
+    The singleton enforcement is useful in cases where dependent Tasks are installed multiple times,
+    to avoid creating duplicate types which would have option scope collisions.
 
-  :param plugin_type: A CheckstylePlugin subclass.
-  :type: :class:`pants.contrib.python.checks.checker.common.CheckstylePlugin`
-  :rtype: :class:`pants.contrib.python.checks.tasks.checkstyle.plugin_subsystem_base.PluginSubsystemBase`
-  """
+    :param plugin_type: A CheckstylePlugin subclass.
+    :type: :class:`pants.contrib.python.checks.checker.common.CheckstylePlugin`
+    :rtype: :class:`pants.contrib.python.checks.tasks.checkstyle.plugin_subsystem_base.PluginSubsystemBase`
+    """
     if not issubclass(plugin_type, CheckstylePlugin):
         raise ValueError(
             "Can only create a default plugin subsystem for subclasses of {}, given: {}".format(

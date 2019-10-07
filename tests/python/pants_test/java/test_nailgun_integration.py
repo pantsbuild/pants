@@ -8,9 +8,8 @@ class TestNailgunIntegration(PantsRunIntegrationTest):
     target = "examples/src/scala/org/pantsbuild/example/hello/welcome"
 
     def test_scala_repl_helloworld_input(self):
-        """Integration test to exercise possible closed-loop breakages in NailgunClient, NailgunSession
-    and InputReader.
-    """
+        """Integration test to exercise possible closed-loop breakages in
+        NailgunClient, NailgunSession and InputReader."""
         pants_run = self.run_pants(
             command=["repl", self.target, "--quiet"],
             stdin_data=(

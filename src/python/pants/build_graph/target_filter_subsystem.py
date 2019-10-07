@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 class TargetFilter(Subsystem):
     """Filter targets matching configured criteria.
 
-  :API: public
-  """
+    :API: public
+    """
 
     options_scope = "target-filter"
 

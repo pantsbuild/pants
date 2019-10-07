@@ -24,8 +24,8 @@ class TestInterpreterCache(TestBase):
     def _make_bad_requirement(requirement):
         """Turns a requirement that passes into one we know will fail.
 
-    E.g. 'CPython==3.7.2' becomes 'CPython==99.7.2'
-    """
+        E.g. 'CPython==3.7.2' becomes 'CPython==99.7.2'
+        """
         requirement_major_version = "3"
         return str(requirement).replace("=={}".format(requirement_major_version), "==99")
 
@@ -76,7 +76,8 @@ class TestInterpreterCache(TestBase):
 
     @skip_unless_python27_and_python36_present
     def test_interpereter_cache_setup_using_pex_python_paths(self):
-        """Test cache setup using interpreters from a mocked PEX_PYTHON_PATH."""
+        """Test cache setup using interpreters from a mocked
+        PEX_PYTHON_PATH."""
         py27_path, py36_path = python_interpreter_path(PY_27), python_interpreter_path(PY_36)
         with setup_pexrc_with_pex_python_path([py27_path, py36_path]):
             with self._setup_cache(constraints=["CPython>=2.7,<3"], search_paths=["<PEXRC>"]) as (
@@ -103,12 +104,13 @@ class TestInterpreterCache(TestBase):
             self.assertEqual([], list(cache._setup_cached()))
 
     def test_interpreter_from_relpath_purges_stale_interpreter(self):
-        """
-    Simulates a stale interpreter cache and tests that _interpreter_from_relpath
-    properly detects it and removes the stale dist directory.
+        """Simulates a stale interpreter cache and tests that
+        _interpreter_from_relpath properly detects it and removes the stale
+        dist directory.
 
-    See https://github.com/pantsbuild/pants/issues/3416 for more info.
-    """
+        See https://github.com/pantsbuild/pants/issues/3416 for more
+        info.
+        """
         with temporary_dir() as temp_dir:
             # Setup a interpreter distribution that we can safely mutate.
             test_interpreter_binary = os.path.join(temp_dir, "python")

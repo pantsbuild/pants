@@ -8,7 +8,8 @@ from pants.contrib.scalajs.targets.scala_js_target import ScalaJSTarget
 
 
 class ScalaJSZincCompile(BaseZincCompile):
-    """Compile scala source code to an scala.js representation, ready to be linked."""
+    """Compile scala source code to an scala.js representation, ready to be
+    linked."""
 
     _name = "scala-js"
     _file_suffix = ".scala"

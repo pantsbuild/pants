@@ -7,16 +7,17 @@ from pants.base.payload_field import PayloadField
 
 
 class PublicationMetadata(PayloadField):
-    """Extra metadata required to publish an artifact beyond its coordinates."""
+    """Extra metadata required to publish an artifact beyond its
+    coordinates."""
 
 
 class Artifact(PayloadField):
     """Represents a publishable jvm artifact ala maven or ivy.
 
-  Used in the ``provides`` parameter to *jvm*\\_library targets.
+    Used in the ``provides`` parameter to *jvm*\\_library targets.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(self, org, name, repo, publication_metadata=None):
         """

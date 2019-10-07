@@ -31,14 +31,14 @@ class LLVMReleaseUrlGenerator(BinaryToolUrlGenerator):
 class LLVM(NativeTool):
     """Subsystem wrapping an archive providing an LLVM distribution.
 
-  This subsystem provides the clang and clang++ compilers. It also provides lld, which is not
-  currently used.
+    This subsystem provides the clang and clang++ compilers. It also provides lld, which is not
+    currently used.
 
-  NB: The lib and include dirs provided by this distribution are produced by using known relative
-  paths into the distribution of LLVM from LLVMReleaseUrlGenerator. If LLVM changes the structure of
-  their release archives, these methods may have to change. They should be stable to version
-  upgrades, however.
-  """
+    NB: The lib and include dirs provided by this distribution are produced by using known relative
+    paths into the distribution of LLVM from LLVMReleaseUrlGenerator. If LLVM changes the structure of
+    their release archives, these methods may have to change. They should be stable to version
+    upgrades, however.
+    """
 
     options_scope = "llvm"
     default_version = "6.0.0"

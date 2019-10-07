@@ -42,7 +42,8 @@ class BaseLocalArtifactCache(ArtifactCache):
 
     @contextmanager
     def _tmpfile(self, cache_key, use):
-        """Allocate tempfile on same device as cache with a suffix chosen to prevent collisions"""
+        """Allocate tempfile on same device as cache with a suffix chosen to
+        prevent collisions."""
         with temporary_file(
             suffix=cache_key.id + use, root_dir=self._cache_root, permissions=self._permissions
         ) as tmpfile:
@@ -50,19 +51,21 @@ class BaseLocalArtifactCache(ArtifactCache):
 
     @contextmanager
     def insert_paths(self, cache_key, paths):
-        """Gather paths into artifact, store it, and yield the path to stored artifact tarball."""
+        """Gather paths into artifact, store it, and yield the path to stored
+        artifact tarball."""
         with self._tmpfile(cache_key, "write") as tmp:
             self._artifact(tmp.name).collect(paths)
             yield self._store_tarball(cache_key, tmp.name)
 
     def store_and_use_artifact(self, cache_key, src, results_dir=None):
-        """Store and then extract the artifact from the given `src` iterator for the given cache_key.
+        """Store and then extract the artifact from the given `src` iterator
+        for the given cache_key.
 
-    :param cache_key: Cache key for the artifact.
-    :param src: Iterator over binary data to store for the artifact.
-    :param str results_dir: The path to the expected destination of the artifact extraction: will
-      be cleared both before extraction, and after a failure to extract.
-    """
+        :param cache_key: Cache key for the artifact.
+        :param src: Iterator over binary data to store for the artifact.
+        :param str results_dir: The path to the expected destination of the artifact extraction: will
+          be cleared both before extraction, and after a failure to extract.
+        """
         with self._tmpfile(cache_key, "read") as tmp:
             for chunk in src:
                 tmp.write(chunk)
@@ -91,7 +94,8 @@ class BaseLocalArtifactCache(ArtifactCache):
             return True
 
     def _store_tarball(self, cache_key, src):
-        """Given a src path to an artifact tarball, store it and return stored artifact's path."""
+        """Given a src path to an artifact tarball, store it and return stored
+        artifact's path."""
         pass
 
 
@@ -126,13 +130,13 @@ class LocalArtifactCache(BaseLocalArtifactCache):
         safe_mkdir(self._cache_root)
 
     def prune(self, root):
-        """Prune stale cache files
+        """Prune stale cache files.
 
-    If the option --cache-target-max-entry is greater than zero, then prune will remove all but n
-    old cache files for each target/task.
+        If the option --cache-target-max-entry is greater than zero, then prune will remove all but n
+        old cache files for each target/task.
 
-    :param str root: The path under which cacheable artifacts will be cleaned
-    """
+        :param str root: The path under which cacheable artifacts will be cleaned
+        """
 
         max_entries_per_target = self._max_entries_per_target
         if os.path.isdir(root) and max_entries_per_target:
@@ -188,9 +192,10 @@ class LocalArtifactCache(BaseLocalArtifactCache):
 class TempLocalArtifactCache(BaseLocalArtifactCache):
     """A local cache that does not actually store any files between calls.
 
-  This implementation does not have a backing _cache_root, and never
-  actually stores files between calls, but is useful for handling file IO for a remote cache.
-  """
+    This implementation does not have a backing _cache_root, and never
+    actually stores files between calls, but is useful for handling file
+    IO for a remote cache.
+    """
 
     def __init__(self, artifact_root, compression, permissions=None):
         """

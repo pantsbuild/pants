@@ -35,51 +35,56 @@ class RoundManager:
         self._producer_infos_by_product_type = None
 
     def require(self, product_type):
-        """Schedules the tasks that produce product_type to be executed before the requesting task.
+        """Schedules the tasks that produce product_type to be executed before
+        the requesting task.
 
-    There must be at least one task that produces the required product type, or the
-    dependencies will not be satisfied.
+        There must be at least one task that produces the required product type, or the
+        dependencies will not be satisfied.
 
-    :API: public
-    """
+        :API: public
+        """
         self._dependencies.add(product_type)
         self._context.products.require(product_type)
 
     def optional_product(self, product_type):
-        """Schedules tasks, if any, that produce product_type to be executed before the requesting task.
+        """Schedules tasks, if any, that produce product_type to be executed
+        before the requesting task.
 
-    There need not be any tasks that produce the required product type.  All this method
-    guarantees is that if there are any then they will be executed before the requesting task.
+        There need not be any tasks that produce the required product type.  All this method
+        guarantees is that if there are any then they will be executed before the requesting task.
 
-    :API: public
-    """
+        :API: public
+        """
         self._optional_dependencies.add(product_type)
         self.require(product_type)
 
     def require_data(self, product_type):
-        """Schedules the tasks that produce product_type to be executed before the requesting task.
+        """Schedules the tasks that produce product_type to be executed before
+        the requesting task.
 
-    There must be at least one task that produces the required product type, or the
-    dependencies will not be satisfied.
+        There must be at least one task that produces the required product type, or the
+        dependencies will not be satisfied.
 
-    :API: public
-    """
+        :API: public
+        """
         self._dependencies.add(product_type)
         self._context.products.require_data(product_type)
 
     def optional_data(self, product_type):
-        """Schedules tasks, if any, that produce product_type to be executed before the requesting task.
+        """Schedules tasks, if any, that produce product_type to be executed
+        before the requesting task.
 
-    There need not be any tasks that produce the required product type.  All this method
-    guarantees is that if there are any then they will be executed before the requesting task.
+        There need not be any tasks that produce the required product type.  All this method
+        guarantees is that if there are any then they will be executed before the requesting task.
 
-    :API: public
-    """
+        :API: public
+        """
         self._optional_dependencies.add(product_type)
         self.require_data(product_type)
 
     def get_dependencies(self):
-        """Returns the set of data dependencies as producer infos corresponding to data requirements."""
+        """Returns the set of data dependencies as producer infos corresponding
+        to data requirements."""
         producer_infos = set()
         for product_type in self._dependencies:
             producer_infos.update(self._get_producer_infos_by_product_type(product_type))

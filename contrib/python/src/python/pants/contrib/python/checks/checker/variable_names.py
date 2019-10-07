@@ -38,7 +38,8 @@ def allow_underscores(num):
 
 @allow_underscores(1)
 def is_upper_camel(name):
-    """UpperCamel, AllowingHTTPAbbrevations, _WithUpToOneUnderscoreAllowable."""
+    """UpperCamel, AllowingHTTPAbbrevations,
+    _WithUpToOneUnderscoreAllowable."""
     return bool(UPPER_CAMEL_RE.match(name) and not ALL_UPPER_CASE_RE.match(name))
 
 
@@ -73,13 +74,14 @@ def is_constant(name):
 
 class PEP8VariableNames(CheckstylePlugin):
     """Enforces PEP8 recommendations for variable names.
-  Specifically:
-     UpperCamel class names
-     lower_snake / _lower_snake / __lower_snake function names
-     lower_snake expression variable names
-     CLASS_LEVEL_CONSTANTS = {}
-     GLOBAL_LEVEL_CONSTANTS = {}
-  """
+
+    Specifically:
+       UpperCamel class names
+       lower_snake / _lower_snake / __lower_snake function names
+       lower_snake expression variable names
+       CLASS_LEVEL_CONSTANTS = {}
+       GLOBAL_LEVEL_CONSTANTS = {}
+    """
 
     @classmethod
     def name(cls):

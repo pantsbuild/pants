@@ -16,10 +16,12 @@ def hash_target(address, suffix):
 
 
 class IntermediateTargetFactoryBase(ABC):
-    """Convenience factory which constructs an intermediate target with the appropriate attributes."""
+    """Convenience factory which constructs an intermediate target with the
+    appropriate attributes."""
 
     class ExpectedAddressError(TargetDefinitionException):
-        """Thrown if an object that is not an address is used as the dependency spec."""
+        """Thrown if an object that is not an address is used as the dependency
+        spec."""
 
     def __init__(self, parse_context):
         self._parse_context = parse_context

@@ -27,7 +27,8 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
     @staticmethod
     @contextmanager
     def caching_config():
-        """Creates a temporary directory and returns a pants configuration for passing to pants_run."""
+        """Creates a temporary directory and returns a pants configuration for
+        passing to pants_run."""
         with temporary_dir() as tmp_dir:
             yield {
                 "cache": {

@@ -35,13 +35,16 @@ class BaseZincCompileIntegrationTest:
 
     # TODO: this could be converted into a unit test!
     def test_consecutive_compiler_option_sets(self):
-        """Test that the ordering of args in compiler option sets are respected.
+        """Test that the ordering of args in compiler option sets are
+        respected.
 
-    Generating a scalac profile requires two consecutive arguments, '-Yprofile-destination' and its
-    following argument, the file to write the CSV profile to. We want to be able to allow users to
-    successfully run scalac with profiling from pants, so we test this case in particular. See the
-    discussion from https://github.com/pantsbuild/pants/pull/7683.
-    """
+        Generating a scalac profile requires two consecutive arguments,
+        '-Yprofile-destination' and its following argument, the file to
+        write the CSV profile to. We want to be able to allow users to
+        successfully run scalac with profiling from pants, so we test
+        this case in particular. See the discussion from
+        https://github.com/pantsbuild/pants/pull/7683.
+        """
         with temporary_dir() as tmp_dir:
             profile_destination = os.path.join(tmp_dir, "scala_profile.csv")
             self.do_command(
@@ -88,7 +91,8 @@ class BaseZincCompileIntegrationTest:
                 )
 
     def test_scala_failure(self):
-        """With no initial analysis, a failed compilation shouldn't leave anything behind."""
+        """With no initial analysis, a failed compilation shouldn't leave
+        anything behind."""
         analysis_file = (
             "testprojects.src.scala."
             "org.pantsbuild.testproject.compilation_failure.compilation_failure.analysis"
@@ -172,12 +176,15 @@ class BaseZincCompileIntegrationTest:
                 )
 
     def test_stale_apt_with_deps(self):
-        """An annotation processor with a dependency doesn't pollute other annotation processors.
+        """An annotation processor with a dependency doesn't pollute other
+        annotation processors.
 
-    At one point, when you added an annotation processor, it stayed configured for all subsequent
-    compiles.  Meaning that if that annotation processor had a dep that wasn't on the classpath,
-    subsequent compiles would fail with missing symbols required by the stale annotation processor.
-    """
+        At one point, when you added an annotation processor, it stayed
+        configured for all subsequent compiles.  Meaning that if that
+        annotation processor had a dep that wasn't on the classpath,
+        subsequent compiles would fail with missing symbols required by
+        the stale annotation processor.
+        """
 
         # Demonstrate that the annotation processor is working
         with self.do_test_compile(
@@ -331,7 +338,8 @@ class BaseZincCompileIntegrationTest:
                 return pants_run
 
     def test_zinc_logs_warnings_properly(self):
-        """Test that, with the standard logger, we log the warning in the expected format."""
+        """Test that, with the standard logger, we log the warning in the
+        expected format."""
         pants_run = self._compile_unused_import()
         # Confirm that we were warned in the expected format.
         expected_strings = [
@@ -344,10 +352,10 @@ class BaseZincCompileIntegrationTest:
             self.assertIn(expected, pants_run.stdout_data)
 
     def test_barebones_logger_works(self):
+        """Test that the barebones logger logs the expected warning.
+
+        TODO(#8312): this should be synced up with the normal logging output in order to use native-image zinc!
         """
-    Test that the barebones logger logs the expected warning.
-    TODO(#8312): this should be synced up with the normal logging output in order to use native-image zinc!
-    """
         pants_run = self._compile_unused_import(use_barebones_logger=True)
         expected_strings = [
             "/testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings/unused_import_warning/UnusedImportWarning.scala",

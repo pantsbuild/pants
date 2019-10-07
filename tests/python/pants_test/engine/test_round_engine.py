@@ -88,8 +88,8 @@ class RoundEngineTest(EngineTestBase, TestBase):
     ):
         """Install a task to goal and return all installed tasks of the goal.
 
-    This is needed to initialize tasks' context.
-    """
+        This is needed to initialize tasks' context.
+        """
         task_type = self.record(
             name, product_types, required_data, optional_data, alternate_target_roots
         )

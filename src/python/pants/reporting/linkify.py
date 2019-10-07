@@ -40,13 +40,14 @@ _NO_URL = "no url"  # Sentinel value for non-existent files in linkify's memo
 
 
 def linkify(buildroot, s, memoized_urls):
-    """Augment text by heuristically finding URL and file references and turning them into links.
+    """Augment text by heuristically finding URL and file references and
+    turning them into links.
 
-  :param string buildroot: The base directory of the project.
-  :param string s: The text to insert links into.
-  :param dict memoized_urls: A cache of text to links so repeated substitutions don't require
-                             additional file stats calls.
-  """
+    :param string buildroot: The base directory of the project.
+    :param string s: The text to insert links into.
+    :param dict memoized_urls: A cache of text to links so repeated substitutions don't require
+                               additional file stats calls.
+    """
 
     def memoized_to_url(m):
         # to_url uses None to signal not to replace the text,

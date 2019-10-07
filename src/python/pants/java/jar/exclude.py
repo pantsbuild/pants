@@ -3,10 +3,11 @@
 
 
 class Exclude:
-    """Represents a dependency exclude pattern to filter transitive dependencies against.
+    """Represents a dependency exclude pattern to filter transitive
+    dependencies against.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(self, org, name=None):
         """

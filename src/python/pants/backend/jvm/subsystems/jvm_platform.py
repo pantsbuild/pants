@@ -27,7 +27,8 @@ class JvmPlatform(Subsystem):
     _COMPILER_CHOICES = ["zinc", "javac", "rsc"]
 
     class IllegalDefaultPlatform(TaskError):
-        """The --default-platform option was set, but isn't defined in --platforms."""
+        """The --default-platform option was set, but isn't defined in
+        --platforms."""
 
     class UndefinedJvmPlatform(TaskError):
         """Platform isn't defined."""
@@ -99,17 +100,18 @@ class JvmPlatform(Subsystem):
 
     @classmethod
     def preferred_jvm_distribution(cls, platforms, strict=False):
-        """Returns a jvm Distribution with a version that should work for all the platforms.
+        """Returns a jvm Distribution with a version that should work for all
+        the platforms.
 
-    Any one of those distributions whose version is >= all requested platforms' versions
-    can be returned unless strict flag is set.
+        Any one of those distributions whose version is >= all requested platforms' versions
+        can be returned unless strict flag is set.
 
-    :param iterable platforms: An iterable of platform settings.
-    :param bool strict: If true, only distribution whose version matches the minimum
-      required version can be returned, i.e, the max target_level of all the requested
-      platforms.
-    :returns: Distribution one of the selected distributions.
-    """
+        :param iterable platforms: An iterable of platform settings.
+        :param bool strict: If true, only distribution whose version matches the minimum
+          required version can be returned, i.e, the max target_level of all the requested
+          platforms.
+        :returns: Distribution one of the selected distributions.
+        """
         if not platforms:
             return DistributionLocator.cached()
         min_version = max(platform.target_level for platform in platforms)
@@ -148,14 +150,14 @@ class JvmPlatform(Subsystem):
     def get_platform_by_name(self, name, for_target=None):
         """Finds the platform with the given name.
 
-    If the name is empty or None, returns the default platform.
-    If not platform with the given name is defined, raises an error.
-    :param str name: name of the platform.
-    :param JvmTarget for_target: optionally specified target we're looking up the platform for.
-      Only used in error message generation.
-    :return: The jvm platform object.
-    :rtype: JvmPlatformSettings
-    """
+        If the name is empty or None, returns the default platform.
+        If not platform with the given name is defined, raises an error.
+        :param str name: name of the platform.
+        :param JvmTarget for_target: optionally specified target we're looking up the platform for.
+          Only used in error message generation.
+        :return: The jvm platform object.
+        :rtype: JvmPlatformSettings
+        """
         if not name:
             return self.default_platform
         if name not in self.platforms_by_name:
@@ -165,10 +167,10 @@ class JvmPlatform(Subsystem):
     def get_platform_for_target(self, target):
         """Find the platform associated with this target.
 
-    :param JvmTarget target: target to query.
-    :return: The jvm platform object.
-    :rtype: JvmPlatformSettings
-    """
+        :param JvmTarget target: target to query.
+        :return: The jvm platform object.
+        :rtype: JvmPlatformSettings
+        """
         if not target.payload.platform and target.is_synthetic:
             derived_from = target.derived_from
             platform = derived_from and getattr(derived_from, "platform", None)
@@ -180,15 +182,15 @@ class JvmPlatform(Subsystem):
     def parse_java_version(cls, version):
         """Parses the java version (given a string or Revision object).
 
-    Handles java version-isms, converting things like '7' -> '1.7' appropriately.
+        Handles java version-isms, converting things like '7' -> '1.7' appropriately.
 
-    Truncates input versions down to just the major and minor numbers (eg, 1.6), ignoring extra
-    versioning information after the second number.
+        Truncates input versions down to just the major and minor numbers (eg, 1.6), ignoring extra
+        versioning information after the second number.
 
-    :param version: the input version, given as a string or Revision object.
-    :return: the parsed and cleaned version, suitable as a javac -source or -target argument.
-    :rtype: Revision
-    """
+        :param version: the input version, given as a string or Revision object.
+        :return: the parsed and cleaned version, suitable as a javac -source or -target argument.
+        :rtype: Revision
+        """
         conversion = {str(i): "1.{}".format(i) for i in cls.SUPPORTED_CONVERSION_VERSIONS}
         if str(version) in conversion:
             return Revision.lenient(conversion[str(version)])
@@ -202,7 +204,8 @@ class JvmPlatform(Subsystem):
 
 @total_ordering
 class JvmPlatformSettings:
-    """Simple information holder to keep track of common arguments to java compilers."""
+    """Simple information holder to keep track of common arguments to java
+    compilers."""
 
     class IllegalSourceTargetCombination(TaskError):
         """Illegal pair of -source and -target flags to compile java."""

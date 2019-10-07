@@ -15,7 +15,8 @@ class ConanFetchTest(TaskTestBase):
         return ConanFetch
 
     def test_conan_pex_noop(self):
-        """Test that the conan pex is not generated if there are no conan libraries to fetch."""
+        """Test that the conan pex is not generated if there are no conan
+        libraries to fetch."""
         conan_prep_task_type = self.synthesize_task_subtype(ConanPrep, "conan_prep_scope")
         context = self.context(for_task_types=[conan_prep_task_type])
         conan_prep = conan_prep_task_type(context, os.path.join(self.pants_workdir, "conan_prep"))

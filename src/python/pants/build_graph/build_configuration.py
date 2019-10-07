@@ -39,13 +39,13 @@ class BuildConfiguration:
     def registered_aliases(self):
         """Return the registered aliases exposed in BUILD files.
 
-    These returned aliases aren't so useful for actually parsing BUILD files.
-    They are useful for generating things like http://pantsbuild.github.io/build_dictionary.html.
+        These returned aliases aren't so useful for actually parsing BUILD files.
+        They are useful for generating things like http://pantsbuild.github.io/build_dictionary.html.
 
-    :returns: A new BuildFileAliases instance containing this BuildConfiguration's registered alias
-              mappings.
-    :rtype: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
-    """
+        :returns: A new BuildFileAliases instance containing this BuildConfiguration's registered alias
+                  mappings.
+        :rtype: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
+        """
         target_factories_by_alias = self._target_by_alias.copy()
         target_factories_by_alias.update(self._target_macro_factory_by_alias)
         return BuildFileAliases(
@@ -57,9 +57,9 @@ class BuildConfiguration:
     def register_aliases(self, aliases):
         """Registers the given aliases to be exposed in parsed BUILD files.
 
-    :param aliases: The BuildFileAliases to register.
-    :type aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
-    """
+        :param aliases: The BuildFileAliases to register.
+        :type aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
+        """
         if not isinstance(aliases, BuildFileAliases):
             raise TypeError("The aliases must be a BuildFileAliases, given {}".format(aliases))
 
@@ -116,10 +116,10 @@ class BuildConfiguration:
     def register_optionables(self, optionables):
         """Registers the given subsystem types.
 
-    :param optionables: The Optionable types to register.
-    :type optionables: :class:`collections.Iterable` containing
-                       :class:`pants.option.optionable.Optionable` subclasses.
-    """
+        :param optionables: The Optionable types to register.
+        :type optionables: :class:`collections.Iterable` containing
+                           :class:`pants.option.optionable.Optionable` subclasses.
+        """
         if not isinstance(optionables, Iterable):
             raise TypeError("The optionables must be an iterable, given {}".format(optionables))
         optionables = tuple(optionables)
@@ -140,17 +140,17 @@ class BuildConfiguration:
     def optionables(self):
         """Returns the registered Optionable types.
 
-    :rtype set
-    """
+        :rtype set
+        """
         return self._optionables
 
     def register_rules(self, rules):
         """Registers the given rules.
 
-    param rules: The rules to register.
-    :type rules: :class:`collections.Iterable` containing
-                 :class:`pants.engine.rules.Rule` instances.
-    """
+        param rules: The rules to register.
+        :type rules: :class:`collections.Iterable` containing
+                     :class:`pants.engine.rules.Rule` instances.
+        """
         if not isinstance(rules, Iterable):
             raise TypeError("The rules must be an iterable, given {!r}".format(rules))
 
@@ -173,15 +173,16 @@ class BuildConfiguration:
     def rules(self):
         """Returns the registered rules.
 
-    :rtype: list
-    """
+        :rtype: list
+        """
         return list(self._rules)
 
     def union_rules(self):
-        """Returns a mapping of registered union base types -> [OrderedSet of union member types].
+        """Returns a mapping of registered union base types -> [OrderedSet of
+        union member types].
 
-    :rtype: OrderedDict
-    """
+        :rtype: OrderedDict
+        """
         return self._union_rules
 
     @memoized_method
@@ -191,11 +192,11 @@ class BuildConfiguration:
     def initialize_parse_state(self, build_file):
         """Creates a fresh parse state for the given build file.
 
-    :param build_file: The BUILD file to set up a new ParseState for.
-    :type build_file: :class:`pants.base.build_file.BuildFile`
-    :returns: A fresh ParseState for parsing the given `build_file` with.
-    :rtype: :class:`BuildConfiguration.ParseState`
-    """
+        :param build_file: The BUILD file to set up a new ParseState for.
+        :type build_file: :class:`pants.base.build_file.BuildFile`
+        :returns: A fresh ParseState for parsing the given `build_file` with.
+        :rtype: :class:`BuildConfiguration.ParseState`
+        """
         # TODO(John Sirois): Introduce a factory method to seal the BuildConfiguration and add a check
         # there that all anonymous types are covered by context aware object factories that are
         # Macro instances.  Without this, we could have non-Macro context aware object factories being

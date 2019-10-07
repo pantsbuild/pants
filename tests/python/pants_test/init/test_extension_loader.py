@@ -220,21 +220,21 @@ class LoaderTest(unittest.TestCase):
     def get_mock_plugin(self, name, version, reg=None, alias=None, after=None, rules=None):
         """Make a fake Distribution (optionally with entry points)
 
-    Note the entry points do not actually point to code in the returned distribution --
-    the distribution does not even have a location and does not contain any code, just metadata.
+        Note the entry points do not actually point to code in the returned distribution --
+        the distribution does not even have a location and does not contain any code, just metadata.
 
-    A module is synthesized on the fly and installed into sys.modules under a random name.
-    If optional entry point callables are provided, those are added as methods to the module and
-    their name (foo/bar/baz in fake module) is added as the requested entry point to the mocked
-    metadata added to the returned dist.
+        A module is synthesized on the fly and installed into sys.modules under a random name.
+        If optional entry point callables are provided, those are added as methods to the module and
+        their name (foo/bar/baz in fake module) is added as the requested entry point to the mocked
+        metadata added to the returned dist.
 
-    :param string name: project_name for distribution (see pkg_resources)
-    :param string version: version for distribution (see pkg_resources)
-    :param callable reg: Optional callable for goal registration entry point
-    :param callable alias: Optional callable for build_file_aliases entry point
-    :param callable after: Optional callable for load_after list entry point
-    :param callable rules: Optional callable for rules entry point
-    """
+        :param string name: project_name for distribution (see pkg_resources)
+        :param string version: version for distribution (see pkg_resources)
+        :param callable reg: Optional callable for goal registration entry point
+        :param callable alias: Optional callable for build_file_aliases entry point
+        :param callable after: Optional callable for load_after list entry point
+        :param callable rules: Optional callable for rules entry point
+        """
 
         plugin_pkg = f"demoplugin{uuid.uuid4().hex}"
         pkg = types.ModuleType(plugin_pkg)

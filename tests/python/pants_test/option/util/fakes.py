@@ -75,17 +75,17 @@ def _options_registration_function(defaults, fingerprintables):
 def create_options(options, passthru_args=None, fingerprintable_options=None):
     """Create a fake Options object for testing.
 
-  Note that the returned object only provides access to the provided options values. There is
-  no registration mechanism on this object. Code under test shouldn't care about resolving
-  cmd-line flags vs. config vs. env vars etc. etc.
+    Note that the returned object only provides access to the provided options values. There is
+    no registration mechanism on this object. Code under test shouldn't care about resolving
+    cmd-line flags vs. config vs. env vars etc. etc.
 
-  :param dict options: A dict of scope -> (dict of option name -> value).
-  :param list passthru_args: A list of passthrough command line argument values.
-  :param dict fingerprintable_options: A dict of scope -> (dict of option name -> option type).
-                                       This registry should contain entries for any of the
-                                       `options` that are expected to contribute to fingerprinting.
-  :returns: An fake `Options` object encapsulating the given scoped options.
-  """
+    :param dict options: A dict of scope -> (dict of option name -> value).
+    :param list passthru_args: A list of passthrough command line argument values.
+    :param dict fingerprintable_options: A dict of scope -> (dict of option name -> option type).
+                                         This registry should contain entries for any of the
+                                         `options` that are expected to contribute to fingerprinting.
+    :returns: An fake `Options` object encapsulating the given scoped options.
+    """
     fingerprintable = fingerprintable_options or defaultdict(dict)
 
     class FakeOptions:
@@ -117,16 +117,16 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
             return {}
 
         def get_fingerprintable_for_scope(self, bottom_scope, include_passthru=False):
-            """Returns a list of fingerprintable (option type, option value) pairs for
-      the given scope.
+            """Returns a list of fingerprintable (option type, option value)
+            pairs for the given scope.
 
-      Note that this method only collects values for a single scope, NOT from
-      all enclosing scopes as in the Options class!
+            Note that this method only collects values for a single scope, NOT from
+            all enclosing scopes as in the Options class!
 
-      :param str bottom_scope: The scope to gather fingerprintable options for.
-      :param bool include_passthru: Whether to include passthru args captured by `bottom_scope` in the
-                                    fingerprintable options.
-      """
+            :param str bottom_scope: The scope to gather fingerprintable options for.
+            :param bool include_passthru: Whether to include passthru args captured by `bottom_scope` in the
+                                          fingerprintable options.
+            """
             pairs = []
             if include_passthru:
                 pu_args = self.passthru_args_for_scope(bottom_scope)
@@ -146,20 +146,21 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
 def create_options_for_optionables(
     optionables, options=None, options_fingerprintable=None, passthru_args=None
 ):
-    """Create a fake Options object for testing with appropriate defaults for the given optionables.
+    """Create a fake Options object for testing with appropriate defaults for
+    the given optionables.
 
-  Any scoped `options` provided will override defaults, behaving as-if set on the command line.
+    Any scoped `options` provided will override defaults, behaving as-if set on the command line.
 
-  :param iterable optionables: A series of `Optionable` types to register default options for.
-  :param dict options: A dict of scope -> (dict of option name -> value) representing option values
-                       explicitly set via the command line.
-  :param dict options_fingerprintable: A dict of scope -> (dict of option name -> option type)
-                                       representing the fingerprintable options
-                                       and the scopes they are registered for.
-  :param list passthru_args: A list of passthrough args (specified after `--` on the command line).
-  :returns: A fake `Options` object with defaults populated for the given `optionables` and any
-            explicitly set `options` overlayed.
-  """
+    :param iterable optionables: A series of `Optionable` types to register default options for.
+    :param dict options: A dict of scope -> (dict of option name -> value) representing option values
+                         explicitly set via the command line.
+    :param dict options_fingerprintable: A dict of scope -> (dict of option name -> option type)
+                                         representing the fingerprintable options
+                                         and the scopes they are registered for.
+    :param list passthru_args: A list of passthrough args (specified after `--` on the command line).
+    :returns: A fake `Options` object with defaults populated for the given `optionables` and any
+              explicitly set `options` overlayed.
+    """
     all_options = defaultdict(dict)
     fingerprintable_options = defaultdict(dict)
     bootstrap_option_values = None

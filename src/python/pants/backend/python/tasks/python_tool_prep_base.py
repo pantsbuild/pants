@@ -84,7 +84,8 @@ class PythonToolInstance:
 # ripe use case for some v2 rules for free caching and no-op when not required for the command-line
 # goals.
 class PythonToolPrepBase(Task):
-    """Base class for tasks that resolve a python tool to be invoked out-of-process."""
+    """Base class for tasks that resolve a python tool to be invoked out-of-
+    process."""
 
     # Subclasses must set to a subclass of `pants.backend.python.subsystems.PythonToolBase`.
     tool_subsystem_cls = None
@@ -133,7 +134,8 @@ class PythonToolPrepBase(Task):
         )
 
     def will_be_invoked(self):
-        """Predicate which can be overridden to allow tool creation to no-op when not needed."""
+        """Predicate which can be overridden to allow tool creation to no-op
+        when not needed."""
         return True
 
     def execute(self):

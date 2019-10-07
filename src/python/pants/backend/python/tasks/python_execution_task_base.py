@@ -21,20 +21,21 @@ from pants.util.contextutil import temporary_file
 
 
 def ensure_interpreter_search_path_env(interpreter):
-    """Produces an environment dict that ensures that the given interpreter is discovered at runtime.
+    """Produces an environment dict that ensures that the given interpreter is
+    discovered at runtime.
 
-  At pex build time, if any interpreter constraints are specified (e.g.: 'CPython>=2.7,<3'), they
-  are added to the resulting pex binary's metadata. At runtime, pex will apply those constraints to
-  locate a relevant interpreter on the `PATH`. If `PEX_PYTHON_PATH` is set in the environment, it
-  will be used instead of a `PATH` search. Unlike a typical `PATH`, `PEX_PYTHON_PATH` can contain a
-  mix of files and directories. We exploit this to set up a singluar `PEX_PYTHON_PATH` pointing
-  directly at the given `interpreter` (which should match the constraints that were provided at
-  build time).
+    At pex build time, if any interpreter constraints are specified (e.g.: 'CPython>=2.7,<3'), they
+    are added to the resulting pex binary's metadata. At runtime, pex will apply those constraints to
+    locate a relevant interpreter on the `PATH`. If `PEX_PYTHON_PATH` is set in the environment, it
+    will be used instead of a `PATH` search. Unlike a typical `PATH`, `PEX_PYTHON_PATH` can contain a
+    mix of files and directories. We exploit this to set up a singluar `PEX_PYTHON_PATH` pointing
+    directly at the given `interpreter` (which should match the constraints that were provided at
+    build time).
 
-  Subclasses of PythonExecutionTaskBase can use `self.ensure_interpreter_search_path_env` to get the
-  relevant interpreter, but this function is exposed for cases where the building of the pex is
-  separated from the execution of the pex.
-  """
+    Subclasses of PythonExecutionTaskBase can use `self.ensure_interpreter_search_path_env` to get the
+    relevant interpreter, but this function is exposed for cases where the building of the pex is
+    separated from the execution of the pex.
+    """
     chosen_interpreter_binary_path = interpreter.binary
     return {"PEX_IGNORE_RCFILES": "1", "PEX_PYTHON_PATH": chosen_interpreter_binary_path}
 
@@ -42,9 +43,9 @@ def ensure_interpreter_search_path_env(interpreter):
 class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     """Base class for tasks that execute user Python code in a PEX environment.
 
-  Note: Extends ResolveRequirementsTaskBase because it may need to resolve
-  extra requirements in order to execute the code.
-  """
+    Note: Extends ResolveRequirementsTaskBase because it may need to resolve
+    extra requirements in order to execute the code.
+    """
 
     @classmethod
     def prepare(cls, options, round_manager):
@@ -56,9 +57,9 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     def extra_requirements(self):
         """Override to provide extra requirements needed for execution.
 
-    :returns: An iterable of pip-style requirement strings.
-    :rtype: :class:`collections.Iterable` of str
-    """
+        :returns: An iterable of pip-style requirement strings.
+        :rtype: :class:`collections.Iterable` of str
+        """
         return ()
 
     @dataclass(frozen=True)
@@ -72,17 +73,17 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
         def empty(cls, path):
             """Creates an empty file with the given PEX path.
 
-      :param str path: The path this extra file should have when added to a PEX.
-      :rtype: :class:`ExtraFile`
-      """
+            :param str path: The path this extra file should have when added to a PEX.
+            :rtype: :class:`ExtraFile`
+            """
             return cls(path=path, content=b"")
 
         def add_to(self, builder):
             """Adds this extra file to a PEX builder.
 
-      :param builder: The PEX builder to add this extra file to.
-      :type builder: :class:`pex.pex_builder.PEXBuilder`
-      """
+            :param builder: The PEX builder to add this extra file to.
+            :type builder: :class:`pex.pex_builder.PEXBuilder`
+            """
             with temporary_file() as fp:
                 fp.write(self.content)
                 fp.close()
@@ -96,17 +97,18 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     def extra_files(self):
         """Override to provide extra files needed for execution.
 
-    :returns: An iterable of extra files to add to the PEX.
-    :rtype: :class:`collections.Iterable` of :class:`PythonExecutionTaskBase.ExtraFile`
-    """
+        :returns: An iterable of extra files to add to the PEX.
+        :rtype: :class:`collections.Iterable` of :class:`PythonExecutionTaskBase.ExtraFile`
+        """
         return ()
 
     def prepare_pex_env(self, env: Optional[Dict[str, str]] = None) -> Dict[str, str]:
-        """Prepares an environment that will run this task's pex with proper isolation.
+        """Prepares an environment that will run this task's pex with proper
+        isolation.
 
-    :param env: An optional seed environment to use; os.environ by default.
-    :return: An environment dict for use in running a PEX.
-    """
+        :param env: An optional seed environment to use; os.environ by default.
+        :return: An environment dict for use in running a PEX.
+        """
         env = (env or os.environ).copy()
 
         interpreter = self.context.products.get_data(PythonInterpreter)
@@ -116,21 +118,22 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
         return env
 
     def create_pex(self, pex_info=None):
-        """Returns a wrapped pex that "merges" other pexes produced in previous tasks via PEX_PATH.
+        """Returns a wrapped pex that "merges" other pexes produced in previous
+        tasks via PEX_PATH.
 
-    This method always creates a PEX to run locally on the current platform and selected
-    interpreter: to create a pex that is distributable to other environments, use the pex_build_util
-    Subsystem.
+        This method always creates a PEX to run locally on the current platform and selected
+        interpreter: to create a pex that is distributable to other environments, use the pex_build_util
+        Subsystem.
 
-    The returned pex will have the pexes from the ResolveRequirements and GatherSources tasks mixed
-    into it via PEX_PATH. Any 3rdparty requirements declared with self.extra_requirements() will
-    also be resolved for the global interpreter, and added to the returned pex via PEX_PATH.
+        The returned pex will have the pexes from the ResolveRequirements and GatherSources tasks mixed
+        into it via PEX_PATH. Any 3rdparty requirements declared with self.extra_requirements() will
+        also be resolved for the global interpreter, and added to the returned pex via PEX_PATH.
 
-    :param pex_info: An optional PexInfo instance to provide to self.merged_pex().
-    :type pex_info: :class:`pex.pex_info.PexInfo`, or None
-    task. Otherwise, all of the interpreter constraints from all python targets will applied.
-    :rtype: :class:`pex.pex.PEX`
-    """
+        :param pex_info: An optional PexInfo instance to provide to self.merged_pex().
+        :type pex_info: :class:`pex.pex_info.PexInfo`, or None
+        task. Otherwise, all of the interpreter constraints from all python targets will applied.
+        :rtype: :class:`pex.pex.PEX`
+        """
         relevant_targets = self.context.targets(
             lambda tgt: isinstance(
                 tgt, (PythonDistribution, PythonRequirementLibrary, PythonTarget, Files)

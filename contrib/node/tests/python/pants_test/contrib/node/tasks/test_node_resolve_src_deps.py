@@ -39,7 +39,7 @@ class NodeResolveSourceDepsTest(TaskTestBase):
             context.products.require_data(product_type)
 
     def _create_trans_dep(self, node_scope=None):
-        """Create a transitive dependency target"""
+        """Create a transitive dependency target."""
         self.create_file("src/node/trans_dep/yarn.lock")
         self.create_file(
             "src/node/trans_dep/package.json",
@@ -82,7 +82,7 @@ class NodeResolveSourceDepsTest(TaskTestBase):
         make_target=True,
         node_scope=None,
     ):
-        """Create a dependency target"""
+        """Create a dependency target."""
 
         src_root = src_root or "src/node"
         bin_field = ""

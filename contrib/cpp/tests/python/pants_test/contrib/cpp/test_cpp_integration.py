@@ -17,7 +17,8 @@ def have_compiler():
 
 
 class CppIntegrationTest(PantsRunIntegrationTest):
-    """Integration test for cpp which builds libraries and builds and runs binaries."""
+    """Integration test for cpp which builds libraries and builds and runs
+    binaries."""
 
     TEST_SIMPLE_BINARY_TARGET = "contrib/cpp/examples/src/cpp/example:hello_pants"
     TEST_BINARY_WITH_LIBRARY_TARGET = "contrib/cpp/examples/src/cpp/calcsqrt"

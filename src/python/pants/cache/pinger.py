@@ -42,22 +42,23 @@ class Pinger:
         return rt_secs
 
     def __init__(self, timeout, tries):
-        """Try pinging the given number of times, each with the given timeout."""
+        """Try pinging the given number of times, each with the given
+        timeout."""
         self._timeout = timeout
         self._tries = tries
 
     def ping(self, url):
         """Time a single roundtrip to the url.
 
-    :param url to ping.
-    :returns: the fastest ping time for a given netloc and number of tries.
-    or Pinger.UNREACHABLE if ping times out.
-    :rtype: float
+        :param url to ping.
+        :returns: the fastest ping time for a given netloc and number of tries.
+        or Pinger.UNREACHABLE if ping times out.
+        :rtype: float
 
-    Note that we don't use actual ICMP pings, because cmd-line ping is
-    inflexible and platform-dependent, so shelling out to it is annoying,
-    and the ICMP python lib can only be called by the superuser.
-    """
+        Note that we don't use actual ICMP pings, because cmd-line ping is
+        inflexible and platform-dependent, so shelling out to it is annoying,
+        and the ICMP python lib can only be called by the superuser.
+        """
         return self._get_ping_time(url, self._timeout, self._tries)
 
     def pings(self, urls):
@@ -75,8 +76,8 @@ class BestUrlSelector:
     def __init__(self, available_urls, max_failures=MAX_FAILURES):
         """Save parsed input urls in order and perform basic validations.
 
-    :param available_urls: input urls pre-sorted by their ping times.
-    """
+        :param available_urls: input urls pre-sorted by their ping times.
+        """
 
         if len(available_urls) == 0:
             raise ValueError("BestUrlSelector requires at least one url to select from.")
@@ -100,12 +101,13 @@ class BestUrlSelector:
     def select_best_url(self):
         """Select `best` url.
 
-    Since urls are pre-sorted w.r.t. their ping times, we simply return the first element
-    from the list. And we always return the same url unless we observe greater than max
-    allowed number of consecutive failures. In this case, we would return the next `best`
-    url, and append the previous best one to the end of list (essentially rotate to the left
-    by one element).
-    """
+        Since urls are pre-sorted w.r.t. their ping times, we simply
+        return the first element from the list. And we always return the
+        same url unless we observe greater than max allowed number of
+        consecutive failures. In this case, we would return the next
+        `best` url, and append the previous best one to the end of list
+        (essentially rotate to the left by one element).
+        """
 
         best_url = self.parsed_urls[0]
         try:

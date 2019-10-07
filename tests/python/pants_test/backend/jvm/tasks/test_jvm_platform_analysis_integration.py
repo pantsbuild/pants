@@ -10,7 +10,8 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class JvmPlatformAnalysisIntegrationTest(PantsRunIntegrationTest):
-    """Make sure jvm-platform-analysis runs properly, especially with respect to caching behavior."""
+    """Make sure jvm-platform-analysis runs properly, especially with respect
+    to caching behavior."""
 
     FAILURE_MESSAGE = "Dependencies cannot have a higher java target level than dependees!"
     CACHE_MESSAGE = "Invalidated 2 targets"

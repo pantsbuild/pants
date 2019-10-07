@@ -16,7 +16,8 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
     def _do_check(
         self, project_dir_path, expected_project_path, expected_targets, incremental_import=None
     ):
-        """Check to see that the project contains the expected source folders."""
+        """Check to see that the project contains the expected source
+        folders."""
 
         iws_file = os.path.join(
             project_dir_path, f"{IdeaPluginGen.get_project_name(expected_targets)}.iws"
@@ -71,13 +72,12 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
             return result.readlines()[0].strip()
 
     def _run_and_check(self, target_specs, incremental_import=None):
-        """
-    Invoke idea-plugin goal and check for target specs and project in the
-    generated project and workspace file.
+        """Invoke idea-plugin goal and check for target specs and project in
+        the generated project and workspace file.
 
-    :param target_specs: list of target specs
-    :return: n/a
-    """
+        :param target_specs: list of target specs
+        :return: n/a
+        """
         self.assertTrue(target_specs, "targets are empty")
         spec_parser = CmdLineSpecParser(get_buildroot())
         # project_path is always the directory of the first target,

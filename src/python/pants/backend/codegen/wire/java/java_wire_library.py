@@ -11,15 +11,15 @@ from pants.base.validation import assert_list
 class JavaWireLibrary(JvmTarget):
     """A Java library generated from Wire IDL files.
 
-  Supports Wire 1.x only.
+    Supports Wire 1.x only.
 
-  For an example Wire 2.x interface that generates service stubs see:
-  https://github.com/ericzundel/mvn2pants/tree/master/src/python/squarepants/plugins/sake_wire_codegen
+    For an example Wire 2.x interface that generates service stubs see:
+    https://github.com/ericzundel/mvn2pants/tree/master/src/python/squarepants/plugins/sake_wire_codegen
 
-  But note this requires you to write a custom wire code generator with a command line interface.
+    But note this requires you to write a custom wire code generator with a command line interface.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(
         self,

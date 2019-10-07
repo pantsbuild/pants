@@ -24,7 +24,8 @@ from pants.util.socket import teardown_socket
 
 
 class PantsRunFailCheckerExiter(Exiter):
-    """Passed to pants runs triggered from this class, will raise an exception if the pants run failed."""
+    """Passed to pants runs triggered from this class, will raise an exception
+    if the pants run failed."""
 
     def exit(self, result, *args, **kwargs):
         if result != 0:
@@ -32,7 +33,8 @@ class PantsRunFailCheckerExiter(Exiter):
 
 
 class DaemonExiter(Exiter):
-    """An Exiter that emits unhandled tracebacks and exit codes via the Nailgun protocol."""
+    """An Exiter that emits unhandled tracebacks and exit codes via the Nailgun
+    protocol."""
 
     @classmethod
     @contextmanager
@@ -85,12 +87,11 @@ class DaemonExiter(Exiter):
 
 
 class _PantsRunFinishedWithFailureException(Exception):
-    """
-  Allows representing a pants run that failed for legitimate reasons
-  (e.g. the target failed to compile).
+    """Allows representing a pants run that failed for legitimate reasons (e.g.
+    the target failed to compile).
 
-  Will be raised by the exiter passed to LocalPantsRunner.
-  """
+    Will be raised by the exiter passed to LocalPantsRunner.
+    """
 
     def __init__(self, exit_code: ExitCode = PANTS_FAILED_EXIT_CODE):
         """
@@ -115,10 +116,11 @@ class _PantsRunFinishedWithFailureException(Exception):
 
 
 class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
-    """A daemonizing PantsRunner that speaks the nailgun protocol to a remote client.
+    """A daemonizing PantsRunner that speaks the nailgun protocol to a remote
+    client.
 
-  N.B. this class is primarily used by the PailgunService in pantsd.
-  """
+    N.B. this class is primarily used by the PailgunService in pantsd.
+    """
 
     @classmethod
     def create(cls, sock, args, env, services, scheduler_service):
@@ -149,7 +151,8 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     @classmethod
     @contextmanager
     def _tty_stdio(cls, env):
-        """Handles stdio redirection in the case of all stdio descriptors being the same tty."""
+        """Handles stdio redirection in the case of all stdio descriptors being
+        the same tty."""
         # If all stdio is a tty, there's only one logical I/O device (the tty device). This happens to
         # be addressable as a file in OSX and Linux, so we take advantage of that and directly open the
         # character device for output redirection - eliminating the need to directly marshall any
@@ -176,7 +179,8 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     def _pipe_stdio(
         cls, maybe_shutdown_socket, stdin_isatty, stdout_isatty, stderr_isatty, handle_stdin
     ):
-        """Handles stdio redirection in the case of pipes and/or mixed pipes and ttys."""
+        """Handles stdio redirection in the case of pipes and/or mixed pipes
+        and ttys."""
         stdio_writers = ((ChunkType.STDOUT, stdout_isatty), (ChunkType.STDERR, stderr_isatty))
         types, ttys = zip(*(stdio_writers))
 
@@ -218,7 +222,8 @@ class DaemonPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     @classmethod
     @contextmanager
     def nailgunned_stdio(cls, sock, env, handle_stdin=True):
-        """Redirects stdio to the connected socket speaking the nailgun protocol."""
+        """Redirects stdio to the connected socket speaking the nailgun
+        protocol."""
         # Determine output tty capabilities from the environment.
         stdin_isatty, stdout_isatty, stderr_isatty = NailgunProtocol.isatty_from_env(env)
         is_tty_capable = all((stdin_isatty, stdout_isatty, stderr_isatty))

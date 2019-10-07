@@ -7,7 +7,8 @@ from pants.task.console_task import ConsoleTask
 
 
 class ClassmapTask(ConsoleTask):
-    """Print a mapping from class name to the owning target from target's runtime classpath."""
+    """Print a mapping from class name to the owning target from target's
+    runtime classpath."""
 
     @classmethod
     def register_options(cls, register):

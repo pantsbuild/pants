@@ -13,17 +13,16 @@ from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 
 
 class Pipe:
+    """Wrapper around OS pipes, that knows whether its write end is closed.
+
+    Note that this exposes raw file descriptors,
+    which means that we could plausibly close one of the ends and re-open it with a different file,
+    before this class notices. For this reason, it is advised to be very careful with these
+    file descriptors.
+
+    TODO Wrap the read and write operations, so that we don't have to expose raw fds anymore.
+    This is not possible yet, because stdio_as needs to replace the fds at the OS level.
     """
-  Wrapper around OS pipes, that knows whether its write end is closed.
-
-  Note that this exposes raw file descriptors,
-  which means that we could plausibly close one of the ends and re-open it with a different file,
-  before this class notices. For this reason, it is advised to be very careful with these
-  file descriptors.
-
-  TODO Wrap the read and write operations, so that we don't have to expose raw fds anymore.
-  This is not possible yet, because stdio_as needs to replace the fds at the OS level.
-  """
 
     def __init__(self, read_fd, write_fd):
         self.read_fd = read_fd
@@ -32,13 +31,12 @@ class Pipe:
         self.writable = True
 
     def is_writable(self):
-        """
-    If the write end of a pipe closes, the read end might still be open, to allow
-    readers to finish reading before closing it.
-    However, there are cases where we still want to know if the write end is closed.
+        """If the write end of a pipe closes, the read end might still be open,
+        to allow readers to finish reading before closing it. However, there
+        are cases where we still want to know if the write end is closed.
 
-    :return: True if the write end of the pipe is open.
-    """
+        :return: True if the write end of the pipe is open.
+        """
         if not self.writable:
             return False
 
@@ -53,7 +51,8 @@ class Pipe:
         self.writable = False
 
     def close(self):
-        """Close the reading end of the pipe, which should close the writing end too."""
+        """Close the reading end of the pipe, which should close the writing
+        end too."""
         os.close(self.read_fd)
         self.writable = False
 
@@ -109,13 +108,14 @@ class _StoppableDaemonThread(threading.Thread):
 
 
 class NailgunStreamStdinReader(_StoppableDaemonThread):
-    """Reads Nailgun 'stdin' chunks on a socket and writes them to an output file-like.
+    """Reads Nailgun 'stdin' chunks on a socket and writes them to an output
+    file-like.
 
-  Because a Nailgun server only ever receives STDIN and STDIN_EOF ChunkTypes after initial
-  setup, this thread executes all reading from a server socket.
+    Because a Nailgun server only ever receives STDIN and STDIN_EOF ChunkTypes after initial
+    setup, this thread executes all reading from a server socket.
 
-  Runs until the socket is closed.
-  """
+    Runs until the socket is closed.
+    """
 
     def __init__(self, maybe_shutdown_socket, write_handle):
         """
@@ -178,9 +178,10 @@ class NailgunStreamWriterError(Exception):
 class NailgunStreamWriter(_StoppableDaemonThread):
     """Reads input from an input fd and writes Nailgun chunks on a socket.
 
-  Should generally be managed with the `open` classmethod contextmanager, which will create
-  a pipe and provide its writing end to the caller.
-  """
+    Should generally be managed with the `open` classmethod
+    contextmanager, which will create a pipe and provide its writing end
+    to the caller.
+    """
 
     SELECT_TIMEOUT = 0.15
 
@@ -236,7 +237,10 @@ class NailgunStreamWriter(_StoppableDaemonThread):
             self.do_run(readable_fds, errored_fds)
 
     def do_run(self, readable_fds, errored_fds):
-        """Represents one iteration of the infinite reading cycle. Subclasses should override this."""
+        """Represents one iteration of the infinite reading cycle.
+
+        Subclasses should override this.
+        """
         if readable_fds:
             for fileno in readable_fds:
                 data = os.read(fileno, self._buf_size)
@@ -253,9 +257,7 @@ class NailgunStreamWriter(_StoppableDaemonThread):
 
 
 class PipedNailgunStreamWriter(NailgunStreamWriter):
-    """
-  Represents a NailgunStreamWriter that reads from a pipe.
-  """
+    """Represents a NailgunStreamWriter that reads from a pipe."""
 
     def __init__(self, pipes, socket, chunk_type, *args, **kwargs):
         self._pipes = pipes
@@ -263,15 +265,17 @@ class PipedNailgunStreamWriter(NailgunStreamWriter):
         super().__init__(in_fds, socket, chunk_type, *args, **kwargs)
 
     def do_run(self, readable_fds, errored_fds):
-        """
-    Overrides the superclass.
+        """Overrides the superclass.
 
-    Wraps the running logic of the parent class to handle pipes that have been closed on the write end.
-    If no file descriptors are readable (i.e. there is no more to read from any pipe for now),
-    it will check each of its pipes. If a pipe is not writable, it will interpret that the writer class
-    does not want to write any more, and so it will remove that pipe from the available pipes to read from.
-    When there are no more pipes to read from, it will stop.
-    """
+        Wraps the running logic of the parent class to handle pipes that
+        have been closed on the write end. If no file descriptors are
+        readable (i.e. there is no more to read from any pipe for now),
+        it will check each of its pipes. If a pipe is not writable, it
+        will interpret that the writer class does not want to write any
+        more, and so it will remove that pipe from the available pipes
+        to read from. When there are no more pipes to read from, it will
+        stop.
+        """
         if not readable_fds:
             for pipe in self._pipes:
                 if not pipe.is_writable():
@@ -286,7 +290,8 @@ class PipedNailgunStreamWriter(NailgunStreamWriter):
     def open(
         cls, sock, chunk_type, isatty, chunk_eof_type=None, buf_size=None, select_timeout=None
     ):
-        """Yields the write side of a pipe that will copy appropriately chunked values to a socket."""
+        """Yields the write side of a pipe that will copy appropriately chunked
+        values to a socket."""
         with cls.open_multi(
             sock, (chunk_type,), (isatty,), chunk_eof_type, buf_size, select_timeout
         ) as ctx:
@@ -297,7 +302,8 @@ class PipedNailgunStreamWriter(NailgunStreamWriter):
     def open_multi(
         cls, sock, chunk_types, isattys, chunk_eof_type=None, buf_size=None, select_timeout=None
     ):
-        """Yields the write sides of pipes that will copy appropriately chunked values to the socket."""
+        """Yields the write sides of pipes that will copy appropriately chunked
+        values to the socket."""
         cls._assert_aligned(chunk_types, isattys)
 
         # N.B. This is purely to permit safe handling of a dynamic number of contextmanagers.

@@ -35,8 +35,9 @@ def is_text_or_binary(obj: Any) -> bool:
 def safe_shlex_split(text_or_binary: Union[bytes, str]) -> List[str]:
     """Split a string using shell-like syntax.
 
-  Safe even on python versions whose shlex.split() method doesn't accept unicode.
-  """
+    Safe even on python versions whose shlex.split() method doesn't
+    accept unicode.
+    """
     value = ensure_text(text_or_binary)
     return shlex.split(value)
 
@@ -61,8 +62,8 @@ def shell_quote(s: str) -> str:
 def safe_shlex_join(arg_list: List[str]) -> str:
     """Join a list of strings into a shlex-able string.
 
-  Shell-quotes each argument with `shell_quote()`.
-  """
+    Shell-quotes each argument with `shell_quote()`.
+    """
     return " ".join(shell_quote(arg) for arg in arg_list)
 
 
@@ -73,7 +74,8 @@ def create_path_env_var(
     delimiter: str = ":",
     prepend: bool = False,
 ):
-    """Join path entries, combining with an environment variable if specified."""
+    """Join path entries, combining with an environment variable if
+    specified."""
     if env is None:
         env = {}
 
@@ -101,11 +103,11 @@ def camelcase(string: str) -> str:
 def pluralize(count: int, item_type: str) -> str:
     """Pluralizes the item_type if the count does not equal one.
 
-  For example `pluralize(1, 'apple')` returns '1 apple',
-  while `pluralize(0, 'apple') returns '0 apples'.
+    For example `pluralize(1, 'apple')` returns '1 apple',
+    while `pluralize(0, 'apple') returns '0 apples'.
 
-  :return The count and inflected item_type together as a string
-  """
+    :return The count and inflected item_type together as a string
+    """
 
     def pluralize_string(x: str) -> str:
         if x.endswith("s"):
@@ -118,16 +120,17 @@ def pluralize(count: int, item_type: str) -> str:
 
 
 def strip_prefix(string: str, prefix: str) -> str:
-    """Returns a copy of the string from which the multi-character prefix has been stripped.
+    """Returns a copy of the string from which the multi-character prefix has
+    been stripped.
 
-  Use strip_prefix() instead of lstrip() to remove a substring (instead of individual characters)
-  from the beginning of a string, if the substring is present.  lstrip() does not match substrings
-  but rather treats a substring argument as a set of characters.
+    Use strip_prefix() instead of lstrip() to remove a substring (instead of individual characters)
+    from the beginning of a string, if the substring is present.  lstrip() does not match substrings
+    but rather treats a substring argument as a set of characters.
 
-  :param string: The string from which to strip the specified prefix.
-  :param prefix: The substring to strip from the left of string, if present.
-  :return: The string with prefix stripped from the left, if present.
-  """
+    :param string: The string from which to strip the specified prefix.
+    :param prefix: The substring to strip from the left of string, if present.
+    :return: The string with prefix stripped from the left, if present.
+    """
     if string.startswith(prefix):
         return string[len(prefix) :]
     else:

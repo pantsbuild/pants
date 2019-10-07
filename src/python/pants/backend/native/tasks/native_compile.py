@@ -48,11 +48,11 @@ class NativeCompile(NativeTask, metaclass=ABCMeta):
     def workunit_label(cls):
         """A string describing the work being done during compilation.
 
-    `NativeCompile` will use `workunit_label` as the name of the workunit when executing the
-    compiler process.
+        `NativeCompile` will use `workunit_label` as the name of the workunit when executing the
+        compiler process.
 
-    :rtype: str
-    """
+        :rtype: str
+        """
 
     @classmethod
     def product_types(cls):
@@ -69,8 +69,8 @@ class NativeCompile(NativeTask, metaclass=ABCMeta):
     class NativeCompileError(TaskError):
         """Raised for errors in this class's logic.
 
-    Subclasses are advised to create their own exception class.
-    """
+        Subclasses are advised to create their own exception class.
+        """
 
     def execute(self):
         object_files_product = self.context.products.get(ObjectFiles)
@@ -100,10 +100,10 @@ class NativeCompile(NativeTask, metaclass=ABCMeta):
     def get_sources_headers_for_target(self, target):
         """Return a list of file arguments to provide to the compiler.
 
-    NB: result list will contain both header and source files!
+        NB: result list will contain both header and source files!
 
-    :raises: :class:`NativeCompile.NativeCompileError` if there is an error processing the sources.
-    """
+        :raises: :class:`NativeCompile.NativeCompileError` if there is an error processing the sources.
+        """
         # Get source paths relative to the target base so the exception message with the target and
         # paths makes sense.
         target_relative_sources = target.sources_relative_to_target_base()
@@ -137,8 +137,8 @@ class NativeCompile(NativeTask, metaclass=ABCMeta):
     def get_compile_settings(self):
         """Return an instance of NativeBuildStep.
 
-    NB: Subclasses will be queried for the compile settings once and the result cached.
-    """
+        NB: Subclasses will be queried for the compile settings once and the result cached.
+        """
 
     @memoized_property
     def _compile_settings(self):
@@ -146,12 +146,13 @@ class NativeCompile(NativeTask, metaclass=ABCMeta):
 
     @abstractmethod
     def get_compiler(self, native_library_target):
-        """An instance of `_CompilerMixin` which can be invoked to compile files.
+        """An instance of `_CompilerMixin` which can be invoked to compile
+        files.
 
-    NB: Subclasses will be queried for the compiler instance once and the result cached.
+        NB: Subclasses will be queried for the compiler instance once and the result cached.
 
-    :return: :class:`pants.backend.native.config.environment._CompilerMixin`
-    """
+        :return: :class:`pants.backend.native.config.environment._CompilerMixin`
+        """
 
     def _compiler(self, native_library_target):
         return self.get_compiler(native_library_target)
@@ -208,7 +209,10 @@ class NativeCompile(NativeTask, metaclass=ABCMeta):
         pass
 
     def _make_compile_argv(self, compile_request):
-        """Return a list of arguments to use to compile sources. Subclasses can override and append."""
+        """Return a list of arguments to use to compile sources.
+
+        Subclasses can override and append.
+        """
 
         sources_minus_headers = list(self._iter_sources_minus_headers(compile_request))
         if len(sources_minus_headers) == 0:
@@ -239,11 +243,12 @@ class NativeCompile(NativeTask, metaclass=ABCMeta):
         return argv
 
     def _compile(self, compile_request):
-        """Perform the process of compilation, writing object files to the request's 'output_dir'.
+        """Perform the process of compilation, writing object files to the
+        request's 'output_dir'.
 
-    NB: This method must arrange the output files so that `collect_cached_objects()` can collect all
-    of the results (or vice versa)!
-    """
+        NB: This method must arrange the output files so that `collect_cached_objects()` can collect all
+        of the results (or vice versa)!
+        """
 
         try:
             argv = self._make_compile_argv(compile_request)
@@ -289,8 +294,9 @@ class NativeCompile(NativeTask, metaclass=ABCMeta):
                 )
 
     def collect_cached_objects(self, versioned_target):
-        """Scan `versioned_target`'s results directory and return the output files from that directory.
+        """Scan `versioned_target`'s results directory and return the output
+        files from that directory.
 
-    :return: :class:`ObjectFiles`
-    """
+        :return: :class:`ObjectFiles`
+        """
         return ObjectFiles(versioned_target.results_dir, os.listdir(versioned_target.results_dir))

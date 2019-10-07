@@ -7,5 +7,5 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 class Benchmark(JvmTarget):
     """A caliper benchmark.
 
-  Run it with the ``bench`` goal.
-  """
+    Run it with the ``bench`` goal.
+    """

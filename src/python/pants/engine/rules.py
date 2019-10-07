@@ -32,7 +32,8 @@ _type_field = SubclassesOf(type)
 
 
 class _RuleVisitor(ast.NodeVisitor):
-    """Pull `Get` calls out of an @rule body and validate `yield` statements."""
+    """Pull `Get` calls out of an @rule body and validate `yield`
+    statements."""
 
     def __init__(self, func, func_node, func_source, orig_indent, parents_table):
         super().__init__()
@@ -105,7 +106,8 @@ The rule defined by function `{func_name}` begins at:
 
     @staticmethod
     def _maybe_end_of_stmt_list(attr_value):
-        """If `attr_value` is a non-empty iterable, return its final element."""
+        """If `attr_value` is a non-empty iterable, return its final
+        element."""
         if (attr_value is not None) and isinstance(attr_value, Iterable):
             result = list(attr_value)
             if len(result) > 0:
@@ -113,37 +115,38 @@ The rule defined by function `{func_name}` begins at:
         return None
 
     def _stmt_is_at_end_of_parent_list(self, stmt):
-        """Determine if `stmt` is at the end of a list of statements (i.e. can be an implicit `return`).
+        """Determine if `stmt` is at the end of a list of statements (i.e. can
+        be an implicit `return`).
 
-    If there are any statements following `stmt` at the same level of nesting, this method returns
-    False, such as the following (if `stmt` is the Expr for `yield 'good'`):
+        If there are any statements following `stmt` at the same level of nesting, this method returns
+        False, such as the following (if `stmt` is the Expr for `yield 'good'`):
 
-    if 2 + 2 == 5:
-      yield 'good'
-      a = 3
+        if 2 + 2 == 5:
+          yield 'good'
+          a = 3
 
-    Note that this returns False even if the statement following `stmt` is a `return`.
+        Note that this returns False even if the statement following `stmt` is a `return`.
 
-    However, if `stmt` is at the end of a list of statements, it can be made more clear that `stmt`
-    is intended to represent a `return`. Another way to view this method is as a dead code
-    elimination check, for a `stmt` which is intended to represent control flow moving out of the
-    current @rule. For example, this method would return True for both of the yield Expr statements
-    in the below snippet.
+        However, if `stmt` is at the end of a list of statements, it can be made more clear that `stmt`
+        is intended to represent a `return`. Another way to view this method is as a dead code
+        elimination check, for a `stmt` which is intended to represent control flow moving out of the
+        current @rule. For example, this method would return True for both of the yield Expr statements
+        in the below snippet.
 
-    if True:
-      yield 3
-    else:
-      a = 3
-      yield a
+        if True:
+          yield 3
+        else:
+          a = 3
+          yield a
 
-    This checking is performed by getting the parent of `stmt` with a pre-generated table passed
-    into the constructor.
+        This checking is performed by getting the parent of `stmt` with a pre-generated table passed
+        into the constructor.
 
-    See https://docs.python.org/2/library/ast.html#abstract-grammar for the grammar specification.
-    'body', 'orelse', and 'finalbody' are the only attributes on any AST nodes which can contain
-    lists of stmts.  'body' is also an attribute in the Exec statement for some reason, but as a
-    single expr, so we simply check if it is iterable in `_maybe_end_of_stmt_list()`.
-    """
+        See https://docs.python.org/2/library/ast.html#abstract-grammar for the grammar specification.
+        'body', 'orelse', and 'finalbody' are the only attributes on any AST nodes which can contain
+        lists of stmts.  'body' is also an attribute in the Exec statement for some reason, but as a
+        single expr, so we simply check if it is iterable in `_maybe_end_of_stmt_list()`.
+        """
         parent_stmt = self._parents_table[stmt]
         last_body_stmt = self._maybe_end_of_stmt_list(getattr(parent_stmt, "body", None))
         if stmt == last_body_stmt:
@@ -219,19 +222,21 @@ The rule defined by function `{func_name}` begins at:
 
 @memoized
 def optionable_rule(optionable_factory):
-    """Returns a TaskRule that constructs an instance of the Optionable for the given OptionableFactory.
+    """Returns a TaskRule that constructs an instance of the Optionable for the
+    given OptionableFactory.
 
-  TODO: This API is slightly awkward for two reasons:
-    1) We should consider whether Subsystems/Optionables should be constructed explicitly using
-      `@rule`s, which would allow them to have non-option dependencies that would be explicit in
-      their constructors (which would avoid the need for the `Subsystem.Factory` pattern).
-    2) Optionable depending on TaskRule would create a cycle in the Python package graph.
-  """
+    TODO: This API is slightly awkward for two reasons:
+      1) We should consider whether Subsystems/Optionables should be constructed explicitly using
+        `@rule`s, which would allow them to have non-option dependencies that would be explicit in
+        their constructors (which would avoid the need for the `Subsystem.Factory` pattern).
+      2) Optionable depending on TaskRule would create a cycle in the Python package graph.
+    """
     return TaskRule(**optionable_factory.signature())
 
 
 def _get_starting_indent(source):
-    """Remove leading indentation from `source` so ast.parse() doesn't raise an exception."""
+    """Remove leading indentation from `source` so ast.parse() doesn't raise an
+    exception."""
     if source.startswith(" "):
         return sum(1 for _ in itertools.takewhile(lambda c: c in {" ", b" "}, source))
     return 0
@@ -240,17 +245,18 @@ def _get_starting_indent(source):
 def _make_rule(
     return_type: type, parameter_types: typing.Iterable[type], cacheable: bool = True
 ) -> Callable[[Callable], Callable]:
-    """A @decorator that declares that a particular static function may be used as a TaskRule.
+    """A @decorator that declares that a particular static function may be used
+    as a TaskRule.
 
-  As a special case, if the output_type is a subclass of `Goal`, the `Goal.Options` for the `Goal`
-  are registered as dependency Optionables.
+    As a special case, if the output_type is a subclass of `Goal`, the `Goal.Options` for the `Goal`
+    are registered as dependency Optionables.
 
-  :param return_type: The return/output type for the Rule. This must be a concrete Python type.
-  :param parameter_types: A sequence of types that matches the number and order of arguments to the
-                          @decorated decorated function.
-  :param cacheable: Whether the results of executing the Rule should be cached as keyed by all of
-                    its inputs.
-  """
+    :param return_type: The return/output type for the Rule. This must be a concrete Python type.
+    :param parameter_types: A sequence of types that matches the number and order of arguments to the
+                            @decorated decorated function.
+    :param cacheable: Whether the results of executing the Rule should be cached as keyed by all of
+                      its inputs.
+    """
 
     is_goal_cls = isinstance(return_type, type) and issubclass(return_type, Goal)
     if is_goal_cls == cacheable:
@@ -417,29 +423,30 @@ def console_rule(*args) -> Callable:
 
 
 def union(cls):
-    """A class decorator which other classes can specify that they can resolve to with `UnionRule`.
+    """A class decorator which other classes can specify that they can resolve
+    to with `UnionRule`.
 
-  Annotating a class with @union allows other classes to use a UnionRule() instance to indicate that
-  they can be resolved to this base union class. This class will never be instantiated, and should
-  have no members -- it is used as a tag only, and will be replaced with whatever object is passed
-  in as the subject of a `yield Get(...)`. See the following example:
+    Annotating a class with @union allows other classes to use a UnionRule() instance to indicate that
+    they can be resolved to this base union class. This class will never be instantiated, and should
+    have no members -- it is used as a tag only, and will be replaced with whatever object is passed
+    in as the subject of a `yield Get(...)`. See the following example:
 
-  @union
-  class UnionBase: pass
+    @union
+    class UnionBase: pass
 
-  @rule
-  def get_some_union_type(x: X) -> B:
-    result = yield Get(ResultType, UnionBase, x.f())
-    # ...
+    @rule
+    def get_some_union_type(x: X) -> B:
+      result = yield Get(ResultType, UnionBase, x.f())
+      # ...
 
-  If there exists a single path from (whatever type the expression `x.f()` returns) -> `ResultType`
-  in the rule graph, the engine will retrieve and execute that path to produce a `ResultType` from
-  `x.f()`. This requires also that whatever type `x.f()` returns was registered as a union member of
-  `UnionBase` with a `UnionRule`.
+    If there exists a single path from (whatever type the expression `x.f()` returns) -> `ResultType`
+    in the rule graph, the engine will retrieve and execute that path to produce a `ResultType` from
+    `x.f()`. This requires also that whatever type `x.f()` returns was registered as a union member of
+    `UnionBase` with a `UnionRule`.
 
-  Unions allow @rule bodies to be written without knowledge of what types may eventually be provided
-  as input -- rather, they let the engine check that there is a valid path to the desired result.
-  """
+    Unions allow @rule bodies to be written without knowledge of what types may eventually be provided
+    as input -- rather, they let the engine check that there is a valid path to the desired result.
+    """
     # TODO: Check that the union base type is used as a tag and nothing else (e.g. no attributes)!
     assert isinstance(cls, type)
 
@@ -457,7 +464,8 @@ def union(cls):
 
 
 class UnionRule(datatype([("union_base", _type_field), ("union_member", _type_field)])):
-    """Specify that an instance of `union_member` can be substituted wherever `union_base` is used."""
+    """Specify that an instance of `union_member` can be substituted wherever
+    `union_base` is used."""
 
     def __new__(cls, union_base, union_member):
         if not getattr(union_base, "_is_union", False):
@@ -483,9 +491,10 @@ class UnionMembership:
 class Rule(ABC):
     """Rules declare how to produce products for the product graph.
 
-  A rule describes what dependencies must be provided to produce a particular product. They also act
-  as factories for constructing the nodes within the graph.
-  """
+    A rule describes what dependencies must be provided to produce a
+    particular product. They also act as factories for constructing the
+    nodes within the graph.
+    """
 
     @property
     @abstractmethod
@@ -497,14 +506,17 @@ class Rule(ABC):
     def dependency_rules(self):
         """A tuple of @rules that are known to be necessary to run this rule.
 
-    Note that installing @rules as flat lists is generally preferable, as Rules already implicitly
-    form a loosely coupled RuleGraph: this facility exists only to assist with boilerplate removal.
-    """
+        Note that installing @rules as flat lists is generally
+        preferable, as Rules already implicitly form a loosely coupled
+        RuleGraph: this facility exists only to assist with boilerplate
+        removal.
+        """
 
     @property
     @abstractmethod
     def dependency_optionables(self):
-        """A tuple of Optionable classes that are known to be necessary to run this rule."""
+        """A tuple of Optionable classes that are known to be necessary to run
+        this rule."""
         return ()
 
 
@@ -522,12 +534,13 @@ class TaskRule(
     ),
     Rule,
 ):
-    """A Rule that runs a task function when all of its input selectors are satisfied.
+    """A Rule that runs a task function when all of its input selectors are
+    satisfied.
 
-  NB: This API is experimental, and not meant for direct consumption. To create a `TaskRule` you
-  should always prefer the `@rule` constructor, and in cases where that is too constraining
-  (likely due to #4535) please bump or open a ticket to explain the usecase.
-  """
+    NB: This API is experimental, and not meant for direct consumption. To create a `TaskRule` you
+    should always prefer the `@rule` constructor, and in cases where that is too constraining
+    (likely due to #4535) please bump or open a ticket to explain the usecase.
+    """
 
     def __new__(
         cls,
@@ -565,10 +578,10 @@ class TaskRule(
 class RootRule(datatype([("output_type", _type_field)]), Rule):
     """Represents a root input to an execution of a rule graph.
 
-  Roots act roughly like parameters, in that in some cases the only source of a
-  particular type might be when a value is provided as a root subject at the beginning
-  of an execution.
-  """
+    Roots act roughly like parameters, in that in some cases the only
+    source of a particular type might be when a value is provided as a
+    root subject at the beginning of an execution.
+    """
 
     @property
     def dependency_rules(self):

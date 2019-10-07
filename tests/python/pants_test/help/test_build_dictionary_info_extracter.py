@@ -22,12 +22,11 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
         class Test1(object):
             """First line.
 
-      Subsequent
-      lines.
+            Subsequent
+            lines.
 
-        with indentations
-
-      """
+              with indentations
+            """
 
         self.assertEqual(
             ("First line.", ["Subsequent", "lines.", "", "  with indentations"]),
@@ -46,10 +45,10 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
         def func(a, b, c):
             """Foo function.
 
-      :param a: Parameter a.
-      :param  str  b: Parameter b.
-      :param c:  Parameter c.
-      """
+            :param a: Parameter a.
+            :param  str  b: Parameter b.
+            :param c:  Parameter c.
+            """
 
         self.assertEqual(
             {"a": "Parameter a.", "b": "Parameter b.", "c": "Parameter c."},
@@ -61,14 +60,14 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
         def func(a, b, c, d, e):
             """Foo function.
 
-      :param a: Parameter a.
-      :param  str  b: Parameter b.
-      :param c:  Parameter c
-                 Second line Parameter c.
-      :param d:
-      Parameter d.
-      :param e:  Parameter e.
-      """
+            :param a: Parameter a.
+            :param  str  b: Parameter b.
+            :param c:  Parameter c
+                       Second line Parameter c.
+            :param d:
+            Parameter d.
+            :param e:  Parameter e.
+            """
 
         self.assertEqual(
             {
@@ -86,14 +85,14 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
         def func(a, b, c):
             """Foo function.
 
-      :param a: Parameter a.
-      :type j:  Type j.
-      :type k:  Type k.
-      Second line Type k.
-      :param  str  b: Parameter b.
-      :param c:  Parameter c.
-      :returns:  Return.
-      """
+            :param a: Parameter a.
+            :type j:  Type j.
+            :type k:  Type k.
+            Second line Type k.
+            :param  str  b: Parameter b.
+            :param c:  Parameter c.
+            :returns:  Return.
+            """
 
         self.assertEqual(
             {"a": "Parameter a.", "b": "Parameter b.", "c": "Parameter c."},

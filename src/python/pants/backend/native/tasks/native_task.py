@@ -24,33 +24,36 @@ class NativeTask(Task):
     @classproperty
     @abstractmethod
     def source_target_constraint(cls):
-        """Return a type constraint which is used to filter "source" targets for this task.
+        """Return a type constraint which is used to filter "source" targets
+        for this task.
 
-    This is used to make it clearer which tasks act on which targets, since the compile and link
-    tasks work on different target sets (just C and just C++ in the compile tasks, and both in the
-    link task).
+        This is used to make it clearer which tasks act on which targets, since the compile and link
+        tasks work on different target sets (just C and just C++ in the compile tasks, and both in the
+        link task).
 
-    :return: :class:`pants.util.objects.TypeConstraint`
-    """
+        :return: :class:`pants.util.objects.TypeConstraint`
+        """
 
     @classproperty
     def dependent_target_constraint(cls):
-        """Return a type constraint which is used to filter dependencies for a target.
+        """Return a type constraint which is used to filter dependencies for a
+        target.
 
-    This is used to make native_deps() calculation automatic and declarative.
+        This is used to make native_deps() calculation automatic and declarative.
 
-    :return: :class:`pants.util.objects.TypeConstraint`
-    """
+        :return: :class:`pants.util.objects.TypeConstraint`
+        """
         return SubclassesOf(NativeLibrary)
 
     @classproperty
     def packaged_dependent_constraint(cls):
-        """Return a type constraint which is used to filter 3rdparty dependencies for a target.
+        """Return a type constraint which is used to filter 3rdparty
+        dependencies for a target.
 
-    This is used to make packaged_native_deps() automatic and declarative.
+        This is used to make packaged_native_deps() automatic and declarative.
 
-    :return: :class:`pants.util.objects.TypeConstraint`
-    """
+        :return: :class:`pants.util.objects.TypeConstraint`
+        """
         return Exactly(PackagedNativeLibrary)
 
     @classmethod
@@ -116,14 +119,15 @@ class NativeTask(Task):
         )
 
     def strict_deps_for_target(self, target, predicate=None):
-        """Get the dependencies of `target` filtered by `predicate`, accounting for 'strict_deps'.
+        """Get the dependencies of `target` filtered by `predicate`, accounting
+        for 'strict_deps'.
 
-    If 'strict_deps' is on, instead of using the transitive closure of dependencies, targets will
-    only be able to see their immediate dependencies declared in the BUILD file. The 'strict_deps'
-    setting is obtained from the result of `get_compile_settings()`.
+        If 'strict_deps' is on, instead of using the transitive closure of dependencies, targets will
+        only be able to see their immediate dependencies declared in the BUILD file. The 'strict_deps'
+        setting is obtained from the result of `get_compile_settings()`.
 
-    NB: This includes the current target in the result.
-    """
+        NB: This includes the current target in the result.
+        """
         if self._native_build_settings.get_strict_deps_value_for_target(target):
             strict_deps = target.strict_dependencies(DependencyContext())
             if predicate:

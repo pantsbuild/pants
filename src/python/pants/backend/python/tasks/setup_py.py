@@ -126,9 +126,9 @@ class TargetAncestorIterator:
     def iter_target_siblings_and_ancestors(self, target):
         """Produces an iterator over a target's siblings and ancestor lineage.
 
-    :returns: A target iterator yielding the target and its siblings and then it ancestors from
-              nearest to furthest removed.
-    """
+        :returns: A target iterator yielding the target and its siblings and then it ancestors from
+                  nearest to furthest removed.
+        """
 
         def iter_targets_in_spec_path(spec_path):
             try:
@@ -165,17 +165,17 @@ class TargetAncestorIterator:
 class ExportedTargetDependencyCalculator(ABC):
     """Calculates the dependencies of exported targets.
 
-  When a target is exported many of its internal transitive library dependencies may be satisfied by
-  other internal targets that are also exported and "own" these internal transitive library deps.
-  In other words, exported targets generally can have reduced dependency sets and an
-  `ExportedTargetDependencyCalculator` can calculate these reduced dependency sets.
+    When a target is exported many of its internal transitive library dependencies may be satisfied by
+    other internal targets that are also exported and "own" these internal transitive library deps.
+    In other words, exported targets generally can have reduced dependency sets and an
+    `ExportedTargetDependencyCalculator` can calculate these reduced dependency sets.
 
-  To use an `ExportedTargetDependencyCalculator` a subclass must be created that implements two
-  predicates and a walk function for the class of targets in question.  For example, a
-  `JvmDependencyCalculator` would need to be able to identify jvm third party dependency targets,
-  and local exportable jvm library targets.  In addition it would need to define a walk function
-  that knew how to walk a jvm target's dependencies.
-  """
+    To use an `ExportedTargetDependencyCalculator` a subclass must be created that implements two
+    predicates and a walk function for the class of targets in question.  For example, a
+    `JvmDependencyCalculator` would need to be able to identify jvm third party dependency targets,
+    and local exportable jvm library targets.  In addition it would need to define a walk function
+    that knew how to walk a jvm target's dependencies.
+    """
 
     class UnExportedError(TaskError):
         """Indicates a target is not exported."""
@@ -184,43 +184,45 @@ class ExportedTargetDependencyCalculator(ABC):
         """Indicates an exportable target has no owning exported target."""
 
     class AmbiguousOwnerError(TaskError):
-        """Indicates an exportable target has more than one owning exported target."""
+        """Indicates an exportable target has more than one owning exported
+        target."""
 
     def __init__(self, build_graph):
         self._ancestor_iterator = TargetAncestorIterator(build_graph)
 
     @abstractmethod
     def requires_export(self, target):
-        """Identifies targets that need to be exported (are internal targets owning source code).
+        """Identifies targets that need to be exported (are internal targets
+        owning source code).
 
-    :param target: The target to identify.
-    :returns: `True` if the given `target` owns files that should be included in exported packages
-              when the target is a member of an exported target's dependency graph.
-    """
+        :param target: The target to identify.
+        :returns: `True` if the given `target` owns files that should be included in exported packages
+                  when the target is a member of an exported target's dependency graph.
+        """
 
     @abstractmethod
     def is_exported(self, target):
         """Identifies targets of interest that are exported from this project.
 
-    :param target: The target to identify.
-    :returns: `True` if the given `target` represents a top-level target exported from this project.
-    """
+        :param target: The target to identify.
+        :returns: `True` if the given `target` represents a top-level target exported from this project.
+        """
 
     @abstractmethod
     def dependencies(self, target):
         """Returns an iterator over the dependencies of the given target.
 
-    :param target: The target to iterate dependencies of.
-    :returns: An iterator over all of the target's dependencies.
-    """
+        :param target: The target to iterate dependencies of.
+        :returns: An iterator over all of the target's dependencies.
+        """
 
     def _walk(self, target, visitor):
         """Walks the dependency graph for the given target.
 
-    :param target: The target to start the walk from.
-    :param visitor: A function that takes a target and returns `True` if its dependencies should
-                    also be visited.
-    """
+        :param target: The target to start the walk from.
+        :param visitor: A function that takes a target and returns `True` if its dependencies should
+                        also be visited.
+        """
         visited = set()
 
         def walk(current):
@@ -234,7 +236,8 @@ class ExportedTargetDependencyCalculator(ABC):
         walk(target)
 
     def _closure(self, target):
-        """Return the target closure as defined by this dependency calculator's definition of a walk."""
+        """Return the target closure as defined by this dependency calculator's
+        definition of a walk."""
         closure = set()
 
         def collect(current):
@@ -246,32 +249,33 @@ class ExportedTargetDependencyCalculator(ABC):
         return closure
 
     def reduced_dependencies(self, exported_target):
-        """Calculates the reduced transitive dependencies for an exported target.
+        """Calculates the reduced transitive dependencies for an exported
+        target.
 
-    The reduced set of dependencies will be just those transitive dependencies "owned" by
-    the `exported_target`.
+        The reduced set of dependencies will be just those transitive dependencies "owned" by
+        the `exported_target`.
 
-    A target is considered "owned" if:
-    1. It's "3rdparty" and "directly reachable" from `exported_target` by at least 1 path.
-    2. It's not "3rdparty" and not "directly reachable" by any of `exported_target`'s "3rdparty"
-       dependencies.
+        A target is considered "owned" if:
+        1. It's "3rdparty" and "directly reachable" from `exported_target` by at least 1 path.
+        2. It's not "3rdparty" and not "directly reachable" by any of `exported_target`'s "3rdparty"
+           dependencies.
 
-    Here "3rdparty" refers to targets identified as either `is_third_party` or `is_exported`.
+        Here "3rdparty" refers to targets identified as either `is_third_party` or `is_exported`.
 
-    And in this context "directly reachable" means the target can be reached by following a series
-    of dependency links from the `exported_target`, never crossing another exported target and
-    staying within the `exported_target` address space.  It's the latter restriction that allows for
-    unambiguous ownership of exportable targets and mirrors the BUILD file convention of targets
-    only being able to own sources in their filesystem subtree.  The single ambiguous case that can
-    arise is when there is more than one exported target in the same BUILD file family that can
-    "directly reach" a target in its address space.
+        And in this context "directly reachable" means the target can be reached by following a series
+        of dependency links from the `exported_target`, never crossing another exported target and
+        staying within the `exported_target` address space.  It's the latter restriction that allows for
+        unambiguous ownership of exportable targets and mirrors the BUILD file convention of targets
+        only being able to own sources in their filesystem subtree.  The single ambiguous case that can
+        arise is when there is more than one exported target in the same BUILD file family that can
+        "directly reach" a target in its address space.
 
-    :raises: `UnExportedError` if the given `exported_target` is not, in-fact, exported.
-    :raises: `NoOwnerError` if a transitive dependency is found with no proper owning exported
-             target.
-    :raises: `AmbiguousOwnerError` if there is more than one viable exported owner target for a
-             given transitive dependency.
-    """
+        :raises: `UnExportedError` if the given `exported_target` is not, in-fact, exported.
+        :raises: `NoOwnerError` if a transitive dependency is found with no proper owning exported
+                 target.
+        :raises: `AmbiguousOwnerError` if there is more than one viable exported owner target for a
+                 given transitive dependency.
+        """
         # The strategy adopted requires 3 passes:
         # 1.) Walk the exported target to collect provisional owned exportable targets, but _not_
         #     3rdparty since these may be introduced by exported subgraphs we discover in later steps!
@@ -354,7 +358,8 @@ class ExportedTargetDependencyCalculator(ABC):
 
 
 def declares_namespace_package(filename):
-    """Given a filename, walk its ast and determine if it declares a namespace package."""
+    """Given a filename, walk its ast and determine if it declares a namespace
+    package."""
 
     import ast
 
@@ -439,7 +444,8 @@ class SetupPy(Task):
 
     @classmethod
     def iter_entry_points(cls, target):
-        """Yields the name, entry_point pairs of binary targets in this PythonArtifact."""
+        """Yields the name, entry_point pairs of binary targets in this
+        PythonArtifact."""
         for name, binary_target in target.provided_binaries.items():
             concrete_target = binary_target
             if not isinstance(concrete_target, PythonBinary) or concrete_target.entry_point is None:
@@ -532,13 +538,14 @@ class SetupPy(Task):
             return ensure_text(stdout).splitlines()
 
     def find_packages(self, root_target, chroot):
-        """Detect packages, namespace packages and resources from an existing chroot.
+        """Detect packages, namespace packages and resources from an existing
+        chroot.
 
-    :returns: a tuple of:
-                set(packages)
-                set(namespace_packages)
-                map(package => set(files))
-    """
+        :returns: a tuple of:
+                    set(packages)
+                    set(namespace_packages)
+                    map(package => set(files))
+        """
         base = os.path.join(chroot.path(), self.SOURCE_ROOT)
         packages, namespace_packages = set(), set()
         resources = defaultdict(set)
@@ -653,8 +660,8 @@ class SetupPy(Task):
     def write_setup(self, root_target, reduced_dependencies, chroot):
         """Write the setup.py of a target.
 
-    Must be run after writing the contents to the chroot.
-    """
+        Must be run after writing the contents to the chroot.
+        """
         setup_keywords = root_target.provides.setup_py_keywords.copy()
 
         package_dir = {"": self.SOURCE_ROOT}

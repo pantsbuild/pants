@@ -8,8 +8,8 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 class ScalaArtifact(Artifact):
     """Extends Artifact to append the configured Scala version.
 
-  :API: public
-  """
+    :API: public
+    """
 
     @property
     def name(self):

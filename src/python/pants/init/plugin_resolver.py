@@ -64,12 +64,13 @@ class PluginResolver:
         self._plugin_cache_dir = bootstrap_options.plugin_cache_dir
 
     def resolve(self, working_set=None):
-        """Resolves any configured plugins and adds them to the global working set.
+        """Resolves any configured plugins and adds them to the global working
+        set.
 
-    :param working_set: The working set to add the resolved plugins to instead of the global
-                        working set (for testing).
-    :type: :class:`pkg_resources.WorkingSet`
-    """
+        :param working_set: The working set to add the resolved plugins to instead of the global
+                            working set (for testing).
+        :type: :class:`pkg_resources.WorkingSet`
+        """
         working_set = working_set or global_working_set
         if self._plugin_requirements:
             for plugin_location in self._resolve_plugin_locations():

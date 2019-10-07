@@ -11,11 +11,13 @@ from pants.build_graph.target import Target
 class RemoteSources(Target):
     """A target that generates a synthetic target using deferred sources.
 
-  This provides a mechanism for using the contents of a jar as sources for another target. The jar
-  where the sources are specified from is given via the `sources_target` parameter, and the type for
-  the target that should be created with those sources is given via the `dest` parameter. Any
-  additional arguments for the new target go into the `args` parameter.
-  """
+    This provides a mechanism for using the contents of a jar as sources
+    for another target. The jar where the sources are specified from is
+    given via the `sources_target` parameter, and the type for the
+    target that should be created with those sources is given via the
+    `dest` parameter. Any additional arguments for the new target go
+    into the `args` parameter.
+    """
 
     def __init__(
         self, address=None, payload=None, sources_target=None, dest=None, args=None, **kwargs

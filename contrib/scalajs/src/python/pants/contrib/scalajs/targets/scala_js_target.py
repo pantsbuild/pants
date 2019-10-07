@@ -10,7 +10,8 @@ from pants.contrib.scalajs.subsystems.scala_js_platform import ScalaJSPlatform
 
 
 class ScalaJSTarget:
-    """A mixin for ScalaJS targets to injects scala-js deps and request ScalaJS compilation."""
+    """A mixin for ScalaJS targets to injects scala-js deps and request ScalaJS
+    compilation."""
 
     @classmethod
     def subsystems(cls):
@@ -41,11 +42,12 @@ class ScalaJSTarget:
 
     @property
     def compiler_option_sets(self):
-        """For every element in this list, enable the corresponding flags on compilation
-    of targets.
-    :return: See constructor.
-    :rtype: list
-    """
+        """For every element in this list, enable the corresponding flags on
+        compilation of targets.
+
+        :return: See constructor.
+        :rtype: list
+        """
         return self.payload.compiler_option_sets
 
     @property

@@ -19,14 +19,15 @@ logger = logging.getLogger(__name__)
 
 
 class LegacyPythonCallbacksParser(Parser):
-    """A parser that parses the given python code into a list of top-level objects.
+    """A parser that parses the given python code into a list of top-level
+    objects.
 
-  Only Serializable objects with `name`s will be collected and returned.  These objects will be
-  addressable via their name in the parsed namespace.
+    Only Serializable objects with `name`s will be collected and returned.  These objects will be
+    addressable via their name in the parsed namespace.
 
-  This parser attempts to be compatible with existing legacy BUILD files and concepts including
-  macros and target factories.
-  """
+    This parser attempts to be compatible with existing legacy BUILD files and concepts including
+    macros and target factories.
+    """
 
     def __init__(self, symbol_table, aliases, build_file_imports_behavior):
         """

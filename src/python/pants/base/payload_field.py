@@ -11,7 +11,10 @@ from pants.util.strutil import ensure_binary
 
 
 def combine_hashes(hashes):
-    """A simple helper function to combine other hashes.  Sorts the hashes before rolling them in."""
+    """A simple helper function to combine other hashes.
+
+    Sorts the hashes before rolling them in.
+    """
     hasher = sha1()
     for h in sorted(hashes):
         h = ensure_binary(h)
@@ -22,19 +25,19 @@ def combine_hashes(hashes):
 class PayloadField(ABC):
     """An immutable, hashable structure to be mixed into Payload instances.
 
-  :API: public
-  """
+    :API: public
+    """
 
     _fingerprint_memo = None
 
     def fingerprint(self):
-        """A memoized sha1 hexdigest hashing the contents of this PayloadField
+        """A memoized sha1 hexdigest hashing the contents of this PayloadField.
 
-    The fingerprint returns either a string or None.  If the return is None, consumers of the
-    fingerprint may choose to elide this PayloadField from their combined hash computation.
+        The fingerprint returns either a string or None.  If the return is None, consumers of the
+        fingerprint may choose to elide this PayloadField from their combined hash computation.
 
-    :API: public
-    """
+        :API: public
+        """
         if self._fingerprint_memo is None:
             self._fingerprint_memo = self._compute_fingerprint()
         return self._fingerprint_memo
@@ -42,15 +45,16 @@ class PayloadField(ABC):
     def mark_dirty(self):
         """Invalidates the memoized fingerprint for this field.
 
-    Exposed for testing.
+        Exposed for testing.
 
-    :API: public
-    """
+        :API: public
+        """
         self._fingerprint_memo = None
 
     @abstractmethod
     def _compute_fingerprint(self):
-        """This method will be called and the result memoized for ``PayloadField.fingerprint``."""
+        """This method will be called and the result memoized for
+        ``PayloadField.fingerprint``."""
         pass
 
     @property
@@ -62,28 +66,31 @@ class PayloadField(ABC):
 
 
 class FingerprintedMixin:
-    """Mixin this class to make your class suitable for passing to FingerprintedField.
+    """Mixin this class to make your class suitable for passing to
+    FingerprintedField.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def fingerprint(self):
         """Override this method to implement a fingerprint for your class.
 
-    :API: public
+        :API: public
 
-    :returns: a sha1 hexdigest hashing the contents of this structure."""
+        :returns: a sha1 hexdigest hashing the contents of this structure.
+        """
         raise NotImplementedError()
 
 
 class FingerprintedField(PayloadField):
-    """Use this field to fingerprint any class that mixes in FingerprintedMixin.
+    """Use this field to fingerprint any class that mixes in
+    FingerprintedMixin.
 
-  The caller must ensure that the class properly implements fingerprint()
-  to hash the contents of the object.
+    The caller must ensure that the class properly implements fingerprint()
+    to hash the contents of the object.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(self, value):
         self._value = value
@@ -99,10 +106,10 @@ class FingerprintedField(PayloadField):
 class PythonRequirementsField(frozenset, PayloadField):
     """A frozenset subclass that mixes in PayloadField.
 
-  Must be initialized with an iterable of PythonRequirement instances.
+    Must be initialized with an iterable of PythonRequirement instances.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def _compute_fingerprint(self):
         def fingerprint_iter():
@@ -122,10 +129,10 @@ class PythonRequirementsField(frozenset, PayloadField):
 class ExcludesField(OrderedSet, PayloadField):
     """An OrderedSet subclass that mixes in PayloadField.
 
-  Must be initialized with an iterable of Excludes instances.
+    Must be initialized with an iterable of Excludes instances.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def _compute_fingerprint(self):
         return stable_json_sha1(tuple(repr(exclude) for exclude in self))
@@ -134,10 +141,10 @@ class ExcludesField(OrderedSet, PayloadField):
 class JarsField(tuple, PayloadField):
     """A tuple subclass that mixes in PayloadField.
 
-  Must be initialized with an iterable of JarDependency instances.
+    Must be initialized with an iterable of JarDependency instances.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def _compute_fingerprint(self):
         return stable_json_sha1(tuple(jar.cache_key() for jar in self))
@@ -146,10 +153,10 @@ class JarsField(tuple, PayloadField):
 class PrimitiveField(PayloadField):
     """A general field for primitive types.
 
-  As long as the contents are JSON representable, their hash can be stably inferred.
+    As long as the contents are JSON representable, their hash can be stably inferred.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(self, underlying=None):
         self._underlying = underlying
@@ -165,12 +172,12 @@ class PrimitiveField(PayloadField):
 class PrimitivesSetField(PayloadField):
     """A general field for order-insensitive sets of primitive, ordered types.
 
-  As long as the underlying elements are JSON representable and have a consistent sort order,
-  their hash can be stably inferred. An underlying value of `None` is preserved to allow for
-  "unset" fields: to default to an empty list/set instead, pass one to the constructor.
+    As long as the underlying elements are JSON representable and have a consistent sort order,
+    their hash can be stably inferred. An underlying value of `None` is preserved to allow for
+    "unset" fields: to default to an empty list/set instead, pass one to the constructor.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(self, underlying=None):
         self._underlying = tuple(sorted(set(underlying))) if underlying is not None else None

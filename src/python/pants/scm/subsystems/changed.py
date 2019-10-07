@@ -28,10 +28,12 @@ class ChangedRequest:
 class Changed(Subsystem):
     """A subsystem for global `changed` functionality.
 
-  This supports the "legacy" `changed`, `test-changed` and `compile-changed` goals as well as the
-  v2 engine style `--changed-*` argument target root replacements which can apply to any goal (e.g.
-  `./pants --changed-parent=HEAD~3 list` replaces `./pants --changed-parent=HEAD~3 changed`).
-  """
+    This supports the "legacy" `changed`, `test-changed` and `compile-
+    changed` goals as well as the v2 engine style `--changed-*` argument
+    target root replacements which can apply to any goal (e.g. `./pants
+    --changed-parent=HEAD~3 list` replaces `./pants --changed-
+    parent=HEAD~3 changed`).
+    """
 
     options_scope = "changed"
 

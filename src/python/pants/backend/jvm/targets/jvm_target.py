@@ -16,10 +16,11 @@ from pants.util.memo import memoized_property
 
 
 class JvmTarget(Target, Jarable):
-    """A base class for all java module targets that provides path and dependency translation.
+    """A base class for all java module targets that provides path and
+    dependency translation.
 
-  :API: public
-  """
+    :API: public
+    """
 
     @classmethod
     def subsystems(cls):
@@ -121,11 +122,12 @@ class JvmTarget(Target, Jarable):
 
     @property
     def strict_deps(self):
-        """If set, whether to limit compile time deps to those that are directly declared.
+        """If set, whether to limit compile time deps to those that are
+        directly declared.
 
-    :return: See constructor.
-    :rtype: bool or None
-    """
+        :return: See constructor.
+        :rtype: bool or None
+        """
         return self.payload.strict_deps
 
     @property
@@ -134,65 +136,69 @@ class JvmTarget(Target, Jarable):
 
     @memoized_property
     def compiler_option_sets(self):
-        """For every element in this list, enable the corresponding flags on compilation
-    of targets.
-    :return: See constructor.
-    :rtype: list
-    """
+        """For every element in this list, enable the corresponding flags on
+        compilation of targets.
+
+        :return: See constructor.
+        :rtype: list
+        """
         return self.payload.compiler_option_sets
 
     @property
     def zinc_file_manager(self):
-        """If false, the default file manager will be used instead of the zinc provided one.
+        """If false, the default file manager will be used instead of the zinc
+        provided one.
 
-    :return: See constructor.
-    :rtype: bool or None
-    """
+        :return: See constructor.
+        :rtype: bool or None
+        """
         return self.payload.zinc_file_manager
 
     @property
     def javac_plugins(self):
-        """The names of compiler plugins to use when compiling this target with javac.
+        """The names of compiler plugins to use when compiling this target with
+        javac.
 
-    :return: See constructor.
-    :rtype: list of strings.
-    """
+        :return: See constructor.
+        :rtype: list of strings.
+        """
         return self.payload.javac_plugins
 
     @property
     def javac_plugin_args(self):
         """Map from javac plugin name to list of args for that plugin.
 
-    :return: See constructor.
-    :rtype: map from string to list of strings.
-    """
+        :return: See constructor.
+        :rtype: map from string to list of strings.
+        """
         return self.payload.javac_plugin_args
 
     @property
     def scalac_plugins(self):
-        """The names of compiler plugins to use when compiling this target with scalac.
+        """The names of compiler plugins to use when compiling this target with
+        scalac.
 
-    :return: See constructor.
-    :rtype: list of strings.
-    """
+        :return: See constructor.
+        :rtype: list of strings.
+        """
         return self.payload.scalac_plugins
 
     @property
     def scalac_plugin_args(self):
         """Map from scalac plugin name to list of args for that plugin.
 
-    :return: See constructor.
-    :rtype: map from string to list of strings.
-    """
+        :return: See constructor.
+        :rtype: map from string to list of strings.
+        """
         return self.payload.scalac_plugin_args
 
     @property
     def platform(self):
         """Platform associated with this target.
 
-    :return: The jvm platform object.
-    :rtype: JvmPlatformSettings
-    """
+        :return: The jvm platform object.
+        :rtype: JvmPlatformSettings
+        """
         return JvmPlatform.global_instance().get_platform_for_target(self)
 
     @memoized_property

@@ -56,9 +56,9 @@ class GoogleJavaFormatBase(RewriteBase):
 class GoogleJavaFormatCheckFormat(LintTaskMixin, GoogleJavaFormatBase):
     """Check if Java source code complies with Google Java Style.
 
-  If the files are not formatted correctly an error is raised
-  including the command to run to format the files correctly
-  """
+    If the files are not formatted correctly an error is raised
+    including the command to run to format the files correctly
+    """
 
     sideeffecting = False
     additional_args = ["--set-exit-if-changed"]

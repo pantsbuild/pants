@@ -491,13 +491,16 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
                 )
 
     def _ensure_pytest_interpreter_search_path(self):
-        """Return an environment for invoking a pex which ensures the use of the selected interpreter.
+        """Return an environment for invoking a pex which ensures the use of
+        the selected interpreter.
 
-    When creating the merged pytest pex, we already have an interpreter, and we only invoke that pex
-    within a pants run, so we can be sure the selected interpreter will be available. Constraining
-    the interpreter search path at pex runtime ensures that any resolved requirements will be
-    compatible with the interpreter being used to invoke the merged pytest pex.
-    """
+        When creating the merged pytest pex, we already have an
+        interpreter, and we only invoke that pex within a pants run, so
+        we can be sure the selected interpreter will be available.
+        Constraining the interpreter search path at pex runtime ensures
+        that any resolved requirements will be compatible with the
+        interpreter being used to invoke the merged pytest pex.
+        """
         pytest_binary = self.context.products.get_data(PytestPrep.PytestBinary)
         return ensure_interpreter_search_path_env(pytest_binary.interpreter)
 

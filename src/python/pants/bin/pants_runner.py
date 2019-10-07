@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 
 class PantsRunner(ExceptionSink.AccessGlobalExiterMixin):
-    """A higher-level runner that delegates runs to either a LocalPantsRunner or RemotePantsRunner."""
+    """A higher-level runner that delegates runs to either a LocalPantsRunner
+    or RemotePantsRunner."""
 
     def __init__(self, args=None, env=None, start_time=None):
         """

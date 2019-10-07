@@ -78,7 +78,8 @@ class ProtobufGen(SimpleCodegenTask):
     # TODO https://github.com/pantsbuild/pants/issues/604 prep finish
 
     def __init__(self, *args, **kwargs):
-        """Generates Java files from .proto files using the Google protobuf compiler."""
+        """Generates Java files from .proto files using the Google protobuf
+        compiler."""
         super().__init__(*args, **kwargs)
         self.plugins = self.get_options().protoc_plugins or []
         self._extra_paths = self.get_options().extra_path or []
@@ -171,8 +172,8 @@ class ProtobufGen(SimpleCodegenTask):
     def _jars_to_directories(self, target):
         """Extracts and maps jars to directories containing their contents.
 
-    :returns: a set of filepaths to directories containing the contents of jar.
-    """
+        :returns: a set of filepaths to directories containing the contents of jar.
+        """
         files = set()
         jar_import_products = self.context.products.get_data(JarImportProducts)
         imports = jar_import_products.imports(target)
@@ -181,7 +182,8 @@ class ProtobufGen(SimpleCodegenTask):
         return files
 
     def _extract_jar(self, coordinate, jar_path):
-        """Extracts the jar to a subfolder of workdir/extracted and returns the path to it."""
+        """Extracts the jar to a subfolder of workdir/extracted and returns the
+        path to it."""
         with open(jar_path, "rb") as f:
             sha = sha1(f.read()).hexdigest()
             outdir = os.path.join(self.workdir, "extracted", sha)

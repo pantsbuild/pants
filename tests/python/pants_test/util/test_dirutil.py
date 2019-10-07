@@ -125,7 +125,8 @@ class DirutilTest(unittest.TestCase):
         )
 
     def test_safe_walk(self) -> None:
-        """Test that directory names are correctly represented as unicode strings"""
+        """Test that directory names are correctly represented as unicode
+        strings."""
         # This test is unnecessary in python 3 since all strings are unicode there is no
         # unicode constructor.
         with temporary_dir() as tmpdir:

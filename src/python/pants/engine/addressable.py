@@ -16,20 +16,24 @@ Addresses = Collection.of(Address)
 class BuildFileAddresses(Collection.of(BuildFileAddress)):
     @property
     def addresses(self):
-        """Converts the BuildFileAddress objects in this collection to Address objects."""
+        """Converts the BuildFileAddress objects in this collection to Address
+        objects."""
         return [bfa.to_address() for bfa in self]
 
 
 class NotSerializableError(TypeError):
-    """Indicates an addressable descriptor is illegally installed in a non-Serializable type."""
+    """Indicates an addressable descriptor is illegally installed in a non-
+    Serializable type."""
 
 
 class MutationError(AttributeError):
-    """Indicates an illegal attempt to mutate an addressable attribute that already has a value."""
+    """Indicates an illegal attempt to mutate an addressable attribute that
+    already has a value."""
 
 
 class AddressableTypeValidationError(TypeConstraintError):
-    """Indicates a value provided to an `AddressableDescriptor` failed to satisfy a type constraint."""
+    """Indicates a value provided to an `AddressableDescriptor` failed to
+    satisfy a type constraint."""
 
 
 class AddressableDescriptor:
@@ -81,17 +85,18 @@ class AddressableDescriptor:
 
      Here the `Thing.parent` property is re-assigned with a type-constrained addressable descriptor
      after the class is defined so the class can be referred to in the type constraint.
-  """
+    """
 
     _descriptors = set()
 
     @classmethod
     def is_addressable(cls, obj, key):
-        """Return `True` if the given attribute of `obj` is an addressable attribute.
+        """Return `True` if the given attribute of `obj` is an addressable
+        attribute.
 
-    :param obj: The object to inspect.
-    :param string key: The name of the property on `obj` to check.
-    """
+        :param obj: The object to inspect.
+        :param string key: The name of the property on `obj` to check.
+        """
         return (type(obj), key) in cls._descriptors
 
     @classmethod
@@ -248,7 +253,7 @@ def addressable(type_constraint):
 
   :param type_constraint: The type constraint the value must satisfy.
   :type type_constraint: :class:`TypeConstraint`
-  """
+    """
     return _addressable_wrapper(AddressableDescriptor, type_constraint)
 
 
@@ -276,14 +281,14 @@ class AddressableList(AddressableDescriptor):
 def addressable_list(type_constraint):
     """Marks a list's values as satisfying a given type constraint.
 
-  Some (or all) elements of the list may be :class:`pants.engine.objects.Resolvable` elements
-  to resolve later.
+    Some (or all) elements of the list may be :class:`pants.engine.objects.Resolvable` elements
+    to resolve later.
 
-  See :class:`AddressableDescriptor` for more details.
+    See :class:`AddressableDescriptor` for more details.
 
-  :param type_constraint: The type constraint the list's values must all satisfy.
-  :type type_constraint: :class:`TypeConstraint`
-  """
+    :param type_constraint: The type constraint the list's values must all satisfy.
+    :type type_constraint: :class:`TypeConstraint`
+    """
     return _addressable_wrapper(AddressableList, type_constraint)
 
 
@@ -313,14 +318,14 @@ class AddressableDict(AddressableDescriptor):
 def addressable_dict(type_constraint):
     """Marks a dicts's values as satisfying a given type constraint.
 
-  Some (or all) values in the dict may be :class:`pants.engine.objects.Resolvable` values to
-  resolve later.
+    Some (or all) values in the dict may be :class:`pants.engine.objects.Resolvable` values to
+    resolve later.
 
-  See :class:`AddressableDescriptor` for more details.
+    See :class:`AddressableDescriptor` for more details.
 
-  :param type_constraint: The type constraint the dict's values must all satisfy.
-  :type type_constraint: :class:`TypeConstraint`
-  """
+    :param type_constraint: The type constraint the dict's values must all satisfy.
+    :type type_constraint: :class:`TypeConstraint`
+    """
     return _addressable_wrapper(AddressableDict, type_constraint)
 
 
@@ -328,10 +333,11 @@ def addressable_dict(type_constraint):
 # into the mainline (if they survive).
 # TODO: Variants currently require an explicit name (and thus a `:`) in order to parse correctly.
 def strip_variants(address):
-    """Return a copy of the given address with the variants (if any) stripped from the name.
+    """Return a copy of the given address with the variants (if any) stripped
+    from the name.
 
-  :rtype: :class:`pants.build_graph.address.Address`
-  """
+    :rtype: :class:`pants.build_graph.address.Address`
+    """
     address, _ = parse_variants(address)
     return address
 
@@ -339,9 +345,9 @@ def strip_variants(address):
 def _extract_variants(address, variants_str):
     """Return the variants (if any) represented by the given variants_str.
 
-  :returns: The variants or else `None` if there are none.
-  :rtype: tuple of tuples (key, value) strings
-  """
+    :returns: The variants or else `None` if there are none.
+    :rtype: tuple of tuples (key, value) strings
+    """
 
     def entries():
         for entry in variants_str.split(","):

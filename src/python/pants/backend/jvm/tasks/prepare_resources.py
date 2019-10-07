@@ -17,9 +17,10 @@ from pants.util.dirutil import safe_mkdir
 class PrepareResources(ResourcesTask):
     """Prepares loose resource files associated with a target.
 
-  Currently this task does no form of resource filtering, it just copies resource files to
-  dedicated, isolated resource chroots for use in the classpath as well as for packaging purposes.
-  """
+    Currently this task does no form of resource filtering, it just
+    copies resource files to dedicated, isolated resource chroots for
+    use in the classpath as well as for packaging purposes.
+    """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

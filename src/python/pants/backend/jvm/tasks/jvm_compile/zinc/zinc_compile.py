@@ -74,14 +74,15 @@ class BaseZincCompile(JvmCompile):
 
     @staticmethod
     def _format_zinc_arguments(settings, distribution):
-        """Extracts and formats the zinc arguments given in the jvm platform settings.
+        """Extracts and formats the zinc arguments given in the jvm platform
+        settings.
 
-    This is responsible for the symbol substitution which replaces $JAVA_HOME with the path to an
-    appropriate jvm distribution.
+        This is responsible for the symbol substitution which replaces $JAVA_HOME with the path to an
+        appropriate jvm distribution.
 
-    :param settings: The jvm platform settings from which to extract the arguments.
-    :type settings: :class:`JvmPlatformSettings`
-    """
+        :param settings: The jvm platform settings from which to extract the arguments.
+        :type settings: :class:`JvmPlatformSettings`
+        """
         zinc_args = [
             "-C-source",
             "-C{}".format(settings.source_level),
@@ -196,14 +197,16 @@ class BaseZincCompile(JvmCompile):
     def incremental(self):
         """Zinc implements incremental compilation.
 
-    Setting this property causes the task infrastructure to clone the previous
-    results_dir for a target into the new results_dir for a target.
-    """
+        Setting this property causes the task infrastructure to clone
+        the previous results_dir for a target into the new results_dir
+        for a target.
+        """
         return self.get_options().incremental
 
     @property
     def cache_incremental(self):
-        """Optionally write the results of incremental compiles to the cache."""
+        """Optionally write the results of incremental compiles to the
+        cache."""
         return self.get_options().incremental_caching
 
     @memoized_property
@@ -263,7 +266,8 @@ class BaseZincCompile(JvmCompile):
             self.context.products.safe_create_data("zinc_args", lambda: defaultdict(list))
 
     def post_compile_extra_resources(self, compile_context):
-        """Override `post_compile_extra_resources` to additionally include scalac_plugin info."""
+        """Override `post_compile_extra_resources` to additionally include
+        scalac_plugin info."""
         result = super().post_compile_extra_resources(compile_context)
         target = compile_context.target
 
@@ -594,17 +598,16 @@ class BaseZincCompile(JvmCompile):
         return res.output_directory_digest
 
     def _compute_local_only_inputs(self, classes_dir, relpath_to_analysis, jar_file):
+        """Compute for the scratch inputs for ExecuteProcessRequest.
+
+        If analysis file exists, then incremental compile is enabled. Otherwise, the compile is not
+        incremental, an empty digest will be returned.
+
+        :param classes_dir: relative path to classes dir from buildroot
+        :param relpath_to_analysis: relative path to zinc analysis file from buildroot
+        :param jar_file: relative path to z.jar from buildroot
+        :return: digest of merged analysis file and loose class files.
         """
-    Compute for the scratch inputs for ExecuteProcessRequest.
-
-    If analysis file exists, then incremental compile is enabled. Otherwise, the compile is not
-    incremental, an empty digest will be returned.
-
-    :param classes_dir: relative path to classes dir from buildroot
-    :param relpath_to_analysis: relative path to zinc analysis file from buildroot
-    :param jar_file: relative path to z.jar from buildroot
-    :return: digest of merged analysis file and loose class files.
-    """
         if not os.path.exists(relpath_to_analysis):
             return EMPTY_DIRECTORY_DIGEST
 
@@ -633,11 +636,13 @@ class BaseZincCompile(JvmCompile):
     def get_zinc_compiler_classpath(self):
         """Get the classpath for the zinc compiler JVM tool.
 
-    This will just be the zinc compiler tool classpath normally, but tasks which invoke zinc along
-    with other JVM tools with nailgun (such as RscCompile) require zinc to be invoked with this
-    method to ensure a single classpath is used for all the tools they need to invoke so that the
-    nailgun instance (which is keyed by classpath and JVM options) isn't invalidated.
-    """
+        This will just be the zinc compiler tool classpath normally, but
+        tasks which invoke zinc along with other JVM tools with nailgun
+        (such as RscCompile) require zinc to be invoked with this method
+        to ensure a single classpath is used for all the tools they need
+        to invoke so that the nailgun instance (which is keyed by
+        classpath and JVM options) isn't invalidated.
+        """
         return [self._zinc.zinc.path]
 
     def _verify_zinc_classpath(self, classpath, allow_dist=True):
@@ -708,19 +713,19 @@ class BaseZincCompile(JvmCompile):
     def _find_scalac_plugins(self, scalac_plugins, classpath):
         """Returns a map from plugin name to list of plugin classpath entries.
 
-    The first entry in each list is the classpath entry containing the plugin metadata.
-    The rest are the internal transitive deps of the plugin.
+        The first entry in each list is the classpath entry containing the plugin metadata.
+        The rest are the internal transitive deps of the plugin.
 
-    This allows us to have in-repo plugins with dependencies (unlike javac, scalac doesn't load
-    plugins or their deps from the regular classpath, so we have to provide these entries
-    separately, in the -Xplugin: flag).
+        This allows us to have in-repo plugins with dependencies (unlike javac, scalac doesn't load
+        plugins or their deps from the regular classpath, so we have to provide these entries
+        separately, in the -Xplugin: flag).
 
-    Note that we don't currently support external plugins with dependencies, as we can't know which
-    external classpath elements are required, and we'd have to put the entire external classpath
-    on each -Xplugin: flag, which seems excessive.
-    Instead, external plugins should be published as "fat jars" (which appears to be the norm,
-    since SBT doesn't support plugins with dependencies anyway).
-    """
+        Note that we don't currently support external plugins with dependencies, as we can't know which
+        external classpath elements are required, and we'd have to put the entire external classpath
+        on each -Xplugin: flag, which seems excessive.
+        Instead, external plugins should be published as "fat jars" (which appears to be the norm,
+        since SBT doesn't support plugins with dependencies anyway).
+        """
         # Allow multiple flags and also comma-separated values in a single flag.
         plugin_names = {p for val in scalac_plugins for p in val.split(",")}
         if not plugin_names:
@@ -767,8 +772,8 @@ class BaseZincCompile(JvmCompile):
     def _maybe_get_plugin_name(cls, classpath_element):
         """If classpath_element is a scalac plugin, returns its name.
 
-    Returns None otherwise.
-    """
+        Returns None otherwise.
+        """
 
         def process_info_file(cp_elem, info_file):
             plugin_info = ElementTree.parse(info_file).getroot()

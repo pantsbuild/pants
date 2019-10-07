@@ -47,7 +47,8 @@ class TestProcessGroup(TestBase):
             self.assertEqual(items, [5, 4, 3, 2, 1])
 
     def test_iter_processes_filter_raises_psutil_exception(self):
-        """If the filter triggers a psutil exception, skip the proc and continue."""
+        """If the filter triggers a psutil exception, skip the proc and
+        continue."""
         with unittest.mock.patch("psutil.process_iter", **PATCH_OPTS) as mock_process_iter:
 
             def noop():
@@ -62,7 +63,8 @@ class TestProcessGroup(TestBase):
             self.assertEqual([noop, noop], items)
 
     def test_iter_processes_process_iter_raises_psutil_exception(self):
-        """If psutil.process_iter raises the exception, silently stop iteration."""
+        """If psutil.process_iter raises the exception, silently stop
+        iteration."""
 
         def id_or_raise(o):
             if isinstance(o, Exception):

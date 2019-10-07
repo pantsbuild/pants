@@ -24,9 +24,9 @@ def fake_process(**kwargs):
 def rw_pipes(write_input=None):
     """Create a pair of pipes wrapped in python file objects.
 
-  :param str write_input: If `write_input` is not None, the writable pipe will have that string
-                          written to it, then closed.
-  """
+    :param str write_input: If `write_input` is not None, the writable pipe will have that string
+                            written to it, then closed.
+    """
     read_pipe, write_pipe = os.pipe()
     read_fileobj = os.fdopen(read_pipe, "r")
     write_fileobj = os.fdopen(write_pipe, "w")

@@ -88,7 +88,8 @@ class LocalExiter(Exiter):
 
 
 class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
-    """Handles a single pants invocation running in the process-local context."""
+    """Handles a single pants invocation running in the process-local
+    context."""
 
     @staticmethod
     def parse_options(args, env, options_bootstrapper=None):
@@ -133,13 +134,13 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
     ):
         """Creates a new LocalPantsRunner instance by parsing options.
 
-    :param Exiter exiter: The Exiter instance to use for this run.
-    :param list args: The arguments (e.g. sys.argv) for this run.
-    :param dict env: The environment (e.g. os.environ) for this run.
-    :param TargetRoots target_roots: The target roots for this run.
-    :param LegacyGraphSession daemon_graph_session: The graph helper for this session.
-    :param OptionsBootstrapper options_bootstrapper: The OptionsBootstrapper instance to reuse.
-    """
+        :param Exiter exiter: The Exiter instance to use for this run.
+        :param list args: The arguments (e.g. sys.argv) for this run.
+        :param dict env: The environment (e.g. os.environ) for this run.
+        :param TargetRoots target_roots: The target roots for this run.
+        :param LegacyGraphSession daemon_graph_session: The graph helper for this session.
+        :param OptionsBootstrapper options_bootstrapper: The OptionsBootstrapper instance to reuse.
+        """
         build_root = get_buildroot()
 
         options, build_config, options_bootstrapper = cls.parse_options(
@@ -297,7 +298,8 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
 
     @staticmethod
     def _compute_final_exit_code(*codes):
-        """Returns the exit code with higher abs value in case of negative values."""
+        """Returns the exit code with higher abs value in case of negative
+        values."""
         max_code = None
         for code in codes:
             if max_code is None or abs(max_code) < abs(code):

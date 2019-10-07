@@ -33,19 +33,20 @@ class OptionsBootstrapper(
         ]
     )
 ):
-    """Holds the result of the first stage of options parsing, and assists with parsing full options."""
+    """Holds the result of the first stage of options parsing, and assists with
+    parsing full options."""
 
     @staticmethod
     def get_config_file_paths(env, args):
         """Get the location of the config files.
 
-    The locations are specified by the --pants-config-files option.  However we need to load the
-    config in order to process the options.  This method special-cases --pants-config-files
-    in order to solve this chicken-and-egg problem.
+        The locations are specified by the --pants-config-files option.  However we need to load the
+        config in order to process the options.  This method special-cases --pants-config-files
+        in order to solve this chicken-and-egg problem.
 
-    Note that, obviously, it's not possible to set the location of config files in a config file.
-    Doing so will have no effect.
-    """
+        Note that, obviously, it's not possible to set the location of config files in a config file.
+        Doing so will have no effect.
+        """
         # This exactly mirrors the logic applied in Option to all regular options.  Note that we'll
         # also parse --pants-config as a regular option later, but there's no harm in that.  In fact,
         # it's preferable, so that any code that happens to want to know where we read config from
@@ -96,11 +97,12 @@ class OptionsBootstrapper(
 
     @classmethod
     def create(cls, env=None, args=None):
-        """Parses the minimum amount of configuration necessary to create an OptionsBootstrapper.
+        """Parses the minimum amount of configuration necessary to create an
+        OptionsBootstrapper.
 
-    :param env: An environment dictionary, or None to use `os.environ`.
-    :param args: An args array, or None to use `sys.argv`.
-    """
+        :param env: An environment dictionary, or None to use `os.environ`.
+        :param args: An args array, or None to use `sys.argv`.
+        """
         env = {
             k: v for k, v in (os.environ if env is None else env).items() if k.startswith("PANTS_")
         }
@@ -175,14 +177,15 @@ class OptionsBootstrapper(
 
     @memoized_property
     def bootstrap_options(self):
-        """The post-bootstrap options, computed from the env, args, and fully discovered Config.
+        """The post-bootstrap options, computed from the env, args, and fully
+        discovered Config.
 
-    Re-computing options after Config has been fully expanded allows us to pick up bootstrap values
-    (such as backends) from a config override file, for example.
+        Re-computing options after Config has been fully expanded allows us to pick up bootstrap values
+        (such as backends) from a config override file, for example.
 
-    Because this can be computed from the in-memory representation of these values, it is not part
-    of the object's identity.
-    """
+        Because this can be computed from the in-memory representation of these values, it is not part
+        of the object's identity.
+        """
         return self.parse_bootstrap_options(self.env, self.bootstrap_args, self.config)
 
     def get_bootstrap_options(self):
@@ -212,21 +215,22 @@ class OptionsBootstrapper(
         return options
 
     def get_full_options(self, known_scope_infos):
-        """Get the full Options instance bootstrapped by this object for the given known scopes.
+        """Get the full Options instance bootstrapped by this object for the
+        given known scopes.
 
-    :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
-    :returns: A bootrapped Options instance that also carries options for all the supplied known
-              scopes.
-    :rtype: :class:`Options`
-    """
+        :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
+        :returns: A bootrapped Options instance that also carries options for all the supplied known
+                  scopes.
+        :rtype: :class:`Options`
+        """
         return self._full_options(tuple(sorted(set(known_scope_infos))))
 
     def verify_configs_against_options(self, options):
         """Verify all loaded configs have correct scopes and options.
 
-    :param options: Fully bootstrapped valid options.
-    :return: None.
-    """
+        :param options: Fully bootstrapped valid options.
+        :return: None.
+        """
         error_log = []
         for config in self.config.configs():
             for section in config.sections():

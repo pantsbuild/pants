@@ -50,12 +50,12 @@ class PushDb:
         def __init__(self, sem_ver, named_ver, named_is_latest, sha, fingerprint):
             """Records the most recent push/release of an artifact.
 
-      :param Semver sem_ver: The last semantically versioned release (or Semver(0.0.0))
-      :param Namedver named_ver: The last named release of this entry (or None)
-      :param boolean named_is_latest: True if named_ver is the latest, false if sem_ver is
-      :param string sha: The last Git SHA (or None)
-      :param string fingerprint: A unique hash for the most recent version of the target.
-      """
+            :param Semver sem_ver: The last semantically versioned release (or Semver(0.0.0))
+            :param Namedver named_ver: The last named release of this entry (or None)
+            :param boolean named_is_latest: True if named_ver is the latest, false if sem_ver is
+            :param string sha: The last Git SHA (or None)
+            :param string fingerprint: A unique hash for the most recent version of the target.
+            """
             self.sem_ver = sem_ver
             self.named_ver = named_ver
             self.named_is_latest = named_is_latest
@@ -69,15 +69,18 @@ class PushDb:
                 return self.sem_ver
 
         def with_sem_ver(self, sem_ver):
-            """Returns a clone of this entry with the given sem_ver marked as the latest."""
+            """Returns a clone of this entry with the given sem_ver marked as
+            the latest."""
             return PushDb.Entry(sem_ver, self.named_ver, False, self.sha, self.fingerprint)
 
         def with_named_ver(self, named_ver):
-            """Returns a clone of this entry with the given name_ver marked as the latest."""
+            """Returns a clone of this entry with the given name_ver marked as
+            the latest."""
             return PushDb.Entry(self.sem_ver, named_ver, True, self.sha, self.fingerprint)
 
         def with_sha_and_fingerprint(self, sha, fingerprint):
-            """Returns a clone of this entry with the given sha and fingerprint."""
+            """Returns a clone of this entry with the given sha and
+            fingerprint."""
             return PushDb.Entry(
                 self.sem_ver, self.named_ver, self.named_is_latest, sha, fingerprint
             )
@@ -96,7 +99,8 @@ class PushDb:
         self._props = props or OrderedDict()
 
     def get_entry(self, target):
-        """Given an internal target, return a PushDb.Entry, which might contain defaults."""
+        """Given an internal target, return a PushDb.Entry, which might contain
+        defaults."""
         db_get, _ = self._accessors_for_target(target)
 
         major = int(db_get("revision.major", "0"))
@@ -175,7 +179,8 @@ class PomWriter:
             generator.write(output)
 
     def _as_versioned_jar(self, internal_target):
-        """Fetches the jar representation of the given target, and applies the latest pushdb version."""
+        """Fetches the jar representation of the given target, and applies the
+        latest pushdb version."""
         jar, _ = internal_target.get_artifact_info()
         pushdb_entry = self._get_db(internal_target).get_entry(internal_target)
         return jar.copy(rev=pushdb_entry.version().version())
@@ -230,10 +235,12 @@ def pushdb_coordinate(jar, entry):
 def target_internal_dependencies(target):
     """Returns internal Jarable dependencies that were "directly" declared.
 
-  Directly declared deps are those that are explicitly listed in the definition of a
-  target, rather than being depended on transitively. But in order to walk through
-  aggregator targets such as `target`, `dependencies`, or `jar_library`, this recursively
-  descends the dep graph and stops at Jarable instances."""
+    Directly declared deps are those that are explicitly listed in the
+    definition of a target, rather than being depended on transitively.
+    But in order to walk through aggregator targets such as `target`,
+    `dependencies`, or `jar_library`, this recursively descends the dep
+    graph and stops at Jarable instances.
+    """
     for dep in target.dependencies:
         if isinstance(dep, Jarable):
             yield dep
@@ -245,62 +252,62 @@ def target_internal_dependencies(target):
 class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublishMixin, JarTask):
     """Publish jars to a maven repository.
 
-  At a high-level, pants uses `Apache Ivy <http://ant.apache.org/ivy/>`_ to
-  publish artifacts to Maven-style repositories. Pants performs prerequisite
-  tasks like compiling, creating jars, and generating ``pom.xml`` files then
-  invokes Ivy to actually publish the artifacts, so publishing is largely
-  configured in ``ivysettings.xml``. ``BUILD`` and ``pants.ini`` files
-  primarily provide linkage between publishable targets and the
-  Ivy ``resolvers`` used to publish them.
+    At a high-level, pants uses `Apache Ivy <http://ant.apache.org/ivy/>`_ to
+    publish artifacts to Maven-style repositories. Pants performs prerequisite
+    tasks like compiling, creating jars, and generating ``pom.xml`` files then
+    invokes Ivy to actually publish the artifacts, so publishing is largely
+    configured in ``ivysettings.xml``. ``BUILD`` and ``pants.ini`` files
+    primarily provide linkage between publishable targets and the
+    Ivy ``resolvers`` used to publish them.
 
-  The following target types are publishable:
-  `java_library <build_dictionary.html#java_library>`_,
-  `scala_library <build_dictionary.html#scala_library>`_,
-  `java_thrift_library <build_dictionary.html#java_thrift_library>`_,
-  `annotation_processor <build_dictionary.html#annotation_processor>`_.
-  Targets to publish and their dependencies must be publishable target
-  types and specify the ``provides`` argument. One exception is
-  `jar <build_dictionary.html#jar>`_\\s - pants will generate a pom file that
-  depends on the already-published jar.
+    The following target types are publishable:
+    `java_library <build_dictionary.html#java_library>`_,
+    `scala_library <build_dictionary.html#scala_library>`_,
+    `java_thrift_library <build_dictionary.html#java_thrift_library>`_,
+    `annotation_processor <build_dictionary.html#annotation_processor>`_.
+    Targets to publish and their dependencies must be publishable target
+    types and specify the ``provides`` argument. One exception is
+    `jar <build_dictionary.html#jar>`_\\s - pants will generate a pom file that
+    depends on the already-published jar.
 
-  Example usage: ::
+    Example usage: ::
 
-     # By default pants will perform a dry-run.
-     ./pants clean-all publish src/java/com/twitter/mybird
+       # By default pants will perform a dry-run.
+       ./pants clean-all publish src/java/com/twitter/mybird
 
-     # Actually publish.
-     ./pants clean-all publish src/java/com/twitter/mybird --no-publish-dryrun
+       # Actually publish.
+       ./pants clean-all publish src/java/com/twitter/mybird --no-publish-dryrun
 
-  Please see ``./pants publish -h`` for a detailed description of all
-  publishing options.
+    Please see ``./pants publish -h`` for a detailed description of all
+    publishing options.
 
-  Publishing can be configured with the following options:
+    Publishing can be configured with the following options:
 
-  * ``--repos`` - Required dictionary of settings for repos that may be pushed to.
-  * ``--jvm-options`` - Optional list of JVM command-line args when invoking Ivy.
-  * ``--restrict-push-branches`` - Optional list of branches to restrict publishing to.
+    * ``--repos`` - Required dictionary of settings for repos that may be pushed to.
+    * ``--jvm-options`` - Optional list of JVM command-line args when invoking Ivy.
+    * ``--restrict-push-branches`` - Optional list of branches to restrict publishing to.
 
-  Example repos dictionary: ::
+    Example repos dictionary: ::
 
-     repos = {
-       # repository target name is paired with this key
-       'myrepo': {
-         # ivysettings.xml resolver to use for publishing
-         'resolver': 'maven.example.com',
-         # address of a Credentials target to use when publishing
-         'auth': 'address/of/credentials:target',
-         # help message if unable to initialize the Credentials target.
-         'help': 'Please check your credentials and try again.',
-       },
-     }
-  """
+       repos = {
+         # repository target name is paired with this key
+         'myrepo': {
+           # ivysettings.xml resolver to use for publishing
+           'resolver': 'maven.example.com',
+           # address of a Credentials target to use when publishing
+           'auth': 'address/of/credentials:target',
+           # help message if unable to initialize the Credentials target.
+           'help': 'Please check your credentials and try again.',
+         },
+       }
+    """
 
     class Publication(namedtuple("Publication", ["name", "classifier", "ext"])):
         """Represents an artifact publication.
 
-    There will be at least 2 of these for any given published coordinate - a pom, and at least one
-    other artifact.
-    """
+        There will be at least 2 of these for any given published coordinate - a pom, and at least one
+        other artifact.
+        """
 
     class DuplicateArtifactError(TaskError):
         """An artifact was defined by two different targets."""
@@ -537,7 +544,10 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
 
     def confirm_push(self, coord, version):
         """Ask the user if a push should be done for a particular version of a
-       particular coordinate.   Return True if the push should be done"""
+        particular coordinate.
+
+        Return True if the push should be done
+        """
         if not self.get_options().prompt:
             return True
         try:
@@ -562,7 +572,8 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
         artifact_ext="",
         override_name=None,
     ):
-        """Copy the products for a target into the artifact path for the jar/version"""
+        """Copy the products for a target into the artifact path for the
+        jar/version."""
         genmap = self.context.products.get(typename)
         product_mapping = genmap.get(tgt)
         if product_mapping is None:
@@ -604,8 +615,12 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
         return jvm_options
 
     def publish(self, publications, jar, entry, repo, published):
-        """Run ivy to publish a jar.  ivyxml_path is the path to the ivy file; published
-    is a list of jars published so far (including this one). entry is a pushdb entry."""
+        """Run ivy to publish a jar.
+
+        ivyxml_path is the path to the ivy file; published is a list of
+        jars published so far (including this one). entry is a pushdb
+        entry.
+        """
 
         try:
             ivy = Bootstrapper.default_ivy()
@@ -1161,7 +1176,8 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
         return self.context.products.get("scaladoc").get(target)
 
     def create_doc_jar(self, target, open_jar, version):
-        """Returns a doc jar if either scala or java docs are available for the given target."""
+        """Returns a doc jar if either scala or java docs are available for the
+        given target."""
         javadoc = self._java_doc(target)
         scaladoc = self._scala_doc(target)
         if javadoc or scaladoc:

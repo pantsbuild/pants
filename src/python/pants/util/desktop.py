@@ -40,10 +40,11 @@ _OPENER_BY_OS = {"darwin": _mac_open, "linux": _linux_open}
 
 
 def ui_open(*files: str) -> None:
-    """Attempts to open the given files using the preferred desktop viewer or editor.
+    """Attempts to open the given files using the preferred desktop viewer or
+    editor.
 
-  :raises :class:`OpenError`: if there is a problem opening any of the files.
-  """
+    :raises :class:`OpenError`: if there is a problem opening any of the files.
+    """
     if files:
         osname = get_os_name()
         opener = _OPENER_BY_OS.get(osname)

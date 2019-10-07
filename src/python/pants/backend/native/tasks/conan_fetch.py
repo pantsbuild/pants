@@ -62,7 +62,8 @@ class ConanFetch(SimpleCodegenTask):
 
     @property
     def _remotes_txt_content(self):
-        """Generate a file containing overrides for Conan remotes which get applied to registry.json."""
+        """Generate a file containing overrides for Conan remotes which get
+        applied to registry.json."""
         return "{}\n".format(
             "\n".join(
                 "{name} {url} {is_ssl}".format(
@@ -73,11 +74,12 @@ class ConanFetch(SimpleCodegenTask):
         )
 
     def _conan_user_home(self, conan, in_workdir=False):
-        """Create the CONAN_USER_HOME for this task fingerprint and initialize the Conan remotes.
+        """Create the CONAN_USER_HOME for this task fingerprint and initialize
+        the Conan remotes.
 
-    See https://docs.conan.io/en/latest/reference/commands/consumer/config.html#conan-config-install
-    for docs on configuring remotes.
-    """
+        See https://docs.conan.io/en/latest/reference/commands/consumer/config.html#conan-config-install
+        for docs on configuring remotes.
+        """
         # This argument is exposed so tests don't leak out of the workdir.
         if in_workdir:
             base_cache_dir = self.workdir
@@ -134,13 +136,12 @@ class ConanFetch(SimpleCodegenTask):
         return basic_attributes + ["include_relpath", "lib_relpath", "native_lib_names"]
 
     def execute_codegen(self, target, target_workdir):
-        """
-    Invoke the conan pex to fetch conan packages specified by a
-    `ExternalNativeLibrary` target.
+        """Invoke the conan pex to fetch conan packages specified by a
+        `ExternalNativeLibrary` target.
 
-    :param ExternalNativeLibrary target: a target containing conan package specifications.
-    :param str target_workdir: where to copy the installed package contents to.
-    """
+        :param ExternalNativeLibrary target: a target containing conan package specifications.
+        :param str target_workdir: where to copy the installed package contents to.
+        """
         conan = self.context.products.get_data(ConanPrep.tool_instance_cls)
 
         # TODO: we should really be able to download all of these in one go, and we should make an

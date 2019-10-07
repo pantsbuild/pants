@@ -16,11 +16,11 @@ from pants_antlr.test.eval.ExprParser import ExprParser
 def main(expr):
     """Code that emits the value of a simple arithmetic expression.
 
-  Exercises interaction with ANTLR3-generated Python code.
+    Exercises interaction with ANTLR3-generated Python code.
 
-  This code is modified from the canonical example
-  at http://www.antlr.org/wiki/display/ANTLR3/Example.
-  """
+    This code is modified from the canonical example
+    at http://www.antlr.org/wiki/display/ANTLR3/Example.
+    """
     char_stream = antlr3.ANTLRStringStream("{}\n".format(expr))
     lexer = ExprLexer(char_stream)
     tokens = antlr3.CommonTokenStream(lexer)

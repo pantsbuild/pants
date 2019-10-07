@@ -13,8 +13,8 @@ from pants.base.payload_field import PrimitiveField
 class JUnitTests(JvmTarget):
     """JUnit tests.
 
-  :API: public
-  """
+    :API: public
+    """
 
     java_test_globs = ("*Test.java",)
     scala_test_globs = ("*Test.scala", "*Spec.scala")

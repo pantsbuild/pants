@@ -10,7 +10,8 @@ from pants.contrib.node.tasks.node_task import NodeTask
 
 
 class NodeRun(NodeTask):
-    """Runs a script specified in a package.json file, currently through "npm run [script name]"."""
+    """Runs a script specified in a package.json file, currently through "npm
+    run [script name]"."""
 
     @classmethod
     def register_options(cls, register):

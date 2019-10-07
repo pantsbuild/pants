@@ -7,8 +7,8 @@ import os
 class Repository:
     """An artifact repository, such as a maven repo.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(self, name=None, url=None, push_db_basedir=None, **kwargs):
         """

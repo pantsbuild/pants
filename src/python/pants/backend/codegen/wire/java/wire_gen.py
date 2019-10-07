@@ -46,7 +46,8 @@ class WireGen(NailgunTaskBase, SimpleCodegenTask):
         return "com.squareup.wire" == jar.org and "wire-compiler" == jar.name
 
     def __init__(self, *args, **kwargs):
-        """Generates Java files from .proto files using the Wire protobuf compiler."""
+        """Generates Java files from .proto files using the Wire protobuf
+        compiler."""
         super().__init__(*args, **kwargs)
 
     def synthetic_target_type(self, target):
@@ -95,7 +96,8 @@ class WireGen(NailgunTaskBase, SimpleCodegenTask):
         return relative_sources, source_roots
 
     def format_args_for_target(self, target, target_workdir):
-        """Calculate the arguments to pass to the command line for a single target."""
+        """Calculate the arguments to pass to the command line for a single
+        target."""
 
         args = ["--java_out={0}".format(target_workdir)]
 

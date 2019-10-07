@@ -20,23 +20,23 @@ logger = logging.getLogger(__name__)
 class Bootstrapper:
     """Bootstraps a working ivy resolver.
 
-  By default a working resolver will be bootstrapped from maven central and it will use standard
-  public jar repositories and a standard ivy local cache directory to execute resolve operations.
+    By default a working resolver will be bootstrapped from maven central and it will use standard
+    public jar repositories and a standard ivy local cache directory to execute resolve operations.
 
-  By default ivy will be bootstrapped from a stable ivy jar version found in maven central, but
-  this can be over-ridden with the ``--ivy-bootstrap-jar-url`` option.  Additionally the
-  bootstrapping will use a connect/read timeout of 1 second by default, but this can be raised by
-  specifying a ``--ivy-bootstrap-fetch-timeout-secs`` option.
+    By default ivy will be bootstrapped from a stable ivy jar version found in maven central, but
+    this can be over-ridden with the ``--ivy-bootstrap-jar-url`` option.  Additionally the
+    bootstrapping will use a connect/read timeout of 1 second by default, but this can be raised by
+    specifying a ``--ivy-bootstrap-fetch-timeout-secs`` option.
 
-  After bootstrapping, ivy will re-resolve itself.  By default it does this via maven central, but
-  a custom ivy tool classpath can be specified by using the ``--ivy-ivy-profile`` option to point to
-  a custom ivy profile ivy.xml.  This can be useful to upgrade ivy to a version released after pants
-  or else mix in auxiliary jars that provide ivy plugins.
+    After bootstrapping, ivy will re-resolve itself.  By default it does this via maven central, but
+    a custom ivy tool classpath can be specified by using the ``--ivy-ivy-profile`` option to point to
+    a custom ivy profile ivy.xml.  This can be useful to upgrade ivy to a version released after pants
+    or else mix in auxiliary jars that provide ivy plugins.
 
-  Finally, by default the ivysettings.xml embedded in the ivy jar will be used in conjunction with
-  the default ivy local cache directory of ~/.ivy2/cache.  To specify custom values for these you
-  can either provide ``--ivy-ivy-settings`` and ``--ivy-cache-dir`` options.
-  """
+    Finally, by default the ivysettings.xml embedded in the ivy jar will be used in conjunction with
+    the default ivy local cache directory of ~/.ivy2/cache.  To specify custom values for these you
+    can either provide ``--ivy-ivy-settings`` and ``--ivy-cache-dir`` options.
+    """
 
     class Error(Exception):
         """Indicates an error bootstrapping an ivy classpath."""
@@ -47,13 +47,13 @@ class Bootstrapper:
     def default_ivy(cls, bootstrap_workunit_factory=None):
         """Returns an Ivy instance using the default global bootstrapper.
 
-    By default runs ivy via a subprocess java executor.  Callers of execute() on the returned
-    Ivy instance can provide their own executor.
+        By default runs ivy via a subprocess java executor.  Callers of execute() on the returned
+        Ivy instance can provide their own executor.
 
-    :param bootstrap_workunit_factory: the optional workunit to bootstrap under.
-    :returns: an Ivy instance.
-    :raises: Bootstrapper.Error if the default ivy instance could not be bootstrapped
-    """
+        :param bootstrap_workunit_factory: the optional workunit to bootstrap under.
+        :returns: an Ivy instance.
+        :raises: Bootstrapper.Error if the default ivy instance could not be bootstrapped
+        """
         return cls.instance().ivy(bootstrap_workunit_factory=bootstrap_workunit_factory)
 
     def __init__(self, ivy_subsystem=None):
@@ -78,9 +78,9 @@ class Bootstrapper:
     def ivy(self, bootstrap_workunit_factory=None):
         """Returns an ivy instance bootstrapped by this bootstrapper.
 
-    :param bootstrap_workunit_factory: the optional workunit to bootstrap under.
-    :raises: Bootstrapper.Error if ivy could not be bootstrapped
-    """
+        :param bootstrap_workunit_factory: the optional workunit to bootstrap under.
+        :raises: Bootstrapper.Error if ivy could not be bootstrapped
+        """
         return Ivy(
             self._get_classpath(bootstrap_workunit_factory),
             ivy_settings=self._ivy_subsystem.get_options().ivy_settings,
@@ -91,8 +91,8 @@ class Bootstrapper:
     def _get_classpath(self, workunit_factory):
         """Returns the bootstrapped ivy classpath as a list of jar paths.
 
-    :raises: Bootstrapper.Error if the classpath could not be bootstrapped
-    """
+        :raises: Bootstrapper.Error if the classpath could not be bootstrapped
+        """
         if not self._classpath:
             self._classpath = self._bootstrap_ivy_classpath(workunit_factory)
         return self._classpath

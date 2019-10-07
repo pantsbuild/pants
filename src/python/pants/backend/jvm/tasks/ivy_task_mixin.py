@@ -65,12 +65,12 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
 class IvyTaskMixin(JvmResolverBase):
     """A mixin for Tasks that execute resolves via Ivy.
 
-  Must be mixed in to a task that registers a --jvm-options option (typically by
-  extending NailgunTask).
-  TODO: Get rid of this requirement by registering an --ivy-jvm-options below.
+    Must be mixed in to a task that registers a --jvm-options option (typically by
+    extending NailgunTask).
+    TODO: Get rid of this requirement by registering an --ivy-jvm-options below.
 
-  :API: public
-  """
+    :API: public
+    """
 
     class Error(TaskError):
         """Indicates an error performing an ivy resolve."""
@@ -118,25 +118,26 @@ class IvyTaskMixin(JvmResolverBase):
         extra_args=None,
         invalidate_dependents=False,
     ):
-        """Resolves external classpath products (typically jars) for the given targets.
+        """Resolves external classpath products (typically jars) for the given
+        targets.
 
-    :API: public
+        :API: public
 
-    :param executor: A java executor to run ivy with.
-    :type executor: :class:`pants.java.executor.Executor`
-    :param targets: The targets to resolve jvm dependencies for.
-    :type targets: :class:`collections.Iterable` of :class:`pants.build_graph.target.Target`
-    :param classpath_products: The classpath products to populate with the results of the resolve.
-    :type classpath_products: :class:`pants.backend.jvm.tasks.classpath_products.ClasspathProducts`
-    :param confs: The ivy configurations to resolve; ('default',) by default.
-    :type confs: :class:`collections.Iterable` of string
-    :param extra_args: Any extra command line arguments to pass to ivy.
-    :type extra_args: list of string
-    :param bool invalidate_dependents: `True` to invalidate dependents of targets that needed to be
-                                        resolved.
-    :returns: The results of each of the resolves run by this call.
-    :rtype: list of IvyResolveResult
-    """
+        :param executor: A java executor to run ivy with.
+        :type executor: :class:`pants.java.executor.Executor`
+        :param targets: The targets to resolve jvm dependencies for.
+        :type targets: :class:`collections.Iterable` of :class:`pants.build_graph.target.Target`
+        :param classpath_products: The classpath products to populate with the results of the resolve.
+        :type classpath_products: :class:`pants.backend.jvm.tasks.classpath_products.ClasspathProducts`
+        :param confs: The ivy configurations to resolve; ('default',) by default.
+        :type confs: :class:`collections.Iterable` of string
+        :param extra_args: Any extra command line arguments to pass to ivy.
+        :type extra_args: list of string
+        :param bool invalidate_dependents: `True` to invalidate dependents of targets that needed to be
+                                            resolved.
+        :returns: The results of each of the resolves run by this call.
+        :rtype: list of IvyResolveResult
+        """
         confs = confs or ("default",)
         targets_by_sets = JarDependencyManagement.global_instance().targets_by_artifact_set(targets)
         results = []
@@ -157,11 +158,11 @@ class IvyTaskMixin(JvmResolverBase):
     def ivy_classpath(self, targets, silent=True, workunit_name=None):
         """Create the classpath for the passed targets.
 
-    :API: public
+        :API: public
 
-    :param targets: A collection of targets to resolve a classpath for.
-    :type targets: collection.Iterable
-    """
+        :param targets: A collection of targets to resolve a classpath for.
+        :type targets: collection.Iterable
+        """
         result = self._ivy_resolve(targets, silent=silent, workunit_name=workunit_name)
         return result.resolved_artifact_paths
 
@@ -215,23 +216,23 @@ class IvyTaskMixin(JvmResolverBase):
     ):
         """Resolves external dependencies for the given targets.
 
-    If there are no targets suitable for jvm transitive dependency resolution, an empty result is
-    returned.
+        If there are no targets suitable for jvm transitive dependency resolution, an empty result is
+        returned.
 
-    :param targets: The targets to resolve jvm dependencies for.
-    :type targets: :class:`collections.Iterable` of :class:`pants.build_graph.target.Target`
-    :param executor: A java executor to run ivy with.
-    :type executor: :class:`pants.java.executor.Executor`
+        :param targets: The targets to resolve jvm dependencies for.
+        :type targets: :class:`collections.Iterable` of :class:`pants.build_graph.target.Target`
+        :param executor: A java executor to run ivy with.
+        :type executor: :class:`pants.java.executor.Executor`
 
-    :param confs: The ivy configurations to resolve; ('default',) by default.
-    :type confs: :class:`collections.Iterable` of string
-    :param extra_args: Any extra command line arguments to pass to ivy.
-    :type extra_args: list of string
-    :param bool invalidate_dependents: `True` to invalidate dependents of targets that needed to be
-                                        resolved.
-    :returns: The result of the resolve.
-    :rtype: IvyResolveResult
-    """
+        :param confs: The ivy configurations to resolve; ('default',) by default.
+        :type confs: :class:`collections.Iterable` of string
+        :param extra_args: Any extra command line arguments to pass to ivy.
+        :type extra_args: list of string
+        :param bool invalidate_dependents: `True` to invalidate dependents of targets that needed to be
+                                            resolved.
+        :returns: The result of the resolve.
+        :rtype: IvyResolveResult
+        """
         # If there are no targets, we don't need to do a resolve.
         if not targets:
             return NO_RESOLVE_RUN_RESULT

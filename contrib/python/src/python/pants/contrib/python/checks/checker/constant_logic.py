@@ -12,7 +12,8 @@ from pants.contrib.python.checks.checker.common import CheckstylePlugin
 
 
 class ConstantLogic(CheckstylePlugin):
-    """Check for constants provided to boolean operators which result in a constant expression."""
+    """Check for constants provided to boolean operators which result in a
+    constant expression."""
 
     @classmethod
     def name(cls):

@@ -79,15 +79,15 @@ class PythonFile(object):
 
     @classmethod
     def _remove_coding_header(cls, blob):
-        """
-    There is a bug in ast.parse that cause it to throw a syntax error if
-    you have a header similar to...
-    # coding=utf-8,
+        """There is a bug in ast.parse that cause it to throw a syntax error if
+        you have a header similar to...
 
-    we replace this line with something else to bypass the bug.
-    :param blob: file text contents
-    :return: adjusted blob
-    """
+        # coding=utf-8,
+
+        we replace this line with something else to bypass the bug.
+        :param blob: file text contents
+        :return: adjusted blob
+        """
         # Remove the # coding=utf-8 to avoid AST erroneous parse errors
         #   https://bugs.python.org/issue22221
         lines = blob.decode("utf-8").split("\n")
@@ -123,9 +123,10 @@ class PythonFile(object):
     def parse(cls, filename, root=None):
         """Parses the file at filename and returns a PythonFile.
 
-    If root is specified, it will open the file with root prepended to the path. The idea is to
-    allow for errors to contain a friendlier file path than the full absolute path.
-    """
+        If root is specified, it will open the file with root prepended
+        to the path. The idea is to allow for errors to contain a
+        friendlier file path than the full absolute path.
+        """
         if root is not None:
             if os.path.isabs(filename):
                 raise ValueError("filename must be a relative path if root is specified")
@@ -141,10 +142,12 @@ class PythonFile(object):
 
     @classmethod
     def from_statement(cls, statement, filename="<expr>"):
-        """A helper to construct a PythonFile from a triple-quoted string, for testing.
-    :param statement: Python file contents
-    :return: Instance of PythonFile
-    """
+        """A helper to construct a PythonFile from a triple-quoted string, for
+        testing.
+
+        :param statement: Python file contents
+        :return: Instance of PythonFile
+        """
         lines = textwrap.dedent(statement).split("\n")
         if lines and not lines[0]:  # Remove the initial empty line, which is an artifact of dedent.
             lines = lines[1:]
@@ -155,21 +158,23 @@ class PythonFile(object):
 
     @classmethod
     def iter_tokens(cls, blob):
-        """ Iterate over tokens found in blob contents
-    :param blob: Input string with python file contents
-    :return: token iterator
-    """
+        """Iterate over tokens found in blob contents.
+
+        :param blob: Input string with python file contents
+        :return: token iterator
+        """
         readline_func = io.StringIO(blob.decode("utf-8")).readline
         return tokenize.generate_tokens(readline_func)
 
     @property
     def tokens(self):
-        """An iterator over tokens for this Python file from the tokenize module."""
+        """An iterator over tokens for this Python file from the tokenize
+        module."""
         return self.iter_tokens(self._blob)
 
     @staticmethod
     def translate_logical_line(start, end, contents, indent_stack, endmarker=False):
-        """Translate raw contents to logical lines"""
+        """Translate raw contents to logical lines."""
         # Remove leading blank lines.
         while contents[0] == "\n":
             start += 1
@@ -185,7 +190,8 @@ class PythonFile(object):
         return start, end + 1, indent
 
     def iter_logical_lines(self, blob):
-        """Returns an iterator of (start_line, stop_line, indent) for logical lines """
+        """Returns an iterator of (start_line, stop_line, indent) for logical
+        lines."""
         indent_stack = []
         contents = []
         line_number_start = None
@@ -212,7 +218,7 @@ class PythonFile(object):
                 line_number_start = None
 
     def line_range(self, line_number):
-        """Return a slice for the given line number"""
+        """Return a slice for the given line number."""
         if line_number <= 0 or line_number > len(self.lines):
             raise IndexError("NOTE: Python file line numbers are offset by 1.")
 
@@ -230,26 +236,26 @@ class PythonFile(object):
 class Nit(object):
     """Encapsulate a Style faux pas.
 
-  The general taxonomy of nits:
+    The general taxonomy of nits:
 
-  Prefix
-    F => Flake8 errors
-    E => PEP8 error
-    W => PEP8 warning
-    T => Twitter error
+    Prefix
+      F => Flake8 errors
+      E => PEP8 error
+      W => PEP8 warning
+      T => Twitter error
 
-  Prefix:
-    0 Naming
-    1 Indentation
-    2 Whitespace
-    3 Blank line
-    4 Import
-    5 Line length
-    6 Deprecation
-    7 Statement
-    8 Flake / Logic
-    9 Runtime
-  """
+    Prefix:
+      0 Naming
+      1 Indentation
+      2 Whitespace
+      3 Blank line
+      4 Import
+      5 Line length
+      6 Deprecation
+      7 Statement
+      8 Flake / Logic
+      9 Runtime
+    """
 
     COMMENT = 0
     WARNING = 1
@@ -276,7 +282,7 @@ class Nit(object):
         self._lines = lines
 
     def __str__(self):
-        """Sanitize to Ascii for safe terminal output"""
+        """Sanitize to Ascii for safe terminal output."""
         flat = list(self.flatten_lines([self.message], self.lines))
         return "\n     |".join(flat).encode("ascii", errors="replace").decode("ascii")
 

@@ -78,7 +78,8 @@ class GoalRunnerFactory:
         return [Goal.by_name(goal) for goal in requested_goals]
 
     def _roots_to_targets(self, build_graph, target_roots):
-        """Populate the BuildGraph and target list from a set of input TargetRoots."""
+        """Populate the BuildGraph and target list from a set of input
+        TargetRoots."""
         with self._run_tracker.new_workunit(name="parse", labels=[WorkUnitLabel.SETUP]):
             return [
                 build_graph.get_target(address)
@@ -142,9 +143,9 @@ class GoalRunnerFactory:
 class GoalRunner:
     """Lists installed goals or else executes a named goal.
 
-  NB: GoalRunner represents a v1-only codepath. v2 goals are registered via `@console_rule` and
-  the `pants.engine.goal.Goal` class.
-  """
+    NB: GoalRunner represents a v1-only codepath. v2 goals are registered via `@console_rule` and
+    the `pants.engine.goal.Goal` class.
+    """
 
     Factory = GoalRunnerFactory
 

@@ -25,10 +25,12 @@ logger = logging.getLogger(__name__)
 class BuildConfigInitializer:
     """Initializes a BuildConfiguration object.
 
-  This class uses a class-level cache for the internally generated `BuildConfiguration` object,
-  which permits multiple invocations in the same runtime context without re-incurring backend &
-  plugin loading, which can be expensive and cause issues (double task registration, etc).
-  """
+    This class uses a class-level cache for the internally generated
+    `BuildConfiguration` object, which permits multiple invocations in
+    the same runtime context without re-incurring backend & plugin
+    loading, which can be expensive and cause issues (double task
+    registration, etc).
+    """
 
     _cached_build_config = None
 
@@ -60,8 +62,8 @@ class BuildConfigInitializer:
     def setup(self):
         """Load backends and plugins.
 
-    :returns: A `BuildConfiguration` object constructed during backend/plugin loading.
-    """
+        :returns: A `BuildConfiguration` object constructed during backend/plugin loading.
+        """
         return self._load_plugins(
             self._working_set,
             self._bootstrap_options.pythonpath,
@@ -77,8 +79,8 @@ class OptionsInitializer:
     def _construct_options(options_bootstrapper, build_configuration):
         """Parse and register options.
 
-    :returns: An Options object representing the full set of runtime options.
-    """
+        :returns: An Options object representing the full set of runtime options.
+        """
         # Now that plugins and backends are loaded, we can gather the known scopes.
 
         # Gather the optionables that are not scoped to any other.  All known scopes are reachable
@@ -101,9 +103,9 @@ class OptionsInitializer:
     def compute_pants_ignore(buildroot, global_options):
         """Computes the merged value of the `--pants-ignore` flag.
 
-    This inherently includes the workdir and distdir locations if they are located under the
-    buildroot.
-    """
+        This inherently includes the workdir and distdir locations if
+        they are located under the buildroot.
+        """
         pants_ignore = list(global_options.pants_ignore)
 
         def add_ignore(absolute_path):
@@ -122,11 +124,12 @@ class OptionsInitializer:
 
     @staticmethod
     def compute_pantsd_invalidation_globs(buildroot, bootstrap_options):
-        """Computes the merged value of the `--pantsd-invalidation-globs` option.
+        """Computes the merged value of the `--pantsd-invalidation-globs`
+        option.
 
-    Combines --pythonpath and --pants-config-files files that are in {buildroot} dir
-    with those invalidation_globs provided by users.
-    """
+        Combines --pythonpath and --pants-config-files files that are in
+        {buildroot} dir with those invalidation_globs provided by users.
+        """
         invalidation_globs = []
         globs = (
             bootstrap_options.pythonpath

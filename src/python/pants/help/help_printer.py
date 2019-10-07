@@ -31,8 +31,8 @@ class HelpPrinter:
     def print_help(self):
         """Print help to the console.
 
-    :return: 0 on success, 1 on failure
-    """
+        :return: 0 on success, 1 on failure
+        """
 
         def print_hint():
             print("Use `pants goals` to list goals.")
@@ -74,10 +74,10 @@ class HelpPrinter:
     def _print_options_help(self):
         """Print a help screen.
 
-    Assumes that self._help_request is an instance of OptionsHelp.
+        Assumes that self._help_request is an instance of OptionsHelp.
 
-    Note: Ony useful if called after options have been registered.
-    """
+        Note: Ony useful if called after options have been registered.
+        """
         show_all_help = self._help_request.all_scopes
         if show_all_help:
             help_scopes = list(self._options.known_scope_to_info.keys())
@@ -116,10 +116,10 @@ class HelpPrinter:
     def _format_help(self, scope_info):
         """Return a help message for the options registered on this object.
 
-    Assumes that self._help_request is an instance of OptionsHelp.
+        Assumes that self._help_request is an instance of OptionsHelp.
 
-    :param scope_info: Scope of the options.
-    """
+        :param scope_info: Scope of the options.
+        """
         scope = scope_info.scope
         description = scope_info.description
         show_recursive = self._help_request.advanced

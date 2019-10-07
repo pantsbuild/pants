@@ -14,7 +14,7 @@ from pants.contrib.buildrefactor.buildozer import Buildozer
 
 
 class BuildozerTest(TaskTestBase):
-    """Test the buildozer tool"""
+    """Test the buildozer tool."""
 
     @classmethod
     def alias_groups(cls):
@@ -91,10 +91,12 @@ class BuildozerTest(TaskTestBase):
             )
 
     def _test_add_dependencies_with_targets(self, dependencies_to_add, roots, targets):
+        """Test that a dependency is (or dependencies are) added to a BUILD
+        file with buildozer.
+
+        This can run on multiple context roots and multiple target
+        objects.
         """
-    Test that a dependency is (or dependencies are) added to a BUILD file with buildozer.
-    This can run on multiple context roots and multiple target objects.
-    """
         for dependency_to_add in dependencies_to_add:
             self._run_buildozer(
                 {"add_dependencies": dependency_to_add}, roots=roots, targets=targets
@@ -115,9 +117,9 @@ class BuildozerTest(TaskTestBase):
     def _run_buildozer(self, options, roots=("b",), targets=None):
         """Run buildozer on the specified context roots and target objects.
 
-    roots -- the context roots supplied to buildozer (default ['b'])
-    targets -- the targets buildozer will run on (defaults to self.targets)
-    """
+        roots -- the context roots supplied to buildozer (default ['b'])
+        targets -- the targets buildozer will run on (defaults to self.targets)
+        """
         self.set_options(**options)
 
         targets = self.targets if targets is None else targets

@@ -7,8 +7,8 @@ from pants.base.exiter import PANTS_FAILED_EXIT_CODE
 class TaskError(Exception):
     """Indicates a task has failed.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(self, *args, **kwargs):
         """
@@ -31,17 +31,17 @@ class TaskError(Exception):
 class ErrorWhileTesting(TaskError):
     """Raised when an actual test run failed.
 
-  This is used to distinguish test run failures from infrastructure failures.
+    This is used to distinguish test run failures from infrastructure failures.
 
-  :API: public
-  """
+    :API: public
+    """
 
 
 class TargetDefinitionException(Exception):
     """Indicates an invalid target definition.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(self, target, msg):
         """
@@ -56,8 +56,10 @@ class BuildConfigurationError(Exception):
 
 
 class BackendConfigurationError(BuildConfigurationError):
-    """Indicates a plugin backend with a missing or malformed register module."""
+    """Indicates a plugin backend with a missing or malformed register
+    module."""
 
 
 class IncompatiblePlatformsError(Exception):
-    """Indicates that target platforms are incompatible with a target that contains native code."""
+    """Indicates that target platforms are incompatible with a target that
+    contains native code."""

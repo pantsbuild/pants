@@ -103,7 +103,8 @@ class SelectInterpreterTest(TaskTestBase):
         return context.products.get_data(PythonInterpreter)
 
     def _select_interpreter_and_get_version(self, target_roots, should_invalidate=None):
-        """Return the version string of the interpreter selected for the target roots."""
+        """Return the version string of the interpreter selected for the target
+        roots."""
         interpreter = self._select_interpreter(target_roots, should_invalidate)
         self.assertTrue(isinstance(interpreter, PythonInterpreter))
         return interpreter.version_string

@@ -11,10 +11,12 @@ from pants.util.objects import TypeConstraintError
 
 
 class ImportRemoteSourcesMixin(Target, metaclass=ABCMeta):
-    """A Target Mixin to be used when a target declares another target type to be imported."""
+    """A Target Mixin to be used when a target declares another target type to
+    be imported."""
 
     class ExpectedAddressError(AddressLookupError):
-        """Thrown upon attempting to resolved an object that is not an address."""
+        """Thrown upon attempting to resolved an object that is not an
+        address."""
 
     class UnresolvedImportError(AddressLookupError):
         """Raised when an imported target cannot be resolved."""
@@ -108,7 +110,8 @@ class ImportRemoteSourcesMixin(Target, metaclass=ABCMeta):
 
     @classmethod
     def compute_dependency_specs(cls, kwargs=None, payload=None):
-        """Tack imported_target_specs onto the traversable_specs generator for this target."""
+        """Tack imported_target_specs onto the traversable_specs generator for
+        this target."""
         for spec in super().compute_dependency_specs(kwargs, payload):
             yield spec
 

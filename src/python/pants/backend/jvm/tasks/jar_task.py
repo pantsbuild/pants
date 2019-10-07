@@ -25,12 +25,12 @@ from pants.util.dirutil import safe_mkdtemp
 class Jar:
     """Encapsulates operations to build up or update a jar file.
 
-  Upon construction the jar is conceptually opened for writes.  The write methods are called to
-  add to the jar's contents and then changes are finalized with a call to close.  If close is not
-  called the staged changes will be lost.
+    Upon construction the jar is conceptually opened for writes.  The write methods are called to
+    add to the jar's contents and then changes are finalized with a call to close.  If close is not
+    called the staged changes will be lost.
 
-  :API: public
-  """
+    :API: public
+    """
 
     class Error(Exception):
         """Indicates an error creating or updating a jar on disk."""
@@ -47,14 +47,15 @@ class Jar:
             return self._dest
 
         def split_manifest(self):
-            """Splits this entry into a jar non-manifest part and a manifest part.
+            """Splits this entry into a jar non-manifest part and a manifest
+            part.
 
-      Some entries represent a manifest, some do not, and others have both a manifest entry and
-      non-manifest entries; as such, callers must be prepared to handle ``None`` entries.
+            Some entries represent a manifest, some do not, and others have both a manifest entry and
+            non-manifest entries; as such, callers must be prepared to handle ``None`` entries.
 
-      :returns: A tuple of (non-manifest Entry, manifest Entry).
-      :rtype: tuple of (:class:`Jar.Entry`, :class:`Jar.Entry`)
-      """
+            :returns: A tuple of (non-manifest Entry, manifest Entry).
+            :rtype: tuple of (:class:`Jar.Entry`, :class:`Jar.Entry`)
+            """
             if self.dest == Manifest.PATH:
                 return None, self
             else:
@@ -64,11 +65,11 @@ class Jar:
         def materialize(self, scratch_dir):
             """Materialize this entry's source data into a filesystem path.
 
-      :param string scratch_dir:  A temporary directory that may be used to do any work required
-        to materialize the entry as a source file. The caller is responsible for cleaning up
-        `scratch_dir` after the jar is closed.
-      :returns: The path to the source data.
-      """
+            :param string scratch_dir:  A temporary directory that may be used to do any work required
+              to materialize the entry as a source file. The caller is responsible for cleaning up
+              `scratch_dir` after the jar is closed.
+            :returns: The path to the source data.
+            """
 
     class FileSystemEntry(Entry):
         """An entry backed by an existing file on disk."""
@@ -136,8 +137,8 @@ class Jar:
     def main(self, main):
         """Specifies a Main-Class entry for this jar's manifest.
 
-    :param string main: a fully qualified class name
-    """
+        :param string main: a fully qualified class name
+        """
         if not main or not isinstance(main, str):
             raise ValueError("The main entry must be a non-empty string")
         self._main = main
@@ -145,24 +146,25 @@ class Jar:
     def append_classpath(self, classpath):
         """Specifies a Class-Path entry for this jar's manifest.
 
-    If called multiple times, new entry will be appended to the existing classpath.
+        If called multiple times, new entry will be appended to the existing classpath.
 
-    :param iterable classpath: a list of paths
-    """
+        :param iterable classpath: a list of paths
+        """
         self._classpath = self._classpath + maybe_list(classpath)
 
     def write(self, src, dest=None):
-        """Schedules a write of the file at ``src`` to the ``dest`` path in this jar.
+        """Schedules a write of the file at ``src`` to the ``dest`` path in
+        this jar.
 
-    If the ``src`` is a file, then ``dest`` must be specified.
+        If the ``src`` is a file, then ``dest`` must be specified.
 
-    If the ``src`` is a directory then by default all descendant files will be added to the jar as
-    entries carrying their relative path.  If ``dest`` is specified it will be prefixed to each
-    descendant's relative path to form its jar entry path.
+        If the ``src`` is a directory then by default all descendant files will be added to the jar as
+        entries carrying their relative path.  If ``dest`` is specified it will be prefixed to each
+        descendant's relative path to form its jar entry path.
 
-    :param string src: the path to the pre-existing source file or directory
-    :param string dest: the path the source file or directory should have in this jar
-    """
+        :param string src: the path to the pre-existing source file or directory
+        :param string dest: the path the source file or directory should have in this jar
+        """
         if not src or not isinstance(src, str):
             raise ValueError(
                 "The src path must be a non-empty string, got {} of type {}.".format(src, type(src))
@@ -179,11 +181,12 @@ class Jar:
         self._add_entry(self.FileSystemEntry(src, dest))
 
     def writestr(self, path, contents):
-        """Schedules a write of the file ``contents`` to the given ``path`` in this jar.
+        """Schedules a write of the file ``contents`` to the given ``path`` in
+        this jar.
 
-    :param string path: the path to write the contents to in this jar
-    :param string contents: the raw byte contents of the file to write to ``path``
-    """
+        :param string path: the path to write the contents to in this jar
+        :param string contents: the raw byte contents of the file to write to ``path``
+        """
         if not path or not isinstance(path, str):
             raise ValueError("The path must be a non-empty string")
 
@@ -200,10 +203,11 @@ class Jar:
             self._entries.append(non_manifest)
 
     def writejar(self, jar):
-        """Schedules all entries from the given ``jar``'s to be added to this jar save for the manifest.
+        """Schedules all entries from the given ``jar``'s to be added to this
+        jar save for the manifest.
 
-    :param string jar: the path to the pre-existing jar to graft into this jar
-    """
+        :param string jar: the path to the pre-existing jar to graft into this jar
+        """
         if not jar or not isinstance(jar, str):
             raise ValueError("The jar path must be a non-empty string")
 
@@ -213,8 +217,8 @@ class Jar:
     def _render_jar_tool_args(self, options):
         """Format the arguments to jar-tool.
 
-    :param Options options:
-    """
+        :param Options options:
+        """
         args = []
 
         with temporary_dir() as manifest_stage_dir:
@@ -270,11 +274,11 @@ class Jar:
 class JarTask(NailgunTask):
     """A baseclass for tasks that need to create or update jars.
 
-  All subclasses will share the same underlying nailgunned jar tool and thus benefit from fast
-  invocations.
+    All subclasses will share the same underlying nailgunned jar tool and thus benefit from fast
+    invocations.
 
-  :API: public
-  """
+    :API: public
+    """
 
     @classmethod
     def subsystem_dependencies(cls):
@@ -314,14 +318,14 @@ class JarTask(NailgunTask):
     def open_jar(self, path, overwrite=False, compressed=True, jar_rules=None):
         """Yields a Jar that will be written when the context exits.
 
-    :API: public
+        :API: public
 
-    :param string path: the path to the jar file
-    :param bool overwrite: overwrite the file at ``path`` if it exists; ``False`` by default; ie:
-      update the pre-existing jar at ``path``
-    :param bool compressed: entries added to the jar should be compressed; ``True`` by default
-    :param jar_rules: an optional set of rules for handling jar exclusions and duplicates
-    """
+        :param string path: the path to the jar file
+        :param bool overwrite: overwrite the file at ``path`` if it exists; ``False`` by default; ie:
+          update the pre-existing jar at ``path``
+        :param bool compressed: entries added to the jar should be compressed; ``True`` by default
+        :param jar_rules: an optional set of rules for handling jar exclusions and duplicates
+        """
         jar = Jar(path)
         try:
             yield jar
@@ -369,10 +373,11 @@ class JarTask(NailgunTask):
 
 class JarBuilderTask(JarTask):
     class JarBuilder(ABC):
-        """A utility to aid in adding the classes and resources associated with targets to a jar.
+        """A utility to aid in adding the classes and resources associated with
+        targets to a jar.
 
-    :API: public
-    """
+        :API: public
+        """
 
         @staticmethod
         def _add_agent_manifest(agent, manifest):
@@ -391,11 +396,12 @@ class JarBuilderTask(JarTask):
 
         @staticmethod
         def _add_manifest_entries(jvm_binary_target, manifest):
-            """Add additional fields to MANIFEST.MF as declared in the ManifestEntries structure.
+            """Add additional fields to MANIFEST.MF as declared in the
+            ManifestEntries structure.
 
-      :param JvmBinary jvm_binary_target:
-      :param Manifest manifest:
-      """
+            :param JvmBinary jvm_binary_target:
+            :param Manifest manifest:
+            """
             for header, value in jvm_binary_target.manifest_entries.entries.items():
                 manifest.addentry(header, value)
 
@@ -403,12 +409,12 @@ class JarBuilderTask(JarTask):
         def prepare(round_manager):
             """Prepares the products needed to use `create_jar_builder`.
 
-      This method should be called during task preparation to ensure the classes and resources
-      needed for jarring targets are mapped by upstream tasks that generate these.
+            This method should be called during task preparation to ensure the classes and resources
+            needed for jarring targets are mapped by upstream tasks that generate these.
 
-      Later, in execute context, the `create_jar_builder` method can be called to get back a
-      prepared ``JarTask.JarBuilder`` ready for use.
-      """
+            Later, in execute context, the `create_jar_builder` method can be called to get back a
+            prepared ``JarTask.JarBuilder`` ready for use.
+            """
             round_manager.require_data("runtime_classpath")
 
         def __init__(self, context, jar):
@@ -419,13 +425,13 @@ class JarBuilderTask(JarTask):
         def add_target(self, target, recursive=False):
             """Adds the classes and resources for a target to an open jar.
 
-      :param target: The target to add generated classes and resources for.
-      :param bool recursive: `True` to add classes and resources for the target's transitive
-        internal dependency closure.
-      :returns: `True` if the target contributed any files - manifest entries, classfiles or
-        resource files - to this jar.
-      :rtype: bool
-      """
+            :param target: The target to add generated classes and resources for.
+            :param bool recursive: `True` to add classes and resources for the target's transitive
+              internal dependency closure.
+            :returns: `True` if the target contributed any files - manifest entries, classfiles or
+              resource files - to this jar.
+            :rtype: bool
+            """
             products_added = False
 
             classpath_products = self._context.products.get_data("runtime_classpath")
@@ -482,9 +488,10 @@ class JarBuilderTask(JarTask):
         def commit_manifest(self, jar):
             """Updates the manifest in the jar being written to.
 
-      Typically done right before closing the .jar. This gives a chance for all targets to bundle
-      in their contributions to the manifest.
-      """
+            Typically done right before closing the .jar. This gives a
+            chance for all targets to bundle in their contributions to
+            the manifest.
+            """
             if not self._manifest.is_empty():
                 jar.writestr(Manifest.PATH, self._manifest.contents())
 
@@ -497,11 +504,11 @@ class JarBuilderTask(JarTask):
     def create_jar_builder(self, jar):
         """Creates a ``JarTask.JarBuilder`` ready for use.
 
-    This method should be called during in `execute` context and only after ensuring
-    `JarTask.JarBuilder.prepare` has already been called in `prepare` context.
+        This method should be called during in `execute` context and only after ensuring
+        `JarTask.JarBuilder.prepare` has already been called in `prepare` context.
 
-    :param jar: An opened ``pants.backend.jvm.tasks.jar_task.Jar`.
-    """
+        :param jar: An opened ``pants.backend.jvm.tasks.jar_task.Jar`.
+        """
         builder = self.JarBuilder(self.context, jar)
         yield builder
         builder.commit_manifest(jar)

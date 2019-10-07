@@ -39,10 +39,10 @@ def _os_decode(b, enc=sys.getfilesystemencoding()):
 def environment_as(**kwargs):
     """Update the environment to the supplied values, for example:
 
-  with environment_as(PYTHONPATH='foo:bar:baz',
-                      PYTHON='/usr/bin/python2.7'):
-    subprocess.Popen(foo).wait()
-  """
+    with environment_as(PYTHONPATH='foo:bar:baz',
+                        PYTHON='/usr/bin/python2.7'):
+      subprocess.Popen(foo).wait()
+    """
     new_environment = kwargs
     old_environment = {}
 
@@ -94,7 +94,8 @@ def hermetic_environment_as(**kwargs):
 
 @contextmanager
 def _stdio_stream_as(src_fd, dst_fd, dst_sys_attribute, mode):
-    """Replace the given dst_fd and attribute on `sys` with an open handle to the given src_fd."""
+    """Replace the given dst_fd and attribute on `sys` with an open handle to
+    the given src_fd."""
     if src_fd == -1:
         src = open("/dev/null", mode)
         src_fd = src.fileno()
@@ -122,16 +123,16 @@ def _stdio_stream_as(src_fd, dst_fd, dst_sys_attribute, mode):
 def stdio_as(stdout_fd, stderr_fd, stdin_fd):
     """Redirect sys.{stdout, stderr, stdin} to alternate file descriptors.
 
-  As a special case, if a given destination fd is `-1`, we will replace it with an open file handle
-  to `/dev/null`.
+    As a special case, if a given destination fd is `-1`, we will replace it with an open file handle
+    to `/dev/null`.
 
-  NB: If the filehandles for sys.{stdout, stderr, stdin} have previously been closed, it's
-  possible that the OS has repurposed fds `0, 1, 2` to represent other files or sockets. It's
-  impossible for this method to locate all python objects which refer to those fds, so it's up
-  to the caller to guarantee that `0, 1, 2` are safe to replace.
+    NB: If the filehandles for sys.{stdout, stderr, stdin} have previously been closed, it's
+    possible that the OS has repurposed fds `0, 1, 2` to represent other files or sockets. It's
+    impossible for this method to locate all python objects which refer to those fds, so it's up
+    to the caller to guarantee that `0, 1, 2` are safe to replace.
 
-  The streams expect unicode. To write and read bytes, access their buffer, e.g. `stdin.buffer.read()`.
-  """
+    The streams expect unicode. To write and read bytes, access their buffer, e.g. `stdin.buffer.read()`.
+    """
     with _stdio_stream_as(stdin_fd, 0, "stdin", "r"), _stdio_stream_as(
         stdout_fd, 1, "stdout", "w"
     ), _stdio_stream_as(stderr_fd, 2, "stderr", "w"):
@@ -140,11 +141,12 @@ def stdio_as(stdout_fd, stderr_fd, stdin_fd):
 
 @contextmanager
 def signal_handler_as(sig, handler):
-    """Temporarily replaces a signal handler for the given signal and restores the old handler.
+    """Temporarily replaces a signal handler for the given signal and restores
+    the old handler.
 
-  :param int sig: The target signal to replace the handler for (e.g. signal.SIGINT).
-  :param func handler: The new temporary handler.
-  """
+    :param int sig: The target signal to replace the handler for (e.g. signal.SIGINT).
+    :param func handler: The new temporary handler.
+    """
     old_handler = signal.signal(sig, handler)
     try:
         yield
@@ -156,8 +158,7 @@ def signal_handler_as(sig, handler):
 def temporary_dir(
     root_dir=None, cleanup=True, suffix="", permissions=None, prefix=tempfile.template
 ):
-    """
-    A with-context that creates a temporary directory.
+    """A with-context that creates a temporary directory.
 
     :API: public
 
@@ -165,7 +166,7 @@ def temporary_dir(
     :param string root_dir: The parent directory to create the temporary directory.
     :param bool cleanup: Whether or not to clean up the temporary directory.
     :param int permissions: If provided, sets the directory permissions to this mode.
-  """
+    """
     path = tempfile.mkdtemp(dir=root_dir, suffix=suffix, prefix=prefix)
 
     try:
@@ -179,15 +180,14 @@ def temporary_dir(
 
 @contextmanager
 def temporary_file_path(root_dir=None, cleanup=True, suffix="", permissions=None):
-    """
-    A with-context that creates a temporary file and returns its path.
+    """A with-context that creates a temporary file and returns its path.
 
     :API: public
 
     You may specify the following keyword args:
     :param str root_dir: The parent directory to create the temporary file.
     :param bool cleanup: Whether or not to clean up the temporary file.
-  """
+    """
     with temporary_file(root_dir, cleanup=cleanup, suffix=suffix, permissions=permissions) as fd:
         fd.close()
         yield fd.name
@@ -195,8 +195,8 @@ def temporary_file_path(root_dir=None, cleanup=True, suffix="", permissions=None
 
 @contextmanager
 def temporary_file(root_dir=None, cleanup=True, suffix="", permissions=None, binary_mode=True):
-    """
-    A with-context that creates a temporary file and returns a writeable file descriptor to it.
+    """A with-context that creates a temporary file and returns a writeable
+    file descriptor to it.
 
     You may specify the following keyword args:
     :param str root_dir: The parent directory to create the temporary file.
@@ -208,7 +208,7 @@ def temporary_file(root_dir=None, cleanup=True, suffix="", permissions=None, bin
                        See :py:class:`tempfile.NamedTemporaryFile`.
     :param int permissions: If provided, sets the file to use these permissions.
     :param bool binary_mode: Whether file opens in binary or text mode.
-  """
+    """
     mode = "w+b" if binary_mode else "w+"  # tempfile's default is 'w+b'
     with tempfile.NamedTemporaryFile(suffix=suffix, dir=root_dir, delete=False, mode=mode) as fd:
         try:
@@ -222,13 +222,14 @@ def temporary_file(root_dir=None, cleanup=True, suffix="", permissions=None, bin
 
 @contextmanager
 def safe_file(path, suffix=None, cleanup=True):
-    """A with-context that copies a file, and copies the copy back to the original file on success.
+    """A with-context that copies a file, and copies the copy back to the
+    original file on success.
 
-  This is useful for doing work on a file but only changing its state on success.
+    This is useful for doing work on a file but only changing its state on success.
 
-  :param str suffix: Use this suffix to create the copy. Otherwise use a random string.
-  :param bool cleanup: Whether or not to clean up the copy.
-  """
+    :param str suffix: Use this suffix to create the copy. Otherwise use a random string.
+    :param bool cleanup: Whether or not to clean up the copy.
+    """
     safe_path = "{}.{}".format(path, suffix or uuid.uuid4())
     if os.path.exists(path):
         shutil.copy(path, safe_path)
@@ -245,9 +246,7 @@ def safe_file(path, suffix=None, cleanup=True):
 
 @contextmanager
 def pushd(directory):
-    """
-    A with-context that encapsulates pushd/popd.
-  """
+    """A with-context that encapsulates pushd/popd."""
     cwd = os.getcwd()
     os.chdir(directory)
     try:
@@ -260,17 +259,17 @@ def pushd(directory):
 def open_zip(path_or_file, *args, **kwargs):
     """A with-context for zip files.
 
-  Passes through *args and **kwargs to zipfile.ZipFile.
+    Passes through *args and **kwargs to zipfile.ZipFile.
 
-  :API: public
+    :API: public
 
-  :param path_or_file: Full path to zip file.
-  :param args: Any extra args accepted by `zipfile.ZipFile`.
-  :param kwargs: Any extra keyword args accepted by `zipfile.ZipFile`.
-  :raises: `InvalidZipPath` if path_or_file is invalid.
-  :raises: `zipfile.BadZipfile` if zipfile.ZipFile cannot open a zip at path_or_file.
-  :returns: `class 'contextlib.GeneratorContextManager`.
-  """
+    :param path_or_file: Full path to zip file.
+    :param args: Any extra args accepted by `zipfile.ZipFile`.
+    :param kwargs: Any extra keyword args accepted by `zipfile.ZipFile`.
+    :raises: `InvalidZipPath` if path_or_file is invalid.
+    :raises: `zipfile.BadZipfile` if zipfile.ZipFile cannot open a zip at path_or_file.
+    :returns: `class 'contextlib.GeneratorContextManager`.
+    """
     if not path_or_file:
         raise InvalidZipPath(f"Invalid zip location: {path_or_file}")
     allowZip64 = kwargs.pop("allowZip64", True)
@@ -287,11 +286,11 @@ def open_zip(path_or_file, *args, **kwargs):
 
 @contextmanager
 def open_tar(path_or_file, *args, **kwargs):
-    """
-    A with-context for tar files.  Passes through positional and kwargs to tarfile.open.
+    """A with-context for tar files.  Passes through positional and kwargs to
+    tarfile.open.
 
     If path_or_file is a file, caller must close it separately.
-  """
+    """
     (path, fileobj) = (
         (path_or_file, None) if isinstance(path_or_file, str) else (None, path_or_file)
     )
@@ -300,7 +299,7 @@ def open_tar(path_or_file, *args, **kwargs):
 
 
 class Timer:
-    """Very basic with-context to time operations
+    """Very basic with-context to time operations.
 
   Example usage:
     >>> from pants.util.contextutil import Timer
@@ -309,8 +308,7 @@ class Timer:
     ...
     >>> timer.elapsed
     2.0020849704742432
-
-  """
+    """
 
     def __init__(self, clock=time):
         self._clock = clock
@@ -333,11 +331,12 @@ class Timer:
 
 @contextmanager
 def exception_logging(logger, msg):
-    """Provides exception logging via `logger.exception` for a given block of code.
+    """Provides exception logging via `logger.exception` for a given block of
+    code.
 
-  :param logging.Logger logger: The `Logger` instance to use for logging.
-  :param string msg: The message to emit before `logger.exception` emits the traceback.
-  """
+    :param logging.Logger logger: The `Logger` instance to use for logging.
+    :param string msg: The message to emit before `logger.exception` emits the traceback.
+    """
     try:
         yield
     except Exception:
@@ -349,8 +348,8 @@ def exception_logging(logger, msg):
 def maybe_profiled(profile_path):
     """A profiling context manager.
 
-  :param string profile_path: The path to write profile information to. If `None`, this will no-op.
-  """
+    :param string profile_path: The path to write profile information to. If `None`, this will no-op.
+    """
     if not profile_path:
         yield
         return

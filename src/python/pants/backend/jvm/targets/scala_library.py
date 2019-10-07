@@ -18,14 +18,14 @@ SCOVERAGE = "scoverage"
 class ScalaLibrary(ExportableJvmLibrary):
     """A Scala library.
 
-  Normally has conceptually-related sources; invoking the ``compile`` goal
-  on this target compiles scala and generates classes. Invoking the ``bundle``
-  goal on this target creates a ``.jar``; but that's an unusual thing to do.
-  Instead, a ``jvm_binary`` might depend on this library; that binary is a
-  more sensible thing to bundle.
+    Normally has conceptually-related sources; invoking the ``compile`` goal
+    on this target compiles scala and generates classes. Invoking the ``bundle``
+    goal on this target creates a ``.jar``; but that's an unusual thing to do.
+    Instead, a ``jvm_binary`` might depend on this library; that binary is a
+    more sensible thing to bundle.
 
-  :API: public
-  """
+    :API: public
+    """
 
     default_sources_globs = "*.scala"
     default_sources_exclude_globs = JUnitTests.scala_test_globs

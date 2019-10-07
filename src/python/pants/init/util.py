@@ -11,12 +11,14 @@ from pants.util.dirutil import absolute_symlink, safe_mkdir, safe_rmtree
 
 
 def init_workdir(global_options):
-    """Given the bootstrap options (generally immediately after bootstrap), initialize the workdir.
+    """Given the bootstrap options (generally immediately after bootstrap),
+    initialize the workdir.
 
-  If it is in use, the "physical" workdir is a directory under the `pants_physical_workdir_base`
-  that is unique to each working copy (via including the entire path to the working copy in its
-  name using `safe_filename_from_path`).
-  """
+    If it is in use, the "physical" workdir is a directory under the
+    `pants_physical_workdir_base` that is unique to each working copy
+    (via including the entire path to the working copy in its name using
+    `safe_filename_from_path`).
+    """
     workdir_src = global_options.pants_workdir
     if not global_options.pants_physical_workdir_base:
         safe_mkdir(workdir_src)
@@ -52,8 +54,8 @@ def init_workdir(global_options):
 def clean_global_runtime_state(reset_subsystem=False):
     """Resets the global runtime state of a pants runtime for cleaner forking.
 
-  :param bool reset_subsystem: Whether or not to clean Subsystem global state.
-  """
+    :param bool reset_subsystem: Whether or not to clean Subsystem global state.
+    """
     if reset_subsystem:
         # Reset subsystem state.
         Subsystem.reset()

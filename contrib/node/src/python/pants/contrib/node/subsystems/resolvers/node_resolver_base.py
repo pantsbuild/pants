@@ -22,12 +22,13 @@ class NodeResolverBase(ABC):
 
     @classmethod
     def prepare(cls, options, round_manager):
-        """Allows a resolver to add additional product requirements to the NodeResolver task."""
+        """Allows a resolver to add additional product requirements to the
+        NodeResolver task."""
         pass
 
     @classmethod
     def parse_file_path(cls, file_path):
-        """Parse a file address path without the file specifier"""
+        """Parse a file address path without the file specifier."""
         address = None
         pattern = cls.file_regex.match(file_path)
         if pattern:
@@ -37,9 +38,9 @@ class NodeResolverBase(ABC):
     def _copy_sources(self, target, results_dir):
         """Copy sources from a target to a results directory.
 
-    :param NodePackage target: A subclass of NodePackage
-    :param string results_dir: The results directory
-    """
+        :param NodePackage target: A subclass of NodePackage
+        :param string results_dir: The results directory
+        """
         buildroot = get_buildroot()
         source_relative_to = target.address.spec_path
         for source in target.sources_relative_to_buildroot():
@@ -48,18 +49,19 @@ class NodeResolverBase(ABC):
             shutil.copyfile(os.path.join(buildroot, source), dest)
 
     def _get_target_from_package_name(self, target, package_name, file_path):
-        """Get a dependent target given the package name and relative file path.
+        """Get a dependent target given the package name and relative file
+        path.
 
-    This will only traverse direct dependencies of the passed target. It is not necessary
-    to traverse further than that because transitive dependencies will be resolved under the
-    direct dependencies and every direct dependencies is symlinked to the target.
+        This will only traverse direct dependencies of the passed target. It is not necessary
+        to traverse further than that because transitive dependencies will be resolved under the
+        direct dependencies and every direct dependencies is symlinked to the target.
 
-    Returns `None` if the target does not exist.
+        Returns `None` if the target does not exist.
 
-    :param NodePackage target: A subclass of NodePackage
-    :param string package_name: A package.json name that is required to be the same as the target name
-    :param string file_path: Relative filepath from target to the package in the format 'file:<address_path>'
-    """
+        :param NodePackage target: A subclass of NodePackage
+        :param string package_name: A package.json name that is required to be the same as the target name
+        :param string file_path: Relative filepath from target to the package in the format 'file:<address_path>'
+        """
         address_path = self.parse_file_path(file_path)
         if not address_path:
             return None

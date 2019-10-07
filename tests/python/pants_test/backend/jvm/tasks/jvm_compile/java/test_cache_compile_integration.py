@@ -275,7 +275,8 @@ class CacheCompileIntegrationTest(BaseCompileIT):
                 )
 
     def test_incremental_caching(self):
-        """Tests that with --no-incremental-caching, we don't write incremental artifacts."""
+        """Tests that with --no-incremental-caching, we don't write incremental
+        artifacts."""
 
         srcfile = "A.java"
 
@@ -361,7 +362,8 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         )
 
     def test_incremental(self):
-        """Tests that with --no-incremental and --no-incremental-caching, we always write artifacts."""
+        """Tests that with --no-incremental and --no-incremental-caching, we
+        always write artifacts."""
 
         srcfile = "A.java"
         config = {"compile.rsc": {"incremental": False, "incremental_caching": False}}
@@ -380,7 +382,8 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         target_to_compile: str,
         callback: Callable[[Compile, Dict[str, str]], None] = lambda cache_test_subdirs: None,
     ) -> None:
-        """Compiles a spec within the same workspace under multiple compilation configs, with a callback function."""
+        """Compiles a spec within the same workspace under multiple compilation
+        configs, with a callback function."""
 
         with temporary_dir() as cache_dir, self.temporary_workdir() as workdir, temporary_dir(
             root_dir=get_buildroot()
@@ -416,7 +419,8 @@ class CacheCompileIntegrationTest(BaseCompileIT):
                 callback(c, cache_test_subdirs)
 
     def _do_test_caching(self, *compiles):
-        """Tests that the given compiles within the same workspace produce the given artifact counts."""
+        """Tests that the given compiles within the same workspace produce the
+        given artifact counts."""
 
         target_name = "cachetest"
 

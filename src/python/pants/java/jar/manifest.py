@@ -6,11 +6,10 @@ from io import BytesIO
 
 
 class Manifest:
-    """
-    Implements the basics of the jar manifest specification.
+    """Implements the basics of the jar manifest specification.
 
     See: http://docs.oracle.com/javase/1.5.0/docs/guide/jar/jar.html#Manifest Specification
-  """
+    """
 
     @staticmethod
     def _wrap(text):

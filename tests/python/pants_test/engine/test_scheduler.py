@@ -117,10 +117,9 @@ def error_msg_test_rule(union_wrapper: UnionWrapper) -> UnionX:
 
 
 class TypeCheckFailWrapper:
-    """
-  This object wraps another object which will be used to demonstrate a type check failure when the
-  engine processes a `yield Get(...)` statement.
-  """
+    """This object wraps another object which will be used to demonstrate a
+    type check failure when the engine processes a `yield Get(...)`
+    statement."""
 
     def __init__(self, inner):
         self.inner = inner
@@ -257,7 +256,8 @@ class SchedulerWithNestedRaiseTest(TestBase):
         ]
 
     def test_get_type_match_failure(self):
-        """Test that Get(...)s are now type-checked during rule execution, to allow for union types."""
+        """Test that Get(...)s are now type-checked during rule execution, to
+        allow for union types."""
         expected_msg = """\
 Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Task(Task { product: A, clause: [Select { product: TypeCheckFailWrapper }], gets: [Get { product: A, subject: B }], func: a_typecheck_fail_test(), cacheable: true }) })) did not declare a dependency on JustGet(Get { product: A, subject: A })
 """
@@ -266,7 +266,8 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
             self.scheduler.product_request(A, [Params(TypeCheckFailWrapper(A()))])
 
     def test_unhashable_failure(self):
-        """Test that unhashable Get(...) params result in a structured error."""
+        """Test that unhashable Get(...) params result in a structured
+        error."""
 
         def assert_has_cffi_extern_traceback_header(exc_str):
             self.assertTrue(

@@ -127,7 +127,9 @@ class ExecuteProcessResult(
 ):
     """Result of successfully executing a process.
 
-  Requesting one of these will raise an exception if the exit code is non-zero."""
+    Requesting one of these will raise an exception if the exit code is
+    non-zero.
+    """
 
 
 class FallibleExecuteProcessResult(
@@ -142,14 +144,16 @@ class FallibleExecuteProcessResult(
 ):
     """Result of executing a process.
 
-  Requesting one of these will not raise an exception if the exit code is non-zero."""
+    Requesting one of these will not raise an exception if the exit code
+    is non-zero.
+    """
 
 
 class ProcessExecutionFailure(Exception):
     """Used to denote that a process exited, but was unsuccessful in some way.
 
-  For example, exiting with a non-zero code.
-  """
+    For example, exiting with a non-zero code.
+    """
 
     MSG_FMT = """process '{desc}' failed with exit code {code}.
 stdout:
@@ -182,9 +186,8 @@ def get_multi_platform_request_description(
 def upcast_execute_process_request(
     req: ExecuteProcessRequest
 ) -> MultiPlatformExecuteProcessRequest:
-    """This rule allows an ExecuteProcessRequest to be run as a
-  platform compatible MultiPlatformExecuteProcessRequest.
-  """
+    """This rule allows an ExecuteProcessRequest to be run as a platform
+    compatible MultiPlatformExecuteProcessRequest."""
     return MultiPlatformExecuteProcessRequest(
         {(PlatformConstraint.none, PlatformConstraint.none): req}
     )
@@ -194,7 +197,8 @@ def upcast_execute_process_request(
 def fallible_to_exec_result_or_raise(
     fallible_result: FallibleExecuteProcessResult, description: ProductDescription
 ) -> ExecuteProcessResult:
-    """Converts a FallibleExecuteProcessResult to a ExecuteProcessResult or raises an error."""
+    """Converts a FallibleExecuteProcessResult to a ExecuteProcessResult or
+    raises an error."""
 
     if fallible_result.exit_code == 0:
         return ExecuteProcessResult(

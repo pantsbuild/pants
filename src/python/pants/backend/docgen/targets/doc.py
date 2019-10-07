@@ -10,9 +10,10 @@ from pants.build_graph.target import Target
 class WikiArtifact:
     """Binds a single documentation page to a wiki instance.
 
-  This object allows you to specify which wiki a page should be published to, along with additional
-  wiki-specific parameters, such as the title, parent page, etc.
-  """
+    This object allows you to specify which wiki a page should be
+    published to, along with additional wiki-specific parameters, such
+    as the title, parent page, etc.
+    """
 
     def __init__(self, wiki, **kwargs):
         """
@@ -52,22 +53,22 @@ class Wiki:
 class Page(Target):
     """A documentation page.
 
-  Here is an example, that shows a markdown page providing a wiki page on an Atlassian Confluence
-  wiki: ::
+    Here is an example, that shows a markdown page providing a wiki page on an Atlassian Confluence
+    wiki: ::
 
-     page(name='mypage',
-       source='mypage.md',
-       provides=[
-         wiki_artifact(wiki=Wiki('foozle', <url builder>),
-                       space='my_space',
-                       title='my_page',
-                       parent='my_parent'),
-       ],
-     )
+       page(name='mypage',
+         source='mypage.md',
+         provides=[
+           wiki_artifact(wiki=Wiki('foozle', <url builder>),
+                         space='my_space',
+                         title='my_page',
+                         parent='my_parent'),
+         ],
+       )
 
-  A ``page`` can have more than one ``wiki_artifact`` in its ``provides``
-  (there might be more than one place to publish it).
-  """
+    A ``page`` can have more than one ``wiki_artifact`` in its ``provides``
+    (there might be more than one place to publish it).
+    """
 
     class ProvidesTupleField(tuple, PayloadField):
         def _compute_fingerprint(self):
@@ -127,12 +128,13 @@ class Page(Target):
     def provides(self):
         """A tuple of WikiArtifact instances provided by this Page.
 
-    Notably different from JvmTarget.provides, which has only a single Artifact rather than a
-    list.
-    """
+        Notably different from JvmTarget.provides, which has only a
+        single Artifact rather than a list.
+        """
         return self.payload.provides
 
     @property
     def format(self):
-        """Returns this page's format, 'md' (Markdown) or 'rst' (ReStructured Text)."""
+        """Returns this page's format, 'md' (Markdown) or 'rst' (ReStructured
+        Text)."""
         return self.payload.format

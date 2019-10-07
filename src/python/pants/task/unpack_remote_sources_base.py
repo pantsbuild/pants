@@ -37,14 +37,16 @@ class UnpackRemoteSourcesBase(Task, metaclass=ABCMeta):
     @classproperty
     @abstractmethod
     def source_target_constraint(cls):
-        """Return a type constraint which is evaluated to determine "source" targets for this task.
+        """Return a type constraint which is evaluated to determine "source"
+        targets for this task.
 
-    :return: :class:`pants.util.objects.TypeConstraint`
-    """
+        :return: :class:`pants.util.objects.TypeConstraint`
+        """
 
     @abstractmethod
     def unpack_target(self, unpackable_target, unpack_dir):
-        """Unpack the remote resources indicated by `unpackable_target` into `unpack_dir`."""
+        """Unpack the remote resources indicated by `unpackable_target` into
+        `unpack_dir`."""
 
     @property
     def _unpacked_sources_product(self):
@@ -68,7 +70,8 @@ class UnpackRemoteSourcesBase(Task, metaclass=ABCMeta):
         return True
 
     class InvalidPatternError(Exception):
-        """Raised if a pattern can't be compiled for including or excluding args"""
+        """Raised if a pattern can't be compiled for including or excluding
+        args."""
 
     @classmethod
     def compile_patterns(cls, patterns, field_name="Unknown", spec="Unknown"):
@@ -88,9 +91,9 @@ class UnpackRemoteSourcesBase(Task, metaclass=ABCMeta):
     def _calculate_unpack_filter(cls, includes=None, excludes=None, spec=None):
         """Take regex patterns and return a filter function.
 
-    :param list includes: List of include patterns to pass to _file_filter.
-    :param list excludes: List of exclude patterns to pass to _file_filter.
-    """
+        :param list includes: List of include patterns to pass to _file_filter.
+        :param list excludes: List of exclude patterns to pass to _file_filter.
+        """
         include_patterns = cls.compile_patterns(
             includes or [], field_name="include_patterns", spec=spec
         )
@@ -103,11 +106,12 @@ class UnpackRemoteSourcesBase(Task, metaclass=ABCMeta):
 
     @classmethod
     def get_unpack_filter(cls, unpackable_target):
-        """Calculate a filter function from the include/exclude patterns of a Target.
+        """Calculate a filter function from the include/exclude patterns of a
+        Target.
 
-    :param ImportRemoteSourcesMixin unpackable_target: A target with include_patterns and
-                                                       exclude_patterns attributes.
-    """
+        :param ImportRemoteSourcesMixin unpackable_target: A target with include_patterns and
+                                                           exclude_patterns attributes.
+        """
         # TODO: we may be able to make use of glob matching in the engine to avoid doing this filtering.
         return cls._calculate_unpack_filter(
             includes=unpackable_target.payload.include_patterns,
@@ -149,7 +153,8 @@ class UnpackRemoteSourcesBase(Task, metaclass=ABCMeta):
         )
 
     class MissingUnpackedDirsError(Exception):
-        """Raised if a directory that is expected to be unpacked doesn't exist."""
+        """Raised if a directory that is expected to be unpacked doesn't
+        exist."""
 
     def execute(self):
         with self.invalidated(

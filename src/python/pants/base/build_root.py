@@ -12,10 +12,11 @@ from pants.util.meta import Singleton
 class BuildRoot(Singleton):
     """Represents the global workspace build root.
 
-  By default a Pants workspace is defined by a root directory where one of multiple sentinel files
-  reside, such as `pants` or `BUILD_ROOT`. This path can also be manipulated through this interface
-  for re-location of the build root in tests.
-  """
+    By default a Pants workspace is defined by a root directory where
+    one of multiple sentinel files reside, such as `pants` or
+    `BUILD_ROOT`. This path can also be manipulated through this
+    interface for re-location of the build root in tests.
+    """
 
     sentinel_files = ["pants", "BUILDROOT", "BUILD_ROOT"]
 
@@ -67,7 +68,8 @@ class BuildRoot(Singleton):
 
     @contextmanager
     def temporary(self, path):
-        """Establishes a temporary build root, restoring the prior build root on exit."""
+        """Establishes a temporary build root, restoring the prior build root
+        on exit."""
         if path is None:
             raise ValueError("Can only temporarily establish a build root given a path.")
         prior = self._root_dir

@@ -24,7 +24,8 @@ logger = logging.getLogger(__name__)
 
 
 class PythonNativeCode(Subsystem):
-    """A subsystem which exposes components of the native backend to the python backend."""
+    """A subsystem which exposes components of the native backend to the python
+    backend."""
 
     options_scope = "python-native-code"
 
@@ -99,14 +100,14 @@ class PythonNativeCode(Subsystem):
         return False
 
     def check_build_for_current_platform_only(self, targets):
-        """
-    Performs a check of whether the current target closure has native sources and if so, ensures
-    that Pants is only targeting the current platform.
+        """Performs a check of whether the current target closure has native
+        sources and if so, ensures that Pants is only targeting the current
+        platform.
 
-    :param tgts: a list of :class:`Target` objects.
-    :return: a boolean value indicating whether the current target closure has native sources.
-    :raises: :class:`pants.base.exceptions.IncompatiblePlatformsError`
-    """
+        :param tgts: a list of :class:`Target` objects.
+        :return: a boolean value indicating whether the current target closure has native sources.
+        :raises: :class:`pants.base.exceptions.IncompatiblePlatformsError`
+        """
         # TODO(#5949): convert this to checking if the closure of python requirements has any
         # platform-specific packages (maybe find the platforms there too?).
         if not self._any_targets_have_native_sources(targets):

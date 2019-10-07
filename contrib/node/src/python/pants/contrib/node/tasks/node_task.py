@@ -62,14 +62,14 @@ class NodeTask(Task):
     def execute_node(self, args, workunit_name, workunit_labels=None, node_paths=None):
         """Executes node passing the given args.
 
-    :param list args: The command line args to pass to `node`.
-    :param string workunit_name: A name for the execution's work unit; defaults to 'node'.
-    :param list workunit_labels: Any extra :class:`pants.base.workunit.WorkUnitLabel`s to apply.
-    :param list node_paths: A list of node module paths to be included.
-    :returns: A tuple of (returncode, command).
-    :rtype: A tuple of (int,
-            :class:`pants.contrib.node.subsystems.node_distribution.NodeDistribution.Command`)
-    """
+        :param list args: The command line args to pass to `node`.
+        :param string workunit_name: A name for the execution's work unit; defaults to 'node'.
+        :param list workunit_labels: Any extra :class:`pants.base.workunit.WorkUnitLabel`s to apply.
+        :param list node_paths: A list of node module paths to be included.
+        :returns: A tuple of (returncode, command).
+        :rtype: A tuple of (int,
+                :class:`pants.contrib.node.subsystems.node_distribution.NodeDistribution.Command`)
+        """
         node_command = self.node_distribution.node_command(args=args, node_paths=node_paths)
         return self._execute_command(
             node_command, workunit_name=workunit_name, workunit_labels=workunit_labels
@@ -148,15 +148,16 @@ class NodeTask(Task):
         )
 
     def _execute_command(self, command, workunit_name=None, workunit_labels=None):
-        """Executes a node or npm command via self._run_node_distribution_command.
+        """Executes a node or npm command via
+        self._run_node_distribution_command.
 
-    :param NodeDistribution.Command command: The command to run.
-    :param string workunit_name: A name for the execution's work unit; default command.executable.
-    :param list workunit_labels: Any extra :class:`pants.base.workunit.WorkUnitLabel`s to apply.
-    :returns: A tuple of (returncode, command).
-    :rtype: A tuple of (int,
-            :class:`pants.contrib.node.subsystems.node_distribution.NodeDistribution.Command`)
-    """
+        :param NodeDistribution.Command command: The command to run.
+        :param string workunit_name: A name for the execution's work unit; default command.executable.
+        :param list workunit_labels: Any extra :class:`pants.base.workunit.WorkUnitLabel`s to apply.
+        :returns: A tuple of (returncode, command).
+        :rtype: A tuple of (int,
+                :class:`pants.contrib.node.subsystems.node_distribution.NodeDistribution.Command`)
+        """
         workunit_name = workunit_name or command.executable
         workunit_labels = {WorkUnitLabel.TOOL} | set(workunit_labels or ())
         with self.context.new_workunit(
@@ -167,16 +168,17 @@ class NodeTask(Task):
             return returncode, command
 
     def _run_node_distribution_command(self, command, workunit):
-        """Runs a NodeDistribution.Command for _execute_command and returns its return code.
+        """Runs a NodeDistribution.Command for _execute_command and returns its
+        return code.
 
-    Passes any additional kwargs to command.run (which passes them, modified, to subprocess.Popen).
-    Override this in a Task subclass to do something more complicated than just calling
-    command.run() and returning the result of wait().
+        Passes any additional kwargs to command.run (which passes them, modified, to subprocess.Popen).
+        Override this in a Task subclass to do something more complicated than just calling
+        command.run() and returning the result of wait().
 
-    :param NodeDistribution.Command command: The command to run.
-    :param WorkUnit workunit: The WorkUnit the command is running under.
-    :returns: returncode
-    :rtype: int
-    """
+        :param NodeDistribution.Command command: The command to run.
+        :param WorkUnit workunit: The WorkUnit the command is running under.
+        :returns: returncode
+        :rtype: int
+        """
         process = command.run(stdout=workunit.output("stdout"), stderr=workunit.output("stderr"))
         return process.wait()

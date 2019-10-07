@@ -48,10 +48,8 @@ def init_rust_logger(level, log_show_rust_3rdparty):
 
 
 def setup_logging_to_stderr(python_logger, level):
-    """
-  We setup logging as loose as possible from the Python side,
-  and let Rust do the filtering.
-  """
+    """We setup logging as loose as possible from the Python side, and let Rust
+    do the filtering."""
     native = Native()
     levelno = get_numeric_level(level)
     handler = create_native_stderr_log_handler(levelno, native, stream=sys.stderr)
@@ -116,11 +114,15 @@ def get_numeric_level(level):
 
 @contextmanager
 def encapsulated_global_logger():
-    """Record all the handlers of the current global logger, yield, and reset that logger.
-  This is useful in the case where we want to easily restore state after calling setup_logging.
-  For instance, when DaemonPantsRunner creates an instance of LocalPantsRunner it sets up specific
-  nailgunned logging, which we want to undo once the LocalPantsRunner has finished runnnig.
-  """
+    """Record all the handlers of the current global logger, yield, and reset
+    that logger.
+
+    This is useful in the case where we want to easily restore state
+    after calling setup_logging. For instance, when DaemonPantsRunner
+    creates an instance of LocalPantsRunner it sets up specific
+    nailgunned logging, which we want to undo once the LocalPantsRunner
+    has finished runnnig.
+    """
     global_logger = logging.getLogger()
     old_handlers = copy.copy(global_logger.handlers)
     try:
@@ -136,22 +138,22 @@ def encapsulated_global_logger():
 def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name=None, native=None):
     """Configures logging for a given scope, by default the global scope.
 
-  :param str level: The logging level to enable, must be one of the level names listed here:
-                    https://docs.python.org/2/library/logging.html#levels
-  :param file console_stream: The stream to use for default (console) logging. If None (default),
-                              this will disable console logging.
-  :param str log_dir: An optional directory to emit logs files in.  If unspecified, no disk logging
-                      will occur.  If supplied, the directory will be created if it does not already
-                      exist and all logs will be tee'd to a rolling set of log files in that
-                      directory.
-  :param str scope: A logging scope to configure.  The scopes are hierarchichal logger names, with
-                    The '.' separator providing the scope hierarchy.  By default the root logger is
-                    configured.
-  :param str log_name: The base name of the log file (defaults to 'pants.log').
-  :param Native native: An instance of the Native FFI lib, to register rust logging.
-  :returns: The full path to the main log file if file logging is configured or else `None`.
-  :rtype: str
-  """
+    :param str level: The logging level to enable, must be one of the level names listed here:
+                      https://docs.python.org/2/library/logging.html#levels
+    :param file console_stream: The stream to use for default (console) logging. If None (default),
+                                this will disable console logging.
+    :param str log_dir: An optional directory to emit logs files in.  If unspecified, no disk logging
+                        will occur.  If supplied, the directory will be created if it does not already
+                        exist and all logs will be tee'd to a rolling set of log files in that
+                        directory.
+    :param str scope: A logging scope to configure.  The scopes are hierarchichal logger names, with
+                      The '.' separator providing the scope hierarchy.  By default the root logger is
+                      configured.
+    :param str log_name: The base name of the log file (defaults to 'pants.log').
+    :param Native native: An instance of the Native FFI lib, to register rust logging.
+    :returns: The full path to the main log file if file logging is configured or else `None`.
+    :rtype: str
+    """
 
     # TODO(John Sirois): Consider moving to straight python logging.  The divide between the
     # context/work-unit logging and standard python logging doesn't buy us anything.

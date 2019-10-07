@@ -76,10 +76,12 @@ class GraphTest(TestBase):
         self.assertEqual(expected_sources, sources)
 
     def test_target_macro_override(self):
-        """Tests that we can "wrap" an existing target type with additional functionality.
+        """Tests that we can "wrap" an existing target type with additional
+        functionality.
 
-    Installs an additional TargetMacro that wraps `target` aliases to add a tag to all definitions.
-    """
+        Installs an additional TargetMacro that wraps `target` aliases
+        to add a tag to all definitions.
+        """
 
         files = self.create_library("src/example", "tagged_files", "things")
         self.assertIn(self._TAG, files.tags)

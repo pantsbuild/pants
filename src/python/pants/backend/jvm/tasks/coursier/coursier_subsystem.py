@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 class CoursierSubsystem(Subsystem):
     """Common configuration items for coursier tasks.
 
-  :API: public
-  """
+    :API: public
+    """
 
     options_scope = "coursier"
 

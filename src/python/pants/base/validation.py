@@ -14,19 +14,19 @@ def assert_list(
     allowable=(list, Fileset, OrderedSet, set, tuple),
     raise_type=ValueError,
 ):
+    """This function is used to ensure that parameters set by users in BUILD
+    files are of acceptable types.
+
+    :API: public
+
+    :param obj           : the object that may be a list. It will pass if it is of type in allowable.
+    :param expected_type : this is the expected type of the returned list contents.
+    :param can_be_none   : this defines whether or not the obj can be None. If True, return default.
+    :param default       : this is the default to return if can_be_none is True and obj is None.
+    :param key_arg       : this is the name of the key to which obj belongs to
+    :param allowable     : the acceptable types for obj. We do not want to allow any iterable (eg string).
+    :param raise_type    : the error to throw if the type is not correct.
     """
-  This function is used to ensure that parameters set by users in BUILD files are of acceptable types.
-
-  :API: public
-
-  :param obj           : the object that may be a list. It will pass if it is of type in allowable.
-  :param expected_type : this is the expected type of the returned list contents.
-  :param can_be_none   : this defines whether or not the obj can be None. If True, return default.
-  :param default       : this is the default to return if can_be_none is True and obj is None.
-  :param key_arg       : this is the name of the key to which obj belongs to
-  :param allowable     : the acceptable types for obj. We do not want to allow any iterable (eg string).
-  :param raise_type    : the error to throw if the type is not correct.
-  """
 
     def get_key_msg(key=None):
         if key is None:

@@ -71,7 +71,8 @@ class Watchman(ProcessManager):
         return self._watchman_client
 
     def _make_client(self):
-        """Create a new watchman client using the BSER protocol over a UNIX socket."""
+        """Create a new watchman client using the BSER protocol over a UNIX
+        socket."""
         self._logger.debug("setting initial watchman timeout to %s", self._startup_timeout)
         return StreamableWatchmanClient(
             sockpath=self.socket, transport="local", timeout=self._startup_timeout
@@ -120,8 +121,8 @@ class Watchman(ProcessManager):
     def launch(self):
         """Launch and synchronously write metadata.
 
-    This is possible due to watchman's built-in async server startup - no double-forking required.
-    """
+        This is possible due to watchman's built-in async server startup - no double-forking required.
+        """
         cmd = self._construct_cmd(
             (self._watchman_path, "get-pid"),
             state_file=self._state_file,
@@ -168,10 +169,11 @@ class Watchman(ProcessManager):
             self._logger.debug("set post-startup watchman timeout to %s", self._timeout)
 
     def watch_project(self, path):
-        """Issues the watch-project command to watchman to begin watching the buildroot.
+        """Issues the watch-project command to watchman to begin watching the
+        buildroot.
 
-    :param string path: the path to the watchman project root/pants build root.
-    """
+        :param string path: the path to the watchman project root/pants build root.
+        """
         # TODO(kwlzn): Add a client.query(timeout=X) param to the upstream pywatchman project.
         try:
             return self.client.query("watch-project", os.path.realpath(path))
@@ -181,10 +183,10 @@ class Watchman(ProcessManager):
     def subscribed(self, build_root, handlers):
         """Bulk subscribe generator for StreamableWatchmanClient.
 
-    :param str build_root: the build_root for all subscriptions.
-    :param iterable handlers: a sequence of Watchman.EventHandler namedtuple objects.
-    :yields: a stream of tuples in the form (subscription_name: str, subscription_event: dict).
-    """
+        :param str build_root: the build_root for all subscriptions.
+        :param iterable handlers: a sequence of Watchman.EventHandler namedtuple objects.
+        :yields: a stream of tuples in the form (subscription_name: str, subscription_event: dict).
+        """
         command_list = [
             ["subscribe", build_root, handler.name, handler.metadata] for handler in handlers
         ]

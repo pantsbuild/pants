@@ -23,17 +23,20 @@ class Fetcher:
         """Indicates an error fetching an URL."""
 
     class TransientError(Error):
-        """Indicates a fetch error for an operation that may reasonably be retried.
+        """Indicates a fetch error for an operation that may reasonably be
+        retried.
 
-    For example a connection error or fetch timeout are both considered transient.
-    """
+        For example a connection error or fetch timeout are both
+        considered transient.
+        """
 
     class PermanentError(Error):
         """Indicates a fetch error that is likely permanent.
 
-    Retrying operations that raise these errors is unlikely to succeed.  For example, an HTTP 404
-    response code is considered a permanent error.
-    """
+        Retrying operations that raise these errors is unlikely to
+        succeed.  For example, an HTTP 404 response code is considered a
+        permanent error.
+        """
 
         def __init__(self, value=None, response_code=None):
             super(Fetcher.PermanentError, self).__init__(value)
@@ -45,33 +48,36 @@ class Fetcher:
         def response_code(self):
             """The HTTP response code of the failed request.
 
-      May be None it the request failed before receiving a server response.
-      """
+            May be None it the request failed before receiving a server
+            response.
+            """
             return self._response_code
 
     class Listener:
-        """A listener callback interface for HTTP GET requests made by a Fetcher."""
+        """A listener callback interface for HTTP GET requests made by a
+        Fetcher."""
 
         def status(self, code, content_length=None):
-            """Called when the response headers are received before data starts streaming.
+            """Called when the response headers are received before data starts
+            streaming.
 
-      :param int code: the HTTP response code
-      :param int content_length: the response Content-Length if known, otherwise None
-      """
+            :param int code: the HTTP response code
+            :param int content_length: the response Content-Length if known, otherwise None
+            """
 
         def recv_chunk(self, data):
-            """Called as each chunk of data is received from the streaming response.
+            """Called as each chunk of data is received from the streaming
+            response.
 
-      :param data: a byte string containing the next chunk of response data
-      """
+            :param data: a byte string containing the next chunk of response data
+            """
 
         def finished(self):
             """Called when the response has been fully read."""
 
         def wrap(self, listener=None):
-            """Returns a Listener that wraps both the given listener and this listener, calling each in
-      turn for each callback method.
-      """
+            """Returns a Listener that wraps both the given listener and this
+            listener, calling each in turn for each callback method."""
             if not listener:
                 return self
 
@@ -94,12 +100,13 @@ class Fetcher:
         """A Listener that writes all received data to a file like object."""
 
         def __init__(self, fh):
-            """Creates a DownloadListener that writes to the given open file handle.
+            """Creates a DownloadListener that writes to the given open file
+            handle.
 
-      The file handle is not closed.
+            The file handle is not closed.
 
-      :param fh: a file handle open for writing
-      """
+            :param fh: a file handle open for writing
+            """
             if not fh or not hasattr(fh, "write"):
                 raise ValueError("fh must be an open file handle, given {}".format(fh))
             self._fh = fh
@@ -111,11 +118,11 @@ class Fetcher:
         """A Listener that checksums the data received."""
 
         def __init__(self, digest=None):
-            """Creates a ChecksumListener with the given hashlib digest or else an MD5 digest if none is
-      supplied.
+            """Creates a ChecksumListener with the given hashlib digest or else
+            an MD5 digest if none is supplied.
 
-      :param digest: the digest to use to checksum the received data, MDS by default
-      """
+            :param digest: the digest to use to checksum the received data, MDS by default
+            """
             self.digest = digest or hashlib.md5()
             self._checksum = None
 
@@ -129,11 +136,11 @@ class Fetcher:
         def checksum(self):
             """Returns the hex digest of the received data.
 
-      Its not valid to access this property before the listener is finished.
+            Its not valid to access this property before the listener is finished.
 
-      :rtype: string
-      :raises: ValueError if accessed before this listener is finished
-      """
+            :rtype: string
+            :raises: ValueError if accessed before this listener is finished
+            """
             if self._checksum is None:
                 raise ValueError(
                     "The checksum cannot be accessed before this listener is finished."
@@ -144,14 +151,15 @@ class Fetcher:
         """A Listener that logs progress to a stream."""
 
         def __init__(self, width=None, chunk_size_bytes=None, stream=None):
-            """Creates a ProgressListener that logs progress for known size items with a progress bar of
-      the given width in characters and otherwise logs a progress indicator every chunk_size.
+            """Creates a ProgressListener that logs progress for known size
+            items with a progress bar of the given width in characters and
+            otherwise logs a progress indicator every chunk_size.
 
-      :param int width: the width of the progress bar for known size downloads, 50 by default.
-      :param chunk_size_bytes: The size of data chunks to note progress for, 10 KB by default.
-      :param stream: A stream to write progress information to; `sys.stderr` by default.
-      :type stream: :class:`io.RawIOBase`
-      """
+            :param int width: the width of the progress bar for known size downloads, 50 by default.
+            :param chunk_size_bytes: The size of data chunks to note progress for, 10 KB by default.
+            :param stream: A stream to write progress information to; `sys.stderr` by default.
+            :type stream: :class:`io.RawIOBase`
+            """
             self._width = width or 50
             if not isinstance(self._width, int):
                 raise ValueError("The width must be an integer, given {}".format(self._width))
@@ -196,12 +204,12 @@ class Fetcher:
     def __init__(self, root_dir, requests_api=None):
         """Creates a Fetcher that uses the given requests api object.
 
-    By default uses the requests module, but can be any object conforming to the requests api like
-    a requests Session object.
+        By default uses the requests module, but can be any object conforming to the requests api like
+        a requests Session object.
 
-    :param root_dir: The root directory to find relative local `file://` url paths against.
-    :param requests_api: An optional requests api-like object.
-    """
+        :param root_dir: The root directory to find relative local `file://` url paths against.
+        :param requests_api: An optional requests api-like object.
+        """
         self._root_dir = root_dir
         self._requests = requests_api or requests
 
@@ -213,25 +221,26 @@ class Fetcher:
         def status_code(self):
             """The HTTP status code for the fetch.
 
-      :rtype: int
-      """
+            :rtype: int
+            """
 
         @property
         @abstractmethod
         def size(self):
-            """The size of the fetched file in bytes if known; otherwise, `None`.
+            """The size of the fetched file in bytes if known; otherwise,
+            `None`.
 
-      :rtype: int
-      :raises :class:`Fetcher.Error` if there is a problem determining the file size.
-      """
+            :rtype: int
+            :raises :class:`Fetcher.Error` if there is a problem determining the file size.
+            """
 
         @abstractmethod
         def iter_content(self, chunk_size_bytes):
             """Return an iterator over the content of the fetched file's bytes.
 
-      :rtype: :class:`collections.Iterator` over byte chunks.
-      :raises :class:`Fetcher.Error` if there is a problem determining the file size.
-      """
+            :rtype: :class:`collections.Iterator` over byte chunks.
+            :raises :class:`Fetcher.Error` if there is a problem determining the file size.
+            """
 
         @abstractmethod
         def close(self):
@@ -335,14 +344,15 @@ class Fetcher:
                 raise self._RequestsResponse.as_fetcher_error(url, e)
 
     def fetch(self, url, listener, chunk_size_bytes=None, timeout_secs=None):
-        """Fetches data from the given URL notifying listener of all lifecycle events.
+        """Fetches data from the given URL notifying listener of all lifecycle
+        events.
 
-    :param string url: the url to GET data from
-    :param listener: the listener to notify of all download lifecycle events
-    :param chunk_size_bytes: the chunk size to use for buffering data, 10 KB by default
-    :param timeout_secs: the maximum time to wait for data to be available, 1 second by default
-    :raises: Fetcher.Error if there was a problem fetching all data from the given url
-    """
+        :param string url: the url to GET data from
+        :param listener: the listener to notify of all download lifecycle events
+        :param chunk_size_bytes: the chunk size to use for buffering data, 10 KB by default
+        :param timeout_secs: the maximum time to wait for data to be available, 1 second by default
+        :raises: Fetcher.Error if there was a problem fetching all data from the given url
+        """
         if not isinstance(listener, self.Listener):
             raise ValueError("listener must be a Listener instance, given {}".format(listener))
 
@@ -378,16 +388,16 @@ class Fetcher:
     ):
         """Downloads data from the given URL.
 
-    By default data is downloaded to a temporary file.
+        By default data is downloaded to a temporary file.
 
-    :param string url: the url to GET data from
-    :param listener: an optional listener to notify of all download lifecycle events
-    :param path_or_fd: an optional file path or open file descriptor to write data to
-    :param chunk_size_bytes: the chunk size to use for buffering data
-    :param timeout_secs: the maximum time to wait for data to be available
-    :returns: the path to the file data was downloaded to.
-    :raises: Fetcher.Error if there was a problem downloading all data from the given url.
-    """
+        :param string url: the url to GET data from
+        :param listener: an optional listener to notify of all download lifecycle events
+        :param path_or_fd: an optional file path or open file descriptor to write data to
+        :param chunk_size_bytes: the chunk size to use for buffering data
+        :param timeout_secs: the maximum time to wait for data to be available
+        :returns: the path to the file data was downloaded to.
+        :raises: Fetcher.Error if there was a problem downloading all data from the given url.
+        """
 
         @contextmanager
         def download_fp(_path_or_fd):

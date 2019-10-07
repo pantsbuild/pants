@@ -23,10 +23,10 @@ from pants.util.memo import memoized_property
 class ResolveRequirementsTaskBase(Task):
     """Base class for tasks that resolve 3rd-party Python requirements.
 
-  Creates an (unzipped) PEX on disk containing all the resolved requirements.
-  This PEX can be merged with other PEXes to create a unified Python environment
-  for running the relevant python code.
-  """
+    Creates an (unzipped) PEX on disk containing all the resolved
+    requirements. This PEX can be merged with other PEXes to create a
+    unified Python environment for running the relevant python code.
+    """
 
     @classmethod
     def subsystem_dependencies(cls):
@@ -56,14 +56,14 @@ class ResolveRequirementsTaskBase(Task):
     def resolve_requirements(self, interpreter, req_libs):
         """Requirements resolution for PEX files.
 
-    NB: This method always resolve all requirements in `req_libs` for the 'current' platform! Tasks
-    such as PythonBinaryCreate which export code meant for other machines to run will need to
-    resolve against the platforms specified by the target or via pants options.
+        NB: This method always resolve all requirements in `req_libs` for the 'current' platform! Tasks
+        such as PythonBinaryCreate which export code meant for other machines to run will need to
+        resolve against the platforms specified by the target or via pants options.
 
-    :param interpreter: Resolve against this :class:`PythonInterpreter`.
-    :param req_libs: A list of :class:`PythonRequirementLibrary` targets to resolve.
-    :returns: a PEX containing target requirements and any specified python dist targets.
-    """
+        :param interpreter: Resolve against this :class:`PythonInterpreter`.
+        :param req_libs: A list of :class:`PythonRequirementLibrary` targets to resolve.
+        :returns: a PEX containing target requirements and any specified python dist targets.
+        """
         with self.invalidated(req_libs) as invalidation_check:
             # If there are no relevant targets, we still go through the motions of resolving
             # an empty set of requirements, to prevent downstream tasks from having to check
@@ -126,8 +126,8 @@ class ResolveRequirementsTaskBase(Task):
     def merged_pex(cls, path, pex_info, interpreter, pexes, interpeter_constraints=None):
         """Yields a pex builder at path with the given pexes already merged.
 
-    :rtype: :class:`pex.pex_builder.PEXBuilder`
-    """
+        :rtype: :class:`pex.pex_builder.PEXBuilder`
+        """
         pex_paths = [pex.path() for pex in pexes if pex]
         if pex_paths:
             pex_info = pex_info.copy()

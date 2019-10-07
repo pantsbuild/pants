@@ -6,14 +6,15 @@ from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 
 class NailgunTaskTestBase(JvmToolTaskTestBase):
-    """Ensures `NailgunTask` tests use subprocess mode to stably test the task under test.
+    """Ensures `NailgunTask` tests use subprocess mode to stably test the task
+    under test.
 
-  For subclasses of NailgunTask the nailgun behavior is irrelevant to the code under test and can
-  cause problems in CI environments. As such, disabling nailgunning ensures the test focus is where
-  it needs to be to test the unit.
+    For subclasses of NailgunTask the nailgun behavior is irrelevant to the code under test and can
+    cause problems in CI environments. As such, disabling nailgunning ensures the test focus is where
+    it needs to be to test the unit.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def setUp(self):
         """

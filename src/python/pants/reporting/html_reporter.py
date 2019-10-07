@@ -23,18 +23,18 @@ from pants.util.dirutil import safe_mkdir
 class HtmlReporter(Reporter):
     """HTML reporting to files.
 
-  The files are intended to be served by the ReportingServer,
-  not accessed directly from the filesystem.
+    The files are intended to be served by the ReportingServer,
+    not accessed directly from the filesystem.
 
-  Pages are rendered using mustache templates, but individual fragments (appended to the report
-  of a currently running Pants run) are rendered using python string.format(), because it's
-  significantly faster, and profiles showed that the difference was non-trivial in short
-  pants runs.
+    Pages are rendered using mustache templates, but individual fragments (appended to the report
+    of a currently running Pants run) are rendered using python string.format(), because it's
+    significantly faster, and profiles showed that the difference was non-trivial in short
+    pants runs.
 
-  TODO: The entire HTML reporting system, and the pants server that backs it, should be
-  rewritten to use some modern webapp framework, instead of this combination of server-side
-  ad-hoc templates and client-side spaghetti code.
-  """
+    TODO: The entire HTML reporting system, and the pants server that backs it, should be
+    rewritten to use some modern webapp framework, instead of this combination of server-side
+    ad-hoc templates and client-side spaghetti code.
+    """
 
     # HTML reporting settings.
     #   html_dir: Where the report files go.
@@ -476,12 +476,12 @@ class HtmlReporter(Reporter):
     def _overwrite(self, filename, func, force=False):
         """Overwrite a file with the specified contents.
 
-    Write times are tracked, too-frequent overwrites are skipped, for performance reasons.
+        Write times are tracked, too-frequent overwrites are skipped, for performance reasons.
 
-    :param filename: The path under the html dir to write to.
-    :param func: A no-arg function that returns the contents to write.
-    :param force: Whether to force a write now, regardless of the last overwrite time.
-    """
+        :param filename: The path under the html dir to write to.
+        :param func: A no-arg function that returns the contents to write.
+        :param force: Whether to force a write now, regardless of the last overwrite time.
+        """
         now = int(time.time() * 1000)
         last_overwrite_time = self._last_overwrite_time.get(filename) or now
         # Overwrite only once per second.
@@ -499,7 +499,8 @@ class HtmlReporter(Reporter):
     _ANSI_COLOR_CODE_RE = re.compile(r"\033\[((?:\d|;)*)m")
 
     def _handle_ansi_color_codes(self, s):
-        """Replace ansi escape sequences with spans of appropriately named css classes."""
+        """Replace ansi escape sequences with spans of appropriately named css
+        classes."""
         parts = HtmlReporter._ANSI_COLOR_CODE_RE.split(s)
         ret = []
         span_depth = 0

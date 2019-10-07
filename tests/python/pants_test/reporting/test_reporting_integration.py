@@ -118,7 +118,8 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
         self.assertTrue(self.INFO_LEVEL_COMPILE_MSG + "\x1b[0m" in pants_run.stdout_data)
 
     def test_output_level_group_compile(self):
-        """Set level with the scope 'compile' and see that it propagates to the task level."""
+        """Set level with the scope 'compile' and see that it propagates to the
+        task level."""
         command = [
             "compile",
             "examples/src/java/org/pantsbuild/example/hello/simple",

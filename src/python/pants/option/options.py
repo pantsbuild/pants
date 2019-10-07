@@ -33,47 +33,47 @@ def make_flag_regex(long_name, short_name=None):
 class Options:
     """The outward-facing API for interacting with options.
 
-  Supports option registration and fetching option values.
+    Supports option registration and fetching option values.
 
-  Examples:
+    Examples:
 
-  The value in global scope of option '--foo-bar' (registered in global scope) will be selected
-  in the following order:
-    - The value of the --foo-bar flag in global scope.
-    - The value of the PANTS_GLOBAL_FOO_BAR environment variable.
-    - The value of the PANTS_FOO_BAR environment variable.
-    - The value of the foo_bar key in the [GLOBAL] section of pants.ini.
-    - The hard-coded value provided at registration time.
-    - None.
+    The value in global scope of option '--foo-bar' (registered in global scope) will be selected
+    in the following order:
+      - The value of the --foo-bar flag in global scope.
+      - The value of the PANTS_GLOBAL_FOO_BAR environment variable.
+      - The value of the PANTS_FOO_BAR environment variable.
+      - The value of the foo_bar key in the [GLOBAL] section of pants.ini.
+      - The hard-coded value provided at registration time.
+      - None.
 
-  The value in scope 'compile.java' of option '--foo-bar' (registered in global scope) will be
-  selected in the following order:
-    - The value of the --foo-bar flag in scope 'compile.java'.
-    - The value of the --foo-bar flag in scope 'compile'.
-    - The value of the --foo-bar flag in global scope.
-    - The value of the PANTS_COMPILE_JAVA_FOO_BAR environment variable.
-    - The value of the PANTS_COMPILE_FOO_BAR environment variable.
-    - The value of the PANTS_GLOBAL_FOO_BAR environment variable.
-    - The value of the PANTS_FOO_BAR environment variable.
-    - The value of the foo_bar key in the [compile.java] section of pants.ini.
-    - The value of the foo_bar key in the [compile] section of pants.ini.
-    - The value of the foo_bar key in the [GLOBAL] section of pants.ini.
-    - The hard-coded value provided at registration time.
-    - None.
+    The value in scope 'compile.java' of option '--foo-bar' (registered in global scope) will be
+    selected in the following order:
+      - The value of the --foo-bar flag in scope 'compile.java'.
+      - The value of the --foo-bar flag in scope 'compile'.
+      - The value of the --foo-bar flag in global scope.
+      - The value of the PANTS_COMPILE_JAVA_FOO_BAR environment variable.
+      - The value of the PANTS_COMPILE_FOO_BAR environment variable.
+      - The value of the PANTS_GLOBAL_FOO_BAR environment variable.
+      - The value of the PANTS_FOO_BAR environment variable.
+      - The value of the foo_bar key in the [compile.java] section of pants.ini.
+      - The value of the foo_bar key in the [compile] section of pants.ini.
+      - The value of the foo_bar key in the [GLOBAL] section of pants.ini.
+      - The hard-coded value provided at registration time.
+      - None.
 
-  The value in scope 'compile.java' of option '--foo-bar' (registered in scope 'compile') will be
-  selected in the following order:
-    - The value of the --foo-bar flag in scope 'compile.java'.
-    - The value of the --foo-bar flag in scope 'compile'.
-    - The value of the PANTS_COMPILE_JAVA_FOO_BAR environment variable.
-    - The value of the PANTS_COMPILE_FOO_BAR environment variable.
-    - The value of the foo_bar key in the [compile.java] section of pants.ini.
-    - The value of the foo_bar key in the [compile] section of pants.ini.
-    - The value of the foo_bar key in the [GLOBAL] section of pants.ini
-      (because of automatic config file fallback to that section).
-    - The hard-coded value provided at registration time.
-    - None.
-  """
+    The value in scope 'compile.java' of option '--foo-bar' (registered in scope 'compile') will be
+    selected in the following order:
+      - The value of the --foo-bar flag in scope 'compile.java'.
+      - The value of the --foo-bar flag in scope 'compile'.
+      - The value of the PANTS_COMPILE_JAVA_FOO_BAR environment variable.
+      - The value of the PANTS_COMPILE_FOO_BAR environment variable.
+      - The value of the foo_bar key in the [compile.java] section of pants.ini.
+      - The value of the foo_bar key in the [compile] section of pants.ini.
+      - The value of the foo_bar key in the [GLOBAL] section of pants.ini
+        (because of automatic config file fallback to that section).
+      - The hard-coded value provided at registration time.
+      - None.
+    """
 
     class FrozenOptionsError(Exception):
         """Options are frozen and can't be mutated."""
@@ -85,10 +85,10 @@ class Options:
     def complete_scopes(cls, scope_infos):
         """Expand a set of scopes to include all enclosing scopes.
 
-    E.g., if the set contains `foo.bar.baz`, ensure that it also contains `foo.bar` and `foo`.
+        E.g., if the set contains `foo.bar.baz`, ensure that it also contains `foo.bar` and `foo`.
 
-    Also adds any deprecated scopes.
-    """
+        Also adds any deprecated scopes.
+        """
         ret = {GlobalOptionsRegistrar.get_scope_info()}
         original_scopes = dict()
         for si in scope_infos:
@@ -117,13 +117,13 @@ class Options:
     def create(cls, env, config, known_scope_infos, args=None, bootstrap_option_values=None):
         """Create an Options instance.
 
-    :param env: a dict of environment variables.
-    :param :class:`pants.option.config.Config` config: data from a config file.
-    :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
-    :param args: a list of cmd-line args; defaults to `sys.argv` if None is supplied.
-    :param bootstrap_option_values: An optional namespace containing the values of bootstrap
-           options. We can use these values when registering other options.
-    """
+        :param env: a dict of environment variables.
+        :param :class:`pants.option.config.Config` config: data from a config file.
+        :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
+        :param args: a list of cmd-line args; defaults to `sys.argv` if None is supplied.
+        :param bootstrap_option_values: An optional namespace containing the values of bootstrap
+               options. We can use these values when registering other options.
+        """
         # We need parsers for all the intermediate scopes, so inherited option values
         # can propagate through them.
         complete_known_scope_infos = cls.complete_scopes(known_scope_infos)
@@ -177,8 +177,8 @@ class Options:
     ):
         """The low-level constructor for an Options instance.
 
-    Dependees should use `Options.create` instead.
-    """
+        Dependees should use `Options.create` instead.
+        """
         self._goals = goals
         self._scope_to_flags = scope_to_flags
         self._target_specs = target_specs
@@ -213,25 +213,27 @@ class Options:
     def target_specs(self):
         """The targets to operate on.
 
-    :API: public
-    """
+        :API: public
+        """
         return self._target_specs
 
     @property
     def goals(self):
         """The requested goals, in the order specified on the cmd line.
 
-    :API: public
-    """
+        :API: public
+        """
         return self._goals
 
     @memoized_property
     def goals_by_version(self):
-        """Goals organized into three tuples by whether they are v1, ambiguous, or v2 goals (respectively).
+        """Goals organized into three tuples by whether they are v1, ambiguous,
+        or v2 goals (respectively).
 
-    It's possible for a goal to be implemented with both v1 and v2, in which case a consumer
-    should use the `--v1` and `--v2` global flags to disambiguate.
-    """
+        It's possible for a goal to be implemented with both v1 and v2,
+        in which case a consumer should use the `--v1` and `--v2` global
+        flags to disambiguate.
+        """
         v1, ambiguous, v2 = [], [], []
         for goal in self._goals:
             goal_dot = "{}.".format(goal)
@@ -263,11 +265,13 @@ class Options:
         self._frozen = True
 
     def drop_flag_values(self):
-        """Returns a copy of these options that ignores values specified via flags.
+        """Returns a copy of these options that ignores values specified via
+        flags.
 
-    Any pre-cached option values are cleared and only option values that come from option defaults,
-    the config or the environment are used.
-    """
+        Any pre-cached option values are cleared and only option values
+        that come from option defaults, the config or the environment
+        are used.
+        """
         # An empty scope_to_flags to force all values to come via the config -> env hierarchy alone
         # and empty values in case we already cached some from flags.
         no_flags = {}
@@ -288,8 +292,8 @@ class Options:
     def is_known_scope(self, scope):
         """Whether the given scope is known by this instance.
 
-    :API: public
-    """
+        :API: public
+        """
         return scope in self._known_scope_to_info
 
     def passthru_args_for_scope(self, scope):
@@ -347,7 +351,8 @@ class Options:
         return register
 
     def get_parser(self, scope):
-        """Returns the parser for the given scope, so code can register on it directly."""
+        """Returns the parser for the given scope, so code can register on it
+        directly."""
         self._assert_not_frozen()
         return self._parser_hierarchy.get_parser_by_scope(scope)
 
@@ -356,17 +361,18 @@ class Options:
         self._parser_hierarchy.walk(callback)
 
     def _check_and_apply_deprecations(self, scope, values):
-        """Checks whether a ScopeInfo has options specified in a deprecated scope.
+        """Checks whether a ScopeInfo has options specified in a deprecated
+        scope.
 
-    There are two related cases here. Either:
-      1) The ScopeInfo has an associated deprecated_scope that was replaced with a non-deprecated
-         scope, meaning that the options temporarily live in two locations.
-      2) The entire ScopeInfo is deprecated (as in the case of deprecated SubsystemDependencies),
-         meaning that the options live in one location.
+        There are two related cases here. Either:
+          1) The ScopeInfo has an associated deprecated_scope that was replaced with a non-deprecated
+             scope, meaning that the options temporarily live in two locations.
+          2) The entire ScopeInfo is deprecated (as in the case of deprecated SubsystemDependencies),
+             meaning that the options live in one location.
 
-    In the first case, this method has the sideeffect of merging options values from deprecated
-    scopes into the given values.
-    """
+        In the first case, this method has the sideeffect of merging options values from deprecated
+        scopes into the given values.
+        """
         si = self.known_scope_to_info[scope]
 
         # If this Scope is itself deprecated, report that.
@@ -414,14 +420,14 @@ class Options:
     ):
         """Specify how a registered option would look like on the command line.
 
-    This information enables fuzzy matching to suggest correct option names when a user specifies an
-    unregistered option on the command line.
+        This information enables fuzzy matching to suggest correct option names when a user specifies an
+        unregistered option on the command line.
 
-    :param scope: the 'scope' component of a command-line flag.
-    :param arg: the unscoped flag name as it would appear on the command line.
-    :param normalized_arg: the fully-scoped option name, without any leading dashes.
-    :param scoped_arg: the fully-scoped option as it would appear on the command line.
-    """
+        :param scope: the 'scope' component of a command-line flag.
+        :param arg: the unscoped flag name as it would appear on the command line.
+        :param normalized_arg: the fully-scoped option name, without any leading dashes.
+        :param scoped_arg: the fully-scoped option as it would appear on the command line.
+        """
 
         def __new__(cls, scope, arg):
             normalized_arg = re.sub("^-+", "", arg)
@@ -442,9 +448,9 @@ class Options:
     def _all_scoped_flag_names_for_fuzzy_matching(self):
         """A list of all registered flags in all their registered scopes.
 
-    This list is used for fuzzy matching against unrecognized option names across registered
-    scopes on the command line.
-    """
+        This list is used for fuzzy matching against unrecognized option
+        names across registered scopes on the command line.
+        """
         all_scoped_flag_names = []
 
         def register_all_scoped_names(parser):
@@ -475,11 +481,11 @@ class Options:
     def for_scope(self, scope, inherit_from_enclosing_scope=True):
         """Return the option values for the given scope.
 
-    Values are attributes of the returned object, e.g., options.foo.
-    Computed lazily per scope.
+        Values are attributes of the returned object, e.g., options.foo.
+        Computed lazily per scope.
 
-    :API: public
-    """
+        :API: public
+        """
 
         # First get enclosing scope's option values, if any.
         if scope == GLOBAL_SCOPE or not inherit_from_enclosing_scope:
@@ -501,22 +507,23 @@ class Options:
     def get_fingerprintable_for_scope(
         self, bottom_scope, include_passthru=False, fingerprint_key=None, invert=False
     ):
-        """Returns a list of fingerprintable (option type, option value) pairs for the given scope.
+        """Returns a list of fingerprintable (option type, option value) pairs
+        for the given scope.
 
-    Fingerprintable options are options registered via a "fingerprint=True" kwarg. This flag
-    can be parameterized with `fingerprint_key` for special cases.
+        Fingerprintable options are options registered via a "fingerprint=True" kwarg. This flag
+        can be parameterized with `fingerprint_key` for special cases.
 
-    This method also searches enclosing options scopes of `bottom_scope` to determine the set of
-    fingerprintable pairs.
+        This method also searches enclosing options scopes of `bottom_scope` to determine the set of
+        fingerprintable pairs.
 
-    :param str bottom_scope: The scope to gather fingerprintable options for.
-    :param bool include_passthru: Whether to include passthru args captured by `bottom_scope` in the
-                                  fingerprintable options.
-    :param string fingerprint_key: The option kwarg to match against (defaults to 'fingerprint').
-    :param bool invert: Whether or not to invert the boolean check for the fingerprint_key value.
+        :param str bottom_scope: The scope to gather fingerprintable options for.
+        :param bool include_passthru: Whether to include passthru args captured by `bottom_scope` in the
+                                      fingerprintable options.
+        :param string fingerprint_key: The option kwarg to match against (defaults to 'fingerprint').
+        :param bool invert: Whether or not to invert the boolean check for the fingerprint_key value.
 
-    :API: public
-    """
+        :API: public
+        """
         fingerprint_key = fingerprint_key or "fingerprint"
         fingerprint_default = bool(invert)
         pairs = []
@@ -558,14 +565,15 @@ class Options:
     def bootstrap_option_values(self):
         """Return the option values for bootstrap options.
 
-    General code can also access these values in the global scope.  But option registration code
-    cannot, hence this special-casing of this small set of options.
-    """
+        General code can also access these values in the global scope.
+        But option registration code cannot, hence this special-casing
+        of this small set of options.
+        """
         return self._bootstrap_option_values
 
     def for_global_scope(self):
         """Return the option values for the global scope.
 
-    :API: public
-    """
+        :API: public
+        """
         return self.for_scope(GLOBAL_SCOPE)

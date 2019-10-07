@@ -114,7 +114,8 @@ class TestArtifactCache(TestBase):
             self.assertFalse(artifact_cache.has(key))
 
     def test_local_backed_remote_cache(self):
-        """make sure that the combined cache finds what it should and that it backfills"""
+        """make sure that the combined cache finds what it should and that it
+        backfills."""
         with self.setup_server() as server:
             with self.setup_local_cache() as local:
                 tmp = TempLocalArtifactCache(local.artifact_root, 0)
@@ -161,7 +162,8 @@ class TestArtifactCache(TestBase):
                     self.assertTrue(bool(local.use_cached_files(key)))
 
     def test_local_backed_remote_cache_corrupt_artifact(self):
-        """Ensure that a combined cache clears outputs after a failure to extract an artifact."""
+        """Ensure that a combined cache clears outputs after a failure to
+        extract an artifact."""
         with temporary_dir() as remote_cache_dir:
             with self.setup_server(cache_root=remote_cache_dir) as server:
                 with self.setup_local_cache() as local:

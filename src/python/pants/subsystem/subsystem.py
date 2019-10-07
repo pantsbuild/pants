@@ -13,27 +13,28 @@ class SubsystemError(Exception):
 
 
 class Subsystem(SubsystemClientMixin, Optionable):
-    """A separable piece of functionality that may be reused across multiple tasks or other code.
+    """A separable piece of functionality that may be reused across multiple
+    tasks or other code.
 
-  Subsystems encapsulate the configuration and initialization of things like JVMs,
-  Python interpreters, SCMs and so on.
+    Subsystems encapsulate the configuration and initialization of things like JVMs,
+    Python interpreters, SCMs and so on.
 
-  Subsystem instances can be global or per-optionable. Global instances are useful for representing
-  global concepts, such as the SCM used in the workspace. Per-optionable instances allow individual
-  Optionable objects (notably, tasks) to have their own configuration for things such as artifact
-  caches.
+    Subsystem instances can be global or per-optionable. Global instances are useful for representing
+    global concepts, such as the SCM used in the workspace. Per-optionable instances allow individual
+    Optionable objects (notably, tasks) to have their own configuration for things such as artifact
+    caches.
 
-  Each subsystem type has an option scope. The global instance of that subsystem initializes
-  itself from options in that scope. An optionable-specific instance initializes itself from options
-  in an appropriate subscope, which defaults back to the global scope.
+    Each subsystem type has an option scope. The global instance of that subsystem initializes
+    itself from options in that scope. An optionable-specific instance initializes itself from options
+    in an appropriate subscope, which defaults back to the global scope.
 
-  For example, the global artifact cache options would be in scope `cache`, but the
-  compile.java task can override those options in scope `cache.compile.java`.
+    For example, the global artifact cache options would be in scope `cache`, but the
+    compile.java task can override those options in scope `cache.compile.java`.
 
-  Subsystems may depend on other subsystems, and therefore mix in SubsystemClientMixin.
+    Subsystems may depend on other subsystems, and therefore mix in SubsystemClientMixin.
 
-  :API: public
-  """
+    :API: public
+    """
 
     options_scope_category = ScopeInfo.SUBSYSTEM
 
@@ -54,11 +55,11 @@ class Subsystem(SubsystemClientMixin, Optionable):
     def scoped(cls, optionable, removal_version=None, removal_hint=None):
         """Returns a dependency on this subsystem, scoped to `optionable`.
 
-    :param removal_version: An optional deprecation version for this scoped Subsystem dependency.
-    :param removal_hint: An optional hint to accompany a deprecation removal_version.
+        :param removal_version: An optional deprecation version for this scoped Subsystem dependency.
+        :param removal_hint: An optional hint to accompany a deprecation removal_version.
 
-    Return value is suitable for use in SubsystemClientMixin.subsystem_dependencies().
-    """
+        Return value is suitable for use in SubsystemClientMixin.subsystem_dependencies().
+        """
         return SubsystemDependency(cls, optionable.options_scope, removal_version, removal_hint)
 
     @classmethod
@@ -88,24 +89,25 @@ class Subsystem(SubsystemClientMixin, Optionable):
     def global_instance(cls):
         """Returns the global instance of this subsystem.
 
-    :API: public
+        :API: public
 
-    :returns: The global subsystem instance.
-    :rtype: :class:`pants.subsystem.subsystem.Subsystem`
-    """
+        :returns: The global subsystem instance.
+        :rtype: :class:`pants.subsystem.subsystem.Subsystem`
+        """
         return cls._instance_for_scope(cls.options_scope)
 
     @classmethod
     def scoped_instance(cls, optionable):
-        """Returns an instance of this subsystem for exclusive use by the given `optionable`.
+        """Returns an instance of this subsystem for exclusive use by the given
+        `optionable`.
 
-    :API: public
+        :API: public
 
-    :param optionable: An optionable type or instance to scope this subsystem under.
-    :type: :class:`pants.option.optionable.Optionable`
-    :returns: The scoped subsystem instance.
-    :rtype: :class:`pants.subsystem.subsystem.Subsystem`
-    """
+        :param optionable: An optionable type or instance to scope this subsystem under.
+        :type: :class:`pants.option.optionable.Optionable`
+        :returns: The scoped subsystem instance.
+        :rtype: :class:`pants.subsystem.subsystem.Subsystem`
+        """
         if not isinstance(optionable, Optionable) and not issubclass(optionable, Optionable):
             raise TypeError(
                 "Can only scope an instance against an Optionable, given {} of type {}.".format(
@@ -127,8 +129,9 @@ class Subsystem(SubsystemClientMixin, Optionable):
     def reset(cls, reset_options=True):
         """Forget all option values and cached subsystem instances.
 
-    Used primarily for test isolation and to reset subsystem state for pantsd.
-    """
+        Used primarily for test isolation and to reset subsystem state
+        for pantsd.
+        """
         if reset_options:
             cls._options = None
         cls._scoped_instances = {}
@@ -156,13 +159,13 @@ class Subsystem(SubsystemClientMixin, Optionable):
     def options(self):
         """Returns the option values for this subsystem's scope.
 
-    :API: public
-    """
+        :API: public
+        """
         return self._scoped_options
 
     def get_options(self):
         """Returns the option values for this subsystem's scope.
 
-    :API: public
-    """
+        :API: public
+        """
         return self._scoped_options

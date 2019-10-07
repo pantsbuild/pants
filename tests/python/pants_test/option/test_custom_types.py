@@ -106,13 +106,14 @@ class CustomTypesTest(unittest.TestCase):
         )
 
     def test_unicode_comments(self):
-        """We had a bug where unicode characters in comments would cause the option parser to fail.
+        """We had a bug where unicode characters in comments would cause the
+        option parser to fail.
 
-    Without the fix to the option parser, this test case reproduces the error:
+        Without the fix to the option parser, this test case reproduces the error:
 
-    UnicodeDecodeError: 'ascii' codec can't decode byte 0xe2 in position 44:
-                       ordinal not in range(128)
-    """
+        UnicodeDecodeError: 'ascii' codec can't decode byte 0xe2 in position 44:
+                           ordinal not in range(128)
+        """
         self._do_test(
             ["Hi there!", "This is an element in a list of strings."],
             dedent(

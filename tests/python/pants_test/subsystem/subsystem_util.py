@@ -8,15 +8,15 @@ from pants_test.option.util.fakes import create_options_for_optionables
 def global_subsystem_instance(subsystem_type, options=None):
     """Returns the global instance of a subsystem, for use in tests.
 
-  :API: public
+    :API: public
 
-  :param type subsystem_type: The subclass of :class:`pants.subsystem.subsystem.Subsystem`
-                              to create.
-  :param options: dict of scope -> (dict of option name -> value).
-                  The scopes may be that of the global instance of the subsystem (i.e.,
-                  subsystem_type.options_scope) and/or the scopes of instances of the
-                  subsystems it transitively depends on.
-  """
+    :param type subsystem_type: The subclass of :class:`pants.subsystem.subsystem.Subsystem`
+                                to create.
+    :param options: dict of scope -> (dict of option name -> value).
+                    The scopes may be that of the global instance of the subsystem (i.e.,
+                    subsystem_type.options_scope) and/or the scopes of instances of the
+                    subsystems it transitively depends on.
+    """
     init_subsystem(subsystem_type, options)
     return subsystem_type.global_instance()
 
@@ -24,21 +24,21 @@ def global_subsystem_instance(subsystem_type, options=None):
 def init_subsystems(subsystem_types, options=None):
     """Initialize subsystems for use in tests.
 
-  Does not create an instance.  This function is for setting up subsystems that the code
-  under test creates.
+    Does not create an instance.  This function is for setting up subsystems that the code
+    under test creates.
 
-  Note that there is some redundancy between this function and BaseTest.context(for_subsystems=...).
-  TODO: Fix that.
+    Note that there is some redundancy between this function and BaseTest.context(for_subsystems=...).
+    TODO: Fix that.
 
-  :API: public
+    :API: public
 
-  :param list subsystem_types: The subclasses of :class:`pants.subsystem.subsystem.Subsystem`
-                               to create.
-  :param options: dict of scope -> (dict of option name -> value).
-                  The scopes may be those of the global instances of the subsystems (i.e.,
-                  subsystem_type.options_scope) and/or the scopes of instances of the
-                  subsystems they transitively depend on.
-  """
+    :param list subsystem_types: The subclasses of :class:`pants.subsystem.subsystem.Subsystem`
+                                 to create.
+    :param options: dict of scope -> (dict of option name -> value).
+                    The scopes may be those of the global instances of the subsystems (i.e.,
+                    subsystem_type.options_scope) and/or the scopes of instances of the
+                    subsystems they transitively depend on.
+    """
     optionables = set()
     for s in subsystem_types:
         if not Subsystem.is_subsystem_type(s):
@@ -63,16 +63,16 @@ def init_subsystems(subsystem_types, options=None):
 
 
 def init_subsystem(subsystem_type, options=None):
+    """Singular form of
+    :func:`pants_test.subsystem.subsystem_util.init_subsystems`
+
+    :API: public
+
+    :param subsystem_type: The subclass of :class:`pants.subsystem.subsystem.Subsystem`
+                                 to create.
+    :param options: dict of scope -> (dict of option name -> value).
+                    The scopes may be those of the global instance of the subsystem (i.e.,
+                    subsystem_type.options_scope) and/or the scopes of instance of the
+                    subsystem it transitively depends on.
     """
-  Singular form of :func:`pants_test.subsystem.subsystem_util.init_subsystems`
-
-  :API: public
-
-  :param subsystem_type: The subclass of :class:`pants.subsystem.subsystem.Subsystem`
-                               to create.
-  :param options: dict of scope -> (dict of option name -> value).
-                  The scopes may be those of the global instance of the subsystem (i.e.,
-                  subsystem_type.options_scope) and/or the scopes of instance of the
-                  subsystem it transitively depends on.
-  """
     init_subsystems([subsystem_type], options)

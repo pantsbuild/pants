@@ -44,5 +44,6 @@ class GoThriftGenLibrary(GoTarget):
 
     @property
     def import_path(self):
-        """The import path as used in import statements in `.go` source files."""
+        """The import path as used in import statements in `.go` source
+        files."""
         return GoLocalSource.local_import_path(self.target_base, self.address)

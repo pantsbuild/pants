@@ -26,12 +26,13 @@ class BaseCompileIT(PantsRunIntegrationTest):
         extra_args=None,
         workdir_outside_of_buildroot=False,
     ):
-        """Runs a configurable number of iterations of compilation for the given target.
+        """Runs a configurable number of iterations of compilation for the
+        given target.
 
-    :API: public
+        :API: public
 
-    By default, runs twice to shake out errors related to noops.
-    """
+        By default, runs twice to shake out errors related to noops.
+        """
         if not workdir_outside_of_buildroot:
             workdir_generator = self.temporary_workdir()
         else:
@@ -87,10 +88,11 @@ class BaseCompileIT(PantsRunIntegrationTest):
         return files.pop()
 
     def do_test_success_and_failure(self, target, success_args, failure_args, shared_args=None):
-        """Ensure that a target fails to build when one arg set is passed, and succeeds for another.
+        """Ensure that a target fails to build when one arg set is passed, and
+        succeeds for another.
 
-    :API: public
-    """
+        :API: public
+        """
         shared_args = shared_args if shared_args else []
 
         # Check that success_args succeed.

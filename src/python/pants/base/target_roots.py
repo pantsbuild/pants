@@ -6,7 +6,8 @@ from typing import Any
 
 
 class InvalidSpecConstraint(Exception):
-    """Raised when invalid constraints are given via target specs and arguments like --changed*."""
+    """Raised when invalid constraints are given via target specs and arguments
+    like --changed*."""
 
 
 @dataclass(frozen=True)

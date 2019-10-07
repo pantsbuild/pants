@@ -10,9 +10,10 @@ from pants.util.contextutil import open_zip
 class CompileContext:
     """A context for the compilation of a target.
 
-  This can be used to differentiate between a partially completed compile in a temporary location
-  and a finalized compile in its permanent location.
-  """
+    This can be used to differentiate between a partially completed
+    compile in a temporary location and a finalized compile in its
+    permanent location.
+    """
 
     def __init__(
         self,

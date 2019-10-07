@@ -10,12 +10,12 @@ from pants.task.console_task import ConsoleTask
 class Depmap(ConsoleTask):
     """Depict the target's dependencies.
 
-  Generates either a textual dependency tree or a graphviz digraph dot file for the dependency
-  set of a target.
-  """
+    Generates either a textual dependency tree or a graphviz digraph dot
+    file for the dependency set of a target.
+    """
 
     class SourceRootTypes:
-        """Defines SourceRoot Types Constants"""
+        """Defines SourceRoot Types Constants."""
 
         SOURCE = "SOURCE"  # Source Target
         TEST = "TEST"  # Test Target
@@ -167,7 +167,8 @@ class Depmap(ConsoleTask):
         color_by_type = {}
 
         def maybe_add_type(dep, dep_id):
-            """Add a class type to a dependency id if --show-types is passed."""
+            """Add a class type to a dependency id if --show-types is
+            passed."""
             return dep_id if not self.show_types else "\\n".join((dep_id, dep.__class__.__name__))
 
         def make_node(dep, dep_id, internal):

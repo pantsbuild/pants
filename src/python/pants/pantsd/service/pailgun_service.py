@@ -66,7 +66,10 @@ class PailgunService(PantsService):
         )
 
     def run(self):
-        """Main service entrypoint. Called via Thread.start() via PantsDaemon.run()."""
+        """Main service entrypoint.
+
+        Called via Thread.start() via PantsDaemon.run().
+        """
         self._logger.info("starting pailgun server on port {}".format(self.pailgun_port))
 
         try:
@@ -81,7 +84,8 @@ class PailgunService(PantsService):
             self._logger.info("pailgun service on port {} shutting down".format(self.pailgun_port))
 
     def terminate(self):
-        """Override of PantsService.terminate() that cleans up when the Pailgun server is terminated."""
+        """Override of PantsService.terminate() that cleans up when the Pailgun
+        server is terminated."""
         # Tear down the Pailgun TCPServer.
         if self.pailgun:
             self.pailgun.server_close()

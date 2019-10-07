@@ -315,7 +315,7 @@ class FailNTimesTest(unittest.TestCase):
 
 
 class JarPublishAuthTest(NailgunTaskTestBase):
-    """Tests for backend jvm JarPublish class"""
+    """Tests for backend jvm JarPublish class."""
 
     def _default_jvm_opts(self):
         """Return a fresh copy of this list every time."""
@@ -343,18 +343,16 @@ class JarPublishAuthTest(NailgunTaskTestBase):
         self._jar_publish = self.create_task(context)
 
     def test_options_with_no_auth(self):
-        """When called without authentication credentials, `JarPublish._ivy_jvm_options()` shouldn't
-    modify any options.
-    """
+        """When called without authentication credentials,
+        `JarPublish._ivy_jvm_options()` shouldn't modify any options."""
         self._jar_publish._jvm_options = self._default_jvm_opts()
         repo = {}
         modified_opts = self._jar_publish._ivy_jvm_options(repo)
         self.assertEqual(modified_opts, self._default_jvm_opts())
 
     def test_options_with_auth(self):
-        """`JarPublish._ivy_jvm_options()` should produce the same list, when called multiple times
-    with authentication credentials.
-    """
+        """`JarPublish._ivy_jvm_options()` should produce the same list, when
+        called multiple times with authentication credentials."""
         self._jar_publish._jvm_options = self._default_jvm_opts()
 
         username = "mjk"

@@ -8,23 +8,25 @@ import pywatchman
 
 # TODO(kwlzn): upstream this in pywatchman.
 class StreamableWatchmanClient(pywatchman.client):
-    """A watchman client subclass that provides for interruptable unilateral queries."""
+    """A watchman client subclass that provides for interruptable unilateral
+    queries."""
 
     WatchmanError = pywatchman.WatchmanError
     SocketTimeout = pywatchman.SocketTimeout
 
     def stream_query(self, commands):
-        """A generator of watchman events that allows queries to be pipelined and multiplexed. This
-    continuously yields unilateral events and subscribe events, or None until an error condition
-    or non-unilateral event (aside from subscribe) is received, at which point the generator
-    ceases.
+        """A generator of watchman events that allows queries to be pipelined
+        and multiplexed. This continuously yields unilateral events and
+        subscribe events, or None until an error condition or non-unilateral
+        event (aside from subscribe) is received, at which point the generator
+        ceases.
 
-    The generator will yield None on socket timeouts unless the client's timeout has been set to
-    None, in which case it will block indefinitely waiting on responses.
+        The generator will yield None on socket timeouts unless the client's timeout has been set to
+        None, in which case it will block indefinitely waiting on responses.
 
-    :param iterable commands: An iterable of commands to send to watchman - e.g. one or more
-                              subscribe commands.
-    """
+        :param iterable commands: An iterable of commands to send to watchman - e.g. one or more
+                                  subscribe commands.
+        """
         # The CLI transport does not support pipelining.
         if self.transport is pywatchman.CLIProcessTransport:
             raise NotImplementedError()

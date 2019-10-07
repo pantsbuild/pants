@@ -143,7 +143,8 @@ class TestWatchman(TestBase):
             self.assertEqual(list(out), [(None, None)])
 
     def test_subscribed_response(self):
-        """Test yielding on the watchman response to the initial subscribe command."""
+        """Test yielding on the watchman response to the initial subscribe
+        command."""
         with self.setup_subscribed([dict(subscribe="test")]):
             out = self.watchman.subscribed(self.BUILD_ROOT, self.HANDLERS)
             self.assertEqual(list(out), [(None, None)])

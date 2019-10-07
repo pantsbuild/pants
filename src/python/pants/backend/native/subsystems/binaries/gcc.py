@@ -13,12 +13,12 @@ from pants.util.memo import memoized_method, memoized_property
 class GCC(NativeTool):
     """Subsystem wrapping an archive providing a GCC distribution.
 
-  This subsystem provides the gcc and g++ compilers.
+    This subsystem provides the gcc and g++ compilers.
 
-  NB: The lib and include dirs provided by this distribution are produced by using known relative
-  paths into the distribution of GCC provided on Pantsbuild S3. If we change how we distribute GCC,
-  these methods may have to change. They should be stable to version upgrades, however.
-  """
+    NB: The lib and include dirs provided by this distribution are produced by using known relative
+    paths into the distribution of GCC provided on Pantsbuild S3. If we change how we distribute GCC,
+    these methods may have to change. They should be stable to version upgrades, however.
+    """
 
     options_scope = "gcc"
     default_version = "7.3.0"

@@ -36,12 +36,14 @@ from pants.util.strutil import ensure_text
 class _LoggerStream(object):
     """A sys.std{out,err} replacement that pipes output to a logger.
 
-  N.B. `logging.Logger` expects unicode. However, most of our outstream logic, such as in `exiter.py`,
-  will use `sys.std{out,err}.buffer` and thus a bytes interface. So, we must provide a `buffer`
-  property, and change the semantics of the buffer to always convert the message to unicode. This
-  is an unfortunate code smell, as `logging` does not expose a bytes interface so this is
-  the best solution we could think of.
-  """
+    N.B. `logging.Logger` expects unicode. However, most of our
+    outstream logic, such as in `exiter.py`, will use
+    `sys.std{out,err}.buffer` and thus a bytes interface. So, we must
+    provide a `buffer` property, and change the semantics of the buffer
+    to always convert the message to unicode. This is an unfortunate
+    code smell, as `logging` does not expose a bytes interface so this
+    is the best solution we could think of.
+    """
 
     def __init__(self, logger, log_level, handler):
         """
@@ -95,15 +97,17 @@ class PantsDaemon(FingerprintedProcessManager):
         """Represents a failure to start pantsd."""
 
     class RuntimeFailure(Exception):
-        """Represents a pantsd failure at runtime, usually from an underlying service failure."""
+        """Represents a pantsd failure at runtime, usually from an underlying
+        service failure."""
 
     @dataclass(frozen=True)
     class Handle:
         """A handle to a "probably running" pantsd instance.
 
-    We attempt to verify that the pantsd instance is still running when we create a Handle, but
-    after it has been created it is entirely process that the pantsd instance perishes.
-    """
+        We attempt to verify that the pantsd instance is still running
+        when we create a Handle, but after it has been created it is
+        entirely process that the pantsd instance perishes.
+        """
 
         pid: int
         port: int
@@ -112,12 +116,13 @@ class PantsDaemon(FingerprintedProcessManager):
     class Factory:
         @classmethod
         def maybe_launch(cls, options_bootstrapper):
-            """Creates and launches a daemon instance if one does not already exist.
+            """Creates and launches a daemon instance if one does not already
+            exist.
 
-      :param OptionsBootstrapper options_bootstrapper: The bootstrap options.
-      :returns: A Handle for the running pantsd instance.
-      :rtype: PantsDaemon.Handle
-      """
+            :param OptionsBootstrapper options_bootstrapper: The bootstrap options.
+            :returns: A Handle for the running pantsd instance.
+            :rtype: PantsDaemon.Handle
+            """
             stub_pantsd = cls.create(options_bootstrapper, full_init=False)
             with stub_pantsd._services.lifecycle_lock:
                 if stub_pantsd.needs_restart(stub_pantsd.options_fingerprint):
@@ -136,10 +141,10 @@ class PantsDaemon(FingerprintedProcessManager):
         def restart(cls, options_bootstrapper):
             """Restarts a running daemon instance.
 
-      :param OptionsBootstrapper options_bootstrapper: The bootstrap options.
-      :returns: A Handle for the pantsd instance.
-      :rtype: PantsDaemon.Handle
-      """
+            :param OptionsBootstrapper options_bootstrapper: The bootstrap options.
+            :returns: A Handle for the pantsd instance.
+            :rtype: PantsDaemon.Handle
+            """
             pantsd = cls.create(options_bootstrapper)
             with pantsd._services.lifecycle_lock:
                 # N.B. This will call `pantsd.terminate()` before starting.
@@ -189,8 +194,8 @@ class PantsDaemon(FingerprintedProcessManager):
         def _setup_services(build_root, bootstrap_options, legacy_graph_scheduler, watchman):
             """Initialize pantsd services.
 
-      :returns: A PantsServices instance.
-      """
+            :returns: A PantsServices instance.
+            """
             should_shutdown_after_run = bootstrap_options.shutdown_pantsd_after_run
             fs_event_service = FSEventService(watchman, build_root)
 
@@ -281,7 +286,8 @@ class PantsDaemon(FingerprintedProcessManager):
         )
 
     def shutdown(self, service_thread_map):
-        """Gracefully terminate all services and kill the main PantsDaemon loop."""
+        """Gracefully terminate all services and kill the main PantsDaemon
+        loop."""
         with self._services.lifecycle_lock:
             for service, service_thread in service_thread_map.items():
                 self._logger.info("terminating pantsd service: {}".format(service))
@@ -292,7 +298,8 @@ class PantsDaemon(FingerprintedProcessManager):
 
     @staticmethod
     def _close_stdio():
-        """Close stdio streams to avoid output in the tty that launched pantsd."""
+        """Close stdio streams to avoid output in the tty that launched
+        pantsd."""
         for fd in (sys.stdin, sys.stdout, sys.stderr):
             file_no = fd.fileno()
             fd.flush()
@@ -303,9 +310,9 @@ class PantsDaemon(FingerprintedProcessManager):
     def _pantsd_logging(self):
         """A context manager that runs with pantsd logging.
 
-    Asserts that stdio (represented by file handles 0, 1, 2) is closed to ensure that
-    we can safely reuse those fd numbers.
-    """
+        Asserts that stdio (represented by file handles 0, 1, 2) is
+        closed to ensure that we can safely reuse those fd numbers.
+        """
 
         # Ensure that stdio is closed so that we can safely reuse those file descriptors.
         for fd in (0, 1, 2):
@@ -463,11 +470,11 @@ class PantsDaemon(FingerprintedProcessManager):
     def needs_launch(self):
         """Determines if pantsd needs to be launched.
 
-    N.B. This should always be called under care of the `lifecycle_lock`.
+        N.B. This should always be called under care of the `lifecycle_lock`.
 
-    :returns: True if the daemon needs launching, False otherwise.
-    :rtype: bool
-    """
+        :returns: True if the daemon needs launching, False otherwise.
+        :rtype: bool
+        """
         new_fingerprint = self.options_fingerprint
         self._logger.debug(
             "pantsd: is_alive={} new_fingerprint={} current_fingerprint={}".format(
@@ -479,11 +486,11 @@ class PantsDaemon(FingerprintedProcessManager):
     def launch(self):
         """Launches pantsd in a subprocess.
 
-    N.B. This should always be called under care of the `lifecycle_lock`.
+        N.B. This should always be called under care of the `lifecycle_lock`.
 
-    :returns: A Handle for the pantsd instance.
-    :rtype: PantsDaemon.Handle
-    """
+        :returns: A Handle for the pantsd instance.
+        :rtype: PantsDaemon.Handle
+        """
         self.terminate(include_watchman=False)
         self.watchman_launcher.maybe_launch()
         self._logger.debug("launching pantsd")
@@ -499,19 +506,20 @@ class PantsDaemon(FingerprintedProcessManager):
     def terminate(self, include_watchman=True):
         """Terminates pantsd and watchman.
 
-    N.B. This should always be called under care of the `lifecycle_lock`.
-    """
+        N.B. This should always be called under care of the
+        `lifecycle_lock`.
+        """
         super().terminate()
         if include_watchman:
             self.watchman_launcher.terminate()
 
     def needs_restart(self, option_fingerprint):
+        """Overrides ProcessManager.needs_restart, to account for the case
+        where pantsd is running but we want to shutdown after this run.
+
+        :param option_fingerprint: A fingeprint of the global bootstrap options.
+        :return: True if the daemon needs to restart.
         """
-    Overrides ProcessManager.needs_restart, to account for the case where pantsd is running
-    but we want to shutdown after this run.
-    :param option_fingerprint: A fingeprint of the global bootstrap options.
-    :return: True if the daemon needs to restart.
-    """
         should_shutdown_after_run = (
             self._bootstrap_options.for_global_scope().shutdown_pantsd_after_run
         )

@@ -13,7 +13,8 @@ from pants.source.source_root import SourceRootConfig
 
 @dataclass(frozen=True)
 class SourceRootStrippedSources:
-    """Wrapper for a snapshot of targets whose source roots have been stripped."""
+    """Wrapper for a snapshot of targets whose source roots have been
+    stripped."""
 
     snapshot: Snapshot
 
@@ -23,7 +24,7 @@ def strip_source_root(
     hydrated_target: HydratedTarget, source_root_config: SourceRootConfig
 ) -> SourceRootStrippedSources:
     """Relativize targets to their source root, e.g.
-  `src/python/pants/util/strutil.py` -> `pants/util/strutil.py ."""
+    `src/python/pants/util/strutil.py` -> `pants/util/strutil.py ."""
 
     target_adaptor = hydrated_target.adaptor
     source_roots = source_root_config.get_source_roots()

@@ -34,11 +34,13 @@ class Artifact:
         self._relpaths = {os.path.relpath(path, self._artifact_root) for path in paths}
 
     def collect(self, paths):
-        """Collect the paths (which must be under artifact root) into this artifact."""
+        """Collect the paths (which must be under artifact root) into this
+        artifact."""
         raise NotImplementedError()
 
     def extract(self):
-        """Extract the files in this artifact to their locations under artifact root."""
+        """Extract the files in this artifact to their locations under artifact
+        root."""
         raise NotImplementedError()
 
 

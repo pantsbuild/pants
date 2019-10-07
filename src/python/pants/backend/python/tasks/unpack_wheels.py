@@ -22,9 +22,8 @@ from pants.util.objects import SubclassesOf
 
 class UnpackWheelsFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
     def compute_fingerprint(self, target):
-        """UnpackedWheels targets need to be re-unpacked if any of its configuration changes or any of
-    the jars they import have changed.
-    """
+        """UnpackedWheels targets need to be re-unpacked if any of its
+        configuration changes or any of the jars they import have changed."""
         if isinstance(target, UnpackedWheels):
             hasher = sha1()
             for cache_key in sorted(req.cache_key() for req in target.all_imported_requirements):
@@ -35,7 +34,8 @@ class UnpackWheelsFingerprintStrategy(DefaultFingerprintHashingMixin, Fingerprin
 
 
 class UnpackWheels(UnpackRemoteSourcesBase):
-    """Extract native code from `NativePythonWheel` targets for use by downstream C/C++ sources."""
+    """Extract native code from `NativePythonWheel` targets for use by
+    downstream C/C++ sources."""
 
     source_target_constraint = SubclassesOf(UnpackedWheels)
 
@@ -54,7 +54,8 @@ class UnpackWheels(UnpackRemoteSourcesBase):
         pass
 
     def _get_matching_wheel(self, pex_path, interpreter, requirements, module_name):
-        """Use PexBuilderWrapper to resolve a single wheel from the requirement specs using pex."""
+        """Use PexBuilderWrapper to resolve a single wheel from the requirement
+        specs using pex."""
         with self.context.new_workunit("extract-native-wheels"):
             with safe_concurrent_creation(pex_path) as chroot:
                 pex_builder = PexBuilderWrapper.Factory.create(

@@ -60,15 +60,16 @@ class SourcesField(PayloadField):
 
     @property
     def address(self):
-        """Returns the address this sources field refers to (used by some derived classes)"""
+        """Returns the address this sources field refers to (used by some
+        derived classes)"""
         return self._ref_address
 
     def snapshot(self, scheduler=None):
-        """
-    Returns a Snapshot containing the sources, relative to the build root.
+        """Returns a Snapshot containing the sources, relative to the build
+        root.
 
-    This API is experimental, and subject to change.
-    """
+        This API is experimental, and subject to change.
+        """
         if isinstance(self._sources, EagerFilesetWithSpec):
             snapshot = self._sources.snapshot
             if snapshot is not None:

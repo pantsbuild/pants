@@ -12,18 +12,19 @@ from pants.util.memo import memoized_method, memoized_property
 
 
 class LibcDev(Subsystem):
-    """Subsystem to detect and provide the host's installed version of a libc "dev" package.
+    """Subsystem to detect and provide the host's installed version of a libc
+    "dev" package.
 
-  A libc "dev" package is provided on most Linux systems by default, but may not be located at any
-  standardized path. We define a libc dev package as one which provides crti.o, an object file which
-  is part of any libc implementation and is required to create executables (more information
-  available at https://wiki.osdev.org/Creating_a_C_Library).
+    A libc "dev" package is provided on most Linux systems by default, but may not be located at any
+    standardized path. We define a libc dev package as one which provides crti.o, an object file which
+    is part of any libc implementation and is required to create executables (more information
+    available at https://wiki.osdev.org/Creating_a_C_Library).
 
-  NB: This is currently unused except in CI, because we have no plans to support creating native
-  executables from C or C++ sources yet (PRs welcome!). It is used to provide an "end-to-end" test
-  of the compilation and linking toolchain in CI by creating and invoking a "hello world"
-  executable.
-  """
+    NB: This is currently unused except in CI, because we have no plans to support creating native
+    executables from C or C++ sources yet (PRs welcome!). It is used to provide an "end-to-end" test
+    of the compilation and linking toolchain in CI by creating and invoking a "hello world"
+    executable.
+    """
 
     options_scope = "libc"
 
@@ -75,7 +76,8 @@ class LibcDev(Subsystem):
     _LIBC_INIT_OBJECT_FILE = "crti.o"
 
     def _get_host_libc_from_host_compiler(self):
-        """Locate the host's libc-dev installation using a specified host compiler's search dirs."""
+        """Locate the host's libc-dev installation using a specified host
+        compiler's search dirs."""
         compiler_exe = self.get_options().host_compiler
 
         # Implicitly, we are passing in the environment of the executing pants process to
@@ -103,7 +105,8 @@ class LibcDev(Subsystem):
 
     @memoized_property
     def _host_libc(self):
-        """Use the --libc-dir option if provided, otherwise invoke a host compiler to find libc dev."""
+        """Use the --libc-dir option if provided, otherwise invoke a host
+        compiler to find libc dev."""
         libc_dir_option = self.get_options().libc_dir
         if libc_dir_option:
             maybe_libc_crti = os.path.join(libc_dir_option, self._LIBC_INIT_OBJECT_FILE)

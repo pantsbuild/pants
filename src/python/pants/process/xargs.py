@@ -6,18 +6,19 @@ import subprocess
 
 
 class Xargs:
-    """A subprocess execution wrapper in the spirit of the xargs command line tool.
+    """A subprocess execution wrapper in the spirit of the xargs command line
+    tool.
 
-  Specifically allows encapsulated commands to be passed very large argument lists by chunking up
-  the argument lists into a minimal set and then invoking the encapsulated command against each
-  chunk in turn.
-  """
+    Specifically allows encapsulated commands to be passed very large
+    argument lists by chunking up the argument lists into a minimal set
+    and then invoking the encapsulated command against each chunk in
+    turn.
+    """
 
     @classmethod
     def subprocess(cls, cmd, **kwargs):
-        """Creates an xargs engine that uses subprocess.call to execute the given cmd array with extra
-    arg chunks.
-    """
+        """Creates an xargs engine that uses subprocess.call to execute the
+        given cmd array with extra arg chunks."""
 
         def call(args):
             return subprocess.call(cmd + args, **kwargs)
@@ -27,9 +28,9 @@ class Xargs:
     def __init__(self, cmd):
         """Creates an xargs engine that calls cmd with argument chunks.
 
-    :param cmd: A function that can execute a command line in the form of a list of strings
-      passed as its sole argument.
-    """
+        :param cmd: A function that can execute a command line in the form of a list of strings
+          passed as its sole argument.
+        """
         self._cmd = cmd
 
     def _split_args(self, args):
@@ -37,10 +38,11 @@ class Xargs:
         return args[:half], args[half:]
 
     def execute(self, args):
-        """Executes the configured cmd passing args in one or more rounds xargs style.
+        """Executes the configured cmd passing args in one or more rounds xargs
+        style.
 
-    :param list args: Extra arguments to pass to cmd.
-    """
+        :param list args: Extra arguments to pass to cmd.
+        """
         all_args = list(args)
         try:
             return self._cmd(all_args)

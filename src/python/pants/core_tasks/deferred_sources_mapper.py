@@ -18,31 +18,32 @@ logger = logging.getLogger(__name__)
 
 
 class DeferredSourcesMapper(Task):
-    """Map `remote_sources()` to files that produce the product `UnpackedArchives`.
+    """Map `remote_sources()` to files that produce the product
+    `UnpackedArchives`.
 
-  If you want a task to be able to map sources like this, make it require the 'deferred_sources'
-  product.
-  """
+    If you want a task to be able to map sources like this, make it
+    require the 'deferred_sources' product.
+    """
 
     class SourcesTargetLookupError(AddressLookupError):
-        """Raised when the referenced target cannot be found in the build graph"""
+        """Raised when the referenced target cannot be found in the build
+        graph."""
 
         pass
 
     class NoUnpackedSourcesError(AddressLookupError):
-        """Raised when there are no files found unpacked from the archive"""
+        """Raised when there are no files found unpacked from the archive."""
 
         pass
 
     @classmethod
     def product_types(cls):
-        """
-    Declare product produced by this task
+        """Declare product produced by this task.
 
-    deferred_sources does not have any data associated with it. Downstream tasks can
-    depend on it just make sure that this task completes first.
-    :return:
-    """
+        deferred_sources does not have any data associated with it. Downstream tasks can
+        depend on it just make sure that this task completes first.
+        :return:
+        """
         return ["deferred_sources"]
 
     @classmethod
@@ -50,7 +51,8 @@ class DeferredSourcesMapper(Task):
         round_manager.require_data(UnpackedArchives)
 
     def process_remote_sources(self):
-        """Create synthetic targets with populated sources from remote_sources targets."""
+        """Create synthetic targets with populated sources from remote_sources
+        targets."""
         unpacked_sources = self.context.products.get_data(UnpackedArchives)
         remote_sources_targets = self.context.targets(
             predicate=lambda t: isinstance(t, RemoteSources)

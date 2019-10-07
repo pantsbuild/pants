@@ -47,7 +47,8 @@ class IvyResolveTest(NailgunTaskTestBase):
         )
 
     def resolve(self, targets):
-        """Given some targets, execute a resolve, and return the resulting compile_classpath."""
+        """Given some targets, execute a resolve, and return the resulting
+        compile_classpath."""
         context = self.context(target_roots=targets)
         self.execute(context)
         return context.products.get_data("compile_classpath")
@@ -204,13 +205,16 @@ class IvyResolveTest(NailgunTaskTestBase):
 
     @ensure_cached(IvyResolve, expected_num_artifacts=1)
     def test_resolve_symlinked_cache(self):
-        """Test to make sure resolve works when --ivy-cache-dir is a symlinked path.
+        """Test to make sure resolve works when --ivy-cache-dir is a symlinked
+        path.
 
-    When ivy returns the path to a resolved jar file, it might be the realpath to the jar file,
-    not the symlink'ed path we are expecting for --ivy-cache-dir.  Make sure that resolve correctly
-    recognizes these as belonging in the cache dir and lookups for either the symlinked cache
-    dir or the realpath to the cache dir are recognized.
-    """
+        When ivy returns the path to a resolved jar file, it might be
+        the realpath to the jar file, not the symlink'ed path we are
+        expecting for --ivy-cache-dir.  Make sure that resolve correctly
+        recognizes these as belonging in the cache dir and lookups for
+        either the symlinked cache dir or the realpath to the cache dir
+        are recognized.
+        """
         with temporary_dir() as realcachedir:
             with temporary_dir() as symlinkdir:
                 symlink_cache_dir = os.path.join(symlinkdir, "symlinkedcache")

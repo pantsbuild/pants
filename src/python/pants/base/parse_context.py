@@ -40,45 +40,47 @@ class ParseContext:
     def __init__(self, rel_path, type_aliases):
         """Create a ParseContext.
 
-    :param rel_path: The (build file) path that the parse is currently operating on: initially None.
-    :param type_aliases: A dictionary of alias name strings or alias classes to a callable
-      constructor for the alias.
-    """
+        :param rel_path: The (build file) path that the parse is currently operating on: initially None.
+        :param type_aliases: A dictionary of alias name strings or alias classes to a callable
+          constructor for the alias.
+        """
 
         self._type_aliases = type_aliases
         self._storage = Storage(rel_path)
 
     def create_object(self, alias, *args, **kwargs):
-        """Constructs the type with the given alias using the given args and kwargs.
+        """Constructs the type with the given alias using the given args and
+        kwargs.
 
-    NB: aliases may be the alias' object type itself if that type is known.
+        NB: aliases may be the alias' object type itself if that type is known.
 
-    :API: public
+        :API: public
 
-    :param alias: Either the type alias or the type itself.
-    :type alias: string|type
-    :param *args: These pass through to the underlying callable object.
-    :param **kwargs: These pass through to the underlying callable object.
-    :returns: The created object.
-    """
+        :param alias: Either the type alias or the type itself.
+        :type alias: string|type
+        :param *args: These pass through to the underlying callable object.
+        :param **kwargs: These pass through to the underlying callable object.
+        :returns: The created object.
+        """
         object_type = self._type_aliases.get(alias)
         if object_type is None:
             raise KeyError("There is no type registered for alias {0}".format(alias))
         return object_type(*args, **kwargs)
 
     def create_object_if_not_exists(self, alias, name=None, *args, **kwargs):
-        """Constructs the type with the given alias using the given args and kwargs.
+        """Constructs the type with the given alias using the given args and
+        kwargs.
 
-    NB: aliases may be the alias' object type itself if that type is known.
+        NB: aliases may be the alias' object type itself if that type is known.
 
-    :API: public
+        :API: public
 
-    :param alias: Either the type alias or the type itself.
-    :type alias: string|type
-    :param *args: These pass through to the underlying callable object.
-    :param **kwargs: These pass through to the underlying callable object.
-    :returns: The created object, or an existing object with the same `name`.
-    """
+        :param alias: Either the type alias or the type itself.
+        :type alias: string|type
+        :param *args: These pass through to the underlying callable object.
+        :param **kwargs: These pass through to the underlying callable object.
+        :returns: The created object, or an existing object with the same `name`.
+        """
         if name is None:
             raise ValueError("Method requires an object `name`.")
         obj_creator = functools.partial(self.create_object, alias, name=name, *args, **kwargs)
@@ -86,10 +88,11 @@ class ParseContext:
 
     @property
     def rel_path(self):
-        """Relative path from the build root to the BUILD file the context aware object is called in.
+        """Relative path from the build root to the BUILD file the context
+        aware object is called in.
 
-    :API: public
+        :API: public
 
-    :rtype string
-    """
+        :rtype string
+        """
         return self._storage.rel_path

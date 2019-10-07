@@ -59,29 +59,29 @@ def execute_java(
 ):
     """Executes the java program defined by the classpath and main.
 
-  If `workunit_factory` is supplied, does so in the context of a workunit.
+    If `workunit_factory` is supplied, does so in the context of a workunit.
 
-  :param list classpath: the classpath for the java program
-  :param string main: the fully qualified class name of the java program's entry point
-  :param list jvm_options: an optional sequence of options for the underlying jvm
-  :param list args: an optional sequence of args to pass to the java program
-  :param executor: an optional java executor to use to launch the program; defaults to a subprocess
-    spawn of the default java distribution
-  :param workunit_factory: an optional callable that can produce a workunit context
-  :param string workunit_name: an optional name for the work unit; defaults to the main
-  :param list workunit_labels: an optional sequence of labels for the work unit
-  :param string cwd: optionally set the working directory
-  :param WorkUnit.LogConfig workunit_log_config: an optional tuple of options affecting reporting
-  :param bool create_synthetic_jar: whether to create a synthentic jar that includes the original
-    classpath in its manifest.
-  :param string synthetic_jar_dir: an optional directory to store the synthetic jar, if `None`
-    a temporary directory will be provided and cleaned up upon process exit.
-  :param file stdin: The stdin handle to use: by default None, meaning that stdin will
-    not be propagated into the process.
+    :param list classpath: the classpath for the java program
+    :param string main: the fully qualified class name of the java program's entry point
+    :param list jvm_options: an optional sequence of options for the underlying jvm
+    :param list args: an optional sequence of args to pass to the java program
+    :param executor: an optional java executor to use to launch the program; defaults to a subprocess
+      spawn of the default java distribution
+    :param workunit_factory: an optional callable that can produce a workunit context
+    :param string workunit_name: an optional name for the work unit; defaults to the main
+    :param list workunit_labels: an optional sequence of labels for the work unit
+    :param string cwd: optionally set the working directory
+    :param WorkUnit.LogConfig workunit_log_config: an optional tuple of options affecting reporting
+    :param bool create_synthetic_jar: whether to create a synthentic jar that includes the original
+      classpath in its manifest.
+    :param string synthetic_jar_dir: an optional directory to store the synthetic jar, if `None`
+      a temporary directory will be provided and cleaned up upon process exit.
+    :param file stdin: The stdin handle to use: by default None, meaning that stdin will
+      not be propagated into the process.
 
-  Returns the exit code of the java program.
-  Raises `pants.java.Executor.Error` if there was a problem launching java itself.
-  """
+    Returns the exit code of the java program.
+    Raises `pants.java.Executor.Error` if there was a problem launching java itself.
+    """
 
     runner = _get_runner(
         classpath,
@@ -121,30 +121,30 @@ def execute_java_async(
     create_synthetic_jar=True,
     synthetic_jar_dir=None,
 ):
-    """This is just like execute_java except that it returns a ProcessHandler rather than a return code.
+    """This is just like execute_java except that it returns a ProcessHandler
+    rather than a return code.
 
+    If `workunit_factory` is supplied, does so in the context of a workunit.
 
-  If `workunit_factory` is supplied, does so in the context of a workunit.
+    :param list classpath: the classpath for the java program
+    :param string main: the fully qualified class name of the java program's entry point
+    :param list jvm_options: an optional sequence of options for the underlying jvm
+    :param list args: an optional sequence of args to pass to the java program
+    :param executor: an optional java executor to use to launch the program; defaults to a subprocess
+      spawn of the default java distribution
+    :param workunit_factory: an optional callable that can produce a workunit context
+    :param string workunit_name: an optional name for the work unit; defaults to the main
+    :param list workunit_labels: an optional sequence of labels for the work unit
+    :param string cwd: optionally set the working directory
+    :param WorkUnit.LogConfig workunit_log_config: an optional tuple of options affecting reporting
+    :param bool create_synthetic_jar: whether to create a synthentic jar that includes the original
+      classpath in its manifest.
+    :param string synthetic_jar_dir: an optional directory to store the synthetic jar, if `None`
+      a temporary directory will be provided and cleaned up upon process exit.
 
-  :param list classpath: the classpath for the java program
-  :param string main: the fully qualified class name of the java program's entry point
-  :param list jvm_options: an optional sequence of options for the underlying jvm
-  :param list args: an optional sequence of args to pass to the java program
-  :param executor: an optional java executor to use to launch the program; defaults to a subprocess
-    spawn of the default java distribution
-  :param workunit_factory: an optional callable that can produce a workunit context
-  :param string workunit_name: an optional name for the work unit; defaults to the main
-  :param list workunit_labels: an optional sequence of labels for the work unit
-  :param string cwd: optionally set the working directory
-  :param WorkUnit.LogConfig workunit_log_config: an optional tuple of options affecting reporting
-  :param bool create_synthetic_jar: whether to create a synthentic jar that includes the original
-    classpath in its manifest.
-  :param string synthetic_jar_dir: an optional directory to store the synthetic jar, if `None`
-    a temporary directory will be provided and cleaned up upon process exit.
-
-  Returns a ProcessHandler to the java program.
-  Raises `pants.java.Executor.Error` if there was a problem launching java itself.
-  """
+    Returns a ProcessHandler to the java program.
+    Raises `pants.java.Executor.Error` if there was a problem launching java itself.
+    """
 
     runner = _get_runner(
         classpath,
@@ -192,20 +192,20 @@ def execute_runner(
 ):
     """Executes the given java runner.
 
-  If `workunit_factory` is supplied, does so in the context of a workunit.
+    If `workunit_factory` is supplied, does so in the context of a workunit.
 
-  :param runner: the java runner to run
-  :param workunit_factory: an optional callable that can produce a workunit context
-  :param string workunit_name: an optional name for the work unit; defaults to the main
-  :param list workunit_labels: an optional sequence of labels for the work unit
-  :param WorkUnit.LogConfig workunit_log_config: an optional tuple of task options affecting reporting
-  :param file stdin: The stdin handle to use: by default None, meaning that stdin will
-    not be propagated into the process.
-  :param string cwd: optionally set the working directory
+    :param runner: the java runner to run
+    :param workunit_factory: an optional callable that can produce a workunit context
+    :param string workunit_name: an optional name for the work unit; defaults to the main
+    :param list workunit_labels: an optional sequence of labels for the work unit
+    :param WorkUnit.LogConfig workunit_log_config: an optional tuple of task options affecting reporting
+    :param file stdin: The stdin handle to use: by default None, meaning that stdin will
+      not be propagated into the process.
+    :param string cwd: optionally set the working directory
 
-  Returns the exit code of the java runner.
-  Raises `pants.java.Executor.Error` if there was a problem launching java itself.
-  """
+    Returns the exit code of the java runner.
+    Raises `pants.java.Executor.Error` if there was a problem launching java itself.
+    """
     if not isinstance(runner, Executor.Runner):
         raise ValueError(
             "The runner argument must be a java Executor.Runner instance, "
@@ -238,25 +238,25 @@ def execute_runner_async(
 ):
     """Executes the given java runner asynchronously.
 
-  We can't use 'with' here because the workunit_generator's __exit__ function
-  must be called after the process exits, in the return_code_handler.
-  The wrapper around process.wait() needs to handle the same exceptions
-  as the contextmanager does, so we have code duplication.
+    We can't use 'with' here because the workunit_generator's __exit__ function
+    must be called after the process exits, in the return_code_handler.
+    The wrapper around process.wait() needs to handle the same exceptions
+    as the contextmanager does, so we have code duplication.
 
-  We're basically faking the 'with' call to deal with asynchronous
-  results.
+    We're basically faking the 'with' call to deal with asynchronous
+    results.
 
-  If `workunit_factory` is supplied, does so in the context of a workunit.
+    If `workunit_factory` is supplied, does so in the context of a workunit.
 
-  :param runner: the java runner to run
-  :param workunit_factory: an optional callable that can produce a workunit context
-  :param string workunit_name: an optional name for the work unit; defaults to the main
-  :param list workunit_labels: an optional sequence of labels for the work unit
-  :param WorkUnit.LogConfig workunit_log_config: an optional tuple of task options affecting reporting
+    :param runner: the java runner to run
+    :param workunit_factory: an optional callable that can produce a workunit context
+    :param string workunit_name: an optional name for the work unit; defaults to the main
+    :param list workunit_labels: an optional sequence of labels for the work unit
+    :param WorkUnit.LogConfig workunit_log_config: an optional tuple of task options affecting reporting
 
-  Returns a ProcessHandler to the java process that is spawned.
-  Raises `pants.java.Executor.Error` if there was a problem launching java itself.
-  """
+    Returns a ProcessHandler to the java process that is spawned.
+    Raises `pants.java.Executor.Error` if there was a problem launching java itself.
+    """
 
     if not isinstance(runner, Executor.Runner):
         raise ValueError(
@@ -301,18 +301,18 @@ def execute_runner_async(
 def relativize_classpath(classpath, root_dir, followlinks=True):
     """Convert into classpath relative to a directory.
 
-  This is eventually used by a jar file located in this directory as its manifest
-  attribute Class-Path. See
-  https://docs.oracle.com/javase/7/docs/technotes/guides/extensions/spec.html#bundled
+    This is eventually used by a jar file located in this directory as its manifest
+    attribute Class-Path. See
+    https://docs.oracle.com/javase/7/docs/technotes/guides/extensions/spec.html#bundled
 
-  :param list classpath: Classpath to be relativized.
-  :param string root_dir: directory to relativize urls in the classpath, does not
-    have to exist yet.
-  :param bool followlinks: whether to follow symlinks to calculate relative path.
+    :param list classpath: Classpath to be relativized.
+    :param string root_dir: directory to relativize urls in the classpath, does not
+      have to exist yet.
+    :param bool followlinks: whether to follow symlinks to calculate relative path.
 
-  :returns: Converted classpath of the same size as input classpath.
-  :rtype: list of strings
-  """
+    :returns: Converted classpath of the same size as input classpath.
+    :rtype: list of strings
+    """
 
     def relativize_url(url, root_dir):
         # When symlink is involed, root_dir concatenated with the returned relpath may not exist.
@@ -334,19 +334,20 @@ def relativize_classpath(classpath, root_dir, followlinks=True):
 
 # VisibleForTesting
 def safe_classpath(classpath, synthetic_jar_dir, custom_name=None):
-    """Bundles classpath into one synthetic jar that includes original classpath in its manifest.
+    """Bundles classpath into one synthetic jar that includes original
+    classpath in its manifest.
 
-  This is to ensure classpath length never exceeds platform ARG_MAX.
+    This is to ensure classpath length never exceeds platform ARG_MAX.
 
-  :param list classpath: Classpath to be bundled.
-  :param string synthetic_jar_dir: directory to store the synthetic jar, if `None`
-    a temp directory will be provided and cleaned up upon process exit. Otherwise synthetic
-    jar will remain in the supplied directory, only for debugging purpose.
-  :param custom_name: filename of the synthetic jar to be created.
+    :param list classpath: Classpath to be bundled.
+    :param string synthetic_jar_dir: directory to store the synthetic jar, if `None`
+      a temp directory will be provided and cleaned up upon process exit. Otherwise synthetic
+      jar will remain in the supplied directory, only for debugging purpose.
+    :param custom_name: filename of the synthetic jar to be created.
 
-  :returns: A classpath (singleton list with just the synthetic jar).
-  :rtype: list of strings
-  """
+    :returns: A classpath (singleton list with just the synthetic jar).
+    :rtype: list of strings
+    """
     if synthetic_jar_dir:
         safe_mkdir(synthetic_jar_dir)
     else:

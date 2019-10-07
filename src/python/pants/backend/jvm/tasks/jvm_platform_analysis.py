@@ -18,7 +18,8 @@ from pants.util.meta import classproperty
 
 
 class JvmPlatformAnalysisMixin:
-    """Mixin which provides common helper methods to JvmPlatformValidate and JvmPlatformExplain."""
+    """Mixin which provides common helper methods to JvmPlatformValidate and
+    JvmPlatformExplain."""
 
     @classmethod
     def _is_jvm_target(cls, target):
@@ -33,17 +34,18 @@ class JvmPlatformAnalysisMixin:
         return frozenset(self.context.targets(self._is_jvm_target))
 
     def _unfiltered_jvm_dependency_map(self, fully_transitive=False):
-        """Jvm dependency map without filtering out non-JvmTarget keys, exposed for testing.
+        """Jvm dependency map without filtering out non-JvmTarget keys, exposed
+        for testing.
 
-    Unfiltered because the keys in the resulting map include non-JvmTargets.
+        Unfiltered because the keys in the resulting map include non-JvmTargets.
 
-    See the explanation in the jvm_dependency_map() docs for what this method produces.
+        See the explanation in the jvm_dependency_map() docs for what this method produces.
 
-    :param fully_transitive: if true, the elements of the map will be the full set of transitive
-      JvmTarget dependencies, not just the "direct" ones. (see jvm_dependency_map for the definition
-      of "direct")
-    :return: map of target -> set of JvmTarget "direct" dependencies.
-    """
+        :param fully_transitive: if true, the elements of the map will be the full set of transitive
+          JvmTarget dependencies, not just the "direct" ones. (see jvm_dependency_map for the definition
+          of "direct")
+        :return: map of target -> set of JvmTarget "direct" dependencies.
+        """
         targets = self.jvm_targets
         jvm_deps = defaultdict(set)
 
@@ -72,43 +74,44 @@ class JvmPlatformAnalysisMixin:
 
     @memoized_property
     def jvm_dependency_map(self):
-        """A map of each JvmTarget in the context to the set of JvmTargets it depends on "directly".
+        """A map of each JvmTarget in the context to the set of JvmTargets it
+        depends on "directly".
 
-    "Directly" is in quotes here because it isn't quite the same as its normal use, which would be
-    filter(self._is_jvm_target, target.dependencies).
+        "Directly" is in quotes here because it isn't quite the same as its normal use, which would be
+        filter(self._is_jvm_target, target.dependencies).
 
-    For this method, we define the set of dependencies which `target` depends on "directly" as:
+        For this method, we define the set of dependencies which `target` depends on "directly" as:
 
-    { dep | dep is a JvmTarget and exists a directed path p from target to dep such that |p| = 1 }
+        { dep | dep is a JvmTarget and exists a directed path p from target to dep such that |p| = 1 }
 
-    Where |p| is computed as the weighted sum of all edges in the path, where edges to a JvmTarget
-    have weight 1, and all other edges have weight 0.
+        Where |p| is computed as the weighted sum of all edges in the path, where edges to a JvmTarget
+        have weight 1, and all other edges have weight 0.
 
-    In other words, a JvmTarget 'A' "directly" depends on a JvmTarget 'B' iff there exists a path in
-    the directed dependency graph from 'A' to 'B' such that there are no internal vertices in the
-    path that are JvmTargets.
+        In other words, a JvmTarget 'A' "directly" depends on a JvmTarget 'B' iff there exists a path in
+        the directed dependency graph from 'A' to 'B' such that there are no internal vertices in the
+        path that are JvmTargets.
 
-    This set is a (not necessarily proper) subset of the set of all JvmTargets that the target
-    transitively depends on. The algorithms using this map *would* operate correctly on the full
-    transitive superset, but it is more efficient to use this subset.
+        This set is a (not necessarily proper) subset of the set of all JvmTargets that the target
+        transitively depends on. The algorithms using this map *would* operate correctly on the full
+        transitive superset, but it is more efficient to use this subset.
 
-    The intuition for why we can get away with using this subset: Consider targets A, b, C, D,
-    such that A depends on b, which depends on C, which depends on D. Say A,C,D are JvmTargets.
+        The intuition for why we can get away with using this subset: Consider targets A, b, C, D,
+        such that A depends on b, which depends on C, which depends on D. Say A,C,D are JvmTargets.
 
-    If A is on java 6 and C is on java 7, we obviously have a problem, and this will be correctly
-    identified when verifying the jvm dependencies of A, because the path A->b->C has length 1.
+        If A is on java 6 and C is on java 7, we obviously have a problem, and this will be correctly
+        identified when verifying the jvm dependencies of A, because the path A->b->C has length 1.
 
-    If instead, A is on java 6, and C is on java 6, but D is on java 7, we still have a problem.
-    It will not be detected when processing A, because A->b->C->D has length 2. But when we process
-    C, it will be picked up, because C->D has length 1.
+        If instead, A is on java 6, and C is on java 6, but D is on java 7, we still have a problem.
+        It will not be detected when processing A, because A->b->C->D has length 2. But when we process
+        C, it will be picked up, because C->D has length 1.
 
-    Unfortunately, we can't do something as simple as just using actual direct dependencies, because
-    it's perfectly legal for a java 6 A to depend on b (which is a non-JvmTarget), and legal for
-    b to depend on a java 7 C, so the transitive information is needed to correctly identify the
-    problem.
+        Unfortunately, we can't do something as simple as just using actual direct dependencies, because
+        it's perfectly legal for a java 6 A to depend on b (which is a non-JvmTarget), and legal for
+        b to depend on a java 7 C, so the transitive information is needed to correctly identify the
+        problem.
 
-    :return: the dict mapping JvmTarget -> set of JvmTargets.
-    """
+        :return: the dict mapping JvmTarget -> set of JvmTargets.
+        """
         jvm_deps = self._unfiltered_jvm_dependency_map()
         return {
             target: deps
@@ -120,17 +123,21 @@ class JvmPlatformAnalysisMixin:
 class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
     """Validation step that runs well in advance of jvm compile.
 
-  Ensures that no jvm targets depend on other targets which use a newer platform.
-  """
-
-    class IllegalJavaTargetLevelDependency(TaskError):
-        """A jvm target depends on another jvm target with a newer java target level.
-
-    E.g., a java_library targeted for Java 6 depends on a java_library targeted for java 7.
+    Ensures that no jvm targets depend on other targets which use a
+    newer platform.
     """
 
+    class IllegalJavaTargetLevelDependency(TaskError):
+        """A jvm target depends on another jvm target with a newer java target
+        level.
+
+        E.g., a java_library targeted for Java 6 depends on a
+        java_library targeted for java 7.
+        """
+
     class PlatformFingerprintStrategy(FingerprintStrategy):
-        """Fingerprint strategy which only cares a target's platform and dependency ids."""
+        """Fingerprint strategy which only cares a target's platform and
+        dependency ids."""
 
         def compute_fingerprint(self, target):
             hasher = sha1()
@@ -177,13 +184,15 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
         self.parents_before_children = not self.get_options().children_before_parents
 
     def validate_platform_dependencies(self):
-        """Check all jvm targets in the context, throwing an error or warning if there are bad targets.
+        """Check all jvm targets in the context, throwing an error or warning
+        if there are bad targets.
 
-    If there are errors, this method fails slow rather than fails fast -- that is, it continues
-    checking the rest of the targets before spitting error messages. This is useful, because it's
-    nice to have a comprehensive list of all errors rather than just the first one we happened to
-    hit.
-    """
+        If there are errors, this method fails slow rather than fails
+        fast -- that is, it continues checking the rest of the targets
+        before spitting error messages. This is useful, because it's
+        nice to have a comprehensive list of all errors rather than just
+        the first one we happened to hit.
+        """
         conflicts = []
 
         def is_conflicting(target, dependency):
@@ -264,24 +273,25 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
 
 
 class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
-    """Console task which provides helpful analysis about jvm platform dependencies.
+    """Console task which provides helpful analysis about jvm platform
+    dependencies.
 
-  This can be very useful when debugging inter-dependencies in large sets of targets with a variety
-  of jvm platforms.
+    This can be very useful when debugging inter-dependencies in large sets of targets with a variety
+    of jvm platforms.
 
-  By default, this calculates the minimum and maximum possible -target level of each JvmTarget
-  specified, printing the range for each one on the console. This is determined by a target's
-  dependencies and dependees: a target cannot have a higher -target level than its dependees, and
-  it cannot have a lower -target level than any of its dependencies.
+    By default, this calculates the minimum and maximum possible -target level of each JvmTarget
+    specified, printing the range for each one on the console. This is determined by a target's
+    dependencies and dependees: a target cannot have a higher -target level than its dependees, and
+    it cannot have a lower -target level than any of its dependencies.
 
-  Additional flags fine-tune this output, including printing more detailed analysis of which
-  dependencies/dependees are limiting a target, or filtering the output to only targets you care
-  about.
+    Additional flags fine-tune this output, including printing more detailed analysis of which
+    dependencies/dependees are limiting a target, or filtering the output to only targets you care
+    about.
 
-  Besides this functionality, --upgradeable and --downgradeable can print lists of targets which
-  can (again, based on the limits of their dependencies and dependees) afford to be upgraded or
-  downgraded to a different version.
-  """
+    Besides this functionality, --upgradeable and --downgradeable can print lists of targets which
+    can (again, based on the limits of their dependencies and dependees) afford to be upgraded or
+    downgraded to a different version.
+    """
 
     Ranges = namedtuple(
         "ranges",
@@ -290,7 +300,8 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
 
     @classproperty
     def _register_console_transitivity_option(cls):
-        """This class registers its own --transitive option, which acts differently."""
+        """This class registers its own --transitive option, which acts
+        differently."""
         return False
 
     @classmethod
@@ -401,7 +412,8 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
         )
 
     def possible_version_evaluation(self):
-        """Evaluate the possible range of versions for each target, yielding the output analysis."""
+        """Evaluate the possible range of versions for each target, yielding
+        the output analysis."""
         only_broken = self.get_options().only_broken
         ranges = self._ranges
         yield "Allowable JVM platform ranges (* = anything):"

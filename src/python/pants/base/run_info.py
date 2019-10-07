@@ -16,8 +16,8 @@ from pants.version import VERSION
 class RunInfo:
     """A little plaintext file containing very basic info about a pants run.
 
-  Can only be appended to, never edited.
-  """
+    Can only be appended to, never edited.
+    """
 
     def __init__(self, info_file):
         self._info_file = info_file
@@ -45,11 +45,13 @@ class RunInfo:
         return self._info.copy()
 
     def add_info(self, key, val, ignore_errors=False, stringify=True):
-        """Adds the given info and returns a dict composed of just this added info."""
+        """Adds the given info and returns a dict composed of just this added
+        info."""
         self.add_infos((key, val), ignore_errors=ignore_errors, stringify=stringify)
 
     def add_infos(self, *keyvals, **kwargs):
-        """Adds the given info and returns a dict composed of just this added info."""
+        """Adds the given info and returns a dict composed of just this added
+        info."""
         kv_pairs = []
         for key, val in keyvals:
             key = key.strip()

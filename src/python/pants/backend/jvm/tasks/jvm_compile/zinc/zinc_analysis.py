@@ -9,12 +9,12 @@ from pants.backend.jvm.zinc.zinc_analysis import ZincAnalysis as UnderlyingAnaly
 class ZincAnalysis(Analysis):
     """Parsed representation of a zinc analysis.
 
-  Implemented by delegating to an underlying pants.backend.jvm.zinc.ZincAnalysis instance.
+    Implemented by delegating to an underlying pants.backend.jvm.zinc.ZincAnalysis instance.
 
-  Note also that all files in keys/values are full-path, just as they appear in the analysis file.
-  If you want paths relative to the build root or the classes dir or whatever, you must compute
-  those yourself.
-  """
+    Note also that all files in keys/values are full-path, just as they appear in the analysis file.
+    If you want paths relative to the build root or the classes dir or whatever, you must compute
+    those yourself.
+    """
 
     FORMAT_VERSION_LINE = UnderlyingAnalysis.FORMAT_VERSION_LINE
 

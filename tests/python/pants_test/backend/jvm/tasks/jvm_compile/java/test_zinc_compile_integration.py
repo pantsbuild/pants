@@ -165,12 +165,10 @@ class ZincCompileIntegrationTest(BaseCompileIT):
                 self.assertEqual(0, pants_run.returncode)
 
     def test_hermetic_incremental_compile(self):
-        """
-    1) create a target containing two scala files
-    2) compile the target, which would be a full compile
-    3) modify a scala file slightly
-    4) recompile, and make sure the compile is incremental by checking the zinc outputs
-    """
+        """1) create a target containing two scala files 2) compile the target,
+        which would be a full compile 3) modify a scala file slightly 4)
+        recompile, and make sure the compile is incremental by checking the
+        zinc outputs."""
         with self.temporary_workdir(cleanup=False) as tmp_build_root:
             # Make sure the tmp build root is recognized by Pants as a build root
             # by touching BUILDROOT.
@@ -180,12 +178,12 @@ class ZincCompileIntegrationTest(BaseCompileIT):
             def _create_file(relpath, contents="", mode="w"):
                 """Writes to a file under the buildroot.
 
-        :API: public
+                :API: public
 
-        relpath:  The relative path to the file from the build root.
-        contents: A string containing the contents of the file - '' by default..
-        mode:     The mode to write to the file in - over-write by default.
-        """
+                relpath:  The relative path to the file from the build root.
+                contents: A string containing the contents of the file - '' by default..
+                mode:     The mode to write to the file in - over-write by default.
+                """
                 path = os.path.join(tmp_build_root, relpath)
                 with safe_open(path, mode=mode) as fp:
                     fp.write(contents)

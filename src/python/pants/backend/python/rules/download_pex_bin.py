@@ -30,21 +30,22 @@ class DownloadedPexBin(HermeticPex):
         input_files: Digest = None,
         **kwargs: Any
     ) -> ExecuteProcessRequest:
-        """Creates an ExecuteProcessRequest that will run the pex CLI tool hermetically.
+        """Creates an ExecuteProcessRequest that will run the pex CLI tool
+        hermetically.
 
-    :param python_setup: The parameters for selecting python interpreters to use when invoking the
-                         pex tool.
-    :param subprocess_encoding_environment: The locale settings to use for the pex tool invocation.
-    :param pex_path: The path within `input_files` of the pex tool.
-    :param pex_args: The arguments to pass to the pex CLI tool.
-    :param description: A description of the process execution to be performed.
-    :param input_files: The files that contain the pex CLI tool itself and any input files it needs
-                        to run against. By default just the files that contain the pex CLI tool
-                        itself. To merge in additional files, include the `directory_digest` in
-                        `DirectoriesToMerge` request.
-    :param env: The environment to run the pex CLI tool in.
-    :param **kwargs: Any additional :class:`ExecuteProcessRequest` kwargs to pass through.
-    """
+        :param python_setup: The parameters for selecting python interpreters to use when invoking the
+                             pex tool.
+        :param subprocess_encoding_environment: The locale settings to use for the pex tool invocation.
+        :param pex_path: The path within `input_files` of the pex tool.
+        :param pex_args: The arguments to pass to the pex CLI tool.
+        :param description: A description of the process execution to be performed.
+        :param input_files: The files that contain the pex CLI tool itself and any input files it needs
+                            to run against. By default just the files that contain the pex CLI tool
+                            itself. To merge in additional files, include the `directory_digest` in
+                            `DirectoriesToMerge` request.
+        :param env: The environment to run the pex CLI tool in.
+        :param **kwargs: Any additional :class:`ExecuteProcessRequest` kwargs to pass through.
+        """
 
         return super().create_execute_request(
             python_setup=python_setup,

@@ -38,12 +38,11 @@ class CoursierResultNotFound(Exception):
 
 
 class CoursierMixin(JvmResolverBase):
-    """
-  Experimental 3rdparty resolver using coursier.
+    """Experimental 3rdparty resolver using coursier.
 
-  TODO(wisechengyi):
-  1. Add relative url support
-  """
+    TODO(wisechengyi):
+    1. Add relative url support
+    """
 
     RESULT_FILENAME = "result"
 
@@ -80,15 +79,14 @@ class CoursierMixin(JvmResolverBase):
 
     @staticmethod
     def _compute_jars_to_resolve_and_pin(raw_jars, artifact_set, manager):
-        """
-    This method provides settled lists of jar dependencies and coordinates
-    based on conflict management.
+        """This method provides settled lists of jar dependencies and
+        coordinates based on conflict management.
 
-    :param raw_jars: a collection of `JarDependencies`
-    :param artifact_set: PinnedJarArtifactSet
-    :param manager: JarDependencyManagement
-    :return: (list of settled `JarDependency`, set of pinned `M2Coordinate`)
-    """
+        :param raw_jars: a collection of `JarDependencies`
+        :param artifact_set: PinnedJarArtifactSet
+        :param manager: JarDependencyManagement
+        :return: (list of settled `JarDependency`, set of pinned `M2Coordinate`)
+        """
         if artifact_set is None:
             artifact_set = PinnedJarArtifactSet()
 
@@ -115,29 +113,28 @@ class CoursierMixin(JvmResolverBase):
         return jar_list, untouched_pinned_artifact
 
     def resolve(self, targets, compile_classpath, sources, javadoc, executor):
+        """This is the core function for coursier resolve.
+
+        Validation strategy:
+
+        1. All targets are going through the `invalidated` to get fingerprinted in the target level.
+           No cache is fetched at this stage because it is disabled.
+        2. Once each target is fingerprinted, we combine them into a `VersionedTargetSet` where they
+           are fingerprinted together, because each run of 3rdparty resolve is context sensitive.
+
+        Artifacts are stored in `VersionedTargetSet`'s results_dir, the contents are the aggregation of
+        each coursier run happened within that context.
+
+        Caching: (TODO): https://github.com/pantsbuild/pants/issues/5187
+        Currently it is disabled due to absolute paths in the coursier results.
+
+        :param targets: a collection of targets to do 3rdparty resolve against
+        :param compile_classpath: classpath product that holds the resolution result. IMPORTANT: this parameter will be changed.
+        :param sources: if True, fetch sources for 3rdparty
+        :param javadoc: if True, fetch javadoc for 3rdparty
+        :param executor: An instance of `pants.java.executor.Executor`. If None, a subprocess executor will be assigned.
+        :return: n/a
         """
-    This is the core function for coursier resolve.
-
-    Validation strategy:
-
-    1. All targets are going through the `invalidated` to get fingerprinted in the target level.
-       No cache is fetched at this stage because it is disabled.
-    2. Once each target is fingerprinted, we combine them into a `VersionedTargetSet` where they
-       are fingerprinted together, because each run of 3rdparty resolve is context sensitive.
-
-    Artifacts are stored in `VersionedTargetSet`'s results_dir, the contents are the aggregation of
-    each coursier run happened within that context.
-
-    Caching: (TODO): https://github.com/pantsbuild/pants/issues/5187
-    Currently it is disabled due to absolute paths in the coursier results.
-
-    :param targets: a collection of targets to do 3rdparty resolve against
-    :param compile_classpath: classpath product that holds the resolution result. IMPORTANT: this parameter will be changed.
-    :param sources: if True, fetch sources for 3rdparty
-    :param javadoc: if True, fetch javadoc for 3rdparty
-    :param executor: An instance of `pants.java.executor.Executor`. If None, a subprocess executor will be assigned.
-    :return: n/a
-    """
         manager = JarDependencyManagement.global_instance()
 
         jar_targets = manager.targets_by_artifact_set(targets)
@@ -230,15 +227,14 @@ class CoursierMixin(JvmResolverBase):
             return None
 
     def _prepare_vts_results_dir(self, vts):
-        """
-    Given a `VergetTargetSet`, prepare its results dir.
-    """
+        """Given a `VergetTargetSet`, prepare its results dir."""
         vt_set_results_dir = os.path.join(self.versioned_workdir, "results", vts.cache_key.hash)
         safe_mkdir(vt_set_results_dir)
         return vt_set_results_dir
 
     def _prepare_workdir(self):
-        """Prepare the location in our task workdir to store all the hardlinks to coursier cache dir."""
+        """Prepare the location in our task workdir to store all the hardlinks
+        to coursier cache dir."""
         pants_jar_base_dir = os.path.join(self.versioned_workdir, "cache")
         safe_mkdir(pants_jar_base_dir)
         return pants_jar_base_dir
@@ -253,52 +249,51 @@ class CoursierMixin(JvmResolverBase):
         javadoc,
         executor,
     ):
-        """
-    Calling coursier and return the result per invocation.
+        """Calling coursier and return the result per invocation.
 
-    If coursier was called once for classifier '' and once for classifier 'tests', then the return value
-    would be: {'default': [<first coursier output>, <second coursier output>]}
+        If coursier was called once for classifier '' and once for classifier 'tests', then the return value
+        would be: {'default': [<first coursier output>, <second coursier output>]}
 
-    :param jars_to_resolve: List of `JarDependency`s to resolve
-    :param global_excludes: List of `M2Coordinate`s to exclude globally
-    :param pinned_coords: List of `M2Coordinate`s that need to be pinned.
-    :param coursier_cache_path: path to where coursier cache is stored.
-    :param executor: An instance of `pants.java.executor.Executor`
+        :param jars_to_resolve: List of `JarDependency`s to resolve
+        :param global_excludes: List of `M2Coordinate`s to exclude globally
+        :param pinned_coords: List of `M2Coordinate`s that need to be pinned.
+        :param coursier_cache_path: path to where coursier cache is stored.
+        :param executor: An instance of `pants.java.executor.Executor`
 
-    :return: The aggregation of results by conf from coursier. Each coursier call could return
-    the following:
+        :return: The aggregation of results by conf from coursier. Each coursier call could return
+        the following:
+            {
+              "conflict_resolution": {
+                "org:name:version" (requested): "org:name:version" (reconciled)
+              },
+              "dependencies": [
+                {
+                  "coord": "orgA:nameA:versionA",
+                  "file": <path>,
+                  "dependencies": [ // coodinates for its transitive dependencies
+                    <orgX:nameX:versionX>,
+                    <orgY:nameY:versionY>,
+                  ]
+                },
+                {
+                  "coord": "orgB:nameB:jar:classifier:versionB",
+                  "file": <path>,
+                  "dependencies": [ // coodinates for its transitive dependencies
+                    <orgX:nameX:versionX>,
+                    <orgZ:nameZ:versionZ>,
+                  ]
+                },
+                ... // more about orgX:nameX:versionX, orgY:nameY:versionY, orgZ:nameZ:versionZ
+              ]
+            }
+        Hence the aggregation of the results will be in the following format, for example when default classifier
+        and sources are fetched:
         {
-          "conflict_resolution": {
-            "org:name:version" (requested): "org:name:version" (reconciled)
-          },
-          "dependencies": [
-            {
-              "coord": "orgA:nameA:versionA",
-              "file": <path>,
-              "dependencies": [ // coodinates for its transitive dependencies
-                <orgX:nameX:versionX>,
-                <orgY:nameY:versionY>,
-              ]
-            },
-            {
-              "coord": "orgB:nameB:jar:classifier:versionB",
-              "file": <path>,
-              "dependencies": [ // coodinates for its transitive dependencies
-                <orgX:nameX:versionX>,
-                <orgZ:nameZ:versionZ>,
-              ]
-            },
-            ... // more about orgX:nameX:versionX, orgY:nameY:versionY, orgZ:nameZ:versionZ
-          ]
+          'default': [<result from coursier call with default conf with classifier X>,
+                      <result from coursier call with default conf with classifier Y>],
+          'src_doc': [<result from coursier call with --sources and/or --javadoc>],
         }
-    Hence the aggregation of the results will be in the following format, for example when default classifier
-    and sources are fetched:
-    {
-      'default': [<result from coursier call with default conf with classifier X>,
-                  <result from coursier call with default conf with classifier Y>],
-      'src_doc': [<result from coursier call with --sources and/or --javadoc>],
-    }
-    """
+        """
         # Prepare coursier args
         coursier_subsystem_instance = CoursierSubsystem.global_instance()
         coursier_jar = coursier_subsystem_instance.bootstrap_coursier(self.context.new_workunit)
@@ -527,16 +522,16 @@ class CoursierMixin(JvmResolverBase):
         result,
         override_classifiers=None,
     ):
-        """
-    Given a coursier run result, load it into compile_classpath by target.
+        """Given a coursier run result, load it into compile_classpath by
+        target.
 
-    :param compile_classpath: `ClasspathProducts` that will be modified
-    :param coursier_cache_path: cache location that is managed by coursier
-    :param invalidation_check: InvalidationCheck
-    :param pants_jar_path_base: location under pants workdir that contains all the hardlinks to coursier cache
-    :param result: result dict converted from the json produced by one coursier run
-    :return: n/a
-    """
+        :param compile_classpath: `ClasspathProducts` that will be modified
+        :param coursier_cache_path: cache location that is managed by coursier
+        :param invalidation_check: InvalidationCheck
+        :param pants_jar_path_base: location under pants workdir that contains all the hardlinks to coursier cache
+        :param result: result dict converted from the json produced by one coursier run
+        :return: n/a
+        """
         # Parse the coursier result
         flattened_resolution = self._extract_dependencies_by_root(result)
 
@@ -625,11 +620,11 @@ class CoursierMixin(JvmResolverBase):
         invalidation_check,
         pants_jar_path_base,
     ):
-        """
-    Given vts_results_dir, load the results which can be from multiple runs of coursier into compile_classpath.
+        """Given vts_results_dir, load the results which can be from multiple
+        runs of coursier into compile_classpath.
 
-    :return: True if success; False if any of the classpath is not valid anymore.
-    """
+        :return: True if success; False if any of the classpath is not valid anymore.
+        """
         result_file_path = os.path.join(vts_results_dir, self.RESULT_FILENAME)
         if not os.path.exists(result_file_path):
             return
@@ -655,37 +650,36 @@ class CoursierMixin(JvmResolverBase):
 
     @classmethod
     def _extract_dependencies_by_root(cls, result):
-        """
-    Only extracts the transitive dependencies for the given coursier resolve.
-    Note the "dependencies" field is already transitive.
+        """Only extracts the transitive dependencies for the given coursier
+        resolve. Note the "dependencies" field is already transitive.
 
-    Example:
-    {
-      "conflict_resolution": {},
-      "dependencies": [
+        Example:
         {
-          "coord": "a",
-          "dependencies": ["b", "c"]
-          "file": ...
-        },
-        {
-          "coord": "b",
-          "dependencies": []
-          "file": ...
-        },
-        {
-          "coord": "c",
-          "dependencies": []
-          "file": ...
+          "conflict_resolution": {},
+          "dependencies": [
+            {
+              "coord": "a",
+              "dependencies": ["b", "c"]
+              "file": ...
+            },
+            {
+              "coord": "b",
+              "dependencies": []
+              "file": ...
+            },
+            {
+              "coord": "c",
+              "dependencies": []
+              "file": ...
+            }
+          ]
         }
-      ]
-    }
 
-    Should return { "a": ["b", "c"], "b": [], "c": [] }
+        Should return { "a": ["b", "c"], "b": [], "c": [] }
 
-    :param result: coursier result like the example.
-    :return: a simplified view with the top artifact as the roots.
-    """
+        :param result: coursier result like the example.
+        :return: a simplified view with the top artifact as the roots.
+        """
         flat_result = defaultdict(list)
 
         for artifact in result["dependencies"]:
@@ -695,49 +689,48 @@ class CoursierMixin(JvmResolverBase):
 
     @classmethod
     def _map_coord_to_resolved_jars(cls, result, coursier_cache_path, pants_jar_path_base):
+        """Map resolved files to each org:name:version.
+
+        Example:
+        {
+          "conflict_resolution": {},
+          "dependencies": [
+            {
+              "coord": "a",
+              "dependencies": ["b", "c"],
+              "file": "a.jar"
+            },
+            {
+              "coord": "b",
+              "dependencies": [],
+              "file": "b.jar"
+            },
+            {
+              "coord": "c",
+              "dependencies": [],
+              "file": "c.jar"
+            },
+            {
+              "coord": "a:sources",
+              "dependencies": ["b", "c"],
+              "file": "a-sources.jar"
+            },
+          ]
+        }
+
+        Should return:
+        {
+          M2Coordinate("a", ...):                             ResolvedJar(classifier='', path/cache_path="a.jar"),
+          M2Coordinate("a", ..., classifier="sources"):       ResolvedJar(classifier='sources', path/cache_path="a-sources.jar"),
+          M2Coordinate("b", ...):                             ResolvedJar(classifier='', path/cache_path="b.jar"),
+          M2Coordinate("c", ...):                             ResolvedJar(classifier='', path/cache_path="c.jar"),
+        }
+
+        :param result: coursier json output
+        :param coursier_cache_path: coursier cache location
+        :param pants_jar_path_base: location under pants workdir to store the hardlink to the coursier cache
+        :return: a map from maven coordinate to a resolved jar.
         """
-    Map resolved files to each org:name:version
-
-    Example:
-    {
-      "conflict_resolution": {},
-      "dependencies": [
-        {
-          "coord": "a",
-          "dependencies": ["b", "c"],
-          "file": "a.jar"
-        },
-        {
-          "coord": "b",
-          "dependencies": [],
-          "file": "b.jar"
-        },
-        {
-          "coord": "c",
-          "dependencies": [],
-          "file": "c.jar"
-        },
-        {
-          "coord": "a:sources",
-          "dependencies": ["b", "c"],
-          "file": "a-sources.jar"
-        },
-      ]
-    }
-
-    Should return:
-    {
-      M2Coordinate("a", ...):                             ResolvedJar(classifier='', path/cache_path="a.jar"),
-      M2Coordinate("a", ..., classifier="sources"):       ResolvedJar(classifier='sources', path/cache_path="a-sources.jar"),
-      M2Coordinate("b", ...):                             ResolvedJar(classifier='', path/cache_path="b.jar"),
-      M2Coordinate("c", ...):                             ResolvedJar(classifier='', path/cache_path="c.jar"),
-    }
-
-    :param result: coursier json output
-    :param coursier_cache_path: coursier cache location
-    :param pants_jar_path_base: location under pants workdir to store the hardlink to the coursier cache
-    :return: a map from maven coordinate to a resolved jar.
-    """
 
         coord_to_resolved_jars = dict()
 
@@ -769,14 +762,13 @@ class CoursierMixin(JvmResolverBase):
 
     @classmethod
     def _get_path_to_jar(cls, coursier_cache_path, pants_jar_path_base, jar_path):
-        """
-    Create the path to the jar that will live in .pants.d
+        """Create the path to the jar that will live in .pants.d.
 
-    :param coursier_cache_path: coursier cache location
-    :param pants_jar_path_base: location under pants workdir to store the hardlink to the coursier cache
-    :param jar_path: path of the jar
-    :return:
-    """
+        :param coursier_cache_path: coursier cache location
+        :param pants_jar_path_base: location under pants workdir to store the hardlink to the coursier cache
+        :param jar_path: path of the jar
+        :return:
+        """
         if os.path.abspath(coursier_cache_path) not in os.path.abspath(jar_path):
             # Appending the string 'absolute' to the jar_path and joining that is a hack to work around
             # python's os.path.join behavior of throwing away all components that come before an
@@ -814,9 +806,8 @@ class CoursierResolve(CoursierMixin, NailgunTask):
         return super().implementation_version() + [("CoursierResolve", 2)]
 
     def execute(self):
-        """Resolves the specified confs for the configured targets and returns an iterator over
-    tuples of (conf, jar path).
-    """
+        """Resolves the specified confs for the configured targets and returns
+        an iterator over tuples of (conf, jar path)."""
 
         jvm_resolve_subsystem = JvmResolveSubsystem.global_instance()
         if jvm_resolve_subsystem.get_options().resolver != "coursier":

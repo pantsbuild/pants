@@ -13,8 +13,8 @@ from pants.task.console_task import ConsoleTask
 class Login(ConsoleTask):
     """Task to auth against some identity provider.
 
-  :API: public
-  """
+    :API: public
+    """
 
     @classmethod
     def subsystem_dependencies(cls):

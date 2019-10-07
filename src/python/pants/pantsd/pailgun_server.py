@@ -16,26 +16,30 @@ from pants.util.socket import RecvBufferedSocket, is_readable
 
 
 class PailgunHandlerBase(BaseRequestHandler):
-    """Base class for nailgun protocol handlers for use with SocketServer-based servers."""
+    """Base class for nailgun protocol handlers for use with SocketServer-based
+    servers."""
 
     def __init__(self, request, client_address, server):
-        """Override of BaseRequestHandler.__init__() that defers calling of self.setup().
+        """Override of BaseRequestHandler.__init__() that defers calling of
+        self.setup().
 
-    :param socket request: The inbound TCPServer request socket.
-    :param tuple client_address: The remote client socket address tuple (host, port).
-    :param TCPServer server: The parent TCPServer instance.
-    """
+        :param socket request: The inbound TCPServer request socket.
+        :param tuple client_address: The remote client socket address tuple (host, port).
+        :param TCPServer server: The parent TCPServer instance.
+        """
         self.request = request
         self.client_address = client_address
         self.server = server
         self.logger = logging.getLogger(__name__)
 
     def handle_request(self):
-        """Handle a request (the equivalent of the latter half of BaseRequestHandler.__init__()).
+        """Handle a request (the equivalent of the latter half of
+        BaseRequestHandler.__init__()).
 
-    This is invoked by a TCPServer subclass that spawns a thread from process_request() that invokes
-    an overridden process_request_thread().
-    """
+        This is invoked by a TCPServer subclass that spawns a thread
+        from process_request() that invokes an overridden
+        process_request_thread().
+        """
         self.setup()
         try:
             self.handle()
@@ -54,7 +58,8 @@ class PailgunHandlerBase(BaseRequestHandler):
 
 
 class PailgunHandler(PailgunHandlerBase):
-    """A nailgun protocol handler for use with forking, SocketServer-based servers."""
+    """A nailgun protocol handler for use with forking, SocketServer-based
+    servers."""
 
     def _run_pants(self, sock, arguments, environment):
         """Execute a given run with a pants runner."""
@@ -106,7 +111,8 @@ class ExclusiveRequestTimeout(Exception):
 
 
 class PailgunHandleRequestLock:
-    """Convenience lock to implement Lock.acquire(timeout), which is not available in Python 2."""
+    """Convenience lock to implement Lock.acquire(timeout), which is not
+    available in Python 2."""
 
     # TODO(#6071): remove and replace for the py3 Lock() when we don't have to support py2 anymore.
 
@@ -115,11 +121,11 @@ class PailgunHandleRequestLock:
         self.available = True
 
     def acquire(self, timeout=0.0):
-        """
-    Try to acquire the lock, blocking until the timeout is reached. Will return immediately if the lock is acquired.
+        """Try to acquire the lock, blocking until the timeout is reached. Will
+        return immediately if the lock is acquired.
 
-    :return True if the lock was aquired, False if the timeout was reached.
-    """
+        :return True if the lock was aquired, False if the timeout was reached.
+        """
         self.cond.acquire()
         if self.available:
             self.available = False
@@ -147,9 +153,9 @@ class PailgunHandleRequestLock:
 class PailgunServer(ThreadingMixIn, TCPServer):
     """A pants nailgun server.
 
-  This class spawns a thread per request via `ThreadingMixIn`: the thread body runs
-  `process_request_thread`, which we override.
-  """
+    This class spawns a thread per request via `ThreadingMixIn`: the
+    thread body runs `process_request_thread`, which we override.
+    """
 
     timeout = 0.05
     # Override the ThreadingMixIn default, to minimize the chances of zombie pailgun processes.
@@ -166,19 +172,19 @@ class PailgunServer(ThreadingMixIn, TCPServer):
     ):
         """Override of TCPServer.__init__().
 
-    N.B. the majority of this function is copied verbatim from TCPServer.__init__().
+        N.B. the majority of this function is copied verbatim from TCPServer.__init__().
 
-    :param tuple server_address: An address tuple of (hostname, port) for socket.bind().
-    :param class runner_factory: A factory function for creating a DaemonPantsRunner for each run.
-    :param threading.RLock lifecycle_lock: A lock used to guard against abrupt teardown of the servers
-                                           execution thread during handling. All pailgun request handling
-                                           will take place under care of this lock, which would be shared with
-                                           a `PailgunServer`-external lifecycle manager to guard teardown.
-    :param function request_complete_callback: A callback that will be called whenever a pailgun request is completed.
-    :param class handler_class: The request handler class to use for each request. (Optional)
-    :param bool bind_and_activate: If True, binds and activates networking at __init__ time.
-                                   (Optional)
-    """
+        :param tuple server_address: An address tuple of (hostname, port) for socket.bind().
+        :param class runner_factory: A factory function for creating a DaemonPantsRunner for each run.
+        :param threading.RLock lifecycle_lock: A lock used to guard against abrupt teardown of the servers
+                                               execution thread during handling. All pailgun request handling
+                                               will take place under care of this lock, which would be shared with
+                                               a `PailgunServer`-external lifecycle manager to guard teardown.
+        :param function request_complete_callback: A callback that will be called whenever a pailgun request is completed.
+        :param class handler_class: The request handler class to use for each request. (Optional)
+        :param bool bind_and_activate: If True, binds and activates networking at __init__ time.
+                                       (Optional)
+        """
         # Old-style class, so we must invoke __init__() this way.
         BaseServer.__init__(self, server_address, handler_class or PailgunHandler)
         self.socket = RecvBufferedSocket(socket.socket(self.address_family, self.socket_type))
@@ -199,16 +205,18 @@ class PailgunServer(ThreadingMixIn, TCPServer):
                 raise
 
     def server_bind(self):
-        """Override of TCPServer.server_bind() that tracks bind-time assigned random ports."""
+        """Override of TCPServer.server_bind() that tracks bind-time assigned
+        random ports."""
         TCPServer.server_bind(self)
         _, self.server_port = self.socket.getsockname()[:2]
 
     def process_request(self, request, client_address):
         """Start a new thread to process the request.
 
-    This is lovingly copied and pasted from ThreadingMixIn, with the addition of setting the name
-    of the thread. It's a shame that ThreadingMixIn doesn't provide a customization hook.
-    """
+        This is lovingly copied and pasted from ThreadingMixIn, with the
+        addition of setting the name of the thread. It's a shame that
+        ThreadingMixIn doesn't provide a customization hook.
+        """
         t = threading.Thread(
             target=self.process_request_thread,
             args=(request, client_address),
@@ -220,12 +228,12 @@ class PailgunServer(ThreadingMixIn, TCPServer):
     def handle_request(self):
         """Override of TCPServer.handle_request() that provides locking.
 
-    Calling this method has the effect of "maybe" (if the socket does not time out first)
-    accepting a request and (because we mixin in ThreadingMixIn) spawning it on a thread. It should
-    always return within `min(self.timeout, socket.gettimeout())`.
+        Calling this method has the effect of "maybe" (if the socket does not time out first)
+        accepting a request and (because we mixin in ThreadingMixIn) spawning it on a thread. It should
+        always return within `min(self.timeout, socket.gettimeout())`.
 
-    N.B. Most of this is copied verbatim from SocketServer.py in the stdlib.
-    """
+        N.B. Most of this is copied verbatim from SocketServer.py in the stdlib.
+        """
         timeout = self.socket.gettimeout()
         if timeout is None:
             timeout = self.timeout
@@ -252,12 +260,12 @@ class PailgunServer(ThreadingMixIn, TCPServer):
 
     @contextmanager
     def ensure_request_is_exclusive(self, environment, request):
-        """
-    Ensure that this is the only pants running.
+        """Ensure that this is the only pants running.
 
-    We currently don't allow parallel pants runs, so this function blocks a request thread until
-    there are no more requests being handled.
-    """
+        We currently don't allow parallel pants runs, so this function
+        blocks a request thread until there are no more requests being
+        handled.
+        """
         # TODO add `did_poll` to pantsd metrics
 
         timeout = float(environment["PANTSD_REQUEST_TIMEOUT_LIMIT"])
@@ -323,7 +331,8 @@ class PailgunServer(ThreadingMixIn, TCPServer):
                 yield
 
     def process_request_thread(self, request, client_address):
-        """Override of ThreadingMixIn.process_request_thread() that delegates to the request handler."""
+        """Override of ThreadingMixIn.process_request_thread() that delegates
+        to the request handler."""
         # Instantiate the request handler.
         Native().override_thread_logging_destination_to_just_pantsd()
         handler = self.RequestHandlerClass(request, client_address, self)

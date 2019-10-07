@@ -70,12 +70,12 @@ class JavaThriftyGen(NailgunTaskBase, SimpleCodegenTask):
     def _compute_include_paths(self, target):
         """Computes the set of paths that thrifty uses to lookup imports.
 
-    The IDL files under these paths are not compiled, but they are required to compile
-    downstream IDL files.
+        The IDL files under these paths are not compiled, but they are required to compile
+        downstream IDL files.
 
-    :param target: the JavaThriftyLibrary target to compile.
-    :return: an ordered set of directories to pass along to thrifty.
-    """
+        :param target: the JavaThriftyLibrary target to compile.
+        :return: an ordered set of directories to pass along to thrifty.
+        """
         paths = OrderedSet()
         paths.add(os.path.join(get_buildroot(), target.target_base))
 

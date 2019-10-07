@@ -13,13 +13,17 @@ from pants.util.dirutil import safe_file_dump
 
 
 class PyThriftNamespaceClashCheck(Task):
-    """Check that no python thrift libraries in the build graph have files with clashing namespaces.
+    """Check that no python thrift libraries in the build graph have files with
+    clashing namespaces.
 
-  This is a temporary workaround for https://issues.apache.org/jira/browse/THRIFT-515. A real fix
-  would ideally be to extend Scrooge to support clashing namespaces with Python code. A second-best
-  solution would be to check all *thrift* libraries in the build graph, but there is currently no
-  "ThriftLibraryMixin" or other way to identify targets containing thrift code generically.
-  """
+    This is a temporary workaround for
+    https://issues.apache.org/jira/browse/THRIFT-515. A real fix would
+    ideally be to extend Scrooge to support clashing namespaces with
+    Python code. A second-best solution would be to check all *thrift*
+    libraries in the build graph, but there is currently no
+    "ThriftLibraryMixin" or other way to identify targets containing
+    thrift code generically.
+    """
 
     # This scope is set for testing only.
     options_scope = "py-thrift-namespace-clash-check"
@@ -38,7 +42,8 @@ class PyThriftNamespaceClashCheck(Task):
 
     @classmethod
     def product_types(cls):
-        """Populate a dict mapping thrift sources to their namespaces and owning targets for testing."""
+        """Populate a dict mapping thrift sources to their namespaces and
+        owning targets for testing."""
         return ["_py_thrift_namespaces_by_files"]
 
     def _get_python_thrift_library_sources(self, py_thrift_targets):

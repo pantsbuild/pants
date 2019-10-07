@@ -5,7 +5,8 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class ScopeProvidedIntegrationTest(PantsRunIntegrationTest):
-    """Tests "provided" emulation (having scope='compile test' and transitive=False)."""
+    """Tests "provided" emulation (having scope='compile test' and
+    transitive=False)."""
 
     @classmethod
     def _spec(cls, name):

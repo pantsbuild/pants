@@ -39,11 +39,13 @@ from pants.util.memo import memoized_property
 # Changing the behavior of this task may affect the IntelliJ Pants plugin.
 # Please add @yic to reviews for this file.
 class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
-    """Base class for generating a json-formattable blob of data about the target graph.
+    """Base class for generating a json-formattable blob of data about the
+    target graph.
 
-  Subclasses can invoke the generate_targets_map method to get a dictionary of plain datastructures
-  (dicts, lists, strings) that can be easily read and exported to various formats.
-  """
+    Subclasses can invoke the generate_targets_map method to get a
+    dictionary of plain datastructures (dicts, lists, strings) that can
+    be easily read and exported to various formats.
+    """
 
     # FORMAT_VERSION_NUMBER: Version number for identifying the export file format output. This
     # version number should change when there is a change to the output format.
@@ -68,7 +70,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
         )
 
     class SourceRootTypes:
-        """Defines SourceRoot Types Constants"""
+        """Defines SourceRoot Types Constants."""
 
         SOURCE = "SOURCE"  # Source Target
         TEST = "TEST"  # Test Target
@@ -84,9 +86,10 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
     @staticmethod
     def _jar_id(jar):
         """Create a string identifier for the IvyModuleRef key.
-    :param IvyModuleRef jar: key for a resolved jar
-    :returns: String representing the key as a maven coordinate
-    """
+
+        :param IvyModuleRef jar: key for a resolved jar
+        :returns: String representing the key as a maven coordinate
+        """
         if jar.rev:
             return "{0}:{1}:{2}".format(jar.org, jar.name, jar.rev)
         else:
@@ -95,9 +98,10 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
     @staticmethod
     def _exclude_id(jar):
         """Create a string identifier for the Exclude key.
-    :param Exclude jar: key for an excluded jar
-    :returns: String representing the key as a maven coordinate
-    """
+
+        :param Exclude jar: key for an excluded jar
+        :returns: String representing the key as a maven coordinate
+        """
         return "{0}:{1}".format(jar.org, jar.name) if jar.name else jar.org
 
     @classmethod
@@ -178,13 +182,14 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
         return compile_classpath
 
     def generate_targets_map(self, targets, classpath_products=None):
-        """Generates a dictionary containing all pertinent information about the target graph.
+        """Generates a dictionary containing all pertinent information about
+        the target graph.
 
-    The return dictionary is suitable for serialization by json.dumps.
-    :param targets: The list of targets to generate the map for.
-    :param classpath_products: Optional classpath_products. If not provided when the --libraries
-      option is `True`, this task will perform its own jar resolution.
-    """
+        The return dictionary is suitable for serialization by json.dumps.
+        :param targets: The list of targets to generate the map for.
+        :param classpath_products: Optional classpath_products. If not provided when the --libraries
+          option is `True`, this task will perform its own jar resolution.
+        """
         targets_map = {}
         resource_target_map = {}
         python_interpreter_targets_mapping = defaultdict(list)
@@ -404,12 +409,12 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
     def _resolve_jars_info(self, targets, classpath_products):
         """Consults ivy_jar_products to export the external libraries.
 
-    :return: mapping of jar_id -> { 'default'     : <jar_file>,
-                                    'sources'     : <jar_file>,
-                                    'javadoc'     : <jar_file>,
-                                    <other_confs> : <jar_file>,
-                                  }
-    """
+        :return: mapping of jar_id -> { 'default'     : <jar_file>,
+                                        'sources'     : <jar_file>,
+                                        'javadoc'     : <jar_file>,
+                                        <other_confs> : <jar_file>,
+                                      }
+        """
         mapping = defaultdict(dict)
         jar_products = classpath_products.get_artifact_classpath_entries_for_targets(
             targets, respect_excludes=False
@@ -430,7 +435,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
         return mapping
 
     def _get_pants_target_alias(self, pants_target_type):
-        """Returns the pants target alias for the given target"""
+        """Returns the pants target alias for the given target."""
         if pants_target_type in self.target_aliases_map:
             return self.target_aliases_map.get(pants_target_type)
         else:
@@ -455,8 +460,9 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
 class Export(ExportTask, ConsoleTask):
     """Export project information in JSON format.
 
-  Intended for exporting project information for IDE, such as the IntelliJ Pants plugin.
-  """
+    Intended for exporting project information for IDE, such as the
+    IntelliJ Pants plugin.
+    """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

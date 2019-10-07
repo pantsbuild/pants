@@ -166,13 +166,13 @@ class CacheFactory:
     def __init__(self, options, log, task, pinger=None, resolver=None):
         """Create a cache factory from settings.
 
-    :param options: Task's scoped options.
-    :param log: Task's context log.
-    :param task: Task to cache results for.
-    :param pinger: Pinger to choose the best remote artifact cache URL.
-    :param resolver: Resolver to look up remote artifact cache URLs.
-    :return: cache factory.
-    """
+        :param options: Task's scoped options.
+        :param log: Task's context log.
+        :param task: Task to cache results for.
+        :param pinger: Pinger to choose the best remote artifact cache URL.
+        :param resolver: Resolver to look up remote artifact cache URLs.
+        :return: cache factory.
+        """
         self._options = options
         self._log = log
         self._task = task
@@ -204,8 +204,8 @@ class CacheFactory:
 
     @staticmethod
     def make_task_cache_dirname(task):
-        """Use the task fingerprint as the name of the cache subdirectory to store
-    results from the task."""
+        """Use the task fingerprint as the name of the cache subdirectory to
+        store results from the task."""
         return task.fingerprint
 
     @memoized_property
@@ -228,8 +228,8 @@ class CacheFactory:
     def get_read_cache(self):
         """Returns the read cache for this setup, creating it if necessary.
 
-    Returns None if no read cache is configured.
-    """
+        Returns None if no read cache is configured.
+        """
         if self._options.read_from and not self._read_cache:
             cache_spec = self._resolve(self._sanitize_cache_spec(self._options.read_from))
             if cache_spec:
@@ -240,8 +240,8 @@ class CacheFactory:
     def get_write_cache(self):
         """Returns the write cache for this setup, creating it if necessary.
 
-    Returns None if no write cache is configured.
-    """
+        Returns None if no write cache is configured.
+        """
         if self._options.write_to and not self._write_cache:
             cache_spec = self._resolve(self._sanitize_cache_spec(self._options.write_to))
             if cache_spec:
@@ -285,7 +285,7 @@ class CacheFactory:
 
     # VisibleForTesting
     def _resolve(self, spec):
-        """Attempt resolving cache URIs when a remote spec is provided. """
+        """Attempt resolving cache URIs when a remote spec is provided."""
         if not spec.remote:
             return spec
 
@@ -342,12 +342,12 @@ class CacheFactory:
     def _do_create_artifact_cache(self, spec, action):
         """Returns an artifact cache for the specified spec.
 
-    spec can be:
-      - a path to a file-based cache root.
-      - a URL of a RESTful cache root.
-      - a bar-separated list of URLs, where we'll pick the one with the best ping times.
-      - A list or tuple of two specs, local, then remote, each as described above
-    """
+        spec can be:
+          - a path to a file-based cache root.
+          - a URL of a RESTful cache root.
+          - a bar-separated list of URLs, where we'll pick the one with the best ping times.
+          - A list or tuple of two specs, local, then remote, each as described above
+        """
         compression = self._options.compression_level
         if compression not in range(1, 10):
             raise ValueError("compression_level must be an integer 1-9: {}".format(compression))

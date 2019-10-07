@@ -8,7 +8,8 @@ from pants_test.test_base import TestBase
 
 
 class UnpackRemoteSourcesTest(TestBase):
-    """Test common functionality for tasks unpacking remote sources, including file filtering."""
+    """Test common functionality for tasks unpacking remote sources, including
+    file filtering."""
 
     def test_invalid_pattern(self):
         with self.assertRaises(UnpackRemoteSourcesBase.InvalidPatternError):
@@ -50,7 +51,7 @@ class UnpackRemoteSourcesTest(TestBase):
 
     @unittest.expectedFailure
     def test_problematic_cases(self):
-        """These should pass, but don't"""
+        """These should pass, but don't."""
         # See https://github.com/twitter/commons/issues/380.  'foo*bar' doesn't match 'foobar'
         self.assertFalse(
             self._run_filter(

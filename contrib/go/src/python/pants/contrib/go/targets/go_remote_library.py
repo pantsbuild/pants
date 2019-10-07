@@ -25,24 +25,24 @@ class GoRemoteLibrary(GoTarget):
     def remote_package_path(cls, remote_root, import_path):
         """Returns the remote package path portion of the given import path.
 
-    A remote package path is the portion of the remote Go package's import path after the remote
-    root path.
+        A remote package path is the portion of the remote Go package's import path after the remote
+        root path.
 
-    For example, the remote import path 'https://github.com/bitly/go-simplejson' has
-    a remote root of 'https://github.com/bitly/go-simplejson' and there is only 1 package
-    in that remote root.  The package path in this case is '' or '.' and is normalized
-    to ''.
+        For example, the remote import path 'https://github.com/bitly/go-simplejson' has
+        a remote root of 'https://github.com/bitly/go-simplejson' and there is only 1 package
+        in that remote root.  The package path in this case is '' or '.' and is normalized
+        to ''.
 
-    Some remote roots have no root package and others have both a root and sub-packages.  The
-    remote root of 'github.com/docker/docker' is an example of the former.  One of the packages
-    you might import from it is 'github.com/docker/docker/daemon/events' and that package has a
-    normalized remote package path of 'daemon/events'.
+        Some remote roots have no root package and others have both a root and sub-packages.  The
+        remote root of 'github.com/docker/docker' is an example of the former.  One of the packages
+        you might import from it is 'github.com/docker/docker/daemon/events' and that package has a
+        normalized remote package path of 'daemon/events'.
 
-    :param string remote_root: The path to the remote; generally a scheme-less URL.
-    :param string import_path: The full import path used to import the package in a `.go` source
-                               file.
-    :raises: `ValueError` if the import_path does not lay within the remote root.
-    """
+        :param string remote_root: The path to the remote; generally a scheme-less URL.
+        :param string import_path: The full import path used to import the package in a `.go` source
+                                   file.
+        :raises: `ValueError` if the import_path does not lay within the remote root.
+        """
         return cls.package_path(remote_root, import_path)
 
     @classmethod
@@ -118,7 +118,8 @@ class GoRemoteLibrary(GoTarget):
 
     @property
     def pkg(self):
-        """The remote package path that when joined to the `remote_root` forms the `import_path`"""
+        """The remote package path that when joined to the `remote_root` forms
+        the `import_path`"""
         return self.payload.pkg
 
     @property
@@ -128,10 +129,12 @@ class GoRemoteLibrary(GoTarget):
 
     @property
     def remote_root(self):
-        """The remote package root prefix portion of the the full `import_path`"""
+        """The remote package root prefix portion of the the full
+        `import_path`"""
         return os.path.relpath(self.address.spec_path, self.target_base)
 
     @property
     def import_path(self):
-        """The full remote import path as used in import statements in `.go` source files."""
+        """The full remote import path as used in import statements in `.go`
+        source files."""
         return os.path.join(self.remote_root, self.pkg) if self.pkg else self.remote_root

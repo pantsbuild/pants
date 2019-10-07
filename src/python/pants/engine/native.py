@@ -73,7 +73,8 @@ wrapped_initnative_engine(void)
 
 
 def get_build_cflags():
-    """Synthesize a CFLAGS env var from the current python env for building of C modules."""
+    """Synthesize a CFLAGS env var from the current python env for building of
+    C modules."""
     return "{} {} -I{}".format(
         sysconfig.get_config_var("BASECFLAGS"),
         sysconfig.get_config_var("OPT"),
@@ -178,7 +179,9 @@ def bootstrap_c_source(scheduler_bindings_path, output_dir, module_name=NATIVE_E
 def _replace_file(path, content):
     """Writes a file if it doesn't already exist with the same content.
 
-  This is useful because cargo uses timestamps to decide whether to compile things."""
+    This is useful because cargo uses timestamps to decide whether to
+    compile things.
+    """
     if os.path.exists(path):
         with open(path, "r") as f:
             if content == f.read():
@@ -201,11 +204,12 @@ class _ExternSignature(
 
 
 def _extern_decl(return_type, arg_types):
-    """A decorator for methods corresponding to extern functions. All types should be strings.
+    """A decorator for methods corresponding to extern functions. All types
+    should be strings.
 
-  The _FFISpecification class is able to automatically convert these into method declarations for
-  cffi.
-  """
+    The _FFISpecification class is able to automatically convert these
+    into method declarations for cffi.
+    """
 
     def wrapper(func):
         signature = _ExternSignature(
@@ -239,10 +243,10 @@ class _FFISpecification(object):
     def register_cffi_externs(self, native):
         """Registers the @_extern_decl methods with our ffi instance.
 
-    Also establishes an `onerror` handler for each extern method which stores any exception in the
-    `native` object so that it can be retrieved later. See
-    https://cffi.readthedocs.io/en/latest/using.html#extern-python-reference for more info.
-    """
+        Also establishes an `onerror` handler for each extern method which stores any exception in the
+        `native` object so that it can be retrieved later. See
+        https://cffi.readthedocs.io/en/latest/using.html#extern-python-reference for more info.
+        """
         native.reset_cffi_extern_method_runtime_exceptions()
 
         def exc_handler(exc_type, exc_value, traceback):
@@ -284,7 +288,7 @@ class _FFISpecification(object):
 
     @_extern_decl("bool", ["ExternContext*", "TypeId"])
     def extern_is_union(self, context_handle, type_id):
-        """Return whether or not a type is a member of a union"""
+        """Return whether or not a type is a member of a union."""
         c = self._ffi.from_handle(context_handle)
         input_type = c.from_id(type_id.tup_0)
         return bool(getattr(input_type, "_is_union", None))
@@ -295,13 +299,15 @@ class _FFISpecification(object):
 
     @_extern_decl("Ident", ["ExternContext*", "Handle*"])
     def extern_identify(self, context_handle, val):
-        """Return a representation of the object's identity, including a hash and TypeId.
+        """Return a representation of the object's identity, including a hash
+        and TypeId.
 
-    `extern_get_type_for()` also returns a TypeId, but doesn't hash the object -- this allows that
-    method to be used on unhashable objects. `extern_identify()` returns a TypeId as well to avoid
-    having to make two separate Python calls when interning a Python object in interning.rs, which
-    requires both the hash and type.
-    """
+        `extern_get_type_for()` also returns a TypeId, but doesn't hash
+        the object -- this allows that method to be used on unhashable
+        objects. `extern_identify()` returns a TypeId as well to avoid
+        having to make two separate Python calls when interning a Python
+        object in interning.rs, which requires both the hash and type.
+        """
         # NB: This check is exposed for testing error handling in CFFI methods. This code path should
         # never be active in normal pants usage.
         if self._do_raise_keyboardinterrupt_on_identify:
@@ -363,7 +369,8 @@ class _FFISpecification(object):
 
     @_extern_decl("Handle", ["ExternContext*", "Handle**", "uint64_t"])
     def extern_store_tuple(self, context_handle, vals_ptr, vals_len):
-        """Given storage and an array of Handles, return a new Handle to represent the list."""
+        """Given storage and an array of Handles, return a new Handle to
+        represent the list."""
         c = self._ffi.from_handle(context_handle)
         return c.to_value(
             tuple(c.from_value(val[0]) for val in self._ffi.unpack(vals_ptr, vals_len))
@@ -371,7 +378,8 @@ class _FFISpecification(object):
 
     @_extern_decl("Handle", ["ExternContext*", "Handle**", "uint64_t"])
     def extern_store_set(self, context_handle, vals_ptr, vals_len):
-        """Given storage and an array of Handles, return a new Handle to represent the set."""
+        """Given storage and an array of Handles, return a new Handle to
+        represent the set."""
         c = self._ffi.from_handle(context_handle)
         return c.to_value(
             OrderedSet(c.from_value(val[0]) for val in self._ffi.unpack(vals_ptr, vals_len))
@@ -379,12 +387,13 @@ class _FFISpecification(object):
 
     @_extern_decl("Handle", ["ExternContext*", "Handle**", "uint64_t"])
     def extern_store_dict(self, context_handle, vals_ptr, vals_len):
-        """Given storage and an array of Handles, return a new Handle to represent the dict.
+        """Given storage and an array of Handles, return a new Handle to
+        represent the dict.
 
-    Array of handles alternates keys and values (i.e. key0, value0, key1, value1, ...).
+        Array of handles alternates keys and values (i.e. key0, value0, key1, value1, ...).
 
-    It is assumed that an even number of values were passed.
-    """
+        It is assumed that an even number of values were passed.
+        """
         c = self._ffi.from_handle(context_handle)
         tup = tuple(c.from_value(val[0]) for val in self._ffi.unpack(vals_ptr, vals_len))
         d = dict()
@@ -394,43 +403,50 @@ class _FFISpecification(object):
 
     @_extern_decl("Handle", ["ExternContext*", "uint8_t*", "uint64_t"])
     def extern_store_bytes(self, context_handle, bytes_ptr, bytes_len):
-        """Given a context and raw bytes, return a new Handle to represent the content."""
+        """Given a context and raw bytes, return a new Handle to represent the
+        content."""
         c = self._ffi.from_handle(context_handle)
         return c.to_value(bytes(self._ffi.buffer(bytes_ptr, bytes_len)))
 
     @_extern_decl("Handle", ["ExternContext*", "uint8_t*", "uint64_t"])
     def extern_store_utf8(self, context_handle, utf8_ptr, utf8_len):
-        """Given a context and UTF8 bytes, return a new Handle to represent the content."""
+        """Given a context and UTF8 bytes, return a new Handle to represent the
+        content."""
         c = self._ffi.from_handle(context_handle)
         return c.to_value(self._ffi.string(utf8_ptr, utf8_len).decode())
 
     @_extern_decl("Handle", ["ExternContext*", "uint64_t"])
     def extern_store_u64(self, context_handle, u64):
-        """Given a context and uint64_t, return a new Handle to represent the uint64_t."""
+        """Given a context and uint64_t, return a new Handle to represent the
+        uint64_t."""
         c = self._ffi.from_handle(context_handle)
         return c.to_value(u64)
 
     @_extern_decl("Handle", ["ExternContext*", "int64_t"])
     def extern_store_i64(self, context_handle, i64):
-        """Given a context and int64_t, return a new Handle to represent the int64_t."""
+        """Given a context and int64_t, return a new Handle to represent the
+        int64_t."""
         c = self._ffi.from_handle(context_handle)
         return c.to_value(i64)
 
     @_extern_decl("Handle", ["ExternContext*", "double"])
     def extern_store_f64(self, context_handle, f64):
-        """Given a context and double, return a new Handle to represent the double."""
+        """Given a context and double, return a new Handle to represent the
+        double."""
         c = self._ffi.from_handle(context_handle)
         return c.to_value(f64)
 
     @_extern_decl("Handle", ["ExternContext*", "_Bool"])
     def extern_store_bool(self, context_handle, b):
-        """Given a context and _Bool, return a new Handle to represent the _Bool."""
+        """Given a context and _Bool, return a new Handle to represent the
+        _Bool."""
         c = self._ffi.from_handle(context_handle)
         return c.to_value(b)
 
     @_extern_decl("Handle", ["ExternContext*", "Handle*", "uint8_t*", "uint64_t"])
     def extern_project_ignoring_type(self, context_handle, val, field_str_ptr, field_str_len):
-        """Given a Handle for `obj`, and a field name, project the field as a new Handle."""
+        """Given a Handle for `obj`, and a field name, project the field as a
+        new Handle."""
         c = self._ffi.from_handle(context_handle)
         obj = c.from_value(val[0])
         field_name = self.to_py_str(field_str_ptr, field_str_len)
@@ -440,7 +456,8 @@ class _FFISpecification(object):
 
     @_extern_decl("HandleBuffer", ["ExternContext*", "Handle*", "uint8_t*", "uint64_t"])
     def extern_project_multi(self, context_handle, val, field_str_ptr, field_str_len):
-        """Given a Key for `obj`, and a field name, project the field as a list of Keys."""
+        """Given a Key for `obj`, and a field name, project the field as a list
+        of Keys."""
         c = self._ffi.from_handle(context_handle)
         obj = c.from_value(val[0])
         field_name = self.to_py_str(field_str_ptr, field_str_len)
@@ -522,11 +539,12 @@ class RawResult(datatype(["is_throw", "throw_handle", "raw_pointer"])):
 
 
 class ExternContext:
-    """A wrapper around python objects used in static extern functions in this module.
+    """A wrapper around python objects used in static extern functions in this
+    module.
 
-  See comments in `src/rust/engine/src/interning.rs` for more information on the relationship
-  between `Key`s and `Handle`s.
-  """
+    See comments in `src/rust/engine/src/interning.rs` for more
+    information on the relationship between `Key`s and `Handle`s.
+    """
 
     def __init__(self, ffi, lib):
         """
@@ -578,7 +596,8 @@ class ExternContext:
         return self._ffi.from_handle(val)
 
     def raise_or_return(self, pyresult):
-        """Consumes the given PyResult to raise/return the exception/value it represents."""
+        """Consumes the given PyResult to raise/return the exception/value it
+        represents."""
         value = self.from_value(pyresult.handle)
         self._handles.remove(pyresult.handle)
         if pyresult.is_throw:
@@ -612,7 +631,8 @@ class ExternContext:
 
 
 class Native(Singleton):
-    """Encapsulates fetching a platform specific version of the native portion of the engine."""
+    """Encapsulates fetching a platform specific version of the native portion
+    of the engine."""
 
     _errors_during_execution = None
 
@@ -627,18 +647,19 @@ class Native(Singleton):
             ]
         )
     ):
-        """Encapsulates an exception raised when a CFFI extern is called so that it can be displayed.
+        """Encapsulates an exception raised when a CFFI extern is called so
+        that it can be displayed.
 
-    When an exception is raised in the body of a CFFI extern, the `onerror` handler is used to
-    capture it, storing the exception info as an instance of `CFFIExternMethodRuntimeErrorInfo` with
-    `.add_cffi_extern_method_runtime_exception()`. The scheduler will then check whether any
-    exceptions were stored by calling `.cffi_extern_method_runtime_exceptions()` after specific
-    calls to the native library which may raise. `.reset_cffi_extern_method_runtime_exceptions()`
-    should be called after the stored exception has been handled or before it is re-raised.
+        When an exception is raised in the body of a CFFI extern, the `onerror` handler is used to
+        capture it, storing the exception info as an instance of `CFFIExternMethodRuntimeErrorInfo` with
+        `.add_cffi_extern_method_runtime_exception()`. The scheduler will then check whether any
+        exceptions were stored by calling `.cffi_extern_method_runtime_exceptions()` after specific
+        calls to the native library which may raise. `.reset_cffi_extern_method_runtime_exceptions()`
+        should be called after the stored exception has been handled or before it is re-raised.
 
-    Some ways that exceptions in CFFI extern methods can be handled are described in
-    https://cffi.readthedocs.io/en/latest/using.html#extern-python-reference.
-    """
+        Some ways that exceptions in CFFI extern methods can be handled are described in
+        https://cffi.readthedocs.io/en/latest/using.html#extern-python-reference.
+        """
 
     def reset_cffi_extern_method_runtime_exceptions(self):
         self._errors_during_execution = []
@@ -682,17 +703,20 @@ class Native(Singleton):
 
     @memoized_property
     def ffi(self):
-        """A CompiledCFFI handle as imported from the native engine python module."""
+        """A CompiledCFFI handle as imported from the native engine python
+        module."""
         return getattr(self._ffi_module, "ffi")
 
     @memoized_property
     def ffi_lib(self):
-        """A CFFI Library handle as imported from the native engine python module."""
+        """A CFFI Library handle as imported from the native engine python
+        module."""
         return getattr(self._ffi_module, "lib")
 
     @memoized_property
     def _ffi_module(self):
-        """Load the native engine as a python module and register CFFI externs."""
+        """Load the native engine as a python module and register CFFI
+        externs."""
         native_bin_dir = os.path.dirname(self.binary)
         logger.debug("loading native engine python module from: %s", native_bin_dir)
         sys.path.insert(0, native_bin_dir)
@@ -745,12 +769,13 @@ class Native(Singleton):
     def gc(self, cdata, destructor):
         """Register a method to be called when `cdata` is garbage collected.
 
-    Returns a new reference that should be used in place of `cdata`.
-    """
+        Returns a new reference that should be used in place of `cdata`.
+        """
         return self.ffi.gc(cdata, destructor)
 
     def unpack(self, cdata_ptr, count):
-        """Given a pointer representing an array, and its count of entries, return a list."""
+        """Given a pointer representing an array, and its count of entries,
+        return a list."""
         return self.ffi.unpack(cdata_ptr, count)
 
     def buffer(self, cdata):

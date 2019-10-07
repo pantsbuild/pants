@@ -33,8 +33,9 @@ class Digest(Protocol):
 def hash_all(strs: typing.Iterable[Union[bytes, str]], digest: Optional[Digest] = None) -> str:
     """Returns a hash of the concatenation of all the strings in strs.
 
-  If a hashlib message digest is not supplied a new sha1 message digest is used.
-  """
+    If a hashlib message digest is not supplied a new sha1 message
+    digest is used.
+    """
     digest = digest or hashlib.sha1()
     for s in strs:
         s = ensure_binary(s)
@@ -43,10 +44,12 @@ def hash_all(strs: typing.Iterable[Union[bytes, str]], digest: Optional[Digest] 
 
 
 def hash_file(path: Union[str, Path], digest: Optional[Digest] = None) -> str:
-    """Hashes the contents of the file at the given path and returns the hash digest in hex form.
+    """Hashes the contents of the file at the given path and returns the hash
+    digest in hex form.
 
-  If a hashlib message digest is not supplied a new sha1 message digest is used.
-  """
+    If a hashlib message digest is not supplied a new sha1 message
+    digest is used.
+    """
     digest = digest or hashlib.sha1()
     with open(path, "rb") as fd:
         s = fd.read(8192)
@@ -59,8 +62,9 @@ def hash_file(path: Union[str, Path], digest: Optional[Digest] = None) -> str:
 def hash_dir(path: Path, *, digest: Optional[Digest] = None) -> str:
     """Hashes the recursive contents under the given directory path.
 
-  If a hashlib message digest is not supplied a new sha1 message digest is used.
-  """
+    If a hashlib message digest is not supplied a new sha1 message
+    digest is used.
+    """
     if not isinstance(path, Path):
         raise TypeError(f"Expected path to be a pathlib.Path, given a: {type(path)}")
 
@@ -77,12 +81,13 @@ def hash_dir(path: Path, *, digest: Optional[Digest] = None) -> str:
 
 
 class CoercingEncoder(json.JSONEncoder):
-    """An encoder which performs coercions in order to serialize many otherwise illegal objects.
+    """An encoder which performs coercions in order to serialize many otherwise
+    illegal objects.
 
-  The python documentation (https://docs.python.org/2/library/json.html#json.dumps) states that
-  dict keys are coerced to strings in json.dumps, but this appears to be incorrect -- it throws a
-  TypeError on things we might to throw at it, like a set, or a dict with tuple keys.
-  """
+    The python documentation (https://docs.python.org/2/library/json.html#json.dumps) states that
+    dict keys are coerced to strings in json.dumps, but this appears to be incorrect -- it throws a
+    TypeError on things we might to throw at it, like a set, or a dict with tuple keys.
+    """
 
     def _maybe_encode_dict_key(self, key_obj):
         # If dict keys aren't strings, recursively encode them until they are. Checking for strings here
@@ -165,30 +170,31 @@ def json_hash(
 ) -> str:
     """Hashes `obj` by dumping to JSON.
 
-  :param obj: An object that can be rendered to json using the given `encoder`.
-  :param digest: An optional `hashlib` compatible message digest. Defaults to `hashlib.sha1`.
-  :param encoder: An optional custom json encoder.
-  :type encoder: :class:`json.JSONEncoder`
-  :returns: A hash of the given `obj` according to the given `encoder`.
-  :rtype: str
+    :param obj: An object that can be rendered to json using the given `encoder`.
+    :param digest: An optional `hashlib` compatible message digest. Defaults to `hashlib.sha1`.
+    :param encoder: An optional custom json encoder.
+    :type encoder: :class:`json.JSONEncoder`
+    :returns: A hash of the given `obj` according to the given `encoder`.
+    :rtype: str
 
-  :API: public
-  """
+    :API: public
+    """
     json_str = json.dumps(obj, ensure_ascii=True, allow_nan=False, sort_keys=True, cls=encoder)
     return hash_all([json_str], digest=digest)
 
 
 # TODO(#6513): something like python 3's @lru_cache decorator could be useful here!
 def stable_json_sha1(obj: Any, digest: Optional[Digest] = None) -> str:
-    """Hashes `obj` stably; ie repeated calls with the same inputs will produce the same hash.
+    """Hashes `obj` stably; ie repeated calls with the same inputs will produce
+    the same hash.
 
-  :param obj: An object that can be rendered to json using a :class:`CoercingEncoder`.
-  :param digest: An optional `hashlib` compatible message digest. Defaults to `hashlib.sha1`.
-  :returns: A stable hash of the given `obj`.
-  :rtype: str
+    :param obj: An object that can be rendered to json using a :class:`CoercingEncoder`.
+    :param digest: An optional `hashlib` compatible message digest. Defaults to `hashlib.sha1`.
+    :returns: A stable hash of the given `obj`.
+    :rtype: str
 
-  :API: public
-  """
+    :API: public
+    """
     return json_hash(obj, digest=digest, encoder=CoercingEncoder)
 
 
@@ -211,8 +217,8 @@ class Sharder:
     def compute_shard(s, mod):
         """Computes the mod-hash of the given string, using a sha1 hash.
 
-    :param string s: The string to compute a shard for.
-    """
+        :param string s: The string to compute a shard for.
+        """
         return int(hash_all([s]), 16) % mod
 
     def __init__(self, shard_spec):
@@ -238,8 +244,8 @@ class Sharder:
     def is_in_shard(self, s):
         """Returns True iff the string s is in this shard.
 
-    :param string s: The string to check.
-    """
+        :param string s: The string to check.
+        """
         return self.compute_shard(s, self._nshards) == self._shard
 
     @property

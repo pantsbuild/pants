@@ -11,24 +11,24 @@ _MAX_FILENAME_LENGTH = 100
 
 
 def safe_filename(name, extension=None, digest=None, max_length=_MAX_FILENAME_LENGTH):
-    """Creates filename from name and extension ensuring that the final length is within the
-  max_length constraint.
+    """Creates filename from name and extension ensuring that the final length
+    is within the max_length constraint.
 
-  By default the length is capped to work on most filesystems and the fallback to achieve
-  shortening is a sha1 hash of the proposed name.
+    By default the length is capped to work on most filesystems and the fallback to achieve
+    shortening is a sha1 hash of the proposed name.
 
-  Raises ValueError if the proposed name is not a simple filename but a file path.
-  Also raises ValueError when the name is simple but cannot be satisfactorily shortened with the
-  given digest.
+    Raises ValueError if the proposed name is not a simple filename but a file path.
+    Also raises ValueError when the name is simple but cannot be satisfactorily shortened with the
+    given digest.
 
-  :API: public
+    :API: public
 
-  name:       the proposed filename without extension
-  extension:  an optional extension to append to the filename
-  digest:     the digest to fall back on for too-long name, extension concatenations - should
-              support the hashlib digest api of update(string) and hexdigest
-  max_length: the maximum desired file name length
-  """
+    name:       the proposed filename without extension
+    extension:  an optional extension to append to the filename
+    digest:     the digest to fall back on for too-long name, extension concatenations - should
+                support the hashlib digest api of update(string) and hexdigest
+    max_length: the maximum desired file name length
+    """
     if os.path.basename(name) != name:
         raise ValueError("Name must be a filename, handed a path: {}".format(name))
 
@@ -59,14 +59,16 @@ def safe_filename(name, extension=None, digest=None, max_length=_MAX_FILENAME_LE
 def safe_filename_from_path(path, **kwargs):
     """As for `safe_filename`, but takes a path.
 
-  First converts it into a name by replacing separator characters, and then calls safe_filename.
-  """
+    First converts it into a name by replacing separator characters, and
+    then calls safe_filename.
+    """
     return safe_filename(path.strip(os.path.sep).replace(os.path.sep, "."), **kwargs)
 
 
 def expand_path(path):
-    """Returns ``path`` as an absolute path with ~user and env var expansion applied.
+    """Returns ``path`` as an absolute path with ~user and env var expansion
+    applied.
 
-  :API: public
-  """
+    :API: public
+    """
     return os.path.abspath(os.path.expandvars(os.path.expanduser(path)))

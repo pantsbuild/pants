@@ -12,9 +12,9 @@ class JaxWsLibrary(JvmTarget):
     def __init__(self, payload=None, xjc_args=None, extra_args=None, **kwargs):
         """Generates a Java library from WSDL files using JAX-WS.
 
-    :param list xjc_args: Additional arguments to xjc.
-    :param list extra_args: Additional arguments for the CLI.
-    """
+        :param list xjc_args: Additional arguments to xjc.
+        :param list extra_args: Additional arguments for the CLI.
+        """
         payload = payload or Payload()
         payload.add_fields(
             {

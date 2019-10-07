@@ -15,18 +15,20 @@ class Workspace(ABC):
 
     @abstractmethod
     def touched_files(self, parent):
-        """Returns the paths modified between the parent state and the current workspace state."""
+        """Returns the paths modified between the parent state and the current
+        workspace state."""
 
     @abstractmethod
     def changes_in(self, rev_or_range):
-        """Returns the paths modified by some revision, revision range or other identifier."""
+        """Returns the paths modified by some revision, revision range or other
+        identifier."""
 
 
 class ScmWorkspace(Workspace):
     """A workspace that uses an Scm to determine the touched files.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(self, scm):
         """

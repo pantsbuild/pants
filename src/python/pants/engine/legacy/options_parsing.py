@@ -12,7 +12,8 @@ from pants.option.scope import Scope, ScopedOptions
 
 @dataclass(frozen=True)
 class _Options:
-    """A wrapper around bootstrapped options values: not for direct consumption."""
+    """A wrapper around bootstrapped options values: not for direct
+    consumption."""
 
     options: Options
 

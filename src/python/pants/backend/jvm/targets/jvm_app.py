@@ -10,13 +10,13 @@ from pants.build_graph.app_base import AppBase
 class JvmApp(AppBase):
     """A deployable JVM application.
 
-  Invoking the ``bundle`` goal on one of these targets creates a
-  self-contained artifact suitable for deployment on some other machine.
-  The artifact contains the executable jar, its dependencies, and
-  extra files like config files, startup scripts, etc.
+    Invoking the ``bundle`` goal on one of these targets creates a
+    self-contained artifact suitable for deployment on some other machine.
+    The artifact contains the executable jar, its dependencies, and
+    extra files like config files, startup scripts, etc.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(self, payload=None, deployjar=None, **kwargs):
         """

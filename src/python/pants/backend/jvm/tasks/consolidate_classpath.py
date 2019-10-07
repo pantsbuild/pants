@@ -10,7 +10,7 @@ from pants.build_graph.target_scopes import Scopes
 
 
 class ConsolidateClasspath(JvmBinaryTask):
-    """Convert loose directories in classpath_products into jars. """
+    """Convert loose directories in classpath_products into jars."""
 
     # Directory for both internal and external libraries.
     LIBS_DIR = "libs"
@@ -48,7 +48,7 @@ class ConsolidateClasspath(JvmBinaryTask):
         self._consolidate_classpath(targets_to_consolidate, consolidated_classpath)
 
     def _consolidate_classpath(self, targets, classpath_products):
-        """Convert loose directories in classpath_products into jars. """
+        """Convert loose directories in classpath_products into jars."""
         # TODO: find a way to not process classpath entries for valid VTs.
 
         # NB: It is very expensive to call to get entries for each target one at a time.

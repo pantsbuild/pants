@@ -14,12 +14,11 @@ from pants.contrib.node.tasks.node_task import NodeTask
 
 
 class NodeResolveFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
-    """
-  Fingerprint package lockfiles (e.g. package.json, yarn.lock...),
-  so that we don't automatically run this if none of those have changed.
+    """Fingerprint package lockfiles (e.g. package.json, yarn.lock...), so that
+    we don't automatically run this if none of those have changed.
 
-  We read every file and add its contents to the hash.
-  """
+    We read every file and add its contents to the hash.
+    """
 
     _package_manager_lockfiles = {
         "yarn": ["package.json", "yarn.lock"],
@@ -49,20 +48,21 @@ class NodeResolveFingerprintStrategy(DefaultFingerprintHashingMixin, Fingerprint
 
 
 class NodeResolve(NodeTask):
-    """Resolves node_package targets to their node paths using different registered resolvers.
+    """Resolves node_package targets to their node paths using different
+    registered resolvers.
 
-  This task exposes two products NodePaths and NodePathsLocal. Both products are handled
-  optionally allowing the consumer to choose.
+    This task exposes two products NodePaths and NodePathsLocal. Both products are handled
+    optionally allowing the consumer to choose.
 
-  NodePaths contain a mapping of targets and their resolved path in the virtualized
-  pants working directory.
+    NodePaths contain a mapping of targets and their resolved path in the virtualized
+    pants working directory.
 
-  NodePathsLocal is similar to NodePaths with the difference that the resolved path
-  is within the same directory that the target is defined.
+    NodePathsLocal is similar to NodePaths with the difference that the resolved path
+    is within the same directory that the target is defined.
 
-  A node path is considered resolved if the source files are present, installed all dependencies,
-  and have executed their build scripts if defined.
-  """
+    A node path is considered resolved if the source files are present, installed all dependencies,
+    and have executed their build scripts if defined.
+    """
 
     _resolver_by_type = dict()
 
@@ -83,43 +83,46 @@ class NodeResolve(NodeTask):
 
     @classmethod
     def register_resolver_for_type(cls, node_package_type, resolver):
-        """Register a NodeResolver instance for a particular subclass of NodePackage.
-    Implementation uses a hash on node_package_type, so the resolver will only be used on the
-    exact NodePackage subclass (not further subclasses of it).
+        """Register a NodeResolver instance for a particular subclass of
+        NodePackage. Implementation uses a hash on node_package_type, so the
+        resolver will only be used on the exact NodePackage subclass (not
+        further subclasses of it).
 
-    :param class node_package_type: A NodePackage subclass
-    :param class resolver: A NodeResolverBase subclass
-    """
+        :param class node_package_type: A NodePackage subclass
+        :param class resolver: A NodeResolverBase subclass
+        """
         cls._resolver_by_type[node_package_type] = resolver
 
     @classmethod
     def _clear_resolvers(cls):
         """Remove all resolvers.
 
-    This method is EXCLUSIVELY for use in tests.
-    """
+        This method is EXCLUSIVELY for use in tests.
+        """
         cls._resolver_by_type.clear()
 
     @classmethod
     def _resolver_for_target(cls, target):
-        """Get the resolver registered for a target's type, or None if there is none.
+        """Get the resolver registered for a target's type, or None if there is
+        none.
 
-    :param NodePackage target: A subclass of NodePackage.
-    :rtype: NodeResolver
-    """
+        :param NodePackage target: A subclass of NodePackage.
+        :rtype: NodeResolver
+        """
         return cls._resolver_by_type.get(type(target))
 
     @classmethod
     def can_resolve_target(cls, target):
-        """Returns whether this is a NodePackage and there a resolver registered for its subtype.
+        """Returns whether this is a NodePackage and there a resolver
+        registered for its subtype.
 
-    :param target: A Target
-    :rtype: Boolean
-    """
+        :param target: A Target
+        :rtype: Boolean
+        """
         return cls.is_node_package(target) and cls._resolver_for_target(target) != None
 
     def _topological_sort(self, targets):
-        """Topologically order a list of targets"""
+        """Topologically order a list of targets."""
 
         target_set = set(targets)
         return [t for t in reversed(sort_targets(targets)) if t in target_set]

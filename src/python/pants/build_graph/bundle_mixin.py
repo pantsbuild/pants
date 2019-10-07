@@ -46,12 +46,12 @@ class BundleMixin(TaskBase):
     def resolved_option(options, target, key):
         """Get value for option "key".
 
-    Resolution precedence is CLI option > target option > pants.ini option.
+        Resolution precedence is CLI option > target option > pants.ini option.
 
-    :param options: Options returned by `task.get_option()`
-    :param target: Target
-    :param key: Key to get using the resolution precedence
-    """
+        :param options: Options returned by `task.get_option()`
+        :param target: Target
+        :param key: Key to get using the resolution precedence
+        """
         option_value = options.get(key)
         if not isinstance(target, AppBase) or options.is_flagged(key):
             return option_value
@@ -61,8 +61,8 @@ class BundleMixin(TaskBase):
     def symlink_bundles(self, app, bundle_dir):
         """For each bundle in the given app, symlinks relevant matched paths.
 
-    Validates that at least one path was matched by a bundle.
-    """
+        Validates that at least one path was matched by a bundle.
+        """
         for bundle_counter, bundle in enumerate(app.bundles):
             count = 0
             for path, relpath in bundle.filemap.items():
@@ -87,7 +87,8 @@ class BundleMixin(TaskBase):
     def publish_results(
         self, dist_dir, use_basename_prefix, vt, bundle_dir, archivepath, id, archive_ext
     ):
-        """Publish a copy of the bundle and archive from the results dir in dist."""
+        """Publish a copy of the bundle and archive from the results dir in
+        dist."""
         # TODO (from mateor) move distdir management somewhere more general purpose.
         name = vt.target.basename if use_basename_prefix else id
         bundle_copy = os.path.join(dist_dir, "{}-bundle".format(name))

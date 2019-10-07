@@ -17,11 +17,11 @@ class PayloadFrozenError(Exception):
 class Payload:
     """A mapping from field names to PayloadField instances.
 
-  A Target will add PayloadFields to its Payload until instantiation is finished, at which point
-  freeze() will be called and make the Payload immutable.
+    A Target will add PayloadFields to its Payload until instantiation is finished, at which point
+    freeze() will be called and make the Payload immutable.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(self):
         self._fields = {}
@@ -39,26 +39,28 @@ class Payload:
     def freeze(self):
         """Permanently make this Payload instance immutable.
 
-    No more fields can be added after calling freeze().
+        No more fields can be added after calling freeze().
 
-    :API: public
-    """
+        :API: public
+        """
         self._frozen = True
 
     def get_field(self, key, default=None):
-        """An alternative to attribute access for duck typing Payload instances.
+        """An alternative to attribute access for duck typing Payload
+        instances.
 
-    Has the same semantics as dict.get, and in fact just delegates to the underlying field mapping.
+        Has the same semantics as dict.get, and in fact just delegates to the underlying field mapping.
 
-    :API: public
-    """
+        :API: public
+        """
         return self._fields.get(key, default)
 
     def get_field_value(self, key, default=None):
-        """Retrieves the value in the payload field if the field exists, otherwise returns the default.
+        """Retrieves the value in the payload field if the field exists,
+        otherwise returns the default.
 
-    :API: public
-    """
+        :API: public
+        """
         if key in self._fields:
             payload_field = self._fields[key]
             if payload_field:
@@ -68,21 +70,21 @@ class Payload:
     def add_fields(self, field_dict):
         """Add a mapping of field names to PayloadField instances.
 
-    :API: public
-    """
+        :API: public
+        """
         for key, field in field_dict.items():
             self.add_field(key, field)
 
     def add_field(self, key, field):
         """Add a field to the Payload.
 
-    :API: public
+        :API: public
 
-    :param string key:  The key for the field.  Fields can be accessed using attribute access as
-      well as `get_field` using `key`.
-    :param PayloadField field:  A PayloadField instance.  None is an allowable value for `field`,
-      in which case it will be skipped during hashing.
-    """
+        :param string key:  The key for the field.  Fields can be accessed using attribute access as
+          well as `get_field` using `key`.
+        :param PayloadField field:  A PayloadField instance.  None is an allowable value for `field`,
+          in which case it will be skipped during hashing.
+        """
         if key in self._fields:
             raise PayloadFieldAlreadyDefinedError(
                 "Key {key} is already set on this payload. The existing field was {existing_field}."
@@ -99,14 +101,15 @@ class Payload:
             self._fingerprint_memo = None
 
     def fingerprint(self, field_keys=None):
-        """A memoizing fingerprint that rolls together the fingerprints of underlying PayloadFields.
+        """A memoizing fingerprint that rolls together the fingerprints of
+        underlying PayloadFields.
 
-    If no fields were hashed (or all fields opted out of being hashed by returning `None`), then
-    `fingerprint()` also returns `None`.
+        If no fields were hashed (or all fields opted out of being hashed by returning `None`), then
+        `fingerprint()` also returns `None`.
 
-    :param iterable<string> field_keys: A subset of fields to use for the fingerprint.  Defaults
-                                        to all fields.
-    """
+        :param iterable<string> field_keys: A subset of fields to use for the fingerprint.  Defaults
+                                            to all fields.
+        """
         field_keys = frozenset(field_keys or self._fields.keys())
         if field_keys not in self._fingerprint_memo_map:
             self._fingerprint_memo_map[field_keys] = self._compute_fingerprint(field_keys)
@@ -134,10 +137,10 @@ class Payload:
     def mark_dirty(self):
         """Invalidates memoized fingerprints for this payload.
 
-    Exposed for testing.
+        Exposed for testing.
 
-    :API: public
-    """
+        :API: public
+        """
         self._fingerprint_memo_map = {}
         for field in self._fields.values():
             field.mark_dirty()

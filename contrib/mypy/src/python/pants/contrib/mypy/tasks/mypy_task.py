@@ -33,14 +33,14 @@ class MypyTaskError(TaskError):
 class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
     """Invoke the mypy static type analyzer for Python.
 
-  Mypy lint task filters out target_roots that are not properly tagged according to
-  --whitelisted-tag-name (defaults to None, and no filtering occurs if this option is 'None'),
-  and executes MyPy on targets in context from whitelisted target roots.
-  (if any transitive targets from the filtered roots are not whitelisted, a warning
-  will be printed.)
+    Mypy lint task filters out target_roots that are not properly tagged according to
+    --whitelisted-tag-name (defaults to None, and no filtering occurs if this option is 'None'),
+    and executes MyPy on targets in context from whitelisted target roots.
+    (if any transitive targets from the filtered roots are not whitelisted, a warning
+    will be printed.)
 
-  'In context' meaning in the sub-graph where a whitelisted target is the root
-  """
+    'In context' meaning in the sub-graph where a whitelisted target is the root
+    """
 
     _MYPY_COMPATIBLE_INTERPETER_CONSTRAINT = ">=3.5"
     _PYTHON_SOURCE_EXTENSION = ".py"
@@ -126,7 +126,8 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
         )
 
     def _calculate_python_sources(self, target_roots: Iterable[Target]) -> List[str]:
-        """Filter targets to generate a set of source files from the given targets."""
+        """Filter targets to generate a set of source files from the given
+        targets."""
         all_targets = {
             tgt
             for tgt in Target.closure_for_targets(target_roots=target_roots)

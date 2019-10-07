@@ -13,7 +13,8 @@ from pants.scm.scm import Scm
 class Version:
     @staticmethod
     def parse(version):
-        """Attempts to parse the given string as Semver, then falls back to Namedver."""
+        """Attempts to parse the given string as Semver, then falls back to
+        Namedver."""
         try:
             return Semver.parse(version)
         except ValueError:
@@ -26,13 +27,13 @@ class Version:
 
 @total_ordering
 class Namedver(Version):
-    """A less restrictive versioning scheme that does not conflict with Semver
+    """A less restrictive versioning scheme that does not conflict with Semver.
 
-  Its important to not allow certain characters that are used in maven for performing
-  range matching like *><=!  See:
+    Its important to not allow certain characters that are used in maven for performing
+    range matching like *><=!  See:
 
-  https://maven.apache.org/enforcer/enforcer-rules/versionRanges.html
-  """
+    https://maven.apache.org/enforcer/enforcer-rules/versionRanges.html
+    """
 
     _VALID_NAME = re.compile("^[-_.A-Za-z0-9]+$")
     _INVALID_NAME = re.compile("^[-_.]*$")
@@ -75,7 +76,10 @@ class Namedver(Version):
 
 @total_ordering
 class Semver(Version):
-    """Semantic versioning. See http://semver.org"""
+    """Semantic versioning.
+
+    See http://semver.org
+    """
 
     @staticmethod
     def parse(version):
@@ -139,19 +143,22 @@ class Semver(Version):
 class ScmPublishMixin:
     """A mixin for tasks that provides methods for publishing pushdbs via scm.
 
-  Requires that the mixing task class
-  * has the properties scm and log,
-  * has the method get_options
-  """
+    Requires that the mixing task class
+    * has the properties scm and log,
+    * has the method get_options
+    """
 
     class InvalidBranchError(TaskError):
-        """Indicates the current branch is not an allowed branch to publish from."""
+        """Indicates the current branch is not an allowed branch to publish
+        from."""
 
     class InvalidRemoteError(TaskError):
-        """Indicates the current default remote server is not an allowed remote server to publish to."""
+        """Indicates the current default remote server is not an allowed remote
+        server to publish to."""
 
     class DirtyWorkspaceError(TaskError):
-        """Indicates the current workspace is dirty and thus unsuitable for publishing from."""
+        """Indicates the current workspace is dirty and thus unsuitable for
+        publishing from."""
 
     _SCM_PUSH_ATTEMPTS = 5
 
@@ -200,12 +207,12 @@ class ScmPublishMixin:
     def check_clean_master(self, commit=False):
         """Perform a sanity check on SCM publishing constraints.
 
-    Checks for uncommitted tracked files and ensures we're on an allowed branch configured to push
-    to an allowed server if `commit` is `True`.
+        Checks for uncommitted tracked files and ensures we're on an allowed branch configured to push
+        to an allowed server if `commit` is `True`.
 
-    :param bool commit: `True` if a commit is in progress.
-    :raise TaskError: on failure
-    """
+        :param bool commit: `True` if a commit is in progress.
+        :raise TaskError: on failure
+        """
         if commit:
             if self.restrict_push_branches:
                 branch = self.scm.branch_name
@@ -236,7 +243,8 @@ class ScmPublishMixin:
             )
 
     def commit_pushdb(self, coordinates, postscript=None):
-        """Commit changes to the pushdb with a message containing the provided coordinates."""
+        """Commit changes to the pushdb with a message containing the provided
+        coordinates."""
         self.scm.commit(
             "pants build committing publish data for push of {coordinates}"
             "{postscript}".format(coordinates=coordinates, postscript=postscript or ""),
@@ -246,7 +254,8 @@ class ScmPublishMixin:
     def publish_pushdb_changes_to_remote_scm(
         self, pushdb_file, coordinate, tag_name, tag_message, postscript=None
     ):
-        """Push pushdb changes to the remote scm repository, and then tag the commit if it succeeds."""
+        """Push pushdb changes to the remote scm repository, and then tag the
+        commit if it succeeds."""
 
         self._add_pushdb(pushdb_file)
         self.commit_pushdb(coordinate, postscript=postscript)

@@ -50,7 +50,8 @@ class CoursierResolveTest(NailgunTaskTestBase):
         return re.compile(r"\.pants\.d/[^/]+/[a-f0-9]+/cache/" + cache_type + "/")
 
     def resolve(self, targets):
-        """Given some targets, execute a resolve, and return the resulting compile_classpath."""
+        """Given some targets, execute a resolve, and return the resulting
+        compile_classpath."""
         context = self.context(target_roots=targets)
         self.execute(context)
         return context.products.get_data("compile_classpath")
@@ -132,10 +133,11 @@ class CoursierResolveTest(NailgunTaskTestBase):
         self.assertEqual("guava-16.0.1.jar", os.path.basename(path))
 
     def test_resolve_ignores_jars_with_rev_left_off(self):
-        """If a resolve jar leaves off the rev, we're supposed to get the latest version,
-       but coursier doesn't currently support that.
-       https://github.com/coursier/coursier/issues/209
-    """
+        """If a resolve jar leaves off the rev, we're supposed to get the
+        latest version, but coursier doesn't currently support that.
+
+        https://github.com/coursier/coursier/issues/209
+        """
         with self.assertRaises(TaskError) as cm:
             jar = JarDependency("com.google.guava", "guava")
             lib = self.make_target("//:b", JarLibrary, jars=[jar])
@@ -203,9 +205,7 @@ class CoursierResolveTest(NailgunTaskTestBase):
         self.assertEqual(0, len(excluding_cp))
 
         def get_coord_in_classpath(cp, targets):
-            """
-      Get the simple coords that are going to be on the classpath
-      """
+            """Get the simple coords that are going to be on the classpath."""
             conf_art_tuples_ex = cp.get_classpath_entries_for_targets(targets)
             simple_coords = {x[1].coordinate.simple_coord for x in conf_art_tuples_ex}
             return simple_coords

@@ -20,13 +20,13 @@ STDIO_DESCRIPTORS = (0, 1, 2)
 class ChunkType:
     """Nailgun protocol chunk types.
 
-  N.B. Because we force `__future__.unicode_literals` in sources, string literals are automatically
-  converted to unicode for us (e.g. 'xyz' automatically becomes u'xyz'). In the case of protocol
-  implementations, supporting methods like struct.pack() require ASCII values - so we specify
-  constants such as these as byte literals (e.g. b'xyz', which can only contain ASCII values)
-  rather than their unicode counterparts. The alternative is to call str.encode('ascii') to
-  convert the unicode string literals to ascii before use.
-  """
+    N.B. Because we force `__future__.unicode_literals` in sources, string literals are automatically
+    converted to unicode for us (e.g. 'xyz' automatically becomes u'xyz'). In the case of protocol
+    implementations, supporting methods like struct.pack() require ASCII values - so we specify
+    constants such as these as byte literals (e.g. b'xyz', which can only contain ASCII values)
+    rather than their unicode counterparts. The alternative is to call str.encode('ascii') to
+    convert the unicode string literals to ascii before use.
+    """
 
     ARGUMENT = b"A"
     ENVIRONMENT = b"E"
@@ -53,28 +53,27 @@ class ChunkType:
 
 
 class NailgunProtocol:
-    """A mixin that provides a base implementation of the Nailgun protocol as described on
-     http://martiansoftware.com/nailgun/protocol.html.
+    """A mixin that provides a base implementation of the Nailgun protocol as
+    described on http://martiansoftware.com/nailgun/protocol.html.
 
-  Communications proceed as follows:
+    Communications proceed as follows:
 
-    1) Client connects to server
-    2) Client transmits zero or more "Argument" chunks
-    3) Client transmits zero or more "Environment" chunks
-    4) Client transmits exactly one "Working Directory" chunk
-    5) Client transmits exactly one "Command" chunk
-    6) If server requires stdin input, server transmits exactly one "Start-reading-input" chunk
+      1) Client connects to server
+      2) Client transmits zero or more "Argument" chunks
+      3) Client transmits zero or more "Environment" chunks
+      4) Client transmits exactly one "Working Directory" chunk
+      5) Client transmits exactly one "Command" chunk
+      6) If server requires stdin input, server transmits exactly one "Start-reading-input" chunk
 
-    After step 5 (and/or 6) the following may happen, interleaved and in any order:
+      After step 5 (and/or 6) the following may happen, interleaved and in any order:
 
-    7) Client transmits zero or more "stdin" chunks (Only if the client has received a
-       "Start-reading-input" chunk, and only until the client transmits a "stdin-eof" chunk).
-    8) Server transmits zero or more "stdout" chunks.
-    9) Server transmits zero or more "stderr" chunks.
+      7) Client transmits zero or more "stdin" chunks (Only if the client has received a
+         "Start-reading-input" chunk, and only until the client transmits a "stdin-eof" chunk).
+      8) Server transmits zero or more "stdout" chunks.
+      9) Server transmits zero or more "stderr" chunks.
 
-    Steps 7-9 repeat indefinitely until the server transmits an "exit" chunk.
-
-  """
+      Steps 7-9 repeat indefinitely until the server transmits an "exit" chunk.
+    """
 
     ENVIRON_SEP = "="
     TTY_ENV_TMPL = "NAILGUN_TTY_{}"
@@ -86,13 +85,15 @@ class NailgunProtocol:
         """Raised if there is an error in the underlying nailgun protocol."""
 
     class TruncatedRead(ProtocolError):
-        """Raised if there is a socket error while reading an expected number of bytes."""
+        """Raised if there is a socket error while reading an expected number
+        of bytes."""
 
     class TruncatedHeaderError(TruncatedRead):
         """Raised if there is a socket error while reading the header bytes."""
 
     class TruncatedPayloadError(TruncatedRead):
-        """Raised if there is a socket error while reading the payload bytes."""
+        """Raised if there is a socket error while reading the payload
+        bytes."""
 
     @classmethod
     def _decode_unicode_seq(cls, seq):
@@ -120,13 +121,16 @@ class NailgunProtocol:
 
     @classmethod
     def parse_request(cls, sock):
-        """Parse the request (the pre-execution) section of the nailgun protocol from the given socket.
+        """Parse the request (the pre-execution) section of the nailgun
+        protocol from the given socket.
 
-    Handles reading of the Argument, Environment, Working Directory and Command chunks from the
-    client which represents the "request" phase of the exchange. Working Directory and Command are
-    required and must be sent as the last two chunks in this phase. Argument and Environment chunks
-    are optional and can be sent more than once (thus we aggregate them).
-    """
+        Handles reading of the Argument, Environment, Working Directory
+        and Command chunks from the client which represents the
+        "request" phase of the exchange. Working Directory and Command
+        are required and must be sent as the last two chunks in this
+        phase. Argument and Environment chunks are optional and can be
+        sent more than once (thus we aggregate them).
+        """
 
         command = None
         working_dir = None
@@ -188,14 +192,14 @@ class NailgunProtocol:
     def read_chunk(cls, sock, return_bytes=False):
         """Read a single chunk from the connected client.
 
-     A "chunk" is a variable-length block of data beginning with a 5-byte chunk header and followed
-     by an optional payload. The chunk header consists of:
+        A "chunk" is a variable-length block of data beginning with a 5-byte chunk header and followed
+        by an optional payload. The chunk header consists of:
 
-          1) The length of the chunk's payload (not including the header) as a four-byte big-endian
-             unsigned long. The high-order byte is header[0] and the low-order byte is header[3].
+             1) The length of the chunk's payload (not including the header) as a four-byte big-endian
+                unsigned long. The high-order byte is header[0] and the low-order byte is header[3].
 
-          2) A single byte identifying the type of chunk.
-    """
+             2) A single byte identifying the type of chunk.
+        """
         try:
             # Read the chunk header from the socket.
             header = cls._read_until(sock, cls.HEADER_BYTES)
@@ -223,12 +227,14 @@ class NailgunProtocol:
         return chunk_type, payload
 
     class ProcessStreamTimeout(Exception):
-        """Raised after a timeout completes when a timeout is set on the stream during iteration."""
+        """Raised after a timeout completes when a timeout is set on the stream
+        during iteration."""
 
     @classmethod
     @contextmanager
     def _set_socket_timeout(cls, sock, timeout=None):
-        """Temporarily set a socket timeout in order to respect a timeout provided to .iter_chunks()."""
+        """Temporarily set a socket timeout in order to respect a timeout
+        provided to .iter_chunks()."""
         if timeout is not None:
             prev_timeout = sock.gettimeout()
         try:
@@ -249,24 +255,26 @@ class NailgunProtocol:
     class TimeoutProvider(ABC):
         @abstractmethod
         def maybe_timeout_options(self):
-            """Called on every stream iteration to obtain a possible specification for a timeout.
+            """Called on every stream iteration to obtain a possible
+            specification for a timeout.
 
-      If this method returns non-None, it should return an instance of `cls.TimeoutOptions`, which
-      then initiates a timeout after which the stream will raise `cls.ProcessStreamTimeout`.
+            If this method returns non-None, it should return an instance of `cls.TimeoutOptions`, which
+            then initiates a timeout after which the stream will raise `cls.ProcessStreamTimeout`.
 
-      :rtype: :class:`cls.TimeoutOptions`, or None
-      """
+            :rtype: :class:`cls.TimeoutOptions`, or None
+            """
 
     @classmethod
     def iter_chunks(cls, maybe_shutdown_socket, return_bytes=False, timeout_object=None):
-        """Generates chunks from a connected socket until an Exit chunk is sent or a timeout occurs.
+        """Generates chunks from a connected socket until an Exit chunk is sent
+        or a timeout occurs.
 
-    :param sock: the socket to read from.
-    :param bool return_bytes: If False, decode the payload into a utf-8 string.
-    :param cls.TimeoutProvider timeout_object: If provided, will be checked every iteration for a
-                                               possible timeout.
-    :raises: :class:`cls.ProcessStreamTimeout`
-    """
+        :param sock: the socket to read from.
+        :param bool return_bytes: If False, decode the payload into a utf-8 string.
+        :param cls.TimeoutProvider timeout_object: If provided, will be checked every iteration for a
+                                                   possible timeout.
+        :raises: :class:`cls.ProcessStreamTimeout`
+        """
         assert timeout_object is None or isinstance(timeout_object, cls.TimeoutProvider)
 
         if timeout_object is None:
@@ -328,7 +336,8 @@ class NailgunProtocol:
 
     @classmethod
     def send_exit_with_code(cls, sock, code):
-        """Send an Exit chunk over the specified socket, containing the specified return code."""
+        """Send an Exit chunk over the specified socket, containing the
+        specified return code."""
         encoded_exit_status = cls.encode_int(code)
         cls.send_exit(sock, payload=encoded_exit_status)
 
@@ -350,11 +359,11 @@ class NailgunProtocol:
     def encode_int(cls, obj):
         """Verify the object is an int, and ASCII-encode it.
 
-    :param int obj: An integer to be encoded.
-    :raises: :class:`TypeError` if `obj` is not an integer.
-    :return: A binary representation of the int `obj` suitable to pass as the `payload` to
-             send_exit().
-    """
+        :param int obj: An integer to be encoded.
+        :raises: :class:`TypeError` if `obj` is not an integer.
+        :return: A binary representation of the int `obj` suitable to pass as the `payload` to
+                 send_exit().
+        """
         if not isinstance(obj, int):
             raise TypeError(
                 "cannot encode non-integer object in encode_int(): object was {} (type '{}').".format(
@@ -367,20 +376,21 @@ class NailgunProtocol:
     def encode_env_var_value(cls, obj):
         """Convert `obj` into a UTF-8 encoded binary string.
 
-    The result of this method be used as the value of an environment variable in a subsequent
-    NailgunClient execution.
-    """
+        The result of this method be used as the value of an environment
+        variable in a subsequent NailgunClient execution.
+        """
         return str(obj).encode()
 
     @classmethod
     def isatty_to_env(cls, stdin, stdout, stderr):
-        """Generate nailgun tty capability environment variables based on checking a set of fds.
+        """Generate nailgun tty capability environment variables based on
+        checking a set of fds.
 
-    :param file stdin: The stream to check for stdin tty capabilities.
-    :param file stdout: The stream to check for stdout tty capabilities.
-    :param file stderr: The stream to check for stderr tty capabilities.
-    :returns: A dict containing the tty capability environment variables.
-    """
+        :param file stdin: The stream to check for stdin tty capabilities.
+        :param file stdout: The stream to check for stdout tty capabilities.
+        :param file stderr: The stream to check for stderr tty capabilities.
+        :returns: A dict containing the tty capability environment variables.
+        """
 
         def gen_env_vars():
             for fd_id, fd in zip(STDIO_DESCRIPTORS, (stdin, stdout, stderr)):
@@ -393,11 +403,12 @@ class NailgunProtocol:
 
     @classmethod
     def isatty_from_env(cls, env):
-        """Determine whether remote file descriptors are tty capable using std nailgunned env variables.
+        """Determine whether remote file descriptors are tty capable using std
+        nailgunned env variables.
 
-    :param dict env: A dictionary representing the environment.
-    :returns: A tuple of boolean values indicating istty or not for (stdin, stdout, stderr).
-    """
+        :param dict env: A dictionary representing the environment.
+        :returns: A tuple of boolean values indicating istty or not for (stdin, stdout, stderr).
+        """
 
         def str_int_bool(i):
             return i.isdigit() and bool(
@@ -413,22 +424,22 @@ class NailgunProtocol:
     def ttynames_from_env(cls, env):
         """Determines the ttynames for remote file descriptors (if ttys).
 
-    :param dict env: A dictionary representing the environment.
-    :returns: A tuple of boolean values indicating ttyname paths or None for (stdin, stdout, stderr).
-    """
+        :param dict env: A dictionary representing the environment.
+        :returns: A tuple of boolean values indicating ttyname paths or None for (stdin, stdout, stderr).
+        """
         return tuple(env.get(cls.TTY_PATH_ENV.format(fd_id)) for fd_id in STDIO_DESCRIPTORS)
 
 
 class MaybeShutdownSocket:
     """A wrapper around a socket which knows whether it has been shut down.
 
-  Because we may shut down a nailgun socket from one thread, and read from it on another, we use
-  this wrapper so that a shutting-down thread can signal to a reading thread that it should stop
-  reading.
+    Because we may shut down a nailgun socket from one thread, and read from it on another, we use
+    this wrapper so that a shutting-down thread can signal to a reading thread that it should stop
+    reading.
 
-  lock guards access to is_shutdown, shutting down the socket, and any calls which need to guarantee
-  they don't race a shutdown call.
-  """
+    lock guards access to is_shutdown, shutting down the socket, and any calls which need to guarantee
+    they don't race a shutdown call.
+    """
 
     def __init__(self, sock):
         self.socket = sock

@@ -28,14 +28,14 @@ class SplitArgs(
 ):
     """The result of splitting args.
 
-  goals: A list of explicitly specified goals.
-  scope_to_flags: An ordered map from scope name to the list of flags belonging to that scope.
-                  The global scope is specified as an empty string.
-                  Keys are in the order encountered in the args.
-  targets: A list of target specs.
-  passthru: Any remaining args specified after a -- separator.
-  passthru_owner: The scope specified last on the command line, if any. None otherwise.
-  """
+    goals: A list of explicitly specified goals.
+    scope_to_flags: An ordered map from scope name to the list of flags belonging to that scope.
+                    The global scope is specified as an empty string.
+                    Keys are in the order encountered in the args.
+    targets: A list of target specs.
+    passthru: Any remaining args specified after a -- separator.
+    passthru_owner: The scope specified last on the command line, if any. None otherwise.
+    """
 
 
 class HelpRequest(ABC):
@@ -46,9 +46,9 @@ class OptionsHelp(HelpRequest):
     def __init__(self, advanced=False, all_scopes=False):
         """The user requested help for cmd-line options.
 
-    :param advanced: Did the user ask for advanced help (e.g., using --help-advanced).
-    :param all_scopes: Did the user ask for help for all goals and tasks (e.g., using --help-all).
-    """
+        :param advanced: Did the user ask for advanced help (e.g., using --help-advanced).
+        :param all_scopes: Did the user ask for help for all goals and tasks (e.g., using --help-all).
+        """
         super().__init__()
         self.advanced = advanced
         self.all_scopes = all_scopes
@@ -77,15 +77,15 @@ class NoGoalHelp(HelpRequest):
 class ArgSplitter:
     """Splits a command-line into scoped sets of flags, and a set of targets.
 
-  Recognizes, e.g.:
+    Recognizes, e.g.:
 
-  ./pants goal -x compile --foo compile.java -y target1 target2
-  ./pants -x compile --foo compile.java -y -- target1 target2
-  ./pants -x compile target1 target2 --compile-java-flag
-  ./pants -x --compile-java-flag compile target1 target2
+    ./pants goal -x compile --foo compile.java -y target1 target2
+    ./pants -x compile --foo compile.java -y -- target1 target2
+    ./pants -x compile target1 target2 --compile-java-flag
+    ./pants -x --compile-java-flag compile target1 target2
 
-  Handles help and version args specially.
-  """
+    Handles help and version args specially.
+    """
 
     _HELP_BASIC_ARGS = ("-h", "--help", "help")
     _HELP_ADVANCED_ARGS = ("--help-advanced", "help-advanced")
@@ -155,10 +155,10 @@ class ArgSplitter:
     def split_args(self, args=None):
         """Split the specified arg list (or sys.argv if unspecified).
 
-    args[0] is ignored.
+        args[0] is ignored.
 
-    Returns a SplitArgs tuple.
-    """
+        Returns a SplitArgs tuple.
+        """
         goals = OrderedSet()
         scope_to_flags = {}
 
@@ -238,15 +238,15 @@ class ArgSplitter:
     def _consume_scope(self):
         """Returns a pair (scope, list of flags encountered in that scope).
 
-    Note that the flag may be explicitly scoped, and therefore not actually belong to this scope.
+        Note that the flag may be explicitly scoped, and therefore not actually belong to this scope.
 
-    For example, in:
+        For example, in:
 
-    ./pants --compile-java-partition-size-hint=100 compile <target>
+        ./pants --compile-java-partition-size-hint=100 compile <target>
 
-    --compile-java-partition-size-hint should be treated as if it were --partition-size-hint=100
-    in the compile.java scope.
-    """
+        --compile-java-partition-size-hint should be treated as if it were --partition-size-hint=100
+        in the compile.java scope.
+        """
         if not self._at_scope():
             return None, []
         scope = self._unconsumed_args.pop()
@@ -263,12 +263,13 @@ class ArgSplitter:
         return flags
 
     def _descope_flag(self, flag, default_scope):
-        """If the flag is prefixed by its scope, in the old style, extract the scope.
+        """If the flag is prefixed by its scope, in the old style, extract the
+        scope.
 
-    Otherwise assume it belongs to default_scope.
+        Otherwise assume it belongs to default_scope.
 
-    returns a pair (scope, flag).
-    """
+        returns a pair (scope, flag).
+        """
         for scope_prefix, scope_info in self._known_scoping_prefixes:
             for flag_prefix in ["--", "--no-"]:
                 prefix = flag_prefix + scope_prefix

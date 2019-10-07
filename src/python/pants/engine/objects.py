@@ -21,7 +21,8 @@ class Resolvable(ABC):
     @property
     @abstractmethod
     def address(self):
-        """Return the opaque address descriptor that this resolvable resolves."""
+        """Return the opaque address descriptor that this resolvable
+        resolves."""
 
     @abstractmethod
     def resolve(self):
@@ -34,23 +35,26 @@ def _unpickle_serializable(serializable_class, kwargs):
 
 
 class Locatable(ABC):
-    """Marks a class whose constructor should receive its spec_path relative to the build root.
+    """Marks a class whose constructor should receive its spec_path relative to
+    the build root.
 
-  Locatable objects will be passed a `spec_path` constructor kwarg that indicates where they
-  were parsed. If the object also has a `name` (not all do), then these two fields can be
-  combined into an Address.
-  """
+    Locatable objects will be passed a `spec_path` constructor kwarg
+    that indicates where they were parsed. If the object also has a
+    `name` (not all do), then these two fields can be combined into an
+    Address.
+    """
 
 
 class SerializablePickle(namedtuple("CustomPickle", ["unpickle_func", "args"])):
     """A named tuple to help the readability of the __reduce__ protocol.
 
-  See: https://docs.python.org/2.7/library/pickle.html#pickling-and-unpickling-extension-types
-  """
+    See: https://docs.python.org/2.7/library/pickle.html#pickling-and-unpickling-extension-types
+    """
 
     @classmethod
     def create(cls, serializable_instance):
-        """Return a tuple that implements the __reduce__ pickle protocol for serializable_instance."""
+        """Return a tuple that implements the __reduce__ pickle protocol for
+        serializable_instance."""
         if not Serializable.is_serializable(serializable_instance):
             raise ValueError(
                 "Can only create pickles for Serializable objects, given {} of type {}".format(
@@ -64,27 +68,30 @@ class SerializablePickle(namedtuple("CustomPickle", ["unpickle_func", "args"])):
 
 
 class Serializable(ABC):
-    """Marks a class that can be serialized into and reconstituted from python builtin values.
+    """Marks a class that can be serialized into and reconstituted from python
+    builtin values.
 
-  Also provides support for the pickling protocol out of the box.
-  """
+    Also provides support for the pickling protocol out of the box.
+    """
 
     @staticmethod
     def is_serializable(obj):
-        """Return `True` if the given object conforms to the Serializable protocol.
+        """Return `True` if the given object conforms to the Serializable
+        protocol.
 
-    :rtype: bool
-    """
+        :rtype: bool
+        """
         if inspect.isclass(obj):
             return Serializable.is_serializable_type(obj)
         return isinstance(obj, Serializable) or hasattr(obj, "_asdict")
 
     @staticmethod
     def is_serializable_type(type_):
-        """Return `True` if the given type's instances conform to the Serializable protocol.
+        """Return `True` if the given type's instances conform to the
+        Serializable protocol.
 
-    :rtype: bool
-    """
+        :rtype: bool
+        """
         if not inspect.isclass(type_):
             return Serializable.is_serializable(type_)
         return issubclass(type_, Serializable) or hasattr(type_, "_asdict")
@@ -105,7 +112,7 @@ class Serializable(ABC):
 
     Any :class:`collections.namedtuple` satisfies the Serializable contract automatically via duck
     typing if it is composed of only primitive python values or Serializable values.
-    """
+        """
 
     def __reduce__(self):
         # We implement __reduce__ to steer the pickling process away from __getattr__ scans.  This is
@@ -124,20 +131,21 @@ class SerializableFactory(ABC):
     def create(self):
         """Return a serializable object.
 
-    :rtype: :class:`Serializable`
-    """
+        :rtype: :class:`Serializable`
+        """
 
 
 class ValidationError(Exception):
     """Indicates invalid fields on an object."""
 
     def __init__(self, identifier, message):
-        """Creates a validation error pertaining to the identified invalid object.
+        """Creates a validation error pertaining to the identified invalid
+        object.
 
-    :param object identifier: Any object whose string representation identifies the invalid object
-                              that led to this validation error.
-    :param string message: A message describing the invalid Struct field.
-    """
+        :param object identifier: Any object whose string representation identifies the invalid object
+                                  that led to this validation error.
+        :param string message: A message describing the invalid Struct field.
+        """
         super().__init__("Failed to validate {id}: {msg}".format(id=identifier, msg=message))
 
 
@@ -148,20 +156,21 @@ class Validatable(ABC):
     def validate(self):
         """Check that this object's fields are valid.
 
-    :raises: :class:`ValidationError` if this object is invalid.
-    """
+        :raises: :class:`ValidationError` if this object is invalid.
+        """
 
 
 class Collection:
-    """Constructs classes representing collections of objects of a particular type.
+    """Constructs classes representing collections of objects of a particular
+    type.
 
-  The produced class will expose its values under a field named dependencies - this is a stable API
-  which may be consumed e.g. over FFI from the engine.
+    The produced class will expose its values under a field named dependencies - this is a stable API
+    which may be consumed e.g. over FFI from the engine.
 
-  Python consumers of a Collection should prefer to use its standard iteration API.
+    Python consumers of a Collection should prefer to use its standard iteration API.
 
-  Note that elements of a Collection are type-checked upon construction.
-  """
+    Note that elements of a Collection are type-checked upon construction.
+    """
 
     @memoized_classmethod
     def of(cls, *element_types):

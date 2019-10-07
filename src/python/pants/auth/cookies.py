@@ -28,8 +28,8 @@ class Cookies(Subsystem):
     def update(self, cookies):
         """Add specified cookies to our cookie jar, and persists it.
 
-    :param cookies: Any iterable that yields http.cookiejar.Cookie instances, such as a CookieJar.
-    """
+        :param cookies: Any iterable that yields http.cookiejar.Cookie instances, such as a CookieJar.
+        """
         cookie_jar = self.get_cookie_jar()
         for cookie in cookies:
             cookie_jar.set_cookie(cookie)

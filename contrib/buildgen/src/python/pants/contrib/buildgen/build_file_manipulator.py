@@ -18,11 +18,13 @@ class BuildTargetParseError(Exception):
 
 
 class DependencySpec:
-    """A representation of a single dependency spec, including comments around it.
+    """A representation of a single dependency spec, including comments around
+    it.
 
-  This is a helper class to aid in deduplicating, sorting, forcing, and formatting
-  dependency specs in a BUILD target's dependencies section.
-  """
+    This is a helper class to aid in deduplicating, sorting, forcing,
+    and formatting dependency specs in a BUILD target's dependencies
+    section.
+    """
 
     def __init__(self, spec, comments_above=None, side_comment=None):
         self.spec = spec
@@ -66,26 +68,28 @@ class DependencySpec:
 
 
 class BuildFileManipulator:
-    """A class to load, represent, and change the dependencies of a given target.
+    """A class to load, represent, and change the dependencies of a given
+    target.
 
-  Use BuildFileManipulator.load(...) for construction, rather than constructing it directly.
-  """
+    Use BuildFileManipulator.load(...) for construction, rather than
+    constructing it directly.
+    """
 
     @classmethod
     def load(cls, build_file, name, target_aliases):
         """A BuildFileManipulator factory class method.
 
-    Note that BuildFileManipulator requires a very strict formatting of target declaration.
-    In particular, it wants to see a newline after `target_type(`, `dependencies = [`, and
-    the last param to the target constructor before the trailing `)`.  There are further
-    restrictions as well--see the comments below or check out the example targets in
-    the tests for this class.
+        Note that BuildFileManipulator requires a very strict formatting of target declaration.
+        In particular, it wants to see a newline after `target_type(`, `dependencies = [`, and
+        the last param to the target constructor before the trailing `)`.  There are further
+        restrictions as well--see the comments below or check out the example targets in
+        the tests for this class.
 
-    :param build_file: A BuildFile instance to operate on.
-    :param name: The name of the target (without the spec path or colon) to operate on.
-    :target aliases: The callables injected into the build file context that we should treat
-      as target declarations.
-    """
+        :param build_file: A BuildFile instance to operate on.
+        :param name: The name of the target (without the spec path or colon) to operate on.
+        :target aliases: The callables injected into the build file context that we should treat
+          as target declarations.
+        """
         with open(build_file.full_path, "r") as f:
             source = f.read()
         source_lines = source.split("\n")
@@ -360,7 +364,8 @@ class BuildFileManipulator:
         dependencies,
         dependencies_interval,
     ):
-        """See BuildFileManipulator.load() for how to construct one as a user."""
+        """See BuildFileManipulator.load() for how to construct one as a
+        user."""
         self.name = name
         self.build_file = build_file
         self.target_address = BuildFileAddress(build_file=build_file, target_name=name)
@@ -382,7 +387,10 @@ class BuildFileManipulator:
             self._dependencies_by_address[dep_address] = dep
 
     def add_dependency(self, address):
-        """Add a dependency to this target.  This will deduplicate existing dependencies."""
+        """Add a dependency to this target.
+
+        This will deduplicate existing dependencies.
+        """
         if address in self._dependencies_by_address:
             if self._dependencies_by_address[address].has_comment():
                 logger.warning(
@@ -398,11 +406,13 @@ class BuildFileManipulator:
     def clear_unforced_dependencies(self):
         """Remove all dependencies not forced by a comment.
 
-    This is useful when existing analysis can infer exactly what the correct dependencies should
-    be.  Typical use is to call `clear_unforced_dependencies`, then call `add_dependency` for each
-    dependency inferred from analysis.  The resulting dependency set should be the pruned set
-    of all dependencies, plus dependencies hand forced by a user comment.
-    """
+        This is useful when existing analysis can infer exactly what the
+        correct dependencies should be.  Typical use is to call
+        `clear_unforced_dependencies`, then call `add_dependency` for
+        each dependency inferred from analysis.  The resulting
+        dependency set should be the pruned set of all dependencies,
+        plus dependencies hand forced by a user comment.
+        """
         self._dependencies_by_address = dict(
             (address, dep)
             for address, dep in self._dependencies_by_address.items()
@@ -412,8 +422,8 @@ class BuildFileManipulator:
     def dependency_lines(self):
         """The formatted dependencies=[...] lines for this target.
 
-    If there are no dependencies, this returns an empty list.
-    """
+        If there are no dependencies, this returns an empty list.
+        """
         deps = sorted(self._dependencies_by_address.values(), key=lambda d: d.spec)
 
         def dep_lines():
@@ -428,23 +438,25 @@ class BuildFileManipulator:
     def target_lines(self):
         """The formatted target_type(...) lines for this target.
 
-    This is just a convenience method for extracting and re-injecting the changed
-    `dependency_lines` into the target text.
-    """
+        This is just a convenience method for extracting and re-
+        injecting the changed `dependency_lines` into the target text.
+        """
         target_lines = self._target_source_lines[:]
         deps_begin, deps_end = self._dependencies_interval
         target_lines[deps_begin:deps_end] = self.dependency_lines()
         return target_lines
 
     def build_file_lines(self):
-        """Like `target_lines`, the entire BUILD file's lines after dependency manipulation."""
+        """Like `target_lines`, the entire BUILD file's lines after dependency
+        manipulation."""
         build_file_lines = self._build_file_source_lines[:]
         target_begin, target_end = self._target_interval
         build_file_lines[target_begin:target_end] = self.target_lines()
         return build_file_lines
 
     def diff_lines(self):
-        """A diff between the original BUILD file and the resulting BUILD file."""
+        """A diff between the original BUILD file and the resulting BUILD
+        file."""
         start_lines = self._build_file_source_lines[:]
         end_lines = self.build_file_lines()
         diff_generator = unified_diff(
@@ -457,10 +469,11 @@ class BuildFileManipulator:
         return list(diff_generator)
 
     def write(self, dry_run=True):
-        """Write out the changes made to the BUILD file, and print the diff to stderr.
+        """Write out the changes made to the BUILD file, and print the diff to
+        stderr.
 
-    :param dry_run: Don't actually write out the BUILD file, but do print the diff to stderr.
-    """
+        :param dry_run: Don't actually write out the BUILD file, but do print the diff to stderr.
+        """
         start_lines = self._build_file_source_lines[:]
         end_lines = self.build_file_lines()
         diff_generator = unified_diff(

@@ -10,7 +10,8 @@ DEFAULT_LOG_PATH = "/tmp/pants_debug.log"
 
 
 def dlog(msg, log_path=DEFAULT_LOG_PATH):
-    """A handy log utility for debugging multi-process, multi-threaded activities."""
+    """A handy log utility for debugging multi-process, multi-threaded
+    activities."""
     with open(log_path, "a") as f:
         f.write("\n{}@{}: {}".format(os.getpid(), threading.current_thread().name, msg))
 
@@ -32,8 +33,7 @@ class ProxyLogger(namedtuple("ProxyLogger", ["wrapped_object", "log_path"])):
   ...
   32912@MainThread: <open file '<stdout>', mode 'w' at 0x1047150>.write(*('blah\n',), **{}) -> None
   ...
-
-  """
+    """
 
     @classmethod
     def wrap_object(cls, obj, log_path=DEFAULT_LOG_PATH):

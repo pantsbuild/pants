@@ -119,8 +119,8 @@ class Reporting(Subsystem):
     def initialize(self, run_tracker, all_options, start_time=None):
         """Initialize with the given RunTracker.
 
-    TODO: See `RunTracker.start`.
-    """
+        TODO: See `RunTracker.start`.
+        """
 
         run_id, run_uuid = run_tracker.initialize(all_options)
         run_dir = os.path.join(self.get_options().reports_dir, run_id)

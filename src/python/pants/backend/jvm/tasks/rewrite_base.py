@@ -39,12 +39,14 @@ class RewriteBase(NailgunTask, metaclass=ABCMeta):
 
     @classmethod
     def target_types(cls):
-        """Returns a list of target type names (e.g.: `scala_library`) this rewriter operates on."""
+        """Returns a list of target type names (e.g.: `scala_library`) this
+        rewriter operates on."""
         raise NotImplementedError()
 
     @classmethod
     def source_extension(cls):
-        """Returns the source extension this rewriter operates on (e.g.: `.scala`)"""
+        """Returns the source extension this rewriter operates on (e.g.:
+        `.scala`)"""
         raise NotImplementedError()
 
     @memoized_property
@@ -110,23 +112,25 @@ class RewriteBase(NailgunTask, metaclass=ABCMeta):
     def invoke_tool(self, absolute_root, target_sources):
         """Invoke the tool on the given (target, absolute source) tuples.
 
-    Sources are guaranteed to be located below the given root.
+        Sources are guaranteed to be located below the given root.
 
-    Returns the UNIX return code of the tool.
-    """
+        Returns the UNIX return code of the tool.
+        """
 
     @property
     @abstractmethod
     def sideeffecting(self):
-        """True if this command has sideeffects: ie, mutates the working copy."""
+        """True if this command has sideeffects: ie, mutates the working
+        copy."""
 
     @abstractmethod
     def process_result(self, return_code):
         """Given a return code, process the result of the tool.
 
-    No return value is expected. If an error occurred while running the tool, raising a TaskError
-    with a useful error message is required.
-    """
+        No return value is expected. If an error occurred while running
+        the tool, raising a TaskError with a useful error message is
+        required.
+        """
 
     def _get_non_synthetic_targets(self, targets):
         return [

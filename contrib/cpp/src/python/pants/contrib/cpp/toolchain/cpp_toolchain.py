@@ -28,13 +28,13 @@ class CppToolchain:
     def register_tool(self, tool, name=None):
         """Check tool and see if it is installed in the local cpp toolchain.
 
-    All cpp tasks should request their tools using this method. Tools are validated
-    and cached for quick lookup.
+        All cpp tasks should request their tools using this method. Tools are validated
+        and cached for quick lookup.
 
-    :param string tool: Name or path of program tool, eg 'g++'
-    :param string name: Logical name of tool, eg 'compiler'. If not supplied defaults to basename
-                        of `tool`
-    """
+        :param string tool: Name or path of program tool, eg 'g++'
+        :param string name: Logical name of tool, eg 'compiler'. If not supplied defaults to basename
+                            of `tool`
+        """
         name = name or os.path.basename(tool)
         if name in self._validated_tools:
             return self._validated_tools[name]

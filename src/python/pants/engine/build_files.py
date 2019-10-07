@@ -38,8 +38,8 @@ def _key_func(entry):
 def parse_address_family(address_mapper: AddressMapper, directory: Dir) -> AddressFamily:
     """Given an AddressMapper and a directory, return an AddressFamily.
 
-  The AddressFamily may be empty, but it will not be None.
-  """
+    The AddressFamily may be empty, but it will not be None.
+    """
     patterns = tuple(join(directory.path, p) for p in address_mapper.build_patterns)
     path_globs = PathGlobs(include=patterns, exclude=address_mapper.build_ignore_patterns)
     snapshot = yield Get(Snapshot, PathGlobs, path_globs)
@@ -76,11 +76,13 @@ def _raise_did_you_mean(address_family, name, source=None):
 
 @rule
 def hydrate_struct(address_mapper: AddressMapper, address: Address) -> HydratedStruct:
-    """Given an AddressMapper and an Address, resolve a Struct from a BUILD file.
+    """Given an AddressMapper and an Address, resolve a Struct from a BUILD
+    file.
 
-  Recursively collects any embedded addressables within the Struct, but will not walk into a
-  dependencies field, since those should be requested explicitly by rules.
-  """
+    Recursively collects any embedded addressables within the Struct,
+    but will not walk into a dependencies field, since those should be
+    requested explicitly by rules.
+    """
 
     address_family = yield Get(AddressFamily, Dir(address.spec_path))
 
@@ -198,13 +200,14 @@ def _hydrate(item_type, spec_path, **kwargs):
 def addresses_from_address_families(
     address_mapper: AddressMapper, specs: Specs
 ) -> BuildFileAddresses:
-    """Given an AddressMapper and list of Specs, return matching BuildFileAddresses.
+    """Given an AddressMapper and list of Specs, return matching
+    BuildFileAddresses.
 
-  :raises: :class:`ResolveError` if:
-     - there were no matching AddressFamilies, or
-     - the Spec matches no addresses for SingleAddresses.
-  :raises: :class:`AddressLookupError` if no targets are matched for non-SingleAddress specs.
-  """
+    :raises: :class:`ResolveError` if:
+       - there were no matching AddressFamilies, or
+       - the Spec matches no addresses for SingleAddresses.
+    :raises: :class:`AddressLookupError` if no targets are matched for non-SingleAddress specs.
+    """
     # Capture a Snapshot covering all paths for these Specs, then group by directory.
     snapshot = yield Get(Snapshot, PathGlobs, _spec_to_globs(address_mapper, specs))
     dirnames = {dirname(f) for f in snapshot.files}
@@ -241,7 +244,8 @@ def addresses_from_address_families(
 
 
 def _spec_to_globs(address_mapper, specs):
-    """Given a Specs object, return a PathGlobs object for the build files that it matches."""
+    """Given a Specs object, return a PathGlobs object for the build files that
+    it matches."""
     patterns = set()
     for spec in specs:
         patterns.update(spec.make_glob_patterns(address_mapper))
@@ -251,9 +255,9 @@ def _spec_to_globs(address_mapper, specs):
 def create_graph_rules(address_mapper):
     """Creates tasks used to parse Structs from BUILD files.
 
-  :param address_mapper_key: The subject key for an AddressMapper instance.
-  :param symbol_table: A SymbolTable instance to provide symbols for Address lookups.
-  """
+    :param address_mapper_key: The subject key for an AddressMapper instance.
+    :param symbol_table: A SymbolTable instance to provide symbols for Address lookups.
+    """
 
     @rule
     def address_mapper_singleton() -> AddressMapper:

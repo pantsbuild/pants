@@ -46,10 +46,10 @@ class NailgunProcessGroup(ProcessGroup):
     def killall(self, everywhere=False):
         """Kills all nailgun servers started by pants.
 
-       :param bool everywhere: If ``True``, kills all pants-started nailguns on this machine;
-                               otherwise restricts the nailguns killed to those started for the
-                               current build root.
-    """
+        :param bool everywhere: If ``True``, kills all pants-started nailguns on this machine;
+                                otherwise restricts the nailguns killed to those started for the
+                                current build root.
+        """
         with self._NAILGUN_KILL_LOCK:
             for proc in self._iter_nailgun_instances(everywhere):
                 logger.info("killing nailgun server pid={pid}".format(pid=proc.pid))
@@ -61,9 +61,10 @@ class NailgunProcessGroup(ProcessGroup):
 class NailgunExecutor(Executor, FingerprintedProcessManager):
     """Executes java programs by launching them in nailgun server.
 
-     If a nailgun is not available for a given set of jvm args and classpath, one is launched and
-     re-used for the given jvm args and classpath on subsequent runs.
-  """
+    If a nailgun is not available for a given set of jvm args and
+    classpath, one is launched and re-used for the given jvm args and
+    classpath on subsequent runs.
+    """
 
     # 'NGServer 0.9.1 started on 127.0.0.1, port 53785.'
     _NG_PORT_REGEX = re.compile(r".*\s+port\s+(\d+)\.$")
@@ -129,11 +130,11 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
     def _fingerprint(jvm_options, classpath, java_version):
         """Compute a fingerprint for this invocation of a Java task.
 
-       :param list jvm_options: JVM options passed to the java invocation
-       :param list classpath: The -cp arguments passed to the java invocation
-       :param Revision java_version: return value from Distribution.version()
-       :return: a hexstring representing a fingerprint of the java invocation
-    """
+        :param list jvm_options: JVM options passed to the java invocation
+        :param list classpath: The -cp arguments passed to the java invocation
+        :param Revision java_version: return value from Distribution.version()
+        :return: a hexstring representing a fingerprint of the java invocation
+        """
         digest = hashlib.sha1()
         # TODO(John Sirois): hash classpath contents?
         encoded_jvm_options = [option.encode() for option in sorted(jvm_options)]
@@ -144,7 +145,10 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
         return digest.hexdigest()
 
     def _runner(self, classpath, main, jvm_options, args):
-        """Runner factory. Called via Executor.execute()."""
+        """Runner factory.
+
+        Called via Executor.execute().
+        """
         command = self._create_command(classpath, main, jvm_options, args)
 
         class Runner(self.Runner):
@@ -197,8 +201,12 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
         return running, updated
 
     def _get_nailgun_client(self, jvm_options, classpath, stdout, stderr, stdin):
-        """This (somewhat unfortunately) is the main entrypoint to this class via the Runner. It handles
-       creation of the running nailgun server as well as creation of the client."""
+        """This (somewhat unfortunately) is the main entrypoint to this class
+        via the Runner.
+
+        It handles creation of the running nailgun server as well as
+        creation of the client.
+        """
         classpath = self._nailgun_classpath + classpath
         new_fingerprint = self._fingerprint(jvm_options, classpath, self._distribution.version)
 
@@ -232,7 +240,8 @@ Stderr:
             super(NailgunExecutor.InitialNailgunConnectTimedOut, self).__init__(msg)
 
     def _await_socket(self, timeout):
-        """Blocks for the nailgun subprocess to bind and emit a listening port in the nailgun stdout."""
+        """Blocks for the nailgun subprocess to bind and emit a listening port
+        in the nailgun stdout."""
         start_time = time.time()
         accumulated_stdout = ""
 
@@ -267,7 +276,8 @@ Stderr:
         return NailgunClient(port=port, ins=stdin, out=stdout, err=stderr)
 
     def ensure_connectable(self, nailgun):
-        """Ensures that a nailgun client is connectable or raises NailgunError."""
+        """Ensures that a nailgun client is connectable or raises
+        NailgunError."""
         attempt_count = 1
         while 1:
             try:
@@ -334,8 +344,8 @@ Stderr:
         return self._PANTS_NG_BUILDROOT_ARG in process.cmdline()
 
     def is_alive(self):
-        """A ProcessManager.is_alive() override that ensures buildroot flags are present in the process
-    command line arguments."""
+        """A ProcessManager.is_alive() override that ensures buildroot flags
+        are present in the process command line arguments."""
         return super().is_alive(self._check_process_buildroot)
 
     def post_fork_child(self, fingerprint, jvm_options, classpath, stdout, stderr):

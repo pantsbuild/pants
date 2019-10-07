@@ -23,10 +23,10 @@ GLOBAL_CACHE_KEY_GEN_VERSION = "7"
 class CacheKey(namedtuple("CacheKey", ["id", "hash"])):
     """A CacheKey represents some version of a set of targets.
 
-  - id identifies the set of targets.
-  - hash is a fingerprint of all invalidating inputs to the build step, i.e., it uniquely
-    determines a given version of the artifacts created when building the target set.
-  """
+    - id identifies the set of targets.
+    - hash is a fingerprint of all invalidating inputs to the build step, i.e., it uniquely
+      determines a given version of the artifacts created when building the target set.
+    """
 
     _UNCACHEABLE_HASH = "__UNCACHEABLE_HASH__"
 
@@ -37,15 +37,16 @@ class CacheKey(namedtuple("CacheKey", ["id", "hash"])):
 
     @classmethod
     def combine_cache_keys(cls, cache_keys):
-        """Returns a cache key for a list of target sets that already have cache keys.
+        """Returns a cache key for a list of target sets that already have
+        cache keys.
 
-    This operation is 'idempotent' in the sense that if cache_keys contains a single key
-    then that key is returned.
+        This operation is 'idempotent' in the sense that if cache_keys contains a single key
+        then that key is returned.
 
-    Note that this operation is commutative but not associative.  We use the term 'combine' rather
-    than 'merge' or 'union' to remind the user of this. Associativity is not a necessary property,
-    in practice.
-    """
+        Note that this operation is commutative but not associative.  We use the term 'combine' rather
+        than 'merge' or 'union' to remind the user of this. Associativity is not a necessary property,
+        in practice.
+        """
         if len(cache_keys) == 1:
             return cache_keys[0]
         else:
@@ -57,11 +58,12 @@ class CacheKey(namedtuple("CacheKey", ["id", "hash"])):
 
     @property
     def cacheable(self):
-        """Indicates whether artifacts associated with this cache key should be cached.
+        """Indicates whether artifacts associated with this cache key should be
+        cached.
 
-    :return: `True` if this cache key represents a cacheable set of target artifacts.
-    :rtype: bool
-    """
+        :return: `True` if this cache key represents a cacheable set of target artifacts.
+        :rtype: bool
+        """
         return self.hash != self._UNCACHEABLE_HASH
 
 
@@ -72,14 +74,14 @@ class CacheKeyGeneratorInterface(ABC):
     def key_for_target(self, target, transitive=False, fingerprint_strategy=None):
         """Get a key representing the given target and its sources.
 
-    A key for a set of targets can be created by calling CacheKey.combine_cache_keys()
-    on the target's individual cache keys.
+        A key for a set of targets can be created by calling CacheKey.combine_cache_keys()
+        on the target's individual cache keys.
 
-    :target: The target to create a CacheKey for.
-    :transitive: Whether or not to include a fingerprint of all of :target:'s dependencies.
-    :fingerprint_strategy: A FingerprintStrategy instance, which can do per task, finer grained
-      fingerprinting of a given Target.
-    """
+        :target: The target to create a CacheKey for.
+        :transitive: Whether or not to include a fingerprint of all of :target:'s dependencies.
+        :fingerprint_strategy: A FingerprintStrategy instance, which can do per task, finer grained
+          fingerprinting of a given Target.
+        """
 
 
 class CacheKeyGenerator(CacheKeyGeneratorInterface):
@@ -121,7 +123,8 @@ class UncacheableCacheKeyGenerator(CacheKeyGeneratorInterface):
 # the inputs to the current version of that target set. That cache key can then be used
 # to look up build artifacts in an artifact cache.
 class BuildInvalidator:
-    """Invalidates build targets based on the SHA1 hash of source files and other inputs."""
+    """Invalidates build targets based on the SHA1 hash of source files and
+    other inputs."""
 
     class Factory(Subsystem):
         options_scope = "build-invalidator"
@@ -130,10 +133,10 @@ class BuildInvalidator:
         def create(cls, build_task=None):
             """Creates a build invalidator optionally scoped to a task.
 
-      :param str build_task: An optional task name to scope the build invalidator to. If not
-                             supplied the build invalidator will act globally across all build
-                             tasks.
-      """
+            :param str build_task: An optional task name to scope the build invalidator to. If not
+                                   supplied the build invalidator will act globally across all build
+                                   tasks.
+            """
             root = os.path.join(
                 cls.global_instance().get_options().pants_workdir, "build_invalidator"
             )
@@ -141,19 +144,21 @@ class BuildInvalidator:
 
     @staticmethod
     def cacheable(cache_key):
-        """Indicates whether artifacts associated with the given `cache_key` should be cached.
+        """Indicates whether artifacts associated with the given `cache_key`
+        should be cached.
 
-    :return: `True` if the `cache_key` represents a cacheable set of target artifacts.
-    :rtype: bool
-    """
+        :return: `True` if the `cache_key` represents a cacheable set of target artifacts.
+        :rtype: bool
+        """
         return cache_key.cacheable
 
     def __init__(self, root, scope=None):
-        """Create a build invalidator using the given root fingerprint database directory.
+        """Create a build invalidator using the given root fingerprint database
+        directory.
 
-    :param str root: The root directory to use for storing build invalidation fingerprints.
-    :param str scope: The scope of this invalidator; if `None` then this invalidator will be global.
-    """
+        :param str root: The root directory to use for storing build invalidation fingerprints.
+        :param str scope: The scope of this invalidator; if `None` then this invalidator will be global.
+        """
         root = os.path.join(root, GLOBAL_CACHE_KEY_GEN_VERSION)
         if scope:
             root = os.path.join(root, scope)
@@ -161,11 +166,12 @@ class BuildInvalidator:
         safe_mkdir(self._root)
 
     def previous_key(self, cache_key):
-        """If there was a previous successful build for the given key, return the previous key.
+        """If there was a previous successful build for the given key, return
+        the previous key.
 
-    :param cache_key: A CacheKey object (as returned by CacheKeyGenerator.key_for().
-    :returns: The previous cache_key, or None if there was not a previous build.
-    """
+        :param cache_key: A CacheKey object (as returned by CacheKeyGenerator.key_for().
+        :returns: The previous cache_key, or None if there was not a previous build.
+        """
         if not self.cacheable(cache_key):
             # We should never successfully cache an uncacheable CacheKey.
             return None
@@ -178,9 +184,9 @@ class BuildInvalidator:
     def needs_update(self, cache_key):
         """Check if the given cached item is invalid.
 
-    :param cache_key: A CacheKey object (as returned by CacheKeyGenerator.key_for().
-    :returns: True if the cached version of the item is out of date.
-    """
+        :param cache_key: A CacheKey object (as returned by CacheKeyGenerator.key_for().
+        :returns: True if the cached version of the item is out of date.
+        """
         if not self.cacheable(cache_key):
             # An uncacheable CacheKey is always out of date.
             return True
@@ -190,8 +196,8 @@ class BuildInvalidator:
     def update(self, cache_key):
         """Makes cache_key the valid version of the corresponding target set.
 
-    :param cache_key: A CacheKey object (typically returned by CacheKeyGenerator.key_for()).
-    """
+        :param cache_key: A CacheKey object (typically returned by CacheKeyGenerator.key_for()).
+        """
         if self.cacheable(cache_key):
             self._write_sha(cache_key)
 

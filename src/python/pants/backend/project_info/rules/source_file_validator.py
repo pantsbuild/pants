@@ -22,11 +22,11 @@ from pants.util.objects import enum
 class DetailLevel(enum(["none", "summary", "nonmatching", "all"])):
     """How much detail about validation to emit to the console.
 
-  none: Emit nothing.
-  summary: Emit a summary only.
-  nonmatching: Emit details for source files that failed to match at least one required pattern.
-  all: Emit details for all source files.
-  """
+    none: Emit nothing.
+    summary: Emit a summary only.
+    nonmatching: Emit details for source files that failed to match at least one required pattern.
+    all: Emit details for all source files.
+    """
 
     pass
 
@@ -106,10 +106,12 @@ RegexMatchResults = Collection.of(RegexMatchResult)
 class Matcher:
     """Class to match a single (possibly inverted) regex.
 
-  Matches are allowed anywhere in the string (so really a "search" in the Python regex parlance).
-  To anchor a match at the beginning of a string, use the ^ anchor. To anchor at the beginning
-  of any line, use the ^ anchor along with the MULTILINE directive (?m).  See test for examples.
-  """
+    Matches are allowed anywhere in the string (so really a "search" in
+    the Python regex parlance). To anchor a match at the beginning of a
+    string, use the ^ anchor. To anchor at the beginning of any line,
+    use the ^ anchor along with the MULTILINE directive (?m).  See test
+    for examples.
+    """
 
     def __init__(self, pattern, inverted=False):
         self.compiled_regex = re.compile(pattern)
@@ -140,8 +142,8 @@ class MultiMatcher:
     def __init__(self, config):
         """Class to check multiple regex matching on files.
 
-    :param dict config: Regex matching config (see above).
-    """
+        :param dict config: Regex matching config (see above).
+        """
         path_patterns = config.get("path_patterns", {})
         content_patterns = config.get("content_patterns", {})
         required_matches = config.get("required_matches", {})
@@ -183,12 +185,12 @@ class MultiMatcher:
     def check_content(self, content_pattern_names, content, encoding):
         """Check which of the named patterns matches the given content.
 
-    Returns a pair (matching, nonmatching), in which each element is a tuple of pattern names.
+        Returns a pair (matching, nonmatching), in which each element is a tuple of pattern names.
 
-    :param iterable content_pattern_names: names of content patterns to check.
-    :param bytes content: the content to check.
-    :param str encoding: the expected encoding of content.
-    """
+        :param iterable content_pattern_names: names of content patterns to check.
+        :param bytes content: the content to check.
+        :param str encoding: the expected encoding of content.
+        """
         if not content_pattern_names or not encoding:
             return (), ()
 
@@ -204,11 +206,11 @@ class MultiMatcher:
     def get_applicable_content_pattern_names(self, path):
         """Return the content patterns applicable to a given path.
 
-    Returns a tuple (applicable_content_pattern_names, content_encoding).
+        Returns a tuple (applicable_content_pattern_names, content_encoding).
 
-    If path matches no path patterns, the returned content_encoding will be None (and
-    applicable_content_pattern_names will be empty).
-    """
+        If path matches no path patterns, the returned content_encoding will be None (and
+        applicable_content_pattern_names will be empty).
+        """
         encodings = set()
         applicable_content_pattern_names = set()
         for path_pattern_name, content_pattern_names in self._required_matches.items():

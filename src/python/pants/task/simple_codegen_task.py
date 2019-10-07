@@ -25,8 +25,8 @@ logger = logging.getLogger(__name__)
 class SimpleCodegenTask(Task):
     """A base-class for code generation for a single target language.
 
-  :API: public
-  """
+    :API: public
+    """
 
     # Subclasses may override to provide the type of gen targets the target acts on.
     # E.g., JavaThriftLibrary. If not provided, the subclass must implement is_gentarget.
@@ -41,11 +41,10 @@ class SimpleCodegenTask(Task):
     sources_exclude_globs = ()
 
     def __init__(self, context, workdir):
-        """
-    Add pass-thru Task Constructor for public API visibility.
+        """Add pass-thru Task Constructor for public API visibility.
 
-    :API: public
-    """
+        :API: public
+        """
         super().__init__(context, workdir)
 
     @classmethod
@@ -79,12 +78,13 @@ class SimpleCodegenTask(Task):
 
     @classmethod
     def get_fingerprint_strategy(cls):
-        """Override this method to use a fingerprint strategy other than the default one.
+        """Override this method to use a fingerprint strategy other than the
+        default one.
 
-    :API: public
+        :API: public
 
-    :return: a fingerprint strategy, or None to use the default strategy.
-    """
+        :return: a fingerprint strategy, or None to use the default strategy.
+        """
         return None
 
     @property
@@ -95,26 +95,26 @@ class SimpleCodegenTask(Task):
     def validate_sources_present(self):
         """A property indicating whether input targets require sources.
 
-    If targets should have sources, the `--allow-empty` flag indicates whether it is a
-    warning or an error for sources to be missing.
+        If targets should have sources, the `--allow-empty` flag indicates whether it is a
+        warning or an error for sources to be missing.
 
-    :API: public
-    """
+        :API: public
+        """
         return True
 
     def synthetic_target_extra_dependencies(self, target, target_workdir):
         """Gets any extra dependencies generated synthetic targets should have.
 
-    This method is optional for subclasses to implement, because some code generators may have no
-    extra dependencies.
-    :param Target target: the Target from which we are generating a synthetic Target. E.g., 'target'
-    might be a JavaProtobufLibrary, whose corresponding synthetic Target would be a JavaLibrary.
-    It may not be necessary to use this parameter depending on the details of the subclass.
+        This method is optional for subclasses to implement, because some code generators may have no
+        extra dependencies.
+        :param Target target: the Target from which we are generating a synthetic Target. E.g., 'target'
+        might be a JavaProtobufLibrary, whose corresponding synthetic Target would be a JavaLibrary.
+        It may not be necessary to use this parameter depending on the details of the subclass.
 
-    :API: public
+        :API: public
 
-    :return: a list of dependencies.
-    """
+        :return: a list of dependencies.
+        """
         return []
 
     @classmethod
@@ -124,70 +124,73 @@ class SimpleCodegenTask(Task):
     def synthetic_target_extra_exports(self, target, target_workdir):
         """Gets any extra exports generated synthetic targets should have.
 
-   This method is optional for subclasses to implement, because some code generators may have no
-    extra exports.
-    NB: Extra exports must also be present in the extra dependencies.
-    :param Target target: the Target from which we are generating a synthetic Target. E.g., 'target'
-    might be a JavaProtobufLibrary, whose corresponding synthetic Target would be a JavaLibrary.
-    It may not be necessary to use this parameter depending on the details of the subclass.
+        This method is optional for subclasses to implement, because some code generators may have no
+         extra exports.
+         NB: Extra exports must also be present in the extra dependencies.
+         :param Target target: the Target from which we are generating a synthetic Target. E.g., 'target'
+         might be a JavaProtobufLibrary, whose corresponding synthetic Target would be a JavaLibrary.
+         It may not be necessary to use this parameter depending on the details of the subclass.
 
-    :API: public
+         :API: public
 
-    :return: a list of exported targets.
-    """
+         :return: a list of exported targets.
+        """
         return []
 
     def synthetic_target_type(self, target):
         """The type of target this codegen task generates.
 
-    For example, the target type for JaxbGen would simply be JavaLibrary.
+        For example, the target type for JaxbGen would simply be JavaLibrary.
 
-    :API: public
+        :API: public
 
-    :return: a type (class) that inherits from Target.
-    """
+        :return: a type (class) that inherits from Target.
+        """
         raise NotImplementedError
 
     def is_gentarget(self, target):
-        """Predicate which determines whether the target in question is relevant to this codegen task.
+        """Predicate which determines whether the target in question is
+        relevant to this codegen task.
 
-    E.g., the JaxbGen task considers JaxbLibrary targets to be relevant, and nothing else.
+        E.g., the JaxbGen task considers JaxbLibrary targets to be relevant, and nothing else.
 
-    :API: public
+        :API: public
 
-    :param Target target: The target to check.
-    :return: True if this class can generate code for the given target, False otherwise.
-    """
+        :param Target target: The target to check.
+        :return: True if this class can generate code for the given target, False otherwise.
+        """
         if self.gentarget_type:
             return isinstance(target, self.gentarget_type)
         else:
             raise NotImplementedError
 
     def ignore_dup(self, tgt1, tgt2, rel_src):
-        """Subclasses can override to omit a specific generated source file from dup checking."""
+        """Subclasses can override to omit a specific generated source file
+        from dup checking."""
         return False
 
     def codegen_targets(self):
         """Finds codegen targets in the dependency graph.
 
-    :API: public
+        :API: public
 
-    :return: an iterable of dependency targets.
-    """
+        :return: an iterable of dependency targets.
+        """
         return self.get_targets(self.is_gentarget)
 
     def _do_validate_sources_present(self, target):
-        """Checks whether sources is empty, and either raises a TaskError or just returns False.
+        """Checks whether sources is empty, and either raises a TaskError or
+        just returns False.
 
-    The specifics of this behavior are defined by whether the user sets --allow-empty to True/False:
-    --allow-empty=False will result in a TaskError being raised in the event of an empty source
-    set. If --allow-empty=True, this method will just return false and log a warning.
+        The specifics of this behavior are defined by whether the user sets --allow-empty to True/False:
+        --allow-empty=False will result in a TaskError being raised in the event of an empty source
+        set. If --allow-empty=True, this method will just return false and log a warning.
 
-    Shared for all SimpleCodegenTask subclasses to help keep errors consistent and descriptive.
+        Shared for all SimpleCodegenTask subclasses to help keep errors consistent and descriptive.
 
-    :param target: Target to validate.
-    :return: True if sources is not empty, False otherwise.
-    """
+        :param target: Target to validate.
+        :return: True if sources is not empty, False otherwise.
+        """
         if not self.validate_sources_present:
             return True
         sources = target.sources_relative_to_buildroot()
@@ -261,10 +264,11 @@ class SimpleCodegenTask(Task):
 
     @property
     def _copy_target_attributes(self):
-        """Return a list of attributes to be copied from the target to derived synthetic targets.
+        """Return a list of attributes to be copied from the target to derived
+        synthetic targets.
 
-    By default, propagates the provides, scope, and tags attributes.
-    """
+        By default, propagates the provides, scope, and tags attributes.
+        """
         return ["provides", "tags", "scope"]
 
     def synthetic_target_dir(self, target, target_workdir):
@@ -318,11 +322,12 @@ class SimpleCodegenTask(Task):
         )
 
     def _inject_synthetic_target(self, vt, sources):
-        """Create, inject, and return a synthetic target for the given target and workdir.
+        """Create, inject, and return a synthetic target for the given target
+        and workdir.
 
-    :param vt: A codegen input VersionedTarget to inject a synthetic target for.
-    :param sources: A FilesetWithSpec to inject for the target.
-    """
+        :param vt: A codegen input VersionedTarget to inject a synthetic target for.
+        :param sources: A FilesetWithSpec to inject for the target.
+        """
         target = vt.target
 
         # NB: For stability, the injected target exposes the stable-symlinked `vt.results_dir`,
@@ -409,25 +414,26 @@ class SimpleCodegenTask(Task):
     def execute_codegen(self, target, target_workdir):
         """Generate code for the given target.
 
-    :param target: A target to generate code for
-    :param target_workdir: A clean directory into which to generate code
-    """
+        :param target: A target to generate code for
+        :param target_workdir: A clean directory into which to generate code
+        """
 
     def _handle_duplicate_sources(self, vt, sources):
-        """Handles duplicate sources generated by the given gen target by either failure or deletion.
+        """Handles duplicate sources generated by the given gen target by
+        either failure or deletion.
 
-    This method should be called after all dependencies have been injected into the graph, but
-    before injecting the synthetic version of this target.
+        This method should be called after all dependencies have been injected into the graph, but
+        before injecting the synthetic version of this target.
 
-    Returns a boolean indicating whether it modified the underlying filesystem.
+        Returns a boolean indicating whether it modified the underlying filesystem.
 
-    NB(gm): Some code generators may re-generate code that their dependent libraries generate.
-    This results in targets claiming to generate sources that they really don't, so we try to
-    filter out sources that were actually generated by dependencies of the target. This causes
-    the code generated by the dependencies to 'win' over the code generated by dependees. By
-    default, this behavior is disabled, and duplication in generated sources will raise a
-    TaskError. This is controlled by the --allow-dups flag.
-    """
+        NB(gm): Some code generators may re-generate code that their dependent libraries generate.
+        This results in targets claiming to generate sources that they really don't, so we try to
+        filter out sources that were actually generated by dependencies of the target. This causes
+        the code generated by the dependencies to 'win' over the code generated by dependees. By
+        default, this behavior is disabled, and duplication in generated sources will raise a
+        TaskError. This is controlled by the --allow-dups flag.
+        """
         target = vt.target
         target_workdir = vt.results_dir
 
@@ -480,14 +486,16 @@ class SimpleCodegenTask(Task):
         return did_modify
 
     class DuplicateSourceError(TaskError):
-        """A target generated the same code that was generated by one of its dependencies.
+        """A target generated the same code that was generated by one of its
+        dependencies.
 
-    This is only thrown when --allow-dups=False.
-    """
+        This is only thrown when --allow-dups=False.
+        """
 
     class MismatchedExtraExports(Exception):
-        """An extra export didn't have an accompanying explicit extra dependency for the same target.
+        """An extra export didn't have an accompanying explicit extra
+        dependency for the same target.
 
-    NB: Exports without accompanying dependencies are caught during compile, but this error will
-    allow errors caused by injected exports to be surfaced earlier.
-    """
+        NB: Exports without accompanying dependencies are caught during compile, but this error will
+        allow errors caused by injected exports to be surfaced earlier.
+        """

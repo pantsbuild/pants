@@ -11,8 +11,8 @@ from pants.build_graph.target import Target
 class PythonAWSLambda(Target):
     """A self-contained Python function suitable for uploading to AWS Lambda.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(self, binary=None, handler=None, **kwargs):
         """

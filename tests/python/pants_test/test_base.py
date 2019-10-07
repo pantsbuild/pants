@@ -57,23 +57,22 @@ class AbstractTestGenerator(ABC):
     def generate_tests(cls):
         """Generate tests for a given class.
 
-    This should be called against the composing class in its defining module, e.g.
+        This should be called against the composing class in its defining module, e.g.
 
-      class ThingTest(TestGenerator):
-        ...
+          class ThingTest(TestGenerator):
+            ...
 
-      ThingTest.generate_tests()
-
-    """
+          ThingTest.generate_tests()
+        """
 
     @classmethod
     def add_test(cls, method_name, method):
         """A classmethod that adds dynamic test methods to a given class.
 
-    :param string method_name: The name of the test method (e.g. `test_thing_x`).
-    :param callable method: A callable representing the method. This should take a 'self' argument
-                            as its first parameter for instance method binding.
-    """
+        :param string method_name: The name of the test method (e.g. `test_thing_x`).
+        :param callable method: A callable representing the method. This should take a 'self' argument
+                                as its first parameter for instance method binding.
+        """
         assert not hasattr(
             cls, method_name
         ), "a test with name `{}` already exists on `{}`!".format(method_name, cls.__name__)
@@ -84,8 +83,8 @@ class AbstractTestGenerator(ABC):
 class TestBase(unittest.TestCase, metaclass=ABCMeta):
     """A baseclass useful for tests requiring a temporary buildroot.
 
-  :API: public
-  """
+    :API: public
+    """
 
     _scheduler = None
     _local_store_dir = None
@@ -93,10 +92,11 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     _address_mapper = None
 
     def build_path(self, relpath):
-        """Returns the canonical BUILD file path for the given relative build path.
+        """Returns the canonical BUILD file path for the given relative build
+        path.
 
-    :API: public
-    """
+        :API: public
+        """
         if os.path.basename(relpath).startswith("BUILD"):
             return relpath
         else:
@@ -105,10 +105,10 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     def create_dir(self, relpath):
         """Creates a directory under the buildroot.
 
-    :API: public
+        :API: public
 
-    relpath: The relative path to the directory from the build root.
-    """
+        relpath: The relative path to the directory from the build root.
+        """
         path = os.path.join(self.build_root, relpath)
         safe_mkdir(path)
         self.invalidate_for(relpath)
@@ -117,10 +117,10 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     def create_workdir_dir(self, relpath):
         """Creates a directory under the work directory.
 
-    :API: public
+        :API: public
 
-    relpath: The relative path to the directory from the work directory.
-    """
+        relpath: The relative path to the directory from the work directory.
+        """
         path = os.path.join(self.pants_workdir, relpath)
         safe_mkdir(path)
         self.invalidate_for(relpath)
@@ -129,9 +129,10 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     def invalidate_for(self, *relpaths):
         """Invalidates all files from the relpath, recursively up to the root.
 
-    Many python operations implicitly create parent directories, so we assume that touching a
-    file located below directories that do not currently exist will result in their creation.
-    """
+        Many python operations implicitly create parent directories, so
+        we assume that touching a file located below directories that do
+        not currently exist will result in their creation.
+        """
         if self._scheduler is None:
             return
         files = {f for relpath in relpaths for f in recursive_dirname(relpath)}
@@ -140,11 +141,11 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     def create_link(self, relsrc, reldst):
         """Creates a symlink within the buildroot.
 
-    :API: public
+        :API: public
 
-    relsrc: A relative path for the source of the link.
-    reldst: A relative path for the destination of the link.
-    """
+        relsrc: A relative path for the source of the link.
+        reldst: A relative path for the destination of the link.
+        """
         src = os.path.join(self.build_root, relsrc)
         dst = os.path.join(self.build_root, reldst)
         relative_symlink(src, dst)
@@ -153,12 +154,12 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     def create_file(self, relpath, contents="", mode="w"):
         """Writes to a file under the buildroot.
 
-    :API: public
+        :API: public
 
-    relpath:  The relative path to the file from the build root.
-    contents: A string containing the contents of the file - '' by default..
-    mode:     The mode to write to the file in - over-write by default.
-    """
+        relpath:  The relative path to the file from the build root.
+        contents: A string containing the contents of the file - '' by default..
+        mode:     The mode to write to the file in - over-write by default.
+        """
         path = os.path.join(self.build_root, relpath)
         with safe_open(path, mode=mode) as fp:
             fp.write(contents)
@@ -166,25 +167,26 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         return path
 
     def create_files(self, path, files):
-        """Writes to a file under the buildroot with contents same as file name.
+        """Writes to a file under the buildroot with contents same as file
+        name.
 
-    :API: public
+        :API: public
 
-     path:  The relative path to the file from the build root.
-     files: List of file names.
-    """
+         path:  The relative path to the file from the build root.
+         files: List of file names.
+        """
         for f in files:
             self.create_file(os.path.join(path, f), contents=f)
 
     def create_workdir_file(self, relpath, contents="", mode="w"):
         """Writes to a file under the work directory.
 
-    :API: public
+        :API: public
 
-    relpath:  The relative path to the file from the work directory.
-    contents: A string containing the contents of the file - '' by default..
-    mode:     The mode to write to the file in - over-write by default.
-    """
+        relpath:  The relative path to the file from the work directory.
+        contents: A string containing the contents of the file - '' by default..
+        mode:     The mode to write to the file in - over-write by default.
+        """
         path = os.path.join(self.pants_workdir, relpath)
         with safe_open(path, mode=mode) as fp:
             fp.write(contents)
@@ -193,11 +195,11 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     def add_to_build_file(self, relpath, target):
         """Adds the given target specification to the BUILD file at relpath.
 
-    :API: public
+        :API: public
 
-    relpath: The relative path to the BUILD file from the build root.
-    target:  A string containing the target definition as it would appear in a BUILD file.
-    """
+        relpath: The relative path to the BUILD file from the build root.
+        target:  A string containing the target definition as it would appear in a BUILD file.
+        """
         self.create_file(self.build_path(relpath), target, mode="a")
 
     def make_target(
@@ -212,14 +214,14 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     ):
         """Creates a target and injects it into the test's build graph.
 
-    :API: public
+        :API: public
 
-    :param string spec: The target address spec that locates this target.
-    :param type target_type: The concrete target subclass to create this new target from.
-    :param list dependencies: A list of target instances this new target depends on.
-    :param derived_from: The target this new target was derived from.
-    :type derived_from: :class:`pants.build_graph.target.Target`
-    """
+        :param string spec: The target address spec that locates this target.
+        :param type target_type: The concrete target subclass to create this new target from.
+        :param list dependencies: A list of target instances this new target depends on.
+        :param derived_from: The target this new target was derived from.
+        :type derived_from: :class:`pants.build_graph.target.Target`
+        """
         self._init_target_subsystem()
 
         address = Address.parse(spec)
@@ -335,12 +337,12 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     def buildroot_files(self, relpath=None):
         """Returns the set of all files under the test build root.
 
-    :API: public
+        :API: public
 
-    :param string relpath: If supplied, only collect files from this subtree.
-    :returns: All file paths found.
-    :rtype: set
-    """
+        :param string relpath: If supplied, only collect files from this subtree.
+        :returns: All file paths found.
+        :rtype: set
+        """
 
         def scan():
             for root, dirs, files in os.walk(os.path.join(self.build_root, relpath or "")):
@@ -420,7 +422,8 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         return self._scheduler
 
     def post_scheduler_init(self):
-        """Run after initializing the Scheduler, it will have the same lifetime"""
+        """Run after initializing the Scheduler, it will have the same
+        lifetime."""
         pass
 
     @property
@@ -543,12 +546,12 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     def subsystems(cls):
         """Initialize these subsystems when running your test.
 
-    If your test instantiates a target type that depends on any subsystems, those subsystems need to
-    be initialized in your test. You can override this property to return the necessary subsystem
-    classes.
+        If your test instantiates a target type that depends on any subsystems, those subsystems need to
+        be initialized in your test. You can override this property to return the necessary subsystem
+        classes.
 
-    :rtype: list of type objects, all subclasses of Subsystem
-    """
+        :rtype: list of type objects, all subclasses of Subsystem
+        """
         return Target.subsystems()
 
     def _init_target_subsystem(self):
@@ -559,12 +562,12 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     def target(self, spec):
         """Resolves the given target address to a Target object.
 
-    :API: public
+        :API: public
 
-    address: The BUILD target address to resolve.
+        address: The BUILD target address to resolve.
 
-    Returns the corresponding Target or else None if the address does not point to a defined Target.
-    """
+        Returns the corresponding Target or else None if the address does not point to a defined Target.
+        """
         self._init_target_subsystem()
 
         address = Address.parse(spec)
@@ -574,13 +577,13 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     def targets(self, spec):
         """Resolves a target spec to one or more Target objects.
 
-    :API: public
+        :API: public
 
-    spec: Either BUILD target address or else a target glob using the siblings ':' or
-          descendants '::' suffixes.
+        spec: Either BUILD target address or else a target glob using the siblings ':' or
+              descendants '::' suffixes.
 
-    Returns the set of all Targets found.
-    """
+        Returns the set of all Targets found.
+        """
 
         spec = CmdLineSpecParser(self.build_root).parse_spec(spec)
         targets = []
@@ -589,18 +592,19 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         return targets
 
     def create_library(self, path, target_type, name, sources=None, **kwargs):
-        """Creates a library target of given type at the BUILD file at path with sources
+        """Creates a library target of given type at the BUILD file at path
+        with sources.
 
-    :API: public
+        :API: public
 
-     path: The relative path to the BUILD file from the build root.
-     target_type: valid pants target type.
-     name: Name of the library target.
-     sources: List of source file at the path relative to path.
-     **kwargs: Optional attributes that can be set for any library target.
-       Currently it includes support for resources, java_sources, provides
-       and dependencies.
-    """
+         path: The relative path to the BUILD file from the build root.
+         target_type: valid pants target type.
+         name: Name of the library target.
+         sources: List of source file at the path relative to path.
+         **kwargs: Optional attributes that can be set for any library target.
+           Currently it includes support for resources, java_sources, provides
+           and dependencies.
+        """
         if sources:
             self.create_files(path, sources)
         self.add_to_build_file(
@@ -644,25 +648,27 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         return self.create_library(path, "resources", name, sources)
 
     def assertUnorderedPrefixEqual(self, expected, actual_iter):
-        """Consumes len(expected) items from the given iter, and asserts that they match, unordered.
+        """Consumes len(expected) items from the given iter, and asserts that
+        they match, unordered.
 
-    :API: public
-    """
+        :API: public
+        """
         actual = list(itertools.islice(actual_iter, len(expected)))
         self.assertEqual(sorted(expected), sorted(actual))
 
     def assertPrefixEqual(self, expected, actual_iter):
-        """Consumes len(expected) items from the given iter, and asserts that they match, in order.
+        """Consumes len(expected) items from the given iter, and asserts that
+        they match, in order.
 
-    :API: public
-    """
+        :API: public
+        """
         self.assertEqual(expected, list(itertools.islice(actual_iter, len(expected))))
 
     def assertInFile(self, string, file_path):
-        """Verifies that a string appears in a file
+        """Verifies that a string appears in a file.
 
-    :API: public
-    """
+        :API: public
+        """
 
         with open(file_path, "r") as f:
             content = f.read()
@@ -674,23 +680,24 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     def assertRaisesWithMessage(self, exception_type, error_text):
         """Verifies than an exception message is equal to `error_text`.
 
-    :param type exception_type: The exception type which is expected to be raised within the body.
-    :param str error_text: Text that the exception message should match exactly with
-                           `self.assertEqual()`.
-    :API: public
-    """
+        :param type exception_type: The exception type which is expected to be raised within the body.
+        :param str error_text: Text that the exception message should match exactly with
+                               `self.assertEqual()`.
+        :API: public
+        """
         with self.assertRaises(exception_type) as cm:
             yield cm
         self.assertEqual(error_text, str(cm.exception))
 
     @contextmanager
     def assertRaisesWithMessageContaining(self, exception_type, error_text):
-        """Verifies that the string `error_text` appears in an exception message.
+        """Verifies that the string `error_text` appears in an exception
+        message.
 
-    :param type exception_type: The exception type which is expected to be raised within the body.
-    :param str error_text: Text that the exception message should contain with `self.assertIn()`.
-    :API: public
-    """
+        :param type exception_type: The exception type which is expected to be raised within the body.
+        :param str error_text: Text that the exception message should contain with `self.assertIn()`.
+        :API: public
+        """
         with self.assertRaises(exception_type) as cm:
             yield cm
         self.assertIn(error_text, str(cm.exception))
@@ -698,17 +705,17 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     def get_bootstrap_options(self, cli_options=()):
         """Retrieves bootstrap options.
 
-    :param cli_options: An iterable of CLI flags to pass as arguments to `OptionsBootstrapper`.
-    """
+        :param cli_options: An iterable of CLI flags to pass as arguments to `OptionsBootstrapper`.
+        """
         args = tuple(["--pants-config-files=[]"]) + tuple(cli_options)
         return OptionsBootstrapper.create(args=args).bootstrap_options.for_global_scope()
 
     def make_snapshot(self, files):
         """Makes a snapshot from a collection of files.
 
-    :param files: a dictionary, where key=filename, value=file_content where both are of type String.
-    :return: a Snapshot.
-    """
+        :param files: a dictionary, where key=filename, value=file_content where both are of type String.
+        :return: a Snapshot.
+        """
         with temporary_dir() as temp_dir:
             for file_name, content in files.items():
                 safe_file_dump(os.path.join(temp_dir, file_name), content)
@@ -776,24 +783,25 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         return single_product
 
     def populate_target_dict(self, target_map):
-        """Return a dict containing targets with files generated according to `target_map`.
+        """Return a dict containing targets with files generated according to
+        `target_map`.
 
-    The keys of `target_map` are target address strings, while the values of `target_map` should be
-    a dict which contains keyword arguments fed into `self.make_target()`, along with a few special
-    keys. Special keys are:
-    - 'key': used to access the target in the returned dict. Defaults to the target address spec.
-    - 'filemap': creates files at the specified relative paths to the target.
+        The keys of `target_map` are target address strings, while the values of `target_map` should be
+        a dict which contains keyword arguments fed into `self.make_target()`, along with a few special
+        keys. Special keys are:
+        - 'key': used to access the target in the returned dict. Defaults to the target address spec.
+        - 'filemap': creates files at the specified relative paths to the target.
 
-    An `OrderedDict` of 2-tuples must be used with the targets topologically ordered, if
-    they have dependencies on each other. Note that dependency cycles are not currently supported
-    with this method.
+        An `OrderedDict` of 2-tuples must be used with the targets topologically ordered, if
+        they have dependencies on each other. Note that dependency cycles are not currently supported
+        with this method.
 
-    :param target_map: Dict mapping each target address to generate -> kwargs for
-                       `self.make_target()`, along with a 'key' and optionally a 'filemap' argument.
-    :return: Dict mapping the required 'key' argument -> target instance for each element of
-             `target_map`.
-    :rtype: dict
-    """
+        :param target_map: Dict mapping each target address to generate -> kwargs for
+                           `self.make_target()`, along with a 'key' and optionally a 'filemap' argument.
+        :return: Dict mapping the required 'key' argument -> target instance for each element of
+                 `target_map`.
+        :rtype: dict
+        """
         target_dict = {}
 
         # Create a target from each specification and insert it into `target_dict`.

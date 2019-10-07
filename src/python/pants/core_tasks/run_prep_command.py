@@ -14,14 +14,14 @@ from pants.task.task import Task
 class RunPrepCommandBase(Task):
     """Base class to enable running shell commands before executing a goal.
 
-  This task is meant to be subclassed, setting the 'goal' variable appropriately.
-  For example, create a subclass and then register it in a plugin to run
-  at the beginning of the binary goal in register.py:
+    This task is meant to be subclassed, setting the 'goal' variable appropriately.
+    For example, create a subclass and then register it in a plugin to run
+    at the beginning of the binary goal in register.py:
 
-  task(name='binary-prep-command', action=RunBinaryPrepCommand).install('binary', first=True)
+    task(name='binary-prep-command', action=RunBinaryPrepCommand).install('binary', first=True)
 
-  :API: public
-  """
+    :API: public
+    """
 
     goal = None
 
@@ -29,9 +29,10 @@ class RunPrepCommandBase(Task):
     def register_options(cls, register):
         """Register options for this optionable.
 
-    In this case, there are no special options, but we want to use this opportunity to setup
-    goal validation in PrepCommand before the build graph is parsed.
-    """
+        In this case, there are no special options, but we want to use
+        this opportunity to setup goal validation in PrepCommand before
+        the build graph is parsed.
+        """
         super().register_options(register)
         PrepCommand.add_allowed_goal(cls.goal)
 

@@ -17,10 +17,11 @@ from pants_test.jvm.jvm_task_test_base import JvmTaskTestBase
 
 
 class JvmToolTaskTestBase(JvmTaskTestBase):
-    """Prepares an ephemeral test build root that supports tasks that use jvm tool bootstrapping.
+    """Prepares an ephemeral test build root that supports tasks that use jvm
+    tool bootstrapping.
 
-  :API: public
-  """
+    :API: public
+    """
 
     @classmethod
     def alias_groups(cls):
@@ -84,15 +85,16 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
         return super().context(for_task_types=for_task_types, **kwargs)
 
     def prepare_execute(self, context):
-        """Prepares a jvm tool-using task for execution, first bootstrapping any required jvm tools.
+        """Prepares a jvm tool-using task for execution, first bootstrapping
+        any required jvm tools.
 
-    Note: Other task pre-requisites will not be ensured and tests must instead setup their own
-          product requirements if any.
+        Note: Other task pre-requisites will not be ensured and tests must instead setup their own
+              product requirements if any.
 
-    :API: public
+        :API: public
 
-    :returns: The prepared Task instance.
-    """
+        :returns: The prepared Task instance.
+        """
         # test_workdir is an @property
         workdir = self.test_workdir
 
@@ -109,15 +111,16 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
         return task
 
     def execute(self, context):
-        """Executes a jvm tool-using task, first bootstrapping any required jvm tools.
+        """Executes a jvm tool-using task, first bootstrapping any required jvm
+        tools.
 
-    Note: Other task pre-requisites will not be ensured and tests must instead setup their own
-          product requirements if any.
+        Note: Other task pre-requisites will not be ensured and tests must instead setup their own
+              product requirements if any.
 
-    :API: public
+        :API: public
 
-    :returns: The Task instance that was executed.
-    """
+        :returns: The Task instance that was executed.
+        """
         task = self.prepare_execute(context)
         if not task.skip_execution:
             task.execute()

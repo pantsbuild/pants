@@ -47,8 +47,8 @@ def workspace_console_rule(
 
 class WorkspaceInConsoleRuleTest(ConsoleRuleTestBase):
     """This test is meant to ensure that the Workspace type successfully
-  invokes the rust FFI function to write to disk in the context of a @console_rule,
-  without crashing or otherwise failing."""
+    invokes the rust FFI function to write to disk in the context of a
+    @console_rule, without crashing or otherwise failing."""
 
     goal_cls = MockWorkspaceGoal
 

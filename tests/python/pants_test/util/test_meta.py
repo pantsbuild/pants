@@ -41,7 +41,7 @@ class WithProp:
 
     @classproperty
     def class_property(cls):
-        "class_property docs"
+        """class_property docs."""
         return cls._value
 
     @classmethod
@@ -50,7 +50,7 @@ class WithProp:
 
     @staticproperty
     def static_property():
-        "static_property docs"
+        """static_property docs."""
         return "static_property"
 
     @staticmethod
@@ -63,10 +63,13 @@ class OverridingValueField(WithProp):
 
 
 class OverridingValueInit(WithProp):
-    """Override the class-level `_value` with an instance-level `_value` from a constructor.
+    """Override the class-level `_value` with an instance-level `_value` from a
+    constructor.
 
-  The class-level methods should still return the class-level `_value`, but the new instance methods
-  should return the value from the constructor."""
+    The class-level methods should still return the class-level
+    `_value`, but the new instance methods should return the value from
+    the constructor.
+    """
 
     def __init__(self, v):
         # This will be ignored when accessed as a class method.
@@ -83,9 +86,10 @@ class OverridingValueInit(WithProp):
 class WithShadowingInstanceMethod(OverridingValueInit):
     """Override the class-level property and method with instance versions.
 
-  The instance-level methods should return the instance-level `_value` (the constructor argument)
-  instead of the class-level `_value` (defined in :class:`WithProp`).
-  """
+    The instance-level methods should return the instance-level `_value`
+    (the constructor argument) instead of the class-level `_value`
+    (defined in :class:`WithProp`).
+    """
 
     @property
     def class_property(self):
@@ -226,7 +230,8 @@ with an @classproperty decorator.""",
             Abstract.f
 
         class WithoutOverriding(Abstract):
-            """Show that subclasses failing to override the abstract classproperty will raise."""
+            """Show that subclasses failing to override the abstract
+            classproperty will raise."""
 
             pass
 

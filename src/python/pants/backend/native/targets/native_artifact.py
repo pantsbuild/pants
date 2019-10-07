@@ -8,7 +8,8 @@ from pants.util.objects import datatype
 
 
 class NativeArtifact(datatype(["lib_name"]), PayloadField):
-    """A BUILD file object declaring a target can be exported to other languages with a native ABI."""
+    """A BUILD file object declaring a target can be exported to other
+    languages with a native ABI."""
 
     # TODO: This should probably be made into an @classproperty (see PR #5901).
     @classmethod

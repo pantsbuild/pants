@@ -8,7 +8,8 @@ from pants.reporting.reporter import Reporter
 
 
 class JsonReporter(Reporter):
-    """A reporter to capture workunit data into a JSON-serializable structure."""
+    """A reporter to capture workunit data into a JSON-serializable
+    structure."""
 
     _log_level_str = ["FATAL", "ERROR", "WARN", "INFO", "DEBUG"]
 

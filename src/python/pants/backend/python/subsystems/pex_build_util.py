@@ -80,8 +80,8 @@ def targets_by_platform(targets, python_setup):
 
 
 def identify_missing_init_files(sources: Sequence[str]) -> Set[str]:
-    """Return the list of paths that would need to be added to ensure that every package has
-  an __init__.py. """
+    """Return the list of paths that would need to be added to ensure that
+    every package has an __init__.py."""
     packages = set()
     for source in sources:
         if source.endswith(".py"):
@@ -121,7 +121,8 @@ def _create_source_dumper(builder: PEXBuilder, tgt: Target) -> Callable[[str], N
 
 
 class PexBuilderWrapper:
-    """Wraps PEXBuilder to provide an API that consumes targets and other BUILD file entities."""
+    """Wraps PEXBuilder to provide an API that consumes targets and other BUILD
+    file entities."""
 
     class Factory(Subsystem):
         options_scope = "pex-builder-wrapper"
@@ -180,13 +181,13 @@ class PexBuilderWrapper:
     def add_requirement_libs_from(self, req_libs, platforms=None):
         """Multi-platform dependency resolution for PEX files.
 
-    :param builder: Dump the requirements into this builder.
-    :param interpreter: The :class:`PythonInterpreter` to resolve requirements for.
-    :param req_libs: A list of :class:`PythonRequirementLibrary` targets to resolve.
-    :param log: Use this logger.
-    :param platforms: A list of :class:`Platform`s to resolve requirements for.
-                      Defaults to the platforms specified by PythonSetup.
-    """
+        :param builder: Dump the requirements into this builder.
+        :param interpreter: The :class:`PythonInterpreter` to resolve requirements for.
+        :param req_libs: A list of :class:`PythonRequirementLibrary` targets to resolve.
+        :param log: Use this logger.
+        :param platforms: A list of :class:`Platform`s to resolve requirements for.
+                          Defaults to the platforms specified by PythonSetup.
+        """
         reqs = [req for req_lib in req_libs for req in req_lib.requirements]
         self.add_resolved_requirements(reqs, platforms=platforms)
 
@@ -194,15 +195,16 @@ class PexBuilderWrapper:
         pass
 
     def extract_single_dist_for_current_platform(self, reqs, dist_key):
-        """Resolve a specific distribution from a set of requirements matching the current platform.
+        """Resolve a specific distribution from a set of requirements matching
+        the current platform.
 
-    :param list reqs: A list of :class:`PythonRequirement` to resolve.
-    :param str dist_key: The value of `distribution.key` to match for a `distribution` from the
-                         resolved requirements.
-    :return: The single :class:`pkg_resources.Distribution` matching `dist_key`.
-    :raises: :class:`self.SingleDistExtractionError` if no dists or multiple dists matched the given
-             `dist_key`.
-    """
+        :param list reqs: A list of :class:`PythonRequirement` to resolve.
+        :param str dist_key: The value of `distribution.key` to match for a `distribution` from the
+                             resolved requirements.
+        :return: The single :class:`pkg_resources.Distribution` matching `dist_key`.
+        :raises: :class:`self.SingleDistExtractionError` if no dists or multiple dists matched the given
+                 `dist_key`.
+        """
         distributions = self._resolve_distributions_by_platform(reqs, platforms=["current"])
         try:
             matched_dist = assert_single_element(
@@ -237,13 +239,13 @@ class PexBuilderWrapper:
     def add_resolved_requirements(self, reqs, platforms=None):
         """Multi-platform dependency resolution for PEX files.
 
-    :param builder: Dump the requirements into this builder.
-    :param interpreter: The :class:`PythonInterpreter` to resolve requirements for.
-    :param reqs: A list of :class:`PythonRequirement` to resolve.
-    :param log: Use this logger.
-    :param platforms: A list of :class:`Platform`s to resolve requirements for.
-                      Defaults to the platforms specified by PythonSetup.
-    """
+        :param builder: Dump the requirements into this builder.
+        :param interpreter: The :class:`PythonInterpreter` to resolve requirements for.
+        :param reqs: A list of :class:`PythonRequirement` to resolve.
+        :param log: Use this logger.
+        :param platforms: A list of :class:`Platform`s to resolve requirements for.
+                          Defaults to the platforms specified by PythonSetup.
+        """
         distributions = self._resolve_distributions_by_platform(reqs, platforms=platforms)
         locations = set()
         for platform, dists in distributions.items():
@@ -258,16 +260,16 @@ class PexBuilderWrapper:
     def _resolve_multi(self, interpreter, requirements, platforms, find_links):
         """Multi-platform dependency resolution for PEX files.
 
-    Returns a list of distributions that must be included in order to satisfy a set of requirements.
-    That may involve distributions for multiple platforms.
+        Returns a list of distributions that must be included in order to satisfy a set of requirements.
+        That may involve distributions for multiple platforms.
 
-    :param interpreter: The :class:`PythonInterpreter` to resolve for.
-    :param requirements: A list of :class:`PythonRequirement` objects to resolve.
-    :param platforms: A list of :class:`Platform`s to resolve for.
-    :param find_links: Additional paths to search for source packages during resolution.
-    :return: Map of platform name -> list of :class:`pkg_resources.Distribution` instances needed
-             to satisfy the requirements on that platform.
-    """
+        :param interpreter: The :class:`PythonInterpreter` to resolve for.
+        :param requirements: A list of :class:`PythonRequirement` objects to resolve.
+        :param platforms: A list of :class:`Platform`s to resolve for.
+        :param find_links: Additional paths to search for source packages during resolution.
+        :return: Map of platform name -> list of :class:`pkg_resources.Distribution` instances needed
+                 to satisfy the requirements on that platform.
+        """
         python_setup = self._python_setup_subsystem
         python_repos = self._python_repos_subsystem
         platforms = platforms or python_setup.platforms

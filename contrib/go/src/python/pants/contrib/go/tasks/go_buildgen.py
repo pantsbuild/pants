@@ -24,7 +24,8 @@ from pants.contrib.go.tasks.go_task import GoTask
 
 
 class GoTargetGenerator:
-    """Automatically generates a Go target graph given pre-existing target roots."""
+    """Automatically generates a Go target graph given pre-existing target
+    roots."""
 
     class GenerationError(Exception):
         """Raised to indicate an error auto-generating a Go target."""
@@ -32,11 +33,13 @@ class GoTargetGenerator:
     class WrongLocalSourceTargetTypeError(GenerationError):
         """Indicates a local source target was defined with the wrong type.
 
-    For example, a Go main package was defined as a GoLibrary instead of a GoBinary.
-    """
+        For example, a Go main package was defined as a GoLibrary
+        instead of a GoBinary.
+        """
 
     class NewRemoteEncounteredButRemotesNotAllowedError(GenerationError):
-        """Indicates a new remote library dependency was found but --remote was not enabled."""
+        """Indicates a new remote library dependency was found but --remote was
+        not enabled."""
 
     def __init__(
         self,
@@ -55,11 +58,12 @@ class GoTargetGenerator:
         self._remote_source_root = remote_root
 
     def generate(self, local_go_targets):
-        """Automatically generates a Go target graph for the given local go targets.
+        """Automatically generates a Go target graph for the given local go
+        targets.
 
-    :param iter local_go_targets: The target roots to fill in a target graph for.
-    :raises: :class:`GoTargetGenerator.GenerationError` if any missing targets cannot be generated.
-    """
+        :param iter local_go_targets: The target roots to fill in a target graph for.
+        :raises: :class:`GoTargetGenerator.GenerationError` if any missing targets cannot be generated.
+        """
         visited = {l.import_path: l.address for l in local_go_targets}
         with temporary_dir() as gopath:
             for local_go_target in local_go_targets:
@@ -281,20 +285,22 @@ class GoBuildgen(GoTask):
             )
 
         def log(self, logger):
-            """Log information about the generated target including its BUILD file and import paths.
+            """Log information about the generated target including its BUILD
+            file and import paths.
 
-      :param logger: The logger to log with.
-      :type logger: A :class:`logging.Logger` compatible object.
-      """
+            :param logger: The logger to log with.
+            :type logger: A :class:`logging.Logger` compatible object.
+            """
             log = logger.info if self.local or self.rev else logger.warn
             log("\t{}".format(self))
 
         @property
         def failed(self):
-            """Return `True` if the generated target should be considered a failed generation.
+            """Return `True` if the generated target should be considered a
+            failed generation.
 
-      :rtype: bool
-      """
+            :rtype: bool
+            """
             return self.fail_floating and not self.rev
 
         def __str__(self):
@@ -305,7 +311,8 @@ class GoBuildgen(GoTask):
             )
 
     class FloatingRemoteError(TaskError):
-        """Indicates Go remote libraries exist or were generated that don't specify a `rev`."""
+        """Indicates Go remote libraries exist or were generated that don't
+        specify a `rev`."""
 
     def _materialize(self, generation_result):
         remote = self.get_options().remote
@@ -368,13 +375,16 @@ class GoBuildgen(GoTask):
             raise self.FloatingRemoteError("Un-pinned (FLOATING) Go remote libraries detected.")
 
     class NoLocalRootsError(TaskError):
-        """Indicates the Go local source owning targets' source roots are invalid."""
+        """Indicates the Go local source owning targets' source roots are
+        invalid."""
 
     class InvalidLocalRootsError(TaskError):
-        """Indicates the Go local source owning targets' source roots are invalid."""
+        """Indicates the Go local source owning targets' source roots are
+        invalid."""
 
     class UnrootedLocalSourceError(TaskError):
-        """Indicates there are Go local source owning targets that fall outside the source root."""
+        """Indicates there are Go local source owning targets that fall outside
+        the source root."""
 
     class InvalidRemoteRootsError(TaskError):
         """Indicates the Go remote library source roots are invalid."""
@@ -394,13 +404,13 @@ class GoBuildgen(GoTask):
     def generate_targets(self, local_go_targets=None):
         """Generate Go targets in memory to form a complete Go graph.
 
-    :param local_go_targets: The local Go targets to fill in a complete target graph for.  If
-                             `None`, then all local Go targets under the Go source root are used.
-    :type local_go_targets: :class:`collections.Iterable` of
-                            :class:`pants.contrib.go.targets.go_local_source import GoLocalSource`
-    :returns: A generation result if targets were generated, else `None`.
-    :rtype: :class:`GoBuildgen.GenerationResult`
-    """
+        :param local_go_targets: The local Go targets to fill in a complete target graph for.  If
+                                 `None`, then all local Go targets under the Go source root are used.
+        :type local_go_targets: :class:`collections.Iterable` of
+                                :class:`pants.contrib.go.targets.go_local_source import GoLocalSource`
+        :returns: A generation result if targets were generated, else `None`.
+        :rtype: :class:`GoBuildgen.GenerationResult`
+        """
         # TODO(John Sirois): support multiple source roots like GOPATH does?
         # The GOPATH's 1st element is read-write, the rest are read-only; ie: their sources build to
         # the 1st element's pkg/ and bin/ dirs.
@@ -504,7 +514,8 @@ class GoBuildgen(GoTask):
                 yield result
 
     class NonUniformRemoteRevsError(TaskError):
-        """Indicates packages with mis-matched versions are defined for a single remote root."""
+        """Indicates packages with mis-matched versions are defined for a
+        single remote root."""
 
     def _create_template_data(self, build_file_path, targets):
         if len(targets) == 1 and self.is_local_src(targets[0]):

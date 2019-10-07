@@ -36,59 +36,65 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class HostPlatform:
-    """Describes a platform to resolve binaries for. Determines the binary's location on disk.
+    """Describes a platform to resolve binaries for. Determines the binary's
+    location on disk.
 
-  :class:`BinaryToolUrlGenerator` instances receive this to generate download urls.
-  """
+    :class:`BinaryToolUrlGenerator` instances receive this to generate download urls.
+    """
 
     os_name: Any
     arch_or_version: Any
 
     def binary_path_components(self):
-        """These strings are used as consecutive components of the path where a binary is fetched.
+        """These strings are used as consecutive components of the path where a
+        binary is fetched.
 
-    This is also used in generating urls from --binaries-baseurls in PantsHosted."""
+        This is also used in generating urls from --binaries-baseurls in
+        PantsHosted.
+        """
         return [self.os_name, self.arch_or_version]
 
 
 class BinaryToolUrlGenerator:
     """Encapsulates the selection of urls to download for some binary tool.
 
-  :API: public
+    :API: public
 
-  :class:`BinaryTool` subclasses can return an instance of a class mixing this in to
-  get_external_url_generator(self) to download their file or archive from some specified url or set
-  of urls.
-  """
+    :class:`BinaryTool` subclasses can return an instance of a class mixing this in to
+    get_external_url_generator(self) to download their file or archive from some specified url or set
+    of urls.
+    """
 
     @abstractmethod
     def generate_urls(self, version, host_platform):
-        """Return a list of urls to download some binary tool from given a version and platform.
+        """Return a list of urls to download some binary tool from given a
+        version and platform.
 
-    Each url is tried in order to resolve the binary -- if the list of urls is empty, or downloading
-    from each of the urls fails, Pants will raise an exception when the binary tool is fetched which
-    should describe why the urls failed to work.
+        Each url is tried in order to resolve the binary -- if the list of urls is empty, or downloading
+        from each of the urls fails, Pants will raise an exception when the binary tool is fetched which
+        should describe why the urls failed to work.
 
-    :param str version: version string for the requested binary (e.g. '2.0.1').
-    :param host_platform: description of the platform to fetch binaries for.
-    :type host_platform: :class:`HostPlatform`
-    :returns: a list of urls to download the binary tool from.
-    :rtype: list
-    """
+        :param str version: version string for the requested binary (e.g. '2.0.1').
+        :param host_platform: description of the platform to fetch binaries for.
+        :type host_platform: :class:`HostPlatform`
+        :returns: a list of urls to download the binary tool from.
+        :rtype: list
+        """
         pass
 
 
 class PantsHosted(BinaryToolUrlGenerator):
-    """Given a binary request and --binaries-baseurls, generate urls to download the binary from.
+    """Given a binary request and --binaries-baseurls, generate urls to
+    download the binary from.
 
-  This url generator is used if get_external_url_generator(self) is not overridden by a BinaryTool
-  subclass, or if --allow-external-binary-tool-downloads is False.
+    This url generator is used if get_external_url_generator(self) is not overridden by a BinaryTool
+    subclass, or if --allow-external-binary-tool-downloads is False.
 
-  NB: "pants-hosted" is referring to the organization of the urls being specific to pants. It also
-  happens that most binaries are downloaded from S3 hosting at binaries.pantsbuild.org by default --
-  but setting --binaries-baseurls to anything else will only download binaries from the baseurls
-  given, not from binaries.pantsbuild.org.
-  """
+    NB: "pants-hosted" is referring to the organization of the urls being specific to pants. It also
+    happens that most binaries are downloaded from S3 hosting at binaries.pantsbuild.org by default --
+    but setting --binaries-baseurls to anything else will only download binaries from the baseurls
+    given, not from binaries.pantsbuild.org.
+    """
 
     class NoBaseUrlsError(ValueError):
         pass
@@ -108,10 +114,11 @@ class PantsHosted(BinaryToolUrlGenerator):
     def generate_urls(self, _version, host_platform):
         """Append the file's download path to each of --binaries-baseurls.
 
-    This assumes that the urls in --binaries-baseurls point somewhere that mirrors Pants's
-    organization of the downloaded binaries on disk. Each url is tried in order until a request
-    succeeds.
-    """
+        This assumes that the urls in --binaries-baseurls point
+        somewhere that mirrors Pants's organization of the downloaded
+        binaries on disk. Each url is tried in order until a request
+        succeeds.
+        """
         binary_path = self._binary_request.get_download_path(host_platform)
         return [posixpath.join(baseurl, binary_path) for baseurl in self._baseurls]
 
@@ -166,10 +173,11 @@ class BinaryFetchRequest:
 class BinaryToolFetcher:
     @classmethod
     def _default_http_fetcher(cls):
-        """Return a fetcher that resolves local file paths against the build root.
+        """Return a fetcher that resolves local file paths against the build
+        root.
 
-    Currently this is used everywhere except in testing.
-    """
+        Currently this is used everywhere except in testing.
+        """
         return Fetcher(get_buildroot())
 
     def __init__(self, bootstrap_dir, timeout_secs, fetcher=None, ignore_cached_download=False):
@@ -196,12 +204,13 @@ class BinaryToolFetcher:
 
     @contextmanager
     def _select_binary_stream(self, name, urls):
-        """Download a file from a list of urls, yielding a stream after downloading the file.
+        """Download a file from a list of urls, yielding a stream after
+        downloading the file.
 
-    URLs are tried in order until they succeed.
+        URLs are tried in order until they succeed.
 
-    :raises: :class:`BinaryToolFetcher.BinaryNotFound` if requests to all the given urls fail.
-    """
+        :raises: :class:`BinaryToolFetcher.BinaryNotFound` if requests to all the given urls fail.
+        """
         downloaded_successfully = False
         accumulated_errors = []
         for url in OrderedSet(urls):  # De-dup URLS: we only want to try each URL once.
@@ -292,7 +301,8 @@ class BinaryUtil:
             )
 
     class MissingMachineInfo(TaskError):
-        """Indicates that pants was unable to map this machine's OS to a binary path prefix."""
+        """Indicates that pants was unable to map this machine's OS to a binary
+        path prefix."""
 
         pass
 
@@ -302,7 +312,8 @@ class BinaryUtil:
         pass
 
     class BinaryResolutionError(TaskError):
-        """Raised to wrap other exceptions raised in the select() method to provide context."""
+        """Raised to wrap other exceptions raised in the select() method to
+        provide context."""
 
         def __init__(self, binary_request, base_exception):
             super(BinaryUtil.BinaryResolutionError, self).__init__(
@@ -318,23 +329,24 @@ class BinaryUtil:
         allow_external_binary_tool_downloads=True,
         uname_func=None,
     ):
-        """Creates a BinaryUtil with the given settings to define binary lookup behavior.
+        """Creates a BinaryUtil with the given settings to define binary lookup
+        behavior.
 
-    This constructor is primarily used for testing.  Production code will usually initialize
-    an instance using the BinaryUtil.Factory.create() method.
+        This constructor is primarily used for testing.  Production code will usually initialize
+        an instance using the BinaryUtil.Factory.create() method.
 
-    :param baseurls: URL prefixes which represent repositories of binaries.
-    :type baseurls: list of string
-    :param int timeout_secs: Timeout in seconds for url reads.
-    :param string bootstrapdir: Directory to use for caching binaries.  Uses this directory to
-      search for binaries in, or download binaries to if needed.
-    :param dict path_by_id: Additional mapping from (sysname, id) -> (os, arch) for tool
-      directory naming
-    :param bool allow_external_binary_tool_downloads: If False, use --binaries-baseurls to download
-                                                      all binaries, regardless of whether an
-                                                      external_url_generator field is provided.
-    :param function uname_func: method to use to emulate os.uname() in testing
-    """
+        :param baseurls: URL prefixes which represent repositories of binaries.
+        :type baseurls: list of string
+        :param int timeout_secs: Timeout in seconds for url reads.
+        :param string bootstrapdir: Directory to use for caching binaries.  Uses this directory to
+          search for binaries in, or download binaries to if needed.
+        :param dict path_by_id: Additional mapping from (sysname, id) -> (os, arch) for tool
+          directory naming
+        :param bool allow_external_binary_tool_downloads: If False, use --binaries-baseurls to download
+                                                          all binaries, regardless of whether an
+                                                          external_url_generator field is provided.
+        :param function uname_func: method to use to emulate os.uname() in testing
+        """
         self._baseurls = baseurls
         self._binary_tool_fetcher = binary_tool_fetcher
 

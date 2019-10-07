@@ -280,11 +280,11 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     def _spawn(self, distribution, executor=None, *args, **kwargs):
         """Returns a processhandler to a process executing java.
 
-    :param Executor executor: the java subprocess executor to use. If not specified, construct
-      using the distribution.
-    :param Distribution distribution: The JDK or JRE installed.
-    :rtype: ProcessHandler
-    """
+        :param Executor executor: the java subprocess executor to use. If not specified, construct
+          using the distribution.
+        :param Distribution distribution: The JDK or JRE installed.
+        :rtype: ProcessHandler
+        """
 
         actual_executor = executor or SubprocessExecutor(distribution)
         return distribution.execute_java_async(*args, executor=actual_executor, **kwargs)
@@ -292,9 +292,10 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     def execute_java_for_coverage(self, targets, *args, **kwargs):
         """Execute java for targets directly and don't use the test mixin.
 
-    This execution won't be wrapped with timeouts and other test mixin code common
-    across test targets. Used for coverage instrumentation.
-    """
+        This execution won't be wrapped with timeouts and other test
+        mixin code common across test targets. Used for coverage
+        instrumentation.
+        """
 
         distribution = self.preferred_jvm_distribution_for_targets(targets)
         actual_executor = SubprocessExecutor(distribution)
@@ -303,11 +304,11 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     def _collect_test_targets(self, targets):
         """Return a test registry mapping the tests found in the given targets.
 
-    If `self._tests_to_run` is set, return a registry of explicitly specified tests instead.
+        If `self._tests_to_run` is set, return a registry of explicitly specified tests instead.
 
-    :returns: A registry of tests to run.
-    :rtype: :class:`pants.java.junit.junit_xml_parser.Test.RegistryOfTests`
-    """
+        :returns: A registry of tests to run.
+        :rtype: :class:`pants.java.junit.junit_xml_parser.Test.RegistryOfTests`
+        """
 
         test_registry = RegistryOfTests(tuple(self._calculate_tests_from_targets(targets)))
 
@@ -517,19 +518,20 @@ class JUnitRun(PartitionedTestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                 yield properties, sorted_tests[i : i + stride]
 
     def _parse(self, test_spec_str):
-        """Parses a test specification string into an object that can yield corresponding tests.
+        """Parses a test specification string into an object that can yield
+        corresponding tests.
 
-    Tests can be specified in one of four forms:
+        Tests can be specified in one of four forms:
 
-    * [classname]
-    * [classname]#[methodname]
-    * [fully qualified classname]#[methodname]
-    * [fully qualified classname]#[methodname]
+        * [classname]
+        * [classname]#[methodname]
+        * [fully qualified classname]#[methodname]
+        * [fully qualified classname]#[methodname]
 
-    :param string test_spec: A test specification.
-    :returns: A Test object.
-    :rtype: :class:`Test`
-    """
+        :param string test_spec: A test specification.
+        :returns: A Test object.
+        :rtype: :class:`Test`
+        """
         components = test_spec_str.split("#", 2)
         classname = components[0]
         methodname = components[1] if len(components) == 2 else None

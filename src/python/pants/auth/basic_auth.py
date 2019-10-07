@@ -73,14 +73,14 @@ class BasicAuth(Subsystem):
     ) -> None:
         """Authenticate against the specified provider.
 
-    :param str provider: Authorize against this provider.
-    :param pants.auth.basic_auth.BasicAuthCreds creds: The creds to use.
-      If unspecified, assumes that creds are set in the netrc file.
-    :param pants.auth.cookies.Cookies cookies: Store the auth cookies in this instance.
-      If unspecified, uses the global instance.
-    :raises pants.auth.basic_auth.BasicAuthException: If auth fails due to misconfiguration or
-      rejection by the server.
-    """
+        :param str provider: Authorize against this provider.
+        :param pants.auth.basic_auth.BasicAuthCreds creds: The creds to use.
+          If unspecified, assumes that creds are set in the netrc file.
+        :param pants.auth.cookies.Cookies cookies: Store the auth cookies in this instance.
+          If unspecified, uses the global instance.
+        :raises pants.auth.basic_auth.BasicAuthException: If auth fails due to misconfiguration or
+          rejection by the server.
+        """
         cookies = cookies or Cookies.global_instance()
 
         if not provider:

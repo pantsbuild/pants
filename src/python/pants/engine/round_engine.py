@@ -25,9 +25,9 @@ class GoalExecutor:
     def attempt(self, explain):
         """Attempts to execute the goal's tasks in installed order.
 
-    :param bool explain: If ``True`` then the goal plan will be explained instead of being
-                         executed.
-    """
+        :param bool explain: If ``True`` then the goal plan will be explained instead of being
+                             executed.
+        """
         goal_workdir = os.path.join(
             self._context.options.for_global_scope().pants_workdir, self._goal.name
         )
@@ -75,12 +75,12 @@ class RoundEngine(Engine):
         """Indicates there is a cycle in the goal dependency graph."""
 
     class TaskOrderError(DependencyError):
-        """Indicates a task depends on data produced by another task in the same goal that is
-    scheduled to runs after it.
-    """
+        """Indicates a task depends on data produced by another task in the
+        same goal that is scheduled to runs after it."""
 
     class MissingProductError(DependencyError):
-        """Indicates an expressed data dependency if not provided by any installed task."""
+        """Indicates an expressed data dependency if not provided by any
+        installed task."""
 
     GoalInfo = namedtuple("GoalInfo", ["goal", "tasktypes_by_name", "goal_dependencies"])
 
@@ -126,7 +126,8 @@ class RoundEngine(Engine):
 
     class TargetRootsReplacement:
         class ConflictingProposalsError(Exception):
-            """Indicates conflicting proposals for a target root replacement in a single pants run."""
+            """Indicates conflicting proposals for a target root replacement in
+            a single pants run."""
 
         def __init__(self):
             self._proposer = None

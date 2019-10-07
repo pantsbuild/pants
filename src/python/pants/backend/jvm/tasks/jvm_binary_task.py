@@ -20,8 +20,8 @@ from pants.util.memo import memoized_property
 class JvmBinaryTask(JarBuilderTask):
     """Encapsulates operations to build or update JvmBinary jars.
 
-  :API: public
-  """
+    :API: public
+    """
 
     @staticmethod
     def is_binary(target):
@@ -31,8 +31,9 @@ class JvmBinaryTask(JarBuilderTask):
     def add_main_manifest_entry(jar, binary):
         """Creates a jar manifest for the given binary.
 
-    If the binary declares a main then a 'Main-Class' manifest entry will be included.
-    """
+        If the binary declares a main then a 'Main-Class' manifest entry
+        will be included.
+        """
         main = binary.main
         if main is not None:
             jar.main(main)
@@ -50,11 +51,11 @@ class JvmBinaryTask(JarBuilderTask):
     def list_external_jar_dependencies(self, binary):
         """Returns the external jar dependencies of the given binary.
 
-    :param binary: The jvm binary target to list transitive external dependencies for.
-    :type binary: :class:`pants.backend.jvm.targets.jvm_binary.JvmBinary`
-    :returns: A list of (jar path, coordinate) tuples.
-    :rtype: list of (string, :class:`pants.java.jar.M2Coordinate`)
-    """
+        :param binary: The jvm binary target to list transitive external dependencies for.
+        :type binary: :class:`pants.backend.jvm.targets.jvm_binary.JvmBinary`
+        :returns: A list of (jar path, coordinate) tuples.
+        :rtype: list of (string, :class:`pants.java.jar.M2Coordinate`)
+        """
         classpath_products = self.context.products.get_data("runtime_classpath")
         classpath_entries = classpath_products.get_artifact_classpath_entries_for_targets(
             binary.closure(
@@ -72,18 +73,19 @@ class JvmBinaryTask(JarBuilderTask):
 
     @contextmanager
     def monolithic_jar(self, binary, path, manifest_classpath=None):
-        """Creates a jar containing all the dependencies for a jvm_binary target.
+        """Creates a jar containing all the dependencies for a jvm_binary
+        target.
 
-    Yields a handle to the open jarfile, so the caller can add to the jar if needed.
-    The yielded jar file either has all the class files for the jvm_binary target as
-    a fat jar, or includes those dependencies in the `Class-Path` field of its
-    Manifest.
+        Yields a handle to the open jarfile, so the caller can add to the jar if needed.
+        The yielded jar file either has all the class files for the jvm_binary target as
+        a fat jar, or includes those dependencies in the `Class-Path` field of its
+        Manifest.
 
-    :param binary: The jvm_binary target to operate on.
-    :param path: Write the output jar here, overwriting an existing file, if any.
-    :param iterable manifest_classpath: If set output jar will set as its manifest's
-      classpath, otherwise output jar will simply include class files.
-    """
+        :param binary: The jvm_binary target to operate on.
+        :param path: Write the output jar here, overwriting an existing file, if any.
+        :param iterable manifest_classpath: If set output jar will set as its manifest's
+          classpath, otherwise output jar will simply include class files.
+        """
         # TODO(benjy): There's actually nothing here that requires 'binary' to be a jvm_binary.
         # It could be any target. And that might actually be useful.
         with self.context.new_workunit(name="create-monolithic-jar"):
@@ -119,11 +121,11 @@ class JvmBinaryTask(JarBuilderTask):
     def shade_jar(self, shading_rules, jar_path):
         """Shades a jar using the shading rules from the given jvm_binary.
 
-    This *overwrites* the existing jar file at ``jar_path``.
+        This *overwrites* the existing jar file at ``jar_path``.
 
-    :param shading_rules: predefined rules for shading
-    :param jar_path: The filepath to the jar that should be shaded.
-    """
+        :param shading_rules: predefined rules for shading
+        :param jar_path: The filepath to the jar that should be shaded.
+        """
         self.context.log.debug("Shading {}.".format(jar_path))
         with temporary_dir() as tempdir:
             output_jar = os.path.join(tempdir, os.path.basename(jar_path))

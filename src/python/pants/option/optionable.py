@@ -18,28 +18,33 @@ def _construct_optionable(optionable_factory):
 
 
 class OptionableFactory(ABC):
-    """A mixin that provides a method that returns an @rule to construct subclasses of Optionable.
+    """A mixin that provides a method that returns an @rule to construct
+    subclasses of Optionable.
 
-  Optionable subclasses constructed in this manner must have a particular constructor shape, which is
-  loosely defined by `_construct_optionable` and `OptionableFactory.signature`.
-  """
+    Optionable subclasses constructed in this manner must have a
+    particular constructor shape, which is loosely defined by
+    `_construct_optionable` and `OptionableFactory.signature`.
+    """
 
     @property
     @abstractmethod
     def optionable_cls(self):
-        """The Optionable class that is constructed by this OptionableFactory."""
+        """The Optionable class that is constructed by this
+        OptionableFactory."""
 
     @property
     @abstractmethod
     def options_scope(self):
-        """The scope from which the ScopedOptions for the target Optionable will be parsed."""
+        """The scope from which the ScopedOptions for the target Optionable
+        will be parsed."""
 
     @classmethod
     def signature(cls):
-        """Returns kwargs to construct a `TaskRule` that will construct the target Optionable.
+        """Returns kwargs to construct a `TaskRule` that will construct the
+        target Optionable.
 
-    TODO: This indirection avoids a cycle between this module and the `rules` module.
-    """
+        TODO: This indirection avoids a cycle between this module and the `rules` module.
+        """
         snake_scope = cls.options_scope.replace("-", "_")
         partial_construct_optionable = functools.partial(_construct_optionable, cls)
         partial_construct_optionable.__name__ = "construct_scope_{}".format(snake_scope)
@@ -88,7 +93,8 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
 
     @classmethod
     def get_scope_info(cls):
-        """Returns a ScopeInfo instance representing this Optionable's options scope."""
+        """Returns a ScopeInfo instance representing this Optionable's options
+        scope."""
         if cls.options_scope is None or cls.options_scope_category is None:
             raise OptionsError(
                 "{} must set options_scope and options_scope_category.".format(cls.__name__)
@@ -102,20 +108,24 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
 
     @classmethod
     def known_scope_infos(cls):
-        """Yields ScopeInfo for all known scopes for this optionable, in no particular order.
+        """Yields ScopeInfo for all known scopes for this optionable, in no
+        particular order.
 
-    Specific Optionable subtypes may override to provide information about other optionables.
-    """
+        Specific Optionable subtypes may override to provide information
+        about other optionables.
+        """
         yield cls.get_scope_info()
 
     @classmethod
     def get_options_scope_equivalent_flag_component(cls):
-        """Return a string representing this optionable's scope as it would be in a command line flag.
+        """Return a string representing this optionable's scope as it would be
+        in a command line flag.
 
-    This method can be used to generate error messages with flags e.g. to fix some error with a
-    pants command. These flags will then be as specific as possible, including e.g. all dependent
-    subsystem scopes.
-    """
+        This method can be used to generate error messages with flags
+        e.g. to fix some error with a pants command. These flags will
+        then be as specific as possible, including e.g. all dependent
+        subsystem scopes.
+        """
         return re.sub(r"\.", "-", cls.options_scope)
 
     @classmethod
@@ -127,15 +137,15 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
     def register_options(cls, register):
         """Register options for this optionable.
 
-    Subclasses may override and call register(*args, **kwargs).
-    """
+        Subclasses may override and call register(*args, **kwargs).
+        """
 
     @classmethod
     def register_options_on_scope(cls, options):
         """Trigger registration of this optionable's options.
 
-    Subclasses should not generally need to override this method.
-    """
+        Subclasses should not generally need to override this method.
+        """
         cls.register_options(options.registration_function_for_optionable(cls))
 
     def __init__(self):

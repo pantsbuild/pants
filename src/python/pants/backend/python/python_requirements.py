@@ -5,24 +5,25 @@ import os
 
 
 class PythonRequirements:
-    """Translates a pip requirements file into an equivalent set of python_requirements
+    """Translates a pip requirements file into an equivalent set of
+    python_requirements.
 
-  If the ``requirements.txt`` file has lines ``foo>=3.14`` and ``bar>=2.7``,
-  then this is roughly like::
+    If the ``requirements.txt`` file has lines ``foo>=3.14`` and ``bar>=2.7``,
+    then this is roughly like::
 
-    python_requirement_library(name="foo", requirements=[
-      python_requirement("foo>=3.14"),
-    ])
-    python_requirement_library(name="bar", requirements=[
-      python_requirement("bar>=2.7"),
-    ])
+      python_requirement_library(name="foo", requirements=[
+        python_requirement("foo>=3.14"),
+      ])
+      python_requirement_library(name="bar", requirements=[
+        python_requirement("bar>=2.7"),
+      ])
 
-  NB some requirements files can't be unambiguously translated; ie: multiple
-  find links.  For these files a ValueError will be raised that points out the issue.
+    NB some requirements files can't be unambiguously translated; ie: multiple
+    find links.  For these files a ValueError will be raised that points out the issue.
 
-  See the requirements file spec here:
-  https://pip.pypa.io/en/latest/reference/pip_install.html#requirements-file-format
-  """
+    See the requirements file spec here:
+    https://pip.pypa.io/en/latest/reference/pip_install.html#requirements-file-format
+    """
 
     def __init__(self, parse_context):
         self._parse_context = parse_context

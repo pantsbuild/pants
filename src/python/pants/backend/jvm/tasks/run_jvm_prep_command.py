@@ -13,19 +13,19 @@ from pants.task.task import Task
 class RunJvmPrepCommandBase(Task):
     """Base class to enable running JVM binaries before executing a goal.
 
-  This command will use the 'runtime_classpath' product and compile dependent JVM code
-  unless the 'classpath_product_only' field on the task subclass is set to True.
-  Setting `classpath_product_only=True` is useful for running commands before the compile goal
-  completes.
+    This command will use the 'runtime_classpath' product and compile dependent JVM code
+    unless the 'classpath_product_only' field on the task subclass is set to True.
+    Setting `classpath_product_only=True` is useful for running commands before the compile goal
+    completes.
 
-  This task is meant to be subclassed, setting the 'goal' variable appropriately.
-  For example, create a subclass and then register it in a plugin to run
-  at the beginning of the binary goal in register.py:
+    This task is meant to be subclassed, setting the 'goal' variable appropriately.
+    For example, create a subclass and then register it in a plugin to run
+    at the beginning of the binary goal in register.py:
 
-  task(name='binary-jvm-prep-command', action=RunBinaryJvmPrepCommand).install('binary', first=True)
+    task(name='binary-jvm-prep-command', action=RunBinaryJvmPrepCommand).install('binary', first=True)
 
-  :API: public
-  """
+    :API: public
+    """
 
     goal = None
     classpath_product_only = False
@@ -38,9 +38,10 @@ class RunJvmPrepCommandBase(Task):
     def register_options(cls, register):
         """Register options for this optionable.
 
-    In this case, there are no special options, but we want to use this opportunity to setup
-    goal validation in JvmPrepCommand before the build graph is parsed.
-    """
+        In this case, there are no special options, but we want to use
+        this opportunity to setup goal validation in JvmPrepCommand
+        before the build graph is parsed.
+        """
         super().register_options(register)
         JvmPrepCommand.add_goal(cls.goal)
 
@@ -108,19 +109,22 @@ class RunJvmPrepCommandBase(Task):
 
 
 class RunBinaryJvmPrepCommand(RunJvmPrepCommandBase):
-    """Run code from a JVM compiled language before other tasks in the binary goal."""
+    """Run code from a JVM compiled language before other tasks in the binary
+    goal."""
 
     goal = "binary"
 
 
 class RunTestJvmPrepCommand(RunJvmPrepCommandBase):
-    """Run code from a JVM compiled language before other tasks in the test goal."""
+    """Run code from a JVM compiled language before other tasks in the test
+    goal."""
 
     goal = "test"
 
 
 class RunCompileJvmPrepCommand(RunJvmPrepCommandBase):
-    """Run code from a JVM compiled language before other tasks in the compile goal."""
+    """Run code from a JVM compiled language before other tasks in the compile
+    goal."""
 
     goal = "compile"
     classpath_product_only = True

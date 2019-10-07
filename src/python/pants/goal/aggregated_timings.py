@@ -10,8 +10,9 @@ from pants.util.dirutil import safe_mkdir_for
 class AggregatedTimings:
     """Aggregates timings over multiple invocations of 'similar' work.
 
-  If filepath is not none, stores the timings in that file. Useful for finding bottlenecks.
-  """
+    If filepath is not none, stores the timings in that file. Useful for
+    finding bottlenecks.
+    """
 
     def __init__(self, path=None):
         # Map path -> timing in seconds (a float)
@@ -24,9 +25,9 @@ class AggregatedTimings:
     def add_timing(self, label, secs, is_tool=False):
         """Aggregate timings by label.
 
-    secs - a double, so fractional seconds are allowed.
-    is_tool - whether this label represents a tool invocation.
-    """
+        secs - a double, so fractional seconds are allowed.
+        is_tool - whether this label represents a tool invocation.
+        """
         self._timings_by_path[label] += secs
         if is_tool:
             self._tool_labels.add(label)
@@ -39,8 +40,9 @@ class AggregatedTimings:
     def get_all(self):
         """Returns all the timings, sorted in decreasing order.
 
-    Each value is a dict: { path: <path>, timing: <timing in seconds> }
-    """
+        Each value is a dict: { path: <path>, timing: <timing in
+        seconds> }
+        """
         return [
             {"label": x[0], "timing": x[1], "is_tool": x[0] in self._tool_labels}
             for x in sorted(self._timings_by_path.items(), key=lambda x: x[1], reverse=True)

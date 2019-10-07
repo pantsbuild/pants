@@ -22,10 +22,12 @@ ExitCode = int
 class Exiter:
     """A class that provides standard runtime exit behavior.
 
-  `pants.base.exception_sink.ExceptionSink` handles exceptions and fatal signals, delegating to an
-  Exiter instance which can be set process-globally with ExceptionSink.reset_exiter(). Call
-  .exit() or .exit_and_fail() on an Exiter instance when you wish to exit the runtime.
-  """
+    `pants.base.exception_sink.ExceptionSink` handles exceptions and
+    fatal signals, delegating to an Exiter instance which can be set
+    process-globally with ExceptionSink.reset_exiter(). Call .exit() or
+    .exit_and_fail() on an Exiter instance when you wish to exit the
+    runtime.
+    """
 
     def __init__(self, exiter=sys.exit):
         """
@@ -45,12 +47,12 @@ class Exiter:
     def exit(self, result=PANTS_SUCCEEDED_EXIT_CODE, msg=None, out=None):
         """Exits the runtime.
 
-    :param result: The exit status. Typically either PANTS_SUCCEEDED_EXIT_CODE or
-                   PANTS_FAILED_EXIT_CODE, but can be a string as well. (Optional)
-    :param msg: A string message to print to stderr or another custom file desciptor before exiting.
-                (Optional)
-    :param out: The file descriptor to emit `msg` to. (Optional)
-    """
+        :param result: The exit status. Typically either PANTS_SUCCEEDED_EXIT_CODE or
+                       PANTS_FAILED_EXIT_CODE, but can be a string as well. (Optional)
+        :param msg: A string message to print to stderr or another custom file desciptor before exiting.
+                    (Optional)
+        :param out: The file descriptor to emit `msg` to. (Optional)
+        """
         if msg:
             out = out or sys.stderr
             if hasattr(out, "buffer"):
@@ -82,8 +84,8 @@ class Exiter:
     def exit_and_fail(self, msg=None, out=None):
         """Exits the runtime with a nonzero exit code, indicating failure.
 
-    :param msg: A string message to print to stderr or another custom file desciptor before exiting.
-                (Optional)
-    :param out: The file descriptor to emit `msg` to. (Optional)
-    """
+        :param msg: A string message to print to stderr or another custom file desciptor before exiting.
+                    (Optional)
+        :param out: The file descriptor to emit `msg` to. (Optional)
+        """
         self.exit(result=PANTS_FAILED_EXIT_CODE, msg=msg, out=out)

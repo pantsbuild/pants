@@ -65,14 +65,14 @@ class Distribution:
     ):
         """Creates a distribution wrapping the given `home_path` or `bin_path`.
 
-    Only one of `home_path` or `bin_path` should be supplied.
+        Only one of `home_path` or `bin_path` should be supplied.
 
-    :param string home_path: the path to the java distribution's home dir
-    :param string bin_path: the path to the java distribution's bin dir
-    :param minimum_version: a modified semantic version string or else a Revision object
-    :param maximum_version: a modified semantic version string or else a Revision object
-    :param bool jdk: ``True`` to require the distribution be a JDK vs a JRE
-    """
+        :param string home_path: the path to the java distribution's home dir
+        :param string bin_path: the path to the java distribution's bin dir
+        :param minimum_version: a modified semantic version string or else a Revision object
+        :param maximum_version: a modified semantic version string or else a Revision object
+        :param bool jdk: ``True`` to require the distribution be a JDK vs a JRE
+        """
         if home_path and not os.path.isdir(home_path):
             raise ValueError("The specified java home path is invalid: {}".format(home_path))
         if bin_path and not os.path.isdir(bin_path):
@@ -100,28 +100,29 @@ class Distribution:
 
     @property
     def system_properties(self):
-        """Returns a dict containing the system properties of this java distribution."""
+        """Returns a dict containing the system properties of this java
+        distribution."""
         return dict(self._get_system_properties(self.java))
 
     @property
     def version(self):
         """Returns the distribution version.
 
-    Raises Distribution.Error if this distribution is not valid according to the configured
-    constraints.
-    """
+        Raises Distribution.Error if this distribution is not valid
+        according to the configured constraints.
+        """
         return self._get_version(self.java)
 
     def find_libs(self, names):
         """Looks for jars in the distribution lib folder(s).
 
-    If the distribution is a JDK, both the `lib` and `jre/lib` dirs will be scanned.
-    The endorsed and extension dirs are not checked.
+        If the distribution is a JDK, both the `lib` and `jre/lib` dirs will be scanned.
+        The endorsed and extension dirs are not checked.
 
-    :param list names: jar file names
-    :return: list of paths to requested libraries
-    :raises: `Distribution.Error` if any of the jars could not be found.
-    """
+        :param list names: jar file names
+        :return: list of paths to requested libraries
+        :raises: `Distribution.Error` if any of the jars could not be found.
+        """
 
         def collect_existing_libs():
             def lib_paths():
@@ -163,12 +164,14 @@ class Distribution:
     def java(self):
         """Returns the path to this distribution's java command.
 
-    If this distribution has no valid java command raises Distribution.Error.
-    """
+        If this distribution has no valid java command raises
+        Distribution.Error.
+        """
         return self.binary("java")
 
     def binary(self, name):
-        """Returns the path to the command of the given name for this distribution.
+        """Returns the path to the command of the given name for this
+        distribution.
 
     For example: ::
 
@@ -180,7 +183,7 @@ class Distribution:
 
     If this distribution has no valid command of the given name raises Distribution.Error.
     If this distribution is a JDK checks both `bin` and `jre/bin` for the binary.
-    """
+        """
         if not isinstance(name, str):
             raise ValueError(
                 "name must be a binary name, given {} of type {}".format(name, type(name))
@@ -191,9 +194,9 @@ class Distribution:
     def validate(self):
         """Validates this distribution against its configured constraints.
 
-    Raises Distribution.Error if this distribution is not valid according to the configured
-    constraints.
-    """
+        Raises Distribution.Error if this distribution is not valid
+        according to the configured constraints.
+        """
         if self._validated_binaries:
             return
 
@@ -306,18 +309,18 @@ class _DistributionEnvironment(ABC):
         def from_home(cls, home):
             """Creates a location given the JAVA_HOME directory.
 
-      :param string home: The path of the JAVA_HOME directory.
-      :returns: The java distribution location.
-      """
+            :param string home: The path of the JAVA_HOME directory.
+            :returns: The java distribution location.
+            """
             return cls(home_path=home, bin_path=None)
 
         @classmethod
         def from_bin(cls, bin_path):
             """Creates a location given the `java` executable parent directory.
 
-      :param string bin_path: The parent path of the `java` executable.
-      :returns: The java distribution location.
-      """
+            :param string bin_path: The parent path of the `java` executable.
+            :returns: The java distribution location.
+            """
             return cls(home_path=None, bin_path=bin_path)
 
     @property
@@ -325,9 +328,9 @@ class _DistributionEnvironment(ABC):
     def jvm_locations(self):
         """Return the jvm locations discovered in this environment.
 
-    :returns: An iterator over all discovered jvm locations.
-    :rtype: iterator of :class:`DistributionEnvironment.Location`
-    """
+        :returns: An iterator over all discovered jvm locations.
+        :rtype: iterator of :class:`DistributionEnvironment.Location`
+        """
 
 
 class _EnvVarEnvironment(_DistributionEnvironment):
@@ -450,14 +453,14 @@ class _Locator(object):
         self._maximum_version = maximum_version
 
     def _scan_constraint_match(self, minimum_version, maximum_version, jdk):
-        """Finds a cached version matching the specified constraints
+        """Finds a cached version matching the specified constraints.
 
-    :param Revision minimum_version: minimum jvm version to look for (eg, 1.7).
-    :param Revision maximum_version: maximum jvm version to look for (eg, 1.7.9999).
-    :param bool jdk: whether the found java distribution is required to have a jdk.
-    :return: the Distribution, or None if no matching distribution is in the cache.
-    :rtype: :class:`pants.java.distribution.Distribution`
-    """
+        :param Revision minimum_version: minimum jvm version to look for (eg, 1.7).
+        :param Revision maximum_version: maximum jvm version to look for (eg, 1.7.9999).
+        :param bool jdk: whether the found java distribution is required to have a jdk.
+        :return: the Distribution, or None if no matching distribution is in the cache.
+        :rtype: :class:`pants.java.distribution.Distribution`
+        """
 
         for dist in self._cache.values():
             if minimum_version and dist.version < minimum_version:
@@ -469,18 +472,19 @@ class _Locator(object):
             return dist
 
     def locate(self, minimum_version=None, maximum_version=None, jdk=False):
-        """Finds a java distribution that meets the given constraints and returns it.
+        """Finds a java distribution that meets the given constraints and
+        returns it.
 
-    First looks for a cached version that was previously located, otherwise calls locate().
-    :param minimum_version: minimum jvm version to look for (eg, 1.7).
-                            The stricter of this and `--jvm-distributions-minimum-version` is used.
-    :param maximum_version: maximum jvm version to look for (eg, 1.7.9999).
-                            The stricter of this and `--jvm-distributions-maximum-version` is used.
-    :param bool jdk: whether the found java distribution is required to have a jdk.
-    :return: the Distribution.
-    :rtype: :class:`Distribution`
-    :raises: :class:`Distribution.Error` if no suitable java distribution could be found.
-    """
+        First looks for a cached version that was previously located, otherwise calls locate().
+        :param minimum_version: minimum jvm version to look for (eg, 1.7).
+                                The stricter of this and `--jvm-distributions-minimum-version` is used.
+        :param maximum_version: maximum jvm version to look for (eg, 1.7.9999).
+                                The stricter of this and `--jvm-distributions-maximum-version` is used.
+        :param bool jdk: whether the found java distribution is required to have a jdk.
+        :return: the Distribution.
+        :rtype: :class:`Distribution`
+        :raises: :class:`Distribution.Error` if no suitable java distribution could be found.
+        """
 
         def _get_stricter_version(a, b, name, stricter):
             version_a = _parse_java_version(name, a)
@@ -511,15 +515,16 @@ class _Locator(object):
         return dist
 
     def _locate(self, minimum_version=None, maximum_version=None, jdk=False):
-        """Finds a java distribution that meets any given constraints and returns it.
+        """Finds a java distribution that meets any given constraints and
+        returns it.
 
-    :param minimum_version: minimum jvm version to look for (eg, 1.7).
-    :param maximum_version: maximum jvm version to look for (eg, 1.7.9999).
-    :param bool jdk: whether the found java distribution is required to have a jdk.
-    :return: the located Distribution.
-    :rtype: :class:`Distribution`
-    :raises: :class:`Distribution.Error` if no suitable java distribution could be found.
-    """
+        :param minimum_version: minimum jvm version to look for (eg, 1.7).
+        :param maximum_version: maximum jvm version to look for (eg, 1.7.9999).
+        :param bool jdk: whether the found java distribution is required to have a jdk.
+        :return: the located Distribution.
+        :rtype: :class:`Distribution`
+        :raises: :class:`Distribution.Error` if no suitable java distribution could be found.
+        """
         for location in itertools.chain(self._distribution_environment.jvm_locations):
             try:
                 dist = Distribution(
@@ -563,38 +568,39 @@ class _Locator(object):
 class DistributionLocator(Subsystem):
     """Subsystem that knows how to look up a java Distribution.
 
-  Distributions are searched for in the following order by default:
+    Distributions are searched for in the following order by default:
 
-  1. Paths listed for this operating system in the `--jvm-distributions-paths` map.
-  2. JDK_HOME/JAVA_HOME
-  3. PATH
-  4. Likely locations on the file system such as `/usr/lib/jvm` on Linux machines.
+    1. Paths listed for this operating system in the `--jvm-distributions-paths` map.
+    2. JDK_HOME/JAVA_HOME
+    3. PATH
+    4. Likely locations on the file system such as `/usr/lib/jvm` on Linux machines.
 
-  :API: public
-  """
+    :API: public
+    """
 
     class Error(Distribution.Error):
         """Error locating a java distribution.
 
-    :API: public
-    """
+        :API: public
+        """
 
     @classmethod
     def cached(cls, minimum_version=None, maximum_version=None, jdk=False):
-        """Finds a java distribution that meets the given constraints and returns it.
+        """Finds a java distribution that meets the given constraints and
+        returns it.
 
-    :API: public
+        :API: public
 
-    First looks for a cached version that was previously located, otherwise calls locate().
-    :param minimum_version: minimum jvm version to look for (eg, 1.7).
-                            The stricter of this and `--jvm-distributions-minimum-version` is used.
-    :param maximum_version: maximum jvm version to look for (eg, 1.7.9999).
-                            The stricter of this and `--jvm-distributions-maximum-version` is used.
-    :param bool jdk: whether the found java distribution is required to have a jdk.
-    :return: the Distribution.
-    :rtype: :class:`Distribution`
-    :raises: :class:`Distribution.Error` if no suitable java distribution could be found.
-    """
+        First looks for a cached version that was previously located, otherwise calls locate().
+        :param minimum_version: minimum jvm version to look for (eg, 1.7).
+                                The stricter of this and `--jvm-distributions-minimum-version` is used.
+        :param maximum_version: maximum jvm version to look for (eg, 1.7.9999).
+                                The stricter of this and `--jvm-distributions-maximum-version` is used.
+        :param bool jdk: whether the found java distribution is required to have a jdk.
+        :return: the Distribution.
+        :rtype: :class:`Distribution`
+        :raises: :class:`Distribution.Error` if no suitable java distribution could be found.
+        """
         try:
             return (
                 cls.global_instance()
@@ -631,9 +637,9 @@ class DistributionLocator(Subsystem):
     def all_jdk_paths(self):
         """Get all explicitly configured JDK paths.
 
-    :return: mapping of os name -> list of jdk_paths
-    :rtype: dict of string -> list of string
-    """
+        :return: mapping of os name -> list of jdk_paths
+        :rtype: dict of string -> list of string
+        """
         return self._normalized_jdk_paths
 
     @memoized_method

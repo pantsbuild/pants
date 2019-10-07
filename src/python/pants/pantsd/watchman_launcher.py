@@ -70,7 +70,8 @@ class WatchmanLauncher:
 
     @staticmethod
     def _convert_log_level(level):
-        """Convert a given pants log level string into a watchman log level string."""
+        """Convert a given pants log level string into a watchman log level
+        string."""
         # N.B. Enabling true Watchman debug logging (log level 2) can generate an absurd amount of log
         # data (10s of gigabytes over the course of an ~hour for an active fs) and is not particularly
         # helpful except for debugging Watchman itself. Thus, here we intentionally avoid this level

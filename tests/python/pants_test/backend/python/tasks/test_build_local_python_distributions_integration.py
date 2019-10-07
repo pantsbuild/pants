@@ -70,7 +70,8 @@ United States
             self._assert_nation_and_greeting(pants_run.stdout_data)
 
     def test_pydist_invalidation(self):
-        """Test that the current version of a python_dist() is resolved after modifying its sources."""
+        """Test that the current version of a python_dist() is resolved after
+        modifying its sources."""
         hello_run = "{}:main_with_no_conflict".format(self.hello_install_requires_dir)
 
         with self.mock_buildroot(

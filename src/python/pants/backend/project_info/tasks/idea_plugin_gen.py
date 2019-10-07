@@ -27,28 +27,29 @@ IDEA_PLUGIN_VERSION = "0.0.3"
 
 
 class IdeaPluginGen(ConsoleTask):
-    """Invoke IntelliJ Pants plugin (installation required) to create a project.
+    """Invoke IntelliJ Pants plugin (installation required) to create a
+    project.
 
-  The ideal workflow is to programmatically open idea -> select import -> import as pants project -> select project
-  path, but IDEA does not have CLI support for "select import" and "import as pants project" once it is opened.
+    The ideal workflow is to programmatically open idea -> select import -> import as pants project -> select project
+    path, but IDEA does not have CLI support for "select import" and "import as pants project" once it is opened.
 
-  Therefore, this task takes another approach to embed the target specs into a `iws` workspace file along
-  with an skeleton `ipr` project file.
+    Therefore, this task takes another approach to embed the target specs into a `iws` workspace file along
+    with an skeleton `ipr` project file.
 
-  Sample `iws`:
-  ********************************************************
-    <?xml version="1.0"?>
-    <project version="4">
-      <component name="PropertiesComponent">
-        <property name="targets" value="[&quot;/Users/me/workspace/pants/testprojects/tests/scala/org/pantsbuild/testproject/cp-directories/::&quot;]" />
-        <property name="project_path" value="/Users/me/workspace/pants/testprojects/tests/scala/org/pantsbuild/testproject/cp-directories/" />
-      </component>
-    </project>
-  ********************************************************
+    Sample `iws`:
+    ********************************************************
+      <?xml version="1.0"?>
+      <project version="4">
+        <component name="PropertiesComponent">
+          <property name="targets" value="[&quot;/Users/me/workspace/pants/testprojects/tests/scala/org/pantsbuild/testproject/cp-directories/::&quot;]" />
+          <property name="project_path" value="/Users/me/workspace/pants/testprojects/tests/scala/org/pantsbuild/testproject/cp-directories/" />
+        </component>
+      </project>
+    ********************************************************
 
-  Once pants plugin sees `targets` and `project_path`, it will simulate the import process on and populate the
-  existing skeleton project into a Pants project as if user is importing these targets.
-  """
+    Once pants plugin sees `targets` and `project_path`, it will simulate the import process on and populate the
+    existing skeleton project into a Pants project as if user is importing these targets.
+    """
 
     PROJECT_NAME_LIMIT = 200
 
@@ -184,8 +185,12 @@ class IdeaPluginGen(ConsoleTask):
         return self.project_filename
 
     def _generate_to_tempfile(self, generator):
-        """Applies the specified generator to a temp file and returns the path to that file.
-    We generate into a temp file so that we don't lose any manual customizations on error."""
+        """Applies the specified generator to a temp file and returns the path
+        to that file.
+
+        We generate into a temp file so that we don't lose any manual
+        customizations on error.
+        """
         with temporary_file(cleanup=False, binary_mode=False) as output:
             generator.write(output)
             return output.name

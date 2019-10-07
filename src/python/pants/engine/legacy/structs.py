@@ -24,18 +24,20 @@ logger = logging.getLogger(__name__)
 class TargetAdaptor(StructWithDeps):
     """A Struct to imitate the existing Target.
 
-  Extends StructWithDeps to add a `dependencies` field marked Addressable.
-  """
+    Extends StructWithDeps to add a `dependencies` field marked
+    Addressable.
+    """
 
     def get_sources(self):
-        """Returns target's non-deferred sources if exists or the default sources if defined.
+        """Returns target's non-deferred sources if exists or the default
+        sources if defined.
 
-    :rtype: :class:`GlobsWithConjunction`
+        :rtype: :class:`GlobsWithConjunction`
 
-    NB: once ivy is implemented in the engine, we can fetch sources natively here, and/or
-    refactor how deferred sources are implemented.
-      see: https://github.com/pantsbuild/pants/issues/2997
-    """
+        NB: once ivy is implemented in the engine, we can fetch sources natively here, and/or
+        refactor how deferred sources are implemented.
+          see: https://github.com/pantsbuild/pants/issues/2997
+        """
         source = getattr(self, "source", None)
         sources = getattr(self, "sources", None)
 
@@ -74,7 +76,8 @@ class TargetAdaptor(StructWithDeps):
 
     @property
     def field_adaptors(self):
-        """Returns a tuple of Fields for captured fields which need additional treatment."""
+        """Returns a tuple of Fields for captured fields which need additional
+        treatment."""
         with exception_logging(logger, "Exception in `field_adaptors` property"):
             conjunction_globs = self.get_sources()
 
@@ -109,23 +112,23 @@ class TargetAdaptor(StructWithDeps):
         return None
 
     def validate_sources(self, sources):
-        """"
-    Validate that the sources argument is allowed.
+        """" Validate that the sources argument is allowed.
 
-    Examples may be to check that the number of sources is correct, that file extensions are as
-    expected, etc.
+        Examples may be to check that the number of sources is correct, that file extensions are as
+        expected, etc.
 
-    TODO: Replace this with some kind of field subclassing, as per
-    https://github.com/pantsbuild/pants/issues/4535
+        TODO: Replace this with some kind of field subclassing, as per
+        https://github.com/pantsbuild/pants/issues/4535
 
-    :param sources EagerFilesetWithSpec resolved sources.
-    """
+        :param sources EagerFilesetWithSpec resolved sources.
+        """
         pass
 
 
 @union
 class HydrateableField:
-    """A marker for Target(Adaptor) fields for which the engine might perform extra construction."""
+    """A marker for Target(Adaptor) fields for which the engine might perform
+    extra construction."""
 
 
 class SourcesField(
@@ -133,19 +136,19 @@ class SourcesField(
 ):
     """Represents the `sources` argument for a particular Target.
 
-  Sources are currently eagerly computed in-engine in order to provide the `BuildGraph`
-  API efficiently; once tasks are explicitly requesting particular Products for Targets,
-  lazy construction will be more natural.
-    see https://github.com/pantsbuild/pants/issues/3560
+    Sources are currently eagerly computed in-engine in order to provide the `BuildGraph`
+    API efficiently; once tasks are explicitly requesting particular Products for Targets,
+    lazy construction will be more natural.
+      see https://github.com/pantsbuild/pants/issues/3560
 
-  :param address: The Address of the TargetAdaptor for which this field is an argument.
-  :param arg: The name of this argument: usually 'sources', but occasionally also 'resources' in the
-    case of python resource globs.
-  :param filespecs: The merged filespecs dict the describes the paths captured by this field.
-  :param path_globs: A PathGlobs describing included files.
-  :param validate_fn: A function which takes an EagerFilesetWithSpec and throws if it's not
-    acceptable. This API will almost certainly change in the near future.
-  """
+    :param address: The Address of the TargetAdaptor for which this field is an argument.
+    :param arg: The name of this argument: usually 'sources', but occasionally also 'resources' in the
+      case of python resource globs.
+    :param filespecs: The merged filespecs dict the describes the paths captured by this field.
+    :param path_globs: A PathGlobs describing included files.
+    :param validate_fn: A function which takes an EagerFilesetWithSpec and throws if it's not
+      acceptable. This API will almost certainly change in the near future.
+    """
 
     def __hash__(self):
         return hash((self.address, self.arg))
@@ -183,7 +186,8 @@ class PageAdaptor(TargetAdaptor):
 
 
 class BundlesField(datatype(["address", "bundles", "filespecs_list", "path_globs_list"])):
-    """Represents the `bundles` argument, each of which has a PathGlobs to represent its `fileset`."""
+    """Represents the `bundles` argument, each of which has a PathGlobs to
+    represent its `fileset`."""
 
     def __hash__(self):
         return hash(self.address)
@@ -192,11 +196,11 @@ class BundlesField(datatype(["address", "bundles", "filespecs_list", "path_globs
 class BundleAdaptor(Struct):
     """A Struct to capture the args for the `bundle` object.
 
-  Bundles have filesets which we need to capture in order to execute them in the engine.
+    Bundles have filesets which we need to capture in order to execute them in the engine.
 
-  TODO: Bundles should arguably be Targets, but that distinction blurs in the `exp` examples
-  package, where a Target is just a collection of configuration.
-  """
+    TODO: Bundles should arguably be Targets, but that distinction blurs in the `exp` examples
+    package, where a Target is just a collection of configuration.
+    """
 
 
 class AppAdaptor(TargetAdaptor):
@@ -303,14 +307,16 @@ class PantsPluginAdaptor(PythonTargetAdaptor):
 
 
 class BaseGlobs(Locatable, metaclass=ABCMeta):
-    """An adaptor class to allow BUILD file parsing from ContextAwareObjectFactories."""
+    """An adaptor class to allow BUILD file parsing from
+    ContextAwareObjectFactories."""
 
     @staticmethod
     def from_sources_field(sources, spec_path):
         """Return a BaseGlobs for the given sources field.
 
-    `sources` may be None, a list/tuple/set, a string or a BaseGlobs instance.
-    """
+        `sources` may be None, a list/tuple/set, a string or a BaseGlobs
+        instance.
+        """
         if sources is None:
             return Files(spec_path=spec_path)
         elif isinstance(sources, BaseGlobs):
@@ -346,7 +352,8 @@ class BaseGlobs(Locatable, metaclass=ABCMeta):
     @property
     @abstractmethod
     def path_globs_kwarg(self):
-        """The name of the `PathGlobs` parameter corresponding to this BaseGlobs instance."""
+        """The name of the `PathGlobs` parameter corresponding to this
+        BaseGlobs instance."""
 
     @property
     @abstractmethod
@@ -384,7 +391,8 @@ class BaseGlobs(Locatable, metaclass=ABCMeta):
             return []
 
     def to_path_globs(self, relpath, conjunction):
-        """Return a PathGlobs representing the included and excluded Files for these patterns."""
+        """Return a PathGlobs representing the included and excluded Files for
+        these patterns."""
         return PathGlobs(
             include=tuple(os.path.join(relpath, glob) for glob in self._file_globs),
             exclude=tuple(os.path.join(relpath, exclude) for exclude in self._excluded_file_globs),

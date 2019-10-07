@@ -197,7 +197,8 @@ class FilterTest(BaseFilterTest):
         )
 
     def test_filter_ancestor_out_of_context(self):
-        """Tests that targets outside of the context used as filters are parsed before use."""
+        """Tests that targets outside of the context used as filters are parsed
+        before use."""
 
         # Add an additional un-injected target, and then use it as a filter.
         self.add_to_build_file("blacklist", "target(name='blacklist', dependencies=['common/a'])")
@@ -216,7 +217,8 @@ class FilterTest(BaseFilterTest):
         )
 
     def test_filter_ancestor_not_passed_targets(self):
-        """Tests filtering targets based on an ancestor not in that list of targets."""
+        """Tests filtering targets based on an ancestor not in that list of
+        targets."""
 
         # Add an additional un-injected target, and then use it as a filter.
         self.add_to_build_file("blacklist", "target(name='blacklist', dependencies=['common/a'])")

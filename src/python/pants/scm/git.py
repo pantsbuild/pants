@@ -34,13 +34,14 @@ class Git(Scm):
 
     @classmethod
     def detect_worktree(cls, binary="git", subdir=None):
-        """Detect the git working tree above cwd and return it; else, return None.
+        """Detect the git working tree above cwd and return it; else, return
+        None.
 
-    :param string binary: The path to the git binary to use, 'git' by default.
-    :param string subdir: The path to start searching for a git repo.
-    :returns: path to the directory where the git working tree is rooted.
-    :rtype: string
-    """
+        :param string binary: The path to the git binary to use, 'git' by default.
+        :param string subdir: The path to start searching for a git repo.
+        :returns: path to the directory where the git working tree is rooted.
+        :rtype: string
+        """
         # TODO(John Sirois): This is only used as a factory for a Git instance in
         # pants.base.build_environment.get_scm, encapsulate in a true factory method.
         cmd = [binary, "rev-parse", "--show-toplevel"]
@@ -59,10 +60,10 @@ class Git(Scm):
     def clone(cls, repo_url, dest, binary="git"):
         """Clone the repo at repo_url into dest.
 
-    :param string binary: The path to the git binary to use, 'git' by default.
-    :returns: an instance of this class representing the cloned repo.
-    :rtype: Git
-    """
+        :param string binary: The path to the git binary to use, 'git' by default.
+        :returns: an instance of this class representing the cloned repo.
+        :rtype: Git
+        """
         cmd = [binary, "clone", repo_url, dest]
         process, out = cls._invoke(cmd)
         cls._check_result(cmd, process.returncode)
@@ -70,18 +71,19 @@ class Git(Scm):
 
     @classmethod
     def _invoke(cls, cmd, stderr=None):
-        """Invoke the given command, and return a tuple of process and raw binary output.
+        """Invoke the given command, and return a tuple of process and raw
+        binary output.
 
-    If stderr is defined as None, it will flow to wherever it is currently mapped
-    for the parent process, generally to the terminal where the user can see the error
-    (cf. https://docs.python.org/3.7/library/subprocess.html#subprocess.Popen ). In
-    some cases we want to treat it specially, which is why it is exposed
-    in the signature of _invoke.
+        If stderr is defined as None, it will flow to wherever it is currently mapped
+        for the parent process, generally to the terminal where the user can see the error
+        (cf. https://docs.python.org/3.7/library/subprocess.html#subprocess.Popen ). In
+        some cases we want to treat it specially, which is why it is exposed
+        in the signature of _invoke.
 
-    :param list cmd: The command in the form of a list of strings
-    :returns: The completed process object and its standard output.
-    :raises: Scm.LocalException if there was a problem exec'ing the command at all.
-    """
+        :param list cmd: The command in the form of a list of strings
+        :returns: The completed process object and its standard output.
+        :raises: Scm.LocalException if there was a problem exec'ing the command at all.
+        """
         try:
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=stderr)
         except OSError as e:
@@ -102,14 +104,15 @@ class Git(Scm):
             raise raise_type(failure_msg or f"{cmd_str} failed with exit code {result}")
 
     def __init__(self, binary="git", gitdir=None, worktree=None, remote=None, branch=None):
-        """Creates a git scm proxy that assumes the git repository is in the cwd by default.
+        """Creates a git scm proxy that assumes the git repository is in the
+        cwd by default.
 
-    binary:    The path to the git binary to use, 'git' by default.
-    gitdir:    The path to the repository's git metadata directory (typically '.git').
-    worktree:  The path to the git repository working tree directory (typically '.').
-    remote:    The default remote to use.
-    branch:    The default remote branch to use.
-    """
+        binary:    The path to the git binary to use, 'git' by default.
+        gitdir:    The path to the repository's git metadata directory (typically '.git').
+        worktree:  The path to the git repository working tree directory (typically '.').
+        remote:    The default remote to use.
+        branch:    The default remote branch to use.
+        """
         super().__init__()
 
         self._gitcmd = binary
@@ -220,16 +223,20 @@ class Git(Scm):
         return self._check_output(args, raise_type=Scm.LocalException, errors="replace")
 
     def merge_base(self, left="master", right="HEAD"):
-        """Returns the merge-base of master and HEAD in bash: `git merge-base left right`"""
+        """Returns the merge-base of master and HEAD in bash: `git merge-base
+        left right`"""
         return self._check_output(["merge-base", left, right], raise_type=Scm.LocalException)
 
     def refresh(self, leave_clean=False):
-        """Attempt to pull-with-rebase from upstream.  This is implemented as fetch-plus-rebase
-       so that we can distinguish between errors in the fetch stage (likely network errors)
-       and errors in the rebase stage (conflicts).  If leave_clean is true, then in the event
-       of a rebase failure, the branch will be rolled back.  Otherwise, it will be left in the
-       conflicted state.
-    """
+        """Attempt to pull-with-rebase from upstream.
+
+        This is implemented as fetch-plus-rebase so that we can
+        distinguish between errors in the fetch stage (likely network
+        errors) and errors in the rebase stage (conflicts).  If
+        leave_clean is true, then in the event of a rebase failure, the
+        branch will be rolled back.  Otherwise, it will be left in the
+        conflicted state.
+        """
         remote, merge = self._get_upstream()
         self._check_call(["fetch", "--tags", remote, merge], raise_type=Scm.RemoteException)
         try:
@@ -276,7 +283,7 @@ class Git(Scm):
         self._check_call(["checkout", rev])
 
     def _get_upstream(self):
-        """Return the remote and remote merge branch for the current branch"""
+        """Return the remote and remote merge branch for the current branch."""
         if not self._remote or not self._branch:
             branch = self.branch_name
             if not branch:
@@ -318,11 +325,11 @@ class Git(Scm):
 
 
 class GitRepositoryReader:
-    """
-  Allows reading from files and directory information from an arbitrary git
-  commit. This is useful for pants-aware git sparse checkouts.
+    """Allows reading from files and directory information from an arbitrary
+    git commit.
 
-  """
+    This is useful for pants-aware git sparse checkouts.
+    """
 
     def __init__(self, scm, rev):
         self.scm = scm
@@ -449,8 +456,8 @@ class GitRepositoryReader:
     def listdir(self, relpath):
         """Like os.listdir, but reads from the git repository.
 
-    :returns: a list of relative filenames
-    """
+        :returns: a list of relative filenames
+        """
 
         path = self._realpath(relpath)
         if not path.endswith("/"):
@@ -466,10 +473,11 @@ class GitRepositoryReader:
     def open(self, relpath):
         """Read a file out of the repository at a certain revision.
 
-    This is complicated because, unlike vanilla git cat-file, this follows symlinks in
-    the repo.  If a symlink points outside repo, the file is read from the filesystem;
-    that's because presumably whoever put that symlink there knew what they were doing.
-    """
+        This is complicated because, unlike vanilla git cat-file, this
+        follows symlinks in the repo.  If a symlink points outside repo,
+        the file is read from the filesystem; that's because presumably
+        whoever put that symlink there knew what they were doing.
+        """
 
         path = self._realpath(relpath)
         if path.endswith("/"):
@@ -487,12 +495,13 @@ class GitRepositoryReader:
 
     @memoized_method
     def _realpath(self, relpath):
-        """Follow symlinks to find the real path to a file or directory in the repo.
+        """Follow symlinks to find the real path to a file or directory in the
+        repo.
 
-    :returns: if the expanded path points to a file, the relative path
-              to that file; if a directory, the relative path + '/'; if
-              a symlink outside the repo, a path starting with / or ../.
-    """
+        :returns: if the expanded path points to a file, the relative path
+                  to that file; if a directory, the relative path + '/'; if
+                  a symlink outside the repo, a path starting with / or ../.
+        """
         obj, path_so_far = self._read_object(relpath, MAX_SYMLINKS_IN_REALPATH)
         if isinstance(obj, self.Symlink):
             raise self.SymlinkLoopException(self.rev, relpath)
@@ -567,10 +576,11 @@ class GitRepositoryReader:
         return path
 
     def _read_tree(self, path):
-        """Given a revision and path, parse the tree data out of git cat-file output.
+        """Given a revision and path, parse the tree data out of git cat-file
+        output.
 
-    :returns: a dict from filename -> [list of Symlink, Dir, and File objects]
-    """
+        :returns: a dict from filename -> [list of Symlink, Dir, and File objects]
+        """
 
         path = self._fixup_dot_relative(path)
 
@@ -609,8 +619,9 @@ class GitRepositoryReader:
 
     def _read_object_from_repo(self, rev=None, relpath=None, sha=None):
         """Read an object from the git repo.
-    This is implemented via a pipe to git cat-file --batch
-    """
+
+        This is implemented via a pipe to git cat-file --batch
+        """
         if sha:
             spec = sha + b"\n"
         else:

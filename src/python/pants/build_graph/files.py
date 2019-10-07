@@ -30,21 +30,22 @@ class Files(Target):
         super().__init__(address=address, payload=payload, **kwargs)
 
     def has_sources(self, extension=None):
-        """`Files` targets never logically "own" sources of any particular type (extension).
+        """`Files` targets never logically "own" sources of any particular type
+        (extension).
 
-    `JavaLibrary` targets, in contrast, logically "own" `.java` files and so target consumers
-    (tasks) may collect targets to operate on by checking `has_sources('.java')` instead of
-    performing a target type test.
+        `JavaLibrary` targets, in contrast, logically "own" `.java` files and so target consumers
+        (tasks) may collect targets to operate on by checking `has_sources('.java')` instead of
+        performing a target type test.
 
-    A `Files` target may have `.java` sources - for example, a java compiler test might use
-    loose `.java` source files in the test tree as compiler inputs - but it does not logically
-    "own" `.java` sources like `JavaLibrary` and so any query of `has_sources` with an `extension`
-    will return `False` to prevent standard compilation by a `javac` task in this example.
+        A `Files` target may have `.java` sources - for example, a java compiler test might use
+        loose `.java` source files in the test tree as compiler inputs - but it does not logically
+        "own" `.java` sources like `JavaLibrary` and so any query of `has_sources` with an `extension`
+        will return `False` to prevent standard compilation by a `javac` task in this example.
 
-    :API: public
+        :API: public
 
-    :param string extension: Suffix of filenames to test for.
-    :return: `True` if this target owns at least one source file and `extension` is `None`.
-    :rtype: bool
-    """
+        :param string extension: Suffix of filenames to test for.
+        :return: `True` if this target owns at least one source file and `extension` is `None`.
+        :rtype: bool
+        """
         return extension is None and super().has_sources()

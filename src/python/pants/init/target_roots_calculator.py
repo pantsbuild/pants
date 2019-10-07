@@ -19,7 +19,8 @@ logger = logging.getLogger(__name__)
 
 
 class InvalidSpecConstraint(Exception):
-    """Raised when invalid constraints are given via target specs and arguments like --changed*."""
+    """Raised when invalid constraints are given via target specs and arguments
+    like --changed*."""
 
 
 class TargetRootsCalculator:
@@ -29,10 +30,10 @@ class TargetRootsCalculator:
     def parse_specs(cls, target_specs, build_root=None, exclude_patterns=None, tags=None):
         """Parse string specs into unique `Spec` objects.
 
-    :param iterable target_specs: An iterable of string specs.
-    :param string build_root: The path to the build root.
-    :returns: A `Specs` object.
-    """
+        :param iterable target_specs: An iterable of string specs.
+        :param string build_root: The path to the build root.
+        :returns: A `Specs` object.
+        """
         build_root = build_root or get_buildroot()
         spec_parser = CmdLineSpecParser(build_root)
 
@@ -47,7 +48,8 @@ class TargetRootsCalculator:
 
     @classmethod
     def changed_files(cls, scm, changes_since=None, diffspec=None):
-        """Determines the files changed according to SCM/workspace and options."""
+        """Determines the files changed according to SCM/workspace and
+        options."""
         workspace = ScmWorkspace(scm)
         if diffspec:
             return workspace.changes_in(diffspec)

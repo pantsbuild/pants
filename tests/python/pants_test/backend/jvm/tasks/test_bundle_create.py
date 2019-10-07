@@ -22,8 +22,8 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
         return BundleCreate
 
     def add_consolidated_bundle(self, context, tgt, files_dict):
-        """Add a bundle to the classpath as if it has been consolidated already.
-    """
+        """Add a bundle to the classpath as if it has been consolidated
+        already."""
         consolidated_classpath = context.products.get_data(
             "consolidated_classpath", init_func=ClasspathProducts.init_func(self.pants_workdir)
         )
@@ -42,7 +42,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
         consolidated_classpath.add_for_target(tgt, [("default", jarpath)])
 
     def setUp(self):
-        """Prepare targets, context, runtime classpath. """
+        """Prepare targets, context, runtime classpath."""
         super().setUp()
         self.task = self.prepare_execute(self.context())
 
@@ -97,9 +97,8 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
         )
 
     def _setup_classpath(self, task_context):
-        """As a separate prep step because to test different option settings, this needs to rerun
-    after context is re-created.
-    """
+        """As a separate prep step because to test different option settings,
+        this needs to rerun after context is re-created."""
         classpath_products = self.ensure_consolidated_classpath_products(task_context)
         classpath_products.add_jars_for_targets(
             targets=[self.jar_lib],
@@ -125,7 +124,8 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
         self._check_bundle_products("foo.foo-app", check_symlink=True)
 
     def test_jvm_bundle_use_basename_prefix(self):
-        """Test override default setting outputs bundle products using basename."""
+        """Test override default setting outputs bundle products using
+        basename."""
         self.app_target = self._create_target()
         self.set_options(use_basename_prefix=True)
         self.task_context = self.context(target_roots=[self.app_target])
@@ -158,7 +158,8 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
             self.execute(self.task_context)
 
     def test_conflicting_basename(self):
-        """Test exception is thrown when two targets share the same basename."""
+        """Test exception is thrown when two targets share the same
+        basename."""
         self.app_target = self._create_target()
         conflict_app_target = self.make_target(
             spec="//foo:foo-app-conflict",

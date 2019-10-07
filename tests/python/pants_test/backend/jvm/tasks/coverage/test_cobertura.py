@@ -17,7 +17,8 @@ from pants_test.test_base import TestBase
 
 
 class attrdict(dict):
-    """Allows entries in the dictionary to be accessed like a property, in order to spoof options."""
+    """Allows entries in the dictionary to be accessed like a property, in
+    order to spoof options."""
 
     def __getattr__(self, key):
         return self.get(key)

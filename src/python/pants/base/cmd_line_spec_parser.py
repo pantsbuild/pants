@@ -9,21 +9,21 @@ from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddres
 class CmdLineSpecParser:
     """Parses address selectors as passed from the command line.
 
-  See the `specs` package for more information on the types of objects returned.
-  This class supports some flexibility in the path portion of the spec to allow for more natural
-  command line use cases like tab completion leaving a trailing / for directories and relative
-  paths, ie both of these::
+    See the `specs` package for more information on the types of objects returned.
+    This class supports some flexibility in the path portion of the spec to allow for more natural
+    command line use cases like tab completion leaving a trailing / for directories and relative
+    paths, ie both of these::
 
-    ./src/::
-    /absolute/path/to/project/src/::
+      ./src/::
+      /absolute/path/to/project/src/::
 
-  Are valid command line specs even though they are not a valid BUILD file specs.  They're both
-  normalized to::
+    Are valid command line specs even though they are not a valid BUILD file specs.  They're both
+    normalized to::
 
-    src::
+      src::
 
-  The above expression would choose every target under src.
-  """
+    The above expression would choose every target under src.
+    """
 
     class BadSpecError(Exception):
         """Indicates an unparseable command line address selector."""
@@ -54,10 +54,10 @@ class CmdLineSpecParser:
     def parse_spec(self, spec):
         """Parse the given spec into a `specs.Spec` object.
 
-    :param spec: a single spec string.
-    :return: a single specs.Specs object.
-    :raises: CmdLineSpecParser.BadSpecError if the address selector could not be parsed.
-    """
+        :param spec: a single spec string.
+        :return: a single specs.Specs object.
+        :raises: CmdLineSpecParser.BadSpecError if the address selector could not be parsed.
+        """
 
         if spec.endswith("::"):
             spec_path = spec[: -len("::")]

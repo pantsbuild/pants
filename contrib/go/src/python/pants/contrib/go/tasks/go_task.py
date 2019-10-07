@@ -54,20 +54,22 @@ class GoTask(Task):
 
     @memoized_property
     def import_oracle(self):
-        """Return an import oracle that can help look up and categorize imports.
+        """Return an import oracle that can help look up and categorize
+        imports.
 
-    :rtype: :class:`ImportOracle`
-    """
+        :rtype: :class:`ImportOracle`
+        """
         return ImportOracle(go_dist=self.go_dist, workunit_factory=self.context.new_workunit)
 
     @memoized_property
     def goos_goarch(self):
-        """Return concatenated $GOOS and $GOARCH environment variables, separated by an underscore.
+        """Return concatenated $GOOS and $GOARCH environment variables,
+        separated by an underscore.
 
-    Useful for locating where the Go compiler is placing binaries ("$GOPATH/pkg/$GOOS_$GOARCH").
+        Useful for locating where the Go compiler is placing binaries ("$GOPATH/pkg/$GOOS_$GOARCH").
 
-    :rtype: string
-    """
+        :rtype: string
+        """
         return "{goos}_{goarch}".format(
             goos=self._lookup_go_env_var("GOOS"), goarch=self._lookup_go_env_var("GOARCH")
         )
@@ -80,7 +82,8 @@ class ImportOracle:
     """Answers questions about Go imports."""
 
     class ListDepsError(Exception):
-        """Indicates a problem listing import paths for one or more packages."""
+        """Indicates a problem listing import paths for one or more
+        packages."""
 
     def __init__(self, go_dist, workunit_factory):
         self._go_dist = go_dist
@@ -90,8 +93,8 @@ class ImportOracle:
     def go_stdlib(self):
         """Return the set of all Go standard library import paths.
 
-    :rtype: frozenset of string
-    """
+        :rtype: frozenset of string
+        """
         out = self._go_dist.create_go_cmd("list", args=["std"]).check_output()
         return frozenset(out.decode().strip().split())
 
@@ -105,14 +108,15 @@ class ImportOracle:
         return self._remote_import_re.match(import_path) is not None
 
     def is_go_internal_import(self, import_path):
-        """Return `True` if the given import path will be satisfied directly by the Go distribution.
+        """Return `True` if the given import path will be satisfied directly by
+        the Go distribution.
 
-    For example, both the go standard library ("archive/tar", "bufio", "fmt", etc.) and "C" imports
-    are satisfiable by a Go distribution via linking of internal Go code and external c standard
-    library code respectively.
+        For example, both the go standard library ("archive/tar", "bufio", "fmt", etc.) and "C" imports
+        are satisfiable by a Go distribution via linking of internal Go code and external c standard
+        library code respectively.
 
-    :rtype: bool
-    """
+        :rtype: bool
+        """
         # The "C" package is a psuedo-package that links through to the c stdlib, see:
         #   http://blog.golang.org/c-go-cgo
         return import_path == "C" or import_path in self.go_stdlib
@@ -126,21 +130,21 @@ class ImportOracle:
         def all_imports(self):
             """Return all imports for this package, including any test imports.
 
-      :rtype: list of string
-      """
+            :rtype: list of string
+            """
             return list(OrderedSet(self.imports + self.test_imports + self.x_test_imports))
 
     @memoized_method
     def list_imports(self, pkg, gopath=None):
         """Return a listing of the dependencies of the given package.
 
-    :param string pkg: The package whose files to list all dependencies of.
-    :param string gopath: An optional $GOPATH which points to a Go workspace containing `pkg`.
-    :returns: The import listing for `pkg` that represents all its dependencies.
-    :rtype: :class:`ImportOracle.ImportListing`
-    :raises: :class:`ImportOracle.ListDepsError` if there was a problem listing the dependencies
-             of `pkg`.
-    """
+        :param string pkg: The package whose files to list all dependencies of.
+        :param string gopath: An optional $GOPATH which points to a Go workspace containing `pkg`.
+        :returns: The import listing for `pkg` that represents all its dependencies.
+        :rtype: :class:`ImportOracle.ImportListing`
+        :raises: :class:`ImportOracle.ListDepsError` if there was a problem listing the dependencies
+                 of `pkg`.
+        """
         go_cmd = self._go_dist.create_go_cmd("list", args=["-json", pkg], gopath=gopath)
         with self._workunit_factory(
             "list {}".format(pkg), cmd=str(go_cmd), labels=[WorkUnitLabel.TOOL]

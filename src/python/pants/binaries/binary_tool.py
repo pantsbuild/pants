@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 class BinaryToolBase(Subsystem):
     """Base class for subsytems that configure binary tools.
 
-  Subclasses can be further subclassed, manually, e.g., to add any extra options.
+    Subclasses can be further subclassed, manually, e.g., to add any extra options.
 
-  :API: public
-  """
+    :API: public
+    """
 
     # Subclasses must set these to appropriate values for the tool they define.
     # They must also set options_scope appropriately.
@@ -81,18 +81,19 @@ class BinaryToolBase(Subsystem):
         return create_archiver(self.archive_type)
 
     def get_external_url_generator(self):
-        """Override and return an instance of BinaryToolUrlGenerator to download from those urls.
+        """Override and return an instance of BinaryToolUrlGenerator to
+        download from those urls.
 
-    If this method returns None, urls to download the tool will be constructed from
-    --binaries-baseurls. Otherwise, generate_urls() will be invoked on the result with the requested
-    version and host platform.
+        If this method returns None, urls to download the tool will be constructed from
+        --binaries-baseurls. Otherwise, generate_urls() will be invoked on the result with the requested
+        version and host platform.
 
-    If the bootstrap option --allow-external-binary-tool-downloads is False, the result of this
-    method will be ignored. Implementations of BinaryTool must be aware of differences (e.g., in
-    archive structure) between the external and internal versions of the downloaded tool, if any.
+        If the bootstrap option --allow-external-binary-tool-downloads is False, the result of this
+        method will be ignored. Implementations of BinaryTool must be aware of differences (e.g., in
+        archive structure) between the external and internal versions of the downloaded tool, if any.
 
-    See the :class:`LLVM` subsystem for an example of usage.
-    """
+        See the :class:`LLVM` subsystem for an example of usage.
+        """
         return None
 
     @classmethod
@@ -116,26 +117,26 @@ class BinaryToolBase(Subsystem):
     def select(self, context=None):
         """Returns the path to the specified binary tool.
 
-    If replaces_scope and replaces_name are defined, then the caller must pass in
-    a context, otherwise no context should be passed.
+        If replaces_scope and replaces_name are defined, then the caller must pass in
+        a context, otherwise no context should be passed.
 
-    # TODO: Once we're migrated, get rid of the context arg.
+        # TODO: Once we're migrated, get rid of the context arg.
 
-    :API: public
-    """
+        :API: public
+        """
         return self._select_for_version(self.version(context))
 
     @memoized_method
     def version(self, context=None):
         """Returns the version of the specified binary tool.
 
-    If replaces_scope and replaces_name are defined, then the caller must pass in
-    a context, otherwise no context should be passed.
+        If replaces_scope and replaces_name are defined, then the caller must pass in
+        a context, otherwise no context should be passed.
 
-    # TODO: Once we're migrated, get rid of the context arg.
+        # TODO: Once we're migrated, get rid of the context arg.
 
-    :API: public
-    """
+        :API: public
+        """
         if self.replaces_scope and self.replaces_name:
             if context:
                 # If the old option is provided explicitly, let it take precedence.
@@ -191,9 +192,9 @@ class BinaryToolBase(Subsystem):
     def hackily_snapshot(self, context):
         """Returns a Snapshot of this tool after downloading it.
 
-    TODO: See https://github.com/pantsbuild/pants/issues/7790, which would make this unnecessary
-    due to the engine's memoization and caching.
-    """
+        TODO: See https://github.com/pantsbuild/pants/issues/7790, which would make this unnecessary
+        due to the engine's memoization and caching.
+        """
         # We call a memoized method under a lock in order to avoid doing a bunch of redundant
         # fetching and snapshotting.
         with self._snapshot_lock:
@@ -203,8 +204,8 @@ class BinaryToolBase(Subsystem):
 class NativeTool(BinaryToolBase):
     """A base class for native-code tools.
 
-  :API: public
-  """
+    :API: public
+    """
 
     platform_dependent = True
 
@@ -212,8 +213,8 @@ class NativeTool(BinaryToolBase):
 class Script(BinaryToolBase):
     """A base class for platform-independent scripts.
 
-  :API: public
-  """
+    :API: public
+    """
 
     platform_dependent = False
 

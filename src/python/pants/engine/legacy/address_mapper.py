@@ -19,8 +19,9 @@ logger = logging.getLogger(__name__)
 class LegacyAddressMapper(AddressMapper):
     """Provides an implementation of AddressMapper using v2 engine.
 
-  This allows tasks to use the context's address_mapper when the v2 engine is enabled.
-  """
+    This allows tasks to use the context's address_mapper when the v2
+    engine is enabled.
+    """
 
     def __init__(self, scheduler, build_root):
         self._scheduler = scheduler

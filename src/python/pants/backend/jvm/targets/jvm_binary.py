@@ -39,8 +39,8 @@ class JarRule(FingerprintedMixin, metaclass=ABCMeta):
     def apply_pattern(self):
         """The pattern that matches jar entry paths this rule applies to.
 
-    :rtype: re.RegexObject
-    """
+        :rtype: re.RegexObject
+        """
         return self._apply_pattern
 
 
@@ -52,16 +52,18 @@ class Skip(JarRule):
 
 
 class Duplicate(JarRule):
-    """A rule that indicates how duplicate entries should be handled when building a jar."""
+    """A rule that indicates how duplicate entries should be handled when
+    building a jar."""
 
     class Error(Exception):
-        """Raised by the ``FAIL`` action when a duplicate entry is encountered"""
+        """Raised by the ``FAIL`` action when a duplicate entry is
+        encountered."""
 
         def __init__(self, path):
             """Creates a duplicate entry error for the given path.
 
-      :param string path: The path of the duplicate entry.
-      """
+            :param string path: The path of the duplicate entry.
+            """
             assert path and isinstance(path, str), "A non-empty path must be supplied."
             super(Duplicate.Error, self).__init__(
                 "Duplicate entry encountered for path {}".format(path)
@@ -98,9 +100,9 @@ class Duplicate(JarRule):
     def validate_action(cls, action):
         """Verifies the given action is a valid duplicate jar rule action.
 
-    :returns: The action if it is valid.
-    :raises: ``ValueError`` if the action is invalid.
-    """
+        :returns: The action if it is valid.
+        :raises: ``ValueError`` if the action is invalid.
+        """
         if action not in cls._VALID_ACTIONS:
             raise ValueError(
                 "The supplied action must be one of {valid}, given: {given}".format(
@@ -112,19 +114,20 @@ class Duplicate(JarRule):
     def __init__(self, apply_pattern, action):
         """Creates a rule for handling duplicate jar entries.
 
-    :param string apply_pattern: A regular expression that matches duplicate jar entries this rule
-      applies to.
-    :param action: An action to take to handle one or more duplicate entries.  Must be one of:
-      ``Duplicate.SKIP``, ``Duplicate.REPLACE``, ``Duplicate.CONCAT``, ``Duplicate.CONCAT_TEXT``,
-      or ``Duplicate.FAIL``.
-    """
+        :param string apply_pattern: A regular expression that matches duplicate jar entries this rule
+          applies to.
+        :param action: An action to take to handle one or more duplicate entries.  Must be one of:
+          ``Duplicate.SKIP``, ``Duplicate.REPLACE``, ``Duplicate.CONCAT``, ``Duplicate.CONCAT_TEXT``,
+          or ``Duplicate.FAIL``.
+        """
         payload = Payload()
         payload.add_fields({"action": PrimitiveField(self.validate_action(action))})
         super().__init__(apply_pattern, payload=payload)
 
     @property
     def action(self):
-        """The action to take for any duplicate entries that match this rule's ``apply_pattern``."""
+        """The action to take for any duplicate entries that match this rule's
+        ``apply_pattern``."""
         return self.payload.action
 
     def fingerprint(self):
@@ -139,23 +142,23 @@ class Duplicate(JarRule):
 class JarRules(FingerprintedMixin):
     """A set of rules for packaging up a deploy jar.
 
-  Deploy jars are executable jars with fully self-contained classpaths and as such, assembling them
-  presents problems given jar semantics.
+    Deploy jars are executable jars with fully self-contained classpaths and as such, assembling them
+    presents problems given jar semantics.
 
-  One issue is signed jars that must be included on the
-  classpath.  These have a signature that depends on the jar contents and assembly of the deploy jar
-  changes the content of the jar, breaking the signatures.  For cases like these the signed jars
-  must be verified and then the signature information thrown away.  The `Skip <#Skip>`_
-  rule supports this sort of issue by allowing outright entry exclusion in the final deploy jar.
+    One issue is signed jars that must be included on the
+    classpath.  These have a signature that depends on the jar contents and assembly of the deploy jar
+    changes the content of the jar, breaking the signatures.  For cases like these the signed jars
+    must be verified and then the signature information thrown away.  The `Skip <#Skip>`_
+    rule supports this sort of issue by allowing outright entry exclusion in the final deploy jar.
 
-  Another issue is duplicate jar entries.  Although the underlying zip format supports these, the
-  java jar tool and libraries do not.  As such some action must be taken for each duplicate entry
-  such that there are no duplicates in the final deploy jar.  The four
-  `Duplicate <#Duplicate>`_ rules support resolution of these cases by allowing 1st wins,
-  last wins, concatenation of the duplicate entry contents or raising an exception.
+    Another issue is duplicate jar entries.  Although the underlying zip format supports these, the
+    java jar tool and libraries do not.  As such some action must be taken for each duplicate entry
+    such that there are no duplicates in the final deploy jar.  The four
+    `Duplicate <#Duplicate>`_ rules support resolution of these cases by allowing 1st wins,
+    last wins, concatenation of the duplicate entry contents or raising an exception.
 
-  :API: public
-  """
+    :API: public
+    """
 
     @classmethod
     def skip_signatures_and_duplicates_concat_well_known_metadata(
@@ -163,19 +166,19 @@ class JarRules(FingerprintedMixin):
     ):
         """Produces a rule set useful in many deploy jar creation contexts.
 
-    The rule set skips duplicate entries by default, retaining the 1st encountered.  In addition it
-    has the following special handling:
+        The rule set skips duplicate entries by default, retaining the 1st encountered.  In addition it
+        has the following special handling:
 
-    - jar signature metadata is dropped
-    - jar indexing files INDEX.LIST are dropped
-    - ``java.util.ServiceLoader`` provider-configuration files are concatenated in the order
-      encountered
+        - jar signature metadata is dropped
+        - jar indexing files INDEX.LIST are dropped
+        - ``java.util.ServiceLoader`` provider-configuration files are concatenated in the order
+          encountered
 
-    :param default_dup_action: An optional default action to take for duplicates.  Defaults to
-      `Duplicate.SKIP` if not specified.
-    :param additional_rules: Optionally one or more jar rules to add to those described above.
-    :returns: JarRules
-    """
+        :param default_dup_action: An optional default action to take for duplicates.  Defaults to
+          `Duplicate.SKIP` if not specified.
+        :param additional_rules: Optionally one or more jar rules to add to those described above.
+        :returns: JarRules
+        """
         default_dup_action = Duplicate.validate_action(default_dup_action or Duplicate.SKIP)
         additional_rules = assert_list(additional_rules, expected_type=(Duplicate, Skip))
 
@@ -195,11 +198,11 @@ class JarRules(FingerprintedMixin):
     def default(cls):
         """Returns the default set of jar rules.
 
-    Can be set with `set_default` but otherwise defaults to
-    `skip_signatures_and_duplicates_concat_well_known_metadata`.
+        Can be set with `set_default` but otherwise defaults to
+        `skip_signatures_and_duplicates_concat_well_known_metadata`.
 
-    :API: public
-    """
+        :API: public
+        """
         if cls._DEFAULT is None:
             cls._DEFAULT = cls.skip_signatures_and_duplicates_concat_well_known_metadata()
         return cls._DEFAULT
@@ -212,13 +215,14 @@ class JarRules(FingerprintedMixin):
         cls._DEFAULT = rules
 
     def __init__(self, rules=None, default_dup_action=Duplicate.SKIP):
-        """Creates a new set of jar rules with the default duplicate action of ``Duplicate.SKIP``.
+        """Creates a new set of jar rules with the default duplicate action of
+        ``Duplicate.SKIP``.
 
-    :param rules: One or more rules that will be applied in order to jar entries being packaged in
-      a deploy jar. `Skip <#Skip>`_ rules can go here.
-    :param default_dup_action: The default action to take when a duplicate entry is encountered and
-      no explicit rules apply to the entry.
-    """
+        :param rules: One or more rules that will be applied in order to jar entries being packaged in
+          a deploy jar. `Skip <#Skip>`_ rules can go here.
+        :param default_dup_action: The default action to take when a duplicate entry is encountered and
+          no explicit rules apply to the entry.
+        """
         self.payload = Payload()
         self.payload.add_fields(
             {"default_dup_action": PrimitiveField(Duplicate.validate_action(default_dup_action))}
@@ -227,10 +231,11 @@ class JarRules(FingerprintedMixin):
 
     @property
     def default_dup_action(self):
-        """The default action to take when a duplicate jar entry is encountered.
+        """The default action to take when a duplicate jar entry is
+        encountered.
 
-    :API: public
-    """
+        :API: public
+        """
         return self.payload.default_dup_action
 
     @property
@@ -286,16 +291,16 @@ class ManifestEntries(FingerprintedMixin):
 class JvmBinary(JvmTarget):
     """A JVM binary.
 
-  Below are a summary of how key goals affect targets of this type:
+    Below are a summary of how key goals affect targets of this type:
 
-  * ``bundle`` - Creates a self-contained directory with the binary and all
-    its dependencies, optionally archived, suitable for deployment.
-  * ``binary`` - Create an executable jar of the binary. On the JVM
-    this means the jar has a manifest specifying the main class.
-  * ``run`` - Executes the main class of this binary locally.
+    * ``bundle`` - Creates a self-contained directory with the binary and all
+      its dependencies, optionally archived, suitable for deployment.
+    * ``binary`` - Create an executable jar of the binary. On the JVM
+      this means the jar has a manifest specifying the main class.
+    * ``run`` - Executes the main class of this binary locally.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(
         self,

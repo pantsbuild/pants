@@ -26,16 +26,17 @@ from pants.util.memo import memoized_property
 
 
 class NativeToolchain(Subsystem):
-    """Abstraction over platform-specific tools to compile and link native code.
+    """Abstraction over platform-specific tools to compile and link native
+    code.
 
-  When this subsystem is consumed, Pants will download and unpack archives (if necessary) which
-  together provide an appropriate "native toolchain" for the host platform: a compiler and linker,
-  usually. This subsystem exposes the toolchain through `@rule`s, which tasks then request during
-  setup or execution (synchronously, for now).
+    When this subsystem is consumed, Pants will download and unpack archives (if necessary) which
+    together provide an appropriate "native toolchain" for the host platform: a compiler and linker,
+    usually. This subsystem exposes the toolchain through `@rule`s, which tasks then request during
+    setup or execution (synchronously, for now).
 
-  NB: Currently, on OSX, Pants will find and invoke the XCode command-line tools, or error out with
-  installation instructions if the XCode tools could not be found.
-  """
+    NB: Currently, on OSX, Pants will find and invoke the XCode command-line tools, or error out with
+    installation instructions if the XCode tools could not be found.
+    """
 
     options_scope = "native-toolchain"
 
@@ -77,7 +78,8 @@ class LibcObjects:
 
 class LinkerWrapperMixin:
     def for_compiler(self, compiler, platform):
-        """Return a Linker object which is intended to be compatible with the given `compiler`."""
+        """Return a Linker object which is intended to be compatible with the
+        given `compiler`."""
         return (
             self.linker
             # TODO(#6143): describe why the compiler needs to be first on the PATH!
@@ -139,8 +141,9 @@ def select_assembler(platform: Platform, native_toolchain: NativeToolchain) -> A
 class BaseLinker:
     """A Linker which is not specific to any compiler yet.
 
-  This represents Linker objects provided by subsystems, but may need additional information to be
-  usable by a specific compiler."""
+    This represents Linker objects provided by subsystems, but may need
+    additional information to be usable by a specific compiler.
+    """
 
     linker: Linker
 
@@ -173,11 +176,13 @@ def select_llvm_linker(base_linker: BaseLinker) -> LLVMLinker:
 
 @dataclass(frozen=True)
 class GCCInstallLocationForLLVM:
-    """This class is convertible into a list of command line arguments for clang and clang++.
+    """This class is convertible into a list of command line arguments for
+    clang and clang++.
 
-  This is only used on Linux. The option --gcc-toolchain stops clang from searching for another gcc
-  on the host system. The option appears to only exist on Linux clang and clang++.
-  """
+    This is only used on Linux. The option --gcc-toolchain stops clang
+    from searching for another gcc on the host system. The option
+    appears to only exist on Linux clang and clang++.
+    """
 
     toolchain_dir: Any
 

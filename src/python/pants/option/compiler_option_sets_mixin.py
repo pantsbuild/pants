@@ -52,7 +52,8 @@ class CompilerOptionSetsMixin:
 
     @classproperty
     def get_default_compiler_option_sets(cls):
-        """Override to set the default compiler_option_sets for targets which don't declare them."""
+        """Override to set the default compiler_option_sets for targets which
+        don't declare them."""
         return []
 
     @classproperty

@@ -12,9 +12,10 @@ from pants.task.console_task import ConsoleTask
 class FileDeps(ConsoleTask):
     """List all source and BUILD files a target transitively depends on.
 
-  Files may be listed with absolute or relative paths and any BUILD files implied in the transitive
-  closure of targets are also included.
-  """
+    Files may be listed with absolute or relative paths and any BUILD
+    files implied in the transitive closure of targets are also
+    included.
+    """
 
     @classmethod
     def register_options(cls, register):

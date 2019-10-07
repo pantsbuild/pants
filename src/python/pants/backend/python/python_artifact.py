@@ -71,22 +71,22 @@ class PythonArtifact(PayloadField):
     def with_binaries(self, *args, **kw):
         """Add binaries tagged to this artifact.
 
-    For example: ::
+        For example: ::
 
-      provides = setup_py(
-        name = 'my_library',
-        zip_safe = True
-      ).with_binaries(
-        my_command = ':my_library_bin'
-      )
+          provides = setup_py(
+            name = 'my_library',
+            zip_safe = True
+          ).with_binaries(
+            my_command = ':my_library_bin'
+          )
 
-    This adds a console_script entry_point for the python_binary target
-    pointed at by :my_library_bin.  Currently only supports
-    python_binaries that specify entry_point explicitly instead of source.
+        This adds a console_script entry_point for the python_binary target
+        pointed at by :my_library_bin.  Currently only supports
+        python_binaries that specify entry_point explicitly instead of source.
 
-    Also can take a dictionary, e.g.
-    with_binaries({'my-command': ':my_library_bin'})
-    """
+        Also can take a dictionary, e.g.
+        with_binaries({'my-command': ':my_library_bin'})
+        """
         for arg in args:
             if isinstance(arg, dict):
                 self._binaries.update(arg)

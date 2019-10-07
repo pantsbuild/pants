@@ -25,17 +25,17 @@ class Measure:
 class S3LogAccumulator:
     """Aggregates total downloaded bytes per file from S3 logs.
 
-  Helps us track which binaries our S3 bandwidth costs are being spent on.
+    Helps us track which binaries our S3 bandwidth costs are being spent on.
 
-  To run, first download S3 access logs. For example, to download all logs for 4/2018,
-  you can use something like:
+    To run, first download S3 access logs. For example, to download all logs for 4/2018,
+    you can use something like:
 
-  aws s3 sync s3://logs.pantsbuild.org/binaries/ /tmp/s3logs --exclude "*" --include "2018-04-*"
+    aws s3 sync s3://logs.pantsbuild.org/binaries/ /tmp/s3logs --exclude "*" --include "2018-04-*"
 
-  Then run this binary on the downloaded logs:
+    Then run this binary on the downloaded logs:
 
-  ./pants run src/python/pants/util/:s3_log_aggregator_bin -- /tmp/s3logs
-  """
+    ./pants run src/python/pants/util/:s3_log_aggregator_bin -- /tmp/s3logs
+    """
 
     def __init__(self):
         self._path_to_measure = defaultdict(Measure)

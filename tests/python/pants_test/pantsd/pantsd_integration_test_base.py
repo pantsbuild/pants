@@ -55,10 +55,11 @@ class PantsDaemonMonitor(ProcessManager):
         return self._pid
 
     def current_memory_usage(self):
-        """Return the current memory usage of the pantsd process (which must be running)
+        """Return the current memory usage of the pantsd process (which must be
+        running)
 
-    :return: memory usage in bytes
-    """
+        :return: memory usage in bytes
+        """
         self.assert_running()
         return psutil.Process(self._pid).memory_info()[0]
 
@@ -80,7 +81,8 @@ class PantsDaemonMonitor(ProcessManager):
 class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
     @classmethod
     def use_pantsd_env_var(cls):
-        """We set our own ad-hoc pantsd configuration in most of these tests"""
+        """We set our own ad-hoc pantsd configuration in most of these
+        tests."""
         return False
 
     @contextmanager

@@ -18,7 +18,8 @@ from pants_test.task_test_base import TaskTestBase
 
 
 class DummyTask(Task):
-    """A task that appends the content of a Files's sources into its results_dir."""
+    """A task that appends the content of a Files's sources into its
+    results_dir."""
 
     _implementation_version = 0
     _force_fail = False
@@ -246,8 +247,12 @@ files(
 
     def _synth_fp(self, scope=None, cls=FakeTask, options_fingerprintable=None, **kwargs):
         """Synthesize a subtype of `cls`, instantiate it, and take its
-    fingerprint. `options_fingerprintable` describes the registered options in
-    their respective scopes which can contribute to the task fingerprint."""
+        fingerprint.
+
+        `options_fingerprintable` describes the registered options in
+        their respective scopes which can contribute to the task
+        fingerprint.
+        """
         task_type = self._synthesize_subtype(scope=scope, cls=cls, **kwargs)
         return self._task_type_to_fp(task_type, options_fingerprintable=options_fingerprintable)
 
@@ -362,7 +367,8 @@ files(
         self.assertEqual(vtA.results_dir, vtB.results_dir)
 
     def test_implementation_version(self):
-        """When the implementation version changes, previous artifacts are not available."""
+        """When the implementation version changes, previous artifacts are not
+        available."""
 
         self._write_build_file()
 
@@ -518,15 +524,15 @@ files(
         self.assertFalse(vtA.cacheable)
 
     def test_fingerprint_identity(self):
-        """Tasks formed with the same parameters should have the same fingerprint
-    (smoke test)."""
+        """Tasks formed with the same parameters should have the same
+        fingerprint (smoke test)."""
         x = self._synth_fp()
         y = self._synth_fp()
         self.assertEqual(y, x)
 
     def test_fingerprint_implementation_version_single(self):
-        """Tasks with a different implementation_version() should have different
-    fingerprints."""
+        """Tasks with a different implementation_version() should have
+        different fingerprints."""
         empty_impls = self._synth_fp(_impls=[])
         zero_version = self._synth_fp(_impls=[("asdf", 0)])
         self.assertNotEqual(zero_version, empty_impls)
@@ -539,8 +545,8 @@ files(
         self.assertNotEqual(zero_one_version, one_version)
 
     def test_fingerprint_implementation_version_inheritance(self):
-        """The implementation_version() of superclasses of the task should affect
-    the task fingerprint."""
+        """The implementation_version() of superclasses of the task should
+        affect the task fingerprint."""
         versioned_fake = self._synth_fp(_impls=[("asdf", 0)])
         base_version_other_fake = self._synth_fp(
             cls=OtherFakeTask, _impls=[("asdf", 0)], _other_impls=[]
@@ -564,7 +570,7 @@ files(
 
     def test_fingerprint_changing_options_scope(self):
         """The options_scope of the task and any of its subsystem_dependencies
-    should affect the task fingerprint."""
+        should affect the task fingerprint."""
         task_fp = self._synth_fp(scope="xxx")
         other_task_fp = self._synth_fp(scope="yyy")
         self.assertNotEqual(other_task_fp, task_fp)
@@ -581,7 +587,7 @@ files(
 
     def test_fingerprint_options_on_registered_scopes_only(self):
         """Changing or setting an option value should only affect the task
-    fingerprint if it is registered as a fingerprintable option."""
+        fingerprint if it is registered as a fingerprintable option."""
         default_fp = self._synth_fp(cls=AnotherFakeTask, options_fingerprintable={})
         self.set_options_for_scope(AnotherFakeTask.options_scope, **{"fake-option": False})
         unregistered_option_fp = self._synth_fp(cls=AnotherFakeTask, options_fingerprintable={})
@@ -595,7 +601,7 @@ files(
 
     def test_fingerprint_changing_option_value(self):
         """Changing an option value in some scope should affect the task
-    fingerprint."""
+        fingerprint."""
         cur_option_spec = {AnotherFakeTask.options_scope: {"fake-option": bool}}
         self.set_options_for_scope(AnotherFakeTask.options_scope, **{"fake-option": False})
         task_opt_false_fp = self._synth_fp(
@@ -639,7 +645,7 @@ files(
 
     def test_fingerprint_passthru_args(self):
         """Passthrough arguments should affect fingerprints iff the task
-    supports passthrough args."""
+        supports passthrough args."""
         task_type_base = self._synthesize_subtype(cls=AnotherFakeTask)
         empty_passthru_args_fp = self._task_type_to_fp(task_type_base, passthru_args=[])
         non_empty_passthru_args_fp = self._task_type_to_fp(

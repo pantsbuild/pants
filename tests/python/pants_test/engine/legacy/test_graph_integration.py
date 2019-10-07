@@ -11,11 +11,12 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class GraphIntegrationTest(PantsRunIntegrationTest):
     @classmethod
     def use_pantsd_env_var(cls):
+        """Some of the tests here expect to read the standard error after an
+        intentional failure.
+
+        However, when pantsd is enabled, these errors are logged to
+        logs/exceptions.<pid>.log So stderr appears empty. (see #7320)
         """
-    Some of the tests here expect to read the standard error after an intentional failure.
-    However, when pantsd is enabled, these errors are logged to logs/exceptions.<pid>.log
-    So stderr appears empty. (see #7320)
-    """
         return False
 
     _NO_BUILD_FILE_TARGET_BASE = "testprojects/src/python/no_build_file"

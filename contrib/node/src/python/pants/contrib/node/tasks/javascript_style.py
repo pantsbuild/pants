@@ -20,10 +20,11 @@ from pants.contrib.node.tasks.node_task import NodeTask
 
 
 class JavascriptStyleBase(NodeTask):
-    """ Check javascript source files to ensure they follow the style guidelines.
+    """Check javascript source files to ensure they follow the style
+    guidelines.
 
-  :API: public
-  """
+    :API: public
+    """
 
     _JS_SOURCE_EXTENSION = ".js"
     _JSX_SOURCE_EXTENSION = ".jsx"
@@ -110,8 +111,8 @@ class JavascriptStyleBase(NodeTask):
     def _install_eslint(self, bootstrap_dir):
         """Install the ESLint distribution.
 
-    :rtype: string
-    """
+        :rtype: string
+        """
         with pushd(bootstrap_dir):
             result, install_command = self.install_module(
                 package_manager=self.node_distribution.get_package_manager(
@@ -208,8 +209,8 @@ class JavascriptStyleBase(NodeTask):
 class JavascriptStyleLint(LintTaskMixin, JavascriptStyleBase):
     """Check source files to ensure they follow the style guidelines.
 
-  :API: public
-  """
+    :API: public
+    """
 
     fix = False
 
@@ -217,7 +218,7 @@ class JavascriptStyleLint(LintTaskMixin, JavascriptStyleBase):
 class JavascriptStyleFmt(FmtTaskMixin, JavascriptStyleBase):
     """Check and fix source files to ensure they follow the style guidelines.
 
-  :API: public
-  """
+    :API: public
+    """
 
     fix = True

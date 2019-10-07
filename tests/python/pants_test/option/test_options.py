@@ -941,7 +941,8 @@ class OptionsTest(TestBase):
             options.for_scope("enum-opt").some_enum
 
     def test_deprecated_option_past_removal(self):
-        """Ensure that expired options raise CodeRemovedError on attempted use."""
+        """Ensure that expired options raise CodeRemovedError on attempted
+        use."""
         # NB: these exceptions are triggered by the `Parser#parse_args()` method, not
         # `Options#for_scope()`!
         # Test option past removal from flag
@@ -1056,7 +1057,8 @@ class OptionsTest(TestBase):
             self.assertOptionWarning(w, "global_delayed_but_already_passed_deprecated_option")
 
     def test_mutually_exclusive_options_flags(self):
-        """Ensure error is raised when mutual exclusive options are given together."""
+        """Ensure error is raised when mutual exclusive options are given
+        together."""
         with self.assertRaises(Parser.MutuallyExclusiveOptionError):
             self._parse("./pants --mutex-foo=foo --mutex-bar=bar").for_global_scope()
 
@@ -1146,12 +1148,12 @@ class OptionsTest(TestBase):
     def test_middle_scoped_options(self):
         """Make sure the rules for inheriting from a hierarchy of scopes.
 
-    Values should follow
-     1. A short circuit scan for a value from the following sources in-order:
-        flags, env, config, hardcoded defaults
-     2. Values for each source follow the . hierarchy scoping rule
-        within that source.
-    """
+        Values should follow
+         1. A short circuit scan for a value from the following sources in-order:
+            flags, env, config, hardcoded defaults
+         2. Values for each source follow the . hierarchy scoping rule
+            within that source.
+        """
 
         # Short circuit using command line.
         options = self._parse("./pants --a=100 compile --a=99")
@@ -1499,9 +1501,7 @@ class OptionsTest(TestBase):
             ).for_scope("cache.compile.scala")
 
     def test_pants_global_with_default(self):
-        """
-    This test makes sure values under [DEFAULT] still gets read.
-    """
+        """This test makes sure values under [DEFAULT] still gets read."""
         config = {"DEFAULT": {"b": "99"}, "GLOBAL": {"store_true_flag": True}}
         options = self._parse("./pants", config=config)
 
@@ -1651,7 +1651,8 @@ class OptionsTest(TestBase):
 
 # TODO: Figure out why this testing is necessary.
 class OptionsTestStringPayloads(OptionsTest):
-    """Runs the same tests as OptionsTest, but backed with `Config.loads` vs `Config.load`."""
+    """Runs the same tests as OptionsTest, but backed with `Config.loads` vs
+    `Config.load`."""
 
     def _create_config_from_strings(self, config):
         with io.BytesIO(b"") as fp:

@@ -14,7 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 def pants_version():
-    """Returns the pants semantic version number as a string: http://semver.org/"""
+    """Returns the pants semantic version number as a string:
+    http://semver.org/"""
     return _VERSION
 
 
@@ -28,8 +29,8 @@ def pants_release():
 def get_buildroot() -> str:
     """Returns the Pants build root, calculating it if needed.
 
-  :API: public
-  """
+    :API: public
+    """
     return BuildRoot().path
 
 
@@ -62,8 +63,8 @@ _SCM: Optional[Scm] = None
 def get_scm() -> Optional[Scm]:
     """Returns the pants Scm if any.
 
-  :API: public
-  """
+    :API: public
+    """
     # TODO(John Sirois): Extract a module/class to carry the bootstrap logic.
     global _SCM
     if _SCM:

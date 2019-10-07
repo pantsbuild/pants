@@ -7,8 +7,8 @@ from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrar
 class AnnotationProcessor(ExportableJvmLibrary):
     """A Java library containing annotation processors.
 
-  :API: public
-  """
+    :API: public
+    """
 
     def __init__(self, processors=None, *args, **kwargs):
 

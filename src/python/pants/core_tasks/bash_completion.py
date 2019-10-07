@@ -16,15 +16,17 @@ from pants.task.task import TaskBase
 
 
 class BashCompletion(ConsoleTask):
-    """Generate a Bash shell script that teaches Bash how to autocomplete pants command lines."""
+    """Generate a Bash shell script that teaches Bash how to autocomplete pants
+    command lines."""
 
     @staticmethod
     def _get_all_cmd_line_scopes():
-        """Return all scopes that may be explicitly specified on the cmd line, in no particular order.
+        """Return all scopes that may be explicitly specified on the cmd line,
+        in no particular order.
 
-    Note that this includes only task scope, and not, say, subsystem scopes,
-    as those aren't specifiable on the cmd line.
-    """
+        Note that this includes only task scope, and not, say, subsystem
+        scopes, as those aren't specifiable on the cmd line.
+        """
         all_scopes = {GLOBAL_SCOPE}
         for goal in Goal.all():
             for task in goal.task_types():
@@ -34,18 +36,18 @@ class BashCompletion(ConsoleTask):
     def get_autocomplete_options_by_scope(self):
         """Return all cmd-line options.
 
-    These are of two types: scoped and unscoped.  Scoped options are explicitly scoped
-    (e.g., --goal-task-foo-bar) and may appear anywhere on the cmd line. Unscoped options
-    may only appear in the appropriate cmd line scope (e.g., ./pants goal.task --foo-bar).
+        These are of two types: scoped and unscoped.  Scoped options are explicitly scoped
+        (e.g., --goal-task-foo-bar) and may appear anywhere on the cmd line. Unscoped options
+        may only appear in the appropriate cmd line scope (e.g., ./pants goal.task --foo-bar).
 
-    Technically, any scoped option can appear anywhere, but in practice, having so many
-    autocomplete options is more confusing than useful. So, as a heuristic:
-     1. In global scope we only autocomplete globally-registered options.
-     2. In a goal scope we only autocomplete options registered by any task in that goal.
-     3. In a task scope we only autocomplete options registered by that task.
+        Technically, any scoped option can appear anywhere, but in practice, having so many
+        autocomplete options is more confusing than useful. So, as a heuristic:
+         1. In global scope we only autocomplete globally-registered options.
+         2. In a goal scope we only autocomplete options registered by any task in that goal.
+         3. In a task scope we only autocomplete options registered by that task.
 
-    :return: A map of scope -> options to complete at that scope.
-    """
+        :return: A map of scope -> options to complete at that scope.
+        """
         autocomplete_options_by_scope = defaultdict(set)
 
         def get_from_parser(parser):
