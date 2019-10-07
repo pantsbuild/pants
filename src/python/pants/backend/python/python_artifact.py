@@ -6,70 +6,68 @@ from pants.base.payload_field import PayloadField
 
 
 class PythonArtifact(PayloadField):
-    """Represents a Python setup.py-based project."""
+  """Represents a Python setup.py-based project."""
+  class MissingArgument(Exception): pass
 
-    class MissingArgument(Exception):
-        pass
+  class UnsupportedArgument(Exception): pass
 
-    class UnsupportedArgument(Exception):
-        pass
+  UNSUPPORTED_ARGS = frozenset({
+    'data_files',
+    'package_dir',
+    'package_data',
+    'packages',
+  })
 
-    UNSUPPORTED_ARGS = frozenset({"data_files", "package_dir", "package_data", "packages"})
-
-    def __init__(self, **kwargs):
-        """
+  def __init__(self, **kwargs):
+    """
     :param kwargs: Passed to `setuptools.setup
        <https://pythonhosted.org/setuptools/setuptools.html>`_."""
-        self._kw = kwargs
-        self._binaries = {}
+    self._kw = kwargs
+    self._binaries = {}
 
-        def has(name):
-            value = self._kw.get(name)
-            if value is None:
-                raise self.MissingArgument(
-                    "PythonArtifact requires {} to be specified!".format(name)
-                )
-            return value
+    def has(name):
+      value = self._kw.get(name)
+      if value is None:
+        raise self.MissingArgument('PythonArtifact requires {} to be specified!'.format(name))
+      return value
 
-        def misses(name):
-            if name in self._kw:
-                raise self.UnsupportedArgument(
-                    "PythonArtifact prohibits {} from being specified".format(name)
-                )
+    def misses(name):
+      if name in self._kw:
+        raise self.UnsupportedArgument('PythonArtifact prohibits {} from being specified'.format(name))
 
-        self._version = has("version")
-        self._name = has("name")
-        for arg in self.UNSUPPORTED_ARGS:
-            misses(arg)
+    self._version = has('version')
+    self._name = has('name')
+    for arg in self.UNSUPPORTED_ARGS:
+      misses(arg)
 
-    @property
-    def name(self):
-        return self._name
+  @property
+  def name(self):
+    return self._name
 
-    @property
-    def version(self):
-        return self._version
+  @property
+  def version(self):
+    return self._version
 
-    @property
-    def key(self):
-        return "{}=={}".format(self._name, self._version)
+  @property
+  def key(self):
+    return '{}=={}'.format(self._name, self._version)
 
-    @property
-    def setup_py_keywords(self):
-        return self._kw
+  @property
+  def setup_py_keywords(self):
+    return self._kw
 
-    @property
-    def binaries(self):
-        return self._binaries
+  @property
+  def binaries(self):
+    return self._binaries
 
-    def __str__(self):
-        return self.name
+  def __str__(self):
+    return self.name
 
-    def _compute_fingerprint(self):
-        return stable_json_sha1((self._kw, self._binaries))
+  def _compute_fingerprint(self):
+    return stable_json_sha1((self._kw, self._binaries))
 
-    def with_binaries(self, *args, **kw):
-        """Add binaries tagged to this artifact.
+  def with_binaries(self, *args, **kw):
+    """Add binaries tagged to this artifact.
 
     For example: ::
 
@@ -87,8 +85,8 @@ class PythonArtifact(PayloadField):
     Also can take a dictionary, e.g.
     with_binaries({'my-command': ':my_library_bin'})
     """
-        for arg in args:
-            if isinstance(arg, dict):
-                self._binaries.update(arg)
-        self._binaries.update(kw)
-        return self
+    for arg in args:
+      if isinstance(arg, dict):
+        self._binaries.update(arg)
+    self._binaries.update(kw)
+    return self
