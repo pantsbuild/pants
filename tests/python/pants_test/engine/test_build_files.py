@@ -11,9 +11,10 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import addressable, addressable_dict
 from pants.engine.build_files import (
   ResolvedTypeMismatchError,
-  addresses_from_address_families,
   create_graph_rules,
   parse_address_family,
+  provenanced_addresses_from_address_families,
+  remove_provenance,
 )
 from pants.engine.fs import Digest, FileContent, FilesContent, PathGlobs, Snapshot, create_fs_rules
 from pants.engine.legacy.structs import TargetAdaptor
@@ -52,10 +53,11 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
     return Snapshot(Digest('xx', 2), ('root/BUILD',), ())
 
   def _resolve_build_file_addresses(self, specs, address_family, snapshot, address_mapper):
-    return run_rule(addresses_from_address_families, address_mapper, specs, {
+    pbfas = run_rule(provenanced_addresses_from_address_families, address_mapper, specs, {
       (Snapshot, PathGlobs): lambda _: snapshot,
       (AddressFamily, Dir): lambda _: address_family,
     })
+    return run_rule(remove_provenance, pbfas)
 
   def test_duplicated(self):
     """Test that matching the same Spec twice succeeds."""
