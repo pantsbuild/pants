@@ -940,8 +940,9 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   def _default_double_check_cache_for_vts(self, vts):
     # Double check the cache before beginning compilation
-    if self.check_cache(vts):
-      vts.update()
+    # TODO: see if removing this makes the run pass!
+    # if self.check_cache(vts):
+    #   vts.update()
 
   def _default_work_for_vts(self, vts, ctx, input_classpath_product_key, counter, all_compile_contexts, output_classpath_product):
     progress_message = ctx.target.address.spec
