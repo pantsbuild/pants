@@ -19,6 +19,7 @@ from pants.engine.legacy.structs import PythonTargetAdaptor, TargetAdaptor
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import rule, subsystem_rule
 from pants.engine.selectors import Get
+from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
 
 
@@ -90,6 +91,7 @@ async def create_pex(
     request: CreatePex,
     pex_bin: DownloadedPexBin,
     python_setup: PythonSetup,
+    python_repos: PythonRepos,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
     pex_build_environment: PexBuildEnvironment,
     platform: Platform,
@@ -148,4 +150,5 @@ def rules():
   return [
     create_pex,
     subsystem_rule(PythonSetup),
+    subsystem_rule(PythonRepos),
   ]

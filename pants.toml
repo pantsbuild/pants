@@ -73,6 +73,7 @@ backend_packages2 = [
   "pants.backend.python.lint.isort",
   "pants.backend.native",
   "internal_backend.rules_for_testing",
+  "pants.backend.python.lint.black",
 ]
 
 # The pants script in this repo consumes these files to run pants
@@ -459,3 +460,7 @@ repos = [
 # and decide to rerun coursier since the paths are invalid.
 read_from = ["%(local_artifact_cache)s"]
 write_to = ["%(local_artifact_cache)s"]
+
+[black]
+version = 'black==19.3b1.dev91+gd9e71a7.d20191007'
+config = "pyproject.toml"
