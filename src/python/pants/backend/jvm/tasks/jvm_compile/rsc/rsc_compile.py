@@ -127,6 +127,10 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     _name = "mixed"  # noqa
     compiler_name = "rsc"
 
+    @classmethod
+    def subsystem_dependencies(cls):
+      return super().subsystem_dependencies() + (Rsc,)
+
     @memoized_property
     def mirrored_target_option_actions(self):
         return {"workflow": self._identify_workflow_tags}
