@@ -58,7 +58,7 @@ impl SpeculatingCommandRunner {
       .then(|raced_result| match raced_result {
         Ok(either_success) => {
           // split take out the homogeneous success type for either primary or
-          // sec"ondary successes.
+          // secondary successes.
           ok::<FallibleExecuteProcessResult, String>(either_success.split().0).to_boxed()
         }
         Err(Either::A((failed_primary_res, _))) => {
