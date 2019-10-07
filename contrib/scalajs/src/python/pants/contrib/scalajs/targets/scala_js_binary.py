@@ -6,9 +6,8 @@ from pants.contrib.scalajs.targets.scala_js_target import ScalaJSTarget
 
 
 class ScalaJSBinary(ScalaJSTarget, NodeModule):
-    """A binary javascript blob built from a collection of ScalaJSLibrary targets.
+  """A binary javascript blob built from a collection of ScalaJSLibrary targets.
 
   Extends NodeModule to allow consumption by NPM and node.
   """
-
-    pass
+  pass

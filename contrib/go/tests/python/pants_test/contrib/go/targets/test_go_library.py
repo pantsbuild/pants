@@ -8,6 +8,7 @@ from pants.contrib.go.targets.go_library import GoLibrary
 
 
 class GoLibraryTest(GoLocalSourceTestBase, TestBase):
-    @property
-    def target_type(self):
-        return GoLibrary
+
+  @property
+  def target_type(self):
+    return GoLibrary

@@ -13,113 +13,117 @@ from pants_test.engine.util import assert_equal_with_printing, remove_locations_
 
 
 class A:
-    pass
+  pass
 
 
 class B:
-    pass
+  pass
 
 
 class C:
-    pass
+  pass
 
 
 class D:
-    pass
+  pass
 
 
 def fn_raises(x):
-    raise Exception(f"An exception for {type(x).__name__}")
+  raise Exception(f'An exception for {type(x).__name__}')
 
 
 @rule
 def nested_raise(x: B) -> A:
-    fn_raises(x)
+  fn_raises(x)
 
 
 @dataclass(frozen=True)
 class Fib:
-    val: int
+  val: int
 
 
 @rule
 def fib(n: int) -> Fib:
-    if n < 2:
-        yield Fib(n)
-    x, y = yield Get(Fib, int(n - 2)), Get(Fib, int(n - 1))
-    yield Fib(x.val + y.val)
+  if n < 2:
+    yield Fib(n)
+  x, y = yield Get(Fib, int(n-2)), Get(Fib, int(n-1))
+  yield Fib(x.val + y.val)
 
 
 @dataclass(frozen=True)
 class MyInt:
-    val: int
+  val: int
 
 
 @dataclass(frozen=True)
 class MyFloat:
-    val: float
+  val: float
 
 
 @rule
 def upcast(n: MyInt) -> MyFloat:
-    yield MyFloat(float(n.val))
+  yield MyFloat(float(n.val))
 
 
 class EngineTest(unittest.TestCase, SchedulerTestBase):
 
-    assert_equal_with_printing = assert_equal_with_printing
+  assert_equal_with_printing = assert_equal_with_printing
 
-    def scheduler(self, rules, include_trace_on_error):
-        return self.mk_scheduler(rules=rules, include_trace_on_error=include_trace_on_error)
+  def scheduler(self, rules, include_trace_on_error):
+    return self.mk_scheduler(rules=rules, include_trace_on_error=include_trace_on_error)
 
-    def test_recursive_multi_get(self):
-        # Tests that a rule that "uses itself" multiple times per invoke works.
-        rules = [fib, RootRule(int)]
+  def test_recursive_multi_get(self):
+    # Tests that a rule that "uses itself" multiple times per invoke works.
+    rules = [
+      fib,
+      RootRule(int),
+    ]
 
-        fib_10, = self.mk_scheduler(rules=rules).product_request(Fib, subjects=[10])
+    fib_10, = self.mk_scheduler(rules=rules).product_request(Fib, subjects=[10])
 
-        self.assertEqual(55, fib_10.val)
+    self.assertEqual(55, fib_10.val)
 
-    def test_no_include_trace_error_raises_boring_error(self):
-        rules = [RootRule(B), nested_raise]
+  def test_no_include_trace_error_raises_boring_error(self):
+    rules = [
+      RootRule(B),
+      nested_raise,
+    ]
 
-        scheduler = self.scheduler(rules, include_trace_on_error=False)
+    scheduler = self.scheduler(rules, include_trace_on_error=False)
 
-        with self.assertRaises(ExecutionError) as cm:
-            list(scheduler.product_request(A, subjects=[(B())]))
+    with self.assertRaises(ExecutionError) as cm:
+      list(scheduler.product_request(A, subjects=[(B())]))
 
-        self.assert_equal_with_printing(
-            "1 Exception encountered:\n  Exception: An exception for B", str(cm.exception)
-        )
+    self.assert_equal_with_printing('1 Exception encountered:\n  Exception: An exception for B', str(cm.exception))
 
-    def test_no_include_trace_error_multiple_paths_raises_executionerror(self):
-        rules = [RootRule(B), nested_raise]
+  def test_no_include_trace_error_multiple_paths_raises_executionerror(self):
+    rules = [
+      RootRule(B),
+      nested_raise,
+    ]
 
-        scheduler = self.scheduler(rules, include_trace_on_error=False)
+    scheduler = self.scheduler(rules, include_trace_on_error=False)
 
-        with self.assertRaises(ExecutionError) as cm:
-            list(scheduler.product_request(A, subjects=[B(), B()]))
+    with self.assertRaises(ExecutionError) as cm:
+      list(scheduler.product_request(A, subjects=[B(), B()]))
 
-        self.assert_equal_with_printing(
-            dedent(
-                """
+    self.assert_equal_with_printing(dedent('''
       2 Exceptions encountered:
         Exception: An exception for B
-        Exception: An exception for B"""
-            ).lstrip(),
-            str(cm.exception),
-        )
+        Exception: An exception for B''').lstrip(),
+      str(cm.exception))
 
-    def test_include_trace_error_raises_error_with_trace(self):
-        rules = [RootRule(B), nested_raise]
+  def test_include_trace_error_raises_error_with_trace(self):
+    rules = [
+      RootRule(B),
+      nested_raise,
+    ]
 
-        scheduler = self.scheduler(rules, include_trace_on_error=True)
-        with self.assertRaises(ExecutionError) as cm:
-            list(scheduler.product_request(A, subjects=[(B())]))
+    scheduler = self.scheduler(rules, include_trace_on_error=True)
+    with self.assertRaises(ExecutionError) as cm:
+      list(scheduler.product_request(A, subjects=[(B())]))
 
-        self.assert_equal_with_printing(
-            dedent(
-                """
+    self.assert_equal_with_printing(dedent('''
       1 Exception encountered:
       Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A)
         Computing Task(nested_raise(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A, true)
@@ -130,52 +134,48 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
               File LOCATION-INFO, in nested_raise
                 fn_raises(x)
               File LOCATION-INFO, in fn_raises
-                raise Exception(f"An exception for {type(x).__name__}")
+                raise Exception(f'An exception for {type(x).__name__}')
             Exception: An exception for B
-      """
-            ).lstrip()
-            + "\n",
-            remove_locations_from_traceback(str(cm.exception)),
-        )
+      ''').lstrip()+'\n',
+      remove_locations_from_traceback(str(cm.exception)))
 
-    def test_fork_context(self):
-        # A smoketest that confirms that we can successfully enter and exit the fork context, which
-        # implies acquiring and releasing all relevant Engine resources.
-        expected = "42"
+  def test_fork_context(self):
+    # A smoketest that confirms that we can successfully enter and exit the fork context, which
+    # implies acquiring and releasing all relevant Engine resources.
+    expected = "42"
+    def fork_context_body():
+      return expected
+    res = self.mk_scheduler().with_fork_context(fork_context_body)
+    self.assertEquals(res, expected)
 
-        def fork_context_body():
-            return expected
+  @unittest.skip('Inherently flaky as described in https://github.com/pantsbuild/pants/issues/6829')
+  def test_trace_multi(self):
+    # Tests that when multiple distinct failures occur, they are each rendered.
 
-        res = self.mk_scheduler().with_fork_context(fork_context_body)
-        self.assertEquals(res, expected)
+    @rule
+    def d_from_b_nested_raise(b: B) -> D:
+      fn_raises(b)
 
-    @unittest.skip(
-        "Inherently flaky as described in https://github.com/pantsbuild/pants/issues/6829"
-    )
-    def test_trace_multi(self):
-        # Tests that when multiple distinct failures occur, they are each rendered.
+    @rule
+    def c_from_b_nested_raise(b: B) -> C:
+      fn_raises(b)
 
-        @rule
-        def d_from_b_nested_raise(b: B) -> D:
-            fn_raises(b)
+    @rule
+    def a_from_c_and_d(c: C, d: D) -> A:
+      return A()
 
-        @rule
-        def c_from_b_nested_raise(b: B) -> C:
-            fn_raises(b)
+    rules = [
+      RootRule(B),
+      d_from_b_nested_raise,
+      c_from_b_nested_raise,
+      a_from_c_and_d,
+    ]
 
-        @rule
-        def a_from_c_and_d(c: C, d: D) -> A:
-            return A()
+    scheduler = self.scheduler(rules, include_trace_on_error=True)
+    with self.assertRaises(ExecutionError) as cm:
+      list(scheduler.product_request(A, subjects=[(B())]))
 
-        rules = [RootRule(B), d_from_b_nested_raise, c_from_b_nested_raise, a_from_c_and_d]
-
-        scheduler = self.scheduler(rules, include_trace_on_error=True)
-        with self.assertRaises(ExecutionError) as cm:
-            list(scheduler.product_request(A, subjects=[(B())]))
-
-        self.assert_equal_with_printing(
-            dedent(
-                """
+    self.assert_equal_with_printing(dedent('''
       1 Exception encountered:
       Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A)
         Computing Task(a_from_c_and_d(), <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, A, true)
@@ -203,38 +203,34 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
                 File LOCATION-INFO, in fn_raises
                   raise Exception('An exception for {}'.format(type(x).__name__))
               Exception: An exception for B
-      """
-            ).lstrip()
-            + "\n",
-            remove_locations_from_traceback(str(cm.exception)),
-        )
+      ''').lstrip()+'\n',
+      remove_locations_from_traceback(str(cm.exception)))
 
-    def test_illegal_root_selection(self):
-        rules = [RootRule(B)]
+  def test_illegal_root_selection(self):
+    rules = [
+      RootRule(B),
+    ]
 
-        scheduler = self.scheduler(rules, include_trace_on_error=False)
+    scheduler = self.scheduler(rules, include_trace_on_error=False)
 
-        # No rules are available to compute A.
-        with self.assertRaises(Exception) as cm:
-            list(scheduler.product_request(A, subjects=[(B())]))
+    # No rules are available to compute A.
+    with self.assertRaises(Exception) as cm:
+      list(scheduler.product_request(A, subjects=[(B())]))
 
-        self.assert_equal_with_printing(
-            "No installed @rules can compute A for input Params(B).", str(cm.exception)
-        )
+    self.assert_equal_with_printing('No installed @rules can compute A for input Params(B).', str(cm.exception))
 
-    def test_non_existing_root_fails_differently(self):
-        rules = [upcast]
+  def test_non_existing_root_fails_differently(self):
+    rules = [
+      upcast,
+    ]
 
-        with self.assertRaises(Exception) as cm:
-            list(self.mk_scheduler(rules=rules, include_trace_on_error=False))
+    with self.assertRaises(Exception) as cm:
+      list(self.mk_scheduler(rules=rules, include_trace_on_error=False))
 
-        self.assert_equal_with_printing(
-            dedent(
-                """
+    self.assert_equal_with_printing(dedent('''
       Rules with errors: 1
         (MyFloat, [MyInt], upcast()):
           No rule was available to compute MyInt. Maybe declare it as a RootRule(MyInt)?
-        """
-            ).strip(),
-            str(cm.exception),
-        )
+        ''').strip(),
+      str(cm.exception)
+    )

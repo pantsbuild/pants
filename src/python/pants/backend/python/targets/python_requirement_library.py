@@ -9,22 +9,24 @@ from pants.build_graph.target import Target
 
 
 class PythonRequirementLibrary(Target):
-    """A set of pip requirements.
+  """A set of pip requirements.
 
   :API: public
   """
 
-    def __init__(self, payload=None, requirements=None, **kwargs):
-        """
+  def __init__(self, payload=None, requirements=None, **kwargs):
+    """
     :param requirements: pip requirements as `python_requirement <#python_requirement>`_\\s.
     :type requirements: List of python_requirement calls
     """
-        payload = payload or Payload()
+    payload = payload or Payload()
 
-        assert_list(requirements, expected_type=PythonRequirement, key_arg="requirements")
-        payload.add_fields({"requirements": PythonRequirementsField(requirements or [])})
-        super().__init__(payload=payload, **kwargs)
+    assert_list(requirements, expected_type=PythonRequirement, key_arg='requirements')
+    payload.add_fields({
+      'requirements': PythonRequirementsField(requirements or []),
+    })
+    super().__init__(payload=payload, **kwargs)
 
-    @property
-    def requirements(self):
-        return self.payload.requirements
+  @property
+  def requirements(self):
+    return self.payload.requirements

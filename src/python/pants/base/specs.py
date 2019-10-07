@@ -15,7 +15,7 @@ from pants.util.objects import datatype
 
 
 class Spec(ABC):
-    """Represents address selectors as passed from the command line.
+  """Represents address selectors as passed from the command line.
 
   Supports `Single` target addresses as well as `Sibling` (:) and `Descendant` (::) selector forms.
 
@@ -24,37 +24,35 @@ class Spec(ABC):
   referring to an unresolved spec string.
   """
 
-    @abstractmethod
-    def to_spec_string(self):
-        """Returns the normalized string representation of this spec."""
+  @abstractmethod
+  def to_spec_string(self):
+    """Returns the normalized string representation of this spec."""
 
-    class AddressFamilyResolutionError(Exception):
-        pass
+  class AddressFamilyResolutionError(Exception): pass
 
-    @abstractmethod
-    def matching_address_families(self, address_families_dict):
-        """Given a dict of (namespace path) -> AddressFamily, return the values matching this spec.
+  @abstractmethod
+  def matching_address_families(self, address_families_dict):
+    """Given a dict of (namespace path) -> AddressFamily, return the values matching this spec.
 
     :raises: :class:`Spec.AddressFamilyResolutionError` if no address families matched this spec.
     :return: list of AddressFamily.
     """
 
-    @classmethod
-    def address_families_for_dir(cls, address_families_dict, spec_dir_path):
-        """Implementation of `matching_address_families()` for specs matching at most one directory."""
-        maybe_af = address_families_dict.get(spec_dir_path, None)
-        if maybe_af is None:
-            raise cls.AddressFamilyResolutionError(
-                'Path "{}" does not contain any BUILD files.'.format(spec_dir_path)
-            )
-        return [maybe_af]
+  @classmethod
+  def address_families_for_dir(cls, address_families_dict, spec_dir_path):
+    """Implementation of `matching_address_families()` for specs matching at most one directory."""
+    maybe_af = address_families_dict.get(spec_dir_path, None)
+    if maybe_af is None:
+      raise cls.AddressFamilyResolutionError(
+        'Path "{}" does not contain any BUILD files.'
+        .format(spec_dir_path))
+    return [maybe_af]
 
-    class AddressResolutionError(Exception):
-        pass
+  class AddressResolutionError(Exception): pass
 
-    @abstractmethod
-    def address_target_pairs_from_address_families(self, address_families):
-        """Given a list of AddressFamily, return (address, target) pairs matching this spec.
+  @abstractmethod
+  def address_target_pairs_from_address_families(self, address_families):
+    """Given a list of AddressFamily, return (address, target) pairs matching this spec.
 
     :raises: :class:`SingleAddress._SingleAddressResolutionError` for resolution errors with a
              :class:`SingleAddress` instance.
@@ -63,146 +61,139 @@ class Spec(ABC):
     :return: list of (Address, Target) pairs.
     """
 
-    @classmethod
-    def all_address_target_pairs(cls, address_families):
-        """Implementation of `address_target_pairs_from_address_families()` which does no filtering."""
-        addr_tgt_pairs = []
-        for af in address_families:
-            addr_tgt_pairs.extend(af.addressables.items())
-        return addr_tgt_pairs
+  @classmethod
+  def all_address_target_pairs(cls, address_families):
+    """Implementation of `address_target_pairs_from_address_families()` which does no filtering."""
+    addr_tgt_pairs = []
+    for af in address_families:
+      addr_tgt_pairs.extend(af.addressables.items())
+    return addr_tgt_pairs
 
-    @abstractmethod
-    def make_glob_patterns(self, address_mapper):
-        """Generate glob patterns matching exactly all the BUILD files this spec covers."""
+  @abstractmethod
+  def make_glob_patterns(self, address_mapper):
+    """Generate glob patterns matching exactly all the BUILD files this spec covers."""
 
-    @classmethod
-    def globs_in_single_dir(cls, spec_dir_path, address_mapper):
-        """Implementation of `make_glob_patterns()` which only allows a single base directory."""
-        return [os.path.join(spec_dir_path, pat) for pat in address_mapper.build_patterns]
+  @classmethod
+  def globs_in_single_dir(cls, spec_dir_path, address_mapper):
+    """Implementation of `make_glob_patterns()` which only allows a single base directory."""
+    return [os.path.join(spec_dir_path, pat) for pat in address_mapper.build_patterns]
 
 
 @dataclass(frozen=True)
 class SingleAddress(Spec):
-    """A Spec for a single address."""
+  """A Spec for a single address."""
+  directory: Any
+  name: Any
 
-    directory: Any
-    name: Any
+  def __post_init__(self):
+    if self.directory is None or self.name is None:
+      raise ValueError(
+        f'A SingleAddress must have both a directory and name. Got: {self.directory}:{self.name}'
+      )
 
-    def __post_init__(self):
-        if self.directory is None or self.name is None:
-            raise ValueError(
-                f"A SingleAddress must have both a directory and name. Got: {self.directory}:{self.name}"
-            )
+  def to_spec_string(self):
+    return '{}:{}'.format(self.directory, self.name)
 
-    def to_spec_string(self):
-        return "{}:{}".format(self.directory, self.name)
+  def matching_address_families(self, address_families_dict):
+    return self.address_families_for_dir(address_families_dict, self.directory)
 
-    def matching_address_families(self, address_families_dict):
-        return self.address_families_for_dir(address_families_dict, self.directory)
+  class _SingleAddressResolutionError(Exception):
+    def __init__(self, single_address_family, name):
+      super(SingleAddress._SingleAddressResolutionError, self).__init__()
+      self.single_address_family = single_address_family
+      self.name = name
 
-    class _SingleAddressResolutionError(Exception):
-        def __init__(self, single_address_family, name):
-            super(SingleAddress._SingleAddressResolutionError, self).__init__()
-            self.single_address_family = single_address_family
-            self.name = name
-
-    def address_target_pairs_from_address_families(self, address_families):
-        """Return the pair for the single target matching the single AddressFamily, or error.
+  def address_target_pairs_from_address_families(self, address_families):
+    """Return the pair for the single target matching the single AddressFamily, or error.
 
     :raises: :class:`SingleAddress._SingleAddressResolutionError` if no targets could be found for a
              :class:`SingleAddress` instance.
     :return: list of (Address, Target) pairs with exactly one element.
     """
-        single_af = assert_single_element(address_families)
-        addr_tgt_pairs = [
-            (addr, tgt)
-            for addr, tgt in single_af.addressables.items()
-            if addr.target_name == self.name
-        ]
-        if len(addr_tgt_pairs) == 0:
-            raise self._SingleAddressResolutionError(single_af, self.name)
-        # There will be at most one target with a given name in a single AddressFamily.
-        assert len(addr_tgt_pairs) == 1
-        return addr_tgt_pairs
+    single_af = assert_single_element(address_families)
+    addr_tgt_pairs = [
+      (addr, tgt) for addr, tgt in single_af.addressables.items()
+      if addr.target_name == self.name
+    ]
+    if len(addr_tgt_pairs) == 0:
+      raise self._SingleAddressResolutionError(single_af, self.name)
+    # There will be at most one target with a given name in a single AddressFamily.
+    assert(len(addr_tgt_pairs) == 1)
+    return addr_tgt_pairs
 
-    def make_glob_patterns(self, address_mapper):
-        return self.globs_in_single_dir(self.directory, address_mapper)
+  def make_glob_patterns(self, address_mapper):
+    return self.globs_in_single_dir(self.directory, address_mapper)
 
 
 @dataclass(frozen=True)
 class SiblingAddresses(Spec):
-    """A Spec representing all addresses located directly within the given directory."""
+  """A Spec representing all addresses located directly within the given directory."""
+  directory: Any
 
-    directory: Any
+  def to_spec_string(self):
+    return '{}:'.format(self.directory)
 
-    def to_spec_string(self):
-        return "{}:".format(self.directory)
+  def matching_address_families(self, address_families_dict):
+    return self.address_families_for_dir(address_families_dict, self.directory)
 
-    def matching_address_families(self, address_families_dict):
-        return self.address_families_for_dir(address_families_dict, self.directory)
+  def address_target_pairs_from_address_families(self, address_families):
+    return self.all_address_target_pairs(address_families)
 
-    def address_target_pairs_from_address_families(self, address_families):
-        return self.all_address_target_pairs(address_families)
-
-    def make_glob_patterns(self, address_mapper):
-        return self.globs_in_single_dir(self.directory, address_mapper)
+  def make_glob_patterns(self, address_mapper):
+    return self.globs_in_single_dir(self.directory, address_mapper)
 
 
 @dataclass(frozen=True)
 class DescendantAddresses(Spec):
-    """A Spec representing all addresses located recursively under the given directory."""
+  """A Spec representing all addresses located recursively under the given directory."""
+  directory: Any
 
-    directory: Any
+  def to_spec_string(self):
+    return '{}::'.format(self.directory)
 
-    def to_spec_string(self):
-        return "{}::".format(self.directory)
+  def matching_address_families(self, address_families_dict):
+    return [
+      af for ns, af in address_families_dict.items()
+      if fast_relpath_optional(ns, self.directory) is not None
+    ]
 
-    def matching_address_families(self, address_families_dict):
-        return [
-            af
-            for ns, af in address_families_dict.items()
-            if fast_relpath_optional(ns, self.directory) is not None
-        ]
+  def address_target_pairs_from_address_families(self, address_families):
+    addr_tgt_pairs = self.all_address_target_pairs(address_families)
+    if len(addr_tgt_pairs) == 0:
+      raise self.AddressResolutionError('Spec {} does not match any targets.'.format(self))
+    return addr_tgt_pairs
 
-    def address_target_pairs_from_address_families(self, address_families):
-        addr_tgt_pairs = self.all_address_target_pairs(address_families)
-        if len(addr_tgt_pairs) == 0:
-            raise self.AddressResolutionError("Spec {} does not match any targets.".format(self))
-        return addr_tgt_pairs
-
-    def make_glob_patterns(self, address_mapper):
-        return [os.path.join(self.directory, "**", pat) for pat in address_mapper.build_patterns]
+  def make_glob_patterns(self, address_mapper):
+    return [os.path.join(self.directory, '**', pat) for pat in address_mapper.build_patterns]
 
 
 @dataclass(frozen=True)
 class AscendantAddresses(Spec):
-    """A Spec representing all addresses located recursively _above_ the given directory."""
+  """A Spec representing all addresses located recursively _above_ the given directory."""
+  directory: Any
 
-    directory: Any
+  def to_spec_string(self):
+    return '{}^'.format(self.directory)
 
-    def to_spec_string(self):
-        return "{}^".format(self.directory)
+  def matching_address_families(self, address_families_dict):
+    return [
+      af for ns, af in address_families_dict.items()
+      if fast_relpath_optional(self.directory, ns) is not None
+    ]
 
-    def matching_address_families(self, address_families_dict):
-        return [
-            af
-            for ns, af in address_families_dict.items()
-            if fast_relpath_optional(self.directory, ns) is not None
-        ]
+  def address_target_pairs_from_address_families(self, address_families):
+    return self.all_address_target_pairs(address_families)
 
-    def address_target_pairs_from_address_families(self, address_families):
-        return self.all_address_target_pairs(address_families)
-
-    def make_glob_patterns(self, address_mapper):
-        return [
-            os.path.join(f, pattern)
-            for pattern in address_mapper.build_patterns
-            for f in recursive_dirname(self.directory)
-        ]
+  def make_glob_patterns(self, address_mapper):
+    return [
+      os.path.join(f, pattern)
+      for pattern in address_mapper.build_patterns
+      for f in recursive_dirname(self.directory)
+    ]
 
 
-class SpecsMatcher(datatype([("tags", tuple), ("exclude_patterns", tuple)])):
-    """Contains filters for the output of a Specs match.
+class SpecsMatcher(datatype([('tags', tuple), ('exclude_patterns', tuple)])):
+  """Contains filters for the output of a Specs match.
 
   This class is separated out from `Specs` to allow for both stuctural equality of the `tags` and
   `exclude_patterns`, and for caching of their compiled forms using `@memoized_property` (which uses
@@ -210,47 +201,47 @@ class SpecsMatcher(datatype([("tags", tuple), ("exclude_patterns", tuple)])):
   directly).
   """
 
-    def __new__(cls, tags=None, exclude_patterns=tuple()):
-        return super().__new__(
-            cls, tags=tuple(tags or []), exclude_patterns=tuple(exclude_patterns)
-        )
+  def __new__(cls, tags=None, exclude_patterns=tuple()):
+    return super().__new__(
+      cls,
+      tags=tuple(tags or []),
+      exclude_patterns=tuple(exclude_patterns))
 
-    @memoized_property
-    def _exclude_compiled_regexps(self):
-        return [re.compile(pattern) for pattern in set(self.exclude_patterns or [])]
+  @memoized_property
+  def _exclude_compiled_regexps(self):
+    return [re.compile(pattern) for pattern in set(self.exclude_patterns or [])]
 
-    def _excluded_by_pattern(self, address):
-        return any(p.search(address.spec) is not None for p in self._exclude_compiled_regexps)
+  def _excluded_by_pattern(self, address):
+    return any(p.search(address.spec) is not None for p in self._exclude_compiled_regexps)
 
-    @memoized_property
-    def _target_tag_matches(self):
-        def filter_for_tag(tag):
-            return lambda t: tag in [str(t_tag) for t_tag in t.kwargs().get("tags", [])]
+  @memoized_property
+  def _target_tag_matches(self):
+    def filter_for_tag(tag):
+      return lambda t: tag in [str(t_tag) for t_tag in t.kwargs().get("tags", [])]
+    return wrap_filters(create_filters(self.tags, filter_for_tag))
 
-        return wrap_filters(create_filters(self.tags, filter_for_tag))
-
-    def matches_target_address_pair(self, address, target):
-        """
+  def matches_target_address_pair(self, address, target):
+    """
     :param Address address: An Address to match
     :param HydratedTarget target: The Target for the address.
 
     :return: True if the given Address/HydratedTarget are included by this matcher.
     """
-        return self._target_tag_matches(target) and not self._excluded_by_pattern(address)
+    return self._target_tag_matches(target) and not self._excluded_by_pattern(address)
 
 
 # TODO: we can't yet express a type in terms of itself, because datatype field types are evaluated
 # eagerly (so we can't yet type-check the individual items of a tuple provided as the `dependencies`
 # field).
-class Specs(datatype([("dependencies", tuple), ("matcher", SpecsMatcher)])):
-    """A collection of Specs representing Spec subclasses, and a SpecsMatcher to filter results."""
+class Specs(datatype([('dependencies', tuple), ('matcher', SpecsMatcher)])):
+  """A collection of Specs representing Spec subclasses, and a SpecsMatcher to filter results."""
 
-    def __new__(cls, dependencies, tags=None, exclude_patterns=tuple()):
-        return super().__new__(
-            cls,
-            dependencies=tuple(dependencies),
-            matcher=SpecsMatcher(tags=tags, exclude_patterns=exclude_patterns),
-        )
+  def __new__(cls, dependencies, tags=None, exclude_patterns=tuple()):
+    return super().__new__(
+      cls,
+      dependencies=tuple(dependencies),
+      matcher=SpecsMatcher(tags=tags, exclude_patterns=exclude_patterns),
+    )
 
-    def __iter__(self):
-        return iter(self.dependencies)
+  def __iter__(self):
+    return iter(self.dependencies)

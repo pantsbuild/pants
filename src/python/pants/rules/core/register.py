@@ -5,11 +5,11 @@ from pants.rules.core import filedeps, fmt, list_roots, list_targets, strip_sour
 
 
 def rules():
-    return [
-        *fmt.rules(),
-        *list_roots.rules(),
-        *list_targets.rules(),
-        *filedeps.rules(),
-        *strip_source_root.rules(),
-        *test.rules(),
-    ]
+  return [
+    *fmt.rules(),
+    *list_roots.rules(),
+    *list_targets.rules(),
+    *filedeps.rules(),
+    *strip_source_root.rules(),
+    *test.rules()
+  ]

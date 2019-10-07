@@ -13,8 +13,14 @@ logger = logging.getLogger(__name__)
 
 
 @contextmanager
-def safe_args(args, options, max_args=None, argfile=None, delimiter="\n", quoter=None, delete=True):
-    """Yields args if there are less than a limit otherwise writes args to an argfile and yields an
+def safe_args(args,
+              options,
+              max_args=None,
+              argfile=None,
+              delimiter='\n',
+              quoter=None,
+              delete=True):
+  """Yields args if there are less than a limit otherwise writes args to an argfile and yields an
   argument list with one argument formed from the path of the argfile.
 
   :param args: The args to work with.
@@ -28,24 +34,23 @@ def safe_args(args, options, max_args=None, argfile=None, delimiter="\n", quoter
   :param delete: If True deletes any arg files created upon exit from this context; defaults to
     True.
   """
-    max_args = max_args or options.max_subprocess_args
-    if len(args) > max_args:
+  max_args = max_args or options.max_subprocess_args
+  if len(args) > max_args:
+    def create_argfile(f):
+      logger.debug('Creating argfile {} with contents {}'.format(f.name, ' '.join(args)))
+      f.write(delimiter.join(args))
+      f.close()
+      return [quoter(f.name) if quoter else '@{}'.format(f.name)]
 
-        def create_argfile(f):
-            logger.debug("Creating argfile {} with contents {}".format(f.name, " ".join(args)))
-            f.write(delimiter.join(args))
-            f.close()
-            return [quoter(f.name) if quoter else "@{}".format(f.name)]
-
-        if argfile:
-            try:
-                with safe_open(argfile, "w") as fp:
-                    yield create_argfile(fp)
-            finally:
-                if delete and os.path.exists(argfile):
-                    os.unlink(argfile)
-        else:
-            with temporary_file(cleanup=delete, binary_mode=False) as fp:
-                yield create_argfile(fp)
+    if argfile:
+      try:
+        with safe_open(argfile, 'w') as fp:
+          yield create_argfile(fp)
+      finally:
+        if delete and os.path.exists(argfile):
+          os.unlink(argfile)
     else:
-        yield args
+      with temporary_file(cleanup=delete, binary_mode=False) as fp:
+        yield create_argfile(fp)
+  else:
+    yield args
