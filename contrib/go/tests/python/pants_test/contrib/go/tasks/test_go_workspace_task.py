@@ -17,110 +17,108 @@ from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
 
 
 class MockGoWorkspaceTask(GoWorkspaceTask):
-    """Used to test instance methods of abstract class GoWorkspaceTask."""
+  """Used to test instance methods of abstract class GoWorkspaceTask."""
 
-    def execute(self):
-        pass
+  def execute(self):
+    pass
 
 
 class GoWorkspaceTaskTest(TaskTestBase):
-    @classmethod
-    def task_type(cls):
-        return MockGoWorkspaceTask
 
-    @classmethod
-    def alias_groups(cls):
-        return BuildFileAliases(targets={"go_library": GoLibrary})
+  @classmethod
+  def task_type(cls):
+    return MockGoWorkspaceTask
 
-    def test_remove_unused_links(self):
-        with temporary_dir() as d:
-            dpath = lambda p: os.path.join(d, p)
-            safe_mkdir(dpath("foo"))
-            safe_mkdir(dpath("bar"))
-            touch(dpath("f"))
-            for l in ("l1", "foo/l2", "bar/l3"):
-                # Create symlinks to directories.
-                os.symlink("/", dpath(l))
-            for l in ("l4", "foo/l5", "bar/l6"):
-                # Create symlinks to files.
-                os.symlink(dpath("f"), dpath(l))
+  @classmethod
+  def alias_groups(cls):
+    return BuildFileAliases(targets={'go_library': GoLibrary})
 
-            required_links = [dpath(l) for l in ("foo/l2", "l4", "bar/l6")]
-            GoWorkspaceTask.remove_unused_links(d, required_links)
+  def test_remove_unused_links(self):
+    with temporary_dir() as d:
+      dpath = lambda p: os.path.join(d, p)
+      safe_mkdir(dpath('foo'))
+      safe_mkdir(dpath('bar'))
+      touch(dpath('f'))
+      for l in ('l1', 'foo/l2', 'bar/l3'):
+        # Create symlinks to directories.
+        os.symlink('/', dpath(l))
+      for l in ('l4', 'foo/l5', 'bar/l6'):
+        # Create symlinks to files.
+        os.symlink(dpath('f'), dpath(l))
 
-            for p in chain(required_links, ["f"]):
-                self.assertTrue(os.path.exists(dpath(p)))
+      required_links = [dpath(l) for l in ('foo/l2', 'l4', 'bar/l6')]
+      GoWorkspaceTask.remove_unused_links(d, required_links)
 
-            for l in ("l1", "bar/l3", "foo/l5"):
-                self.assertFalse(os.path.exists(dpath(l)))
+      for p in chain(required_links, ['f']):
+        self.assertTrue(os.path.exists(dpath(p)))
 
-    def test_symlink_local_src(self):
-        with pushd(self.build_root):
-            spec = "src/main/go/foo/bar/mylib"
+      for l in ('l1', 'bar/l3', 'foo/l5'):
+        self.assertFalse(os.path.exists(dpath(l)))
 
-            sources = ["x.go", "y.go", "z.go", "z.c", "z.h", "w.png"]
-            for src in sources:
-                self.create_file(os.path.join(spec, src))
+  def test_symlink_local_src(self):
+    with pushd(self.build_root):
+      spec = 'src/main/go/foo/bar/mylib'
 
-            self.add_to_build_file(spec, "go_library()")
+      sources = ['x.go', 'y.go', 'z.go', 'z.c', 'z.h', 'w.png']
+      for src in sources:
+        self.create_file(os.path.join(spec, src))
 
-            go_lib = self.target(spec)
-            ws_task = self.create_task(self.context())
-            gopath = ws_task.get_gopath(go_lib)
+      self.add_to_build_file(spec, 'go_library()')
 
-            def assert_is_linked(src):
-                link = os.path.join(gopath, "src/foo/bar/mylib", src)
-                self.assertTrue(os.path.islink(link))
-                self.assertEqual(os.readlink(link), os.path.join(self.build_root, spec, src))
+      go_lib = self.target(spec)
+      ws_task = self.create_task(self.context())
+      gopath = ws_task.get_gopath(go_lib)
 
-            ws_task._symlink_local_src(gopath, go_lib, set())
-            for src in sources:
-                assert_is_linked(src)
+      def assert_is_linked(src):
+        link = os.path.join(gopath, 'src/foo/bar/mylib', src)
+        self.assertTrue(os.path.islink(link))
+        self.assertEqual(os.readlink(link), os.path.join(self.build_root, spec, src))
 
-            # Sleep so that first round of linking has 1.5 second earlier mtime than future links.
-            time.sleep(1.5)
+      ws_task._symlink_local_src(gopath, go_lib, set())
+      for src in sources:
+        assert_is_linked(src)
 
-            # Add source file and re-make library.
-            self.create_file(os.path.join(spec, "w.go"))
-            self.reset_build_graph()
-            go_lib = self.target(spec)
+      # Sleep so that first round of linking has 1.5 second earlier mtime than future links.
+      time.sleep(1.5)
 
-            ws_task._symlink_local_src(gopath, go_lib, set())
-            for src in chain(sources, ["w.go"]):
-                assert_is_linked(src)
+      # Add source file and re-make library.
+      self.create_file(os.path.join(spec, 'w.go'))
+      self.reset_build_graph()
+      go_lib = self.target(spec)
 
-            mtime = lambda src: os.lstat(os.path.join(gopath, "src/foo/bar/mylib", src)).st_mtime
-            for src in sources:
-                # Ensure none of the old links were overwritten.
-                self.assertLessEqual(mtime(src), mtime("w.go") - 1)
+      ws_task._symlink_local_src(gopath, go_lib, set())
+      for src in chain(sources, ['w.go']):
+        assert_is_linked(src)
 
-    def test_symlink_remote_lib(self):
-        with pushd(self.build_root):
-            with temporary_dir() as d:
-                spec = "3rdparty/go/github.com/user/lib"
+      mtime = lambda src: os.lstat(os.path.join(gopath, 'src/foo/bar/mylib', src)).st_mtime
+      for src in sources:
+        # Ensure none of the old links were overwritten.
+        self.assertLessEqual(mtime(src), mtime('w.go') - 1)
 
-                remote_lib_src_dir = os.path.join(d, spec)
-                remote_files = ["file.go", "file.cc", "file.hh"]
-                for remote_file in remote_files:
-                    self.create_file(os.path.join(remote_lib_src_dir, remote_file))
+  def test_symlink_remote_lib(self):
+    with pushd(self.build_root):
+      with temporary_dir() as d:
+        spec = '3rdparty/go/github.com/user/lib'
 
-                go_remote_lib = self.make_target(spec=spec, target_type=GoRemoteLibrary)
+        remote_lib_src_dir = os.path.join(d, spec)
+        remote_files = ['file.go', 'file.cc', 'file.hh']
+        for remote_file in remote_files:
+          self.create_file(os.path.join(remote_lib_src_dir, remote_file))
 
-                context = self.context()
-                go_remote_lib_src = context.products.get_data(
-                    "go_remote_lib_src", init_func=lambda: defaultdict(str)
-                )
-                go_remote_lib_src[go_remote_lib] = remote_lib_src_dir
+        go_remote_lib = self.make_target(spec=spec, target_type=GoRemoteLibrary)
 
-                ws_task = self.create_task(context)
+        context = self.context()
+        go_remote_lib_src = context.products.get_data('go_remote_lib_src',
+                                                      init_func=lambda: defaultdict(str))
+        go_remote_lib_src[go_remote_lib] = remote_lib_src_dir
 
-                gopath = ws_task.get_gopath(go_remote_lib)
-                ws_task._symlink_remote_lib(gopath, go_remote_lib, set())
-                workspace_dir = os.path.join(gopath, "src/github.com/user/lib")
-                self.assertTrue(os.path.isdir(workspace_dir))
+        ws_task = self.create_task(context)
 
-                for remote_file in remote_files:
-                    link = os.path.join(workspace_dir, remote_file)
-                    self.assertEqual(
-                        os.readlink(link), os.path.join(remote_lib_src_dir, remote_file)
-                    )
+        gopath = ws_task.get_gopath(go_remote_lib)
+        ws_task._symlink_remote_lib(gopath, go_remote_lib, set())
+        workspace_dir = os.path.join(gopath, 'src/github.com/user/lib')
+        self.assertTrue(os.path.isdir(workspace_dir))
+
+        for remote_file in remote_files:
+          link = os.path.join(workspace_dir, remote_file)
+          self.assertEqual(os.readlink(link), os.path.join(remote_lib_src_dir, remote_file))
