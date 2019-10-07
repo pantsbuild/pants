@@ -14,10 +14,10 @@ from pants.base.specs import SingleAddress, Spec, Specs, more_specific
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.engine.addressable import (
-    AddressableDescriptor,
-    BuildFileAddresses,
-    ProvenancedBuildFileAddress,
-    ProvenancedBuildFileAddresses,
+  AddressableDescriptor,
+  BuildFileAddresses,
+  ProvenancedBuildFileAddress,
+  ProvenancedBuildFileAddresses,
 )
 from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
