@@ -3,15 +3,22 @@
 
 import logging
 from collections.abc import MutableMapping, MutableSequence
+from dataclasses import dataclass
 from os.path import dirname, join
+from typing import Dict
 
 from twitter.common.collections import OrderedSet
 
 from pants.base.project_tree import Dir
-from pants.base.specs import SingleAddress, Spec, Specs
+from pants.base.specs import SingleAddress, Spec, Specs, more_specific
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants.engine.addressable import AddressableDescriptor, BuildFileAddresses
+from pants.engine.addressable import (
+  AddressableDescriptor,
+  BuildFileAddresses,
+  ProvenancedBuildFileAddress,
+  ProvenancedBuildFileAddresses,
+)
 from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
@@ -179,6 +186,20 @@ def _hydrate(item_type, spec_path, **kwargs):
   return item
 
 
+@dataclass(frozen=True)
+class AddressMapperAndSpecs:
+  # TODO: We only need this class because Get() requires a single Param.
+  address_mapper: AddressMapper
+  specs: Specs
+
+
+@rule
+def bind_addressmapper_and_specs(
+    address_mapper: AddressMapper, specs: Specs
+) -> AddressMapperAndSpecs:
+  return AddressMapperAndSpecs(address_mapper, specs)
+
+
 @rule
 def addresses_from_address_families(
   address_mapper: AddressMapper, specs: Specs
@@ -190,6 +211,27 @@ def addresses_from_address_families(
      - the Spec matches no addresses for SingleAddresses.
   :raises: :class:`AddressLookupError` if no targets are matched for non-SingleAddress specs.
   """
+  provenanced_build_file_addresses = yield Get(
+    ProvenancedBuildFileAddresses,
+    AddressMapperAndSpecs, AddressMapperAndSpecs(address_mapper, specs))
+  yield BuildFileAddresses(
+    tuple(pbfa.build_file_address for pbfa in provenanced_build_file_addresses))
+
+
+@rule
+def provenanced_addresses_from_address_families(
+    address_mapper_and_specs: AddressMapperAndSpecs
+) -> ProvenancedBuildFileAddresses:
+  """Given an AddressMapper and list of Specs, return matching ProvenancedBuildFileAddresses.
+
+  :raises: :class:`ResolveError` if:
+     - there were no matching AddressFamilies, or
+     - the Spec matches no addresses for SingleAddresses.
+  :raises: :class:`AddressLookupError` if no targets are matched for non-SingleAddress specs.
+  """
+  address_mapper = address_mapper_and_specs.address_mapper
+  specs = address_mapper_and_specs.specs
+
   # Capture a Snapshot covering all paths for these Specs, then group by directory.
   snapshot = yield Get(Snapshot, PathGlobs, _spec_to_globs(address_mapper, specs))
   dirnames = {dirname(f) for f in snapshot.files}
@@ -197,6 +239,8 @@ def addresses_from_address_families(
   address_family_by_directory = {af.namespace: af for af in address_families}
 
   matched_addresses = OrderedSet()
+  addr_to_provenance: Dict[BuildFileAddress, Spec] = {}
+
   for spec in specs:
     # NB: if a spec is provided which expands to some number of targets, but those targets match
     # --exclude-target-regexp, we do NOT fail! This is why we wait to apply the tag and exclude
@@ -208,6 +252,9 @@ def addresses_from_address_families(
 
     try:
       all_addr_tgt_pairs = spec.address_target_pairs_from_address_families(addr_families_for_spec)
+      for addr, _ in all_addr_tgt_pairs:
+        # A target might be covered by multiple specs, so we take the most specific one.
+        addr_to_provenance[addr] = more_specific(addr_to_provenance.get(addr), spec)
     except Spec.AddressResolutionError as e:
       raise AddressLookupError(e) from e
     except SingleAddress._SingleAddressResolutionError as e:
@@ -219,7 +266,25 @@ def addresses_from_address_families(
     )
 
   # NB: This may be empty, as the result of filtering by tag and exclude patterns!
-  yield BuildFileAddresses(tuple(matched_addresses))
+  yield ProvenancedBuildFileAddresses(tuple(
+    ProvenancedBuildFileAddress(build_file_address=addr, provenance=addr_to_provenance.get(addr))
+    for addr in matched_addresses
+  ))
+
+
+@dataclass(frozen=True)
+class AddressProvenanceMap:
+  bfaddr_to_spec: Dict[BuildFileAddress, Spec]
+
+  def is_single_address(self, address: BuildFileAddress):
+    return isinstance(self.bfaddr_to_spec.get(address), SingleAddress)
+
+
+@rule
+def address_provenance_map(pbfas: ProvenancedBuildFileAddresses) -> AddressProvenanceMap:
+  return AddressProvenanceMap(bfaddr_to_spec={
+    pbfa.build_file_address: pbfa.provenance for pbfa in pbfas.dependencies
+  })
 
 
 def _spec_to_globs(address_mapper, specs):
@@ -249,6 +314,9 @@ def create_graph_rules(address_mapper):
     # Spec handling: locate directories that contain build files, and request
     # AddressFamilies for each of them.
     addresses_from_address_families,
+    provenanced_addresses_from_address_families,
+    address_provenance_map,
+    bind_addressmapper_and_specs,
     # Root rules representing parameters that might be provided via root subjects.
     RootRule(Address),
     RootRule(BuildFileAddress),

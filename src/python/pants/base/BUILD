@@ -139,6 +139,8 @@ python_library(
     '3rdparty/python:dataclasses',
     'src/python/pants/util:collections',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:filtering',
+    'src/python/pants/util:memo',
     'src/python/pants/util:objects',
   ],
 )
@@ -211,5 +213,12 @@ python_library(
   dependencies=[
     'src/python/pants/util:fileutil',
     'src/python/pants/util:strutil',
+  ]
+)
+
+python_tests(
+  name='tests',
+  dependencies=[
+    ':specs'
   ]
 )
