@@ -6,11 +6,10 @@ from pants_test.test_base import TestBase
 
 
 class CredentialsTest(TestBase):
+    def test_literal_declaration(self):
+        username = "please don`t ever do this."
+        password = "seriously, don`t."
+        t = self.make_target(":creds", LiteralCredentials, username=username, password=password)
 
-  def test_literal_declaration(self):
-    username = 'please don`t ever do this.'
-    password = 'seriously, don`t.'
-    t = self.make_target(':creds', LiteralCredentials, username=username, password=password)
-
-    self.assertEqual(t.username('anything'), username)
-    self.assertEqual(t.password('anything'), password)
+        self.assertEqual(t.username("anything"), username)
+        self.assertEqual(t.password("anything"), password)

@@ -9,12 +9,12 @@ from pants.task.task import Task
 
 
 class PantsDaemonKill(Task):
-  """Terminate the pants daemon."""
+    """Terminate the pants daemon."""
 
-  def execute(self):
-    try:
-      pantsd = PantsDaemon.Factory.create(OptionsBootstrapper.create(), full_init=False)
-      with pantsd.lifecycle_lock:
-        pantsd.terminate()
-    except ProcessManager.NonResponsiveProcess as e:
-      raise TaskError('failure while terminating pantsd: {}'.format(e))
+    def execute(self):
+        try:
+            pantsd = PantsDaemon.Factory.create(OptionsBootstrapper.create(), full_init=False)
+            with pantsd.lifecycle_lock:
+                pantsd.terminate()
+        except ProcessManager.NonResponsiveProcess as e:
+            raise TaskError("failure while terminating pantsd: {}".format(e))

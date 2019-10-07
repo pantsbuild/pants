@@ -27,16 +27,16 @@ from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_task
 from pants.engine.legacy.options_parsing import create_options_parsing_rules
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (
-  JvmAppAdaptor,
-  JvmBinaryAdaptor,
-  PageAdaptor,
-  PantsPluginAdaptor,
-  PythonAppAdaptor,
-  PythonBinaryAdaptor,
-  PythonTargetAdaptor,
-  PythonTestsAdaptor,
-  RemoteSourcesAdaptor,
-  TargetAdaptor,
+    JvmAppAdaptor,
+    JvmBinaryAdaptor,
+    PageAdaptor,
+    PantsPluginAdaptor,
+    PythonAppAdaptor,
+    PythonBinaryAdaptor,
+    PythonTargetAdaptor,
+    PythonTestsAdaptor,
+    RemoteSourcesAdaptor,
+    TargetAdaptor,
 )
 from pants.engine.legacy.structs import rules as structs_rules
 from pants.engine.mapper import AddressMapper
@@ -47,9 +47,9 @@ from pants.engine.scheduler import Scheduler
 from pants.engine.selectors import Params
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.global_options import (
-  DEFAULT_EXECUTION_OPTIONS,
-  ExecutionOptions,
-  GlobMatchErrorBehavior,
+    DEFAULT_EXECUTION_OPTIONS,
+    ExecutionOptions,
+    GlobMatchErrorBehavior,
 )
 
 
@@ -57,31 +57,31 @@ logger = logging.getLogger(__name__)
 
 
 def _tuplify(v):
-  if v is None:
-    return None
-  if isinstance(v, tuple):
-    return v
-  if isinstance(v, (list, set)):
-    return tuple(v)
-  return (v,)
+    if v is None:
+        return None
+    if isinstance(v, tuple):
+        return v
+    if isinstance(v, (list, set)):
+        return tuple(v)
+    return (v,)
 
 
 def _compute_default_sources_globs(base_class, target_type):
-  """Look up the default source globs for the type, and return as a tuple of (globs, excludes)."""
-  if not target_type.supports_default_sources() or target_type.default_sources_globs is None:
-    return (None, None)
+    """Look up the default source globs for the type, and return as a tuple of (globs, excludes)."""
+    if not target_type.supports_default_sources() or target_type.default_sources_globs is None:
+        return (None, None)
 
-  globs = _tuplify(target_type.default_sources_globs)
-  excludes = _tuplify(target_type.default_sources_exclude_globs)
+    globs = _tuplify(target_type.default_sources_globs)
+    excludes = _tuplify(target_type.default_sources_exclude_globs)
 
-  return (globs, excludes)
+    return (globs, excludes)
 
 
 def _apply_default_sources_globs(base_class, target_type):
-  """Mutates the given TargetAdaptor subclass to apply default sources from the given legacy target type."""
-  globs, excludes = _compute_default_sources_globs(base_class, target_type)
-  base_class.default_sources_globs = globs
-  base_class.default_sources_exclude_globs = excludes
+    """Mutates the given TargetAdaptor subclass to apply default sources from the given legacy target type."""
+    globs, excludes = _compute_default_sources_globs(base_class, target_type)
+    base_class.default_sources_globs = globs
+    base_class.default_sources_exclude_globs = excludes
 
 
 # TODO: These calls mutate the adaptor classes for some known library types to copy over
@@ -98,98 +98,98 @@ _apply_default_sources_globs(RemoteSourcesAdaptor, RemoteSources)
 
 
 def _legacy_symbol_table(build_file_aliases):
-  """Construct a SymbolTable for the given BuildFileAliases.
+    """Construct a SymbolTable for the given BuildFileAliases.
 
   :param build_file_aliases: BuildFileAliases to register.
   :type build_file_aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
 
   :returns: A SymbolTable.
   """
-  table = {
-    alias: _make_target_adaptor(TargetAdaptor, target_type)
-    for alias, target_type in build_file_aliases.target_types.items()
-  }
+    table = {
+        alias: _make_target_adaptor(TargetAdaptor, target_type)
+        for alias, target_type in build_file_aliases.target_types.items()
+    }
 
-  for alias, factory in build_file_aliases.target_macro_factories.items():
-    # TargetMacro.Factory with more than one target type is deprecated.
-    # For default sources, this means that TargetMacro Factories with more than one target_type
-    # will not parse sources through the engine, and will fall back to the legacy python sources
-    # parsing.
-    # Conveniently, multi-target_type TargetMacro.Factory, and legacy python source parsing, are
-    # targeted to be removed in the same version of pants.
-    if len(factory.target_types) == 1:
-      table[alias] = _make_target_adaptor(
-        TargetAdaptor,
-        tuple(factory.target_types)[0],
-      )
+    for alias, factory in build_file_aliases.target_macro_factories.items():
+        # TargetMacro.Factory with more than one target type is deprecated.
+        # For default sources, this means that TargetMacro Factories with more than one target_type
+        # will not parse sources through the engine, and will fall back to the legacy python sources
+        # parsing.
+        # Conveniently, multi-target_type TargetMacro.Factory, and legacy python source parsing, are
+        # targeted to be removed in the same version of pants.
+        if len(factory.target_types) == 1:
+            table[alias] = _make_target_adaptor(TargetAdaptor, tuple(factory.target_types)[0])
 
-  # TODO: The alias replacement here is to avoid elevating "TargetAdaptors" into the public
-  # API until after https://github.com/pantsbuild/pants/issues/3560 has been completed.
-  # These should likely move onto Target subclasses as the engine gets deeper into beta
-  # territory.
-  table['python_library'] = PythonTargetAdaptor
-  table['jvm_app'] = JvmAppAdaptor
-  table['jvm_binary'] = JvmBinaryAdaptor
-  table['python_app'] = PythonAppAdaptor
-  table['python_tests'] = PythonTestsAdaptor
-  table['python_binary'] = PythonBinaryAdaptor
-  table['remote_sources'] = RemoteSourcesAdaptor
-  table['page'] = PageAdaptor
+    # TODO: The alias replacement here is to avoid elevating "TargetAdaptors" into the public
+    # API until after https://github.com/pantsbuild/pants/issues/3560 has been completed.
+    # These should likely move onto Target subclasses as the engine gets deeper into beta
+    # territory.
+    table["python_library"] = PythonTargetAdaptor
+    table["jvm_app"] = JvmAppAdaptor
+    table["jvm_binary"] = JvmBinaryAdaptor
+    table["python_app"] = PythonAppAdaptor
+    table["python_tests"] = PythonTestsAdaptor
+    table["python_binary"] = PythonBinaryAdaptor
+    table["remote_sources"] = RemoteSourcesAdaptor
+    table["page"] = PageAdaptor
 
-  # Note that these don't call _make_target_adaptor because we don't have a handy reference to the
-  # types being constructed. They don't have any default_sources behavior, so this should be ok,
-  # but if we end up doing more things in _make_target_adaptor, we should make sure they're
-  # applied here too.
-  table['pants_plugin'] = PantsPluginAdaptor
-  table['contrib_plugin'] = PantsPluginAdaptor
+    # Note that these don't call _make_target_adaptor because we don't have a handy reference to the
+    # types being constructed. They don't have any default_sources behavior, so this should be ok,
+    # but if we end up doing more things in _make_target_adaptor, we should make sure they're
+    # applied here too.
+    table["pants_plugin"] = PantsPluginAdaptor
+    table["contrib_plugin"] = PantsPluginAdaptor
 
-  return SymbolTable(table)
+    return SymbolTable(table)
 
 
 def _make_target_adaptor(base_class, target_type):
-  """Create an adaptor subclass for the given TargetAdaptor base class and legacy target type."""
-  globs, excludes = _compute_default_sources_globs(base_class, target_type)
-  if globs is None:
-    return base_class
+    """Create an adaptor subclass for the given TargetAdaptor base class and legacy target type."""
+    globs, excludes = _compute_default_sources_globs(base_class, target_type)
+    if globs is None:
+        return base_class
 
-  class GlobsHandlingTargetAdaptor(base_class):
-    default_sources_globs = globs
-    default_sources_exclude_globs = excludes
+    class GlobsHandlingTargetAdaptor(base_class):
+        default_sources_globs = globs
+        default_sources_exclude_globs = excludes
 
-  return GlobsHandlingTargetAdaptor
+    return GlobsHandlingTargetAdaptor
 
 
 @dataclass(frozen=True)
 class LegacyGraphScheduler:
-  """A thin wrapper around a Scheduler configured with @rules for a symbol table."""
-  scheduler: Any
-  build_file_aliases: Any
-  goal_map: Any
+    """A thin wrapper around a Scheduler configured with @rules for a symbol table."""
 
-  def new_session(self, zipkin_trace_v2, v2_ui=False):
-    session = self.scheduler.new_session(zipkin_trace_v2, v2_ui)
-    return LegacyGraphSession(session, self.build_file_aliases, self.goal_map)
+    scheduler: Any
+    build_file_aliases: Any
+    goal_map: Any
+
+    def new_session(self, zipkin_trace_v2, v2_ui=False):
+        session = self.scheduler.new_session(zipkin_trace_v2, v2_ui)
+        return LegacyGraphSession(session, self.build_file_aliases, self.goal_map)
 
 
 @dataclass(frozen=True)
 class LegacyGraphSession:
-  """A thin wrapper around a SchedulerSession configured with @rules for a symbol table."""
-  scheduler_session: Any
-  build_file_aliases: Any
-  goal_map: Any
+    """A thin wrapper around a SchedulerSession configured with @rules for a symbol table."""
 
-  class InvalidGoals(Exception):
-    """Raised when invalid v2 goals are passed in a v2-only mode."""
+    scheduler_session: Any
+    build_file_aliases: Any
+    goal_map: Any
 
-    def __init__(self, invalid_goals):
-      super(LegacyGraphSession.InvalidGoals, self).__init__(
-        'could not satisfy the following goals with @console_rules: {}'
-        .format(', '.join(invalid_goals))
-      )
-      self.invalid_goals = invalid_goals
+    class InvalidGoals(Exception):
+        """Raised when invalid v2 goals are passed in a v2-only mode."""
 
-  def run_console_rules(self, options_bootstrapper, goals, target_roots):
-    """Runs @console_rules sequentially and interactively by requesting their implicit Goal products.
+        def __init__(self, invalid_goals):
+            super(LegacyGraphSession.InvalidGoals, self).__init__(
+                "could not satisfy the following goals with @console_rules: {}".format(
+                    ", ".join(invalid_goals)
+                )
+            )
+            self.invalid_goals = invalid_goals
+
+    def run_console_rules(self, options_bootstrapper, goals, target_roots):
+        """Runs @console_rules sequentially and interactively by requesting their implicit Goal products.
 
     For retryable failures, raises scheduler.ExecutionError.
 
@@ -198,103 +198,103 @@ class LegacyGraphSession:
 
     :returns: An exit code.
     """
-    subject = target_roots.specs
-    console = Console(
-      use_colors=options_bootstrapper.bootstrap_options.for_global_scope().colors
-    )
-    workspace = Workspace(self.scheduler_session)
+        subject = target_roots.specs
+        console = Console(
+            use_colors=options_bootstrapper.bootstrap_options.for_global_scope().colors
+        )
+        workspace = Workspace(self.scheduler_session)
 
-    for goal in goals:
-      goal_product = self.goal_map[goal]
-      params = Params(subject, options_bootstrapper, console, workspace)
-      logger.debug(f'requesting {goal_product} to satisfy execution of `{goal}` goal')
-      try:
-        exit_code = self.scheduler_session.run_console_rule(goal_product, params)
-      finally:
-        console.flush()
+        for goal in goals:
+            goal_product = self.goal_map[goal]
+            params = Params(subject, options_bootstrapper, console, workspace)
+            logger.debug(f"requesting {goal_product} to satisfy execution of `{goal}` goal")
+            try:
+                exit_code = self.scheduler_session.run_console_rule(goal_product, params)
+            finally:
+                console.flush()
 
-      if exit_code != PANTS_SUCCEEDED_EXIT_CODE:
-        return exit_code
-    return PANTS_SUCCEEDED_EXIT_CODE
+            if exit_code != PANTS_SUCCEEDED_EXIT_CODE:
+                return exit_code
+        return PANTS_SUCCEEDED_EXIT_CODE
 
-  def create_build_graph(self, target_roots, build_root=None):
-    """Construct and return a `BuildGraph` given a set of input specs.
+    def create_build_graph(self, target_roots, build_root=None):
+        """Construct and return a `BuildGraph` given a set of input specs.
 
     :param TargetRoots target_roots: The targets root of the request.
     :param string build_root: The build root.
     :returns: A tuple of (BuildGraph, AddressMapper).
     """
-    logger.debug('target_roots are: %r', target_roots)
-    graph = LegacyBuildGraph.create(self.scheduler_session, self.build_file_aliases)
-    logger.debug('build_graph is: %s', graph)
-    # Ensure the entire generator is unrolled.
-    for _ in graph.inject_roots_closure(target_roots):
-      pass
+        logger.debug("target_roots are: %r", target_roots)
+        graph = LegacyBuildGraph.create(self.scheduler_session, self.build_file_aliases)
+        logger.debug("build_graph is: %s", graph)
+        # Ensure the entire generator is unrolled.
+        for _ in graph.inject_roots_closure(target_roots):
+            pass
 
-    address_mapper = LegacyAddressMapper(self.scheduler_session, build_root or get_buildroot())
-    logger.debug('address_mapper is: %s', address_mapper)
-    return graph, address_mapper
+        address_mapper = LegacyAddressMapper(self.scheduler_session, build_root or get_buildroot())
+        logger.debug("address_mapper is: %s", address_mapper)
+        return graph, address_mapper
 
 
 class EngineInitializer:
-  """Constructs the components necessary to run the v2 engine with v1 BuildGraph compatibility."""
+    """Constructs the components necessary to run the v2 engine with v1 BuildGraph compatibility."""
 
-  class GoalMappingError(Exception):
-    """Raised when a goal cannot be mapped to an @rule."""
+    class GoalMappingError(Exception):
+        """Raised when a goal cannot be mapped to an @rule."""
 
-  @staticmethod
-  def _make_goal_map_from_rules(rules):
-    goal_map = {}
-    for r in rules:
-      output_type = getattr(r, 'output_type', None)
-      if not output_type or not issubclass(output_type, Goal):
-        continue
-      goal = r.output_type.name
-      if goal in goal_map:
-        raise EngineInitializer.GoalMappingError(
-          f'could not map goal `{goal}` to rule `{r}`: already claimed by product `{goal_map[goal]}`'
+    @staticmethod
+    def _make_goal_map_from_rules(rules):
+        goal_map = {}
+        for r in rules:
+            output_type = getattr(r, "output_type", None)
+            if not output_type or not issubclass(output_type, Goal):
+                continue
+            goal = r.output_type.name
+            if goal in goal_map:
+                raise EngineInitializer.GoalMappingError(
+                    f"could not map goal `{goal}` to rule `{r}`: already claimed by product `{goal_map[goal]}`"
+                )
+            goal_map[goal] = r.output_type
+        return goal_map
+
+    @staticmethod
+    def setup_legacy_graph(native, options_bootstrapper, build_configuration):
+        """Construct and return the components necessary for LegacyBuildGraph construction."""
+        build_root = get_buildroot()
+        bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
+        return EngineInitializer.setup_legacy_graph_extended(
+            OptionsInitializer.compute_pants_ignore(build_root, bootstrap_options),
+            bootstrap_options.local_store_dir,
+            bootstrap_options.build_file_imports,
+            options_bootstrapper,
+            build_configuration,
+            build_root=build_root,
+            native=native,
+            glob_match_error_behavior=bootstrap_options.glob_expansion_failure,
+            build_ignore_patterns=bootstrap_options.build_ignore,
+            exclude_target_regexps=bootstrap_options.exclude_target_regexp,
+            subproject_roots=bootstrap_options.subproject_roots,
+            include_trace_on_error=bootstrap_options.print_exception_stacktrace,
+            execution_options=ExecutionOptions.from_bootstrap_options(bootstrap_options),
         )
-      goal_map[goal] = r.output_type
-    return goal_map
 
-  @staticmethod
-  def setup_legacy_graph(native, options_bootstrapper, build_configuration):
-    """Construct and return the components necessary for LegacyBuildGraph construction."""
-    build_root = get_buildroot()
-    bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
-    return EngineInitializer.setup_legacy_graph_extended(
-      OptionsInitializer.compute_pants_ignore(build_root, bootstrap_options),
-      bootstrap_options.local_store_dir,
-      bootstrap_options.build_file_imports,
-      options_bootstrapper,
-      build_configuration,
-      build_root=build_root,
-      native=native,
-      glob_match_error_behavior=bootstrap_options.glob_expansion_failure,
-      build_ignore_patterns=bootstrap_options.build_ignore,
-      exclude_target_regexps=bootstrap_options.exclude_target_regexp,
-      subproject_roots=bootstrap_options.subproject_roots,
-      include_trace_on_error=bootstrap_options.print_exception_stacktrace,
-      execution_options=ExecutionOptions.from_bootstrap_options(bootstrap_options),
-    )
-
-  @staticmethod
-  def setup_legacy_graph_extended(
-    pants_ignore_patterns,
-    local_store_dir,
-    build_file_imports_behavior,
-    options_bootstrapper,
-    build_configuration,
-    build_root=None,
-    native=None,
-    glob_match_error_behavior=None,
-    build_ignore_patterns=None,
-    exclude_target_regexps=None,
-    subproject_roots=None,
-    include_trace_on_error=True,
-    execution_options=None,
-  ):
-    """Construct and return the components necessary for LegacyBuildGraph construction.
+    @staticmethod
+    def setup_legacy_graph_extended(
+        pants_ignore_patterns,
+        local_store_dir,
+        build_file_imports_behavior,
+        options_bootstrapper,
+        build_configuration,
+        build_root=None,
+        native=None,
+        glob_match_error_behavior=None,
+        build_ignore_patterns=None,
+        exclude_target_regexps=None,
+        subproject_roots=None,
+        include_trace_on_error=True,
+        execution_options=None,
+    ):
+        """Construct and return the components necessary for LegacyBuildGraph construction.
 
     :param list pants_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
                                        usually taken from the '--pants-ignore' global option.
@@ -323,79 +323,81 @@ class EngineInitializer:
     :returns: A LegacyGraphScheduler.
     """
 
-    build_root = build_root or get_buildroot()
-    build_configuration = build_configuration or BuildConfigInitializer.get(options_bootstrapper)
-    bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
+        build_root = build_root or get_buildroot()
+        build_configuration = build_configuration or BuildConfigInitializer.get(
+            options_bootstrapper
+        )
+        bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
 
-    build_file_aliases = build_configuration.registered_aliases()
-    rules = build_configuration.rules()
+        build_file_aliases = build_configuration.registered_aliases()
+        rules = build_configuration.rules()
 
-    symbol_table = _legacy_symbol_table(build_file_aliases)
+        symbol_table = _legacy_symbol_table(build_file_aliases)
 
-    project_tree = FileSystemProjectTree(build_root, pants_ignore_patterns)
+        project_tree = FileSystemProjectTree(build_root, pants_ignore_patterns)
 
-    execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
+        execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
-    # Register "literal" subjects required for these rules.
-    parser = LegacyPythonCallbacksParser(
-      symbol_table,
-      build_file_aliases,
-      build_file_imports_behavior
-    )
-    address_mapper = AddressMapper(parser=parser,
-                                   build_ignore_patterns=build_ignore_patterns,
-                                   exclude_target_regexps=exclude_target_regexps,
-                                   subproject_roots=subproject_roots)
+        # Register "literal" subjects required for these rules.
+        parser = LegacyPythonCallbacksParser(
+            symbol_table, build_file_aliases, build_file_imports_behavior
+        )
+        address_mapper = AddressMapper(
+            parser=parser,
+            build_ignore_patterns=build_ignore_patterns,
+            exclude_target_regexps=exclude_target_regexps,
+            subproject_roots=subproject_roots,
+        )
 
-    @rule
-    def glob_match_error_behavior_singleton() -> GlobMatchErrorBehavior:
-      return glob_match_error_behavior or GlobMatchErrorBehavior.ignore
+        @rule
+        def glob_match_error_behavior_singleton() -> GlobMatchErrorBehavior:
+            return glob_match_error_behavior or GlobMatchErrorBehavior.ignore
 
-    @rule
-    def build_configuration_singleton() -> BuildConfiguration:
-      return build_configuration
+        @rule
+        def build_configuration_singleton() -> BuildConfiguration:
+            return build_configuration
 
-    @rule
-    def symbol_table_singleton() -> SymbolTable:
-      return symbol_table
+        @rule
+        def symbol_table_singleton() -> SymbolTable:
+            return symbol_table
 
-    @rule
-    def union_membership_singleton() -> UnionMembership:
-      return UnionMembership(build_configuration.union_rules())
+        @rule
+        def union_membership_singleton() -> UnionMembership:
+            return UnionMembership(build_configuration.union_rules())
 
-    # Create a Scheduler containing graph and filesystem rules, with no installed goals. The
-    # LegacyBuildGraph will explicitly request the products it needs.
-    rules = (
-      [
-        RootRule(Console),
-        glob_match_error_behavior_singleton,
-        build_configuration_singleton,
-        symbol_table_singleton,
-        union_membership_singleton,
-      ] +
-      create_legacy_graph_tasks() +
-      create_fs_rules() +
-      create_process_rules() +
-      create_platform_rules() +
-      create_graph_rules(address_mapper) +
-      create_options_parsing_rules() +
-      structs_rules() +
-      rules
-    )
+        # Create a Scheduler containing graph and filesystem rules, with no installed goals. The
+        # LegacyBuildGraph will explicitly request the products it needs.
+        rules = (
+            [
+                RootRule(Console),
+                glob_match_error_behavior_singleton,
+                build_configuration_singleton,
+                symbol_table_singleton,
+                union_membership_singleton,
+            ]
+            + create_legacy_graph_tasks()
+            + create_fs_rules()
+            + create_process_rules()
+            + create_platform_rules()
+            + create_graph_rules(address_mapper)
+            + create_options_parsing_rules()
+            + structs_rules()
+            + rules
+        )
 
-    goal_map = EngineInitializer._make_goal_map_from_rules(rules)
+        goal_map = EngineInitializer._make_goal_map_from_rules(rules)
 
-    union_rules = build_configuration.union_rules()
+        union_rules = build_configuration.union_rules()
 
-    scheduler = Scheduler(
-      native,
-      project_tree,
-      local_store_dir,
-      rules,
-      union_rules,
-      execution_options,
-      include_trace_on_error=include_trace_on_error,
-      visualize_to_dir=bootstrap_options.native_engine_visualize_to,
-    )
+        scheduler = Scheduler(
+            native,
+            project_tree,
+            local_store_dir,
+            rules,
+            union_rules,
+            execution_options,
+            include_trace_on_error=include_trace_on_error,
+            visualize_to_dir=bootstrap_options.native_engine_visualize_to,
+        )
 
-    return LegacyGraphScheduler(scheduler, build_file_aliases, goal_map)
+        return LegacyGraphScheduler(scheduler, build_file_aliases, goal_map)

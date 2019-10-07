@@ -12,37 +12,37 @@ from pants.util.memo import memoized_property
 
 
 class MessagingExiter(Exiter):
-  """An Exiter that prints a provided message to stderr."""
+    """An Exiter that prints a provided message to stderr."""
 
-  def __init__(self, message):
-    super().__init__()
-    self._message = message
+    def __init__(self, message):
+        super().__init__()
+        self._message = message
 
-  def exit(self, *args, **kwargs):
-    print(self._message, file=sys.stderr)
-    super().exit(*args, **kwargs)
+    def exit(self, *args, **kwargs):
+        print(self._message, file=sys.stderr)
+        super().exit(*args, **kwargs)
 
 
 class LifecycleStubTask(Task):
-  """A task which raises an Exception on execution which is used to test Pants shutdown behavior."""
+    """A task which raises an Exception on execution which is used to test Pants shutdown behavior."""
 
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super().subsystem_dependencies() + (LifecycleStubs.scoped(cls),)
+    @classmethod
+    def subsystem_dependencies(cls):
+        return super().subsystem_dependencies() + (LifecycleStubs.scoped(cls),)
 
-  @memoized_property
-  def _lifecycle_stubs(self):
-    return LifecycleStubs.scoped_instance(self)
+    @memoized_property
+    def _lifecycle_stubs(self):
+        return LifecycleStubs.scoped_instance(self)
 
-  def execute(self):
-    exit_msg = self._lifecycle_stubs.add_exiter_message
-    if exit_msg:
-      new_exiter = MessagingExiter(exit_msg)
-      ExceptionSink._reset_exiter(new_exiter)
+    def execute(self):
+        exit_msg = self._lifecycle_stubs.add_exiter_message
+        if exit_msg:
+            new_exiter = MessagingExiter(exit_msg)
+            ExceptionSink._reset_exiter(new_exiter)
 
-    output_file = self._lifecycle_stubs.new_interactive_stream_output_file
-    if output_file:
-      file_stream = open(output_file, 'wb')
-      ExceptionSink.reset_interactive_output_stream(file_stream, output_file)
+        output_file = self._lifecycle_stubs.new_interactive_stream_output_file
+        if output_file:
+            file_stream = open(output_file, "wb")
+            ExceptionSink.reset_interactive_output_stream(file_stream, output_file)
 
-    raise Exception('erroneous!')
+        raise Exception("erroneous!")

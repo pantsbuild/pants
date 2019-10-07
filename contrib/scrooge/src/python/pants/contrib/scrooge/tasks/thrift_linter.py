@@ -15,123 +15,150 @@ from pants.contrib.scrooge.tasks.thrift_util import calculate_include_paths
 
 
 class ThriftLintError(Exception):
-  """Raised on a lint failure."""
+    """Raised on a lint failure."""
 
 
 class ThriftLinter(LintTaskMixin, NailgunTask):
-  """Print lint warnings for thrift files."""
+    """Print lint warnings for thrift files."""
 
-  @staticmethod
-  def _is_thrift(target):
-    return isinstance(target, JavaThriftLibrary)
+    @staticmethod
+    def _is_thrift(target):
+        return isinstance(target, JavaThriftLibrary)
 
-  @classmethod
-  def register_options(cls, register):
-    super().register_options(register)
-    register('--strict', type=bool, fingerprint=True,
-             help='Fail the goal if thrift linter errors are found. Overrides the '
-                  '`strict-default` option.')
-    register('--strict-default', default=False, advanced=True, type=bool,
-             fingerprint=True,
-             help='Sets the default strictness for targets. The `strict` option overrides '
-                  'this value if it is set.')
-    register('--linter-args', default=[], advanced=True, type=list, fingerprint=True,
-             help='Additional options passed to the linter.')
-    register('--worker-count', default=multiprocessing.cpu_count(), advanced=True, type=int,
-             help='Maximum number of workers to use for linter parallelization.')
-    cls.register_jvm_tool(register, 'scrooge-linter')
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--strict",
+            type=bool,
+            fingerprint=True,
+            help="Fail the goal if thrift linter errors are found. Overrides the "
+            "`strict-default` option.",
+        )
+        register(
+            "--strict-default",
+            default=False,
+            advanced=True,
+            type=bool,
+            fingerprint=True,
+            help="Sets the default strictness for targets. The `strict` option overrides "
+            "this value if it is set.",
+        )
+        register(
+            "--linter-args",
+            default=[],
+            advanced=True,
+            type=list,
+            fingerprint=True,
+            help="Additional options passed to the linter.",
+        )
+        register(
+            "--worker-count",
+            default=multiprocessing.cpu_count(),
+            advanced=True,
+            type=int,
+            help="Maximum number of workers to use for linter parallelization.",
+        )
+        cls.register_jvm_tool(register, "scrooge-linter")
 
-  @classmethod
-  def product_types(cls):
-    # Declare the product of this goal. Gen depends on thrift-linter.
-    return ['thrift-linter']
+    @classmethod
+    def product_types(cls):
+        # Declare the product of this goal. Gen depends on thrift-linter.
+        return ["thrift-linter"]
 
-  @property
-  def cache_target_dirs(self):
-    return True
+    @property
+    def cache_target_dirs(self):
+        return True
 
-  @staticmethod
-  def _to_bool(value):
-    # Converts boolean and string values to boolean.
-    return str(value) == 'True'
+    @staticmethod
+    def _to_bool(value):
+        # Converts boolean and string values to boolean.
+        return str(value) == "True"
 
-  def _is_strict(self, target):
-    # The strict value is read from the following, in order:
-    # 1. the option --[no-]strict, but only if explicitly set.
-    # 2. java_thrift_library target in BUILD file, thrift_linter_strict = False,
-    # 3. options, --[no-]strict-default
-    options = self.get_options()
-    if options.get_rank('strict') > RankedValue.HARDCODED:
-      return self._to_bool(self.get_options().strict)
+    def _is_strict(self, target):
+        # The strict value is read from the following, in order:
+        # 1. the option --[no-]strict, but only if explicitly set.
+        # 2. java_thrift_library target in BUILD file, thrift_linter_strict = False,
+        # 3. options, --[no-]strict-default
+        options = self.get_options()
+        if options.get_rank("strict") > RankedValue.HARDCODED:
+            return self._to_bool(self.get_options().strict)
 
-    if target.thrift_linter_strict is not None:
-      return self._to_bool(target.thrift_linter_strict)
+        if target.thrift_linter_strict is not None:
+            return self._to_bool(target.thrift_linter_strict)
 
-    return self._to_bool(self.get_options().strict_default)
+        return self._to_bool(self.get_options().strict_default)
 
-  def _lint(self, target, classpath):
-    self.context.log.debug('Linting {0}'.format(target.address.spec))
+    def _lint(self, target, classpath):
+        self.context.log.debug("Linting {0}".format(target.address.spec))
 
-    config_args = []
+        config_args = []
 
-    config_args.extend(self.get_options().linter_args)
+        config_args.extend(self.get_options().linter_args)
 
-    # N.B. We always set --fatal-warnings to make sure errors like missing-namespace are at least printed.
-    # If --no-strict is turned on, the return code will be 0 instead of 1, but the errors/warnings
-    # need to always be printed.
-    config_args.append('--fatal-warnings')
-    if not self._is_strict(target):
-      config_args.append('--ignore-errors')
+        # N.B. We always set --fatal-warnings to make sure errors like missing-namespace are at least printed.
+        # If --no-strict is turned on, the return code will be 0 instead of 1, but the errors/warnings
+        # need to always be printed.
+        config_args.append("--fatal-warnings")
+        if not self._is_strict(target):
+            config_args.append("--ignore-errors")
 
-    paths = list(target.sources_relative_to_buildroot())
-    include_paths = calculate_include_paths([target], self._is_thrift)
-    if target.include_paths:
-      include_paths |= set(target.include_paths)
-    for p in include_paths:
-      config_args.extend(['--include-path', p])
+        paths = list(target.sources_relative_to_buildroot())
+        include_paths = calculate_include_paths([target], self._is_thrift)
+        if target.include_paths:
+            include_paths |= set(target.include_paths)
+        for p in include_paths:
+            config_args.extend(["--include-path", p])
 
-    args = config_args + paths
+        args = config_args + paths
 
-    # If runjava returns non-zero, this marks the workunit as a
-    # FAILURE, and there is no way to wrap this here.
-    returncode = self.runjava(classpath=classpath,
-                              main='com.twitter.scrooge.linter.Main',
-                              args=args,
-                              jvm_options=self.get_options().jvm_options,
-                              # to let stdout/err through, but don't print tool's label.
-                              workunit_labels=[WorkUnitLabel.COMPILER, WorkUnitLabel.SUPPRESS_LABEL])
+        # If runjava returns non-zero, this marks the workunit as a
+        # FAILURE, and there is no way to wrap this here.
+        returncode = self.runjava(
+            classpath=classpath,
+            main="com.twitter.scrooge.linter.Main",
+            args=args,
+            jvm_options=self.get_options().jvm_options,
+            # to let stdout/err through, but don't print tool's label.
+            workunit_labels=[WorkUnitLabel.COMPILER, WorkUnitLabel.SUPPRESS_LABEL],
+        )
 
-    if returncode != 0:
-      raise ThriftLintError(
-        'Lint errors in target {0} for {1}.'.format(target.address.spec, paths))
+        if returncode != 0:
+            raise ThriftLintError(
+                "Lint errors in target {0} for {1}.".format(target.address.spec, paths)
+            )
 
-  def execute(self):
-    thrift_targets = self.get_targets(self._is_thrift)
-    with self.invalidated(thrift_targets) as invalidation_check:
-      if not invalidation_check.invalid_vts:
-        return
+    def execute(self):
+        thrift_targets = self.get_targets(self._is_thrift)
+        with self.invalidated(thrift_targets) as invalidation_check:
+            if not invalidation_check.invalid_vts:
+                return
 
-      with self.context.new_workunit('parallel-thrift-linter') as workunit:
-        worker_pool = WorkerPool(workunit.parent,
-                                 self.context.run_tracker,
-                                 self.get_options().worker_count,
-                                 workunit.name)
+            with self.context.new_workunit("parallel-thrift-linter") as workunit:
+                worker_pool = WorkerPool(
+                    workunit.parent,
+                    self.context.run_tracker,
+                    self.get_options().worker_count,
+                    workunit.name,
+                )
 
-        scrooge_linter_classpath = self.tool_classpath('scrooge-linter')
-        results = []
-        errors = []
-        for vt in invalidation_check.invalid_vts:
-          r = worker_pool.submit_async_work(Work(self._lint, [(vt.target, scrooge_linter_classpath)]))
-          results.append((r, vt))
-        for r, vt in results:
-          r.wait()
-          # MapResult will raise _value in `get` if the run is not successful.
-          try:
-            r.get()
-          except ThriftLintError as e:
-            errors.append(str(e))
-          else:
-            vt.update()
+                scrooge_linter_classpath = self.tool_classpath("scrooge-linter")
+                results = []
+                errors = []
+                for vt in invalidation_check.invalid_vts:
+                    r = worker_pool.submit_async_work(
+                        Work(self._lint, [(vt.target, scrooge_linter_classpath)])
+                    )
+                    results.append((r, vt))
+                for r, vt in results:
+                    r.wait()
+                    # MapResult will raise _value in `get` if the run is not successful.
+                    try:
+                        r.get()
+                    except ThriftLintError as e:
+                        errors.append(str(e))
+                    else:
+                        vt.update()
 
-        if errors:
-          raise TaskError('\n'.join(errors))
+                if errors:
+                    raise TaskError("\n".join(errors))

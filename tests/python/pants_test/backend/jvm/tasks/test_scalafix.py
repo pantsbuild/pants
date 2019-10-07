@@ -7,107 +7,95 @@ from pants.util.dirutil import read_file
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-TEST_DIR = 'testprojects/src/scala/org/pantsbuild/testproject'
+TEST_DIR = "testprojects/src/scala/org/pantsbuild/testproject"
 
 
 class ScalaFixIntegrationTest(PantsRunIntegrationTest):
+    @classmethod
+    def hermetic(cls):
+        return True
 
-  @classmethod
-  def hermetic(cls):
-    return True
+    def test_scalafix_fail(self):
 
-  def test_scalafix_fail(self):
+        rules = {"rules": "ProcedureSyntax"}
+        options = {"lint.scalafix": rules, "fmt.scalafix": rules, "lint.scalastyle": {"skip": True}}
 
-    rules = {'rules': 'ProcedureSyntax'}
-    options = {
-      'lint.scalafix': rules,
-      'fmt.scalafix': rules,
-      'lint.scalastyle': {'skip': True}
-    }
+        target = f"{TEST_DIR}/procedure_syntax"
+        # lint should fail because the rule has an impact.
+        failing_test = self.run_pants(["lint", target], options)
+        self.assert_failure(failing_test)
 
-    target = f'{TEST_DIR}/procedure_syntax'
-    # lint should fail because the rule has an impact.
-    failing_test = self.run_pants(['lint', target], options)
-    self.assert_failure(failing_test)
+    def test_scalafix_disabled(self):
 
-  def test_scalafix_disabled(self):
+        rules = {"rules": "ProcedureSyntax"}
+        options = {"lint.scalafix": rules, "fmt.scalafix": rules, "lint.scalastyle": {"skip": True}}
 
-    rules = {'rules': 'ProcedureSyntax'}
-    options = {
-      'lint.scalafix': rules,
-      'fmt.scalafix': rules,
-      'lint.scalastyle': {'skip': True}
-    }
+        # take a snapshot of the file which we can write out
+        # after the test finishes executing.
+        test_file_name = f"{TEST_DIR}/procedure_syntax/ProcedureSyntax.scala"
 
-    # take a snapshot of the file which we can write out
-    # after the test finishes executing.
-    test_file_name = f'{TEST_DIR}/procedure_syntax/ProcedureSyntax.scala'
+        with self.with_overwritten_file_content(test_file_name):
+            # format an incorrectly formatted file.
+            target = f"{TEST_DIR}/procedure_syntax"
+            fmt_result = self.run_pants(["fmt", target], options)
+            self.assert_success(fmt_result)
 
-    with self.with_overwritten_file_content(test_file_name):
-      # format an incorrectly formatted file.
-      target = f'{TEST_DIR}/procedure_syntax'
-      fmt_result = self.run_pants(['fmt', target], options)
-      self.assert_success(fmt_result)
+            # verify that the lint check passes.
+            test_fix = self.run_pants(["lint", target], options)
+            self.assert_success(test_fix)
 
-      # verify that the lint check passes.
-      test_fix = self.run_pants(['lint', target], options)
-      self.assert_success(test_fix)
+    def test_scalafix_scalacoptions(self):
 
-  def test_scalafix_scalacoptions(self):
+        rules = {"rules": "RemoveUnused", "semantic": True}
+        options = {
+            "scala": {
+                "scalac_plugin_dep": f"{TEST_DIR}/rsc_compat:semanticdb-scalac",
+                "scalac_plugins": '+["semanticdb"]',
+            },
+            "compile.rsc": {"args": '+["-S-Ywarn-unused"]'},
+            "lint.scalafix": rules,
+            "fmt.scalafix": rules,
+            "lint.scalastyle": {"skip": True},
+        }
 
-    rules = {
-      'rules': 'RemoveUnused',
-      'semantic': True
-    }
-    options = {
-      'scala': {
-        'scalac_plugin_dep': f'{TEST_DIR}/rsc_compat:semanticdb-scalac',
-        'scalac_plugins': '+["semanticdb"]'
-      },
-      'compile.rsc': {'args': '+["-S-Ywarn-unused"]'},
-      'lint.scalafix': rules,
-      'fmt.scalafix': rules,
-      'lint.scalastyle': {'skip': True}
-    }
+        test_file_name = f"{TEST_DIR}/rsc_compat/RscCompat.scala"
 
-    test_file_name = f'{TEST_DIR}/rsc_compat/RscCompat.scala'
+        with self.with_overwritten_file_content(test_file_name):
+            # format an incorrectly formatted file.
+            target = f"{TEST_DIR}/rsc_compat"
+            fmt_result = self.run_pants(["fmt", target], options)
+            self.assert_success(fmt_result)
 
-    with self.with_overwritten_file_content(test_file_name):
-      # format an incorrectly formatted file.
-      target = f'{TEST_DIR}/rsc_compat'
-      fmt_result = self.run_pants(['fmt', target], options)
-      self.assert_success(fmt_result)
+            # verify that the lint check passes.
+            test_fix = self.run_pants(["lint", target], options)
+            self.assert_success(test_fix)
 
-      # verify that the lint check passes.
-      test_fix = self.run_pants(['lint', target], options)
-      self.assert_success(test_fix)
+    def test_rsccompat_fmt(self):
+        options = {
+            "scala": {
+                "scalac_plugin_dep": f"{TEST_DIR}/rsc_compat:semanticdb-scalac",
+                "scalac_plugins": '+["semanticdb"]',
+            },
+            "fmt.scalafix": {
+                "rules": "scala:rsc.rules.RscCompat",
+                "semantic": True,
+                "transitive": True,
+                "scalafix_tool_classpath": f"{TEST_DIR}/rsc_compat:rsc-compat",
+            },
+            "lint.scalafix": {"skip": True},
+            "lint.scalastyle": {"skip": True},
+        }
 
-  def test_rsccompat_fmt(self):
-    options =  {
-      'scala': {
-        'scalac_plugin_dep': f'{TEST_DIR}/rsc_compat:semanticdb-scalac',
-        'scalac_plugins': '+["semanticdb"]'
-      },
-      'fmt.scalafix': {
-        'rules': 'scala:rsc.rules.RscCompat',
-        'semantic': True,
-        'transitive': True,
-        'scalafix_tool_classpath': f'{TEST_DIR}/rsc_compat:rsc-compat',
-      },
-      'lint.scalafix': {'skip': True},
-      'lint.scalastyle': {'skip': True},
-    }
-    
-    test_file_name = f'{TEST_DIR}/rsc_compat/RscCompat.scala'
-    fixed_file_name = f'{TEST_DIR}/rsc_compat/RscCompatFixed.scala'
+        test_file_name = f"{TEST_DIR}/rsc_compat/RscCompat.scala"
+        fixed_file_name = f"{TEST_DIR}/rsc_compat/RscCompatFixed.scala"
 
-    with self.with_overwritten_file_content(test_file_name):
-      # format an incorrectly formatted file.
-      target = f'{TEST_DIR}/rsc_compat'
-      fmt_result = self.run_pants(['fmt', target], options)
-      self.assert_success(fmt_result)
+        with self.with_overwritten_file_content(test_file_name):
+            # format an incorrectly formatted file.
+            target = f"{TEST_DIR}/rsc_compat"
+            fmt_result = self.run_pants(["fmt", target], options)
+            self.assert_success(fmt_result)
 
-      result = read_file(test_file_name)
-      result = re.sub(re.escape('object RscCompat {'), 'object RscCompatFixed {', result)
-      expected = read_file(fixed_file_name)
-      self.assertEqual(result, expected)
+            result = read_file(test_file_name)
+            result = re.sub(re.escape("object RscCompat {"), "object RscCompatFixed {", result)
+            expected = read_file(fixed_file_name)
+            self.assertEqual(result, expected)

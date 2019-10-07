@@ -7,12 +7,12 @@ from pants.backend.python.tasks.python_tool_prep_base import PythonToolInstance,
 
 
 class ConanInstance(PythonToolInstance):
-  pass
+    pass
 
 
 class ConanPrep(PythonToolPrepBase):
-  tool_subsystem_cls = Conan
-  tool_instance_cls = ConanInstance
+    tool_subsystem_cls = Conan
+    tool_instance_cls = ConanInstance
 
-  def will_be_invoked(self):
-    return any(self.get_targets(lambda t: isinstance(t, ExternalNativeLibrary)))
+    def will_be_invoked(self):
+        return any(self.get_targets(lambda t: isinstance(t, ExternalNativeLibrary)))

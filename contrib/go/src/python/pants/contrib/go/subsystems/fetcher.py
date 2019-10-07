@@ -15,18 +15,18 @@ logger = logging.getLogger(__name__)
 
 
 class Fetcher(ABC):
-  """Knows how to interpret remote import paths and fetch code to satisfy them."""
+    """Knows how to interpret remote import paths and fetch code to satisfy them."""
 
-  def __init__(self, import_path):
-    self._import_path = import_path
+    def __init__(self, import_path):
+        self._import_path = import_path
 
-  @property
-  def import_path(self):
-    return self._import_path
+    @property
+    def import_path(self):
+        return self._import_path
 
-  @abstractmethod
-  def root(self):
-    """Returns the root of this fetcher's remote import_path.
+    @abstractmethod
+    def root(self):
+        """Returns the root of this fetcher's remote import_path.
 
     The root is defined as the portion of the remote import path indicating the associated
     package's remote location; ie: for the remote import path of
@@ -42,9 +42,9 @@ class Fetcher(ABC):
     :raises: :class:`FetchError` if there was a problem detecting the root.
     """
 
-  @abstractmethod
-  def fetch(self, dest, rev=None):
-    """Fetches the remote library to the given dest dir.
+    @abstractmethod
+    def fetch(self, dest, rev=None):
+        """Fetches the remote library to the given dest dir.
 
     The dest dir provided will be an existing empty directory.
 
@@ -57,7 +57,7 @@ class Fetcher(ABC):
 
 
 class CloningFetcher(Fetcher):
-  """A fetcher that gets the remote library by cloning its repo.
+    """A fetcher that gets the remote library by cloning its repo.
 
   This emulates the standard way go fetch works, and follows the protocol described here:
   https://golang.org/cmd/go/#hdr-Remote_import_paths. In particular, it inspects go-import
@@ -66,39 +66,42 @@ class CloningFetcher(Fetcher):
   Not that currently we require meta tags, and don't support the explicit form:
   import "example.org/repo.git/foo/bar", as it looks like it's not used much in practice.
   """
-  # TODO: Support the explicit form if needed. It wouldn't be difficult.
 
-  def __init__(self, import_path, meta_tag_reader):
-    super().__init__(import_path)
-    self._meta_tag_reader = meta_tag_reader
+    # TODO: Support the explicit form if needed. It wouldn't be difficult.
 
-  def root(self):
-    imported_repo = self._meta_tag_reader.get_imported_repo(self.import_path)
-    if imported_repo:
-      return imported_repo.import_prefix
-    else:
-      raise FetchError('No <meta name="go-import"> tag found at {}'.format(self.import_path))
+    def __init__(self, import_path, meta_tag_reader):
+        super().__init__(import_path)
+        self._meta_tag_reader = meta_tag_reader
 
-  def fetch(self, dest, rev=None):
-    imported_repo = self._meta_tag_reader.get_imported_repo(self.import_path)
-    if not imported_repo:
-      raise FetchError('No <meta name="go-import"> tag found, so cannot fetch repo '
-                       'at {}'.format(self.import_path))
-    if imported_repo.vcs != 'git':
-      # TODO: Support other vcs systems as needed.
-      raise FetchError("Don't know how to fetch for vcs type {}.".format(imported_repo.vcs))
-    # TODO: Do this in a workunit (see https://github.com/pantsbuild/pants/issues/3502).
-    logger.info('Cloning {} into {}'.format(imported_repo.url, dest))
-    repo = Git.clone(imported_repo.url, dest)
-    if rev:
-      repo.set_state(rev)
+    def root(self):
+        imported_repo = self._meta_tag_reader.get_imported_repo(self.import_path)
+        if imported_repo:
+            return imported_repo.import_prefix
+        else:
+            raise FetchError('No <meta name="go-import"> tag found at {}'.format(self.import_path))
+
+    def fetch(self, dest, rev=None):
+        imported_repo = self._meta_tag_reader.get_imported_repo(self.import_path)
+        if not imported_repo:
+            raise FetchError(
+                'No <meta name="go-import"> tag found, so cannot fetch repo '
+                "at {}".format(self.import_path)
+            )
+        if imported_repo.vcs != "git":
+            # TODO: Support other vcs systems as needed.
+            raise FetchError("Don't know how to fetch for vcs type {}.".format(imported_repo.vcs))
+        # TODO: Do this in a workunit (see https://github.com/pantsbuild/pants/issues/3502).
+        logger.info("Cloning {} into {}".format(imported_repo.url, dest))
+        repo = Git.clone(imported_repo.url, dest)
+        if rev:
+            repo.set_state(rev)
 
 
 class ArchiveFetcher(Fetcher):
-  """A fetcher that retrieves and unpacks remote libraries from archive files."""
+    """A fetcher that retrieves and unpacks remote libraries from archive files."""
 
-  class UrlInfo(namedtuple('UrlInfo', ['url_format', 'default_rev', 'strip_level'])):
-    """Information about a remote archive.
+    class UrlInfo(namedtuple("UrlInfo", ["url_format", "default_rev", "strip_level"])):
+        """Information about a remote archive.
 
     - url_format: A string template that yields the remote archive's url when formatted with the
                   remote import path\'s `rev`, `import_prefix`, and `pkg`.
@@ -107,26 +110,27 @@ class ArchiveFetcher(Fetcher):
                    files upacked from the archive.
     """
 
-  def __init__(self, import_path, import_prefix, url_info, archive_retriever):
-    super().__init__(import_path)
-    self._import_prefix = import_prefix
-    self._url_info = url_info
-    self._archive_retriver = archive_retriever
+    def __init__(self, import_path, import_prefix, url_info, archive_retriever):
+        super().__init__(import_path)
+        self._import_prefix = import_prefix
+        self._url_info = url_info
+        self._archive_retriver = archive_retriever
 
-  def root(self):
-    return self._import_prefix
+    def root(self):
+        return self._import_prefix
 
-  def fetch(self, dest, rev=None):
-    pkg = GoRemoteLibrary.remote_package_path(self.root(), self.import_path)
-    archive_url = self._url_info.url_format.format(rev=rev or self._url_info.default_rev,
-                                                   pkg=pkg, import_prefix=self.root())
-    try:
-      self._fetch(archive_url, self._url_info.strip_level, dest)
-    except FetchError as e:
-      # Modify the message to add more information, then reraise with the original traceback.
-      e.add_message_prefix('Error while fetching import {}: '.format(self.import_path))
-      raise
+    def fetch(self, dest, rev=None):
+        pkg = GoRemoteLibrary.remote_package_path(self.root(), self.import_path)
+        archive_url = self._url_info.url_format.format(
+            rev=rev or self._url_info.default_rev, pkg=pkg, import_prefix=self.root()
+        )
+        try:
+            self._fetch(archive_url, self._url_info.strip_level, dest)
+        except FetchError as e:
+            # Modify the message to add more information, then reraise with the original traceback.
+            e.add_message_prefix("Error while fetching import {}: ".format(self.import_path))
+            raise
 
-  def _fetch(self, archive_url, strip_level, dest):
-    # Note: Broken out into a separate function so we can mock it out easily in tests.
-    self._archive_retriver.fetch_archive(archive_url, strip_level, dest)
+    def _fetch(self, archive_url, strip_level, dest):
+        # Note: Broken out into a separate function so we can mock it out easily in tests.
+        self._archive_retriver.fetch_archive(archive_url, strip_level, dest)

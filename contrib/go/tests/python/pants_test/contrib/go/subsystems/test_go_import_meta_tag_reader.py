@@ -7,16 +7,23 @@ from pants.contrib.go.subsystems.go_import_meta_tag_reader import GoImportMetaTa
 
 
 class FetchersTest(unittest.TestCase):
-  def test_find_meta_tag_all_one_line(self):
-    test_html = '<!DOCTYPE html><html><head><meta name="go-import" content="google.golang.org/api git https://code.googlesource.com/google-api-go-client"></head><body> Nothing to see here.</body></html>'
+    def test_find_meta_tag_all_one_line(self):
+        test_html = '<!DOCTYPE html><html><head><meta name="go-import" content="google.golang.org/api git https://code.googlesource.com/google-api-go-client"></head><body> Nothing to see here.</body></html>'
 
-    meta_tag_content = GoImportMetaTagReader.find_meta_tags(test_html)
-    self.assertEqual(meta_tag_content,
-                     [('google.golang.org/api', 'git',
-                      'https://code.googlesource.com/google-api-go-client')])
+        meta_tag_content = GoImportMetaTagReader.find_meta_tags(test_html)
+        self.assertEqual(
+            meta_tag_content,
+            [
+                (
+                    "google.golang.org/api",
+                    "git",
+                    "https://code.googlesource.com/google-api-go-client",
+                )
+            ],
+        )
 
-  def test_find_meta_tag_typical(self):
-    test_html = """
+    def test_find_meta_tag_typical(self):
+        test_html = """
     <!DOCTYPE html>
     <html>
     <head>
@@ -31,13 +38,20 @@ class FetchersTest(unittest.TestCase):
     </html>
     """
 
-    meta_tag_content = GoImportMetaTagReader.find_meta_tags(test_html)
-    self.assertEqual(meta_tag_content,
-                     [('google.golang.org/api', 'git',
-                      'https://code.googlesource.com/google-api-go-client')])
+        meta_tag_content = GoImportMetaTagReader.find_meta_tags(test_html)
+        self.assertEqual(
+            meta_tag_content,
+            [
+                (
+                    "google.golang.org/api",
+                    "git",
+                    "https://code.googlesource.com/google-api-go-client",
+                )
+            ],
+        )
 
-  def test_find_multiline_meta_tag(self):
-    test_html = """
+    def test_find_multiline_meta_tag(self):
+        test_html = """
     <!DOCTYPE html>
     <html>
     <head>
@@ -54,13 +68,20 @@ class FetchersTest(unittest.TestCase):
     </html>
     """
 
-    meta_tag_content = GoImportMetaTagReader.find_meta_tags(test_html)
-    self.assertEqual(meta_tag_content,
-                     [('google.golang.org/api', 'git',
-                      'https://code.googlesource.com/google-api-go-client')])
+        meta_tag_content = GoImportMetaTagReader.find_meta_tags(test_html)
+        self.assertEqual(
+            meta_tag_content,
+            [
+                (
+                    "google.golang.org/api",
+                    "git",
+                    "https://code.googlesource.com/google-api-go-client",
+                )
+            ],
+        )
 
-  def test_find_multiple_go_import_meta_tag(self):
-    test_html = """
+    def test_find_multiple_go_import_meta_tag(self):
+        test_html = """
     <!DOCTYPE html>
     <html>
     <head>
@@ -85,25 +106,36 @@ class FetchersTest(unittest.TestCase):
     </html>
     """
 
-    meta_tag_content = GoImportMetaTagReader.find_meta_tags(test_html)
-    self.assertEqual(meta_tag_content,
-      [
-        ('google.golang.org/notapi', 'git',
-         'https://code.googlesource.com/google-notapi-go-client'),
-        ('google.golang.org/api', 'git',
-         'https://code.googlesource.com/google-api-go-client'),
-        ('google.golang.org/otherapi', 'git',
-        'https://code.googlesource.com/google-otherapi-go-client'),
-      ])
+        meta_tag_content = GoImportMetaTagReader.find_meta_tags(test_html)
+        self.assertEqual(
+            meta_tag_content,
+            [
+                (
+                    "google.golang.org/notapi",
+                    "git",
+                    "https://code.googlesource.com/google-notapi-go-client",
+                ),
+                (
+                    "google.golang.org/api",
+                    "git",
+                    "https://code.googlesource.com/google-api-go-client",
+                ),
+                (
+                    "google.golang.org/otherapi",
+                    "git",
+                    "https://code.googlesource.com/google-otherapi-go-client",
+                ),
+            ],
+        )
 
-  def test_no_meta_tag(self):
-    test_html = "<!DOCTYPE html><html><head></head><body>Nothing to see here.</body></html>"
+    def test_no_meta_tag(self):
+        test_html = "<!DOCTYPE html><html><head></head><body>Nothing to see here.</body></html>"
 
-    meta_tag_content = GoImportMetaTagReader.find_meta_tags(test_html)
-    self.assertEqual(meta_tag_content, [])
+        meta_tag_content = GoImportMetaTagReader.find_meta_tags(test_html)
+        self.assertEqual(meta_tag_content, [])
 
-  def test_meta_tag_end_with_forward_slash(self):
-    test_html = """
+    def test_meta_tag_end_with_forward_slash(self):
+        test_html = """
     <!DOCTYPE html>
     <html>
     <head>
@@ -119,6 +151,14 @@ class FetchersTest(unittest.TestCase):
     </html>
     """
 
-    meta_tag_content = GoImportMetaTagReader.find_meta_tags(test_html)
-    self.assertEqual(meta_tag_content, [('google.golang.org/notapi', 'git',
-                      'https://code.googlesource.com/google-notapi-go-client')])
+        meta_tag_content = GoImportMetaTagReader.find_meta_tags(test_html)
+        self.assertEqual(
+            meta_tag_content,
+            [
+                (
+                    "google.golang.org/notapi",
+                    "git",
+                    "https://code.googlesource.com/google-notapi-go-client",
+                )
+            ],
+        )

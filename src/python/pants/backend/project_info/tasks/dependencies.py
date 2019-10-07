@@ -13,48 +13,54 @@ from pants.task.console_task import ConsoleTask
 
 
 class Dependencies(ConsoleTask):
-  """Print the target's dependencies."""
+    """Print the target's dependencies."""
 
-  @staticmethod
-  def _is_jvm(target):
-    return isinstance(target, (JarLibrary, JvmTarget, JvmApp))
+    @staticmethod
+    def _is_jvm(target):
+        return isinstance(target, (JarLibrary, JvmTarget, JvmApp))
 
-  @classmethod
-  def register_options(cls, register):
-    super().register_options(register)
-    register('--internal-only', type=bool,
-             help='Specifies that only internal dependencies should be included in the graph '
-                  'output (no external jars).')
-    register('--external-only', type=bool,
-             help='Specifies that only external dependencies should be included in the graph '
-                  'output (only external jars).')
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--internal-only",
+            type=bool,
+            help="Specifies that only internal dependencies should be included in the graph "
+            "output (no external jars).",
+        )
+        register(
+            "--external-only",
+            type=bool,
+            help="Specifies that only external dependencies should be included in the graph "
+            "output (only external jars).",
+        )
 
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-    self.is_internal_only = self.get_options().internal_only
-    self.is_external_only = self.get_options().external_only
-    if self.is_internal_only and self.is_external_only:
-      raise TaskError('At most one of --internal-only or --external-only can be selected.')
+        self.is_internal_only = self.get_options().internal_only
+        self.is_external_only = self.get_options().external_only
+        if self.is_internal_only and self.is_external_only:
+            raise TaskError("At most one of --internal-only or --external-only can be selected.")
 
-  def console_output(self, unused_method_argument):
-    ordered_closure = OrderedSet()
-    for target in self.context.target_roots:
-      if self.act_transitively:
-        target.walk(ordered_closure.add)
-      else:
-        ordered_closure.update(target.dependencies)
+    def console_output(self, unused_method_argument):
+        ordered_closure = OrderedSet()
+        for target in self.context.target_roots:
+            if self.act_transitively:
+                target.walk(ordered_closure.add)
+            else:
+                ordered_closure.update(target.dependencies)
 
-    for tgt in ordered_closure:
-      if not self.is_external_only:
-        yield tgt.address.spec
-      if not self.is_internal_only:
-        # TODO(John Sirois): We need an external payload abstraction at which point knowledge
-        # of jar and requirement payloads can go and this hairball will be untangled.
-        if isinstance(tgt.payload.get_field('requirements'), PythonRequirementsField):
-          for requirement in tgt.payload.requirements:
-            yield str(requirement.requirement)
-        elif isinstance(tgt.payload.get_field('jars'), JarsField):
-          for jar in tgt.payload.jars:
-            data = dict(org=jar.org, name=jar.name, rev=jar.rev)
-            yield ('{org}:{name}:{rev}' if jar.rev else '{org}:{name}').format(**data)
+        for tgt in ordered_closure:
+            if not self.is_external_only:
+                yield tgt.address.spec
+            if not self.is_internal_only:
+                # TODO(John Sirois): We need an external payload abstraction at which point knowledge
+                # of jar and requirement payloads can go and this hairball will be untangled.
+                if isinstance(tgt.payload.get_field("requirements"), PythonRequirementsField):
+                    for requirement in tgt.payload.requirements:
+                        yield str(requirement.requirement)
+                elif isinstance(tgt.payload.get_field("jars"), JarsField):
+                    for jar in tgt.payload.jars:
+                        data = dict(org=jar.org, name=jar.name, rev=jar.rev)
+                        yield ("{org}:{name}:{rev}" if jar.rev else "{org}:{name}").format(**data)

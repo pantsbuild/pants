@@ -13,20 +13,17 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def build_file_aliases():
-  return BuildFileAliases(
-    context_aware_object_factories={
-      'pants_infra_tests': PantsInfraTests,
-    }
-  )
+    return BuildFileAliases(context_aware_object_factories={"pants_infra_tests": PantsInfraTests})
+
 
 def register_goals():
-  task(name='deprecation-warning-task', action=DeprecationWarningTask).install()
-  task(name='lifecycle-stub-task', action=LifecycleStubTask).install('lifecycle-stub-goal')
+    task(name="deprecation-warning-task", action=DeprecationWarningTask).install()
+    task(name="lifecycle-stub-task", action=LifecycleStubTask).install("lifecycle-stub-goal")
 
 
 def global_subsystems():
-  return (PantsTestInfra,)
+    return (PantsTestInfra,)
 
 
-if os.environ.get('_RAISE_KEYBOARDINTERRUPT_ON_IMPORT', False):
-  raise KeyboardInterrupt('ctrl-c during import!')
+if os.environ.get("_RAISE_KEYBOARDINTERRUPT_ON_IMPORT", False):
+    raise KeyboardInterrupt("ctrl-c during import!")

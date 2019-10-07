@@ -6,4 +6,4 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def register_goals():
-  task(name='sitegen', action=SiteGen).install()
+    task(name="sitegen", action=SiteGen).install()

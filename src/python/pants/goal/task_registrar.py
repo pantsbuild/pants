@@ -9,12 +9,12 @@ from pants.goal.goal import Goal
 
 
 class TaskRegistrar:
-  """
+    """
   :API: public
   """
 
-  def __init__(self, name, action, dependencies=None, serialize=True):
-    """
+    def __init__(self, name, action, dependencies=None, serialize=True):
+        """
     :param name: the name of the task.
     :param action: the Task action object to invoke this task.
     :param dependencies: DEPRECATED
@@ -22,13 +22,15 @@ class TaskRegistrar:
     :param serialize: a flag indicating whether or not the action to achieve this goal requires
       the global lock. If true, the action will block until it can acquire the lock.
     """
-    self.serialize = serialize
-    self.name = name
-    self._task = action
+        self.serialize = serialize
+        self.name = name
+        self._task = action
 
-    if dependencies:
-      # TODO(John Sirois): kill this warning and the kwarg after a deprecation cycle.
-      print(dedent("""
+        if dependencies:
+            # TODO(John Sirois): kill this warning and the kwarg after a deprecation cycle.
+            print(
+                dedent(
+                    """
           WARNING: Registered dependencies are now ignored and only `Task.product_types`
           and product requirements as expressed in `Task.prepare` are used to
           infer Task dependencies.
@@ -36,24 +38,27 @@ class TaskRegistrar:
           Please fix this registration:
             {reg}
             {location}
-          """).format(reg=self,
-                      location=traceback.format_list([traceback.extract_stack()[-2]])[0]),
-            file=sys.stderr)
+          """
+                ).format(
+                    reg=self, location=traceback.format_list([traceback.extract_stack()[-2]])[0]
+                ),
+                file=sys.stderr,
+            )
 
-  def __repr__(self):
-    return 'TaskRegistrar({name}, {action} serialize={serialize})'.format(name=self.name,
-                                                                          action=self._task,
-                                                                          serialize=self.serialize)
+    def __repr__(self):
+        return "TaskRegistrar({name}, {action} serialize={serialize})".format(
+            name=self.name, action=self._task, serialize=self.serialize
+        )
 
-  @property
-  def task_type(self):
-    """
+    @property
+    def task_type(self):
+        """
     :API: public
     """
-    return self._task
+        return self._task
 
-  def install(self, goal=None, first=False, replace=False, before=None, after=None):
-    """Install the task in the specified goal (or a new goal with the same name as the task).
+    def install(self, goal=None, first=False, replace=False, before=None, after=None):
+        """Install the task in the specified goal (or a new goal with the same name as the task).
 
     The placement of the task in the execution list of the goal defaults to the end but can be
     :rtype : object
@@ -67,6 +72,6 @@ class TaskRegistrar:
     :param after: Places this task after the named task in the goal's execution list.
     :returns: The goal with task installed.
     """
-    goal = Goal.by_name(goal or self.name)
-    goal.install(self, first, replace, before, after)
-    return goal
+        goal = Goal.by_name(goal or self.name)
+        goal.install(self, first, replace, before, after)
+        return goal

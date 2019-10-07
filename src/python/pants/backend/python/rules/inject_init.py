@@ -13,32 +13,34 @@ from pants.engine.selectors import Get
 # TODO(#7710): Once this gets fixed, rename this to InitInjectedDigest.
 @dataclass(frozen=True)
 class InjectedInitDigest:
-  directory_digest: Digest
+    directory_digest: Digest
 
 
 @rule
 def inject_init(snapshot: Snapshot) -> InjectedInitDigest:
-  """Ensure that every package has an __init__.py file in it."""
-  missing_init_files = tuple(sorted(identify_missing_init_files(snapshot.files)))
-  if not missing_init_files:
-    new_init_files_digest = EMPTY_DIRECTORY_DIGEST
-  else:
-    # TODO(7718): add a builtin rule for FilesContent->Snapshot, so that we can avoid using touch
-    # and the absolute path and have the engine build the files for us.
-    touch_init_request = ExecuteProcessRequest(
-      argv=("/usr/bin/touch",) + missing_init_files,
-      output_files=missing_init_files,
-      description="Inject missing __init__.py files: {}".format(", ".join(missing_init_files)),
-      input_files=snapshot.directory_digest,
-    )
-    touch_init_result = yield Get(ExecuteProcessResult, ExecuteProcessRequest, touch_init_request)
-    new_init_files_digest = touch_init_result.output_directory_digest
-  # TODO(#7710): Once this gets fixed, merge the original source digest and the new init digest
-  # into one unified digest.
-  yield InjectedInitDigest(directory_digest=new_init_files_digest)
+    """Ensure that every package has an __init__.py file in it."""
+    missing_init_files = tuple(sorted(identify_missing_init_files(snapshot.files)))
+    if not missing_init_files:
+        new_init_files_digest = EMPTY_DIRECTORY_DIGEST
+    else:
+        # TODO(7718): add a builtin rule for FilesContent->Snapshot, so that we can avoid using touch
+        # and the absolute path and have the engine build the files for us.
+        touch_init_request = ExecuteProcessRequest(
+            argv=("/usr/bin/touch",) + missing_init_files,
+            output_files=missing_init_files,
+            description="Inject missing __init__.py files: {}".format(
+                ", ".join(missing_init_files)
+            ),
+            input_files=snapshot.directory_digest,
+        )
+        touch_init_result = yield Get(
+            ExecuteProcessResult, ExecuteProcessRequest, touch_init_request
+        )
+        new_init_files_digest = touch_init_result.output_directory_digest
+    # TODO(#7710): Once this gets fixed, merge the original source digest and the new init digest
+    # into one unified digest.
+    yield InjectedInitDigest(directory_digest=new_init_files_digest)
 
 
 def rules():
-  return [
-      inject_init,
-    ]
+    return [inject_init]

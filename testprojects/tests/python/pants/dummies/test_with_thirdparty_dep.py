@@ -5,4 +5,4 @@ from colors import red, strip_color
 
 
 def test_f():
-  assert strip_color(red("foo")) == "foo"
+    assert strip_color(red("foo")) == "foo"

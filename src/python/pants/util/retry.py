@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 def retry_on_exception(func, max_retries, exception_types, backoff_func=lambda n: 0):
-  """Retry a callable against a set of exceptions, optionally sleeping between retries.
+    """Retry a callable against a set of exceptions, optionally sleeping between retries.
 
   :param callable func: The callable to retry.
   :param int max_retries: The maximum number of times to attempt running the function.
@@ -19,12 +19,12 @@ def retry_on_exception(func, max_retries, exception_types, backoff_func=lambda n
                                 max_retries=4 with a backoff_func=lambda n: n * n will result in
                                 sleeps of [1, 4, 9] between retries. Defaults to no backoff.
   """
-  for i in range(0, max_retries):
-    if i:
-      time.sleep(backoff_func(i))
-    try:
-      return func()
-    except exception_types as e:
-      logger.debug(f'encountered exception on retry #{i}: {e!r}')
-      if i == max_retries - 1:
-        raise
+    for i in range(0, max_retries):
+        if i:
+            time.sleep(backoff_func(i))
+        try:
+            return func()
+        except exception_types as e:
+            logger.debug(f"encountered exception on retry #{i}: {e!r}")
+            if i == max_retries - 1:
+                raise

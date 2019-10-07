@@ -5,15 +5,15 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 
 
 class ExportableJvmLibrary(JvmTarget):
-  """A baseclass for java targets that support being exported to an artifact repository.
+    """A baseclass for java targets that support being exported to an artifact repository.
 
   :API: public
   """
 
-  def __init__(self, *args, **kwargs):
-    """
+    def __init__(self, *args, **kwargs):
+        """
     :param :class:`pants.backend.jvm.artifact.Artifact` provides:
       An optional object indicating the ivy artifact to export.
     """
-    # TODO: Move provides argument out of the parent class and onto this one?
-    super().__init__(*args, **kwargs)
+        # TODO: Move provides argument out of the parent class and onto this one?
+        super().__init__(*args, **kwargs)

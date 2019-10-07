@@ -8,7 +8,7 @@ from pants.contrib.node.targets.node_module import NodeModule
 
 
 class NodePreinstalledModule(NodeModule):
-  """A NodeModule which resolves deps by downloading an archived node_modules directory.
+    """A NodeModule which resolves deps by downloading an archived node_modules directory.
 
   This is basically an example, to demonstrate how additional types of NodeModule targets with
   their own resolvers (in this case NodePreinstalledModuleResolver), which still work with
@@ -18,21 +18,20 @@ class NodePreinstalledModule(NodeModule):
   NodePreinstalledModuleResolver subject to future change or removal for now.
   """
 
-  def __init__(self, dependencies_archive_url=None, sources=None,
-               address=None, payload=None, **kwargs):
-    """
+    def __init__(
+        self, dependencies_archive_url=None, sources=None, address=None, payload=None, **kwargs
+    ):
+        """
     :param string url: The location of a tar.gz file containing containing a node_modules directory.
     """
-    payload = payload or Payload()
-    payload.add_fields({
-      'dependencies_archive_url': PrimitiveField(dependencies_archive_url),
-    })
-    super().__init__(sources=sources, address=address, payload=payload, **kwargs)
+        payload = payload or Payload()
+        payload.add_fields({"dependencies_archive_url": PrimitiveField(dependencies_archive_url)})
+        super().__init__(sources=sources, address=address, payload=payload, **kwargs)
 
-  @property
-  def dependencies_archive_url(self):
-    """Where to download the archive containing the node_modules directory.
+    @property
+    def dependencies_archive_url(self):
+        """Where to download the archive containing the node_modules directory.
 
     :rtype: string
     """
-    return self.payload.dependencies_archive_url
+        return self.payload.dependencies_archive_url

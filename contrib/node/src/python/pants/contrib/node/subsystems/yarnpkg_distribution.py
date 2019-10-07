@@ -12,19 +12,21 @@ logger = logging.getLogger(__name__)
 
 class YarnReleaseUrlGenerator(BinaryToolUrlGenerator):
 
-  _DIST_URL_FMT = 'https://github.com/yarnpkg/yarn/releases/download/{version}/yarn-{version}.tar.gz'
+    _DIST_URL_FMT = (
+        "https://github.com/yarnpkg/yarn/releases/download/{version}/yarn-{version}.tar.gz"
+    )
 
-  def generate_urls(self, version, host_platform):
-    return [self._DIST_URL_FMT.format(version=version)]
+    def generate_urls(self, version, host_platform):
+        return [self._DIST_URL_FMT.format(version=version)]
 
 
 class YarnpkgDistribution(NativeTool):
-  """Represents a self-bootstrapping Yarnpkg distribution."""
+    """Represents a self-bootstrapping Yarnpkg distribution."""
 
-  options_scope = 'yarnpkg-distribution'
-  name = 'yarnpkg'
-  default_version = 'v1.6.0'
-  archive_type = 'tgz'
+    options_scope = "yarnpkg-distribution"
+    name = "yarnpkg"
+    default_version = "v1.6.0"
+    archive_type = "tgz"
 
-  def get_external_url_generator(self):
-    return YarnReleaseUrlGenerator()
+    def get_external_url_generator(self):
+        return YarnReleaseUrlGenerator()

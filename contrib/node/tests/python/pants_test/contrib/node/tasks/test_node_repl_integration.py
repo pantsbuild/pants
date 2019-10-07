@@ -7,12 +7,10 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class NodeReplIntegrationTest(PantsRunIntegrationTest):
-
-  def test_run_repl(self):
-    command = ['-q',
-               'repl',
-               'contrib/node/examples/3rdparty/node/react']
-    program = dedent("""
+    def test_run_repl(self):
+        command = ["-q", "repl", "contrib/node/examples/3rdparty/node/react"]
+        program = dedent(
+            """
         var React = require('react');
         var HelloWorldClass = React.createClass({
           render: function() {
@@ -20,43 +18,51 @@ class NodeReplIntegrationTest(PantsRunIntegrationTest):
           }
         });
         console.log(React.renderToStaticMarkup(React.createElement(HelloWorldClass)));
-      """)
-    pants_run = self.run_pants(command=command, stdin_data=program)
+      """
+        )
+        pants_run = self.run_pants(command=command, stdin_data=program)
 
-    self.assert_success(pants_run)
-    self.assertEqual('<div>Hello World</div>', pants_run.stdout_data.strip())
+        self.assert_success(pants_run)
+        self.assertEqual("<div>Hello World</div>", pants_run.stdout_data.strip())
 
-  def test_run_repl_passthrough(self):
-    eval_string = (
-      'var React = require("react");'
-      'console.log(React.renderToStaticMarkup(React.createElement("div", null, "Hello World")));'
-    )
-    command = ['-q',
-               'repl',
-               'contrib/node/examples/3rdparty/node/react',
-               '--',
-               '--eval',
-               eval_string]
-    pants_run = self.run_pants(command=command)
+    def test_run_repl_passthrough(self):
+        eval_string = (
+            'var React = require("react");'
+            'console.log(React.renderToStaticMarkup(React.createElement("div", null, "Hello World")));'
+        )
+        command = [
+            "-q",
+            "repl",
+            "contrib/node/examples/3rdparty/node/react",
+            "--",
+            "--eval",
+            eval_string,
+        ]
+        pants_run = self.run_pants(command=command)
 
-    self.assert_success(pants_run)
-    self.assertEqual('<div>Hello World</div>', pants_run.stdout_data.strip())
+        self.assert_success(pants_run)
+        self.assertEqual("<div>Hello World</div>", pants_run.stdout_data.strip())
 
-  def test_run_repl_multiple_targets(self):
-    command = ['-q',
-               'repl',
-               'contrib/node/examples/3rdparty/node/react',
-               'contrib/node/examples/src/node/preinstalled-project']
-    program = dedent("""
+    def test_run_repl_multiple_targets(self):
+        command = [
+            "-q",
+            "repl",
+            "contrib/node/examples/3rdparty/node/react",
+            "contrib/node/examples/src/node/preinstalled-project",
+        ]
+        program = dedent(
+            """
         var React = require('react');
         var Calculator = require('preinstalled-project');
         var reactElem = React.renderToStaticMarkup(React.createElement("div", null, "Hello World"));
         var calc = new Calculator(0);
         calc.add(1);
         console.log('React: ' + reactElem + ', Calc + 1: ' + calc.number);
-      """).encode()
-    pants_run = self.run_pants(command=command, stdin_data=program)
+      """
+        ).encode()
+        pants_run = self.run_pants(command=command, stdin_data=program)
 
-    self.assert_success(pants_run)
-    self.assertIn('React: <div>Hello World</div>, Calc + 1: 1',
-                  pants_run.stdout_data.splitlines())
+        self.assert_success(pants_run)
+        self.assertIn(
+            "React: <div>Hello World</div>, Calc + 1: 1", pants_run.stdout_data.splitlines()
+        )

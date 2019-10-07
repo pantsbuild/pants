@@ -6,17 +6,17 @@ from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_requirements import PythonRequirements
 from pants.backend.python.rules import (
-  download_pex_bin,
-  inject_init,
-  pex,
-  python_fmt,
-  python_test_runner,
+    download_pex_bin,
+    inject_init,
+    pex,
+    python_fmt,
+    python_test_runner,
 )
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
 from pants.backend.python.subsystems.python_native_code import rules as python_native_code_rules
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.subsystems.subprocess_environment import (
-  rules as subprocess_environment_rules,
+    rules as subprocess_environment_rules,
 )
 from pants.backend.python.targets.python_app import PythonApp
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -26,13 +26,13 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.targets.unpacked_whls import UnpackedWheels
 from pants.backend.python.tasks.build_local_python_distributions import (
-  BuildLocalPythonDistributions,
+    BuildLocalPythonDistributions,
 )
 from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.isort_prep import IsortPrep
 from pants.backend.python.tasks.isort_run import IsortRun
 from pants.backend.python.tasks.local_python_distribution_artifact import (
-  LocalPythonDistributionArtifact,
+    LocalPythonDistributionArtifact,
 )
 from pants.backend.python.tasks.pytest_prep import PytestPrep
 from pants.backend.python.tasks.pytest_run import PytestRun
@@ -50,58 +50,58 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def global_subsystems():
-  return (SubprocessEnvironment, PythonNativeCode)
+    return (SubprocessEnvironment, PythonNativeCode)
 
 
 def build_file_aliases():
-  return BuildFileAliases(
-    targets={
-      PythonApp.alias(): PythonApp,
-      PythonBinary.alias(): PythonBinary,
-      PythonLibrary.alias(): PythonLibrary,
-      PythonTests.alias(): PythonTests,
-      PythonDistribution.alias(): PythonDistribution,
-      'python_requirement_library': PythonRequirementLibrary,
-      Resources.alias(): Resources,
-      UnpackedWheels.alias(): UnpackedWheels,
-    },
-    objects={
-      'python_requirement': PythonRequirement,
-      'python_artifact': PythonArtifact,
-      'setup_py': PythonArtifact,
-    },
-    context_aware_object_factories={
-      'python_requirements': PythonRequirements,
-      PantsRequirement.alias: PantsRequirement,
-    }
-  )
+    return BuildFileAliases(
+        targets={
+            PythonApp.alias(): PythonApp,
+            PythonBinary.alias(): PythonBinary,
+            PythonLibrary.alias(): PythonLibrary,
+            PythonTests.alias(): PythonTests,
+            PythonDistribution.alias(): PythonDistribution,
+            "python_requirement_library": PythonRequirementLibrary,
+            Resources.alias(): Resources,
+            UnpackedWheels.alias(): UnpackedWheels,
+        },
+        objects={
+            "python_requirement": PythonRequirement,
+            "python_artifact": PythonArtifact,
+            "setup_py": PythonArtifact,
+        },
+        context_aware_object_factories={
+            "python_requirements": PythonRequirements,
+            PantsRequirement.alias: PantsRequirement,
+        },
+    )
 
 
 def register_goals():
-  task(name='interpreter', action=SelectInterpreter).install('pyprep')
-  task(name='build-local-dists', action=BuildLocalPythonDistributions).install('pyprep')
-  task(name='requirements', action=ResolveRequirements).install('pyprep')
-  task(name='sources', action=GatherSources).install('pyprep')
-  task(name='py', action=PythonRun).install('run')
-  task(name='pytest-prep', action=PytestPrep).install('test')
-  task(name='pytest', action=PytestRun).install('test')
-  task(name='py', action=PythonRepl).install('repl')
-  task(name='setup-py', action=SetupPy).install()
-  task(name='py', action=PythonBinaryCreate).install('binary')
-  task(name='py-wheels', action=LocalPythonDistributionArtifact).install('binary')
-  task(name='isort-prep', action=IsortPrep).install('fmt')
-  task(name='isort', action=IsortRun).install('fmt')
-  task(name='py', action=PythonBundle).install('bundle')
-  task(name='unpack-wheels', action=UnpackWheels).install()
+    task(name="interpreter", action=SelectInterpreter).install("pyprep")
+    task(name="build-local-dists", action=BuildLocalPythonDistributions).install("pyprep")
+    task(name="requirements", action=ResolveRequirements).install("pyprep")
+    task(name="sources", action=GatherSources).install("pyprep")
+    task(name="py", action=PythonRun).install("run")
+    task(name="pytest-prep", action=PytestPrep).install("test")
+    task(name="pytest", action=PytestRun).install("test")
+    task(name="py", action=PythonRepl).install("repl")
+    task(name="setup-py", action=SetupPy).install()
+    task(name="py", action=PythonBinaryCreate).install("binary")
+    task(name="py-wheels", action=LocalPythonDistributionArtifact).install("binary")
+    task(name="isort-prep", action=IsortPrep).install("fmt")
+    task(name="isort", action=IsortRun).install("fmt")
+    task(name="py", action=PythonBundle).install("bundle")
+    task(name="unpack-wheels", action=UnpackWheels).install()
 
 
 def rules():
-  return (
-    download_pex_bin.rules() +
-    inject_init.rules() +
-    python_fmt.rules() +
-    python_test_runner.rules() +
-    python_native_code_rules() +
-    pex.rules() +
-    subprocess_environment_rules()
-  )
+    return (
+        download_pex_bin.rules()
+        + inject_init.rules()
+        + python_fmt.rules()
+        + python_test_runner.rules()
+        + python_native_code_rules()
+        + pex.rules()
+        + subprocess_environment_rules()
+    )

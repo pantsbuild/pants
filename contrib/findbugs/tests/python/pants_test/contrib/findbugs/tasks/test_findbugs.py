@@ -7,10 +7,10 @@ from pants.contrib.findbugs.tasks.findbugs import FindBugs
 
 
 class FindBugsTest(NailgunTaskTestBase):
-  @classmethod
-  def task_type(cls):
-    return FindBugs
+    @classmethod
+    def task_type(cls):
+        return FindBugs
 
-  def test_no_sources(self):
-    task = self.prepare_execute(self.context())
-    self.assertEqual(None, task.execute())
+    def test_no_sources(self):
+        task = self.prepare_execute(self.context())
+        self.assertEqual(None, task.execute())

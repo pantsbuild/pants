@@ -16,69 +16,77 @@ logger = logging.getLogger(__name__)
 
 
 class MetaRename(Task):
-  """Rename a target and update its dependees' dependencies with the new target name
+    """Rename a target and update its dependees' dependencies with the new target name
 
   Provides a mechanism for renaming the target's name within its local BUILD file.
   Also renames the target wherever it's specified as a dependency.
   """
 
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super().subsystem_dependencies() + (BuildozerBinary.scoped(cls),)
+    @classmethod
+    def subsystem_dependencies(cls):
+        return super().subsystem_dependencies() + (BuildozerBinary.scoped(cls),)
 
-  @classmethod
-  def register_options(cls, register):
-    super().register_options(register)
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
 
-    register('--from', type=str, default=None, help='The old dependency name to change')
-    register('--to', type=str, default=None, help='The new name for the dependency')
+        register("--from", type=str, default=None, help="The old dependency name to change")
+        register("--to", type=str, default=None, help="The new name for the dependency")
 
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-    self._from_address = Address.parse(self.get_options()['from'])
-    self._to_address = Address.parse(self.get_options().to)
+        self._from_address = Address.parse(self.get_options()["from"])
+        self._to_address = Address.parse(self.get_options().to)
 
-  def execute(self):
-    self.update_dependee_references()
-    self.update_original_build_name()
+    def execute(self):
+        self.update_dependee_references()
+        self.update_original_build_name()
 
-  def update_dependee_references(self):
-    dependee_targets = self.dependency_graph()[
-      # TODO: The **{} seems unnecessary.
-      Target(name=self._from_address.target_name, address=self._from_address, build_graph=self.context.build_graph, **{})
-    ]
+    def update_dependee_references(self):
+        dependee_targets = self.dependency_graph()[
+            # TODO: The **{} seems unnecessary.
+            Target(
+                name=self._from_address.target_name,
+                address=self._from_address,
+                build_graph=self.context.build_graph,
+                **{}
+            )
+        ]
 
-    logging.disable(logging.WARNING)
+        logging.disable(logging.WARNING)
 
-    buildozer_binary = BuildozerBinary.scoped_instance(self)
-    for concrete_target in dependee_targets:
-      for formats in [
-        { 'from': self._from_address.spec, 'to': self._to_address.spec },
-        { 'from': ':{}'.format(self._from_address.target_name), 'to': ':{}'.format(
-          self._to_address.target_name) }
-      ]:
-        buildozer_binary.execute(
-          'replace dependencies {} {}'.format(formats['from'], formats['to']),
-          spec=concrete_target.address.spec,
-          context=self.context
+        buildozer_binary = BuildozerBinary.scoped_instance(self)
+        for concrete_target in dependee_targets:
+            for formats in [
+                {"from": self._from_address.spec, "to": self._to_address.spec},
+                {
+                    "from": ":{}".format(self._from_address.target_name),
+                    "to": ":{}".format(self._to_address.target_name),
+                },
+            ]:
+                buildozer_binary.execute(
+                    "replace dependencies {} {}".format(formats["from"], formats["to"]),
+                    spec=concrete_target.address.spec,
+                    context=self.context,
+                )
+
+        logging.disable(logging.NOTSET)
+
+    def update_original_build_name(self):
+        BuildozerBinary.scoped_instance(self).execute(
+            "set name {}".format(self._to_address.target_name),
+            spec=self._from_address.spec,
+            context=self.context,
         )
 
-    logging.disable(logging.NOTSET)
+    def dependency_graph(self, scope=""):
+        dependency_graph = defaultdict(set)
 
-  def update_original_build_name(self):
-    BuildozerBinary.scoped_instance(self).execute(
-      'set name {}'.format(self._to_address.target_name),
-      spec=self._from_address.spec,
-      context=self.context)
+        for address in self.context.build_graph.inject_specs_closure([DescendantAddresses(scope)]):
+            target = self.context.build_graph.get_target(address)
 
-  def dependency_graph(self, scope=''):
-    dependency_graph = defaultdict(set)
+            for dependency in target.dependencies:
+                dependency_graph[dependency].add(target.concrete_derived_from)
 
-    for address in self.context.build_graph.inject_specs_closure([DescendantAddresses(scope)]):
-      target = self.context.build_graph.get_target(address)
-
-      for dependency in target.dependencies:
-        dependency_graph[dependency].add(target.concrete_derived_from)
-
-    return dependency_graph
+        return dependency_graph

@@ -17,7 +17,7 @@ class Distiller(object):
 
 
 class ClassFactoringTest(CheckstylePluginTestBase):
-  plugin_type = ClassFactoring
+    plugin_type = ClassFactoring
 
-  def test_class_factoring(self):
-    self.assertNit(BAD_CLASS, 'T800', Nit.WARNING)
+    def test_class_factoring(self):
+        self.assertNit(BAD_CLASS, "T800", Nit.WARNING)

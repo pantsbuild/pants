@@ -19,149 +19,152 @@ logger = logging.getLogger(__name__)
 
 
 def antlr4_jar(name):
-  return JarDependency(org='org.antlr', name=name, rev='4.1')
+    return JarDependency(org="org.antlr", name=name, rev="4.1")
 
 
 _DEFAULT_ANTLR_DEPS = {
-  'antlr3': ('//:antlr-3.4', [JarDependency(org='org.antlr', name='antlr', rev='3.4')]),
-  'antlr4': ('//:antlr-4', [antlr4_jar(name='antlr4'),
-                            antlr4_jar(name='antlr4-runtime')])
+    "antlr3": ("//:antlr-3.4", [JarDependency(org="org.antlr", name="antlr", rev="3.4")]),
+    "antlr4": ("//:antlr-4", [antlr4_jar(name="antlr4"), antlr4_jar(name="antlr4-runtime")]),
 }
 
 
 # TODO: Refactor this and AntlrPyGen to share a common base class with most of the functionality.
 # See comments there for what that would take.
 class AntlrJavaGen(SimpleCodegenTask, NailgunTask):
-  """Generate .java source code from ANTLR grammar files."""
-  gentarget_type = JavaAntlrLibrary
+    """Generate .java source code from ANTLR grammar files."""
 
-  sources_globs = ('**/*.java',)
+    gentarget_type = JavaAntlrLibrary
 
-  class AmbiguousPackageError(TaskError):
-    """Raised when a java package cannot be unambiguously determined for a JavaAntlrLibrary."""
+    sources_globs = ("**/*.java",)
 
-  # TODO: Do we need this?
-  def find_sources(self, target, target_dir):
-    sources = super().find_sources(target, target_dir)
-    return [source for source in sources if source.endswith('.java')]
+    class AmbiguousPackageError(TaskError):
+        """Raised when a java package cannot be unambiguously determined for a JavaAntlrLibrary."""
 
-  @classmethod
-  def register_options(cls, register):
-    super().register_options(register)
-    for key, (classpath_spec, classpath) in _DEFAULT_ANTLR_DEPS.items():
-      cls.register_jvm_tool(register, key, classpath=classpath, classpath_spec=classpath_spec)
+    # TODO: Do we need this?
+    def find_sources(self, target, target_dir):
+        sources = super().find_sources(target, target_dir)
+        return [source for source in sources if source.endswith(".java")]
 
-  def is_gentarget(self, target):
-    return isinstance(target, JavaAntlrLibrary)
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        for key, (classpath_spec, classpath) in _DEFAULT_ANTLR_DEPS.items():
+            cls.register_jvm_tool(register, key, classpath=classpath, classpath_spec=classpath_spec)
 
-  def synthetic_target_type(self, target):
-    return JavaLibrary
+    def is_gentarget(self, target):
+        return isinstance(target, JavaAntlrLibrary)
 
-  def execute_codegen(self, target, target_workdir):
-    args = ['-o', target_workdir]
-    compiler = target.compiler
-    if target.package is None:
-      java_package = self._get_sources_package(target)
-    else:
-      java_package = target.package
+    def synthetic_target_type(self, target):
+        return JavaLibrary
 
-    if compiler == 'antlr3':
-      if target.package is not None:
-        logger.warning("The 'package' attribute is not supported for antlr3 and will be ignored.")
-      java_main = 'org.antlr.Tool'
-    elif compiler == 'antlr4':
-      args.append('-visitor')  # Generate Parse Tree Visitor As Well
-      # Note that this assumes that there is no package set in the antlr file itself,
-      # which is considered an ANTLR best practice.
-      args.append('-package')
-      args.append(java_package)
-      java_main = 'org.antlr.v4.Tool'
-    else:
-      raise TaskError('Unsupported ANTLR compiler: {}'.format(compiler))
+    def execute_codegen(self, target, target_workdir):
+        args = ["-o", target_workdir]
+        compiler = target.compiler
+        if target.package is None:
+            java_package = self._get_sources_package(target)
+        else:
+            java_package = target.package
 
-    antlr_classpath = self.tool_classpath(compiler)
-    sources = self._calculate_sources([target])
-    args.extend(sources)
-    result = self.runjava(classpath=antlr_classpath, main=java_main, args=args,
-                          workunit_name='antlr')
-    if result != 0:
-      raise TaskError('java {} ... exited non-zero ({})'.format(java_main, result))
+        if compiler == "antlr3":
+            if target.package is not None:
+                logger.warning(
+                    "The 'package' attribute is not supported for antlr3 and will be ignored."
+                )
+            java_main = "org.antlr.Tool"
+        elif compiler == "antlr4":
+            args.append("-visitor")  # Generate Parse Tree Visitor As Well
+            # Note that this assumes that there is no package set in the antlr file itself,
+            # which is considered an ANTLR best practice.
+            args.append("-package")
+            args.append(java_package)
+            java_main = "org.antlr.v4.Tool"
+        else:
+            raise TaskError("Unsupported ANTLR compiler: {}".format(compiler))
 
-    self._rearrange_output_for_package(target_workdir, java_package)
-    if compiler == 'antlr3':
-      self._scrub_generated_timestamps(target_workdir)
+        antlr_classpath = self.tool_classpath(compiler)
+        sources = self._calculate_sources([target])
+        args.extend(sources)
+        result = self.runjava(
+            classpath=antlr_classpath, main=java_main, args=args, workunit_name="antlr"
+        )
+        if result != 0:
+            raise TaskError("java {} ... exited non-zero ({})".format(java_main, result))
 
-  def synthetic_target_extra_dependencies(self, target, target_workdir):
-    # Fetch the right java dependency from the target's compiler option
-    return self._deps(target.compiler)
+        self._rearrange_output_for_package(target_workdir, java_package)
+        if compiler == "antlr3":
+            self._scrub_generated_timestamps(target_workdir)
 
-  @memoized_method
-  def _deps(self, compiler):
-    spec = self.get_options()[compiler]
-    return list(self.resolve_deps([spec])) if spec else []
+    def synthetic_target_extra_dependencies(self, target, target_workdir):
+        # Fetch the right java dependency from the target's compiler option
+        return self._deps(target.compiler)
 
-  # This checks to make sure that all of the sources have an identical package source structure, and
-  # if they do, uses that as the package. If they are different, then the user will need to set the
-  # package as it cannot be correctly inferred.
-  def _get_sources_package(self, target):
-    parents = {os.path.dirname(source) for source in target.sources_relative_to_source_root()}
-    if len(parents) != 1:
-      raise self.AmbiguousPackageError('Antlr sources in multiple directories, cannot infer '
-                                       'package. Please set package member in antlr target.')
-    return parents.pop().replace('/', '.')
+    @memoized_method
+    def _deps(self, compiler):
+        spec = self.get_options()[compiler]
+        return list(self.resolve_deps([spec])) if spec else []
 
-  def _calculate_sources(self, targets):
-    sources = set()
+    # This checks to make sure that all of the sources have an identical package source structure, and
+    # if they do, uses that as the package. If they are different, then the user will need to set the
+    # package as it cannot be correctly inferred.
+    def _get_sources_package(self, target):
+        parents = {os.path.dirname(source) for source in target.sources_relative_to_source_root()}
+        if len(parents) != 1:
+            raise self.AmbiguousPackageError(
+                "Antlr sources in multiple directories, cannot infer "
+                "package. Please set package member in antlr target."
+            )
+        return parents.pop().replace("/", ".")
 
-    def collect_sources(tgt):
-      if self.is_gentarget(tgt):
-        sources.update(tgt.sources_relative_to_buildroot())
-    for target in targets:
-      target.walk(collect_sources)
-    return sources
+    def _calculate_sources(self, targets):
+        sources = set()
 
-  _COMMENT_WITH_TIMESTAMP_RE = re.compile(r'^//.*\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d')
+        def collect_sources(tgt):
+            if self.is_gentarget(tgt):
+                sources.update(tgt.sources_relative_to_buildroot())
 
-  def _rearrange_output_for_package(self, target_workdir, java_package):
-    """Rearrange the output files to match a standard Java structure.
+        for target in targets:
+            target.walk(collect_sources)
+        return sources
+
+    _COMMENT_WITH_TIMESTAMP_RE = re.compile(r"^//.*\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d")
+
+    def _rearrange_output_for_package(self, target_workdir, java_package):
+        """Rearrange the output files to match a standard Java structure.
 
     Antlr emits a directory structure based on the relative path provided
     for the grammar file. If the source root of the file is different from
     the Pants build root, then the Java files end up with undesired parent
     directories.
     """
-    package_dir_rel = java_package.replace('.', os.path.sep)
-    package_dir = os.path.join(target_workdir, package_dir_rel)
-    safe_mkdir(package_dir)
-    for root, dirs, files in safe_walk(target_workdir):
-      if root == package_dir_rel:
-        # This path is already in the correct location
-        continue
-      for f in files:
-        os.rename(
-          os.path.join(root, f),
-          os.path.join(package_dir, f)
-        )
+        package_dir_rel = java_package.replace(".", os.path.sep)
+        package_dir = os.path.join(target_workdir, package_dir_rel)
+        safe_mkdir(package_dir)
+        for root, dirs, files in safe_walk(target_workdir):
+            if root == package_dir_rel:
+                # This path is already in the correct location
+                continue
+            for f in files:
+                os.rename(os.path.join(root, f), os.path.join(package_dir, f))
 
-    # Remove any empty directories that were left behind
-    for root, dirs, files in safe_walk(target_workdir, topdown = False):
-      for d in dirs:
-        full_dir = os.path.join(root, d)
-        if not os.listdir(full_dir):
-          os.rmdir(full_dir)
+        # Remove any empty directories that were left behind
+        for root, dirs, files in safe_walk(target_workdir, topdown=False):
+            for d in dirs:
+                full_dir = os.path.join(root, d)
+                if not os.listdir(full_dir):
+                    os.rmdir(full_dir)
 
-  def _scrub_generated_timestamps(self, target_workdir):
-    """Remove the first line of comment from each file if it contains a timestamp."""
-    for root, _, filenames in safe_walk(target_workdir):
-      for filename in filenames:
-        source = os.path.join(root, filename)
+    def _scrub_generated_timestamps(self, target_workdir):
+        """Remove the first line of comment from each file if it contains a timestamp."""
+        for root, _, filenames in safe_walk(target_workdir):
+            for filename in filenames:
+                source = os.path.join(root, filename)
 
-        with open(source, 'r') as f:
-          lines = f.readlines()
-        if len(lines) < 1:
-          return
-        with open(source, 'w') as f:
-          if not self._COMMENT_WITH_TIMESTAMP_RE.match(lines[0]):
-            f.write(lines[0])
-          for line in lines[1:]:
-            f.write(line)
+                with open(source, "r") as f:
+                    lines = f.readlines()
+                if len(lines) < 1:
+                    return
+                with open(source, "w") as f:
+                    if not self._COMMENT_WITH_TIMESTAMP_RE.match(lines[0]):
+                        f.write(lines[0])
+                    for line in lines[1:]:
+                        f.write(line)

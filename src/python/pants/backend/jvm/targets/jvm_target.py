@@ -16,37 +16,39 @@ from pants.util.memo import memoized_property
 
 
 class JvmTarget(Target, Jarable):
-  """A base class for all java module targets that provides path and dependency translation.
+    """A base class for all java module targets that provides path and dependency translation.
 
   :API: public
   """
 
-  @classmethod
-  def subsystems(cls):
-    return super().subsystems() + (Java, JvmPlatform)
+    @classmethod
+    def subsystems(cls):
+        return super().subsystems() + (Java, JvmPlatform)
 
-  def __init__(self,
-               address=None,
-               payload=None,
-               sources=None,
-               provides=None,
-               excludes=None,
-               services=None,
-               platform=None,
-               strict_deps=None,
-               exports=None,
-               compiler_option_sets=None,
-               zinc_file_manager=None,
-               # Some subclasses can have both .java and .scala sources
-               # (e.g., JUnitTests, JvmBinary, even ScalaLibrary), so it's convenient
-               # to have both plugins settings here, even though for other subclasses
-               # (e.g., JavaLibrary) only one will be relevant.
-               javac_plugins=None,
-               javac_plugin_args=None,
-               scalac_plugins=None,
-               scalac_plugin_args=None,
-               **kwargs):
-    """
+    def __init__(
+        self,
+        address=None,
+        payload=None,
+        sources=None,
+        provides=None,
+        excludes=None,
+        services=None,
+        platform=None,
+        strict_deps=None,
+        exports=None,
+        compiler_option_sets=None,
+        zinc_file_manager=None,
+        # Some subclasses can have both .java and .scala sources
+        # (e.g., JUnitTests, JvmBinary, even ScalaLibrary), so it's convenient
+        # to have both plugins settings here, even though for other subclasses
+        # (e.g., JavaLibrary) only one will be relevant.
+        javac_plugins=None,
+        javac_plugin_args=None,
+        scalac_plugins=None,
+        scalac_plugin_args=None,
+        **kwargs
+    ):
+        """
     :API: public
 
     :param excludes: List of `exclude <#exclude>`_\\s to filter this target's
@@ -89,141 +91,145 @@ class JvmTarget(Target, Jarable):
     :param dict scalac_plugin_args: Map from scalac plugin name to list of arguments for that plugin.
     """
 
-    self.address = address  # Set in case a TargetDefinitionException is thrown early
-    payload = payload or Payload()
-    excludes = ExcludesField(self.assert_list(excludes, expected_type=Exclude, key_arg='excludes'))
-    payload.add_fields({
-      'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
-      'provides': provides,
-      'excludes': excludes,
-      'platform': PrimitiveField(platform),
-      'strict_deps': PrimitiveField(strict_deps),
-      'exports': PrimitivesSetField(exports or []),
-      'compiler_option_sets': PrimitivesSetField(compiler_option_sets),
-      'zinc_file_manager': PrimitiveField(zinc_file_manager),
-      'javac_plugins': PrimitivesSetField(javac_plugins or []),
-      'javac_plugin_args': PrimitiveField(javac_plugin_args),
-      'scalac_plugins': PrimitivesSetField(scalac_plugins or []),
-      'scalac_plugin_args': PrimitiveField(scalac_plugin_args),
-    })
+        self.address = address  # Set in case a TargetDefinitionException is thrown early
+        payload = payload or Payload()
+        excludes = ExcludesField(
+            self.assert_list(excludes, expected_type=Exclude, key_arg="excludes")
+        )
+        payload.add_fields(
+            {
+                "sources": self.create_sources_field(sources, address.spec_path, key_arg="sources"),
+                "provides": provides,
+                "excludes": excludes,
+                "platform": PrimitiveField(platform),
+                "strict_deps": PrimitiveField(strict_deps),
+                "exports": PrimitivesSetField(exports or []),
+                "compiler_option_sets": PrimitivesSetField(compiler_option_sets),
+                "zinc_file_manager": PrimitiveField(zinc_file_manager),
+                "javac_plugins": PrimitivesSetField(javac_plugins or []),
+                "javac_plugin_args": PrimitiveField(javac_plugin_args),
+                "scalac_plugins": PrimitivesSetField(scalac_plugins or []),
+                "scalac_plugin_args": PrimitiveField(scalac_plugin_args),
+            }
+        )
 
-    super().__init__(address=address, payload=payload, **kwargs)
+        super().__init__(address=address, payload=payload, **kwargs)
 
-    # Service info is only used when generating resources, it should not affect, for example, a
-    # compile fingerprint or javadoc fingerprint.  As such, its not a payload field.
-    self._services = services or {}
+        # Service info is only used when generating resources, it should not affect, for example, a
+        # compile fingerprint or javadoc fingerprint.  As such, its not a payload field.
+        self._services = services or {}
 
-  @property
-  def strict_deps(self):
-    """If set, whether to limit compile time deps to those that are directly declared.
+    @property
+    def strict_deps(self):
+        """If set, whether to limit compile time deps to those that are directly declared.
 
     :return: See constructor.
     :rtype: bool or None
     """
-    return self.payload.strict_deps
+        return self.payload.strict_deps
 
-  @property
-  def export_specs(self):
-    return self.payload.exports
+    @property
+    def export_specs(self):
+        return self.payload.exports
 
-  @memoized_property
-  def compiler_option_sets(self):
-    """For every element in this list, enable the corresponding flags on compilation
+    @memoized_property
+    def compiler_option_sets(self):
+        """For every element in this list, enable the corresponding flags on compilation
     of targets.
     :return: See constructor.
     :rtype: list
     """
-    return self.payload.compiler_option_sets
+        return self.payload.compiler_option_sets
 
-  @property
-  def zinc_file_manager(self):
-    """If false, the default file manager will be used instead of the zinc provided one.
+    @property
+    def zinc_file_manager(self):
+        """If false, the default file manager will be used instead of the zinc provided one.
 
     :return: See constructor.
     :rtype: bool or None
     """
-    return self.payload.zinc_file_manager
+        return self.payload.zinc_file_manager
 
-  @property
-  def javac_plugins(self):
-    """The names of compiler plugins to use when compiling this target with javac.
-
-    :return: See constructor.
-    :rtype: list of strings.
-    """
-    return self.payload.javac_plugins
-
-  @property
-  def javac_plugin_args(self):
-    """Map from javac plugin name to list of args for that plugin.
-
-    :return: See constructor.
-    :rtype: map from string to list of strings.
-    """
-    return self.payload.javac_plugin_args
-
-  @property
-  def scalac_plugins(self):
-    """The names of compiler plugins to use when compiling this target with scalac.
+    @property
+    def javac_plugins(self):
+        """The names of compiler plugins to use when compiling this target with javac.
 
     :return: See constructor.
     :rtype: list of strings.
     """
-    return self.payload.scalac_plugins
+        return self.payload.javac_plugins
 
-  @property
-  def scalac_plugin_args(self):
-    """Map from scalac plugin name to list of args for that plugin.
+    @property
+    def javac_plugin_args(self):
+        """Map from javac plugin name to list of args for that plugin.
 
     :return: See constructor.
     :rtype: map from string to list of strings.
     """
-    return self.payload.scalac_plugin_args
+        return self.payload.javac_plugin_args
 
-  @property
-  def platform(self):
-    """Platform associated with this target.
+    @property
+    def scalac_plugins(self):
+        """The names of compiler plugins to use when compiling this target with scalac.
+
+    :return: See constructor.
+    :rtype: list of strings.
+    """
+        return self.payload.scalac_plugins
+
+    @property
+    def scalac_plugin_args(self):
+        """Map from scalac plugin name to list of args for that plugin.
+
+    :return: See constructor.
+    :rtype: map from string to list of strings.
+    """
+        return self.payload.scalac_plugin_args
+
+    @property
+    def platform(self):
+        """Platform associated with this target.
 
     :return: The jvm platform object.
     :rtype: JvmPlatformSettings
     """
-    return JvmPlatform.global_instance().get_platform_for_target(self)
+        return JvmPlatform.global_instance().get_platform_for_target(self)
 
-  @memoized_property
-  def jar_dependencies(self):
-    return OrderedSet(self.get_jar_dependencies())
+    @memoized_property
+    def jar_dependencies(self):
+        return OrderedSet(self.get_jar_dependencies())
 
-  def mark_extra_invalidation_hash_dirty(self):
-    del self.jar_dependencies
+    def mark_extra_invalidation_hash_dirty(self):
+        del self.jar_dependencies
 
-  def get_jar_dependencies(self):
-    jar_deps = OrderedSet()
+    def get_jar_dependencies(self):
+        jar_deps = OrderedSet()
 
-    def collect_jar_deps(target):
-      if isinstance(target, JarLibrary):
-        jar_deps.update(target.payload.jars)
+        def collect_jar_deps(target):
+            if isinstance(target, JarLibrary):
+                jar_deps.update(target.payload.jars)
 
-    self.walk(work=collect_jar_deps)
-    return jar_deps
+        self.walk(work=collect_jar_deps)
+        return jar_deps
 
-  @property
-  def has_resources(self):
-    return len(self.resources) > 0
+    @property
+    def has_resources(self):
+        return len(self.resources) > 0
 
-  @property
-  def provides(self):
-    return self.payload.provides
+    @property
+    def provides(self):
+        return self.payload.provides
 
-  @property
-  def resources(self):
-    # TODO: We should deprecate this method, but doing so will require changes to JVM publishing.
-    #   see https://github.com/pantsbuild/pants/issues/4568
-    return [dependency for dependency in self.dependencies if isinstance(dependency, Resources)]
+    @property
+    def resources(self):
+        # TODO: We should deprecate this method, but doing so will require changes to JVM publishing.
+        #   see https://github.com/pantsbuild/pants/issues/4568
+        return [dependency for dependency in self.dependencies if isinstance(dependency, Resources)]
 
-  @property
-  def excludes(self):
-    return self.payload.excludes
+    @property
+    def excludes(self):
+        return self.payload.excludes
 
-  @property
-  def services(self):
-    return self._services
+    @property
+    def services(self):
+        return self._services

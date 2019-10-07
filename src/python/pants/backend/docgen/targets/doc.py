@@ -8,14 +8,14 @@ from pants.build_graph.target import Target
 
 
 class WikiArtifact:
-  """Binds a single documentation page to a wiki instance.
+    """Binds a single documentation page to a wiki instance.
 
   This object allows you to specify which wiki a page should be published to, along with additional
   wiki-specific parameters, such as the title, parent page, etc.
   """
 
-  def __init__(self, wiki, **kwargs):
-    """
+    def __init__(self, wiki, **kwargs):
+        """
     :param wiki: target spec of a ``wiki``.
     :param kwargs: a dictionary that may contain configuration directives for your particular wiki.
       For example, the following keys are supported for Atlassian's Confluence:
@@ -24,33 +24,33 @@ class WikiArtifact:
       * ``title`` -- A title for the wiki page
       * ``parent`` -- The title of a wiki page that will denote this page as a child.
     """
-    self.wiki = wiki
-    self.config = kwargs
+        self.wiki = wiki
+        self.config = kwargs
 
-  def fingerprint(self):
-    return combine_hashes([self.wiki.fingerprint(), stable_json_sha1(self.config)])
+    def fingerprint(self):
+        return combine_hashes([self.wiki.fingerprint(), stable_json_sha1(self.config)])
 
-  def __str__(self):
-    return self.wiki.name
+    def __str__(self):
+        return self.wiki.name
 
 
 class Wiki:
-  """Identifies a wiki where pages can be published."""
+    """Identifies a wiki where pages can be published."""
 
-  def __init__(self, name, url_builder):
-    """
+    def __init__(self, name, url_builder):
+        """
     :param url_builder: Function that accepts a page target and an optional wiki config dict.
     """
-    self.name = name
-    self.url_builder = url_builder
+        self.name = name
+        self.url_builder = url_builder
 
-  def fingerprint(self):
-    # TODO: url_builder is not a part of fingerprint.
-    return stable_json_sha1(self.name)
+    def fingerprint(self):
+        # TODO: url_builder is not a part of fingerprint.
+        return stable_json_sha1(self.name)
 
 
 class Page(Target):
-  """A documentation page.
+    """A documentation page.
 
   Here is an example, that shows a markdown page providing a wiki page on an Atlassian Confluence
   wiki: ::
@@ -69,19 +69,14 @@ class Page(Target):
   (there might be more than one place to publish it).
   """
 
-  class ProvidesTupleField(tuple, PayloadField):
-    def _compute_fingerprint(self):
-      return combine_hashes(artifact.fingerprint() for artifact in self)
+    class ProvidesTupleField(tuple, PayloadField):
+        def _compute_fingerprint(self):
+            return combine_hashes(artifact.fingerprint() for artifact in self)
 
-  def __init__(self,
-               sources,
-               address=None,
-               payload=None,
-               format=None,
-               links=None,
-               provides=None,
-               **kwargs):
-    """
+    def __init__(
+        self, sources, address=None, payload=None, format=None, links=None, provides=None, **kwargs
+    ):
+        """
     :param sources: Page source file. Exactly one will be present.
     :param format: Page's format, ``md`` or ``rst``. By default, Pants infers from ``source`` file
        extension: ``.rst`` is ReStructured Text; anything else is Markdown.
@@ -91,49 +86,53 @@ class Page(Target):
        E.g., a wiki location.
     :type provides: List of ``wiki_artifact``s
     """
-    payload = payload or Payload()
-    if not format:
-      if sources.files[0].lower().endswith('.rst'):
-        format = 'rst'
-      else:
-        format = 'md'
-    payload.add_fields({
-      'sources': self.create_sources_field(sources=sources,
-                                           sources_rel_path=address.spec_path,
-                                           key_arg='sources'),
-      'format': PrimitiveField(format),
-      'links': PrimitiveField(links or []),
-      'provides': self.ProvidesTupleField(provides or []),
-    })
-    super().__init__(address=address, payload=payload, **kwargs)
+        payload = payload or Payload()
+        if not format:
+            if sources.files[0].lower().endswith(".rst"):
+                format = "rst"
+            else:
+                format = "md"
+        payload.add_fields(
+            {
+                "sources": self.create_sources_field(
+                    sources=sources, sources_rel_path=address.spec_path, key_arg="sources"
+                ),
+                "format": PrimitiveField(format),
+                "links": PrimitiveField(links or []),
+                "provides": self.ProvidesTupleField(provides or []),
+            }
+        )
+        super().__init__(address=address, payload=payload, **kwargs)
 
-    if provides and not isinstance(provides[0], WikiArtifact):
-      raise ValueError('Page must provide a wiki_artifact. Found instead: {}'.format(provides))
+        if provides and not isinstance(provides[0], WikiArtifact):
+            raise ValueError(
+                "Page must provide a wiki_artifact. Found instead: {}".format(provides)
+            )
 
-  @property
-  def source(self):
-    """The first (and only) source listed by this Page."""
-    return list(self.payload.sources.source_paths)[0]
+    @property
+    def source(self):
+        """The first (and only) source listed by this Page."""
+        return list(self.payload.sources.source_paths)[0]
 
-  @classmethod
-  def compute_injectable_specs(cls, kwargs=None, payload=None):
-    for spec in super().compute_injectable_specs(kwargs, payload):
-      yield spec
+    @classmethod
+    def compute_injectable_specs(cls, kwargs=None, payload=None):
+        for spec in super().compute_injectable_specs(kwargs, payload):
+            yield spec
 
-    target_representation = kwargs or payload.as_dict()
-    for spec in target_representation.get('links', []):
-      yield spec
+        target_representation = kwargs or payload.as_dict()
+        for spec in target_representation.get("links", []):
+            yield spec
 
-  @property
-  def provides(self):
-    """A tuple of WikiArtifact instances provided by this Page.
+    @property
+    def provides(self):
+        """A tuple of WikiArtifact instances provided by this Page.
 
     Notably different from JvmTarget.provides, which has only a single Artifact rather than a
     list.
     """
-    return self.payload.provides
+        return self.payload.provides
 
-  @property
-  def format(self):
-    """Returns this page's format, 'md' (Markdown) or 'rst' (ReStructured Text)."""
-    return self.payload.format
+    @property
+    def format(self):
+        """Returns this page's format, 'md' (Markdown) or 'rst' (ReStructured Text)."""
+        return self.payload.format

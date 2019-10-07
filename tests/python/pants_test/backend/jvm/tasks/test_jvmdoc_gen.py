@@ -8,54 +8,54 @@ from pants.base.exceptions import TaskError
 from pants_test.jvm.jvm_task_test_base import JvmTaskTestBase
 
 
-dummydoc = Jvmdoc(tool_name='dummydoc', product_type='dummydoc')
+dummydoc = Jvmdoc(tool_name="dummydoc", product_type="dummydoc")
 
 
 class DummyJvmdocGen(JvmdocGen):
-  @classmethod
-  def jvmdoc(cls):
-    return dummydoc
+    @classmethod
+    def jvmdoc(cls):
+        return dummydoc
 
-  def execute(self):
-    self.generate_doc(lambda t: True, create_dummydoc_command)
+    def execute(self):
+        self.generate_doc(lambda t: True, create_dummydoc_command)
 
 
 def create_dummydoc_command(classpath, gendir, *targets):
-  # here we need to test that we get the expected classpath
-  pass
+    # here we need to test that we get the expected classpath
+    pass
 
 
 class JvmdocGenTest(JvmTaskTestBase):
-  """Test some base functionality in JvmdocGen."""
+    """Test some base functionality in JvmdocGen."""
 
-  @classmethod
-  def task_type(cls):
-    return DummyJvmdocGen
+    @classmethod
+    def task_type(cls):
+        return DummyJvmdocGen
 
-  def setUp(self):
-    super().setUp()
+    def setUp(self):
+        super().setUp()
 
-    self.t1 = self.make_target('t1')
-    context = self.context(target_roots=[self.t1])
+        self.t1 = self.make_target("t1")
+        context = self.context(target_roots=[self.t1])
 
-    self.targets = context.targets()
+        self.targets = context.targets()
 
-    self.populate_runtime_classpath(context)
+        self.populate_runtime_classpath(context)
 
-    self.task = self.create_task(context)
+        self.task = self.create_task(context)
 
-  def test_classpath(self):
-    self.task.execute()
+    def test_classpath(self):
+        self.task.execute()
 
-  def test_generate(self):
-    def create_jvmdoc_command_fail(classpath, gendir, *targets):
-      return ['python', os.path.join(os.path.dirname(__file__), "false.py")]
-    def create_jvmdoc_command_succeed(classpath, gendir, *targets):
-      return ['python', os.path.join(os.path.dirname(__file__), "true.py")]
+    def test_generate(self):
+        def create_jvmdoc_command_fail(classpath, gendir, *targets):
+            return ["python", os.path.join(os.path.dirname(__file__), "false.py")]
 
-    for generate in [self.task._generate_individual,
-                     self.task._generate_combined]:
-      with self.assertRaises(TaskError):
-        generate(self.targets, create_jvmdoc_command_fail)
+        def create_jvmdoc_command_succeed(classpath, gendir, *targets):
+            return ["python", os.path.join(os.path.dirname(__file__), "true.py")]
 
-      generate(self.targets, create_jvmdoc_command_succeed)
+        for generate in [self.task._generate_individual, self.task._generate_combined]:
+            with self.assertRaises(TaskError):
+                generate(self.targets, create_jvmdoc_command_fail)
+
+            generate(self.targets, create_jvmdoc_command_succeed)

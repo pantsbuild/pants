@@ -9,40 +9,44 @@ from pants_test.jvm.jvm_task_test_base import JvmTaskTestBase
 
 
 class DummyJvmTask(JvmTask):
-  def execute(self):
-    pass
+    def execute(self):
+        pass
 
 
 class JvmTaskTest(JvmTaskTestBase):
-  """Test some base functionality in JvmTask."""
+    """Test some base functionality in JvmTask."""
 
-  @classmethod
-  def task_type(cls):
-    return DummyJvmTask
+    @classmethod
+    def task_type(cls):
+        return DummyJvmTask
 
-  def setUp(self):
-    super().setUp()
+    def setUp(self):
+        super().setUp()
 
-    self.t1 = self.make_target('t1')
-    self.t2 = self.make_target('t2')
-    self.t3 = self.make_target('t3')
+        self.t1 = self.make_target("t1")
+        self.t2 = self.make_target("t2")
+        self.t3 = self.make_target("t3")
 
-    context = self.context(target_roots=[self.t1, self.t2, self.t3])
+        context = self.context(target_roots=[self.t1, self.t2, self.t3])
 
-    self.classpath = [os.path.join(self.pants_workdir, entry) for entry in ('a', 'b')]
-    self.populate_runtime_classpath(context, self.classpath)
+        self.classpath = [os.path.join(self.pants_workdir, entry) for entry in ("a", "b")]
+        self.populate_runtime_classpath(context, self.classpath)
 
-    self.task = self.create_task(context)
+        self.task = self.create_task(context)
 
-  def test_classpath(self):
-    self.assertEqual(self.classpath, self.task.classpath([self.t1]))
-    self.assertEqual(self.classpath, self.task.classpath([self.t2]))
-    self.assertEqual(self.classpath, self.task.classpath([self.t3]))
-    self.assertEqual(self.classpath, self.task.classpath([self.t1, self.t2, self.t3]))
+    def test_classpath(self):
+        self.assertEqual(self.classpath, self.task.classpath([self.t1]))
+        self.assertEqual(self.classpath, self.task.classpath([self.t2]))
+        self.assertEqual(self.classpath, self.task.classpath([self.t3]))
+        self.assertEqual(self.classpath, self.task.classpath([self.t1, self.t2, self.t3]))
 
-  def test_classpath_prefix(self):
-    self.assertEqual(['first'] + self.classpath,
-                     self.task.classpath([self.t1], classpath_prefix=['first']))
+    def test_classpath_prefix(self):
+        self.assertEqual(
+            ["first"] + self.classpath, self.task.classpath([self.t1], classpath_prefix=["first"])
+        )
 
-  def test_classpath_custom_product(self):
-    self.assertEqual([], self.task.classpath([self.t1], classpath_product=ClasspathProducts(self.pants_workdir)))
+    def test_classpath_custom_product(self):
+        self.assertEqual(
+            [],
+            self.task.classpath([self.t1], classpath_product=ClasspathProducts(self.pants_workdir)),
+        )

@@ -7,6 +7,6 @@ import time
 
 
 def test_terminates_self():
-  time.sleep(1)
+    time.sleep(1)
 
-  os.kill(os.getpid(), signal.SIGTERM)
+    os.kill(os.getpid(), signal.SIGTERM)

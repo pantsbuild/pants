@@ -6,11 +6,11 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 
 
 class ScalaArtifact(Artifact):
-  """Extends Artifact to append the configured Scala version.
+    """Extends Artifact to append the configured Scala version.
 
   :API: public
   """
 
-  @property
-  def name(self):
-    return ScalaPlatform.global_instance().suffix_version(self._base_name)
+    @property
+    def name(self):
+        return ScalaPlatform.global_instance().suffix_version(self._base_name)

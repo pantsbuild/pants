@@ -8,39 +8,40 @@ import pystache
 
 
 class MustacheRenderer:
-  """Renders text using mustache templates."""
+    """Renders text using mustache templates."""
 
-  class MustacheError(Exception):
-    """Indicates failure rendering mustache templates."""
+    class MustacheError(Exception):
+        """Indicates failure rendering mustache templates."""
 
-  @staticmethod
-  def expand(args):
-    # Add foo? for each foo in the map that evaluates to true.
-    # Mustache needs this, especially in cases where foo is a list: there is no way to render a
-    # block exactly once iff a list is not empty.
-    # Note: if the original map contains foo?, it will take precedence over our synthetic foo?.
-    def convert_val(x):
-      # Pystache can't handle sets, so we convert to maps of key->True.
-      if isinstance(x, set):
-        return dict([(k, True) for k in x])
-      elif isinstance(x, dict):
-        return MustacheRenderer.expand(x)
-      elif isinstance(x, list):
-        return [convert_val(e) for e in x]
-      else:
-        return x
-    items = [(key, convert_val(val)) for (key, val) in args.items()]
-    ret = dict([(key + '?', True) for (key, val) in items if val and not key.endswith('?')])
-    ret.update(dict(items))
-    return ret
+    @staticmethod
+    def expand(args):
+        # Add foo? for each foo in the map that evaluates to true.
+        # Mustache needs this, especially in cases where foo is a list: there is no way to render a
+        # block exactly once iff a list is not empty.
+        # Note: if the original map contains foo?, it will take precedence over our synthetic foo?.
+        def convert_val(x):
+            # Pystache can't handle sets, so we convert to maps of key->True.
+            if isinstance(x, set):
+                return dict([(k, True) for k in x])
+            elif isinstance(x, dict):
+                return MustacheRenderer.expand(x)
+            elif isinstance(x, list):
+                return [convert_val(e) for e in x]
+            else:
+                return x
 
-  @staticmethod
-  def parse_template(template_text):
-    template = pystache.parse(template_text)
-    return template
+        items = [(key, convert_val(val)) for (key, val) in args.items()]
+        ret = dict([(key + "?", True) for (key, val) in items if val and not key.endswith("?")])
+        ret.update(dict(items))
+        return ret
 
-  def __init__(self, template_dir=None, package_name=None):
-    """Create a renderer that finds templates by name in one of two ways.
+    @staticmethod
+    def parse_template(template_text):
+        template = pystache.parse(template_text)
+        return template
+
+    def __init__(self, template_dir=None, package_name=None):
+        """Create a renderer that finds templates by name in one of two ways.
 
     * If template_dir is specified, finds template foo in the file foo.mustache in that dir.
     * Otherwise, if package_name is specified, finds template foo embedded in that
@@ -48,45 +49,48 @@ class MustacheRenderer:
     * Otherwise will not find templates by name, so can only be used with an existing
       template string.
     """
-    self._template_dir = template_dir
-    self._package_name = package_name
-    if self._package_name is not None:
-      class PartialsLoader:
-        def get(me, template_name):
-          return self._get_template_text_from_package(template_name)
-      partials = PartialsLoader()
-    else:
-      partials = None
-    self._pystache_renderer = pystache.Renderer(search_dirs=template_dir, partials=partials)
-    self._templates = {}
+        self._template_dir = template_dir
+        self._package_name = package_name
+        if self._package_name is not None:
 
-  def render_name(self, template_name, args):
-    parsed_template = self._load_template(template_name)
-    return self.render(parsed_template, args)
+            class PartialsLoader:
+                def get(me, template_name):
+                    return self._get_template_text_from_package(template_name)
 
-  def render(self, template, args):
-    return self._pystache_renderer.render(template, MustacheRenderer.expand(args))
+            partials = PartialsLoader()
+        else:
+            partials = None
+        self._pystache_renderer = pystache.Renderer(search_dirs=template_dir, partials=partials)
+        self._templates = {}
 
-  def _load_template(self, template_name):
-    template = self._templates.get(template_name)
-    if not template:
-      if self._template_dir:
-        # Let pystache find the template by name.
-        template = self._pystache_renderer.load_template(template_name)
-      else:
-        template_text = self._get_template_text_from_package(template_name)
-        template = MustacheRenderer.parse_template(template_text)
-      self._templates[template_name] = template
-    return template
+    def render_name(self, template_name, args):
+        parsed_template = self._load_template(template_name)
+        return self.render(parsed_template, args)
 
-  def _get_template_text_from_package(self, template_name):
-    """Load the named template embedded in our package."""
-    if self._package_name is None:
-      raise self.MustacheError('No package specified for template loading.')
+    def render(self, template, args):
+        return self._pystache_renderer.render(template, MustacheRenderer.expand(args))
 
-    path = os.path.join('templates', template_name + '.mustache')
-    template_text = pkgutil.get_data(self._package_name, path)
-    if template_text is None:
-      raise self.MustacheError(
-        'could not find template {} in package {}'.format(path, self._package_name))
-    return template_text.decode('utf8')
+    def _load_template(self, template_name):
+        template = self._templates.get(template_name)
+        if not template:
+            if self._template_dir:
+                # Let pystache find the template by name.
+                template = self._pystache_renderer.load_template(template_name)
+            else:
+                template_text = self._get_template_text_from_package(template_name)
+                template = MustacheRenderer.parse_template(template_text)
+            self._templates[template_name] = template
+        return template
+
+    def _get_template_text_from_package(self, template_name):
+        """Load the named template embedded in our package."""
+        if self._package_name is None:
+            raise self.MustacheError("No package specified for template loading.")
+
+        path = os.path.join("templates", template_name + ".mustache")
+        template_text = pkgutil.get_data(self._package_name, path)
+        if template_text is None:
+            raise self.MustacheError(
+                "could not find template {} in package {}".format(path, self._package_name)
+            )
+        return template_text.decode("utf8")

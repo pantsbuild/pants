@@ -9,22 +9,25 @@ from pants.util.contextutil import temporary_file
 
 
 class XmlTestBase(unittest.TestCase):
-  """Base class for tests that parse xml."""
+    """Base class for tests that parse xml."""
 
-  @contextmanager
-  def xml_file(self,
-               manifest_element='manifest',
-               package_attribute='package',
-               package_value='org.pantsbuild.example.hello',
-               uses_sdk_element='uses-sdk',
-               android_attribute='android:targetSdkVersion',
-               activity_element='activity',
-               android_name_attribute='android:name',
-               application_name_value='org.pantsbuild.example.hello.HelloWorld'):
-    """Represent an .xml file (Here an AndroidManifest.xml is used)."""
-    with temporary_file(binary_mode=False) as fp:
-      fp.write(textwrap.dedent(
-        """<?xml version="1.0" encoding="utf-8"?>
+    @contextmanager
+    def xml_file(
+        self,
+        manifest_element="manifest",
+        package_attribute="package",
+        package_value="org.pantsbuild.example.hello",
+        uses_sdk_element="uses-sdk",
+        android_attribute="android:targetSdkVersion",
+        activity_element="activity",
+        android_name_attribute="android:name",
+        application_name_value="org.pantsbuild.example.hello.HelloWorld",
+    ):
+        """Represent an .xml file (Here an AndroidManifest.xml is used)."""
+        with temporary_file(binary_mode=False) as fp:
+            fp.write(
+                textwrap.dedent(
+                    """<?xml version="1.0" encoding="utf-8"?>
         <{manifest} xmlns:android="http://schemas.android.com/apk/res/android"
                     xmlns:unrelated="http://schemas.android.com/apk/res/android"
             {package}="{package_name}" >
@@ -35,14 +38,18 @@ class XmlTestBase(unittest.TestCase):
                     {android_name}="{application_name}" >
                 </{activity}>
             </application>
-        </{manifest}>""".format(manifest=manifest_element,
-                                package=package_attribute,
-                                package_name=package_value,
-                                uses_sdk=uses_sdk_element,
-                                android=android_attribute,
-                                activity=activity_element,
-                                android_name=android_name_attribute,
-                                application_name=application_name_value)))
-      fp.close()
-      path = fp.name
-      yield path
+        </{manifest}>""".format(
+                        manifest=manifest_element,
+                        package=package_attribute,
+                        package_name=package_value,
+                        uses_sdk=uses_sdk_element,
+                        android=android_attribute,
+                        activity=activity_element,
+                        android_name=android_name_attribute,
+                        application_name=application_name_value,
+                    )
+                )
+            )
+            fp.close()
+            path = fp.name
+            yield path

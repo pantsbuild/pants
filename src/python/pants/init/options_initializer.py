@@ -23,142 +23,144 @@ logger = logging.getLogger(__name__)
 
 
 class BuildConfigInitializer:
-  """Initializes a BuildConfiguration object.
+    """Initializes a BuildConfiguration object.
 
   This class uses a class-level cache for the internally generated `BuildConfiguration` object,
   which permits multiple invocations in the same runtime context without re-incurring backend &
   plugin loading, which can be expensive and cause issues (double task registration, etc).
   """
 
-  _cached_build_config = None
+    _cached_build_config = None
 
-  @classmethod
-  def get(cls, options_bootstrapper):
-    if cls._cached_build_config is None:
-      cls._cached_build_config = cls(options_bootstrapper).setup()
-    return cls._cached_build_config
+    @classmethod
+    def get(cls, options_bootstrapper):
+        if cls._cached_build_config is None:
+            cls._cached_build_config = cls(options_bootstrapper).setup()
+        return cls._cached_build_config
 
-  @classmethod
-  def reset(cls):
-    cls._cached_build_config = None
+    @classmethod
+    def reset(cls):
+        cls._cached_build_config = None
 
-  def __init__(self, options_bootstrapper):
-    self._options_bootstrapper = options_bootstrapper
-    self._bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
-    self._working_set = PluginResolver(self._options_bootstrapper).resolve()
+    def __init__(self, options_bootstrapper):
+        self._options_bootstrapper = options_bootstrapper
+        self._bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
+        self._working_set = PluginResolver(self._options_bootstrapper).resolve()
 
-  def _load_plugins(self, working_set, python_paths, plugins, backend_packages):
-    # Add any extra paths to python path (e.g., for loading extra source backends).
-    for path in python_paths:
-      if path not in sys.path:
-        sys.path.append(path)
-        pkg_resources.fixup_namespace_packages(path)
+    def _load_plugins(self, working_set, python_paths, plugins, backend_packages):
+        # Add any extra paths to python path (e.g., for loading extra source backends).
+        for path in python_paths:
+            if path not in sys.path:
+                sys.path.append(path)
+                pkg_resources.fixup_namespace_packages(path)
 
-    # Load plugins and backends.
-    return load_backends_and_plugins(plugins, working_set, backend_packages)
+        # Load plugins and backends.
+        return load_backends_and_plugins(plugins, working_set, backend_packages)
 
-  def setup(self):
-    """Load backends and plugins.
+    def setup(self):
+        """Load backends and plugins.
 
     :returns: A `BuildConfiguration` object constructed during backend/plugin loading.
     """
-    return self._load_plugins(
-      self._working_set,
-      self._bootstrap_options.pythonpath,
-      self._bootstrap_options.plugins,
-      self._bootstrap_options.backend_packages
-    )
+        return self._load_plugins(
+            self._working_set,
+            self._bootstrap_options.pythonpath,
+            self._bootstrap_options.plugins,
+            self._bootstrap_options.backend_packages,
+        )
 
 
 class OptionsInitializer:
-  """Initializes options."""
+    """Initializes options."""
 
-  @staticmethod
-  def _construct_options(options_bootstrapper, build_configuration):
-    """Parse and register options.
+    @staticmethod
+    def _construct_options(options_bootstrapper, build_configuration):
+        """Parse and register options.
 
     :returns: An Options object representing the full set of runtime options.
     """
-    # Now that plugins and backends are loaded, we can gather the known scopes.
+        # Now that plugins and backends are loaded, we can gather the known scopes.
 
-    # Gather the optionables that are not scoped to any other.  All known scopes are reachable
-    # via these optionables' known_scope_infos() methods.
-    top_level_optionables = (
-      {GlobalOptionsRegistrar} |
-      GlobalSubsystems.get() |
-      build_configuration.optionables() |
-      set(Goal.get_optionables())
-    )
+        # Gather the optionables that are not scoped to any other.  All known scopes are reachable
+        # via these optionables' known_scope_infos() methods.
+        top_level_optionables = (
+            {GlobalOptionsRegistrar}
+            | GlobalSubsystems.get()
+            | build_configuration.optionables()
+            | set(Goal.get_optionables())
+        )
 
-    # Now that we have the known scopes we can get the full options. `get_full_options` will
-    # sort and de-duplicate these for us.
-    known_scope_infos = [si
-                         for optionable in top_level_optionables
-                         for si in optionable.known_scope_infos()]
-    return options_bootstrapper.get_full_options(known_scope_infos)
+        # Now that we have the known scopes we can get the full options. `get_full_options` will
+        # sort and de-duplicate these for us.
+        known_scope_infos = [
+            si for optionable in top_level_optionables for si in optionable.known_scope_infos()
+        ]
+        return options_bootstrapper.get_full_options(known_scope_infos)
 
-  @staticmethod
-  def compute_pants_ignore(buildroot, global_options):
-    """Computes the merged value of the `--pants-ignore` flag.
+    @staticmethod
+    def compute_pants_ignore(buildroot, global_options):
+        """Computes the merged value of the `--pants-ignore` flag.
 
     This inherently includes the workdir and distdir locations if they are located under the
     buildroot.
     """
-    pants_ignore = list(global_options.pants_ignore)
+        pants_ignore = list(global_options.pants_ignore)
 
-    def add_ignore(absolute_path):
-      # To ensure that the path is ignored regardless of whether it is a symlink or a directory, we
-      # strip trailing slashes (which would signal that we wanted to ignore only directories).
-      maybe_rel_path = fast_relpath_optional(absolute_path, buildroot)
-      # Exclude temp workdir from <pants_ignore>.
-      # temp workdir is /path/to/<pants_workdir>/tmp/tmp<process_id>.pants.d
-      if maybe_rel_path and not re.search("tmp/tmp(.+).pants.d", maybe_rel_path):
-        rel_path = maybe_rel_path.rstrip(os.path.sep)
-        pants_ignore.append(f'/{rel_path}')
+        def add_ignore(absolute_path):
+            # To ensure that the path is ignored regardless of whether it is a symlink or a directory, we
+            # strip trailing slashes (which would signal that we wanted to ignore only directories).
+            maybe_rel_path = fast_relpath_optional(absolute_path, buildroot)
+            # Exclude temp workdir from <pants_ignore>.
+            # temp workdir is /path/to/<pants_workdir>/tmp/tmp<process_id>.pants.d
+            if maybe_rel_path and not re.search("tmp/tmp(.+).pants.d", maybe_rel_path):
+                rel_path = maybe_rel_path.rstrip(os.path.sep)
+                pants_ignore.append(f"/{rel_path}")
 
-    add_ignore(global_options.pants_workdir)
-    add_ignore(global_options.pants_distdir)
-    return pants_ignore
+        add_ignore(global_options.pants_workdir)
+        add_ignore(global_options.pants_distdir)
+        return pants_ignore
 
-  @staticmethod
-  def compute_pantsd_invalidation_globs(buildroot, bootstrap_options):
-    """Computes the merged value of the `--pantsd-invalidation-globs` option.
+    @staticmethod
+    def compute_pantsd_invalidation_globs(buildroot, bootstrap_options):
+        """Computes the merged value of the `--pantsd-invalidation-globs` option.
 
     Combines --pythonpath and --pants-config-files files that are in {buildroot} dir
     with those invalidation_globs provided by users.
     """
-    invalidation_globs = []
-    globs = bootstrap_options.pythonpath + \
-      bootstrap_options.pants_config_files + \
-      bootstrap_options.pantsd_invalidation_globs
-
-    for glob in globs:
-      glob_relpath = os.path.relpath(glob, buildroot)
-      if glob_relpath and (not glob_relpath.startswith("../")):
-        invalidation_globs.extend([glob_relpath, glob_relpath + '/**'])
-      else:
-        logging.getLogger(__name__).warning(
-          f"Changes to {glob}, outside of the buildroot, will not be invalidated."
+        invalidation_globs = []
+        globs = (
+            bootstrap_options.pythonpath
+            + bootstrap_options.pants_config_files
+            + bootstrap_options.pantsd_invalidation_globs
         )
 
-    return invalidation_globs
+        for glob in globs:
+            glob_relpath = os.path.relpath(glob, buildroot)
+            if glob_relpath and (not glob_relpath.startswith("../")):
+                invalidation_globs.extend([glob_relpath, glob_relpath + "/**"])
+            else:
+                logging.getLogger(__name__).warning(
+                    f"Changes to {glob}, outside of the buildroot, will not be invalidated."
+                )
 
-  @classmethod
-  def create(cls, options_bootstrapper, build_configuration, init_subsystems=True):
-    global_bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
+        return invalidation_globs
 
-    if global_bootstrap_options.pants_version != pants_version():
-      raise BuildConfigurationError(
-        f'Version mismatch: Requested version was {global_bootstrap_options.pants_version}, '
-        f'our version is {pants_version()}.'
-      )
+    @classmethod
+    def create(cls, options_bootstrapper, build_configuration, init_subsystems=True):
+        global_bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
 
-    # Parse and register options.
-    options = cls._construct_options(options_bootstrapper, build_configuration)
+        if global_bootstrap_options.pants_version != pants_version():
+            raise BuildConfigurationError(
+                f"Version mismatch: Requested version was {global_bootstrap_options.pants_version}, "
+                f"our version is {pants_version()}."
+            )
 
-    GlobalOptionsRegistrar.validate_instance(options.for_global_scope())
+        # Parse and register options.
+        options = cls._construct_options(options_bootstrapper, build_configuration)
 
-    if init_subsystems:
-      Subsystem.set_options(options)
+        GlobalOptionsRegistrar.validate_instance(options.for_global_scope())
 
-    return options
+        if init_subsystems:
+            Subsystem.set_options(options)
+
+        return options

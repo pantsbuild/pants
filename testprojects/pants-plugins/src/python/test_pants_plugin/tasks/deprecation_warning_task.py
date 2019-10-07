@@ -6,8 +6,10 @@ from pants.task.task import Task
 
 
 class DeprecationWarningTask(Task):
-  """Make a deprecation warning so that warning filters can be integration tested."""
+    """Make a deprecation warning so that warning filters can be integration tested."""
 
-  def execute(self):
-    warn_or_error(removal_version='999.999.9.dev9',
-                  deprecated_entity_description='This is a test warning!')
+    def execute(self):
+        warn_or_error(
+            removal_version="999.999.9.dev9",
+            deprecated_entity_description="This is a test warning!",
+        )

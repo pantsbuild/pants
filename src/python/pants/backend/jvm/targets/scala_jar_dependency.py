@@ -6,12 +6,12 @@ from pants.java.jar.jar_dependency import JarDependency
 
 
 class ScalaJarDependency(JarDependency):
-  """A JarDependency with the configured '--scala-platform-version' automatically appended.
+    """A JarDependency with the configured '--scala-platform-version' automatically appended.
 
   This allows for more natural consumption of cross-published scala libraries, which have their
   scala version/platform appended to the artifact name.
   """
 
-  @property
-  def name(self):
-    return ScalaPlatform.global_instance().suffix_version(self.base_name)
+    @property
+    def name(self):
+        return ScalaPlatform.global_instance().suffix_version(self.base_name)

@@ -6,14 +6,14 @@ from pants.backend.python.targets.python_tests import PythonTests
 
 
 class PythonLibrary(PythonTarget):
-  """A Python library.
+    """A Python library.
 
   :API: public
   """
 
-  @classmethod
-  def alias(cls):
-    return 'python_library'
+    @classmethod
+    def alias(cls):
+        return "python_library"
 
-  default_sources_globs = '*.py'
-  default_sources_exclude_globs = PythonTests.default_sources_globs
+    default_sources_globs = "*.py"
+    default_sources_exclude_globs = PythonTests.default_sources_globs

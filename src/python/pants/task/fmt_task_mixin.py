@@ -2,12 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.task.target_restriction_mixins import (
-  HasSkipAndTransitiveGoalOptionsMixin,
-  SkipAndTransitiveGoalOptionsRegistrar,
+    HasSkipAndTransitiveGoalOptionsMixin,
+    SkipAndTransitiveGoalOptionsRegistrar,
 )
 
 
 class FmtTaskMixin(HasSkipAndTransitiveGoalOptionsMixin):
-  """A mixin to combine with code formatting tasks."""
-  goal_options_registrar_cls = SkipAndTransitiveGoalOptionsRegistrar
-  target_filtering_enabled = True
+    """A mixin to combine with code formatting tasks."""
+
+    goal_options_registrar_cls = SkipAndTransitiveGoalOptionsRegistrar
+    target_filtering_enabled = True

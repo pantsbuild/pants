@@ -4,8 +4,8 @@
 from collections import namedtuple
 
 
-class ImportedRepo(namedtuple('_ImportedRepo', ['import_prefix', 'vcs', 'url'])):
-  """The three values used to import a remote Go repo.
+class ImportedRepo(namedtuple("_ImportedRepo", ["import_prefix", "vcs", "url"])):
+    """The three values used to import a remote Go repo.
 
       - import_prefix: The alias of the root of the referenced repo, when used in import statements.
       - vcs: The type of VCS used by the referenced repo.

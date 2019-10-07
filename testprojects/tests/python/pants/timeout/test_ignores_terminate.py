@@ -6,12 +6,12 @@ import time
 
 
 def test_ignores_terminate():
-  def signal_term_handler(signal, frame):
-    # Ignore SIGTERM.
-    pass
+    def signal_term_handler(signal, frame):
+        # Ignore SIGTERM.
+        pass
 
-  signal.signal(signal.SIGTERM, signal_term_handler)
-  time.sleep(1000)
+    signal.signal(signal.SIGTERM, signal_term_handler)
+    time.sleep(1000)
 
-  # We need a second sleep because the SIGTERM will interrupt the first sleep.
-  time.sleep(1000)
+    # We need a second sleep because the SIGTERM will interrupt the first sleep.
+    time.sleep(1000)

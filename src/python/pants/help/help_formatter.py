@@ -9,74 +9,76 @@ from pants.help.help_info_extracter import HelpInfoExtracter
 
 
 class HelpFormatter:
+    def __init__(self, scope, show_recursive, show_advanced, color):
+        self._scope = scope
+        self._show_recursive = show_recursive
+        self._show_advanced = show_advanced
+        self._color = color
 
-  def __init__(self, scope, show_recursive, show_advanced, color):
-    self._scope = scope
-    self._show_recursive = show_recursive
-    self._show_advanced = show_advanced
-    self._color = color
+    def _maybe_blue(self, s):
+        return self._maybe_color(blue, s)
 
-  def _maybe_blue(self, s):
-    return self._maybe_color(blue, s)
+    def _maybe_cyan(self, s):
+        return self._maybe_color(cyan, s)
 
-  def _maybe_cyan(self, s):
-    return self._maybe_color(cyan, s)
+    def _maybe_green(self, s):
+        return self._maybe_color(green, s)
 
-  def _maybe_green(self, s):
-    return self._maybe_color(green, s)
+    def _maybe_red(self, s):
+        return self._maybe_color(red, s)
 
-  def _maybe_red(self, s):
-    return self._maybe_color(red, s)
+    def _maybe_color(self, color, s):
+        return color(s) if self._color else s
 
-  def _maybe_color(self, color, s):
-    return color(s) if self._color else s
-
-  def format_options(self, scope, description, option_registrations_iter):
-    """Return a help message for the specified options.
+    def format_options(self, scope, description, option_registrations_iter):
+        """Return a help message for the specified options.
 
     :param option_registrations_iter: An iterator over (args, kwargs) pairs, as passed in to
                                       options registration.
     """
-    oshi = HelpInfoExtracter(self._scope).get_option_scope_help_info(option_registrations_iter)
-    lines = []
-    def add_option(category, ohis):
-      if ohis:
-        lines.append('')
-        display_scope = scope or 'Global'
-        if category:
-          lines.append(self._maybe_blue('{} {} options:'.format(display_scope, category)))
-        else:
-          lines.append(self._maybe_blue('{} options:'.format(display_scope)))
-          if description:
-            lines.append(description)
-        lines.append(' ')
-        for ohi in ohis:
-          lines.extend(self.format_option(ohi))
-    add_option('', oshi.basic)
-    if self._show_recursive:
-      add_option('recursive', oshi.recursive)
-    if self._show_advanced:
-      add_option('advanced', oshi.advanced)
-    return lines
+        oshi = HelpInfoExtracter(self._scope).get_option_scope_help_info(option_registrations_iter)
+        lines = []
 
-  def format_option(self, ohi):
-    """Format the help output for a single option.
+        def add_option(category, ohis):
+            if ohis:
+                lines.append("")
+                display_scope = scope or "Global"
+                if category:
+                    lines.append(self._maybe_blue("{} {} options:".format(display_scope, category)))
+                else:
+                    lines.append(self._maybe_blue("{} options:".format(display_scope)))
+                    if description:
+                        lines.append(description)
+                lines.append(" ")
+                for ohi in ohis:
+                    lines.extend(self.format_option(ohi))
+
+        add_option("", oshi.basic)
+        if self._show_recursive:
+            add_option("recursive", oshi.recursive)
+        if self._show_advanced:
+            add_option("advanced", oshi.advanced)
+        return lines
+
+    def format_option(self, ohi):
+        """Format the help output for a single option.
 
     :param OptionHelpInfo ohi: Extracted information for option to print
     :return: Formatted help text for this option
     :rtype: list of string
     """
-    lines = []
-    choices = 'one of: [{}] '.format(ohi.choices) if ohi.choices else ''
-    arg_line = ('{args} {dflt}'
-                .format(args=self._maybe_cyan(', '.join(ohi.display_args)),
-                        dflt=self._maybe_green('({}default: {})'.format(choices, ohi.default))))
-    lines.append(arg_line)
+        lines = []
+        choices = "one of: [{}] ".format(ohi.choices) if ohi.choices else ""
+        arg_line = "{args} {dflt}".format(
+            args=self._maybe_cyan(", ".join(ohi.display_args)),
+            dflt=self._maybe_green("({}default: {})".format(choices, ohi.default)),
+        )
+        lines.append(arg_line)
 
-    indent = '    '
-    lines.extend(['{}{}'.format(indent, s) for s in wrap(ohi.help, 76)])
-    if ohi.deprecated_message:
-      lines.append(self._maybe_red('{}{}.'.format(indent, ohi.deprecated_message)))
-      if ohi.removal_hint:
-        lines.append(self._maybe_red('{}{}'.format(indent, ohi.removal_hint)))
-    return lines
+        indent = "    "
+        lines.extend(["{}{}".format(indent, s) for s in wrap(ohi.help, 76)])
+        if ohi.deprecated_message:
+            lines.append(self._maybe_red("{}{}.".format(indent, ohi.deprecated_message)))
+            if ohi.removal_hint:
+                lines.append(self._maybe_red("{}{}".format(indent, ohi.removal_hint)))
+        return lines

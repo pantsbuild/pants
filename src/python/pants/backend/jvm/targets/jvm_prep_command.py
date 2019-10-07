@@ -8,7 +8,7 @@ from pants.base.payload_field import PrimitiveField
 
 
 class JvmPrepCommand(JvmTarget):
-  """A command (defined in a Java target) that must be run before other tasks in a goal.
+    """A command (defined in a Java target) that must be run before other tasks in a goal.
 
   For example, you can use `jvm_prep_command()` to execute a script that sets up tunnels to database
   servers. These tunnels could then be leveraged by integration tests.
@@ -34,42 +34,47 @@ class JvmPrepCommand(JvmTarget):
 
   :API: public
   """
-  _goals=frozenset()
 
-  @staticmethod
-  def add_goal(goal):
-    """Add a named goal to the list of valid goals for the 'goal' parameter."""
-    JvmPrepCommand._goals = frozenset(list(JvmPrepCommand._goals) + [goal])
+    _goals = frozenset()
 
-  @classmethod
-  def reset(cls):
-    """Used for testing purposes to reset state."""
-    cls._goals=frozenset()
+    @staticmethod
+    def add_goal(goal):
+        """Add a named goal to the list of valid goals for the 'goal' parameter."""
+        JvmPrepCommand._goals = frozenset(list(JvmPrepCommand._goals) + [goal])
 
-  @staticmethod
-  def goals():
-    return JvmPrepCommand._goals
+    @classmethod
+    def reset(cls):
+        """Used for testing purposes to reset state."""
+        cls._goals = frozenset()
 
-  def __init__(self, payload=None, mainclass=None, args=None, jvm_options=None, goal=None,
-      **kwargs):
-    """
+    @staticmethod
+    def goals():
+        return JvmPrepCommand._goals
+
+    def __init__(
+        self, payload=None, mainclass=None, args=None, jvm_options=None, goal=None, **kwargs
+    ):
+        """
     :param args: A list of command-line args to the excutable.
     :param goal: Pants goal to run this command in [test, binary or compile]. If not specified,
                  runs in 'test'
     :param jvm_options: extra options to pass the JVM
     :param mainclass: The path to the executable that should be run.
     """
-    payload = payload or Payload()
-    goal = goal or 'test'
-    payload.add_fields({
-      'goal': PrimitiveField(goal),
-      'mainclass': PrimitiveField(mainclass),
-      'args': PrimitiveField(args or []),
-      'jvm_options': PrimitiveField(jvm_options or []),
-    })
-    super().__init__(payload=payload, **kwargs)
-    if not mainclass:
-      raise TargetDefinitionException(self, 'mainclass must be specified.')
-    if goal not in self.goals():
-      raise TargetDefinitionException(self, 'Got goal "{}". Goal must be one of {}.'.format(
-          goal, self.goals()))
+        payload = payload or Payload()
+        goal = goal or "test"
+        payload.add_fields(
+            {
+                "goal": PrimitiveField(goal),
+                "mainclass": PrimitiveField(mainclass),
+                "args": PrimitiveField(args or []),
+                "jvm_options": PrimitiveField(jvm_options or []),
+            }
+        )
+        super().__init__(payload=payload, **kwargs)
+        if not mainclass:
+            raise TargetDefinitionException(self, "mainclass must be specified.")
+        if goal not in self.goals():
+            raise TargetDefinitionException(
+                self, 'Got goal "{}". Goal must be one of {}.'.format(goal, self.goals())
+            )

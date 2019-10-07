@@ -4,5 +4,5 @@
 from pants.bin import pants_loader
 
 
-if __name__ == '__main__':
-  pants_loader.main()
+if __name__ == "__main__":
+    pants_loader.main()

@@ -9,43 +9,49 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 
 
 class IvyImports(IvyTaskMixin, NailgunTask):
-  """Resolves jar files for imported_targets on `ImportJarsMixin` targets.
+    """Resolves jar files for imported_targets on `ImportJarsMixin` targets.
 
   One use case is for JavaProtobufLibrary, which includes imports for jars containing .proto files.
   """
 
-  # TODO https://github.com/pantsbuild/pants/issues/604 product_types start
-  @classmethod
-  def product_types(cls):
-    return [JarImportProducts]
-  # TODO https://github.com/pantsbuild/pants/issues/604 product_types finish
+    # TODO https://github.com/pantsbuild/pants/issues/604 product_types start
+    @classmethod
+    def product_types(cls):
+        return [JarImportProducts]
 
-  @staticmethod
-  def has_imports(target):
-    return isinstance(target, ImportJarsMixin) and target.imported_targets
+    # TODO https://github.com/pantsbuild/pants/issues/604 product_types finish
 
-  def execute(self):
-    jar_import_products = self.context.products.get_data(JarImportProducts,
-                                                         init_func=JarImportProducts)
+    @staticmethod
+    def has_imports(target):
+        return isinstance(target, ImportJarsMixin) and target.imported_targets
 
-    # Gather all targets that are both capable of importing jars and actually declare some imports.
-    targets = self.context.targets(predicate=self.has_imports)
-    if not targets:
-      return
+    def execute(self):
+        jar_import_products = self.context.products.get_data(
+            JarImportProducts, init_func=JarImportProducts
+        )
 
-    # Create a list of all of these targets plus the list of JarDependencies they depend on.
-    all_targets = set(targets)
-    for target in targets:
-      all_targets.update(target.imported_targets)
+        # Gather all targets that are both capable of importing jars and actually declare some imports.
+        targets = self.context.targets(predicate=self.has_imports)
+        if not targets:
+            return
 
-    imports_classpath = ClasspathProducts(self.get_options().pants_workdir)
-    self.resolve(executor=self.create_java_executor(),
-                 targets=all_targets,
-                 classpath_products=imports_classpath,
-                 invalidate_dependents=True)
+        # Create a list of all of these targets plus the list of JarDependencies they depend on.
+        all_targets = set(targets)
+        for target in targets:
+            all_targets.update(target.imported_targets)
 
-    for target in targets:
-      cp_entries = imports_classpath.get_classpath_entries_for_targets(target.closure(bfs=True))
-      for conf, cp_entry in cp_entries:
-        if isinstance(cp_entry, ArtifactClasspathEntry):
-          jar_import_products.imported(target, cp_entry.coordinate, cp_entry.path)
+        imports_classpath = ClasspathProducts(self.get_options().pants_workdir)
+        self.resolve(
+            executor=self.create_java_executor(),
+            targets=all_targets,
+            classpath_products=imports_classpath,
+            invalidate_dependents=True,
+        )
+
+        for target in targets:
+            cp_entries = imports_classpath.get_classpath_entries_for_targets(
+                target.closure(bfs=True)
+            )
+            for conf, cp_entry in cp_entries:
+                if isinstance(cp_entry, ArtifactClasspathEntry):
+                    jar_import_products.imported(target, cp_entry.coordinate, cp_entry.path)

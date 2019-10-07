@@ -15,7 +15,7 @@ from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
 
 
 class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
-  """Runs `go test` on Go packages.
+    """Runs `go test` on Go packages.
 
   To run a library's tests, GoTest only requires a Go workspace to be initialized
   (see GoWorkspaceTask) with links to necessary source files. It does not require
@@ -25,97 +25,109 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
   from scratch.
   """
 
-  @classmethod
-  def register_options(cls, register):
-    super().register_options(register)
-    # TODO: make a shlexed flags option type!
-    register('--shlexed-build-and-test-flags', type=list, member_type=str, fingerprint=True,
-             help='Flags to pass in to `go test` tool. Each string is parsed as a shell would, '
-                  'respecting quotes and backslashes.')
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        # TODO: make a shlexed flags option type!
+        register(
+            "--shlexed-build-and-test-flags",
+            type=list,
+            member_type=str,
+            fingerprint=True,
+            help="Flags to pass in to `go test` tool. Each string is parsed as a shell would, "
+            "respecting quotes and backslashes.",
+        )
 
-  @classmethod
-  def supports_passthru_args(cls):
-    return True
+    @classmethod
+    def supports_passthru_args(cls):
+        return True
 
-  def _test_target_filter(self):
-    """Filter for go library targets (in the target closure) with test files."""
-    return self.is_test_target
+    def _test_target_filter(self):
+        """Filter for go library targets (in the target closure) with test files."""
+        return self.is_test_target
 
-  def _validate_target(self, target):
-    self.ensure_workspace(target)
+    def _validate_target(self, target):
+        self.ensure_workspace(target)
 
-  @dataclass(frozen=True)
-  class _GoTestTargetInfo:
-    import_path: str
-    gopath: str
+    @dataclass(frozen=True)
+    class _GoTestTargetInfo:
+        import_path: str
+        gopath: str
 
-  def _generate_args_for_targets(self, targets):
-    """
+    def _generate_args_for_targets(self, targets):
+        """
     Generate a dict mapping target -> _GoTestTargetInfo so that the import path and gopath can be
     reconstructed for spawning test commands regardless of how the targets are partitioned.
     """
-    return {
-      t: self._GoTestTargetInfo(import_path=t.import_path, gopath=self.get_gopath(t))
-      for t in targets
-    }
+        return {
+            t: self._GoTestTargetInfo(import_path=t.import_path, gopath=self.get_gopath(t))
+            for t in targets
+        }
 
-  @contextmanager
-  def partitions(self, per_target, all_targets, test_targets):
-    if per_target:
-      def iter_partitions():
-        for test_target in test_targets:
-          partition = (test_target,)
-          args = (self._generate_args_for_targets([test_target]),)
-          yield partition, args
-    else:
-      def iter_partitions():
-        if test_targets:
-          partition = tuple(test_targets)
-          args = (self._generate_args_for_targets(test_targets),)
-          yield partition, args
-    yield iter_partitions
+    @contextmanager
+    def partitions(self, per_target, all_targets, test_targets):
+        if per_target:
 
-  def collect_files(self, *args):
-    """This task currently doesn't have any output that it would store in an artifact cache."""
-    return []
+            def iter_partitions():
+                for test_target in test_targets:
+                    partition = (test_target,)
+                    args = (self._generate_args_for_targets([test_target]),)
+                    yield partition, args
 
-  @memoized_property
-  def _build_and_test_flags(self):
-    return  [
-      single_flag
-      for flags_section in self.get_options().shlexed_build_and_test_flags
-      for single_flag in safe_shlex_split(flags_section)
-    ]
+        else:
 
-  def _spawn(self, workunit, go_cmd, cwd):
-    go_process = go_cmd.spawn(cwd=cwd,
-                              stdout=workunit.output('stdout'),
-                              stderr=workunit.output('stderr'))
-    return SubprocessProcessHandler(go_process)
+            def iter_partitions():
+                if test_targets:
+                    partition = tuple(test_targets)
+                    args = (self._generate_args_for_targets(test_targets),)
+                    yield partition, args
 
-  @property
-  def _maybe_workdir(self):
-    if self.run_tests_in_chroot:
-      return None
-    return get_buildroot()
+        yield iter_partitions
 
-  def run_tests(self, fail_fast, test_targets, args_by_target):
-    self.context.log.debug('test_targets: {}'.format(test_targets))
+    def collect_files(self, *args):
+        """This task currently doesn't have any output that it would store in an artifact cache."""
+        return []
 
-    with self.chroot(test_targets, self._maybe_workdir) as chroot:
-      cmdline_args = self._build_and_test_flags + [
-        args_by_target[t].import_path for t in test_targets
-      ] + self.get_passthru_args()
-      gopath = create_path_env_var(
-        args_by_target[t].gopath for t in test_targets
-      )
-      go_cmd = self.go_dist.create_go_cmd('test', gopath=gopath, args=cmdline_args)
+    @memoized_property
+    def _build_and_test_flags(self):
+        return [
+            single_flag
+            for flags_section in self.get_options().shlexed_build_and_test_flags
+            for single_flag in safe_shlex_split(flags_section)
+        ]
 
-      self.context.log.debug('go_cmd: {}'.format(go_cmd))
+    def _spawn(self, workunit, go_cmd, cwd):
+        go_process = go_cmd.spawn(
+            cwd=cwd, stdout=workunit.output("stdout"), stderr=workunit.output("stderr")
+        )
+        return SubprocessProcessHandler(go_process)
 
-      workunit_labels = [WorkUnitLabel.TOOL, WorkUnitLabel.TEST]
-      with self.context.new_workunit(
-          name='go test', cmd=safe_shlex_join(go_cmd.cmdline), labels=workunit_labels) as workunit:
+    @property
+    def _maybe_workdir(self):
+        if self.run_tests_in_chroot:
+            return None
+        return get_buildroot()
 
-        exit_code = self.spawn_and_wait(test_targets, workunit=workunit, go_cmd=go_cmd, cwd=chroot)
-        return TestResult.rc(exit_code)
+    def run_tests(self, fail_fast, test_targets, args_by_target):
+        self.context.log.debug("test_targets: {}".format(test_targets))
+
+        with self.chroot(test_targets, self._maybe_workdir) as chroot:
+            cmdline_args = (
+                self._build_and_test_flags
+                + [args_by_target[t].import_path for t in test_targets]
+                + self.get_passthru_args()
+            )
+            gopath = create_path_env_var(args_by_target[t].gopath for t in test_targets)
+            go_cmd = self.go_dist.create_go_cmd("test", gopath=gopath, args=cmdline_args)
+
+            self.context.log.debug("go_cmd: {}".format(go_cmd))
+
+            workunit_labels = [WorkUnitLabel.TOOL, WorkUnitLabel.TEST]
+            with self.context.new_workunit(
+                name="go test", cmd=safe_shlex_join(go_cmd.cmdline), labels=workunit_labels
+            ) as workunit:
+
+                exit_code = self.spawn_and_wait(
+                    test_targets, workunit=workunit, go_cmd=go_cmd, cwd=chroot
+                )
+                return TestResult.rc(exit_code)

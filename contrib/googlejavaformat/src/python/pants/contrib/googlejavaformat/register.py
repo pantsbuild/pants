@@ -3,10 +3,12 @@
 
 from pants.goal.task_registrar import TaskRegistrar as task
 
-from pants.contrib.googlejavaformat.googlejavaformat import (GoogleJavaFormat,
-                                                             GoogleJavaFormatCheckFormat)
+from pants.contrib.googlejavaformat.googlejavaformat import (
+    GoogleJavaFormat,
+    GoogleJavaFormatCheckFormat,
+)
 
 
 def register_goals():
-  task(name='google-java-format', action=GoogleJavaFormat).install('fmt')
-  task(name='google-java-format', action=GoogleJavaFormatCheckFormat).install('lint')
+    task(name="google-java-format", action=GoogleJavaFormat).install("fmt")
+    task(name="google-java-format", action=GoogleJavaFormatCheckFormat).install("lint")

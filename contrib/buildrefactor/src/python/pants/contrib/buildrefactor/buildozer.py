@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class Buildozer(Task):
-  """Enables interaction with the Buildozer Go binary
+    """Enables interaction with the Buildozer Go binary
 
   Behavior:
   1. `./pants buildozer --add-dependencies=<dependencies>`
@@ -31,43 +31,49 @@ class Buildozer(Task):
     Note that buildozer assumes that BUILD files contain a name field for the target.
   """
 
-  options_scope = 'buildozer'
+    options_scope = "buildozer"
 
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super().subsystem_dependencies() + (BuildozerBinary.scoped(cls),)
+    @classmethod
+    def subsystem_dependencies(cls):
+        return super().subsystem_dependencies() + (BuildozerBinary.scoped(cls),)
 
-  @classmethod
-  def register_options(cls, register):
-    register('--add-dependencies', type=str, help='The dependency or dependencies to add')
-    register('--remove-dependencies', type=str, help='The dependency or dependencies to remove')
-    register('--command', type=str, help='A custom buildozer command to execute')
+    @classmethod
+    def register_options(cls, register):
+        register("--add-dependencies", type=str, help="The dependency or dependencies to add")
+        register("--remove-dependencies", type=str, help="The dependency or dependencies to remove")
+        register("--command", type=str, help="A custom buildozer command to execute")
 
-  def execute(self):
-    options = self.get_options()
-    if options.command:
-      if options.add_dependencies or options.remove_dependencies:
-        raise TaskError('Buildozer custom command cannot be used together with ' +
-                        '--add-dependencies or --remove-dependencies.')
-      self._execute_buildozer_script(options.command)
+    def execute(self):
+        options = self.get_options()
+        if options.command:
+            if options.add_dependencies or options.remove_dependencies:
+                raise TaskError(
+                    "Buildozer custom command cannot be used together with "
+                    + "--add-dependencies or --remove-dependencies."
+                )
+            self._execute_buildozer_script(options.command)
 
-    if options.add_dependencies:
-      self._execute_buildozer_script('add dependencies {}'.format(options.add_dependencies))
+        if options.add_dependencies:
+            self._execute_buildozer_script("add dependencies {}".format(options.add_dependencies))
 
-    if options.remove_dependencies:
-      self._execute_buildozer_script('remove dependencies {}'.format(options.remove_dependencies))
+        if options.remove_dependencies:
+            self._execute_buildozer_script(
+                "remove dependencies {}".format(options.remove_dependencies)
+            )
 
-  def _execute_buildozer_script(self, command):
-    binary = BuildozerBinary.scoped_instance(self)
-    for root in self.context.target_roots:
-      binary.execute(command, root.address.spec, context=self.context)
+    def _execute_buildozer_script(self, command):
+        binary = BuildozerBinary.scoped_instance(self)
+        for root in self.context.target_roots:
+            binary.execute(command, root.address.spec, context=self.context)
 
-  @classmethod
-  def _execute_buildozer_command(cls, buildozer_command):
-    try:
-      subprocess.check_call(buildozer_command, cwd=get_buildroot())
-    except subprocess.CalledProcessError as err:
-      if err.returncode == 3:
-        logger.warning('{} ... no changes were made'.format(buildozer_command))
-      else:
-        raise TaskError('{} ... exited non-zero ({}).'.format(buildozer_command, err.returncode))
+    @classmethod
+    def _execute_buildozer_command(cls, buildozer_command):
+        try:
+            subprocess.check_call(buildozer_command, cwd=get_buildroot())
+        except subprocess.CalledProcessError as err:
+            if err.returncode == 3:
+                logger.warning("{} ... no changes were made".format(buildozer_command))
+            else:
+                raise TaskError(
+                    "{} ... exited non-zero ({}).".format(buildozer_command, err.returncode)
+                )

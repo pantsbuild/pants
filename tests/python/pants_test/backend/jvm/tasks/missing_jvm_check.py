@@ -6,9 +6,11 @@ from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 def is_missing_jvm(version):
-  init_subsystem(DistributionLocator)
-  try:
-    DistributionLocator.cached(minimum_version=version, maximum_version='{}.9999'.format(version))
-    return False
-  except DistributionLocator.Error:
-    return True
+    init_subsystem(DistributionLocator)
+    try:
+        DistributionLocator.cached(
+            minimum_version=version, maximum_version="{}.9999".format(version)
+        )
+        return False
+    except DistributionLocator.Error:
+        return True

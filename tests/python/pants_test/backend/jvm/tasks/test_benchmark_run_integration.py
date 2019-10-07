@@ -5,9 +5,12 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class BenchmarkRunIntegrationTest(PantsRunIntegrationTest):
-  def test_running_an_empty_benchmark_target(self):
-    pants_run = self.run_pants([
-      'bench',
-      '--target=org.pantsbuild.testproject.bench.CaliperBench',
-      'testprojects/src/java/org/pantsbuild/testproject/bench',])
-    self.assert_success(pants_run)
+    def test_running_an_empty_benchmark_target(self):
+        pants_run = self.run_pants(
+            [
+                "bench",
+                "--target=org.pantsbuild.testproject.bench.CaliperBench",
+                "testprojects/src/java/org/pantsbuild/testproject/bench",
+            ]
+        )
+        self.assert_success(pants_run)

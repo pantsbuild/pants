@@ -5,11 +5,11 @@ from pants.contrib.go.targets.go_local_source import GoLocalSource
 
 
 class GoLibrary(GoLocalSource):
-  """A local Go package."""
+    """A local Go package."""
 
-  default_sources_globs = '*'
-  default_sources_exclude_globs = ('BUILD', 'BUILD.*')
+    default_sources_globs = "*"
+    default_sources_exclude_globs = ("BUILD", "BUILD.*")
 
-  @classmethod
-  def alias(cls):
-    return 'go_library'
+    @classmethod
+    def alias(cls):
+        return "go_library"

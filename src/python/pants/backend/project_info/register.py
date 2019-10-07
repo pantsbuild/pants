@@ -11,17 +11,17 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def build_file_aliases():
-  pass
+    pass
 
 
 def register_goals():
-  task(name='idea-plugin', action=IdeaPluginGen).install()
-  task(name='export', action=Export).install()
+    task(name="idea-plugin", action=IdeaPluginGen).install()
+    task(name="export", action=Export).install()
 
-  task(name='depmap', action=Depmap).install()
-  task(name='dependencies', action=Dependencies).install()
-  task(name='filedeps', action=FileDeps).install('filedeps')
+    task(name="depmap", action=Depmap).install()
+    task(name="dependencies", action=Dependencies).install()
+    task(name="filedeps", action=FileDeps).install("filedeps")
 
 
 def rules():
-  return tuple(source_file_validator.rules())
+    return tuple(source_file_validator.rules())

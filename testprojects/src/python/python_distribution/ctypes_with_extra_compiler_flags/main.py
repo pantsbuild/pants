@@ -4,6 +4,6 @@
 from ctypes_python_pkg.ctypes_wrapper import f
 
 
-if __name__ == '__main__':
-  x = 3
-  print('x={}, f(x)={}'.format(x, f(x)))
+if __name__ == "__main__":
+    x = 3
+    print("x={}, f(x)={}".format(x, f(x)))

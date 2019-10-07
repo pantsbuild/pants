@@ -10,23 +10,23 @@ from pants_test.task_test_base import TaskTestBase
 
 
 class GrpcioTestBase(TaskTestBase):
+    @classmethod
+    def task_type(cls):
+        return GrpcioRun
 
-  @classmethod
-  def task_type(cls):
-    return GrpcioRun
+    def generate_grpcio_targets(self, python_grpcio_library):
+        grpcio_prep_task_type = self.synthesize_task_subtype(GrpcioPrep, "gp")
+        context = self.context(
+            for_task_types=[grpcio_prep_task_type], target_roots=[python_grpcio_library]
+        )
 
-  def generate_grpcio_targets(self, python_grpcio_library):
-    grpcio_prep_task_type = self.synthesize_task_subtype(GrpcioPrep, 'gp')
-    context = self.context(for_task_types=[grpcio_prep_task_type],
-                           target_roots=[python_grpcio_library])
+        grpcio_prep = grpcio_prep_task_type(context, os.path.join(self.pants_workdir, "gp"))
+        grpcio_prep.execute()
 
-    grpcio_prep = grpcio_prep_task_type(context, os.path.join(self.pants_workdir, 'gp'))
-    grpcio_prep.execute()
+        grpcio_gen = self.create_task(context)
+        grpcio_gen.execute()
 
-    grpcio_gen = self.create_task(context)
-    grpcio_gen.execute()
+        def is_synthetic_python_library(target):
+            return isinstance(target, PythonLibrary) and target.is_synthetic
 
-    def is_synthetic_python_library(target):
-      return isinstance(target, PythonLibrary) and target.is_synthetic
-
-    return context.targets(predicate=is_synthetic_python_library)
+        return context.targets(predicate=is_synthetic_python_library)

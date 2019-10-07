@@ -11,21 +11,21 @@ from pants.util.strutil import create_path_env_var
 
 
 class HermeticPex:
-  """A mixin for types that provide an executable Pex that should be executed hermetically."""
+    """A mixin for types that provide an executable Pex that should be executed hermetically."""
 
-  def create_execute_request(
-    self,
-    python_setup: PythonSetup,
-    subprocess_encoding_environment: SubprocessEncodingEnvironment,
-    *,
-    pex_path: str,
-    pex_args: Iterable[str],
-    description: str,
-    input_files: Digest,
-    env: Optional[Dict[str, str]] = None,
-    **kwargs: Any
-  ) -> ExecuteProcessRequest:
-    """Creates an ExecuteProcessRequest that will run a PEX hermetically.
+    def create_execute_request(
+        self,
+        python_setup: PythonSetup,
+        subprocess_encoding_environment: SubprocessEncodingEnvironment,
+        *,
+        pex_path: str,
+        pex_args: Iterable[str],
+        description: str,
+        input_files: Digest,
+        env: Optional[Dict[str, str]] = None,
+        **kwargs: Any
+    ) -> ExecuteProcessRequest:
+        """Creates an ExecuteProcessRequest that will run a PEX hermetically.
 
     :param python_setup: The parameters for selecting python interpreters to use when invoking the
                          PEX.
@@ -39,28 +39,24 @@ class HermeticPex:
     :param **kwargs: Any additional :class:`ExecuteProcessRequest` kwargs to pass through.
     """
 
-    # NB: we use the hardcoded and generic bin name `python`, rather than something dynamic like
-    # `sys.executable`, to ensure that the interpreter may be discovered both locally and in remote
-    # execution (so long as `env` is populated with a `PATH` env var and `python` is discoverable
-    # somewhere on that PATH). This is only used to run the downloaded PEX tool; it is not
-    # necessarily the interpreter that PEX will use to execute the generated .pex file.
-    # TODO(#7735): Set --python-setup-interpreter-search-paths differently for the host and target
-    # platforms, when we introduce platforms in https://github.com/pantsbuild/pants/issues/7735.
-    argv = ('python', pex_path, *pex_args)
+        # NB: we use the hardcoded and generic bin name `python`, rather than something dynamic like
+        # `sys.executable`, to ensure that the interpreter may be discovered both locally and in remote
+        # execution (so long as `env` is populated with a `PATH` env var and `python` is discoverable
+        # somewhere on that PATH). This is only used to run the downloaded PEX tool; it is not
+        # necessarily the interpreter that PEX will use to execute the generated .pex file.
+        # TODO(#7735): Set --python-setup-interpreter-search-paths differently for the host and target
+        # platforms, when we introduce platforms in https://github.com/pantsbuild/pants/issues/7735.
+        argv = ("python", pex_path, *pex_args)
 
-    hermetic_env = env.copy() if env else {}
-    hermetic_env.update(
-      PATH=create_path_env_var(python_setup.interpreter_search_paths),
-      PEX_ROOT='./pex_root',
-      PEX_INHERIT_PATH='false',
-      PEX_IGNORE_RCFILES='true',
-      **subprocess_encoding_environment.invocation_environment_dict
-    )
+        hermetic_env = env.copy() if env else {}
+        hermetic_env.update(
+            PATH=create_path_env_var(python_setup.interpreter_search_paths),
+            PEX_ROOT="./pex_root",
+            PEX_INHERIT_PATH="false",
+            PEX_IGNORE_RCFILES="true",
+            **subprocess_encoding_environment.invocation_environment_dict
+        )
 
-    return ExecuteProcessRequest(
-      argv=argv,
-      input_files=input_files,
-      description=description,
-      env=hermetic_env,
-      **kwargs
-    )
+        return ExecuteProcessRequest(
+            argv=argv, input_files=input_files, description=description, env=hermetic_env, **kwargs
+        )

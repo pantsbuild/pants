@@ -12,15 +12,15 @@ from pants.source.source_root import SourceRootConfig
 
 
 class GlobalSubsystems:
-  @classmethod
-  def get(cls):
-    """Subsystems used outside of any task."""
-    return {
-      SourceRootConfig,
-      Reporting,
-      Reproducer,
-      RunTracker,
-      Changed,
-      BinaryUtil.Factory,
-      Subprocess.Factory
-    }
+    @classmethod
+    def get(cls):
+        """Subsystems used outside of any task."""
+        return {
+            SourceRootConfig,
+            Reporting,
+            Reproducer,
+            RunTracker,
+            Changed,
+            BinaryUtil.Factory,
+            Subprocess.Factory,
+        }

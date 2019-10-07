@@ -7,23 +7,23 @@ from pants.backend.jvm.targets.import_jars_mixin import ImportJarsMixin
 
 
 class JarImportProducts:
-  """Represents the products of jar import resolutions.
+    """Represents the products of jar import resolutions.
 
   Jar imports are jars containing source code to be unpacked and used locally.
   """
 
-  JarImport = namedtuple('JarImport', ['coordinate', 'jar'])
-  """Represents a jar containing source imports.
+    JarImport = namedtuple("JarImport", ["coordinate", "jar"])
+    """Represents a jar containing source imports.
 
   Each jar import has a `coordinate` :class:`pants.java.jar_utls.M2Coordinate`
   and a `jar` path that points to the resolved jar import for the `coordinate`.
   """
 
-  def __init__(self):
-    self._imports = defaultdict(list)
+    def __init__(self):
+        self._imports = defaultdict(list)
 
-  def imported(self, target, coordinate, jar):
-    """Registers a :class`JarImportProducts.JarImport` for the given target.
+    def imported(self, target, coordinate, jar):
+        """Registers a :class`JarImportProducts.JarImport` for the given target.
 
     :param target: The :class:`pants.backend.jvm.targets.import_jars_mixin.ImportJarsMixin` target
                    whose `all_imported_jar_deps` were resolved.
@@ -31,18 +31,18 @@ class JarImportProducts:
     :type coordinate: :class:`pants.java.jar_utls.M2Coordinate`
     :param string jar: The path of the resolved import jar.
     """
-    if not isinstance(target, ImportJarsMixin):
-      raise ValueError('The given target is not an `ImportJarsMixin`: {}'.format(target))
-    self._imports[target].append(self.JarImport(coordinate, jar))
+        if not isinstance(target, ImportJarsMixin):
+            raise ValueError("The given target is not an `ImportJarsMixin`: {}".format(target))
+        self._imports[target].append(self.JarImport(coordinate, jar))
 
-  def imports(self, target):
-    """Returns a list of :class:`JarImportProducts.JarImport`s for the given target.
+    def imports(self, target):
+        """Returns a list of :class:`JarImportProducts.JarImport`s for the given target.
 
     Will be an empty list if the target has no jar imports.
 
     :rtype: list
     """
-    return self._imports[target]
+        return self._imports[target]
 
-  def __repr__(self):
-    return 'JarImportProducts({!r})'.format(self._imports)
+    def __repr__(self):
+        return "JarImportProducts({!r})".format(self._imports)
