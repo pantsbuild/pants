@@ -112,6 +112,10 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   _name = 'mixed' # noqa
   compiler_name = 'rsc'
 
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super().subsystem_dependencies() + (Rsc,)
+
   @memoized_property
   def mirrored_target_option_actions(self):
     return {
@@ -120,7 +124,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
   @classmethod
   def implementation_version(cls):
-    return super().implementation_version() + [('RscCompile', 173)]
+    return super().implementation_version() + [('RscCompile', 174)]
 
   class JvmCompileWorkflowType(enum(['zinc-only', 'zinc-java', 'rsc-and-zinc'])):
     """Target classifications used to correctly schedule Zinc and Rsc jobs.
