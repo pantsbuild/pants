@@ -11,7 +11,7 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 
 
 class CoverageEngine(ABC):
-  """The interface JVM code coverage processors must support.
+    """The interface JVM code coverage processors must support.
 
   This is a stateful interface that will be called via the following sequence:
 
@@ -27,9 +27,9 @@ class CoverageEngine(ABC):
   is instantiated and used exactly once per `JUnitRun` task execution.
   """
 
-  @dataclass(frozen=True)
-  class RunModifications:
-    """Modifications that should be made to the java command where code coverage is collected.
+    @dataclass(frozen=True)
+    class RunModifications:
+        """Modifications that should be made to the java command where code coverage is collected.
 
     The `classpath_prepend` field should be an iterable of classpath elements to prepend to java
     command classpath.
@@ -37,33 +37,35 @@ class CoverageEngine(ABC):
     The `extra_jvm_options` should be a list of jvm options to include when executing the java
     command.
     """
-    classpath_prepend: Any
-    extra_jvm_options: Any
 
-    @classmethod
-    def create(cls, classpath_prepend=None, extra_jvm_options=None):
-      return cls(classpath_prepend=classpath_prepend or (),
-                 extra_jvm_options=extra_jvm_options or [])
+        classpath_prepend: Any
+        extra_jvm_options: Any
 
-  @abstractmethod
-  def instrument(self, output_dir):
-    """Instruments JVM bytecode for coverage tracking.
+        @classmethod
+        def create(cls, classpath_prepend=None, extra_jvm_options=None):
+            return cls(
+                classpath_prepend=classpath_prepend or (), extra_jvm_options=extra_jvm_options or []
+            )
+
+    @abstractmethod
+    def instrument(self, output_dir):
+        """Instruments JVM bytecode for coverage tracking.
 
     :param str output_dir: The path where report data should be generated under.
     """
 
-  @abstractmethod
-  def run_modifications(self, output_dir):
-    """Describe modifications needed to the java command line that will run the instrumented code.
+    @abstractmethod
+    def run_modifications(self, output_dir):
+        """Describe modifications needed to the java command line that will run the instrumented code.
 
     :param str output_dir: The path where report data should be generated under.
     :returns: A description of run modifications.
     :rtype: :class:`CoverageEngine.RunModifications`
     """
 
-  @abstractmethod
-  def report(self, output_dir, execution_failed_exception=None):
-    """Generate a report of code coverage.
+    @abstractmethod
+    def report(self, output_dir, execution_failed_exception=None):
+        """Generate a report of code coverage.
 
     :param str output_dir: The path where report data should be generated under.
     :param Exception execution_failed_exception: If execution of the instrumented code failed, the
@@ -72,25 +74,27 @@ class CoverageEngine(ABC):
     :rtype: str
     """
 
-  @staticmethod
-  def is_coverage_target(tgt):
-    # TODO: Does this actually need to check AnnotationProcessor targets? It does so at present
-    # to preserve compatibility while migrating off target labels to type checks, but it seems
-    # likely that inclusion of AnnotationProcessor in the past was in error, and unnecessary.
-    return (isinstance(tgt, (AnnotationProcessor, JavaLibrary, ScalaLibrary))
-            and not tgt.is_synthetic)
+    @staticmethod
+    def is_coverage_target(tgt):
+        # TODO: Does this actually need to check AnnotationProcessor targets? It does so at present
+        # to preserve compatibility while migrating off target labels to type checks, but it seems
+        # likely that inclusion of AnnotationProcessor in the past was in error, and unnecessary.
+        return (
+            isinstance(tgt, (AnnotationProcessor, JavaLibrary, ScalaLibrary))
+            and not tgt.is_synthetic
+        )
 
 
 class NoCoverage(CoverageEngine):
-  """A JVM code coverage processor that collects no code coverage data at all."""
+    """A JVM code coverage processor that collects no code coverage data at all."""
 
-  _NO_MODIFICATIONS = CoverageEngine.RunModifications.create()
+    _NO_MODIFICATIONS = CoverageEngine.RunModifications.create()
 
-  def instrument(self, output_dir):
-    pass
+    def instrument(self, output_dir):
+        pass
 
-  def run_modifications(self, output_dir):
-    return self._NO_MODIFICATIONS
+    def run_modifications(self, output_dir):
+        return self._NO_MODIFICATIONS
 
-  def report(self, output_dir, execution_failed_exception=None):
-    return None
+    def report(self, output_dir, execution_failed_exception=None):
+        return None

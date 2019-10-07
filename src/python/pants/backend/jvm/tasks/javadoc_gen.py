@@ -12,72 +12,85 @@ from pants.util.memo import memoized
 
 
 class JavadocGen(JvmdocGen):
-  """Generate javadoc html for Java source targets."""
+    """Generate javadoc html for Java source targets."""
 
-  @classmethod
-  @memoized
-  def jvmdoc(cls):
-    return Jvmdoc(tool_name='javadoc', product_type='javadoc')
+    @classmethod
+    @memoized
+    def jvmdoc(cls):
+        return Jvmdoc(tool_name="javadoc", product_type="javadoc")
 
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super().subsystem_dependencies() + (DistributionLocator,)
+    @classmethod
+    def subsystem_dependencies(cls):
+        return super().subsystem_dependencies() + (DistributionLocator,)
 
-  def execute(self):
-    def is_java(target):
-      return target.has_sources('.java')
+    def execute(self):
+        def is_java(target):
+            return target.has_sources(".java")
 
-    self.generate_doc(is_java, self.create_javadoc_command)
+        self.generate_doc(is_java, self.create_javadoc_command)
 
-  def create_javadoc_command(self, classpath, gendir, *targets):
-    sources = []
-    for target in targets:
-      sources.extend(target.sources_relative_to_buildroot())
+    def create_javadoc_command(self, classpath, gendir, *targets):
+        sources = []
+        for target in targets:
+            sources.extend(target.sources_relative_to_buildroot())
 
-    if not sources:
-      return None
+        if not sources:
+            return None
 
-    # Without a JDK/tools.jar we have no javadoc tool and cannot proceed, so check/acquire early.
-    jdk = DistributionLocator.cached(jdk=True)
-    tool_classpath = jdk.find_libs(['tools.jar'])
+        # Without a JDK/tools.jar we have no javadoc tool and cannot proceed, so check/acquire early.
+        jdk = DistributionLocator.cached(jdk=True)
+        tool_classpath = jdk.find_libs(["tools.jar"])
 
-    args = ['-quiet',
-            '-encoding', 'UTF-8',
-            '-notimestamp',
-            '-use',
-            '-Xmaxerrs', '10000', # the default is 100
-            '-Xmaxwarns', '10000', # the default is 100
-            '-d', gendir]
+        args = [
+            "-quiet",
+            "-encoding",
+            "UTF-8",
+            "-notimestamp",
+            "-use",
+            "-Xmaxerrs",
+            "10000",  # the default is 100
+            "-Xmaxwarns",
+            "10000",  # the default is 100
+            "-d",
+            gendir,
+        ]
 
-    # Always provide external linking for java API
-    offlinelinks = {'http://download.oracle.com/javase/8/docs/api/'}
+        # Always provide external linking for java API
+        offlinelinks = {"http://download.oracle.com/javase/8/docs/api/"}
 
-    def link(target):
-      for jar in target.jar_dependencies:
-        if jar.apidocs:
-          offlinelinks.add(jar.apidocs)
-    for target in targets:
-      target.walk(link, lambda t: isinstance(t, (JvmTarget, JarLibrary)))
+        def link(target):
+            for jar in target.jar_dependencies:
+                if jar.apidocs:
+                    offlinelinks.add(jar.apidocs)
 
-    for link in offlinelinks:
-      args.extend(['-linkoffline', link, link])
+        for target in targets:
+            target.walk(link, lambda t: isinstance(t, (JvmTarget, JarLibrary)))
 
-    args.extend(self.args)
+        for link in offlinelinks:
+            args.extend(["-linkoffline", link, link])
 
-    javadoc_classpath_file = os.path.join(self.workdir, '{}.classpath'.format(os.path.basename(gendir)))
-    with open(javadoc_classpath_file, 'w') as f:
-      f.write('-classpath ')
-      f.write(':'.join(classpath))
-    args.extend(['@{}'.format(javadoc_classpath_file)])
+        args.extend(self.args)
 
-    javadoc_sources_file = os.path.join(self.workdir, '{}.source.files'.format(os.path.basename(gendir)))
-    with open(javadoc_sources_file, 'w') as f:
-      f.write('\n'.join(sources))
-    args.extend(['@{}'.format(javadoc_sources_file)])
+        javadoc_classpath_file = os.path.join(
+            self.workdir, "{}.classpath".format(os.path.basename(gendir))
+        )
+        with open(javadoc_classpath_file, "w") as f:
+            f.write("-classpath ")
+            f.write(":".join(classpath))
+        args.extend(["@{}".format(javadoc_classpath_file)])
 
-    java_executor = SubprocessExecutor(jdk)
-    runner = java_executor.runner(jvm_options=self.jvm_options,
-                                  classpath=tool_classpath,
-                                  main='com.sun.tools.javadoc.Main',
-                                  args=args)
-    return runner.command
+        javadoc_sources_file = os.path.join(
+            self.workdir, "{}.source.files".format(os.path.basename(gendir))
+        )
+        with open(javadoc_sources_file, "w") as f:
+            f.write("\n".join(sources))
+        args.extend(["@{}".format(javadoc_sources_file)])
+
+        java_executor = SubprocessExecutor(jdk)
+        runner = java_executor.runner(
+            jvm_options=self.jvm_options,
+            classpath=tool_classpath,
+            main="com.sun.tools.javadoc.Main",
+            args=args,
+        )
+        return runner.command

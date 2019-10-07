@@ -11,34 +11,44 @@ from pants.base.payload_field import PrimitiveField
 
 
 class JUnitTests(JvmTarget):
-  """JUnit tests.
+    """JUnit tests.
 
   :API: public
   """
 
-  java_test_globs = ('*Test.java',)
-  scala_test_globs = ('*Test.scala', '*Spec.scala')
+    java_test_globs = ("*Test.java",)
+    scala_test_globs = ("*Test.scala", "*Spec.scala")
 
-  default_sources_globs = java_test_globs + scala_test_globs
+    default_sources_globs = java_test_globs + scala_test_globs
 
+    CONCURRENCY_SERIAL = "SERIAL"
+    CONCURRENCY_PARALLEL_CLASSES = "PARALLEL_CLASSES"
+    CONCURRENCY_PARALLEL_METHODS = "PARALLEL_METHODS"
+    CONCURRENCY_PARALLEL_CLASSES_AND_METHODS = "PARALLEL_CLASSES_AND_METHODS"
+    VALID_CONCURRENCY_OPTS = [
+        CONCURRENCY_SERIAL,
+        CONCURRENCY_PARALLEL_CLASSES,
+        CONCURRENCY_PARALLEL_METHODS,
+        CONCURRENCY_PARALLEL_CLASSES_AND_METHODS,
+    ]
 
-  CONCURRENCY_SERIAL = 'SERIAL'
-  CONCURRENCY_PARALLEL_CLASSES = 'PARALLEL_CLASSES'
-  CONCURRENCY_PARALLEL_METHODS = 'PARALLEL_METHODS'
-  CONCURRENCY_PARALLEL_CLASSES_AND_METHODS = 'PARALLEL_CLASSES_AND_METHODS'
-  VALID_CONCURRENCY_OPTS = [CONCURRENCY_SERIAL,
-                            CONCURRENCY_PARALLEL_CLASSES,
-                            CONCURRENCY_PARALLEL_METHODS,
-                            CONCURRENCY_PARALLEL_CLASSES_AND_METHODS]
+    @classmethod
+    def subsystems(cls):
+        return super().subsystems() + (JUnit,)
 
-  @classmethod
-  def subsystems(cls):
-    return super().subsystems() + (JUnit,)
-
-  def __init__(self, cwd=None, test_platform=None, payload=None, timeout=None,
-               extra_jvm_options=None, extra_env_vars=None, concurrency=None,
-               threads=None, **kwargs):
-    """
+    def __init__(
+        self,
+        cwd=None,
+        test_platform=None,
+        payload=None,
+        timeout=None,
+        extra_jvm_options=None,
+        extra_env_vars=None,
+        concurrency=None,
+        threads=None,
+        **kwargs
+    ):
+        """
     :param str cwd: working directory (relative to the build root) for the tests under this
       target. If unspecified (None), the working directory will be controlled by junit_run's --cwd
       and --chroot options.
@@ -57,65 +67,72 @@ class JUnitTests(JvmTarget):
       the setting of --test-junit-parallel-threads.
     """
 
-    payload = payload or Payload()
+        payload = payload or Payload()
 
-    if extra_env_vars is None:
-      extra_env_vars = {}
-    for key, value in extra_env_vars.items():
-      if value is not None:
-        extra_env_vars[key] = str(value)
+        if extra_env_vars is None:
+            extra_env_vars = {}
+        for key, value in extra_env_vars.items():
+            if value is not None:
+                extra_env_vars[key] = str(value)
 
-    payload.add_fields({
-      'test_platform': PrimitiveField(test_platform),
-      # TODO(zundel): Do extra_jvm_options and extra_env_vars really need to be fingerprinted?
-      'extra_jvm_options': PrimitiveField(tuple(extra_jvm_options or ())),
-      'extra_env_vars': PrimitiveField(tuple(extra_env_vars.items())),
-    })
-    super().__init__(payload=payload, **kwargs)
+        payload.add_fields(
+            {
+                "test_platform": PrimitiveField(test_platform),
+                # TODO(zundel): Do extra_jvm_options and extra_env_vars really need to be fingerprinted?
+                "extra_jvm_options": PrimitiveField(tuple(extra_jvm_options or ())),
+                "extra_env_vars": PrimitiveField(tuple(extra_env_vars.items())),
+            }
+        )
+        super().__init__(payload=payload, **kwargs)
 
-    # These parameters don't need to go into the fingerprint:
-    self._concurrency = concurrency
-    self._cwd = cwd
-    self._threads = None
-    self._timeout = timeout
+        # These parameters don't need to go into the fingerprint:
+        self._concurrency = concurrency
+        self._cwd = cwd
+        self._threads = None
+        self._timeout = timeout
 
-    try:
-      if threads is not None:
-        self._threads = int(threads)
-    except ValueError:
-      raise TargetDefinitionException(self,
-                                      "The value for 'threads' must be an integer, got " + threads)
-    if concurrency and concurrency not in self.VALID_CONCURRENCY_OPTS:
-      raise TargetDefinitionException(self,
-                                      "The value for 'concurrency' must be one of "
-                                      + repr(self.VALID_CONCURRENCY_OPTS) + " got: " + concurrency)
+        try:
+            if threads is not None:
+                self._threads = int(threads)
+        except ValueError:
+            raise TargetDefinitionException(
+                self, "The value for 'threads' must be an integer, got " + threads
+            )
+        if concurrency and concurrency not in self.VALID_CONCURRENCY_OPTS:
+            raise TargetDefinitionException(
+                self,
+                "The value for 'concurrency' must be one of "
+                + repr(self.VALID_CONCURRENCY_OPTS)
+                + " got: "
+                + concurrency,
+            )
 
-  @classmethod
-  def compute_dependency_specs(cls, kwargs=None, payload=None):
-    for spec in super().compute_dependency_specs(kwargs, payload):
-      yield spec
+    @classmethod
+    def compute_dependency_specs(cls, kwargs=None, payload=None):
+        for spec in super().compute_dependency_specs(kwargs, payload):
+            yield spec
 
-    for spec in JUnit.global_instance().injectables_specs_for_key('library'):
-      yield spec
+        for spec in JUnit.global_instance().injectables_specs_for_key("library"):
+            yield spec
 
-  @property
-  def test_platform(self):
-    if self.payload.test_platform:
-      return JvmPlatform.global_instance().get_platform_by_name(self.payload.test_platform)
-    return self.platform
+    @property
+    def test_platform(self):
+        if self.payload.test_platform:
+            return JvmPlatform.global_instance().get_platform_by_name(self.payload.test_platform)
+        return self.platform
 
-  @property
-  def concurrency(self):
-    return self._concurrency
+    @property
+    def concurrency(self):
+        return self._concurrency
 
-  @property
-  def cwd(self):
-    return self._cwd
+    @property
+    def cwd(self):
+        return self._cwd
 
-  @property
-  def threads(self):
-    return self._threads
+    @property
+    def threads(self):
+        return self._threads
 
-  @property
-  def timeout(self):
-    return self._timeout
+    @property
+    def timeout(self):
+        return self._timeout

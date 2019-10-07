@@ -8,53 +8,54 @@ from pants.scm.scm import Scm
 
 
 class Workspace(ABC):
-  """Tracks the state of the current workspace."""
+    """Tracks the state of the current workspace."""
 
-  class WorkspaceError(Exception):
-    """Indicates a problem reading the local workspace."""
+    class WorkspaceError(Exception):
+        """Indicates a problem reading the local workspace."""
 
-  @abstractmethod
-  def touched_files(self, parent):
-    """Returns the paths modified between the parent state and the current workspace state."""
+    @abstractmethod
+    def touched_files(self, parent):
+        """Returns the paths modified between the parent state and the current workspace state."""
 
-  @abstractmethod
-  def changes_in(self, rev_or_range):
-    """Returns the paths modified by some revision, revision range or other identifier."""
+    @abstractmethod
+    def changes_in(self, rev_or_range):
+        """Returns the paths modified by some revision, revision range or other identifier."""
 
 
 class ScmWorkspace(Workspace):
-  """A workspace that uses an Scm to determine the touched files.
+    """A workspace that uses an Scm to determine the touched files.
 
   :API: public
   """
 
-  def __init__(self, scm):
-    """
+    def __init__(self, scm):
+        """
     :API: public
     """
-    super().__init__()
+        super().__init__()
 
-    if scm is None:
-      raise self.WorkspaceError('Cannot figure out what changed without a configured '
-                                'source-control system.')
-    self._scm = scm
+        if scm is None:
+            raise self.WorkspaceError(
+                "Cannot figure out what changed without a configured " "source-control system."
+            )
+        self._scm = scm
 
-  def touched_files(self, parent):
-    """
+    def touched_files(self, parent):
+        """
     :API: public
     """
-    try:
-      return self._scm.changed_files(from_commit=parent,
-                                     include_untracked=True,
-                                     relative_to=get_buildroot())
-    except Scm.ScmException as e:
-      raise self.WorkspaceError("Problem detecting changed files.", e)
+        try:
+            return self._scm.changed_files(
+                from_commit=parent, include_untracked=True, relative_to=get_buildroot()
+            )
+        except Scm.ScmException as e:
+            raise self.WorkspaceError("Problem detecting changed files.", e)
 
-  def changes_in(self, rev_or_range):
-    """
+    def changes_in(self, rev_or_range):
+        """
     :API: public
     """
-    try:
-      return self._scm.changes_in(rev_or_range, relative_to=get_buildroot())
-    except Scm.ScmException as e:
-      raise self.WorkspaceError("Problem detecting changes in {}.".format(rev_or_range), e)
+        try:
+            return self._scm.changes_in(rev_or_range, relative_to=get_buildroot())
+        except Scm.ScmException as e:
+            raise self.WorkspaceError("Problem detecting changes in {}.".format(rev_or_range), e)

@@ -8,33 +8,32 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensur
 
 
 class SchedulerIntegrationTest(PantsRunIntegrationTest):
+    def test_visualize_to(self):
+        # Tests usage of the `--native-engine-visualize-to=` option, which triggers background
+        # visualization of the graph. There are unit tests confirming the content of the rendered
+        # results.
+        with temporary_dir() as destdir:
+            args = [
+                f"--native-engine-visualize-to={destdir}",
+                "list",
+                "examples/src/scala/org/pantsbuild/example/hello/welcome",
+            ]
+            self.assert_success(self.run_pants(args))
+            destdir_files = list(Path(destdir).iterdir())
+            self.assertTrue(len(destdir_files) > 0)
 
-  def test_visualize_to(self):
-    # Tests usage of the `--native-engine-visualize-to=` option, which triggers background
-    # visualization of the graph. There are unit tests confirming the content of the rendered
-    # results.
-    with temporary_dir() as destdir:
-      args = [
-          f'--native-engine-visualize-to={destdir}',
-          'list',
-          'examples/src/scala/org/pantsbuild/example/hello/welcome',
+    @ensure_daemon
+    def test_graceful_termination(self):
+        args = [
+            "--no-v1",
+            "--v2",
+            "list-and-die-for-testing",
+            "examples/src/scala/org/pantsbuild/example/hello/welcome",
         ]
-      self.assert_success(self.run_pants(args))
-      destdir_files = list(Path(destdir).iterdir())
-      self.assertTrue(len(destdir_files) > 0)
-
-  @ensure_daemon
-  def test_graceful_termination(self):
-    args = [
-      '--no-v1',
-      '--v2',
-      'list-and-die-for-testing',
-      'examples/src/scala/org/pantsbuild/example/hello/welcome',
-    ]
-    pants_result = self.run_pants(args)
-    self.assert_failure(pants_result)
-    self.assertEqual(
-      pants_result.stdout_data,
-      'examples/src/scala/org/pantsbuild/example/hello/welcome:welcome\n'
-    )
-    self.assertEqual(pants_result.returncode, 42)
+        pants_result = self.run_pants(args)
+        self.assert_failure(pants_result)
+        self.assertEqual(
+            pants_result.stdout_data,
+            "examples/src/scala/org/pantsbuild/example/hello/welcome:welcome\n",
+        )
+        self.assertEqual(pants_result.returncode, 42)

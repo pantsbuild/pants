@@ -10,16 +10,22 @@ logger = logging.getLogger(__name__)
 
 
 class JvmResolveSubsystem(Subsystem):
-  """Used to keep track of global jvm resolver settings
+    """Used to keep track of global jvm resolver settings
 
   :API: public
   """
-  options_scope = 'resolver'
 
-  # TODO: Convert to an enum.
-  CHOICES = ['ivy', 'coursier']
+    options_scope = "resolver"
 
-  @classmethod
-  def register_options(cls, register):
-    super().register_options(register)
-    register('--resolver', choices=cls.CHOICES, default='ivy', help='Resolver to use for external jvm dependencies.')
+    # TODO: Convert to an enum.
+    CHOICES = ["ivy", "coursier"]
+
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--resolver",
+            choices=cls.CHOICES,
+            default="ivy",
+            help="Resolver to use for external jvm dependencies.",
+        )

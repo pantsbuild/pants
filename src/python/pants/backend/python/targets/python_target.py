@@ -15,19 +15,15 @@ from pants.build_graph.target import Target
 
 
 class PythonTarget(Target):
-  """Base class for all Python targets.
+    """Base class for all Python targets.
 
   :API: public
   """
 
-  def __init__(self,
-               address=None,
-               payload=None,
-               sources=None,
-               provides=None,
-               compatibility=None,
-               **kwargs):
-    """
+    def __init__(
+        self, address=None, payload=None, sources=None, provides=None, compatibility=None, **kwargs
+    ):
+        """
     :param dependencies: The addresses of targets that this target depends on.
       These dependencies may
       be ``python_library``-like targets (``python_library``,
@@ -47,62 +43,68 @@ class PythonTarget(Target):
       the example above, a Requirement-style compatibility constraint like '>=2.7,<3' (N.B.: not
       prefixed with CPython) can be used.
     """
-    self.address = address
-    payload = payload or Payload()
-    payload.add_fields({
-      'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
-      'provides': provides,
-      'compatibility': PrimitiveField(maybe_list(compatibility or ())),
-    })
-    super().__init__(address=address, payload=payload, **kwargs)
+        self.address = address
+        payload = payload or Payload()
+        payload.add_fields(
+            {
+                "sources": self.create_sources_field(sources, address.spec_path, key_arg="sources"),
+                "provides": provides,
+                "compatibility": PrimitiveField(maybe_list(compatibility or ())),
+            }
+        )
+        super().__init__(address=address, payload=payload, **kwargs)
 
-    if provides and not isinstance(provides, PythonArtifact):
-      raise TargetDefinitionException(self,
-        "Target must provide a valid pants setup_py object. Received a '{}' object instead.".format(
-          provides.__class__.__name__))
+        if provides and not isinstance(provides, PythonArtifact):
+            raise TargetDefinitionException(
+                self,
+                "Target must provide a valid pants setup_py object. Received a '{}' object instead.".format(
+                    provides.__class__.__name__
+                ),
+            )
 
-    self._provides = provides
+        self._provides = provides
 
-    # Check that the compatibility requirements are well-formed.
-    for req in self.payload.compatibility:
-      try:
-        PythonIdentity.parse_requirement(req)
-      except ValueError as e:
-        raise TargetDefinitionException(self, str(e))
+        # Check that the compatibility requirements are well-formed.
+        for req in self.payload.compatibility:
+            try:
+                PythonIdentity.parse_requirement(req)
+            except ValueError as e:
+                raise TargetDefinitionException(self, str(e))
 
-  @classmethod
-  def compute_injectable_specs(cls, kwargs=None, payload=None):
-    for spec in super().compute_injectable_specs(kwargs, payload):
-      yield spec
+    @classmethod
+    def compute_injectable_specs(cls, kwargs=None, payload=None):
+        for spec in super().compute_injectable_specs(kwargs, payload):
+            yield spec
 
-    target_representation = kwargs or payload.as_dict()
-    provides = target_representation.get('provides', None) or []
-    if provides:
-      for spec in provides._binaries.values():
-        yield spec
+        target_representation = kwargs or payload.as_dict()
+        provides = target_representation.get("provides", None) or []
+        if provides:
+            for spec in provides._binaries.values():
+                yield spec
 
-  @property
-  def provides(self):
-    return self.payload.provides
+    @property
+    def provides(self):
+        return self.payload.provides
 
-  @property
-  def provided_binaries(self):
-    def binary_iter():
-      if self.payload.provides:
-        for key, binary_spec in self.payload.provides.binaries.items():
-          address = Address.parse(binary_spec, relative_to=self.address.spec_path)
-          yield (key, self._build_graph.get_target(address))
-    return dict(binary_iter())
+    @property
+    def provided_binaries(self):
+        def binary_iter():
+            if self.payload.provides:
+                for key, binary_spec in self.payload.provides.binaries.items():
+                    address = Address.parse(binary_spec, relative_to=self.address.spec_path)
+                    yield (key, self._build_graph.get_target(address))
 
-  @property
-  def compatibility(self):
-    return self.payload.compatibility
+        return dict(binary_iter())
 
-  @property
-  def resources(self):
-    return [dep for dep in self.dependencies if isinstance(dep, Resources)]
+    @property
+    def compatibility(self):
+        return self.payload.compatibility
 
-  def walk(self, work, predicate=None):
-    super().walk(work, predicate)
-    for binary in self.provided_binaries.values():
-      binary.walk(work, predicate)
+    @property
+    def resources(self):
+        return [dep for dep in self.dependencies if isinstance(dep, Resources)]
+
+    def walk(self, work, predicate=None):
+        super().walk(work, predicate)
+        for binary in self.provided_binaries.values():
+            binary.walk(work, predicate)

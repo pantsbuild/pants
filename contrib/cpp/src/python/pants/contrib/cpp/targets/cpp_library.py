@@ -5,4 +5,4 @@ from pants.contrib.cpp.targets.cpp_target import CppTarget
 
 
 class CppLibrary(CppTarget):
-  """A statically linked C++ library."""
+    """A statically linked C++ library."""

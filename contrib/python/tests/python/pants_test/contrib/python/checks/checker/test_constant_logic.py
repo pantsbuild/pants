@@ -7,17 +7,17 @@ from pants.contrib.python.checks.checker.constant_logic import ConstantLogic
 
 
 class ConstantLogicTest(CheckstylePluginTestBase):
-  plugin_type = ConstantLogic
+    plugin_type = ConstantLogic
 
-  def test_or(self):
-    self.assertNit('None or x', 'T804')
-    self.assertNit('True or x', 'T804')
-    self.assertNit('False or x', 'T804')
-    self.assertNit('1 or x', 'T804')
-    self.assertNit('"a" or x', 'T804')
-    self.assertNoNits('x or y')
+    def test_or(self):
+        self.assertNit("None or x", "T804")
+        self.assertNit("True or x", "T804")
+        self.assertNit("False or x", "T804")
+        self.assertNit("1 or x", "T804")
+        self.assertNit('"a" or x', "T804")
+        self.assertNoNits("x or y")
 
-  def test_and(self):
-    self.assertNit('None and x', 'T804')
-    self.assertNit('x and False', 'T805')
-    self.assertNoNits('x and y')
+    def test_and(self):
+        self.assertNit("None and x", "T804")
+        self.assertNit("x and False", "T805")
+        self.assertNoNits("x and y")

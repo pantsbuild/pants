@@ -7,26 +7,26 @@ from pants.contrib.python.checks.checker.new_style_classes import NewStyleClasse
 
 
 class NewStyleClassesTest(CheckstylePluginTestBase):
-  plugin_type = NewStyleClasses
+    plugin_type = NewStyleClasses
 
-  def test_new_style_classes(self):
-    statement = """
+    def test_new_style_classes(self):
+        statement = """
       class OldStyle:
         pass
 
       class NewStyle(object):
         pass
     """
-    self.assertNit(statement, 'T606')
+        self.assertNit(statement, "T606")
 
-    statement = """
+        statement = """
       class NewStyle(OtherThing, ThatThing, WhatAmIDoing):
         pass
     """
-    self.assertNoNits(statement)
+        self.assertNoNits(statement)
 
-    statement = """
+        statement = """
       class OldStyle():  # unspecified mro
         pass
     """
-    self.assertNit(statement, 'T606')
+        self.assertNit(statement, "T606")

@@ -14,49 +14,49 @@ _kwargs_separator = (object(),)
 
 
 def equal_args(*args, **kwargs):
-  """A memoized key factory that compares the equality (`==`) of a stable sort of the parameters."""
-  key = args
-  if kwargs:
-    key += _kwargs_separator + tuple(sorted(kwargs.items()))
-  return key
+    """A memoized key factory that compares the equality (`==`) of a stable sort of the parameters."""
+    key = args
+    if kwargs:
+        key += _kwargs_separator + tuple(sorted(kwargs.items()))
+    return key
 
 
 class InstanceKey:
-  """An equality wrapper for an arbitrary object instance.
+    """An equality wrapper for an arbitrary object instance.
 
   This wrapper leverages `id` and `is` for fast `__hash__` and `__eq__` but both of these rely on
   the object in question not being gc'd since both `id` and `is` rely on the instance address which
   can be recycled; so we retain a strong reference to the instance to ensure no recycling can occur.
   """
 
-  def __init__(self, instance):
-    self._instance = instance
-    self._hash = id(instance)
+    def __init__(self, instance):
+        self._instance = instance
+        self._hash = id(instance)
 
-  def __hash__(self):
-    return self._hash
+    def __hash__(self):
+        return self._hash
 
-  def __eq__(self, other):
-    if self._instance is other:
-      return True
-    if isinstance(other, InstanceKey):
-      return self._instance is other._instance
-    return False
+    def __eq__(self, other):
+        if self._instance is other:
+            return True
+        if isinstance(other, InstanceKey):
+            return self._instance is other._instance
+        return False
 
 
 def per_instance(*args, **kwargs):
-  """A memoized key factory that works like `equal_args` except that the first parameter's identity
+    """A memoized key factory that works like `equal_args` except that the first parameter's identity
   is used when forming the key.
 
   This is a useful key factory when you want to enforce memoization happens per-instance for an
   instance method in a class hierarchy that defines a custom `__hash__`/`__eq__`.
   """
-  instance_and_rest = (InstanceKey(args[0]),) + args[1:]
-  return equal_args(*instance_and_rest, **kwargs)
+    instance_and_rest = (InstanceKey(args[0]),) + args[1:]
+    return equal_args(*instance_and_rest, **kwargs)
 
 
 def memoized(func=None, key_factory=equal_args, cache_factory=dict):
-  """Memoizes the results of a function call.
+    """Memoizes the results of a function call.
 
   By default, exactly one result is memoized for each unique combination of function arguments.
 
@@ -87,56 +87,59 @@ def memoized(func=None, key_factory=equal_args, cache_factory=dict):
   :raises: `ValueError` if the wrapper is applied to anything other than a function.
   :returns: A wrapped function that memoizes its results or else a function wrapper that does this.
   """
-  if func is None:
-    # We're being applied as a decorator factory; ie: the user has supplied args, like so:
-    # >>> @memoized(cache_factory=lru_cache)
-    # ... def expensive_operation(user):
-    # ...   pass
-    # So we return a decorator with the user-supplied args curried in for the python decorator
-    # machinery to use to wrap the upcoming func.
-    #
-    # NB: This is just a tricky way to allow for both `@memoized` and `@memoized(...params...)`
-    # application forms.  Without this trick, ie: using a decorator class or nested decorator
-    # function, the no-params application would have to be `@memoized()`.  It still can, but need
-    # not be and a bare `@memoized` will work as well as a `@memoized()`.
-    return functools.partial(memoized, key_factory=key_factory, cache_factory=cache_factory)
+    if func is None:
+        # We're being applied as a decorator factory; ie: the user has supplied args, like so:
+        # >>> @memoized(cache_factory=lru_cache)
+        # ... def expensive_operation(user):
+        # ...   pass
+        # So we return a decorator with the user-supplied args curried in for the python decorator
+        # machinery to use to wrap the upcoming func.
+        #
+        # NB: This is just a tricky way to allow for both `@memoized` and `@memoized(...params...)`
+        # application forms.  Without this trick, ie: using a decorator class or nested decorator
+        # function, the no-params application would have to be `@memoized()`.  It still can, but need
+        # not be and a bare `@memoized` will work as well as a `@memoized()`.
+        return functools.partial(memoized, key_factory=key_factory, cache_factory=cache_factory)
 
-  if not inspect.isfunction(func):
-    raise ValueError('The @memoized decorator must be applied innermost of all decorators.')
+    if not inspect.isfunction(func):
+        raise ValueError("The @memoized decorator must be applied innermost of all decorators.")
 
-  key_func = key_factory or equal_args
-  memoized_results = cache_factory() if cache_factory else {}
+    key_func = key_factory or equal_args
+    memoized_results = cache_factory() if cache_factory else {}
 
-  @functools.wraps(func)
-  def memoize(*args, **kwargs):
-    key = key_func(*args, **kwargs)
-    if key in memoized_results:
-      return memoized_results[key]
-    result = func(*args, **kwargs)
-    memoized_results[key] = result
-    return result
+    @functools.wraps(func)
+    def memoize(*args, **kwargs):
+        key = key_func(*args, **kwargs)
+        if key in memoized_results:
+            return memoized_results[key]
+        result = func(*args, **kwargs)
+        memoized_results[key] = result
+        return result
 
-  @contextmanager
-  def put(*args, **kwargs):
-    key = key_func(*args, **kwargs)
-    yield functools.partial(memoized_results.__setitem__, key)
-  memoize.put = put
+    @contextmanager
+    def put(*args, **kwargs):
+        key = key_func(*args, **kwargs)
+        yield functools.partial(memoized_results.__setitem__, key)
 
-  def forget(*args, **kwargs):
-    key = key_func(*args, **kwargs)
-    if key in memoized_results:
-      del memoized_results[key]
-  memoize.forget = forget
+    memoize.put = put
 
-  def clear():
-    memoized_results.clear()
-  memoize.clear = clear
+    def forget(*args, **kwargs):
+        key = key_func(*args, **kwargs)
+        if key in memoized_results:
+            del memoized_results[key]
 
-  return memoize
+    memoize.forget = forget
+
+    def clear():
+        memoized_results.clear()
+
+    memoize.clear = clear
+
+    return memoize
 
 
 def memoized_method(func=None, key_factory=per_instance, **kwargs):
-  """A convenience wrapper for memoizing instance methods.
+    """A convenience wrapper for memoizing instance methods.
 
   Typically you'd expect a memoized instance method to hold a cached value per class instance;
   however, for classes that implement a custom `__hash__`/`__eq__` that can hash separate instances
@@ -168,11 +171,11 @@ def memoized_method(func=None, key_factory=per_instance, **kwargs):
   :raises: `ValueError` if the wrapper is applied to anything other than a function.
   :returns: A wrapped function that memoizes its results or else a function wrapper that does this.
   """
-  return memoized(func=func, key_factory=key_factory, **kwargs)
+    return memoized(func=func, key_factory=key_factory, **kwargs)
 
 
 def memoized_property(func=None, key_factory=per_instance, **kwargs):
-  """A convenience wrapper for memoizing properties.
+    """A convenience wrapper for memoizing properties.
 
   Applied like so:
 
@@ -233,34 +236,32 @@ def memoized_property(func=None, key_factory=per_instance, **kwargs):
   :returns: A read-only property that memoizes its calculated value and un-caches its value when
             `del`ed.
   """
-  getter = memoized_method(func=func, key_factory=key_factory, **kwargs)
-  return property(fget=getter, fdel=lambda self: getter.forget(self))
+    getter = memoized_method(func=func, key_factory=key_factory, **kwargs)
+    return property(fget=getter, fdel=lambda self: getter.forget(self))
 
 
 def memoized_classmethod(*args, **kwargs):
-  return classmethod(memoized_method(*args, **kwargs))
+    return classmethod(memoized_method(*args, **kwargs))
 
 
 def memoized_classproperty(*args, **kwargs):
-  return classproperty(memoized_classmethod(*args, **kwargs))
+    return classproperty(memoized_classmethod(*args, **kwargs))
 
 
 def memoized_staticmethod(*args, **kwargs):
-  return staticmethod(memoized(*args, **kwargs))
+    return staticmethod(memoized(*args, **kwargs))
 
 
 def memoized_staticproperty(*args, **kwargs):
-  return staticproperty(memoized_staticmethod(*args, **kwargs))
+    return staticproperty(memoized_staticmethod(*args, **kwargs))
 
 
 def testable_memoized_property(func=None, key_factory=per_instance, **kwargs):
-  """A variant of `memoized_property` that allows for setting of properties (for tests, etc)."""
-  getter = memoized_method(func=func, key_factory=key_factory, **kwargs)
+    """A variant of `memoized_property` that allows for setting of properties (for tests, etc)."""
+    getter = memoized_method(func=func, key_factory=key_factory, **kwargs)
 
-  def setter(self, val):
-    with getter.put(self) as putter:
-      putter(val)
+    def setter(self, val):
+        with getter.put(self) as putter:
+            putter(val)
 
-  return property(fget=getter,
-                  fset=setter,
-                  fdel=lambda self: getter.forget(self))
+    return property(fget=getter, fset=setter, fdel=lambda self: getter.forget(self))

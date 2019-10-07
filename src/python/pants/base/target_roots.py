@@ -6,10 +6,11 @@ from typing import Any
 
 
 class InvalidSpecConstraint(Exception):
-  """Raised when invalid constraints are given via target specs and arguments like --changed*."""
+    """Raised when invalid constraints are given via target specs and arguments like --changed*."""
 
 
 @dataclass(frozen=True)
 class TargetRoots:
-  """Determines the target roots for a given pants run."""
-  specs: Any
+    """Determines the target roots for a given pants run."""
+
+    specs: Any

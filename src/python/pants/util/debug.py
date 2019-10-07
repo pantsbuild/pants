@@ -6,17 +6,17 @@ import threading
 from collections import namedtuple
 
 
-DEFAULT_LOG_PATH = '/tmp/pants_debug.log'
+DEFAULT_LOG_PATH = "/tmp/pants_debug.log"
 
 
 def dlog(msg, log_path=DEFAULT_LOG_PATH):
-  """A handy log utility for debugging multi-process, multi-threaded activities."""
-  with open(log_path, 'a') as f:
-    f.write('\n{}@{}: {}'.format(os.getpid(), threading.current_thread().name, msg))
+    """A handy log utility for debugging multi-process, multi-threaded activities."""
+    with open(log_path, "a") as f:
+        f.write("\n{}@{}: {}".format(os.getpid(), threading.current_thread().name, msg))
 
 
-class ProxyLogger(namedtuple('ProxyLogger', ['wrapped_object', 'log_path'])):
-  """An instance-wrapping method call logger that uses `dlog` logging.
+class ProxyLogger(namedtuple("ProxyLogger", ["wrapped_object", "log_path"])):
+    """An instance-wrapping method call logger that uses `dlog` logging.
 
   Example usage:
 
@@ -35,16 +35,14 @@ class ProxyLogger(namedtuple('ProxyLogger', ['wrapped_object', 'log_path'])):
 
   """
 
-  @classmethod
-  def wrap_object(cls, obj, log_path=DEFAULT_LOG_PATH):
-    return cls(obj, log_path)
+    @classmethod
+    def wrap_object(cls, obj, log_path=DEFAULT_LOG_PATH):
+        return cls(obj, log_path)
 
-  def __getattr__(self, attr):
-    def wrapped_method_call(*args, **kwargs):
-      r = getattr(self.wrapped_object, attr)(*args, **kwargs)
-      dlog(
-        f'{self.wrapped_object}.{attr}(*{args}, **{kwargs}) -> {r}',
-        self.log_path
-      )
-      return r
-    return wrapped_method_call
+    def __getattr__(self, attr):
+        def wrapped_method_call(*args, **kwargs):
+            r = getattr(self.wrapped_object, attr)(*args, **kwargs)
+            dlog(f"{self.wrapped_object}.{attr}(*{args}, **{kwargs}) -> {r}", self.log_path)
+            return r
+
+        return wrapped_method_call

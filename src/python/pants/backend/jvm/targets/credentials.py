@@ -11,61 +11,63 @@ from pants.util.netrc import Netrc
 
 
 class Credentials(Target, metaclass=ABCMeta):
-  """Credentials for a maven repository.
+    """Credentials for a maven repository.
 
   The ``publish.jar`` section of your ``pants.ini`` file can refer to one
   or more of these.
   """
 
-  @abstractmethod
-  def username(self, repository):
-    """Returns the username in java system property argument form."""
+    @abstractmethod
+    def username(self, repository):
+        """Returns the username in java system property argument form."""
 
-  @abstractmethod
-  def password(self, repository):
-    """Returns the password in java system property argument form."""
+    @abstractmethod
+    def password(self, repository):
+        """Returns the password in java system property argument form."""
 
 
 def _ignored_repository(value, repository):
-  return value
+    return value
 
 
 class LiteralCredentials(Credentials):
-
-  def __init__(self, username=None, password=None, **kwargs):
-    """
+    def __init__(self, username=None, password=None, **kwargs):
+        """
     :param string name: The name of these credentials.
     :param username: A constant username value.
     :param password: A constant password value.
     """
-    super().__init__(**kwargs)
+        super().__init__(**kwargs)
 
-    if callable(username) or callable(password):
-      raise TargetDefinitionException(self, 'The username and password arguments to credentials() '
-                                            'cannot be callable. Use netrc_credentials() instead.')
+        if callable(username) or callable(password):
+            raise TargetDefinitionException(
+                self,
+                "The username and password arguments to credentials() "
+                "cannot be callable. Use netrc_credentials() instead.",
+            )
 
-    self._username = functools.partial(_ignored_repository, username)
-    self._password = functools.partial(_ignored_repository, password)
+        self._username = functools.partial(_ignored_repository, username)
+        self._password = functools.partial(_ignored_repository, password)
 
-  def username(self, repository):
-    return self._username(repository)
+    def username(self, repository):
+        return self._username(repository)
 
-  def password(self, repository):
-    return self._password(repository)
+    def password(self, repository):
+        return self._password(repository)
 
 
 class NetrcCredentials(Credentials):
-  """A Credentials subclass that uses a Netrc file to compute credentials."""
+    """A Credentials subclass that uses a Netrc file to compute credentials."""
 
-  @memoized_method
-  def _credentials(self, repository):
-    netrc = Netrc()
-    return (netrc.getusername(repository), netrc.getpassword(repository))
+    @memoized_method
+    def _credentials(self, repository):
+        netrc = Netrc()
+        return (netrc.getusername(repository), netrc.getpassword(repository))
 
-  def username(self, repository):
-    """Returns the username in java system property argument form."""
-    return self._credentials(repository)[0]
+    def username(self, repository):
+        """Returns the username in java system property argument form."""
+        return self._credentials(repository)[0]
 
-  def password(self, repository):
-    """Returns the password in java system property argument form."""
-    return self._credentials(repository)[1]
+    def password(self, repository):
+        """Returns the password in java system property argument form."""
+        return self._credentials(repository)[1]

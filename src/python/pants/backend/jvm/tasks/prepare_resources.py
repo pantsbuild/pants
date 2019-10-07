@@ -15,41 +15,42 @@ from pants.util.dirutil import safe_mkdir
 
 
 class PrepareResources(ResourcesTask):
-  """Prepares loose resource files associated with a target.
+    """Prepares loose resource files associated with a target.
 
   Currently this task does no form of resource filtering, it just copies resource files to
   dedicated, isolated resource chroots for use in the classpath as well as for packaging purposes.
   """
 
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
-    self._buildroot = get_buildroot()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._buildroot = get_buildroot()
 
-  @classmethod
-  def implementation_version(cls):
-    return super().implementation_version() + [('PrepareResources', 2)]
+    @classmethod
+    def implementation_version(cls):
+        return super().implementation_version() + [("PrepareResources", 2)]
 
-  def find_all_relevant_resources_targets(self):
-    # NB: Ordering isn't relevant here, because it is applied during the dep walk to
-    # consume from the runtime_classpath.
-    def is_jvm_target(target):
-      return isinstance(target, JvmTarget)
-    jvm_targets = self.context.targets(predicate=is_jvm_target)
+    def find_all_relevant_resources_targets(self):
+        # NB: Ordering isn't relevant here, because it is applied during the dep walk to
+        # consume from the runtime_classpath.
+        def is_jvm_target(target):
+            return isinstance(target, JvmTarget)
 
-    all_resources_tgts = OrderedSet()
-    for target in Target.closure_for_targets(jvm_targets, bfs=True):
-      if isinstance(target, Resources):
-        all_resources_tgts.add(target)
-    return all_resources_tgts
+        jvm_targets = self.context.targets(predicate=is_jvm_target)
 
-  def prepare_resources(self, target, chroot):
-    for resource_file_from_source_root in target.sources_relative_to_source_root():
-      basedir = os.path.dirname(resource_file_from_source_root)
-      destdir = os.path.join(chroot, basedir)
-      safe_mkdir(destdir)
+        all_resources_tgts = OrderedSet()
+        for target in Target.closure_for_targets(jvm_targets, bfs=True):
+            if isinstance(target, Resources):
+                all_resources_tgts.add(target)
+        return all_resources_tgts
 
-      # TODO(Benjy Weinberger): Symlink instead?
-      src = os.path.join(self._buildroot, target.target_base, resource_file_from_source_root)
-      dst = os.path.join(chroot, resource_file_from_source_root)
-      self.context.log.debug('Copying resource from {} to {}'.format(src, dst))
-      shutil.copy(src, dst)
+    def prepare_resources(self, target, chroot):
+        for resource_file_from_source_root in target.sources_relative_to_source_root():
+            basedir = os.path.dirname(resource_file_from_source_root)
+            destdir = os.path.join(chroot, basedir)
+            safe_mkdir(destdir)
+
+            # TODO(Benjy Weinberger): Symlink instead?
+            src = os.path.join(self._buildroot, target.target_base, resource_file_from_source_root)
+            dst = os.path.join(chroot, resource_file_from_source_root)
+            self.context.log.debug("Copying resource from {} to {}".format(src, dst))
+            shutil.copy(src, dst)

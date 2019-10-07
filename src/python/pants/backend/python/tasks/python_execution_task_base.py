@@ -21,7 +21,7 @@ from pants.util.contextutil import temporary_file
 
 
 def ensure_interpreter_search_path_env(interpreter):
-  """Produces an environment dict that ensures that the given interpreter is discovered at runtime.
+    """Produces an environment dict that ensures that the given interpreter is discovered at runtime.
 
   At pex build time, if any interpreter constraints are specified (e.g.: 'CPython>=2.7,<3'), they
   are added to the resulting pex binary's metadata. At runtime, pex will apply those constraints to
@@ -35,90 +35,88 @@ def ensure_interpreter_search_path_env(interpreter):
   relevant interpreter, but this function is exposed for cases where the building of the pex is
   separated from the execution of the pex.
   """
-  chosen_interpreter_binary_path = interpreter.binary
-  return {
-    'PEX_IGNORE_RCFILES': '1',
-    'PEX_PYTHON_PATH': chosen_interpreter_binary_path,
-  }
+    chosen_interpreter_binary_path = interpreter.binary
+    return {"PEX_IGNORE_RCFILES": "1", "PEX_PYTHON_PATH": chosen_interpreter_binary_path}
 
 
 class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
-  """Base class for tasks that execute user Python code in a PEX environment.
+    """Base class for tasks that execute user Python code in a PEX environment.
 
   Note: Extends ResolveRequirementsTaskBase because it may need to resolve
   extra requirements in order to execute the code.
   """
 
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super().prepare(options, round_manager)
-    round_manager.require_data(PythonInterpreter)
-    round_manager.require_data(ResolveRequirements.REQUIREMENTS_PEX)
-    round_manager.require_data(GatherSources.PYTHON_SOURCES)
+    @classmethod
+    def prepare(cls, options, round_manager):
+        super().prepare(options, round_manager)
+        round_manager.require_data(PythonInterpreter)
+        round_manager.require_data(ResolveRequirements.REQUIREMENTS_PEX)
+        round_manager.require_data(GatherSources.PYTHON_SOURCES)
 
-  def extra_requirements(self):
-    """Override to provide extra requirements needed for execution.
+    def extra_requirements(self):
+        """Override to provide extra requirements needed for execution.
 
     :returns: An iterable of pip-style requirement strings.
     :rtype: :class:`collections.Iterable` of str
     """
-    return ()
+        return ()
 
-  @dataclass(frozen=True)
-  class ExtraFile:
-    """Models an extra file to place in a PEX."""
-    path: str
-    content: bytes
+    @dataclass(frozen=True)
+    class ExtraFile:
+        """Models an extra file to place in a PEX."""
 
-    @classmethod
-    def empty(cls, path):
-      """Creates an empty file with the given PEX path.
+        path: str
+        content: bytes
+
+        @classmethod
+        def empty(cls, path):
+            """Creates an empty file with the given PEX path.
 
       :param str path: The path this extra file should have when added to a PEX.
       :rtype: :class:`ExtraFile`
       """
-      return cls(path=path, content=b'')
+            return cls(path=path, content=b"")
 
-    def add_to(self, builder):
-      """Adds this extra file to a PEX builder.
+        def add_to(self, builder):
+            """Adds this extra file to a PEX builder.
 
       :param builder: The PEX builder to add this extra file to.
       :type builder: :class:`pex.pex_builder.PEXBuilder`
       """
-      with temporary_file() as fp:
-        fp.write(self.content)
-        fp.close()
-        add = builder.add_source if self.path.endswith('.py') else builder.add_resource
-        add(fp.name, self.path)
+            with temporary_file() as fp:
+                fp.write(self.content)
+                fp.close()
+                add = builder.add_source if self.path.endswith(".py") else builder.add_resource
+                add(fp.name, self.path)
 
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super().subsystem_dependencies() + (PythonSetup,)
+    @classmethod
+    def subsystem_dependencies(cls):
+        return super().subsystem_dependencies() + (PythonSetup,)
 
-  def extra_files(self):
-    """Override to provide extra files needed for execution.
+    def extra_files(self):
+        """Override to provide extra files needed for execution.
 
     :returns: An iterable of extra files to add to the PEX.
     :rtype: :class:`collections.Iterable` of :class:`PythonExecutionTaskBase.ExtraFile`
     """
-    return ()
+        return ()
 
-  def prepare_pex_env(self, env: Optional[Dict[str, str]] = None) -> Dict[str, str]:
-    """Prepares an environment that will run this task's pex with proper isolation.
+    def prepare_pex_env(self, env: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+        """Prepares an environment that will run this task's pex with proper isolation.
 
     :param env: An optional seed environment to use; os.environ by default.
     :return: An environment dict for use in running a PEX.
     """
-    env = (env or os.environ).copy()
+        env = (env or os.environ).copy()
 
-    interpreter = self.context.products.get_data(PythonInterpreter)
-    interpreter_search_path_env = ensure_interpreter_search_path_env(interpreter)
-    env.update(interpreter_search_path_env)
+        interpreter = self.context.products.get_data(PythonInterpreter)
+        interpreter_search_path_env = ensure_interpreter_search_path_env(interpreter)
+        env.update(interpreter_search_path_env)
 
-    return env
+        return env
 
-  def create_pex(self, pex_info=None):
-    """Returns a wrapped pex that "merges" other pexes produced in previous tasks via PEX_PATH.
+    def create_pex(self, pex_info=None):
+        """Returns a wrapped pex that "merges" other pexes produced in previous tasks via PEX_PATH.
 
     This method always creates a PEX to run locally on the current platform and selected
     interpreter: to create a pex that is distributable to other environments, use the pex_build_util
@@ -133,44 +131,50 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     task. Otherwise, all of the interpreter constraints from all python targets will applied.
     :rtype: :class:`pex.pex.PEX`
     """
-    relevant_targets = self.context.targets(
-      lambda tgt: isinstance(tgt, (
-        PythonDistribution, PythonRequirementLibrary, PythonTarget, Files)))
-    with self.invalidated(relevant_targets) as invalidation_check:
+        relevant_targets = self.context.targets(
+            lambda tgt: isinstance(
+                tgt, (PythonDistribution, PythonRequirementLibrary, PythonTarget, Files)
+            )
+        )
+        with self.invalidated(relevant_targets) as invalidation_check:
 
-      # If there are no relevant targets, we still go through the motions of resolving
-      # an empty set of requirements, to prevent downstream tasks from having to check
-      # for this special case.
-      if invalidation_check.all_vts:
-        target_set_id = VersionedTargetSet.from_versioned_targets(
-          invalidation_check.all_vts).cache_key.hash
-      else:
-        target_set_id = 'no_targets'
+            # If there are no relevant targets, we still go through the motions of resolving
+            # an empty set of requirements, to prevent downstream tasks from having to check
+            # for this special case.
+            if invalidation_check.all_vts:
+                target_set_id = VersionedTargetSet.from_versioned_targets(
+                    invalidation_check.all_vts
+                ).cache_key.hash
+            else:
+                target_set_id = "no_targets"
 
-      interpreter = self.context.products.get_data(PythonInterpreter)
-      path = os.path.realpath(os.path.join(self.workdir, str(interpreter.identity), target_set_id))
+            interpreter = self.context.products.get_data(PythonInterpreter)
+            path = os.path.realpath(
+                os.path.join(self.workdir, str(interpreter.identity), target_set_id)
+            )
 
-      # Note that we check for the existence of the directory, instead of for invalid_vts,
-      # to cover the empty case.
-      if not os.path.isdir(path):
-        pexes = [
-          self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX),
-          self.context.products.get_data(GatherSources.PYTHON_SOURCES)
-        ]
+            # Note that we check for the existence of the directory, instead of for invalid_vts,
+            # to cover the empty case.
+            if not os.path.isdir(path):
+                pexes = [
+                    self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX),
+                    self.context.products.get_data(GatherSources.PYTHON_SOURCES),
+                ]
 
-        if self.extra_requirements():
-          extra_requirements_pex = self.resolve_requirement_strings(
-            interpreter, self.extra_requirements())
-          # Add the extra requirements first, so they take precedence over any colliding version
-          # in the target set's dependency closure.
-          pexes = [extra_requirements_pex] + pexes
+                if self.extra_requirements():
+                    extra_requirements_pex = self.resolve_requirement_strings(
+                        interpreter, self.extra_requirements()
+                    )
+                    # Add the extra requirements first, so they take precedence over any colliding version
+                    # in the target set's dependency closure.
+                    pexes = [extra_requirements_pex] + pexes
 
-        # NB: See docstring. We always use the previous selected interpreter.
-        constraints = {str(interpreter.identity.requirement)}
+                # NB: See docstring. We always use the previous selected interpreter.
+                constraints = {str(interpreter.identity.requirement)}
 
-        with self.merged_pex(path, pex_info, interpreter, pexes, constraints) as builder:
-          for extra_file in self.extra_files():
-            extra_file.add_to(builder)
-          builder.freeze(bytecode_compile=False)
+                with self.merged_pex(path, pex_info, interpreter, pexes, constraints) as builder:
+                    for extra_file in self.extra_files():
+                        extra_file.add_to(builder)
+                    builder.freeze(bytecode_compile=False)
 
-    return PEX(path, interpreter)
+        return PEX(path, interpreter)

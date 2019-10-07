@@ -9,17 +9,21 @@ from pants_test.test_base import TestBase
 
 
 class TestWatchmanClient(TestBase):
-  def setUp(self):
-    super().setUp()
-    self.swc = StreamableWatchmanClient(sockpath='/tmp/testing', transport='local')
+    def setUp(self):
+        super().setUp()
+        self.swc = StreamableWatchmanClient(sockpath="/tmp/testing", transport="local")
 
-  @contextmanager
-  def setup_stream_query(self):
-    with unittest.mock.patch.object(StreamableWatchmanClient, '_connect') as mock_connect, \
-         unittest.mock.patch.object(StreamableWatchmanClient, 'sendConn') as mock_sendconn, \
-         unittest.mock.patch.object(StreamableWatchmanClient, 'recvConn') as mock_recvconn:
-      yield mock_connect, mock_sendconn, mock_recvconn
+    @contextmanager
+    def setup_stream_query(self):
+        with unittest.mock.patch.object(
+            StreamableWatchmanClient, "_connect"
+        ) as mock_connect, unittest.mock.patch.object(
+            StreamableWatchmanClient, "sendConn"
+        ) as mock_sendconn, unittest.mock.patch.object(
+            StreamableWatchmanClient, "recvConn"
+        ) as mock_recvconn:
+            yield mock_connect, mock_sendconn, mock_recvconn
 
-  def test_stream_query(self):
-    with self.setup_stream_query():
-      self.swc.stream_query([])
+    def test_stream_query(self):
+        with self.setup_stream_query():
+            self.swc.stream_query([])

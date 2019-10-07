@@ -5,19 +5,19 @@ from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrar
 
 
 class AnnotationProcessor(ExportableJvmLibrary):
-  """A Java library containing annotation processors.
+    """A Java library containing annotation processors.
 
   :API: public
   """
 
-  def __init__(self, processors=None, *args, **kwargs):
+    def __init__(self, processors=None, *args, **kwargs):
 
-    """
+        """
     :param resources: An optional list of file paths (DEPRECATED) or
       ``resources`` targets (which in turn point to file paths). The paths
       indicate text file resources to place in this module's jar.
     :param processors: A list of the fully qualified class names of the
       annotation processors this library exports.
     """
-    super().__init__(*args, **kwargs)
-    self.processors = processors
+        super().__init__(*args, **kwargs)
+        self.processors = processors

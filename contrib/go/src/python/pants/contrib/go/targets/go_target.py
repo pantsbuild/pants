@@ -8,9 +8,9 @@ from pants.build_graph.target import Target
 
 
 class GoTarget(Target):
-  @classmethod
-  def package_path(cls, root, path):
-    """Returns a normalized package path constructed from the given path and its root.
+    @classmethod
+    def package_path(cls, root, path):
+        """Returns a normalized package path constructed from the given path and its root.
 
     A remote package path is the portion of the remote Go package's import path after the remote
     root path.
@@ -31,12 +31,12 @@ class GoTarget(Target):
                         directory relative to the $GOPATH.
     :raises: `ValueError` if the path does not lay within the root.
     """
-    package_path = os.path.relpath(path, root)
-    return cls.normalize_package_path(package_path)
+        package_path = os.path.relpath(path, root)
+        return cls.normalize_package_path(package_path)
 
-  @classmethod
-  def normalize_package_path(cls, package_path):
-    """Returns a normalized version of the given package path.
+    @classmethod
+    def normalize_package_path(cls, package_path):
+        """Returns a normalized version of the given package path.
 
     The root package might by denoted by '' or '.' and is normalized to ''.
 
@@ -48,16 +48,20 @@ class GoTarget(Target):
     :param string package_path: The Go package path to normalize.
     :raises: `ValueError` if the package path cannot be normalized.
     """
-    if package_path.startswith(os.pardir + os.sep):
-      raise ValueError('Relative package paths are not allowed. Given: {!r}'.format(package_path))
-    if os.path.isabs(package_path):
-      raise ValueError('Absolute package paths are not allowed. Given: {!r}'.format(package_path))
-    return '' if not package_path or package_path == os.curdir else package_path.lstrip('/')
+        if package_path.startswith(os.pardir + os.sep):
+            raise ValueError(
+                "Relative package paths are not allowed. Given: {!r}".format(package_path)
+            )
+        if os.path.isabs(package_path):
+            raise ValueError(
+                "Absolute package paths are not allowed. Given: {!r}".format(package_path)
+            )
+        return "" if not package_path or package_path == os.curdir else package_path.lstrip("/")
 
-  @property
-  @abstractmethod
-  def import_path(self):
-    """Returns the import path string that should be used to import this target's package.
+    @property
+    @abstractmethod
+    def import_path(self):
+        """Returns the import path string that should be used to import this target's package.
 
     :returns: An import path that can be used to import this package in a `.go` file.
     :rtype: string

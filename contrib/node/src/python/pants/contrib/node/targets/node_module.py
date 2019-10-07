@@ -14,13 +14,23 @@ logger = logging.getLogger(__name__)
 
 
 class NodeModule(NodePackage):
-  """A Node module."""
+    """A Node module."""
 
-  def __init__(
-    self, package_manager=None, sources=None, build_script=None, output_dir='dist',
-    dev_dependency=False, style_ignore_path='.eslintignore', address=None, payload=None,
-    bin_executables=None, node_scope=None, **kwargs):
-    """
+    def __init__(
+        self,
+        package_manager=None,
+        sources=None,
+        build_script=None,
+        output_dir="dist",
+        dev_dependency=False,
+        style_ignore_path=".eslintignore",
+        address=None,
+        payload=None,
+        bin_executables=None,
+        node_scope=None,
+        **kwargs
+    ):
+        """
     :param sources: Javascript and other source code files that make up this module; paths are
                     relative to the BUILD file's directory.
     :type sources: `globs`, `rglobs` or a list of strings
@@ -52,49 +62,54 @@ class NodeModule(NodePackage):
       Any target-level node_scope will override the global node-scope.
 
     """
-    # TODO(John Sirois): Support devDependencies, etc.  The devDependencies case is not
-    # clear-cut since pants controlled builds would provide devDependencies as needed to perform
-    # tasks.  The reality is likely to be though that both pants will never cover all cases, and a
-    # back door to execute new tools during development will be desirable and supporting conversion
-    # of pre-existing package.json files as node_module targets will require this.
+        # TODO(John Sirois): Support devDependencies, etc.  The devDependencies case is not
+        # clear-cut since pants controlled builds would provide devDependencies as needed to perform
+        # tasks.  The reality is likely to be though that both pants will never cover all cases, and a
+        # back door to execute new tools during development will be desirable and supporting conversion
+        # of pre-existing package.json files as node_module targets will require this.
 
-    bin_executables = bin_executables or {}
-    if not (isinstance(bin_executables, dict) or isinstance(bin_executables, str)):
-      raise TargetDefinitionException(
-        self,
-        'expected a `dict` or `str` object for bin_executables, instead found a {}'
-        .format(type(bin_executables)))
+        bin_executables = bin_executables or {}
+        if not (isinstance(bin_executables, dict) or isinstance(bin_executables, str)):
+            raise TargetDefinitionException(
+                self,
+                "expected a `dict` or `str` object for bin_executables, instead found a {}".format(
+                    type(bin_executables)
+                ),
+            )
 
-    payload = payload or Payload()
-    payload.add_fields({
-      'sources': self.create_sources_field(
-        sources=sources, sources_rel_path=address.spec_path, key_arg='sources'),
-      'build_script': PrimitiveField(build_script),
-      'package_manager': PrimitiveField(package_manager),
-      'output_dir': PrimitiveField(output_dir),
-      'dev_dependency': PrimitiveField(dev_dependency),
-      'style_ignore_path': PrimitiveField(style_ignore_path),
-      'bin_executables': PrimitiveField(bin_executables),
-      'node_scope': PrimitiveField(node_scope),
-    })
-    super().__init__(address=address, payload=payload, **kwargs)
+        payload = payload or Payload()
+        payload.add_fields(
+            {
+                "sources": self.create_sources_field(
+                    sources=sources, sources_rel_path=address.spec_path, key_arg="sources"
+                ),
+                "build_script": PrimitiveField(build_script),
+                "package_manager": PrimitiveField(package_manager),
+                "output_dir": PrimitiveField(output_dir),
+                "dev_dependency": PrimitiveField(dev_dependency),
+                "style_ignore_path": PrimitiveField(style_ignore_path),
+                "bin_executables": PrimitiveField(bin_executables),
+                "node_scope": PrimitiveField(node_scope),
+            }
+        )
+        super().__init__(address=address, payload=payload, **kwargs)
 
-  @property
-  def style_ignore_path(self):
-    """The name of the ignore path file.
+    @property
+    def style_ignore_path(self):
+        """The name of the ignore path file.
 
     :rtype: string
     """
-    return self.payload.style_ignore_path
+        return self.payload.style_ignore_path
 
-  @property
-  def bin_executables(self):
-    """A normalized map of bin executable names and local path to an executable
+    @property
+    def bin_executables(self):
+        """A normalized map of bin executable names and local path to an executable
 
     :rtype: dict
     """
-    if isinstance(self.payload.bin_executables, str):
-      # In this case, the package_name is the bin name
-      return {self.package_name: self.payload.bin_executables}
+        if isinstance(self.payload.bin_executables, str):
+            # In this case, the package_name is the bin name
+            return {self.package_name: self.payload.bin_executables}
 
-    return self.payload.bin_executables
+        return self.payload.bin_executables

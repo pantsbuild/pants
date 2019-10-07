@@ -10,37 +10,41 @@ from pants.java.jar.jar_dependency import JarDependency
 from pants_test.test_base import TestBase
 
 
-jar1 = JarDependency(org='testOrg1', name='testName1', rev='123')
-jar2 = JarDependency(org='testOrg2', name='testName2', rev='456')
+jar1 = JarDependency(org="testOrg1", name="testName1", rev="123")
+jar2 = JarDependency(org="testOrg2", name="testName2", rev="456")
 
 
 class JarLibraryTest(TestBase):
+    @classmethod
+    def alias_groups(cls):
+        return BuildFileAliases(targets={"jar_library": JarLibrary}, objects={"jar": JarDependency})
 
-  @classmethod
-  def alias_groups(cls):
-    return BuildFileAliases(targets={'jar_library': JarLibrary},
-                            objects={'jar': JarDependency})
+    def test_validation(self):
+        target = Target(
+            name="mybird", address=Address.parse("//:mybird"), build_graph=self.build_graph
+        )
+        # jars attribute must contain only JarLibrary instances
+        with self.assertRaises(TargetDefinitionException):
+            JarLibrary(name="test", jars=[target])
 
-  def test_validation(self):
-    target = Target(name='mybird', address=Address.parse('//:mybird'),
-                    build_graph=self.build_graph)
-    # jars attribute must contain only JarLibrary instances
-    with self.assertRaises(TargetDefinitionException):
-      JarLibrary(name="test", jars=[target])
+    def test_jar_dependencies(self):
+        lib = JarLibrary(
+            name="foo",
+            address=Address.parse("//:foo"),
+            build_graph=self.build_graph,
+            jars=[jar1, jar2],
+        )
+        self.assertEqual((jar1, jar2), lib.jar_dependencies)
 
-  def test_jar_dependencies(self):
-    lib = JarLibrary(name='foo', address=Address.parse('//:foo'),
-                     build_graph=self.build_graph,
-                     jars=[jar1, jar2])
-    self.assertEqual((jar1, jar2), lib.jar_dependencies)
+    def test_empty_jar_dependencies(self):
+        def example():
+            return self.make_target("//:foo", JarLibrary)
 
-  def test_empty_jar_dependencies(self):
-    def example():
-      return self.make_target('//:foo', JarLibrary)
-    self.assertRaises(TargetDefinitionException, example)
+        self.assertRaises(TargetDefinitionException, example)
 
-  def test_excludes(self):
-    # TODO(Eric Ayers) There doesn't seem to be any way to set this field at the moment.
-    lib = JarLibrary(name='foo', address=Address.parse('//:foo'),
-                     build_graph=self.build_graph, jars=[jar1])
-    self.assertEqual([], lib.excludes)
+    def test_excludes(self):
+        # TODO(Eric Ayers) There doesn't seem to be any way to set this field at the moment.
+        lib = JarLibrary(
+            name="foo", address=Address.parse("//:foo"), build_graph=self.build_graph, jars=[jar1]
+        )
+        self.assertEqual([], lib.excludes)

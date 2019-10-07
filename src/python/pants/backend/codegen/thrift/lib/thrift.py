@@ -5,5 +5,5 @@ from pants.binaries.binary_tool import NativeTool
 
 
 class Thrift(NativeTool):
-  options_scope = 'thrift'
-  default_version = '0.10.0'
+    options_scope = "thrift"
+    default_version = "0.10.0"

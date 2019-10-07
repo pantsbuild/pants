@@ -9,6 +9,6 @@ from pants.contrib.codeanalysis.tasks.index_java import IndexJava
 
 
 def register_goals():
-  task(name='kythe-java-extract', action=ExtractJava).install('index')
-  task(name='kythe-java-index', action=IndexJava).install('index')
-  task(name='bundle-entries', action=BundleEntries).install('index')
+    task(name="kythe-java-extract", action=ExtractJava).install("index")
+    task(name="kythe-java-index", action=IndexJava).install("index")
+    task(name="bundle-entries", action=BundleEntries).install("index")

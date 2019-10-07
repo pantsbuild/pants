@@ -8,6 +8,6 @@ from pants.util.memo import memoized
 
 @memoized
 def get_project_tree(options):
-  """Creates the project tree for build files for use in a given pants run."""
-  pants_ignore = options.pants_ignore or []
-  return FileSystemProjectTree(get_buildroot(), pants_ignore)
+    """Creates the project tree for build files for use in a given pants run."""
+    pants_ignore = options.pants_ignore or []
+    return FileSystemProjectTree(get_buildroot(), pants_ignore)

@@ -9,11 +9,11 @@ from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin, Subsyst
 
 
 class SubsystemError(Exception):
-  """An error in a subsystem."""
+    """An error in a subsystem."""
 
 
 class Subsystem(SubsystemClientMixin, Optionable):
-  """A separable piece of functionality that may be reused across multiple tasks or other code.
+    """A separable piece of functionality that may be reused across multiple tasks or other code.
 
   Subsystems encapsulate the configuration and initialization of things like JVMs,
   Python interpreters, SCMs and so on.
@@ -34,66 +34,70 @@ class Subsystem(SubsystemClientMixin, Optionable):
 
   :API: public
   """
-  options_scope_category = ScopeInfo.SUBSYSTEM
 
-  class UninitializedSubsystemError(SubsystemError):
-    def __init__(self, class_name, scope):
-      super(Subsystem.UninitializedSubsystemError, self).__init__(
-        'Subsystem "{}" not initialized for scope "{}". '
-        'Is subsystem missing from subsystem_dependencies() in a task? '.format(class_name, scope))
+    options_scope_category = ScopeInfo.SUBSYSTEM
 
-  @classmethod
-  def is_subsystem_type(cls, obj):
-    return inspect.isclass(obj) and issubclass(obj, cls)
+    class UninitializedSubsystemError(SubsystemError):
+        def __init__(self, class_name, scope):
+            super(Subsystem.UninitializedSubsystemError, self).__init__(
+                'Subsystem "{}" not initialized for scope "{}". '
+                "Is subsystem missing from subsystem_dependencies() in a task? ".format(
+                    class_name, scope
+                )
+            )
 
-  @classmethod
-  def scoped(cls, optionable, removal_version=None, removal_hint=None):
-    """Returns a dependency on this subsystem, scoped to `optionable`.
+    @classmethod
+    def is_subsystem_type(cls, obj):
+        return inspect.isclass(obj) and issubclass(obj, cls)
+
+    @classmethod
+    def scoped(cls, optionable, removal_version=None, removal_hint=None):
+        """Returns a dependency on this subsystem, scoped to `optionable`.
 
     :param removal_version: An optional deprecation version for this scoped Subsystem dependency.
     :param removal_hint: An optional hint to accompany a deprecation removal_version.
 
     Return value is suitable for use in SubsystemClientMixin.subsystem_dependencies().
     """
-    return SubsystemDependency(cls, optionable.options_scope, removal_version, removal_hint)
+        return SubsystemDependency(cls, optionable.options_scope, removal_version, removal_hint)
 
-  @classmethod
-  def get_scope_info(cls, subscope=None):
-    cls.validate_scope_name_component(cls.options_scope)
-    if subscope is None:
-      return super().get_scope_info()
-    else:
-      return ScopeInfo(cls.subscope(subscope), ScopeInfo.SUBSYSTEM, cls)
+    @classmethod
+    def get_scope_info(cls, subscope=None):
+        cls.validate_scope_name_component(cls.options_scope)
+        if subscope is None:
+            return super().get_scope_info()
+        else:
+            return ScopeInfo(cls.subscope(subscope), ScopeInfo.SUBSYSTEM, cls)
 
-  # The full Options object for this pants run.  Will be set after options are parsed.
-  # TODO: A less clunky way to make option values available?
-  _options = None
+    # The full Options object for this pants run.  Will be set after options are parsed.
+    # TODO: A less clunky way to make option values available?
+    _options = None
 
-  @classmethod
-  def set_options(cls, options):
-    cls._options = options
+    @classmethod
+    def set_options(cls, options):
+        cls._options = options
 
-  @classmethod
-  def is_initialized(cls):
-    return cls._options is not None
+    @classmethod
+    def is_initialized(cls):
+        return cls._options is not None
 
-  # A cache of (cls, scope) -> the instance of cls tied to that scope.
-  _scoped_instances = {}
+    # A cache of (cls, scope) -> the instance of cls tied to that scope.
+    _scoped_instances = {}
 
-  @classmethod
-  def global_instance(cls):
-    """Returns the global instance of this subsystem.
+    @classmethod
+    def global_instance(cls):
+        """Returns the global instance of this subsystem.
 
     :API: public
 
     :returns: The global subsystem instance.
     :rtype: :class:`pants.subsystem.subsystem.Subsystem`
     """
-    return cls._instance_for_scope(cls.options_scope)
+        return cls._instance_for_scope(cls.options_scope)
 
-  @classmethod
-  def scoped_instance(cls, optionable):
-    """Returns an instance of this subsystem for exclusive use by the given `optionable`.
+    @classmethod
+    def scoped_instance(cls, optionable):
+        """Returns an instance of this subsystem for exclusive use by the given `optionable`.
 
     :API: public
 
@@ -102,32 +106,35 @@ class Subsystem(SubsystemClientMixin, Optionable):
     :returns: The scoped subsystem instance.
     :rtype: :class:`pants.subsystem.subsystem.Subsystem`
     """
-    if not isinstance(optionable, Optionable) and not issubclass(optionable, Optionable):
-      raise TypeError('Can only scope an instance against an Optionable, given {} of type {}.'
-                      .format(optionable, type(optionable)))
-    return cls._instance_for_scope(cls.subscope(optionable.options_scope))
+        if not isinstance(optionable, Optionable) and not issubclass(optionable, Optionable):
+            raise TypeError(
+                "Can only scope an instance against an Optionable, given {} of type {}.".format(
+                    optionable, type(optionable)
+                )
+            )
+        return cls._instance_for_scope(cls.subscope(optionable.options_scope))
 
-  @classmethod
-  def _instance_for_scope(cls, scope):
-    if cls._options is None:
-      raise cls.UninitializedSubsystemError(cls.__name__, scope)
-    key = (cls, scope)
-    if key not in cls._scoped_instances:
-      cls._scoped_instances[key] = cls(scope, cls._options.for_scope(scope))
-    return cls._scoped_instances[key]
+    @classmethod
+    def _instance_for_scope(cls, scope):
+        if cls._options is None:
+            raise cls.UninitializedSubsystemError(cls.__name__, scope)
+        key = (cls, scope)
+        if key not in cls._scoped_instances:
+            cls._scoped_instances[key] = cls(scope, cls._options.for_scope(scope))
+        return cls._scoped_instances[key]
 
-  @classmethod
-  def reset(cls, reset_options=True):
-    """Forget all option values and cached subsystem instances.
+    @classmethod
+    def reset(cls, reset_options=True):
+        """Forget all option values and cached subsystem instances.
 
     Used primarily for test isolation and to reset subsystem state for pantsd.
     """
-    if reset_options:
-      cls._options = None
-    cls._scoped_instances = {}
+        if reset_options:
+            cls._options = None
+        cls._scoped_instances = {}
 
-  def __init__(self, scope, scoped_options):
-    """Note: A subsystem has no access to options in scopes other than its own.
+    def __init__(self, scope, scoped_options):
+        """Note: A subsystem has no access to options in scopes other than its own.
 
     TODO: We'd like that to be true of Tasks some day. Subsystems will help with that.
 
@@ -136,26 +143,26 @@ class Subsystem(SubsystemClientMixin, Optionable):
 
     :API: public
     """
-    super().__init__()
-    self._scope = scope
-    self._scoped_options = scoped_options
-    self._fingerprint = None
+        super().__init__()
+        self._scope = scope
+        self._scoped_options = scoped_options
+        self._fingerprint = None
 
-  @property
-  def options_scope(self):
-    return self._scope
+    @property
+    def options_scope(self):
+        return self._scope
 
-  @property
-  def options(self):
-    """Returns the option values for this subsystem's scope.
-
-    :API: public
-    """
-    return self._scoped_options
-
-  def get_options(self):
-    """Returns the option values for this subsystem's scope.
+    @property
+    def options(self):
+        """Returns the option values for this subsystem's scope.
 
     :API: public
     """
-    return self._scoped_options
+        return self._scoped_options
+
+    def get_options(self):
+        """Returns the option values for this subsystem's scope.
+
+    :API: public
+    """
+        return self._scoped_options

@@ -25,29 +25,29 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def build_file_aliases():
-  return BuildFileAliases(
-    targets={
-      'java_antlr_library': JavaAntlrLibrary,
-      'java_protobuf_library': JavaProtobufLibrary,
-      'java_ragel_library': JavaRagelLibrary,
-      'java_thrift_library': JavaThriftLibrary,
-      'java_wire_library': JavaWireLibrary,
-      'python_antlr_library': PythonAntlrLibrary,
-      'python_thrift_library': PythonThriftLibrary,
-      'python_grpcio_library': PythonGrpcioLibrary,
-      'jaxb_library': JaxbLibrary,
-      }
+    return BuildFileAliases(
+        targets={
+            "java_antlr_library": JavaAntlrLibrary,
+            "java_protobuf_library": JavaProtobufLibrary,
+            "java_ragel_library": JavaRagelLibrary,
+            "java_thrift_library": JavaThriftLibrary,
+            "java_wire_library": JavaWireLibrary,
+            "python_antlr_library": PythonAntlrLibrary,
+            "python_thrift_library": PythonThriftLibrary,
+            "python_grpcio_library": PythonGrpcioLibrary,
+            "jaxb_library": JaxbLibrary,
+        }
     )
 
 
 def register_goals():
-  task(name='thrift-java', action=ApacheThriftJavaGen).install('gen')
-  task(name='thrift-py', action=ApacheThriftPyGen).install('gen')
-  task(name='grpcio-prep', action=GrpcioPrep).install('gen')
-  task(name='grpcio-run', action=GrpcioRun).install('gen')
-  task(name='protoc', action=ProtobufGen).install('gen')
-  task(name='antlr-java', action=AntlrJavaGen).install('gen')
-  task(name='antlr-py', action=AntlrPyGen).install('gen')
-  task(name='ragel', action=RagelGen).install('gen')
-  task(name='jaxb', action=JaxbGen).install('gen')
-  task(name='wire', action=WireGen).install('gen')
+    task(name="thrift-java", action=ApacheThriftJavaGen).install("gen")
+    task(name="thrift-py", action=ApacheThriftPyGen).install("gen")
+    task(name="grpcio-prep", action=GrpcioPrep).install("gen")
+    task(name="grpcio-run", action=GrpcioRun).install("gen")
+    task(name="protoc", action=ProtobufGen).install("gen")
+    task(name="antlr-java", action=AntlrJavaGen).install("gen")
+    task(name="antlr-py", action=AntlrPyGen).install("gen")
+    task(name="ragel", action=RagelGen).install("gen")
+    task(name="jaxb", action=JaxbGen).install("gen")
+    task(name="wire", action=WireGen).install("gen")

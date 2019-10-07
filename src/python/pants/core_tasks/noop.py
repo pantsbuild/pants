@@ -5,22 +5,22 @@ from pants.task.noop_exec_task import NoopExecTask
 
 
 class NoopCompile(NoopExecTask):
-  """A no-op that provides a product type that can be used to force scheduling.
+    """A no-op that provides a product type that can be used to force scheduling.
 
   :API: public
   """
 
-  @classmethod
-  def product_types(cls):
-    return ['ran_compile']
+    @classmethod
+    def product_types(cls):
+        return ["ran_compile"]
 
 
 class NoopTest(NoopExecTask):
-  """A no-op that provides a product type that can be used to force scheduling.
+    """A no-op that provides a product type that can be used to force scheduling.
 
   :API: public
   """
 
-  @classmethod
-  def product_types(cls):
-    return ['ran_tests']
+    @classmethod
+    def product_types(cls):
+        return ["ran_tests"]

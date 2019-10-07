@@ -8,8 +8,7 @@ from example.tensorflow_custom_op.zero_out_custom_op import zero_out_module
 
 # This code is from the guide in https://www.tensorflow.org/guide/extend/op.
 class ZeroOutTest(tf.test.TestCase):
-
-  def test_zero_out(self):
-    with self.cached_session():
-      result = zero_out_module().zero_out([5, 4, 3, 2, 1])
-      self.assertAllEqual(result.eval(), [5, 0, 0, 0, 0])
+    def test_zero_out(self):
+        with self.cached_session():
+            result = zero_out_module().zero_out([5, 4, 3, 2, 1])
+            self.assertAllEqual(result.eval(), [5, 0, 0, 0, 0])

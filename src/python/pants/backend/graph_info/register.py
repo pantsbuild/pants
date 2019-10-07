@@ -12,11 +12,11 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def register_goals():
-  task(name='path', action=Path).install()
-  task(name='paths', action=Paths).install()
-  task(name='dependees', action=ReverseDepmap).install()
-  task(name='filemap', action=Filemap).install()
-  task(name='minimize', action=MinimalCover).install()
-  task(name='filter', action=Filter).install()
-  task(name='sort', action=SortTargets).install()
-  task(name='cloc', action=CountLinesOfCode).install()
+    task(name="path", action=Path).install()
+    task(name="paths", action=Paths).install()
+    task(name="dependees", action=ReverseDepmap).install()
+    task(name="filemap", action=Filemap).install()
+    task(name="minimize", action=MinimalCover).install()
+    task(name="filter", action=Filter).install()
+    task(name="sort", action=SortTargets).install()
+    task(name="cloc", action=CountLinesOfCode).install()

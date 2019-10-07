@@ -8,26 +8,26 @@ from pants.contrib.python.checks.checker.missing_contextmanager import MissingCo
 
 
 class MissingContextManagerTest(CheckstylePluginTestBase):
-  plugin_type = MissingContextManager
+    plugin_type = MissingContextManager
 
-  def test_missing_contextmanager(self):
-    statement = """
+    def test_missing_contextmanager(self):
+        statement = """
       with open("derp.txt"):
         pass
 
       with open("herp.txt") as fp:
         fp.read()
     """
-    self.assertNoNits(statement)
+        self.assertNoNits(statement)
 
-    statement = """
+        statement = """
       foo = open("derp.txt")
     """
-    self.assertNit(statement, 'T802', Nit.WARNING)
+        self.assertNit(statement, "T802", Nit.WARNING)
 
-    # TODO(wickman): In these cases suggest using contextlib.closing.
-    statement = """
+        # TODO(wickman): In these cases suggest using contextlib.closing.
+        statement = """
       from urllib2 import urlopen
       the_googs = urlopen("http://www.google.com").read()
     """
-    self.assertNoNits(statement)
+        self.assertNoNits(statement)

@@ -13,20 +13,24 @@ logger = logging.getLogger(__name__)
 
 
 class BuildozerBinary(NativeTool):
-  # Note: Not in scope 'buildozer' because that's the name of the singleton task
-  # that runs buildozer.
-  options_scope = 'buildozer-binary'
-  name = 'buildozer'
-  default_version = '0.6.0-80c7f0d45d7e40fa1f7362852697d4a03df557b3'
+    # Note: Not in scope 'buildozer' because that's the name of the singleton task
+    # that runs buildozer.
+    options_scope = "buildozer-binary"
+    name = "buildozer"
+    default_version = "0.6.0-80c7f0d45d7e40fa1f7362852697d4a03df557b3"
 
-  replaces_scope = 'buildozer'
-  replaces_name = 'version'
+    replaces_scope = "buildozer"
+    replaces_name = "version"
 
-  def execute(self, buildozer_command, spec, context=None):
-    try:
-      subprocess.check_call([self.select(context), buildozer_command, spec], cwd=get_buildroot())
-    except subprocess.CalledProcessError as err:
-      if err.returncode == 3:
-        logger.warning('{} ... no changes were made'.format(buildozer_command))
-      else:
-        raise TaskError('{} ... exited non-zero ({}).'.format(buildozer_command, err.returncode))
+    def execute(self, buildozer_command, spec, context=None):
+        try:
+            subprocess.check_call(
+                [self.select(context), buildozer_command, spec], cwd=get_buildroot()
+            )
+        except subprocess.CalledProcessError as err:
+            if err.returncode == 3:
+                logger.warning("{} ... no changes were made".format(buildozer_command))
+            else:
+                raise TaskError(
+                    "{} ... exited non-zero ({}).".format(buildozer_command, err.returncode)
+                )

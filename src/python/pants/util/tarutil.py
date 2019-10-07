@@ -5,9 +5,8 @@ import tarfile
 
 
 class TarFile(tarfile.TarFile):
-
-  def next(self):
-    """A copy and modification of the next() method in tarfile module.
+    def next(self):
+        """A copy and modification of the next() method in tarfile module.
 
     Note: this function should stay named next(), not __next__(), to reflect CPython.
     See https://github.com/python/cpython/blob/master/Lib/tarfile.py#L2255.
@@ -29,49 +28,49 @@ class TarFile(tarfile.TarFile):
     # The above copyright  notice and this  permission notice shall  be
     # included in all copies or substantial portions of the Software.
     """
-    self._check("ra")
-    if self.firstmember is not None:
-      m = self.firstmember
-      self.firstmember = None
-      return m
+        self._check("ra")
+        if self.firstmember is not None:
+            m = self.firstmember
+            self.firstmember = None
+            return m
 
-    # Advance the file pointer.
-    if self.offset != self.fileobj.tell():
-      self.fileobj.seek(self.offset - 1)
-      if not self.fileobj.read(1):
-        raise tarfile.ReadError("unexpected end of data")
+        # Advance the file pointer.
+        if self.offset != self.fileobj.tell():
+            self.fileobj.seek(self.offset - 1)
+            if not self.fileobj.read(1):
+                raise tarfile.ReadError("unexpected end of data")
 
-    # Read the next block.
-    tarinfo = None
-    while True:
-      try:
-        tarinfo = self.tarinfo.fromtarfile(self)
-      except tarfile.EOFHeaderError as e:
-        if self.ignore_zeros:
-          self._dbg(2, f"0x{self.offset:X}: {e!r}")
-          self.offset += tarfile.BLOCKSIZE
-          continue
-      except tarfile.InvalidHeaderError as e:
-        if self.ignore_zeros:
-          self._dbg(2, f"0x{self.offset:X}: {e!r}")
-          self.offset += tarfile.BLOCKSIZE
-          continue
-        # Modify here, to raise exceptions if errorlevel is bigger than 0.
-        elif self.errorlevel > 0:
-          raise tarfile.ReadError(str(e))
-      except tarfile.EmptyHeaderError:
-        if self.offset == 0:
-          raise tarfile.ReadError("empty file")
-      except tarfile.TruncatedHeaderError as e:
-        if self.offset == 0:
-          raise tarfile.ReadError(str(e))
-      except tarfile.SubsequentHeaderError as e:
-        raise tarfile.ReadError(str(e))
-      break
+        # Read the next block.
+        tarinfo = None
+        while True:
+            try:
+                tarinfo = self.tarinfo.fromtarfile(self)
+            except tarfile.EOFHeaderError as e:
+                if self.ignore_zeros:
+                    self._dbg(2, f"0x{self.offset:X}: {e!r}")
+                    self.offset += tarfile.BLOCKSIZE
+                    continue
+            except tarfile.InvalidHeaderError as e:
+                if self.ignore_zeros:
+                    self._dbg(2, f"0x{self.offset:X}: {e!r}")
+                    self.offset += tarfile.BLOCKSIZE
+                    continue
+                # Modify here, to raise exceptions if errorlevel is bigger than 0.
+                elif self.errorlevel > 0:
+                    raise tarfile.ReadError(str(e))
+            except tarfile.EmptyHeaderError:
+                if self.offset == 0:
+                    raise tarfile.ReadError("empty file")
+            except tarfile.TruncatedHeaderError as e:
+                if self.offset == 0:
+                    raise tarfile.ReadError(str(e))
+            except tarfile.SubsequentHeaderError as e:
+                raise tarfile.ReadError(str(e))
+            break
 
-    if tarinfo is not None:
-      self.members.append(tarinfo)
-    else:
-      self._loaded = True
+        if tarinfo is not None:
+            self.members.append(tarinfo)
+        else:
+            self._loaded = True
 
-    return tarinfo
+        return tarinfo

@@ -5,18 +5,17 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensur
 
 
 class BootstrapJvmToolsIntegrationTest(PantsRunIntegrationTest):
+    @ensure_resolver
+    def test_bootstrap_jarjar_succeeds_normally(self):
+        # NB(gmalmquist): The choice of jarjar here is arbitrary; any jvm-tool that is integral to pants
+        # would suffice (eg, nailgun or jar-tool).
+        self.assert_success(self.run_pants(["clean-all"]))
+        pants_run = self.run_pants(["bootstrap", "3rdparty:junit"])
+        self.assert_success(pants_run)
 
-  @ensure_resolver
-  def test_bootstrap_jarjar_succeeds_normally(self):
-    # NB(gmalmquist): The choice of jarjar here is arbitrary; any jvm-tool that is integral to pants
-    # would suffice (eg, nailgun or jar-tool).
-    self.assert_success(self.run_pants(['clean-all']))
-    pants_run = self.run_pants(['bootstrap', '3rdparty:junit'])
-    self.assert_success(pants_run)
-
-  @ensure_resolver
-  def test_bootstrap_jarjar_failure(self):
-    self.assert_success(self.run_pants(['clean-all']))
-    pants_run = self.run_pants(['bootstrap', '--shader-jarjar="fake-target"', '3rdparty:junit'])
-    self.assert_failure(pants_run)
-    self.assertIn('fake-target', pants_run.stdout_data)
+    @ensure_resolver
+    def test_bootstrap_jarjar_failure(self):
+        self.assert_success(self.run_pants(["clean-all"]))
+        pants_run = self.run_pants(["bootstrap", '--shader-jarjar="fake-target"', "3rdparty:junit"])
+        self.assert_failure(pants_run)
+        self.assertIn("fake-target", pants_run.stdout_data)

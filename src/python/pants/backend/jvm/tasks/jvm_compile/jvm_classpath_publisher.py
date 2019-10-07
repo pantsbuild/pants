@@ -10,32 +10,35 @@ from pants.task.task import Task
 
 
 class RuntimeClasspathPublisher(Task):
-  """Create stable symlinks for runtime classpath entries for JVM targets."""
+    """Create stable symlinks for runtime classpath entries for JVM targets."""
 
-  @classmethod
-  def register_options(cls, register):
-    super().register_options(register)
-    register('--manifest-jar-only', type=bool, default=False,
-             help='Only export classpath in a manifest jar.')
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--manifest-jar-only",
+            type=bool,
+            default=False,
+            help="Only export classpath in a manifest jar.",
+        )
 
-  @classmethod
-  def prepare(cls, options, round_manager):
-    round_manager.require_data('runtime_classpath')
+    @classmethod
+    def prepare(cls, options, round_manager):
+        round_manager.require_data("runtime_classpath")
 
-  @property
-  def _output_folder(self):
-    return self.options_scope.replace('.', os.sep)
+    @property
+    def _output_folder(self):
+        return self.options_scope.replace(".", os.sep)
 
-  def execute(self):
-    basedir = os.path.join(self.get_options().pants_distdir, self._output_folder)
-    runtime_classpath = self.context.products.get_data('runtime_classpath')
-    targets = self.context.targets()
-    if self.get_options().manifest_jar_only:
-      classpath = ClasspathUtil.classpath(targets, runtime_classpath)
-      # Safely create e.g. dist/export-classpath/manifest.jar
-      safe_classpath(classpath, basedir, "manifest.jar")
-    else:
-      ClasspathProducts.create_canonical_classpath(runtime_classpath,
-                                                   targets,
-                                                   basedir,
-                                                   save_classpath_file=True)
+    def execute(self):
+        basedir = os.path.join(self.get_options().pants_distdir, self._output_folder)
+        runtime_classpath = self.context.products.get_data("runtime_classpath")
+        targets = self.context.targets()
+        if self.get_options().manifest_jar_only:
+            classpath = ClasspathUtil.classpath(targets, runtime_classpath)
+            # Safely create e.g. dist/export-classpath/manifest.jar
+            safe_classpath(classpath, basedir, "manifest.jar")
+        else:
+            ClasspathProducts.create_canonical_classpath(
+                runtime_classpath, targets, basedir, save_classpath_file=True
+            )

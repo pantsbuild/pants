@@ -4,4 +4,4 @@
 from django.utils import text
 
 
-assert 'forty-two' == text.slugify('forty two')
+assert "forty-two" == text.slugify("forty two")

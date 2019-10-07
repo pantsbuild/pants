@@ -5,22 +5,22 @@ from pants.build_graph.intermediate_target_factory import IntermediateTargetFact
 
 
 class IntransitiveDependencyFactory(IntermediateTargetFactoryBase):
-  """Creates a dependency which is intransitive.
+    """Creates a dependency which is intransitive.
 
   This dependency will not be seen by dependees of this target. The syntax for this feature is
   experimental and may change in the future.
   """
 
-  @property
-  def extra_target_arguments(self):
-    return dict(_transitive=False)
+    @property
+    def extra_target_arguments(self):
+        return dict(_transitive=False)
 
-  def __call__(self, address):
-    return self._create_intermediate_target(address, 'intransitive')
+    def __call__(self, address):
+        return self._create_intermediate_target(address, "intransitive")
 
 
 class ProvidedDependencyFactory(IntermediateTargetFactoryBase):
-  """Creates an intransitive dependency with scope='compile test'.
+    """Creates an intransitive dependency with scope='compile test'.
 
   This mirrors the behavior of the "provided" scope found in other build systems, such as Gradle,
   Maven, and IntelliJ.
@@ -28,9 +28,9 @@ class ProvidedDependencyFactory(IntermediateTargetFactoryBase):
   The syntax for this feature is experimental and may change in the future.
   """
 
-  @property
-  def extra_target_arguments(self):
-    return dict(_transitive=False, scope='compile test')
+    @property
+    def extra_target_arguments(self):
+        return dict(_transitive=False, scope="compile test")
 
-  def __call__(self, address):
-    return self._create_intermediate_target(address, 'provided')
+    def __call__(self, address):
+        return self._create_intermediate_target(address, "provided")

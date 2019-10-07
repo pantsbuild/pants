@@ -9,57 +9,58 @@ from pants.util.memo import memoized
 
 
 class ScaladocGen(JvmdocGen):
-  """Generate scaladoc html for Scala source targets."""
+    """Generate scaladoc html for Scala source targets."""
 
-  @classmethod
-  @memoized
-  def jvmdoc(cls):
-    return Jvmdoc(tool_name='scaladoc', product_type='scaladoc')
+    @classmethod
+    @memoized
+    def jvmdoc(cls):
+        return Jvmdoc(tool_name="scaladoc", product_type="scaladoc")
 
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super().subsystem_dependencies() + (DistributionLocator, ScalaPlatform.scoped(cls))
+    @classmethod
+    def subsystem_dependencies(cls):
+        return super().subsystem_dependencies() + (DistributionLocator, ScalaPlatform.scoped(cls))
 
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super().prepare(options, round_manager)
-    ScalaPlatform.prepare_tools(round_manager)
+    @classmethod
+    def prepare(cls, options, round_manager):
+        super().prepare(options, round_manager)
+        ScalaPlatform.prepare_tools(round_manager)
 
-  def execute(self):
-    def is_scala(target):
-      return target.has_sources('.scala')
+    def execute(self):
+        def is_scala(target):
+            return target.has_sources(".scala")
 
-    self.generate_doc(is_scala, self.create_scaladoc_command)
+        self.generate_doc(is_scala, self.create_scaladoc_command)
 
-  def create_scaladoc_command(self, classpath, gendir, *targets):
-    sources = []
-    for target in targets:
-      sources.extend(target.sources_relative_to_buildroot())
-      # TODO(Tejal Desai): pantsbuild/pants/65: Remove java_sources attribute for ScalaLibrary
-      # A '.scala' owning target may not have java_sources, eg: junit_tests
-      if hasattr(target, 'java_sources'):
-        for java_target in target.java_sources:
-          sources.extend(java_target.sources_relative_to_buildroot())
+    def create_scaladoc_command(self, classpath, gendir, *targets):
+        sources = []
+        for target in targets:
+            sources.extend(target.sources_relative_to_buildroot())
+            # TODO(Tejal Desai): pantsbuild/pants/65: Remove java_sources attribute for ScalaLibrary
+            # A '.scala' owning target may not have java_sources, eg: junit_tests
+            if hasattr(target, "java_sources"):
+                for java_target in target.java_sources:
+                    sources.extend(java_target.sources_relative_to_buildroot())
 
-    if not sources:
-      return None
+        if not sources:
+            return None
 
-    scala_platform = ScalaPlatform.global_instance()
-    tool_classpath = [
-        cp_entry.path for cp_entry in scala_platform.compiler_classpath_entries(self.context.products)
-      ]
+        scala_platform = ScalaPlatform.global_instance()
+        tool_classpath = [
+            cp_entry.path
+            for cp_entry in scala_platform.compiler_classpath_entries(self.context.products)
+        ]
 
-    args = ['-usejavacp',
-            '-classpath', ':'.join(classpath),
-            '-d', gendir]
+        args = ["-usejavacp", "-classpath", ":".join(classpath), "-d", gendir]
 
-    args.extend(self.args)
+        args.extend(self.args)
 
-    args.extend(sources)
+        args.extend(sources)
 
-    java_executor = SubprocessExecutor(DistributionLocator.cached())
-    runner = java_executor.runner(jvm_options=self.jvm_options,
-                                  classpath=tool_classpath,
-                                  main='scala.tools.nsc.ScalaDoc',
-                                  args=args)
-    return runner.command
+        java_executor = SubprocessExecutor(DistributionLocator.cached())
+        runner = java_executor.runner(
+            jvm_options=self.jvm_options,
+            classpath=tool_classpath,
+            main="scala.tools.nsc.ScalaDoc",
+            args=args,
+        )
+        return runner.command

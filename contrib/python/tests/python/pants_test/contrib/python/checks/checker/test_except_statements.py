@@ -16,25 +16,27 @@ EXCEPT_TEMPLATE = """
 
 
 class ExceptStatementsTest(CheckstylePluginTestBase):
-  plugin_type = ExceptStatements
+    plugin_type = ExceptStatements
 
-  def test_except_statements(self):
-    for clause in ('except:', 'except :', 'except\t:'):
-      self.assertNit(EXCEPT_TEMPLATE.format(clause), 'T803')
+    def test_except_statements(self):
+        for clause in ("except:", "except :", "except\t:"):
+            self.assertNit(EXCEPT_TEMPLATE.format(clause), "T803")
 
-    try:
-      for clause in (
-          'except KeyError, e:',
-          'except (KeyError, ValueError), e:',
-          'except KeyError, e :',
-          'except (KeyError, ValueError), e\t:'):
-        self.assertNit(EXCEPT_TEMPLATE.format(clause), 'T601')
-    except CheckSyntaxError:  # Fix Python 3 raising SyntaxError
-      pass
+        try:
+            for clause in (
+                "except KeyError, e:",
+                "except (KeyError, ValueError), e:",
+                "except KeyError, e :",
+                "except (KeyError, ValueError), e\t:",
+            ):
+                self.assertNit(EXCEPT_TEMPLATE.format(clause), "T601")
+        except CheckSyntaxError:  # Fix Python 3 raising SyntaxError
+            pass
 
-    for clause in (
-        'except KeyError:',
-        'except KeyError as e:',
-        'except (KeyError, ValueError) as e:',
-        'except (KeyError, ValueError) as e:'):
-      self.assertNoNits(EXCEPT_TEMPLATE.format(clause))
+        for clause in (
+            "except KeyError:",
+            "except KeyError as e:",
+            "except (KeyError, ValueError) as e:",
+            "except (KeyError, ValueError) as e:",
+        ):
+            self.assertNoNits(EXCEPT_TEMPLATE.format(clause))

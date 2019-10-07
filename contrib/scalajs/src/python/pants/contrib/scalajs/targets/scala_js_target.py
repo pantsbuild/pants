@@ -10,49 +10,48 @@ from pants.contrib.scalajs.subsystems.scala_js_platform import ScalaJSPlatform
 
 
 class ScalaJSTarget:
-  """A mixin for ScalaJS targets to injects scala-js deps and request ScalaJS compilation."""
+    """A mixin for ScalaJS targets to injects scala-js deps and request ScalaJS compilation."""
 
-  @classmethod
-  def subsystems(cls):
-    return super().subsystems() + (JvmPlatform, ScalaJSPlatform)
+    @classmethod
+    def subsystems(cls):
+        return super().subsystems() + (JvmPlatform, ScalaJSPlatform)
 
-  def __init__(self, address=None, payload=None, **kwargs):
-    self.address = address  # Set in case a TargetDefinitionException is thrown early
-    payload = payload or Payload()
-    payload.add_fields({
-      'platform': PrimitiveField(None),
-      'compiler_option_sets': PrimitivesSetField(None)
-    })
-    super().__init__(address=address, payload=payload, **kwargs)
+    def __init__(self, address=None, payload=None, **kwargs):
+        self.address = address  # Set in case a TargetDefinitionException is thrown early
+        payload = payload or Payload()
+        payload.add_fields(
+            {"platform": PrimitiveField(None), "compiler_option_sets": PrimitivesSetField(None)}
+        )
+        super().__init__(address=address, payload=payload, **kwargs)
 
-  @classmethod
-  def compute_dependency_specs(cls, kwargs=None, payload=None):
-    for spec in super().compute_dependency_specs(kwargs, payload):
-      yield spec
-    for spec in ScalaJSPlatform.global_instance().injectables_specs_for_key('runtime'):
-      yield spec
+    @classmethod
+    def compute_dependency_specs(cls, kwargs=None, payload=None):
+        for spec in super().compute_dependency_specs(kwargs, payload):
+            yield spec
+        for spec in ScalaJSPlatform.global_instance().injectables_specs_for_key("runtime"):
+            yield spec
 
-  @property
-  def strict_deps(self):
-    return False
+    @property
+    def strict_deps(self):
+        return False
 
-  @property
-  def fatal_warnings(self):
-    return False
+    @property
+    def fatal_warnings(self):
+        return False
 
-  @property
-  def compiler_option_sets(self):
-    """For every element in this list, enable the corresponding flags on compilation
+    @property
+    def compiler_option_sets(self):
+        """For every element in this list, enable the corresponding flags on compilation
     of targets.
     :return: See constructor.
     :rtype: list
     """
-    return self.payload.compiler_option_sets
+        return self.payload.compiler_option_sets
 
-  @property
-  def zinc_file_manager(self):
-    return False
+    @property
+    def zinc_file_manager(self):
+        return False
 
-  @property
-  def platform(self):
-    return JvmPlatform.global_instance().get_platform_for_target(self)
+    @property
+    def platform(self):
+        return JvmPlatform.global_instance().get_platform_for_target(self)

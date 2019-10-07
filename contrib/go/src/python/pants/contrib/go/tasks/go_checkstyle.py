@@ -8,10 +8,10 @@ from pants.contrib.go.tasks.go_fmt_task_base import GoFmtTaskBase
 
 
 class GoCheckstyle(LintTaskMixin, GoFmtTaskBase):
-  """Checks Go code matches gofmt style."""
+    """Checks Go code matches gofmt style."""
 
-  def execute(self):
-    with self.go_fmt_invalid_targets(['-d']) as output:
-      if output:
-        self.context.log.error(output)
-        raise TaskError('Found style errors. Use `./pants fmt` to fix.')
+    def execute(self):
+        with self.go_fmt_invalid_targets(["-d"]) as output:
+            if output:
+                self.context.log.error(output)
+                raise TaskError("Found style errors. Use `./pants fmt` to fix.")

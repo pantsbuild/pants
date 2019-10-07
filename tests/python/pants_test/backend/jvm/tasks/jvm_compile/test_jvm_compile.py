@@ -14,64 +14,68 @@ from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
 class DummyJvmCompile(JvmCompile):
-  pass
+    pass
 
 
 class JvmCompileTest(NailgunTaskTestBase):
-  DEFAULT_CONF = 'default'
+    DEFAULT_CONF = "default"
 
-  @classmethod
-  def task_type(cls):
-    return DummyJvmCompile
+    @classmethod
+    def task_type(cls):
+        return DummyJvmCompile
 
-  def test_if_runtime_classpath_exists(self):
-    target = self.make_target(
-      'java/classpath:java_lib',
-      target_type=JavaLibrary,
-      sources=['com/foo/Bar.java'],
-    )
+    def test_if_runtime_classpath_exists(self):
+        target = self.make_target(
+            "java/classpath:java_lib", target_type=JavaLibrary, sources=["com/foo/Bar.java"]
+        )
 
-    context = self.context(target_roots=[target])
-    compile_classpath = context.products.get_data('compile_classpath', ClasspathProducts.init_func(self.pants_workdir))
+        context = self.context(target_roots=[target])
+        compile_classpath = context.products.get_data(
+            "compile_classpath", ClasspathProducts.init_func(self.pants_workdir)
+        )
 
-    compile_entry = os.path.join(self.pants_workdir, 'compile-entry')
-    pre_init_runtime_entry = os.path.join(self.pants_workdir, 'pre-inited-runtime-entry')
-    compile_classpath.add_for_targets([target], [('default', compile_entry)])
-    runtime_classpath = context.products.get_data('runtime_classpath', ClasspathProducts.init_func(self.pants_workdir))
+        compile_entry = os.path.join(self.pants_workdir, "compile-entry")
+        pre_init_runtime_entry = os.path.join(self.pants_workdir, "pre-inited-runtime-entry")
+        compile_classpath.add_for_targets([target], [("default", compile_entry)])
+        runtime_classpath = context.products.get_data(
+            "runtime_classpath", ClasspathProducts.init_func(self.pants_workdir)
+        )
 
-    runtime_classpath.add_for_targets([target], [('default', pre_init_runtime_entry)])
+        runtime_classpath.add_for_targets([target], [("default", pre_init_runtime_entry)])
 
-    task = self.create_task(context)
-    resulting_classpath = task.create_runtime_classpath()
-    self.assertEqual([('default', pre_init_runtime_entry), ('default', compile_entry)],
-      resulting_classpath.get_for_target(target))
+        task = self.create_task(context)
+        resulting_classpath = task.create_runtime_classpath()
+        self.assertEqual(
+            [("default", pre_init_runtime_entry), ("default", compile_entry)],
+            resulting_classpath.get_for_target(target),
+        )
 
 
 class BaseZincCompileJDKTest(NailgunTaskTestBase):
-  DEFAULT_CONF = 'default'
-  old_cwd = os.getcwd()
+    DEFAULT_CONF = "default"
+    old_cwd = os.getcwd()
 
-  @classmethod
-  def task_type(cls):
-    return BaseZincCompile
+    @classmethod
+    def task_type(cls):
+        return BaseZincCompile
 
-  def setUp(self):
-    os.chdir(get_buildroot())
-    super().setUp()
+    def setUp(self):
+        os.chdir(get_buildroot())
+        super().setUp()
 
-  def tearDown(self):
-    os.chdir(self.old_cwd)
-    super().tearDown()
+    def tearDown(self):
+        os.chdir(self.old_cwd)
+        super().tearDown()
 
-  def test_subprocess_compile_jdk_being_symlink(self):
-    context = self.context(target_roots=[])
-    zinc = Zinc.Factory.global_instance().create(context.products, NailgunTaskBase.SUBPROCESS)
-    self.assertTrue(os.path.islink(zinc.dist.home))
+    def test_subprocess_compile_jdk_being_symlink(self):
+        context = self.context(target_roots=[])
+        zinc = Zinc.Factory.global_instance().create(context.products, NailgunTaskBase.SUBPROCESS)
+        self.assertTrue(os.path.islink(zinc.dist.home))
 
-  def test_hermetic_jdk_being_underlying_dist(self):
-    context = self.context(target_roots=[])
-    zinc = Zinc.Factory.global_instance().create(context.products, NailgunTaskBase.HERMETIC)
-    self.assertFalse(
-      os.path.islink(zinc.dist.home),
-      "Expected {} to not be a link, it was.".format(zinc.dist.home)
-    )
+    def test_hermetic_jdk_being_underlying_dist(self):
+        context = self.context(target_roots=[])
+        zinc = Zinc.Factory.global_instance().create(context.products, NailgunTaskBase.HERMETIC)
+        self.assertFalse(
+            os.path.islink(zinc.dist.home),
+            "Expected {} to not be a link, it was.".format(zinc.dist.home),
+        )

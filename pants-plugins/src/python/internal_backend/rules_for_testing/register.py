@@ -8,21 +8,19 @@ from pants.engine.rules import console_rule
 
 
 class ListAndDieForTesting(Goal):
-  """A fast and deadly variant of `./pants list`."""
+    """A fast and deadly variant of `./pants list`."""
 
-  name = 'list-and-die-for-testing'
+    name = "list-and-die-for-testing"
 
 
 @console_rule
 def fast_list_and_die_for_testing(
-  console: Console, addresses: BuildFileAddresses
+    console: Console, addresses: BuildFileAddresses
 ) -> ListAndDieForTesting:
-  for address in addresses.dependencies:
-    console.print_stdout(address.spec)
-  yield ListAndDieForTesting(exit_code=42)
+    for address in addresses.dependencies:
+        console.print_stdout(address.spec)
+    yield ListAndDieForTesting(exit_code=42)
 
 
 def rules():
-  return [
-      fast_list_and_die_for_testing,
-    ]
+    return [fast_list_and_die_for_testing]

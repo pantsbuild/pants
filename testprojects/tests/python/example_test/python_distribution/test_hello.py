@@ -7,6 +7,5 @@ from hello_package import hello
 
 
 class HelloTest(unittest.TestCase):
-
-  def test_hello_import(self):
-    self.assertEqual('hello!', hello.hello_string())
+    def test_hello_import(self):
+        self.assertEqual("hello!", hello.hello_string())

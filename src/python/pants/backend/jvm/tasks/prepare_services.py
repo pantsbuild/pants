@@ -11,42 +11,47 @@ from pants.util.dirutil import safe_open
 
 
 class JvmServiceFingerprintStrategy(DefaultFingerprintStrategy):
-  """Fingerprints a JvmTarget for its service provider configuration."""
+    """Fingerprints a JvmTarget for its service provider configuration."""
 
-  def compute_fingerprint(self, target):
-    return stable_json_sha1(target.services)
+    def compute_fingerprint(self, target):
+        return stable_json_sha1(target.services)
 
 
 class PrepareServices(ResourcesTask):
-  """Generates service provider configuration for targets that host service implementations.
+    """Generates service provider configuration for targets that host service implementations.
 
   This automates maintenance of jvm service provider configuration files as described here:
   https://docs.oracle.com/javase/6/docs/api/java/util/ServiceLoader.html
   """
 
-  @staticmethod
-  def service_info_path(service):
-    return os.path.join('META-INF', 'services', service)
+    @staticmethod
+    def service_info_path(service):
+        return os.path.join("META-INF", "services", service)
 
-  def find_all_relevant_resources_targets(self):
-    def may_have_jvm_services(target):
-      return isinstance(target, JvmTarget) and list(target.services.values())
-    return self.context.targets(predicate=may_have_jvm_services)
+    def find_all_relevant_resources_targets(self):
+        def may_have_jvm_services(target):
+            return isinstance(target, JvmTarget) and list(target.services.values())
 
-  def create_invalidation_strategy(self):
-    # Service provider configuration has no dependency on target sources, deps or any other payload.
-    # We just care about the services mapping.
-    return JvmServiceFingerprintStrategy()
+        return self.context.targets(predicate=may_have_jvm_services)
 
-  def prepare_resources(self, target, chroot):
-    for service, impls in target.services.items():
-      if impls:
-        service_provider_configuration_file = os.path.join(chroot, self.service_info_path(service))
-        # NB: provider configuration files must be UTF-8 encoded, see the mini-spec:
-        # https://docs.oracle.com/javase/6/docs/api/java/util/ServiceLoader.html
-        with safe_open(service_provider_configuration_file, 'w') as fp:
-          def write_line(line):
-            fp.write((line + '\n'))
-          write_line('# Generated from pants target {}'.format(target.address.spec))
-          for impl in impls:
-            write_line(impl)
+    def create_invalidation_strategy(self):
+        # Service provider configuration has no dependency on target sources, deps or any other payload.
+        # We just care about the services mapping.
+        return JvmServiceFingerprintStrategy()
+
+    def prepare_resources(self, target, chroot):
+        for service, impls in target.services.items():
+            if impls:
+                service_provider_configuration_file = os.path.join(
+                    chroot, self.service_info_path(service)
+                )
+                # NB: provider configuration files must be UTF-8 encoded, see the mini-spec:
+                # https://docs.oracle.com/javase/6/docs/api/java/util/ServiceLoader.html
+                with safe_open(service_provider_configuration_file, "w") as fp:
+
+                    def write_line(line):
+                        fp.write((line + "\n"))
+
+                    write_line("# Generated from pants target {}".format(target.address.spec))
+                    for impl in impls:
+                        write_line(impl)
