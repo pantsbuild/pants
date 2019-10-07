@@ -34,9 +34,21 @@ use futures::task::{self, Task};
 use futures::{Async, Poll};
 use log::warn;
 use parking_lot::Mutex;
+use rand;
+
+struct UniqueTask {
+  id: u64,
+  task: Task,
+}
+
+impl PartialEq<u64> for UniqueTask {
+  fn eq(&self, other: &u64) -> bool {
+    *other == self.id
+  }
+}
 
 struct Inner {
-  waiters: VecDeque<Task>,
+  waiters: VecDeque<UniqueTask>,
   available_permits: usize,
 }
 
@@ -70,6 +82,7 @@ impl AsyncSemaphore {
   {
     let permit = PermitFuture {
       inner: Some(self.inner.clone()),
+      task_id: None,
     };
     Box::new(
       permit
@@ -93,9 +106,12 @@ impl Drop for Permit {
     let task = {
       let mut inner = self.inner.lock();
       inner.available_permits += 1;
-      if let Some(task) = inner.waiters.pop_front() {
-        warn!("dropped permit, num waiters is {:?}", inner.waiters.len());
-        task
+      if let Some(unique_task) = inner.waiters.pop_front() {
+        warn!(
+          "dropped permit notifying next task, queue length is {:?}",
+          inner.waiters.len()
+        );
+        unique_task.task
       } else {
         return;
       }
@@ -104,8 +120,26 @@ impl Drop for Permit {
   }
 }
 
+#[derive(Clone)]
 pub struct PermitFuture {
   inner: Option<Arc<Mutex<Inner>>>,
+  task_id: Option<u64>,
+}
+
+impl Drop for PermitFuture {
+  fn drop(&mut self) {
+    // if task_id is Some then this PermitFuture was added to the waiters queue.
+    // if inner is still Some then this task hasn't been popped and run yet.
+    if self.task_id.is_some() && self.inner.is_some() {
+      let task_id = self.task_id.unwrap();
+      let inner = self.inner.take().unwrap();
+      let mut inner = inner.lock();
+      if let Some(task_index) = inner.waiters.iter().position(|task| task_id == task.id) {
+        warn!("found index for task to drop {:?}", task_index);
+        inner.waiters.remove(task_index);
+      }
+    }
+  }
 }
 
 impl Future for PermitFuture {
@@ -117,7 +151,19 @@ impl Future for PermitFuture {
     let acquired = {
       let mut inner = inner.lock();
       if inner.available_permits == 0 {
-        inner.waiters.push_back(task::current());
+        if self.task_id.is_none() {
+          let task_id = rand::random::<u64>();
+          let this_task = UniqueTask {
+            id: task_id,
+            task: task::current(),
+          };
+          self.task_id = Some(task_id);
+          inner.waiters.push_back(this_task);
+          warn!(
+            "added task to waiters, queue length is {:?}.",
+            inner.waiters.len()
+          );
+        }
         false
       } else {
         inner.available_permits -= 1;

@@ -38,7 +38,7 @@ impl SpeculatingCommandRunner {
     let delay = Delay::new(Instant::now() + self.speculation_timeout);
     let req2 = req.clone();
     let workunit_store2 = workunit_store.clone();
-    warn!(
+    debug!(
       "Running primary command. Num waiters is {:?}",
       self.primary.num_waiters()
     );
@@ -59,10 +59,6 @@ impl SpeculatingCommandRunner {
         Ok(either_success) => {
           // split take out the homogeneous success type for either primary or
           // sec"ondary successes.
-          match either_success {
-            Either::A(_) => warn!("First request SUCCEEDED"),
-            Either::B(_) => warn!("Second request SUCCEEDED"),
-          };
           ok::<FallibleExecuteProcessResult, String>(either_success.split().0).to_boxed()
         }
         Err(Either::A((failed_primary_res, _))) => {
