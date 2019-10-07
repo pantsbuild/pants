@@ -4,6 +4,82 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.22.0.dev1 (10/04/2019)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Depreciate resolve.ivy (#8364)
+  `PR #8364 <https://github.com/pantsbuild/pants/pull/8364>`_
+
+* Deprecate `@rule(...)` in favor of `@rule` (#8360)
+  `PR #8360 <https://github.com/pantsbuild/pants/pull/8360>`_
+
+
+New Features
+~~~~~~~~~~~~
+
+* Add black support as a v2 rule (#8350)
+  `PR #8350 <https://github.com/pantsbuild/pants/pull/8350>`_
+
+* Use the newest pyflakes for internal Python linter (#8359)
+  `PR #8359 <https://github.com/pantsbuild/pants/pull/8359>`_
+
+
+Bugfixes
+~~~~~~~~
+
+* Revert "Fix export test failure to unrevert #8370 (#8380)" (#8386)
+  `PR #8386 <https://github.com/pantsbuild/pants/pull/8386>`_
+
+* Fix typo: "our" -> "are" (#8372)
+  `PR #8372 <https://github.com/pantsbuild/pants/pull/8372>`_
+
+* Fix export test failure to unrevert #8370 (#8380)
+  `PR #8380 <https://github.com/pantsbuild/pants/pull/8380>`_
+
+* Revert "add scala_platform to export output for metals! (#8370)" (#8379)
+  `PR #8379 <https://github.com/pantsbuild/pants/pull/8379>`_
+
+* No longer cache failed `ExecuteProcessResult`s (#8291)
+  `PR #8291 <https://github.com/pantsbuild/pants/pull/8291>`_
+
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Follow up on critical path algorithm (#8381)
+  `PR #8381 <https://github.com/pantsbuild/pants/pull/8381>`_
+
+* Make PEX creation generic (#8289)
+  `PR #8289 <https://github.com/pantsbuild/pants/pull/8289>`_
+
+* Replace most usages of datatype() with @dataclass (#8362)
+  `PR #8362 <https://github.com/pantsbuild/pants/pull/8362>`_
+
+* Port `backend/project-info` integration tests to V2 (#8361)
+  `PR #8361 <https://github.com/pantsbuild/pants/pull/8361>`_
+
+* Port `engine/legacy` integration tests to V2 (#8363)
+  `PR #8363 <https://github.com/pantsbuild/pants/pull/8363>`_
+
+* add scala_platform to export output for metals! (#8370)
+  `PR #8370 <https://github.com/pantsbuild/pants/pull/8370>`_
+
+* Remove a superfluous import. (#8376)
+  `PR #8376 <https://github.com/pantsbuild/pants/pull/8376>`_
+
+* Update rust to 1.38.0 (#8367)
+  `PR #8367 <https://github.com/pantsbuild/pants/pull/8367>`_
+
+* Port more integration tests to V1 chroot and some to V2 (#8365)
+  `PR #8365 <https://github.com/pantsbuild/pants/pull/8365>`_
+
+* Don't upgrade openssl on the OSX Rust test CI shard. (#8383)
+  `PR #8383 <https://github.com/pantsbuild/pants/pull/8383>`_
+
+
 1.22.0.dev0 (09/28/2019)
 ------------------------
 
