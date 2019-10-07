@@ -56,6 +56,9 @@ function ensure_hook() {
   fi
 }
 
+# Make sure users of recent git don't have their history polluted
+# by formatting changes.
+git config --local blame.ignoreRevsFile .ignored_revisions
 
 for HOOK in ${HOOK_NAMES}; do
   ensure_hook "${HOOK}"
