@@ -28,6 +28,7 @@ from pants.engine.selectors import Get
 from pants.engine.struct import Struct
 from pants.util.objects import TypeConstraintError
 
+
 logger = logging.getLogger(__name__)
 
 
