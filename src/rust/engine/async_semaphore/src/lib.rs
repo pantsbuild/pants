@@ -194,6 +194,7 @@ mod tests {
   use std::sync::mpsc;
   use std::thread;
   use std::time::Duration;
+  //use tokio_timer::Delay;
 
   #[test]
   fn acquire_and_release() {
@@ -253,5 +254,59 @@ mod tests {
     acquired_thread2
       .recv_timeout(Duration::from_secs(5))
       .expect("thread2 didn't acquire.");
+  }
+
+  #[test]
+  fn dropped_future_is_removed_from_queue() {
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    let sema = AsyncSemaphore::new(1);
+    let handle1 = sema.clone();
+    let handle2 = sema.clone();
+
+    let (tx_thread1, acquired_thread1) = mpsc::channel();
+    let (unblock_thread1, rx_thread1) = mpsc::channel();
+    let (tx_thread2, acquired_thread2) = mpsc::channel();
+    let (unblock_thread2, rx_thread2) = mpsc::channel();
+
+    runtime.spawn(
+      handle1
+        .with_acquired(move || {
+          // Indicate that we've acquired, and then wait to be signaled to exit.
+          tx_thread1.send(()).unwrap();
+          rx_thread1.recv().unwrap();
+          future::ok::<_, ()>(())
+        })
+    );
+
+    // Wait for thread1 to acquire, and then launch thread2.
+    acquired_thread1
+      .recv_timeout(Duration::from_secs(5))
+      .expect("thread1 didn't acquire.");
+    let waiter = handle2.with_acquired(move || future::ok::<_,()>(()));
+    runtime.spawn(future::ok::<_, ()>(()).select(waiter).then(move |res| {
+      let mut waiter_fute = match res {
+        Ok((_, fute)) => fute,
+        Err(_) => panic!("future delay should not panic"),
+      };
+      let _waiter_res = waiter_fute.poll();
+      tx_thread2.send(()).unwrap();
+      rx_thread2.recv().unwrap();
+      drop(waiter_fute);
+      tx_thread2.send(()).unwrap();
+      rx_thread2.recv().unwrap();
+      future::ok::<_, ()>(())
+
+    }));
+    acquired_thread2
+      .recv_timeout(Duration::from_secs(5))
+      .expect("thread2 didn't acquire.");
+    assert_eq!(1, sema.clone().num_waiters());
+    unblock_thread2.send(()).unwrap();
+    acquired_thread2
+      .recv_timeout(Duration::from_secs(5))
+      .expect("thread2 didn't drop future.");
+    assert_eq!(0, sema.clone().num_waiters());
+    unblock_thread2.send(()).unwrap();
+    unblock_thread1.send(()).unwrap();
   }
 }
