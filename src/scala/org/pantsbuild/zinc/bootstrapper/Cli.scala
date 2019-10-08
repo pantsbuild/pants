@@ -6,6 +6,7 @@
 package org.pantsbuild.zinc.bootstrapper
 
 import java.io.File
+import org.pantsbuild.zinc.util.Util
 
 case class Configuration(
   outputPath: File = new File("."),
@@ -14,7 +15,19 @@ case class Configuration(
   scalaCompiler: File = new File("."),
   scalaLibrary: File = new File("."),
   scalaReflect: File = new File(".")
-)
+) {
+  def withAbsolutePaths(relativeTo: File): Configuration = {
+    def normalise(path: File): File = Util.normalise(Some(relativeTo))(path)
+    this.copy(
+      outputPath = normalise(this.outputPath),
+      compilerInterface = normalise(this.compilerInterface),
+      compilerBridgeSource = normalise(this.compilerBridgeSource),
+      scalaCompiler = normalise(this.scalaCompiler),
+      scalaLibrary = normalise(this.scalaLibrary),
+      scalaReflect = normalise(this.scalaReflect)
+    )
+  }
+}
 
 object Cli {
   val CliParser = new scopt.OptionParser[Configuration]("scopt") {
