@@ -79,6 +79,7 @@ python_library(
 python_library(
   name = 'meta',
   sources = ['meta.py'],
+  tags = {'type_checked'},
 )
 
 python_library(

@@ -18,7 +18,7 @@ from pants.engine.selectors import Get
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file, safe_mkdir, safe_mkdtemp
 from pants.util.memo import memoized_classproperty, memoized_property
-from pants.util.meta import Singleton
+from pants.util.meta import SingletonMetaclass
 from pants.util.objects import SubclassesOf, datatype
 
 
@@ -612,7 +612,7 @@ class ExternContext:
     return self._lib.val_for(key)
 
 
-class Native(Singleton):
+class Native(metaclass=SingletonMetaclass):
   """Encapsulates fetching a platform specific version of the native portion of the engine."""
 
   _errors_during_execution = None

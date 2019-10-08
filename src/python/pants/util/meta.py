@@ -3,7 +3,14 @@
 
 
 class SingletonMetaclass(type):
-  """Singleton metaclass."""
+  """When using this metaclass in your class definition, your class becomes a singleton. That is,
+  every construction returns the same instance.
+
+  Example class definition:
+
+    class Unicorn(metaclass=SingletonMetaclass):
+      pass
+  """
 
   def __call__(cls, *args, **kwargs):
     # TODO: convert this into an `@memoized_classproperty`!
@@ -96,9 +103,3 @@ def staticproperty(func):
     func = staticmethod(func)
 
   return ClassPropertyDescriptor(func, doc)
-
-
-# TODO: look into merging this with `enum` and `ChoicesMixin`, which describe a fixed set of
-# singletons, to decouple the enum interface from the implementation as a `datatype`.
-# Extend Singleton and your class becomes a singleton, each construction returns the same instance.
-Singleton = SingletonMetaclass('Singleton', (object,), {})

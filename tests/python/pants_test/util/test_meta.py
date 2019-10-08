@@ -3,7 +3,7 @@
 
 from abc import ABC, abstractmethod
 
-from pants.util.meta import Singleton, classproperty, staticproperty
+from pants.util.meta import SingletonMetaclass, classproperty, staticproperty
 from pants_test.test_base import TestBase
 
 
@@ -30,7 +30,7 @@ class AbstractClassTest(TestBase):
 
 class SingletonTest(TestBase):
   def test_singleton(self):
-    class One(Singleton):
+    class One(metaclass=SingletonMetaclass):
       pass
 
     self.assertIs(One(), One())

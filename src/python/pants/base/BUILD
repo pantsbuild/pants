@@ -9,7 +9,7 @@ python_library(
     'src/python/pants/scm',
     'src/python/pants/scm:git',
     'src/python/pants:version',
-  ]
+  ],
 )
 
 python_library(
