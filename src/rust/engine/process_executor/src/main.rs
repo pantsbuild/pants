@@ -33,7 +33,7 @@ use process_execution;
 
 use clap::{value_t, App, AppSettings, Arg};
 use hashing::{Digest, Fingerprint};
-use process_execution::{ExecuteProcessRequestMetadata, Platform};
+use process_execution::{Context, ExecuteProcessRequestMetadata, Platform};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
 use std::iter::{FromIterator, Iterator};
@@ -351,7 +351,7 @@ fn main() {
   let mut runtime = Runtime::new().unwrap();
 
   let result = runtime
-    .block_on(runner.run(request.into(), WorkUnitStore::new()))
+    .block_on(runner.run(request.into(), Context::default()))
     .expect("Error executing");
 
   if let Some(output) = args.value_of("materialize-output-to").map(PathBuf::from) {

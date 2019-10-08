@@ -18,8 +18,9 @@ use store::{OneOffStoreFileByDigest, Snapshot, Store};
 use tokio_codec::{BytesCodec, FramedRead};
 use tokio_process::CommandExt;
 
-use super::{
-  ExecuteProcessRequest, FallibleExecuteProcessResult, MultiPlatformExecuteProcessRequest, Platform,
+use crate::{
+  Context, ExecuteProcessRequest, FallibleExecuteProcessResult, MultiPlatformExecuteProcessRequest,
+  Platform,
 };
 
 use bytes::{Bytes, BytesMut};
@@ -241,7 +242,7 @@ impl super::CommandRunner for CommandRunner {
   fn run(
     &self,
     req: MultiPlatformExecuteProcessRequest,
-    workunit_store: WorkUnitStore,
+    context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let workdir = try_future!(tempfile::Builder::new()
       .prefix("process-execution")
@@ -270,17 +271,23 @@ impl super::CommandRunner for CommandRunner {
     let maybe_jdk_home = req.jdk_home;
     let unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule =
       req.unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule;
-    let workunit_store2 = workunit_store.clone();
 
     self
       .store
-      .materialize_directory(workdir_path.clone(), req.input_files, workunit_store)
-      .and_then(move |_metadata| {
-        store2.materialize_directory(
-          workdir_path4,
-          unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
-          workunit_store2,
-        )
+      .materialize_directory(
+        workdir_path.clone(),
+        req.input_files,
+        context.workunit_store.clone(),
+      )
+      .and_then({
+        let workunit_store = context.workunit_store.clone();
+        move |_metadata| {
+          store2.materialize_directory(
+            workdir_path4,
+            unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
+            workunit_store,
+          )
+        }
       })
       .and_then(move |_metadata| {
         maybe_jdk_home.map_or(Ok(()), |jdk_home| {
@@ -380,9 +387,8 @@ mod tests {
   use tempfile;
   use testutil;
 
-  use super::super::CommandRunner as CommandRunnerTrait;
   use super::{ExecuteProcessRequest, FallibleExecuteProcessResult};
-  use crate::Platform;
+  use crate::{CommandRunner as CommandRunnerTrait, Context, Platform};
   use hashing::EMPTY_DIGEST;
   use std;
   use std::collections::{BTreeMap, BTreeSet};
@@ -393,7 +399,6 @@ mod tests {
   use testutil::data::{TestData, TestDirectory};
   use testutil::path::find_bash;
   use testutil::{as_bytes, owned_string_vec};
-  use workunit_store::WorkUnitStore;
 
   #[test]
   #[cfg(unix)]
@@ -1063,6 +1068,6 @@ mod tests {
       cleanup_local_dirs: cleanup,
       platform: Platform::current_platform().unwrap(),
     };
-    executor.block_on(runner.run(req.into(), WorkUnitStore::new()))
+    executor.block_on(runner.run(req.into(), Context::default()))
   }
 }

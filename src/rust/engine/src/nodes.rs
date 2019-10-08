@@ -521,7 +521,10 @@ impl WrappedNode for MultiPlatformExecuteProcess {
 
   fn run(self, context: Context) -> NodeFuture<ProcessResult> {
     let request = self.0;
-    let workunit_store = context.session.workunit_store();
+    let execution_context = process_execution::Context {
+      workunit_store: context.session.workunit_store(),
+      build_id: context.session.build_id().to_string(),
+    };
     if context
       .core
       .command_runner
@@ -531,7 +534,7 @@ impl WrappedNode for MultiPlatformExecuteProcess {
       context
         .core
         .command_runner
-        .run(request, workunit_store)
+        .run(request, execution_context)
         .map(ProcessResult)
         .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
         .to_boxed()

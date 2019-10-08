@@ -236,6 +236,12 @@ impl AddAssign<UploadSummary> for ExecutionStats {
   }
 }
 
+#[derive(Clone, Default)]
+pub struct Context {
+  pub workunit_store: WorkUnitStore,
+  pub build_id: String,
+}
+
 pub trait CommandRunner: Send + Sync {
   ///
   /// Submit a request for execution on the underlying runtime, and return
@@ -244,7 +250,7 @@ pub trait CommandRunner: Send + Sync {
   fn run(
     &self,
     req: MultiPlatformExecuteProcessRequest,
-    workunit_store: WorkUnitStore,
+    context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResult, String>;
 
   ///
@@ -279,13 +285,13 @@ impl CommandRunner for BoundedCommandRunner {
   fn run(
     &self,
     req: MultiPlatformExecuteProcessRequest,
-    workunit_store: WorkUnitStore,
+    context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let inner = self.inner.clone();
     self
       .inner
       .1
-      .with_acquired(move || inner.0.run(req, workunit_store))
+      .with_acquired(move || inner.0.run(req, context))
   }
 
   fn extract_compatible_request(
