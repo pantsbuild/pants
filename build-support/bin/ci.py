@@ -10,7 +10,7 @@ import tempfile
 from contextlib import contextmanager
 from enum import Enum, auto
 from pathlib import Path
-from typing import Iterator, List, NamedTuple, Optional, Set
+from typing import Iterable, Iterator, List, NamedTuple, Optional, Set, Union
 
 from common import banner, die, green, travis_section
 
@@ -52,7 +52,7 @@ def main() -> None:
     if args.integration_tests_v2:
       run_integration_tests_v2(oauth_token_path=remote_execution_oauth_token_path)
     if args.plugin_tests:
-      run_plugin_tests()
+      run_plugin_tests(oauth_token_path=remote_execution_oauth_token_path)
     if args.platform_specific_tests:
       run_platform_specific_tests()
 
@@ -195,6 +195,7 @@ def maybe_get_remote_execution_oauth_token_path(
 # -------------------------------------------------------------------------
 
 Target = str
+Glob = str
 TargetSet = Set[Target]
 
 
@@ -205,7 +206,11 @@ class TestStrategy(Enum):
   v2_remote = auto()
 
   def pants_command(
-    self, *, targets: TargetSet, shard: Optional[str] = None, oauth_token_path: Optional[str] = None
+    self,
+    *,
+    targets: Iterable[Union[Target, Glob]],
+    shard: Optional[str] = None,
+    oauth_token_path: Optional[str] = None
   ) -> List[str]:
     if self == self.v2_remote and oauth_token_path is None:  # type: ignore
       raise ValueError("Must specify oauth_token_path.")
@@ -532,14 +537,12 @@ def run_integration_tests_v2(*, oauth_token_path: Optional[str] = None) -> None:
     )
 
 
-def run_plugin_tests() -> None:
+def run_plugin_tests(*, oauth_token_path: Optional[str] = None) -> None:
   _run_command(
-    ["./pants.pex",
-     "test.pytest",
-     "pants-plugins/src/python::",
-     "pants-plugins/tests/python::",
-     *PYTEST_PASSTHRU_ARGS,
-     ],
+    TestStrategy.v2_remote.pants_command(
+      targets={"pants-plugins/src/python::", "pants-plugins/tests/python::"},
+      oauth_token_path=oauth_token_path
+    ),
     slug="BackendTests",
     start_message="Running internal backend Python tests",
     die_message="Internal backend Python test failure."
