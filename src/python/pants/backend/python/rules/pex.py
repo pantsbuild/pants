@@ -29,10 +29,10 @@ from pants.util.strutil import create_path_env_var
 
 @dataclass(frozen=True)
 class PexRequirements:
-  requirements: Tuple[str] = ()
+  requirements: Tuple[str, ...] = ()
 
   @classmethod
-  def create_from_adaptors(cls, adaptors: Tuple[TargetAdaptor], additional_requirements: Tuple[str]) -> 'PexRequirements':
+  def create_from_adaptors(cls, adaptors: Tuple[TargetAdaptor, ...], additional_requirements: Tuple[str, ...] = ()) -> 'PexRequirements':
     all_target_requirements = []
     for maybe_python_req_lib in adaptors:
       # This is a python_requirement()-like target.
@@ -57,13 +57,13 @@ class PexInterpreterContraints:
     return args
 
   @classmethod
-  def create_from_adaptors(cls, adaptors: Tuple[PythonTargetAdaptor], python_setup: PythonSetup) -> 'PexInterpreterContraints':
+  def create_from_adaptors(cls, adaptors: Tuple[PythonTargetAdaptor, ...], python_setup: PythonSetup) -> 'PexInterpreterContraints':
     interpreter_constraints = frozenset(
-      [constraint
+      constraint
       for target_adaptor in adaptors
       for constraint in python_setup.compatibility_or_constraints(
         getattr(target_adaptor, 'compatibility', None)
-      )]
+      )
     )
     return PexInterpreterContraints(constraint_set=interpreter_constraints)
 
@@ -99,12 +99,10 @@ def create_pex(
   """Returns a PEX with the given requirements, optional entry point, and optional
   interpreter constraints."""
 
-  interpreter_constraint_args = request.interpreter_constraints.generate_pex_arg_list()
-
   argv = ["--output-file", request.output_filename]
   if request.entry_point is not None:
     argv.extend(["--entry-point", request.entry_point])
-  argv.extend(interpreter_constraint_args)
+  argv.extend(request.interpreter_constraints.generate_pex_arg_list())
   argv.extend(request.requirements.requirements)
 
   source_dir_name = 'source_files'

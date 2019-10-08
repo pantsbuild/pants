@@ -35,7 +35,7 @@ def create_python_binary(python_binary_adaptor: PythonBinaryAdaptor,
     for target_adaptor in all_targets
   ]
 
-  #TODO This way of calculating the entry point works but is a bit hackish.
+  #TODO(#8420) This way of calculating the entry point works but is a bit hackish.
   entry_point = None
   if hasattr(python_binary_adaptor, 'entry_point'):
     entry_point = python_binary_adaptor.entry_point

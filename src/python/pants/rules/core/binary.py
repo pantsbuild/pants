@@ -18,6 +18,7 @@ from pants.engine.selectors import Get
 
 @dataclass(frozen=True)
 class Binary(LineOriented, Goal):
+  """Create a runnable binary."""
   name = 'binary'
 
 
@@ -37,15 +38,13 @@ def create_binary(addresses: BuildFileAddresses, console: Console, workspace: Wo
   with Binary.line_oriented(options, console) as (print_stdout, print_stderr):
     print_stdout("Generating binaries in `dist/`")
     binaries = yield [Get(CreatedBinary, Address, address.to_address()) for address in addresses]
-    for binary in binaries:
-      dtm = DirectoryToMaterialize(
-        path = 'dist/',
-        directory_digest = binary.digest,
-      )
-      output = workspace.materialize_directories((dtm,))
-      for path in output.dependencies[0].output_paths:
+    dirs_to_materialize = tuple(
+      DirectoryToMaterialize(path='dist/', directory_digest=binary.digest) for binary in binaries
+    )
+    results = workspace.materialize_directories(dirs_to_materialize)
+    for result in results.dependencies:
+      for path in result.output_paths:
         print_stdout(f"Wrote {path}")
-
   yield Binary(exit_code=0)
 
 
