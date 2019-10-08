@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.backend.jvm.subsystems.junit import JUnit
+from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.tasks.coverage.cobertura import Cobertura
@@ -213,6 +214,34 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       sources=['FooTest.java'],
       extra_jvm_options=['-Dexample.property=1'],
     )
+    self._execute_junit_runner([('FooTest.java', dedent("""
+        package org.pantsbuild.foo;
+        import org.junit.Test;
+        import static org.junit.Assert.assertTrue;
+        public class FooTest {
+          @Test
+          public void testFoo() {
+            String exampleProperty = System.getProperty("example.property");
+            assertTrue(exampleProperty != null && exampleProperty.equals("1"));
+          }
+        }
+      """))], target_name='tests/java/org/pantsbuild/foo:foo_test')
+
+  @ensure_cached(JUnitRun, expected_num_artifacts=1)
+  def test_junit_runner_platform_args(self):
+    self.make_target(
+      spec='tests/java/org/pantsbuild/foo:foo_test',
+      target_type=JUnitTests,
+      sources=['FooTest.java'],
+      test_platform='java8-extra',
+      #extra_jvm_options=['-Dexample.property=1'],
+    )
+    self.set_options_for_scope(JvmPlatform.options_scope,
+      platforms={
+        'java8-extra': {
+          'source': '8',
+          'target': '8',
+          'args': ['-Dexample.property=1'] },})
     self._execute_junit_runner([('FooTest.java', dedent("""
         package org.pantsbuild.foo;
         import org.junit.Test;
