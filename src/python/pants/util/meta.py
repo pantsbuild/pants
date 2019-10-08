@@ -1,6 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import Any, Callable, Optional, Type, TypeVar, Union
+
 
 class SingletonMetaclass(type):
   """When using this metaclass in your class definition, your class becomes a singleton. That is,
@@ -12,11 +14,14 @@ class SingletonMetaclass(type):
       pass
   """
 
-  def __call__(cls, *args, **kwargs):
+  def __call__(cls, *args: Any, **kwargs: Any) -> Any:
     # TODO: convert this into an `@memoized_classproperty`!
     if not hasattr(cls, 'instance'):
       cls.instance = super().__call__(*args, **kwargs)
     return cls.instance
+
+
+T = TypeVar("T")
 
 
 class ClassPropertyDescriptor:
@@ -26,29 +31,28 @@ class ClassPropertyDescriptor:
   # definition beyond declaring a @classproperty.  It seems overriding __set__ and __delete__ would
   # require defining a metaclass or overriding __setattr__/__delattr__ (see
   # https://stackoverflow.com/questions/5189699/how-to-make-a-class-property).
-  def __init__(self, fget, doc):
+  def __init__(self, fget: Union[classmethod, staticmethod], doc: Optional[str]) -> None:
     self.fget = fget
     self.__doc__ = doc
 
-  # See https://docs.python.org/2/howto/descriptor.html for more details.
-  def __get__(self, obj, objtype=None):
+  # See https://docs.python.org/3/howto/descriptor.html for more details.
+  def __get__(self, obj: T, objtype: Optional[Type[T]] = None) -> Any:
     if objtype is None:
       objtype = type(obj)
       # Get the callable field for this object, which may be a property.
     callable_field = self.fget.__get__(obj, objtype)
     if getattr(self.fget.__func__, '__isabstractmethod__', False):
-      field_name = self.fget.__func__.fget.__name__
+      field_name = self.fget.__func__.fget.__name__  # type: ignore
       raise TypeError("""\
 The classproperty '{func_name}' in type '{type_name}' was an abstractproperty, meaning that type \
 {type_name} must override it by setting it as a variable in the class body or defining a method \
 with an @classproperty decorator."""
                       .format(func_name=field_name,
                               type_name=objtype.__name__))
-    else:
-      return callable_field()
+    return callable_field()
 
 
-def classproperty(func):
+def classproperty(func: Union[classmethod, staticmethod, Callable]) -> ClassPropertyDescriptor:
   """Use as a decorator on a method definition to make it a class-level attribute.
 
   This decorator can be applied to a method, a classmethod, or a staticmethod. This decorator will
@@ -76,7 +80,7 @@ def classproperty(func):
   return ClassPropertyDescriptor(func, doc)
 
 
-def staticproperty(func):
+def staticproperty(func: Union[staticmethod, Callable]) -> ClassPropertyDescriptor:
   """Use as a decorator on a method definition to make it a class-level attribute (without binding).
 
   This decorator can be applied to a method or a staticmethod. This decorator does not bind any
