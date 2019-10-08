@@ -24,6 +24,9 @@ class ClasspathEntry:
     """
     return self._path
 
+  def set_directory_digest(self, directory_digest):
+    self._directory_digest = directory_digest
+
   @property
   def directory_digest(self):
     """Returns the directory digest which contains this file. May be None.
