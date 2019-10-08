@@ -80,12 +80,9 @@ impl AsyncSemaphore {
     F: FnOnce() -> B + Send + 'static,
     B: Future<Item = T, Error = E> + Send + 'static,
   {
-    let permit = PermitFuture {
-      inner: Some(self.inner.clone()),
-      task_id: None,
-    };
     Box::new(
-      permit
+      self
+        .acquire()
         .map_err(|()| panic!("Acquisition is infalliable."))
         .and_then(|permit| {
           f().map(move |t| {
@@ -94,6 +91,13 @@ impl AsyncSemaphore {
           })
         }),
     )
+  }
+
+  fn acquire(&self) -> PermitFuture {
+    PermitFuture {
+      inner: Some(self.inner.clone()),
+      task_id: None,
+    }
   }
 }
 
@@ -193,8 +197,9 @@ mod tests {
   use futures::{future, Future};
   use std::sync::mpsc;
   use std::thread;
-  use std::time::Duration;
-  //use tokio_timer::Delay;
+  use std::time::{Duration, Instant};
+
+  use tokio_timer::Delay;
 
   #[test]
   fn acquire_and_release() {
@@ -257,6 +262,67 @@ mod tests {
   }
 
   #[test]
+  fn drop_while_waiting() {
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    let sema = AsyncSemaphore::new(1);
+    let handle1 = sema.clone();
+    let handle2 = sema.clone();
+
+    let (tx_thread1, acquired_thread1) = mpsc::channel();
+    let (unblock_thread1, rx_thread1) = mpsc::channel();
+    let (tx_thread2_attempt_1, did_not_acquire_thread2_attempt_1) = mpsc::channel();
+    let (tx_thread2_attempt_2, acquired_thread2_attempt_2) = mpsc::channel();
+
+    runtime.spawn(handle1.with_acquired(move || {
+      // Indicate that we've acquired, and then wait to be signaled to exit.
+      tx_thread1.send(()).unwrap();
+      rx_thread1.recv().unwrap();
+      future::ok::<_, ()>(())
+    }));
+
+    // Wait for thread1 to acquire, and then launch thread2.
+    acquired_thread1
+      .recv_timeout(Duration::from_secs(5))
+      .expect("thread1 didn't acquire.");
+
+    // thread2 will wait for a little while, but then drop its PermitFuture to give up on waiting.
+    runtime.spawn(future::lazy(move || {
+      let permit_future = handle2.acquire();
+      let delay_future = Delay::new(Instant::now() + Duration::from_millis(10));
+      permit_future
+        .select2(delay_future)
+        .map(move |raced_result| {
+          // We expect to have timed out, because the other Future will not resolve until asked.
+          match raced_result {
+            future::Either::A(_) => panic!("Expected to time out."),
+            future::Either::B(_) => {}
+          };
+          tx_thread2_attempt_1.send(()).unwrap();
+        })
+        .map_err(|_| panic!("Permit or duration failed."))
+        .and_then(move |()| {
+          // Attempt again to acquire.
+          handle2.acquire()
+        })
+        .map(move |_permit| {
+          // Confirm that we did.
+          tx_thread2_attempt_2.send(()).unwrap()
+        })
+    }));
+
+    // thread2 should signal that it did not successfully acquire for the first attempt.
+    did_not_acquire_thread2_attempt_1
+      .recv_timeout(Duration::from_secs(5))
+      .expect("thread2 should have failed to acquire by now.");
+
+    // Unblock thread1 and confirm that thread2 acquires.
+    unblock_thread1.send(()).unwrap();
+    acquired_thread2_attempt_2
+      .recv_timeout(Duration::from_secs(5))
+      .expect("thread2 didn't acquire.");
+  }
+
+  #[test]
   fn dropped_future_is_removed_from_queue() {
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
     let sema = AsyncSemaphore::new(1);
@@ -268,21 +334,18 @@ mod tests {
     let (tx_thread2, acquired_thread2) = mpsc::channel();
     let (unblock_thread2, rx_thread2) = mpsc::channel();
 
-    runtime.spawn(
-      handle1
-        .with_acquired(move || {
-          // Indicate that we've acquired, and then wait to be signaled to exit.
-          tx_thread1.send(()).unwrap();
-          rx_thread1.recv().unwrap();
-          future::ok::<_, ()>(())
-        })
-    );
+    runtime.spawn(handle1.with_acquired(move || {
+      // Indicate that we've acquired, and then wait to be signaled to exit.
+      tx_thread1.send(()).unwrap();
+      rx_thread1.recv().unwrap();
+      future::ok::<_, ()>(())
+    }));
 
     // Wait for thread1 to acquire, and then launch thread2.
     acquired_thread1
       .recv_timeout(Duration::from_secs(5))
       .expect("thread1 didn't acquire.");
-    let waiter = handle2.with_acquired(move || future::ok::<_,()>(()));
+    let waiter = handle2.with_acquired(move || future::ok::<_, ()>(()));
     runtime.spawn(future::ok::<_, ()>(()).select(waiter).then(move |res| {
       let mut waiter_fute = match res {
         Ok((_, fute)) => fute,
@@ -295,7 +358,6 @@ mod tests {
       tx_thread2.send(()).unwrap();
       rx_thread2.recv().unwrap();
       future::ok::<_, ()>(())
-
     }));
     acquired_thread2
       .recv_timeout(Duration::from_secs(5))
