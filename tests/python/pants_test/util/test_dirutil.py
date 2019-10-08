@@ -135,9 +135,7 @@ class DirutilTest(unittest.TestCase):
     # unicode constructor.
     with temporary_dir() as tmpdir:
       safe_mkdir(os.path.join(tmpdir, '中文'))
-      if isinstance(tmpdir, str):
-        tmpdir = tmpdir.encode()
-      for _, dirs, _ in dirutil.safe_walk(tmpdir):
+      for _, dirs, _ in dirutil.safe_walk(tmpdir.encode()):
         self.assertTrue(all(isinstance(dirname, str) for dirname in dirs))
 
   @contextmanager

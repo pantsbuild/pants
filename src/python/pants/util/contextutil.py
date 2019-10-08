@@ -14,6 +14,8 @@ import zipfile
 from contextlib import closing, contextmanager
 from queue import Queue
 from socketserver import TCPServer
+from types import FrameType
+from typing import IO, Any, Callable, Iterator, Mapping, Optional, Type, Union, cast
 
 from colors import green
 
@@ -25,18 +27,8 @@ class InvalidZipPath(ValueError):
   """Indicates a bad zip file path."""
 
 
-def _os_encode(u, enc=sys.getfilesystemencoding()):
-  """Turns a `unicode` into `bytes` via encoding."""
-  return u.encode(enc, 'strict')
-
-
-def _os_decode(b, enc=sys.getfilesystemencoding()):
-  """Turns a `bytes` into `unicode` via decoding."""
-  return b.decode(enc, 'strict')
-
-
 @contextmanager
-def environment_as(**kwargs):
+def environment_as(**kwargs: Optional[str]) -> Iterator[None]:
   """Update the environment to the supplied values, for example:
 
   with environment_as(PYTHONPATH='foo:bar:baz',
@@ -46,7 +38,7 @@ def environment_as(**kwargs):
   new_environment = kwargs
   old_environment = {}
 
-  def setenv(key, val):
+  def setenv(key: str, val: Optional[str]) -> None:
     if val is not None:
       os.environ[key] = val
     else:
@@ -63,7 +55,7 @@ def environment_as(**kwargs):
       setenv(key, val)
 
 
-def _purge_env():
+def _purge_env() -> None:
   # N.B. Without the use of `del` here (which calls `os.unsetenv` under the hood), subprocess
   # invokes or other things that may access the environment at the C level may not see the
   # correct env vars (i.e. we can't just replace os.environ with an empty dict).
@@ -74,13 +66,13 @@ def _purge_env():
     del os.environ[k]
 
 
-def _restore_env(env):
+def _restore_env(env: Mapping[str, str]) -> None:
   for k, v in env.items():
     os.environ[k] = v
 
 
 @contextmanager
-def hermetic_environment_as(**kwargs):
+def hermetic_environment_as(**kwargs: Optional[str]) -> Iterator[None]:
   """Set the environment to the supplied values from an empty state."""
   old_environment = os.environ.copy()
   _purge_env()
@@ -93,7 +85,7 @@ def hermetic_environment_as(**kwargs):
 
 
 @contextmanager
-def _stdio_stream_as(src_fd, dst_fd, dst_sys_attribute, mode):
+def _stdio_stream_as(src_fd: int, dst_fd: int, dst_sys_attribute: str, mode: str) -> Iterator[None]:
   """Replace the given dst_fd and attribute on `sys` with an open handle to the given src_fd."""
   if src_fd == -1:
     src = open('/dev/null', mode)
@@ -119,7 +111,7 @@ def _stdio_stream_as(src_fd, dst_fd, dst_sys_attribute, mode):
 
 
 @contextmanager
-def stdio_as(stdout_fd, stderr_fd, stdin_fd):
+def stdio_as(stdout_fd: int, stderr_fd: int, stdin_fd: int) -> Iterator[None]:
   """Redirect sys.{stdout, stderr, stdin} to alternate file descriptors.
 
   As a special case, if a given destination fd is `-1`, we will replace it with an open file handle
@@ -139,11 +131,13 @@ def stdio_as(stdout_fd, stderr_fd, stdin_fd):
 
 
 @contextmanager
-def signal_handler_as(sig, handler):
+def signal_handler_as(
+  sig: int, handler: Union[int, Callable[[int, FrameType], None]]
+)-> Iterator[None]:
   """Temporarily replaces a signal handler for the given signal and restores the old handler.
 
-  :param int sig: The target signal to replace the handler for (e.g. signal.SIGINT).
-  :param func handler: The new temporary handler.
+  :param sig: The target signal to replace the handler for (e.g. signal.SIGINT).
+  :param handler: The new temporary handler.
   """
   old_handler = signal.signal(sig, handler)
   try:
@@ -153,16 +147,22 @@ def signal_handler_as(sig, handler):
 
 
 @contextmanager
-def temporary_dir(root_dir=None, cleanup=True, suffix='', permissions=None, prefix=tempfile.template):
+def temporary_dir(
+  root_dir: Optional[str] = None,
+  cleanup: bool = True,
+  suffix: Optional[str] = None,
+  permissions: Optional[int] = None,
+  prefix: Optional[str] = tempfile.template,
+) -> Iterator[str]:
   """
     A with-context that creates a temporary directory.
 
     :API: public
 
     You may specify the following keyword args:
-    :param string root_dir: The parent directory to create the temporary directory.
-    :param bool cleanup: Whether or not to clean up the temporary directory.
-    :param int permissions: If provided, sets the directory permissions to this mode.
+    :param root_dir: The parent directory to create the temporary directory.
+    :param cleanup: Whether or not to clean up the temporary directory.
+    :param permissions: If provided, sets the directory permissions to this mode.
   """
   path = tempfile.mkdtemp(dir=root_dir, suffix=suffix, prefix=prefix)
 
@@ -176,15 +176,20 @@ def temporary_dir(root_dir=None, cleanup=True, suffix='', permissions=None, pref
 
 
 @contextmanager
-def temporary_file_path(root_dir=None, cleanup=True, suffix='', permissions=None):
+def temporary_file_path(
+  root_dir: Optional[str] = None,
+  cleanup: bool = True,
+  suffix: Optional[str] = None,
+  permissions: Optional[int] = None,
+) -> Iterator[str]:
   """
     A with-context that creates a temporary file and returns its path.
 
     :API: public
 
     You may specify the following keyword args:
-    :param str root_dir: The parent directory to create the temporary file.
-    :param bool cleanup: Whether or not to clean up the temporary file.
+    :param root_dir: The parent directory to create the temporary file.
+    :param cleanup: Whether or not to clean up the temporary file.
   """
   with temporary_file(root_dir, cleanup=cleanup, suffix=suffix, permissions=permissions) as fd:
     fd.close()
@@ -192,20 +197,26 @@ def temporary_file_path(root_dir=None, cleanup=True, suffix='', permissions=None
 
 
 @contextmanager
-def temporary_file(root_dir=None, cleanup=True, suffix='', permissions=None, binary_mode=True):
+def temporary_file(
+  root_dir: Optional[str] = None,
+  cleanup: bool = True,
+  suffix: Optional[str] = None,
+  permissions: Optional[int] = None,
+  binary_mode: bool = True,
+) -> Iterator[IO]:
   """
     A with-context that creates a temporary file and returns a writeable file descriptor to it.
 
     You may specify the following keyword args:
-    :param str root_dir: The parent directory to create the temporary file.
-    :param bool cleanup: Whether or not to clean up the temporary file.
-    :param str suffix: If suffix is specified, the file name will end with that suffix.
+    :param root_dir: The parent directory to create the temporary file.
+    :param cleanup: Whether or not to clean up the temporary file.
+    :param suffix: If suffix is specified, the file name will end with that suffix.
                        Otherwise there will be no suffix.
                        mkstemp() does not put a dot between the file name and the suffix;
                        if you need one, put it at the beginning of suffix.
                        See :py:class:`tempfile.NamedTemporaryFile`.
-    :param int permissions: If provided, sets the file to use these permissions.
-    :param bool binary_mode: Whether file opens in binary or text mode.
+    :param permissions: If provided, sets the file to use these permissions.
+    :param binary_mode: Whether file opens in binary or text mode.
   """
   mode = 'w+b' if binary_mode else 'w+'  # tempfile's default is 'w+b'
   with tempfile.NamedTemporaryFile(suffix=suffix, dir=root_dir, delete=False, mode=mode) as fd:
@@ -219,13 +230,13 @@ def temporary_file(root_dir=None, cleanup=True, suffix='', permissions=None, bin
 
 
 @contextmanager
-def safe_file(path, suffix=None, cleanup=True):
+def safe_file(path: str, suffix: Optional[str] = None, cleanup: bool = True) -> Iterator[str]:
   """A with-context that copies a file, and copies the copy back to the original file on success.
 
   This is useful for doing work on a file but only changing its state on success.
 
-  :param str suffix: Use this suffix to create the copy. Otherwise use a random string.
-  :param bool cleanup: Whether or not to clean up the copy.
+  :param suffix: Use this suffix to create the copy. Otherwise use a random string.
+  :param cleanup: Whether or not to clean up the copy.
   """
   safe_path = '{}.{}'.format(path, suffix or uuid.uuid4())
   if os.path.exists(path):
@@ -242,7 +253,7 @@ def safe_file(path, suffix=None, cleanup=True):
 
 
 @contextmanager
-def pushd(directory):
+def pushd(directory: str) -> Iterator[str]:
   """
     A with-context that encapsulates pushd/popd.
   """
@@ -255,7 +266,7 @@ def pushd(directory):
 
 
 @contextmanager
-def open_zip(path_or_file, *args, **kwargs):
+def open_zip(path_or_file: Union[str, Any], *args, **kwargs) -> Iterator[zipfile.ZipFile]:
   """A with-context for zip files.
 
   Passes through *args and **kwargs to zipfile.ZipFile.
@@ -267,13 +278,13 @@ def open_zip(path_or_file, *args, **kwargs):
   :param kwargs: Any extra keyword args accepted by `zipfile.ZipFile`.
   :raises: `InvalidZipPath` if path_or_file is invalid.
   :raises: `zipfile.BadZipfile` if zipfile.ZipFile cannot open a zip at path_or_file.
-  :returns: `class 'contextlib.GeneratorContextManager`.
   """
   if not path_or_file:
     raise InvalidZipPath(f'Invalid zip location: {path_or_file}')
-  allowZip64 = kwargs.pop('allowZip64', True)
+  if "allowZip64" not in kwargs:
+    kwargs["allowZip64"] = True
   try:
-    zf = zipfile.ZipFile(path_or_file, *args, allowZip64=allowZip64, **kwargs)
+    zf = zipfile.ZipFile(path_or_file, *args, **kwargs)
   except zipfile.BadZipfile as bze:
     # Use the realpath in order to follow symlinks back to the problem source file.
     raise zipfile.BadZipfile("Bad Zipfile {}: {}".format(os.path.realpath(path_or_file), bze))
@@ -284,15 +295,18 @@ def open_zip(path_or_file, *args, **kwargs):
 
 
 @contextmanager
-def open_tar(path_or_file, *args, **kwargs):
+def open_tar(path_or_file: Union[str, Any], *args, **kwargs) -> Iterator[TarFile]:
   """
     A with-context for tar files.  Passes through positional and kwargs to tarfile.open.
 
     If path_or_file is a file, caller must close it separately.
   """
   (path, fileobj) = (path_or_file, None) if isinstance(path_or_file, str) else (None, path_or_file)
-  with closing(TarFile.open(path, *args, fileobj=fileobj, **kwargs)) as tar:
-    yield tar
+  kwargs["fileobj"] = fileobj
+  with closing(TarFile.open(path, *args, **kwargs)) as tar:
+    # We must cast the normal tarfile.TarFile to our custom pants.util.tarutil.TarFile.
+    typed_tar = cast(TarFile, tar)
+    yield typed_tar
 
 
 class Timer:
@@ -308,31 +322,29 @@ class Timer:
 
   """
 
-  def __init__(self, clock=time):
+  def __init__(self, clock=time) -> None:
     self._clock = clock
 
-  def __enter__(self):
-    self.start = self._clock.time()
-    self.finish = None
+  def __enter__(self) -> "Timer":
+    self.start: float = self._clock.time()
+    self.finish: Optional[float] = None
     return self
 
   @property
-  def elapsed(self):
-    if self.finish:
-      return self.finish - self.start
-    else:
-      return self._clock.time() - self.start
+  def elapsed(self) -> float:
+    end_time: float = self.finish if self.finish is not None else self._clock.time()
+    return end_time - self.start
 
   def __exit__(self, typ, val, traceback):
     self.finish = self._clock.time()
 
 
 @contextmanager
-def exception_logging(logger, msg):
+def exception_logging(logger: logging.Logger, msg: str) -> Iterator[None]:
   """Provides exception logging via `logger.exception` for a given block of code.
 
-  :param logging.Logger logger: The `Logger` instance to use for logging.
-  :param string msg: The message to emit before `logger.exception` emits the traceback.
+  :param logger: The `Logger` instance to use for logging.
+  :param msg: The message to emit before `logger.exception` emits the traceback.
   """
   try:
     yield
@@ -342,10 +354,10 @@ def exception_logging(logger, msg):
 
 
 @contextmanager
-def maybe_profiled(profile_path):
+def maybe_profiled(profile_path: Optional[str]) -> Iterator[None]:
   """A profiling context manager.
 
-  :param string profile_path: The path to write profile information to. If `None`, this will no-op.
+  :param profile_path: The path to write profile information to. If `None`, this will no-op.
   """
   if not profile_path:
     yield
@@ -367,16 +379,16 @@ def maybe_profiled(profile_path):
 
 
 @contextmanager
-def http_server(handler_class):
-  def serve(port_queue, shutdown_queue):
+def http_server(handler_class: Type) -> Iterator[int]:
+  def serve(port_queue: "Queue[int]", shutdown_queue: "Queue[bool]") -> None:
     httpd = TCPServer(("", 0), handler_class)
     httpd.timeout = 0.1
     port_queue.put(httpd.server_address[1])
     while shutdown_queue.empty():
       httpd.handle_request()
 
-  port_queue = Queue()
-  shutdown_queue = Queue()
+  port_queue: "Queue[int]" = Queue()
+  shutdown_queue: "Queue[bool]" = Queue()
   t = threading.Thread(target=lambda: serve(port_queue, shutdown_queue))
   t.daemon = True
   t.start()

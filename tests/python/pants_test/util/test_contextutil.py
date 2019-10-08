@@ -12,6 +12,7 @@ import unittest.mock
 import uuid
 import zipfile
 from contextlib import contextmanager
+from typing import Iterator
 
 from pants.util.contextutil import (
   InvalidZipPath,
@@ -35,7 +36,7 @@ PATCH_OPTS = dict(autospec=True, spec_set=True)
 class ContextutilTest(unittest.TestCase):
 
   @contextmanager
-  def ensure_user_defined_in_environment(self):
+  def ensure_user_defined_in_environment(self) -> Iterator[None]:
     """Utility to test for hermetic environments."""
     original_env = os.environ.copy()
     if "USER" not in original_env:
@@ -46,11 +47,11 @@ class ContextutilTest(unittest.TestCase):
       os.environ.clear()
       os.environ.update(original_env)
 
-  def test_empty_environment(self):
+  def test_empty_environment(self) -> None:
     with environment_as():
       pass
 
-  def test_override_single_variable(self):
+  def test_override_single_variable(self) -> None:
     with temporary_file(binary_mode=False) as output:
       # test that the override takes place
       with environment_as(HORK='BORK'):
@@ -66,7 +67,7 @@ class ContextutilTest(unittest.TestCase):
         new_output.seek(0)
         self.assertEqual('False\n', new_output.read())
 
-  def test_environment_negation(self):
+  def test_environment_negation(self) -> None:
     with temporary_file(binary_mode=False) as output:
       with environment_as(HORK='BORK'):
         with environment_as(HORK=None):
@@ -76,12 +77,12 @@ class ContextutilTest(unittest.TestCase):
           output.seek(0)
           self.assertEqual('False\n', output.read())
 
-  def test_hermetic_environment(self):
+  def test_hermetic_environment(self) -> None:
     with self.ensure_user_defined_in_environment():
       with hermetic_environment_as():
         self.assertNotIn('USER', os.environ)
 
-  def test_hermetic_environment_subprocesses(self):
+  def test_hermetic_environment_subprocesses(self) -> None:
     with self.ensure_user_defined_in_environment():
       with hermetic_environment_as(AAA='333'):
         output = subprocess.check_output('env', shell=True).decode()
@@ -91,7 +92,7 @@ class ContextutilTest(unittest.TestCase):
       self.assertIn('USER', os.environ)
       self.assertNotIn('AAA', os.environ)
 
-  def test_hermetic_environment_unicode(self):
+  def test_hermetic_environment_unicode(self) -> None:
     with environment_as(XXX='¡'):
       self.assertEqual(os.environ['XXX'], '¡')
       with hermetic_environment_as(AAA='¡'):
@@ -99,7 +100,7 @@ class ContextutilTest(unittest.TestCase):
         self.assertEqual(os.environ['AAA'], '¡')
       self.assertEqual(os.environ['XXX'], '¡')
 
-  def test_simple_pushd(self):
+  def test_simple_pushd(self) -> None:
     pre_cwd = os.getcwd()
     with temporary_dir() as tempdir:
       with pushd(tempdir) as path:
@@ -108,7 +109,7 @@ class ContextutilTest(unittest.TestCase):
       self.assertEqual(pre_cwd, os.getcwd())
     self.assertEqual(pre_cwd, os.getcwd())
 
-  def test_nested_pushd(self):
+  def test_nested_pushd(self) -> None:
     pre_cwd = os.getcwd()
     with temporary_dir() as tempdir1:
       with pushd(tempdir1):
@@ -121,57 +122,57 @@ class ContextutilTest(unittest.TestCase):
       self.assertEqual(pre_cwd, os.getcwd())
     self.assertEqual(pre_cwd, os.getcwd())
 
-  def test_temporary_file_no_args(self):
+  def test_temporary_file_no_args(self) -> None:
     with temporary_file() as fp:
       self.assertTrue(os.path.exists(fp.name), 'Temporary file should exist within the context.')
     self.assertTrue(os.path.exists(fp.name) == False,
                     'Temporary file should not exist outside of the context.')
 
-  def test_temporary_file_without_cleanup(self):
+  def test_temporary_file_without_cleanup(self) -> None:
     with temporary_file(cleanup=False) as fp:
       self.assertTrue(os.path.exists(fp.name), 'Temporary file should exist within the context.')
     self.assertTrue(os.path.exists(fp.name),
                     'Temporary file should exist outside of context if cleanup=False.')
     os.unlink(fp.name)
 
-  def test_temporary_file_within_other_dir(self):
+  def test_temporary_file_within_other_dir(self) -> None:
     with temporary_dir() as path:
       with temporary_file(root_dir=path) as f:
         self.assertTrue(os.path.realpath(f.name).startswith(os.path.realpath(path)),
                         'file should be created in root_dir if specified.')
 
-  def test_temporary_dir_no_args(self):
+  def test_temporary_dir_no_args(self) -> None:
     with temporary_dir() as path:
       self.assertTrue(os.path.exists(path), 'Temporary dir should exist within the context.')
       self.assertTrue(os.path.isdir(path), 'Temporary dir should be a dir and not a file.')
     self.assertFalse(os.path.exists(path), 'Temporary dir should not exist outside of the context.')
 
-  def test_temporary_dir_without_cleanup(self):
+  def test_temporary_dir_without_cleanup(self) -> None:
     with temporary_dir(cleanup=False) as path:
       self.assertTrue(os.path.exists(path), 'Temporary dir should exist within the context.')
     self.assertTrue(os.path.exists(path),
                     'Temporary dir should exist outside of context if cleanup=False.')
     shutil.rmtree(path)
 
-  def test_temporary_dir_with_root_dir(self):
+  def test_temporary_dir_with_root_dir(self) -> None:
     with temporary_dir() as path1:
       with temporary_dir(root_dir=path1) as path2:
         self.assertTrue(os.path.realpath(path2).startswith(os.path.realpath(path1)),
                         'Nested temporary dir should be created within outer dir.')
 
-  def test_timer(self):
+  def test_timer(self) -> None:
 
     class FakeClock:
 
       def __init__(self):
         self._time = 0.0
 
-      def time(self):
-        ret = self._time
+      def time(self) -> float:
+        ret: float = self._time
         self._time += 0.0001  # Force a little time to elapse.
         return ret
 
-      def sleep(self, duration):
+      def sleep(self, duration: float) -> None:
         self._time += duration
 
     clock = FakeClock()
@@ -190,39 +191,39 @@ class ContextutilTest(unittest.TestCase):
     self.assertGreater(t.elapsed, 0.2)
     self.assertLess(t.finish, clock.time())
 
-  def test_open_zipDefault(self):
+  def test_open_zipDefault(self) -> None:
     with temporary_dir() as tempdir:
       with open_zip(os.path.join(tempdir, 'test'), 'w') as zf:
-        self.assertTrue(zf._allowZip64)
+        self.assertTrue(zf._allowZip64)  # type: ignore
 
-  def test_open_zipTrue(self):
+  def test_open_zipTrue(self) -> None:
     with temporary_dir() as tempdir:
       with open_zip(os.path.join(tempdir, 'test'), 'w', allowZip64=True) as zf:
-        self.assertTrue(zf._allowZip64)
+        self.assertTrue(zf._allowZip64)  # type: ignore
 
-  def test_open_zipFalse(self):
+  def test_open_zipFalse(self) -> None:
     with temporary_dir() as tempdir:
       with open_zip(os.path.join(tempdir, 'test'), 'w', allowZip64=False) as zf:
-        self.assertFalse(zf._allowZip64)
+        self.assertFalse(zf._allowZip64)  # type: ignore
 
   def test_open_zip_raises_exception_on_falsey_paths(self):
     falsey = (None, '', False)
     for invalid in falsey:
-      with self.assertRaises(InvalidZipPath):
-        next(open_zip(invalid).gen)
+      with self.assertRaises(InvalidZipPath), open_zip(invalid):
+        pass
 
-  def test_open_zip_returns_realpath_on_badzipfile(self):
+  def test_open_zip_returns_realpath_on_badzipfile(self) -> None:
     # In case of file corruption, deleting a Pants-constructed symlink would not resolve the error.
     with temporary_file() as not_zip:
       with temporary_dir() as tempdir:
         file_symlink = os.path.join(tempdir, 'foo')
         os.symlink(not_zip.name, file_symlink)
         self.assertEqual(os.path.realpath(file_symlink), os.path.realpath(not_zip.name))
-        with self.assertRaisesRegexp(zipfile.BadZipfile, r'{}'.format(not_zip.name)):
-          next(open_zip(file_symlink).gen)
+        with self.assertRaisesRegexp(zipfile.BadZipfile, f'{not_zip.name}'), open_zip(file_symlink):
+          pass
 
   @contextmanager
-  def _stdio_as_tempfiles(self):
+  def _stdio_as_tempfiles(self) -> Iterator[None]:
     """Harness to replace `sys.std*` with tempfiles.
 
     Validates that all files are read/written/flushed correctly, and acts as a
@@ -232,7 +233,7 @@ class ContextutilTest(unittest.TestCase):
     # Prefix contents written within this instance with a unique string to differentiate
     # them from other instances.
     uuid_str = str(uuid.uuid4())
-    def u(string):
+    def u(string: str) -> str:
       return '{}#{}'.format(uuid_str, string)
     stdin_data = u('stdio')
     stdout_data = u('stdout')
@@ -261,7 +262,7 @@ class ContextutilTest(unittest.TestCase):
       self.assertEqual(stdout_data, tmp_stdout.read().strip())
       self.assertEqual(stderr_data, tmp_stderr.read().strip())
 
-  def test_stdio_as(self):
+  def test_stdio_as(self) -> None:
     self.assertTrue(sys.stderr.fileno() > 2,
                     "Expected a pseudofile as stderr, got: {}".format(sys.stderr))
     old_stdout, old_stderr, old_stdin = sys.stdout, sys.stderr, sys.stdin
@@ -283,7 +284,7 @@ class ContextutilTest(unittest.TestCase):
     self.assertEqual(sys.stderr, old_stderr)
     self.assertEqual(sys.stdin, old_stdin)
 
-  def test_stdio_as_dev_null(self):
+  def test_stdio_as_dev_null(self) -> None:
     # Capture output to tempfiles.
     with self._stdio_as_tempfiles():
       # Read/write from/to `/dev/null`, which will be validated by the harness as not
@@ -293,7 +294,7 @@ class ContextutilTest(unittest.TestCase):
         print('garbage', file=sys.stdout)
         print('garbage', file=sys.stderr)
 
-  def test_signal_handler_as(self):
+  def test_signal_handler_as(self) -> None:
     mock_initial_handler = 1
     mock_new_handler = 2
     with unittest.mock.patch('signal.signal', **PATCH_OPTS) as mock_signal:
@@ -309,14 +310,14 @@ class ContextutilTest(unittest.TestCase):
       unittest.mock.call(signal.SIGUSR2, mock_initial_handler)
     ])
 
-  def test_permissions(self):
+  def test_permissions(self) -> None:
     with temporary_file(permissions=0o700) as f:
       self.assertEqual(0o700, os.stat(f.name)[0] & 0o777)
 
     with temporary_dir(permissions=0o644) as path:
       self.assertEqual(0o644, os.stat(path)[0] & 0o777)
 
-  def test_exception_logging(self):
+  def test_exception_logging(self) -> None:
     fake_logger = unittest.mock.Mock()
 
     with self.assertRaises(AssertionError):
@@ -325,7 +326,7 @@ class ContextutilTest(unittest.TestCase):
 
     fake_logger.exception.assert_called_once_with('error!')
 
-  def test_maybe_profiled(self):
+  def test_maybe_profiled(self) -> None:
     with temporary_dir() as td:
       profile_path = os.path.join(td, 'profile.prof')
 

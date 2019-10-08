@@ -2,18 +2,22 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from textwrap import dedent
+from typing import Any, Optional, Tuple, Type, Union
 
 
-def parse_expression(val, acceptable_types, name=None, raise_type=ValueError):
+def parse_expression(
+    val: str,
+    acceptable_types: Union[Type, Tuple[Type, ...]],
+    name: Optional[str] = None,
+    raise_type: Type[BaseException] = ValueError,
+) -> Any:
   """Attempts to parse the given `val` as a python expression of the specified `acceptable_types`.
 
-  :param string val: A string containing a python expression.
+  :param val: A string containing a python expression.
   :param acceptable_types: The acceptable types of the parsed object.
-  :type acceptable_types: type|tuple of types.  The tuple may be nested; ie anything `isinstance`
-                          accepts.
-  :param string name: An optional logical name for the value being parsed; ie if the literal val
+  :param name: An optional logical name for the value being parsed; ie if the literal val
                       represents a person's age, 'age'.
-  :param type raise_type: The type of exception to raise for all failures; ValueError by default.
+  :param raise_type: The type of exception to raise for all failures; ValueError by default.
   :raises: If `val` is not a valid python literal expression or it is but evaluates to an object
            that is not a an instance of one of the `acceptable_types`.
   """
