@@ -8,7 +8,9 @@ import itertools
 import os
 from abc import ABC
 from contextlib import contextmanager
+from dataclasses import dataclass
 from hashlib import sha1
+from typing import ClassVar, Tuple
 
 from twitter.common.collections import OrderedSet
 
@@ -23,7 +25,7 @@ class Config(ABC):
   Supports recursive variable substitution using standard python format strings. E.g.,
   %(var_name)s will be replaced with the value of var_name.
   """
-  DEFAULT_SECTION = configparser.DEFAULTSECT
+  DEFAULT_SECTION: ClassVar[str] = configparser.DEFAULTSECT
 
   class ConfigError(Exception):
     pass
@@ -181,7 +183,8 @@ class Config(ABC):
     raise NotImplementedError
 
 
-class _EmptyConfig(datatype([]), Config):
+@dataclass(frozen=True)
+class _EmptyConfig(Config):
   """A dummy config with no data at all."""
 
   def sources(self):
@@ -251,12 +254,14 @@ class _SingleFileConfig(Config):
     return hash(self.content_digest)
 
 
-class _ChainedConfig(datatype(['chained_configs']), Config):
+@dataclass(frozen=True)
+class _ChainedConfig(Config):
   """Config read from multiple sources.
 
-  :param configs: A tuple of Config instances to chain.
-                  Later instances take precedence over earlier ones.
+  :param chained_configs: A tuple of Config instances to chain. Later instances take precedence
+                          over earlier ones.
   """
+  chained_configs: Tuple[Config, ...]
 
   @property
   def _configs(self):

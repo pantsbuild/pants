@@ -4,6 +4,7 @@
 import copy
 import re
 import sys
+from dataclasses import dataclass
 
 from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
@@ -15,7 +16,6 @@ from pants.option.parser import Parser
 from pants.option.parser_hierarchy import ParserHierarchy, all_enclosing_scopes, enclosing_scope
 from pants.option.scope import ScopeInfo
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.objects import datatype
 
 
 def make_flag_regex(long_name, short_name=None):
@@ -365,12 +365,8 @@ class Options:
             hint='Use scope {} instead (options: {})'.format(scope, ', '.join(explicit_keys))
           )
 
-  class _ScopedFlagNameForFuzzyMatching(datatype([
-      ('scope', str),
-      ('arg', str),
-      ('normalized_arg', str),
-      ('scoped_arg', str),
-  ])):
+  @dataclass(unsafe_hash=True)
+  class _ScopedFlagNameForFuzzyMatching:
     """Specify how a registered option would look like on the command line.
 
     This information enables fuzzy matching to suggest correct option names when a user specifies an
@@ -381,20 +377,20 @@ class Options:
     :param normalized_arg: the fully-scoped option name, without any leading dashes.
     :param scoped_arg: the fully-scoped option as it would appear on the command line.
     """
+    scope: str
+    arg: str
+    normalized_arg: str
+    scoped_arg: str
 
-    def __new__(cls, scope, arg):
-      normalized_arg = re.sub('^-+', '', arg)
+    def __init__(self, scope: str, arg: str) -> None:
+      self.scope = scope
+      self.arg = arg
+      self.normalized_arg = re.sub('^-+', '', arg)
       if scope == GLOBAL_SCOPE:
-        scoped_arg = arg
+        self.scoped_arg = arg
       else:
         dashed_scope = scope.replace('.', '-')
-        scoped_arg = '--{}-{}'.format(dashed_scope, normalized_arg)
-      return super().__new__(
-        cls,
-        scope=scope,
-        arg=arg,
-        normalized_arg=normalized_arg,
-        scoped_arg=scoped_arg)
+        self.scoped_arg = f'--{dashed_scope}-{self.normalized_arg}'
 
     @property
     def normalized_scoped_arg(self):
