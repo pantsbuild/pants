@@ -94,7 +94,6 @@ python_library(
     ':objects',
     ':parser',
     'src/python/pants/build_graph',
-    'src/python/pants/util:objects',
     'src/python/pants/util:memo',
   ]
 )

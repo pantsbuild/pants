@@ -4,12 +4,12 @@
 import re
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Iterable, Optional, Tuple
 
 from pants.build_graph.address import BuildFileAddress
 from pants.engine.objects import Serializable
+from pants.engine.parser import Parser
 from pants.util.memo import memoized_property
-from pants.util.objects import datatype
 
 
 class MappingError(Exception):
@@ -155,52 +155,43 @@ class ResolveError(MappingError):
   """Indicates an error resolving targets."""
 
 
-class AddressMapper(datatype([
-  'parser',
-  'build_patterns',
-  'build_ignore_patterns',
-  'exclude_target_regexps',
-  'subproject_roots',
-])):
+@dataclass(unsafe_hash=True)
+class AddressMapper:
   """Configuration to parse build files matching a filename pattern."""
+  parser: Parser
+  build_patterns: Tuple
+  build_ignore_patterns: Tuple
+  exclude_target_regexps: Tuple
+  subproject_roots: Tuple
 
-  def __new__(cls,
-              parser,
-              build_patterns=None,
-              build_ignore_patterns=None,
-              exclude_target_regexps=None,
-              subproject_roots=None):
+  def __init__(
+    self,
+    parser: Parser,
+    build_patterns: Optional[Iterable] = None,
+    build_ignore_patterns: Optional[Iterable] = None,
+    exclude_target_regexps: Optional[Iterable] = None,
+    subproject_roots: Optional[Iterable] = None,
+  ) -> None:
     """Create an AddressMapper.
 
     Both the set of files that define a mappable BUILD files and the parser used to parse those
     files can be customized.  See the `pants.engine.parsers` module for example parsers.
 
     :param parser: The BUILD file parser to use.
-    :type parser: An instance of :class:`pants.engine.parser.Parser`.
-    :param tuple build_patterns: A tuple of fnmatch-compatible patterns for identifying BUILD files
-                                 used to resolve addresses.
-    :param list build_ignore_patterns: A list of path ignore patterns used when searching for BUILD files.
-    :param list exclude_target_regexps: A list of regular expressions for excluding targets.
+    :param build_patterns: A tuple of fnmatch-compatible patterns for identifying BUILD files
+                          used to resolve addresses.
+    :param build_ignore_patterns: A list of path ignore patterns used when searching for BUILD files.
+    :param exclude_target_regexps: A list of regular expressions for excluding targets.
     """
-    build_patterns = tuple(build_patterns or ['BUILD', 'BUILD.*'])
-    build_ignore_patterns = tuple(build_ignore_patterns or [])
-    exclude_target_regexps = tuple(exclude_target_regexps or [])
-    subproject_roots = tuple(subproject_roots or [])
-    return super().__new__(
-        cls,
-        parser,
-        build_patterns,
-        build_ignore_patterns,
-        exclude_target_regexps,
-        subproject_roots
-      )
-
-  @memoized_property
-  def exclude_patterns(self):
-    return tuple(re.compile(pattern) for pattern in self.exclude_target_regexps)
+    self.parser = parser
+    self.build_patterns = tuple(build_patterns or ['BUILD', 'BUILD.*'])
+    self.build_ignore_patterns = tuple(build_ignore_patterns or [])
+    self.exclude_target_regexps = tuple(exclude_target_regexps or [])
+    self.subproject_roots = tuple(subproject_roots or [])
 
   def __repr__(self):
     return 'AddressMapper(parser={}, build_patterns={})'.format(self.parser, self.build_patterns)
 
-  def __str__(self):
-    return repr(self)
+  @memoized_property
+  def exclude_patterns(self):
+    return tuple(re.compile(pattern) for pattern in self.exclude_target_regexps)
