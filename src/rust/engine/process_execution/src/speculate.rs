@@ -37,14 +37,13 @@ impl SpeculatingCommandRunner {
     debug!("request is compatible with both platforms...speculating");
     let delay = Delay::new(Instant::now() + self.speculation_timeout);
     let req2 = req.clone();
-    let workunit_store2 = workunit_store.clone();
     debug!(
       "Running primary command. Num waiters is {:?}",
       self.primary.num_waiters()
     );
     self
       .primary
-      .run(req, workunit_store)
+      .run(req, context.clone())
       .select2({
         let command_runner = self.clone();
         delay.then(move |_| {
@@ -52,7 +51,7 @@ impl SpeculatingCommandRunner {
             "delay finished, running second command, num waiters are {:?}",
             command_runner.secondary.num_waiters()
           );
-          command_runner.secondary.run(req2, workunit_store2)
+          command_runner.secondary.run(req2, context)
         })
       })
       .then(|raced_result| match raced_result {
