@@ -32,16 +32,17 @@ def run_python_test(
     TransitiveHydratedTargets, BuildFileAddresses((test_target.address,))
   )
   all_targets = transitive_hydrated_targets.closure
+  all_target_adaptors = tuple(t.adaptor for t in all_targets)
 
   interpreter_constraints = PexInterpreterContraints.create_from_adaptors(
-    adaptors=tuple(all_targets),
+    adaptors=tuple(all_target_adaptors),
     python_setup=python_setup
   )
 
   # Produce a pex containing pytest and all transitive 3rdparty requirements.
   output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
   requirements = PexRequirements.create_from_adaptors(
-    adaptors=all_targets,
+    adaptors=all_target_adaptors,
     additional_requirements=pytest.get_requirement_strings()
   )
 
