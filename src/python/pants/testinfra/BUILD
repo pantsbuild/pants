@@ -2,6 +2,48 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
+  name='test_infra',
+  dependencies=[
+    ':legacy_test_infra',
+    ':int-test-for-export',
+    ':test_base',
+    'src/python/pants/testinfra/jvm:jar_task_test_base',
+    'src/python/pants/testinfra/jvm:nailgun_task_test_base',
+    'src/python/pants/testinfra/jvm:jvm_tool_task_test_base',
+    'src/python/pants/testinfra/engine:engine_test_base',
+    'src/python/pants/testinfra/subsystem',
+  ],
+  provides=pants_setup_py(
+    name='pantsbuild.pants.testinfra',
+    description='Test support for writing pants plugins.',
+    namespace_packages=['pants.testinfra', 'pants_test'],
+    additional_classifiers=[
+      'Topic :: Software Development :: Testing',
+    ]
+  )
+)
+
+# NB: The below targets are only here to ensure that we still include in the wheel the original
+# pants_test files. We add all transitive dependencies on testinfra code explicitly.
+# These should be deleted once we can remove the files.
+python_library(
+  name='legacy_test_infra',
+  dependencies=[
+    'tests/python/pants_test:int-test-for-export',
+    'tests/python/pants_test:test_base',
+    'tests/python/pants_test/jvm:jar_task_test_base',
+    'tests/python/pants_test/jvm:nailgun_task_test_base',
+    'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+    'tests/python/pants_test/engine:engine_test_base',
+    'tests/python/pants_test/subsystem:subsystem_utils',
+    'tests/python/pants_test/base:context_utils',
+    'tests/python/pants_test/engine:util',
+    'tests/python/pants_test/option/util',
+    'tests/python/pants_test/testutils:file_test_util',
+  ],
+)
+
+python_library(
   name = 'int-test-for-export',
   sources = [
     'pants_run_integration_test.py'
