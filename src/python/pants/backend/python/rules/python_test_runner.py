@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.python.rules.inject_init import InjectedInitDigest
-from pants.backend.python.rules.pex import CreatePex, Pex, PexInterpreterContraints
+from pants.backend.python.rules.pex import CreatePex, Pex, PexInterpreterContraints, PexRequirements
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
@@ -40,17 +40,11 @@ def run_python_test(
 
   # Produce a pex containing pytest and all transitive 3rdparty requirements.
   output_pytest_requirements_pex_filename = 'pytest-with-requirements.pex'
-  all_target_requirements = []
-  for t in all_targets:
-    maybe_python_req_lib = t.adaptor
-    # This is a python_requirement()-like target.
-    if hasattr(maybe_python_req_lib, 'requirement'):
-      all_target_requirements.append(str(maybe_python_req_lib.requirement))
-    # This is a python_requirement_library()-like target.
-    if hasattr(maybe_python_req_lib, 'requirements'):
-      for py_req in maybe_python_req_lib.requirements:
-        all_target_requirements.append(str(py_req.requirement))
-  all_requirements = all_target_requirements + list(pytest.get_requirement_strings())
+  requirements = PexRequirements.create_from_adaptors(
+    adaptors=all_targets,
+    additional_requirements=pytest.get_requirement_strings()
+  )
+
   resolved_requirements_pex = yield Get(
     Pex, CreatePex(
       output_filename=output_pytest_requirements_pex_filename,

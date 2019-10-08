@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.python.rules.inject_init import InjectedInitDigest
-from pants.backend.python.rules.pex import CreatePex, Pex, PexInterpreterContraints
+from pants.backend.python.rules.pex import CreatePex, Pex, PexInterpreterContraints, PexRequirements
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.engine.fs import Digest, DirectoriesToMerge
@@ -53,25 +53,12 @@ def create_python_binary(python_binary_adaptor: PythonBinaryAdaptor,
   all_input_digests = [sources_digest, inits_digest.directory_digest]
   merged_input_files = yield Get(Digest, DirectoriesToMerge, DirectoriesToMerge(directories=tuple(all_input_digests)))
 
-  #TODO This chunk of code should be made into an @rule and used both here and in
-  # python_test_runner.py.
-  # Produce a pex containing pytest and all transitive 3rdparty requirements.
-  all_target_requirements = []
-  for maybe_python_req_lib in all_target_adaptors:
-    # This is a python_requirement()-like target.
-    if hasattr(maybe_python_req_lib, 'requirement'):
-      all_target_requirements.append(str(maybe_python_req_lib.requirement))
-    # This is a python_requirement_library()-like target.
-    if hasattr(maybe_python_req_lib, 'requirements'):
-      for py_req in maybe_python_req_lib.requirements:
-        all_target_requirements.append(str(py_req.requirement))
-
+  requirements = PexRequirements.create_from_adaptors(all_target_adaptors)
   output_filename = f"{python_binary_adaptor.address.target_name}.pex"
 
-  all_requirements = all_target_requirements
   create_requirements_pex = CreatePex(
     output_filename=output_filename,
-    requirements=tuple(sorted(all_requirements)),
+    requirements=requirements,
     interpreter_constraints=interpreter_constraints,
     entry_point=entry_point,
     input_files_digest=merged_input_files,
