@@ -196,7 +196,8 @@ _specificity = {
   SingleAddress: 0,
   SiblingAddresses: 1,
   AscendantAddresses: 2,
-  DescendantAddresses: 3
+  DescendantAddresses: 3,
+  type(None): 99
 }
 
 
@@ -207,7 +208,7 @@ def more_specific(spec1: Spec, spec2: Spec) -> Spec:
   the "most specific" one, which will make the most intuitive sense to the user.
   """
   # Note that if either of spec1 or spec2 is None, the other will be returned.
-  return spec1 if _specificity.get(type(spec1), 99) < _specificity.get(type(spec2), 99) else spec2
+  return spec1 if _specificity[type(spec1)] < _specificity[type(spec2)] else spec2
 
 
 class SpecsMatcher(datatype([('tags', tuple), ('exclude_patterns', tuple)])):
