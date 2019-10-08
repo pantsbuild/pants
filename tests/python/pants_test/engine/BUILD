@@ -76,6 +76,7 @@ python_tests(
   name='isolated_process',
   sources=['test_isolated_process.py'],
   dependencies=[
+    '3rdparty/python:dataclasses',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:isolated_process',
     'src/python/pants/engine:rules',
