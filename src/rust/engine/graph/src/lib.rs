@@ -48,7 +48,7 @@ use fnv::FnvHasher;
 
 use futures::future::{self, Future};
 use indexmap::IndexSet;
-use log::{info, trace, warn};
+use log::{debug, trace, warn};
 use parking_lot::Mutex;
 use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
@@ -653,21 +653,21 @@ impl<N: Node> Graph<N> {
           // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
           // without a much more complicated algorithm.
           let potential_dst_id = inner.ensure_entry(dst_node.clone());
-          match Self::detect_cycle(src_id, potential_dst_id, &mut inner) {
-            Ok(true) => {
-              // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
-              inner.ensure_entry(EntryKey::Cyclic(dst_node))
-            }
-            Ok(false) => {
-              // Valid dependency.
-              trace!(
-                "Adding dependency from {:?} to {:?}",
-                inner.entry_for_id(src_id).unwrap().node(),
-                inner.entry_for_id(potential_dst_id).unwrap().node()
-              );
-              potential_dst_id
-            }
-            Err(err) => return futures::future::err(err).to_boxed(),
+          if let Some(cycle_path) = Self::detect_cycle(src_id, potential_dst_id, &mut inner) {
+            // Cyclic dependency: render an error.
+            let path_strs = cycle_path
+              .into_iter()
+              .map(|e| e.node().to_string())
+              .collect();
+            return futures::future::err(N::Error::cyclic(path_strs)).to_boxed();
+          } else {
+            // Valid dependency.
+            trace!(
+              "Adding dependency from {:?} to {:?}",
+              inner.entry_for_id(src_id).unwrap().node(),
+              inner.entry_for_id(potential_dst_id).unwrap().node()
+            );
+            potential_dst_id
           }
         };
         // All edges get a weight of 1.0 so that we can Bellman-Ford over the graph, treating each
@@ -692,7 +692,7 @@ impl<N: Node> Graph<N> {
     src_id: EntryId,
     potential_dst_id: EntryId,
     inner: &mut InnerGraph<N>,
-  ) -> Result<bool, N::Error> {
+  ) -> Option<Vec<Entry<N>>> {
     let mut counter = 0;
     loop {
       // Find one cycle if any cycles exist.
@@ -706,14 +706,14 @@ impl<N: Node> Graph<N> {
           .collect();
         if dirty_nodes.is_empty() {
           // We detected a cycle with no dirty nodes - there's a cycle and there's nothing we can do
-          // to remove it.
-          info!(
+          // to remove it. We only log at debug because the UI will render the cycle.
+          debug!(
             "Detected cycle considering adding edge from {:?} to {:?}; existing path: {:?}",
             inner.entry_for_id(src_id).unwrap(),
             inner.entry_for_id(potential_dst_id).unwrap(),
             cycle_path
           );
-          return Ok(true);
+          return Some(cycle_path);
         }
         counter += 1;
         // Obsolete edges from a dirty node may cause fake cycles to be detected if there was a
@@ -732,12 +732,12 @@ impl<N: Node> Graph<N> {
             "Couldn't remove cycle containing dirty nodes after {} attempts; nodes in cycle: {:?}",
             counter, cycle_path
           );
-          return Err(N::Error::cyclic());
+          return Some(cycle_path);
         }
         // Clear the dirty nodes, removing the edges from them, and try again.
         inner.invalidate_from_roots(|node| dirty_nodes.contains(node));
       } else {
-        return Ok(false);
+        return None;
       }
     }
   }

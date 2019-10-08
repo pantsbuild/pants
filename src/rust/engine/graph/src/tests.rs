@@ -616,7 +616,7 @@ impl NodeError for TError {
     TError::Invalidated
   }
 
-  fn cyclic() -> Self {
+  fn cyclic(_path: Vec<String>) -> Self {
     TError::Cyclic
   }
 }
