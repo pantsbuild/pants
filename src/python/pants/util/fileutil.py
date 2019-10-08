@@ -6,12 +6,13 @@ import os
 import random
 import shutil
 from contextlib import contextmanager
+from typing import Callable, Dict, Iterator, Sequence
 from uuid import uuid4
 
 from pants.util.contextutil import temporary_file
 
 
-def atomic_copy(src, dst):
+def atomic_copy(src: str, dst: str) -> None:
   """Copy the file src to dst, overwriting dst atomically."""
   with temporary_file(root_dir=os.path.dirname(dst)) as tmp_dst:
     shutil.copyfile(src, tmp_dst.name)
@@ -20,7 +21,7 @@ def atomic_copy(src, dst):
 
 
 @contextmanager
-def safe_temp_edit(filename):
+def safe_temp_edit(filename: str) -> Iterator[str]:
   """Safely modify a file within context that automatically reverts any changes afterwards
 
   The file mutatation occurs in place. The file is backed up in a temporary file before edits
@@ -37,7 +38,7 @@ def safe_temp_edit(filename):
       shutil.copyfile(tmp_file.name, filename)
 
 
-def create_size_estimators():
+def create_size_estimators() -> Dict[str, Callable[[Sequence[str]], int]]:
   """Create a dict of name to a function that returns an estimated size for a given target.
 
   The estimated size is used to build the largest targets first (subject to dependency constraints).
@@ -45,7 +46,7 @@ def create_size_estimators():
   builds.
   :returns: Dict of a name to a function that returns an estimated size.
   """
-  def line_count(filename):
+  def line_count(filename: str) -> int:
     with open(filename, 'rb') as fh:
       return sum(1 for line in fh)
   return {
@@ -57,8 +58,8 @@ def create_size_estimators():
   }
 
 
-def safe_hardlink_or_copy(source, dest, overwrite=False):
-  def do_copy():
+def safe_hardlink_or_copy(source: str, dest: str, overwrite: bool = False) -> None:
+  def do_copy() -> None:
     temp_dest = dest + uuid4().hex
     shutil.copyfile(source, temp_dest)
     os.rename(temp_dest, dest)
