@@ -174,6 +174,7 @@ python_library(
   name='selectors',
   sources=['selectors.py'],
   dependencies=[
+    '3rdparty/python:dataclasses',
     'src/python/pants/util:objects',
   ]
 )

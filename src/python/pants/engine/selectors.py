@@ -2,24 +2,53 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import ast
+from dataclasses import dataclass
+from textwrap import dedent
+from typing import Any, Tuple, Type
 
-from pants.util.objects import SubclassesOf, TypeConstraint, datatype
+from pants.util.objects import TypeConstraint
 
 
-_type_field = SubclassesOf(type)
-
-
-class Get(datatype([
-    ('product', _type_field),
-    ('subject_declared_type', _type_field),
-    'subject',
-])):
+@dataclass(unsafe_hash=True)
+class Get:
   """Experimental synchronous generator API.
 
   May be called equivalently as either:
     # verbose form: Get(product_type, subject_declared_type, subject)
     # shorthand form: Get(product_type, subject_type(subject))
   """
+  product: Type
+  subject_declared_type: Type
+  subject: Any
+
+  def __init__(self, *args: Any) -> None:
+    if len(args) not in (2, 3):
+      raise ValueError(
+        f'Expected either two or three arguments to {Get.__name__}; got {args}.'
+      )
+    if len(args) == 2:
+      product, subject = args
+
+      if isinstance(subject, (type, TypeConstraint)):
+        raise TypeError(dedent("""\
+          The two-argument form of Get does not accept a type as its second argument.
+        
+          args were: Get({args!r})
+        
+          Get.create_statically_for_rule_graph() should be used to generate a Get() for
+          the `input_gets` field of a rule. If you are using a `yield Get(...)` in a rule
+          and a type was intended, use the 3-argument version:
+          Get({product!r}, {subject_type!r}, {subject!r})
+          """.format(args=args, product=product, subject_type=type(subject), subject=subject)
+        ))
+
+      subject_declared_type = type(subject)
+    else:
+      product, subject_declared_type, subject = args
+
+    self.product = product
+    self.subject_declared_type = subject_declared_type
+    self.subject = subject
 
   @staticmethod
   def extract_constraints(call_node):
@@ -64,38 +93,14 @@ class Get(datatype([
     """
     return cls(product_type, subject_type, None)
 
-  def __new__(cls, *args):
-    # TODO(#7114): Use datatype type checking for these fields! We can wait until after #7114, when
-    # we can just check that they are types.
-    if len(args) == 2:
-      product, subject = args
 
-      if isinstance(subject, (type, TypeConstraint)):
-        raise TypeError("""\
-The two-argument form of Get does not accept a type as its second argument.
-
-args were: Get({args!r})
-
-Get.create_statically_for_rule_graph() should be used to generate a Get() for
-the `input_gets` field of a rule. If you are using a `yield Get(...)` in a rule
-and a type was intended, use the 3-argument version:
-Get({product!r}, {subject_type!r}, {subject!r})
-""".format(args=args, product=product, subject_type=type(subject), subject=subject))
-
-      subject_declared_type = type(subject)
-    elif len(args) == 3:
-      product, subject_declared_type, subject = args
-    else:
-      raise ValueError('Expected either two or three arguments to {}; got {}.'
-                       .format(Get.__name__, args))
-    return super().__new__(cls, product, subject_declared_type, subject)
-
-
-class Params(datatype([('params', tuple)])):
+@dataclass(unsafe_hash=True)
+class Params:
   """A set of values with distinct types.
 
   Distinct types are enforced at consumption time by the rust type of the same name.
   """
+  params: Tuple[Any]
 
-  def __new__(cls, *args):
-    return super().__new__(cls, tuple(args))
+  def __init__(self, *args: Any) -> None:
+    self.params = tuple(args)
