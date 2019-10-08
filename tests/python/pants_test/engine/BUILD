@@ -81,6 +81,7 @@ python_tests(
     'src/python/pants/engine:isolated_process',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
+    'src/python/pants/util:contextutil',
     'tests/python/pants_test:test_base',
     'tests/python/pants_test/engine/examples:fs_test',
     'tests/python/pants_test/engine/examples:scheduler_inputs',

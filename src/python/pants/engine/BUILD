@@ -104,11 +104,11 @@ python_library(
   name='isolated_process',
   sources=['isolated_process.py'],
   dependencies=[
+    '3rdparty/python:dataclasses',
     ':fs',
     ':rules',
     ':selectors',
     ':platform',
-    'src/python/pants/util:objects',
   ]
 )
 

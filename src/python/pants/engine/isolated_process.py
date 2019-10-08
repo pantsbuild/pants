@@ -2,17 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+from dataclasses import dataclass
+from typing import Dict, Optional, Tuple, Union
 
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest
 from pants.engine.platform import PlatformConstraint
 from pants.engine.rules import RootRule, rule
-from pants.util.objects import (
-  Exactly,
-  TypedCollection,
-  datatype,
-  hashable_string_list,
-  string_optional,
-)
 
 
 logger = logging.getLogger(__name__)
@@ -20,83 +15,73 @@ logger = logging.getLogger(__name__)
 _default_timeout_seconds = 15 * 60
 
 
-class ProductDescription(datatype([('value', str)])): pass
+@dataclass(frozen=True)
+class ProductDescription:
+  value: str
 
 
-class ExecuteProcessRequest(datatype([
-  ('argv', hashable_string_list),
-  ('input_files', Digest),
-  ('description', str),
-  ('env', hashable_string_list),
-  ('output_files', hashable_string_list),
-  ('output_directories', hashable_string_list),
-  # NB: timeout_seconds covers the whole remote operation including queuing and setup.
-  ('timeout_seconds', Exactly(float, int)),
-  ('unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule', Digest),
-  ('jdk_home', string_optional),
-])):
+@dataclass(unsafe_hash=True)
+class ExecuteProcessRequest:
   """Request for execution with args and snapshots to extract."""
 
   # TODO: add a method to hack together a `process_executor` invocation command line which
   # reproduces this process execution request to make debugging remote executions effortless!
-  def __new__(
-    cls,
-    argv,
-    input_files,
-    description,
-    env=None,
-    output_files=(),
-    output_directories=(),
-    timeout_seconds=_default_timeout_seconds,
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule=EMPTY_DIRECTORY_DIGEST,
-    jdk_home=None,
-  ):
-    if env is None:
-      env = ()
-    else:
-      if not isinstance(env, dict):
-        raise cls.make_type_error(
-          "arg 'env' was invalid: value {} (with type {}) must be a dict".format(env, type(env)))
-      env = tuple(item for pair in env.items() for item in pair)
+  argv: Tuple[str, ...]
+  input_files: Digest
+  description: str
+  env: Tuple[str, ...]
+  output_files: Tuple[str, ...]
+  output_directories: Tuple[str, ...]
+  timeout_seconds: Union[int, float]
+  unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: Digest
+  jdk_home: Optional[str]
 
-    return super().__new__(
-      cls,
-      argv=argv,
-      env=env,
-      input_files=input_files,
-      description=description,
-      output_files=output_files,
-      output_directories=output_directories,
-      timeout_seconds=timeout_seconds,
-      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule=unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
-      jdk_home=jdk_home,
-    )
+  def __init__(
+    self,
+    argv: Tuple[str, ...],
+    *,
+    input_files: Digest,
+    description: str,
+    env: Optional[Dict[str, str]] = None,
+    output_files: Optional[Tuple[str, ...]] = None,
+    output_directories: Optional[Tuple[str, ...]] = None,
+    timeout_seconds: Union[int, float] = _default_timeout_seconds,
+    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: Digest = EMPTY_DIRECTORY_DIGEST,
+    jdk_home: Optional[str] = None
+  ) -> None:
+    self.argv = argv
+    self.input_files = input_files
+    self.description = description
+    self.env = tuple(item for pair in env.items() for item in pair) if env else ()
+    self.output_files = output_files or ()
+    self.output_directories = output_directories or ()
+    self.timeout_seconds = timeout_seconds
+    self.unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule = unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule
+    self.jdk_home = jdk_home
 
 
-class MultiPlatformExecuteProcessRequest(datatype([
-  ('platform_constraints', hashable_string_list),
-  ('execute_process_requests', TypedCollection(Exactly(ExecuteProcessRequest))),
-])):
-  # args collects a set of tuples representing platform constraints mapped to a req, just like a dict constructor can.
+@dataclass(unsafe_hash=True)
+class MultiPlatformExecuteProcessRequest:
+  # args collects a set of tuples representing platform constraints mapped to a req,
+  # just like a dict constructor can.
+  platform_constraints: Tuple[str, ...]
+  execute_process_requests: Tuple[ExecuteProcessRequest, ...]
 
-  def __new__(cls, request_dict):
+  def __init__(
+    self, request_dict: Dict[Tuple[PlatformConstraint, PlatformConstraint], ExecuteProcessRequest]
+  ) -> None:
     if len(request_dict) == 0:
-      raise cls.make_type_error("At least one platform constrained ExecuteProcessRequest must be passed.")
-
-    # validate the platform constraints using the platforms enum an flatten the keys.
+      raise ValueError("At least one platform constrained ExecuteProcessRequest must be passed.")
     validated_constraints = tuple(
       constraint.value
       for pair in request_dict.keys() for constraint in pair
       if PlatformConstraint(constraint.value)
     )
     if len({req.description for req in request_dict.values()}) != 1:
-      raise ValueError(f"The `description` of all execute_process_requests in a {cls.__name__} must be identical.")
+      raise ValueError(f"The `description` of all execute_process_requests in a {self.__name__} must be identical.")
 
-    return super().__new__(
-      cls,
-      validated_constraints,
-      tuple(request_dict.values())
-    )
+    self.platform_constraints = validated_constraints
+    self.execute_process_requests = tuple(request_dict.values())
 
   @property
   def product_description(self):
@@ -106,23 +91,25 @@ class MultiPlatformExecuteProcessRequest(datatype([
     return ProductDescription(self.execute_process_requests[0].description)
 
 
-class ExecuteProcessResult(datatype([('stdout', bytes),
-                                     ('stderr', bytes),
-                                     ('output_directory_digest', Digest)
-                                     ])):
+@dataclass(frozen=True)
+class ExecuteProcessResult:
   """Result of successfully executing a process.
 
   Requesting one of these will raise an exception if the exit code is non-zero."""
+  stdout: bytes
+  stderr: bytes
+  output_directory_digest: Digest
 
 
-class FallibleExecuteProcessResult(datatype([('stdout', bytes),
-                                             ('stderr', bytes),
-                                             ('exit_code', int),
-                                             ('output_directory_digest', Digest)
-                                             ])):
+@dataclass(frozen=True)
+class FallibleExecuteProcessResult:
   """Result of executing a process.
 
   Requesting one of these will not raise an exception if the exit code is non-zero."""
+  stdout: bytes
+  stderr: bytes
+  exit_code: int
+  output_directory_digest: Digest
 
 
 class ProcessExecutionFailure(Exception):

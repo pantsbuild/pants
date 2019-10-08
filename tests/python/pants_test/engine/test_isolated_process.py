@@ -25,7 +25,6 @@ from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get
 from pants.util.contextutil import temporary_dir
-from pants.util.objects import TypeCheckError
 from pants_test.test_base import TestBase
 
 
@@ -199,69 +198,6 @@ def create_javac_compile_rules():
 
 
 class ExecuteProcessRequestTest(unittest.TestCase):
-  def _default_args_execute_process_request(self, argv=tuple(), env=None):
-    env = env or dict()
-    return ExecuteProcessRequest(
-      argv=argv,
-      description='',
-      env=env,
-      input_files=EMPTY_DIRECTORY_DIGEST,
-      output_files=(),
-    )
-
-  def test_blows_up_on_invalid_args(self):
-    try:
-      self._default_args_execute_process_request()
-    except ValueError:
-      self.assertTrue(False, "should be able to construct without error")
-
-    with self.assertRaises(TypeCheckError):
-      self._default_args_execute_process_request(argv=1)
-    with self.assertRaises(TypeCheckError):
-      self._default_args_execute_process_request(argv='1')
-    with self.assertRaises(TypeCheckError):
-      self._default_args_execute_process_request(argv=('1',), env='foo=bar')
-
-
-    with self.assertRaisesRegexp(TypeCheckError, "env"):
-      ExecuteProcessRequest(
-        argv=('1',),
-        env=(),
-        input_files='',
-        output_files=(),
-        output_directories=(),
-        timeout_seconds=0.1,
-        description=''
-      )
-    with self.assertRaisesRegexp(TypeCheckError, "input_files"):
-      ExecuteProcessRequest(argv=('1',),
-        env=dict(),
-        input_files=3,
-        output_files=(),
-        output_directories=(),
-        timeout_seconds=0.1,
-        description=''
-      )
-    with self.assertRaisesRegexp(TypeCheckError, "output_files"):
-      ExecuteProcessRequest(
-        argv=('1',),
-        env=dict(),
-        input_files=EMPTY_DIRECTORY_DIGEST,
-        output_files=("blah"),
-        output_directories=(),
-        timeout_seconds=0.1,
-        description=''
-      )
-    with self.assertRaisesRegexp(TypeCheckError, "timeout"):
-      ExecuteProcessRequest(
-        argv=('1',),
-        env=dict(),
-        input_files=EMPTY_DIRECTORY_DIGEST,
-        output_files=("blah"),
-        output_directories=(),
-        timeout_seconds=None,
-        description=''
-      )
 
   def test_create_from_snapshot_with_env(self):
     req = ExecuteProcessRequest(
