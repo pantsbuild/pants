@@ -106,17 +106,16 @@ impl Drop for Permit {
     let task = {
       let mut inner = self.inner.lock();
       inner.available_permits += 1;
-      if let Some(unique_task) = inner.waiters.pop_front() {
+      if let Some(unique_task) = inner.waiters.front() {
         warn!(
           "dropped permit notifying next task, queue length is {:?}",
           inner.waiters.len()
         );
-        unique_task.task
+        unique_task.task.clone()
       } else {
         return;
       }
     };
-    warn!("notifying task {:?}", task);
     task.notify();
   }
 }
@@ -148,7 +147,6 @@ impl Future for PermitFuture {
   type Error = ();
 
   fn poll(&mut self) -> Poll<Permit, ()> {
-    warn!("polling task {:?}", task::current());
     let inner = self.inner.clone().unwrap();
     let acquired = {
       let mut inner = inner.lock();
@@ -168,6 +166,14 @@ impl Future for PermitFuture {
         }
         false
       } else {
+        if let Some(front_task) = inner.waiters.front() {
+          // This task is the one we notified so remove it. Otherwise keep it on the
+          // waiters queue so that it doesn't get forgotten.
+          if front_task.task.will_notify_current() {
+            inner.waiters.pop_front();
+            warn!("front task is the current task so we can remove it from queue")
+          }
+        }
         inner.available_permits -= 1;
         true
       }
