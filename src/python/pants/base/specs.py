@@ -200,7 +200,7 @@ _specificity = {
 }
 
 
-def more_specific(spec1, spec2):
+def more_specific(spec1: Spec, spec2: Spec) -> Spec:
   """Returns which of the two specs is more specific.
 
   This is useful when a target matches multiple specs, and we want to associate it with
