@@ -41,8 +41,6 @@ from pants.engine.legacy.structs import (
 from pants.engine.legacy.structs import rules as structs_rules
 from pants.engine.mapper import AddressMapper
 from pants.engine.parser import SymbolTable
-from pants.engine.platform import create_platform_rules
-from pants.engine.rules import RootRule, UnionMembership, rule
 from pants.engine.platform import PlatformConstraint, create_platform_rules
 from pants.engine.rules import RootRule, UnionMembership, rule
 from pants.engine.scheduler import Scheduler
@@ -205,7 +203,7 @@ class LegacyGraphSession:
     console = Console(
       use_colors=global_options.colors
     )
-    target_platform_constraint = PlatformConstraint(global_options.target_platform)
+    target_platform_constraint = PlatformConstraint.local_platform
     workspace = Workspace(self.scheduler_session)
 
     for goal in goals:

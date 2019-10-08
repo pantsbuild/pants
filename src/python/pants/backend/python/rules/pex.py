@@ -51,10 +51,6 @@ def create_pex(
   """Returns a PEX with the given requirements, optional entry point, and optional
   interpreter constraints."""
 
-  # ignore none constraint if some rule pushes a constraint down as none.
-  if platform == PlatformConstraint.none:
-    platform = PlatformConstraint.local_platform
-
   interpreter_constraint_args = []
   for constraint in request.interpreter_constraints:
     interpreter_constraint_args.extend(["--interpreter-constraint", constraint])
@@ -71,6 +67,10 @@ def create_pex(
   sources_digest_as_subdir = yield Get(Digest, DirectoryWithPrefixToAdd(sources_digest, source_dir_name))
   all_inputs = (pex_bin.directory_digest, sources_digest_as_subdir,)
   merged_digest = yield Get(Digest, DirectoriesToMerge(directories=all_inputs))
+
+  # ignore none constraint if some rule pushes a constraint down as none.
+  if platform == PlatformConstraint.none:
+    platform = PlatformConstraint.local_platform
 
   # NB: PEX outputs are platform dependent so in order to get a PEX that we can use locally, without
   # cross-building, we specify that our PEX command be run on the current local platform. When we

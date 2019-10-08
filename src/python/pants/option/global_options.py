@@ -58,7 +58,6 @@ class ExecutionOptions:
   remote_ca_certs_path: Any
   remote_oauth_bearer_token_path: Any
   remote_execution_extra_platform_properties: Any
-  target_platform: Any
 
   @classmethod
   def from_bootstrap_options(cls, bootstrap_options):
@@ -82,7 +81,6 @@ class ExecutionOptions:
       remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
       remote_oauth_bearer_token_path=bootstrap_options.remote_oauth_bearer_token_path,
       remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
-      target_platform=bootstrap_options.target_platform,
     )
 
 
@@ -106,7 +104,6 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_ca_certs_path=None,
     remote_oauth_bearer_token_path=None,
     remote_execution_extra_platform_properties=[],
-    target_platform=get_normalized_os_name(),
   )
 
 
@@ -429,10 +426,6 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              advanced=True)
     register('--process-execution-use-local-cache', type=bool, default=True, advanced=True,
              help='Whether to keep process executions in a local cache persisted to disk.')
-
-    register('--target-platform', type=str, default=DEFAULT_EXECUTION_OPTIONS.target_platform, advanced=True,
-             help='Build binaries that are compatible, with a certain platform. Defaults is your local platform.',
-             choices=all_normalized_os_names())
 
   @classmethod
   def register_options(cls, register):
