@@ -7,7 +7,13 @@ import zipfile
 from typing import Dict, List
 
 from pants.backend.python.rules.download_pex_bin import download_pex_bin
-from pants.backend.python.rules.pex import CreatePex, Pex, PexInterpreterContraints, create_pex
+from pants.backend.python.rules.pex import (
+  CreatePex,
+  Pex,
+  PexInterpreterContraints,
+  PexRequirements,
+  create_pex,
+)
 from pants.backend.python.subsystems.python_native_code import (
   PythonNativeCode,
   create_pex_native_build_environment,
@@ -47,7 +53,7 @@ class TestResolveRequirements(TestBase):
     super().setUp()
     init_subsystems([PythonSetup, PythonNativeCode, SubprocessEnvironment])
 
-  def create_pex_and_get_all_data(self, *, requirements=None,
+  def create_pex_and_get_all_data(self, *, requirements=PexRequirements(),
       entry_point=None,
       interpreter_constraints=PexInterpreterContraints(),
       input_files: Digest = None) -> (Dict, List[str]):
@@ -56,7 +62,7 @@ class TestResolveRequirements(TestBase):
 
     request = CreatePex(
       output_filename="test.pex",
-      requirements=hashify_optional_collection(requirements),
+      requirements=requirements,
       interpreter_constraints=interpreter_constraints,
       entry_point=entry_point,
       input_files_digest=input_files,
@@ -80,7 +86,7 @@ class TestResolveRequirements(TestBase):
     return {'pex': requirements_pex, 'info': json.loads(pex_info_content), 'files': pex_list}
 
   def create_pex_and_get_pex_info(
-    self, *, requirements=None, entry_point=None,
+    self, *, requirements=PexRequirements(), entry_point=None,
     interpreter_constraints=PexInterpreterContraints(),
     input_files: Digest = None) -> Dict:
     return self.create_pex_and_get_all_data(requirements=requirements, entry_point=entry_point, interpreter_constraints=interpreter_constraints,
@@ -110,11 +116,11 @@ class TestResolveRequirements(TestBase):
     self.assertEqual(result.stdout, b"from main\n")
 
   def test_resolves_dependencies(self) -> None:
-    requirements = {"six==1.12.0", "jsonschema==2.6.0", "requests==2.22.0"}
+    requirements = PexRequirements(requirements=("six==1.12.0", "jsonschema==2.6.0", "requests==2.22.0"))
     pex_info = self.create_pex_and_get_pex_info(requirements=requirements)
     # NB: We do not check for transitive dependencies, which PEX-INFO will include. We only check
     # that at least the dependencies we requested are included.
-    self.assertTrue(requirements.issubset(pex_info["requirements"]))
+    self.assertTrue(set(requirements.requirements).issubset(pex_info["requirements"]))
 
   def test_entry_point(self) -> None:
     entry_point = "pydoc"

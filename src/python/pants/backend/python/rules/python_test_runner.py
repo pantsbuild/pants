@@ -48,7 +48,7 @@ def run_python_test(
   resolved_requirements_pex = yield Get(
     Pex, CreatePex(
       output_filename=output_pytest_requirements_pex_filename,
-      requirements=tuple(sorted(all_requirements)),
+      requirements=requirements,
       interpreter_constraints=interpreter_constraints,
       entry_point="pytest:main",
     )
