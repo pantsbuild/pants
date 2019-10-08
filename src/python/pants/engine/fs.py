@@ -26,9 +26,6 @@ class FileContent:
       self.is_executable,
     )
 
-  def __str__(self):
-    return repr(self)
-
 
 FilesContent = Collection.of(FileContent)
 
