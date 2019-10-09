@@ -32,7 +32,7 @@ use std::sync::Arc;
 use futures::future::Future;
 use futures::task::{self, Task};
 use futures::{Async, Poll};
-use log::warn;
+use log::trace;
 use parking_lot::Mutex;
 use rand;
 
@@ -111,8 +111,8 @@ impl Drop for Permit {
       let mut inner = self.inner.lock();
       inner.available_permits += 1;
       if let Some(unique_task) = inner.waiters.front() {
-        warn!(
-          "dropped permit notifying next task, queue length is {:?}",
+        trace!(
+          "Finished a task. Current length of waiters Queue is {:?}",
           inner.waiters.len()
         );
         unique_task.task.clone()
@@ -139,7 +139,6 @@ impl Drop for PermitFuture {
       let inner = self.inner.take().unwrap();
       let mut inner = inner.lock();
       if let Some(task_index) = inner.waiters.iter().position(|task| task_id == task.id) {
-        warn!("found index for task to drop {:?}", task_index);
         inner.waiters.remove(task_index);
       }
     }
@@ -163,8 +162,8 @@ impl Future for PermitFuture {
           };
           self.task_id = Some(task_id);
           inner.waiters.push_back(this_task);
-          warn!(
-            "added task to waiters, queue length is {:?}.",
+          trace!(
+            "Added a task to the queue number of waiters is {:?}.",
             inner.waiters.len()
           );
         }
@@ -175,7 +174,6 @@ impl Future for PermitFuture {
           // waiters queue so that it doesn't get forgotten.
           if front_task.task.will_notify_current() {
             inner.waiters.pop_front();
-            warn!("front task is the current task so we can remove it from queue")
           }
         }
         inner.available_permits -= 1;

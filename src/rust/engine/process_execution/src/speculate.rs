@@ -4,7 +4,7 @@ use crate::{
 };
 use boxfuture::{BoxFuture, Boxable};
 use futures::future::{err, ok, Either, Future};
-use log::{debug, warn};
+use log::debug;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio_timer::Delay;
@@ -34,25 +34,14 @@ impl SpeculatingCommandRunner {
     req: MultiPlatformExecuteProcessRequest,
     context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
-    debug!("request is compatible with both platforms...speculating");
     let delay = Delay::new(Instant::now() + self.speculation_timeout);
     let req2 = req.clone();
-    debug!(
-      "Running primary command. Num waiters is {:?}",
-      self.primary.num_waiters()
-    );
     self
       .primary
       .run(req, context.clone())
       .select2({
         let command_runner = self.clone();
-        delay.then(move |_| {
-          warn!(
-            "delay finished, running second command, num waiters are {:?}",
-            command_runner.secondary.num_waiters()
-          );
-          command_runner.secondary.run(req2, context)
-        })
+        delay.then(move |_| command_runner.secondary.run(req2, context))
       })
       .then(|raced_result| match raced_result {
         Ok(either_success) => {
@@ -68,11 +57,11 @@ impl SpeculatingCommandRunner {
         // a failure to the user if the primary execution source fails. This maintains
         // feel between speculation on and off states.
         Err(Either::B((_failed_secondary_res, outstanding_primary_request))) => {
-          warn!("secondary request FAILED, waiting for primary!");
+          debug!("secondary request FAILED, waiting for primary!");
           outstanding_primary_request
             .then(|primary_result| match primary_result {
               Ok(primary_success) => {
-                warn!("primary request eventually SUCCEEDED after secondary failed");
+                debug!("primary request eventually SUCCEEDED after secondary failed");
                 ok::<FallibleExecuteProcessResult, String>(primary_success).to_boxed()
               }
               Err(primary_failure) => {
