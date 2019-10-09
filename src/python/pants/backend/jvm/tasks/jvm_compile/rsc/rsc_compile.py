@@ -338,7 +338,22 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         dependencies_for_target = list(
           DependencyContext.global_instance().dependencies_respecting_strict_deps(target))
 
+
         classpath_paths = []
+
+        def _get_zinc_compiler_snapshot():
+          all_snap = []
+          # Security manager is baked into the shaded zinc compiler jar.
+          # zinc_compiler_classpath = super(RscCompile, self).get_zinc_compiler_classpath()
+          rel_compiler_jar_paths = [fast_relpath(cp, get_buildroot()) for cp in super(RscCompile, self).get_zinc_compiler_classpath()]
+          compiler_jar_snapshot, = self.context._scheduler.capture_snapshots([
+            PathGlobsAndRoot(
+              PathGlobs(rel_compiler_jar_paths),
+              get_buildroot(),
+            ),
+          ])
+          return compiler_jar_snapshot
+
         classpath_directory_digests = []
         classpath_product = self.context.products.get_data('rsc_mixed_compile_classpath')
         classpath_entries = classpath_product.get_classpath_entries_for_targets(dependencies_for_target)
@@ -365,8 +380,10 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
           def hermetic_digest_classpath():
             jdk_libs_rel, jdk_libs_digest = self._jdk_libs_paths_and_digest(distribution)
 
+            zinc_compiler_snapshot = _get_zinc_compiler_snapshot()
             merged_sources_and_jdk_digest = self.context._scheduler.merge_directories(
-              (jdk_libs_digest, sources_snapshot.directory_digest) + tuple(classpath_directory_digests))
+              (jdk_libs_digest, sources_snapshot.directory_digest) + tuple(classpath_directory_digests)
+              + (zinc_compiler_snapshot.directory_digest,))
             classpath_rel_jdk = classpath_paths + jdk_libs_rel
             return (merged_sources_and_jdk_digest, classpath_rel_jdk)
           def nonhermetic_digest_classpath():
@@ -603,13 +620,12 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       ))
 
   def _runtool_hermetic(self, main, tool_name, distribution, input_digest, ctx):
-    tool_classpath_abs = self._rsc_classpath
+    tool_classpath_abs = self._rsc_classpath + super(RscCompile, self).get_zinc_compiler_classpath()
     tool_classpath = fast_relpath_collection(tool_classpath_abs)
 
     jvm_options = self._jvm_options
 
     if self._rsc.use_native_image:
-      #jvm_options = []
       if jvm_options:
         raise ValueError(
           "`{}` got non-empty jvm_options when running with a graal native-image, but this is "
