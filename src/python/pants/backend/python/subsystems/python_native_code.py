@@ -3,7 +3,9 @@
 
 import logging
 import os
+from dataclasses import dataclass
 from textwrap import dedent
+from typing import Tuple
 
 from pants.backend.native.subsystems.native_toolchain import NativeToolchain
 from pants.backend.native.targets.native_library import NativeLibrary
@@ -16,7 +18,7 @@ from pants.binaries.executable_pex_tool import ExecutablePexTool
 from pants.engine.rules import optionable_rule, rule
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
-from pants.util.objects import SubclassesOf, TypedCollection, datatype, string_type
+from pants.util.objects import SubclassesOf
 from pants.util.strutil import safe_shlex_join, safe_shlex_split
 
 
@@ -142,10 +144,10 @@ class BuildSetupRequiresPex(ExecutablePexTool):
     ]
 
 
-class PexBuildEnvironment(datatype([
-    ('cpp_flags', TypedCollection(string_type)),
-    ('ld_flags', TypedCollection(string_type)),
-])):
+@dataclass(frozen=True)
+class PexBuildEnvironment:
+  cpp_flags: Tuple[str, ...]
+  ld_flags: Tuple[str, ...]
 
   @property
   def invocation_environment_dict(self):
