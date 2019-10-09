@@ -338,7 +338,6 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         dependencies_for_target = list(
           DependencyContext.global_instance().dependencies_respecting_strict_deps(target))
 
-
         classpath_paths = []
         classpath_directory_digests = []
         classpath_product = self.context.products.get_data('rsc_mixed_compile_classpath')
