@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
+from dataclasses import dataclass
+from typing import Optional, Sequence, Tuple
 
 from pants.base.hash_utils import stable_json_sha1
 from pants.base.payload import Payload
@@ -9,7 +11,6 @@ from pants.base.payload_field import PayloadField
 from pants.base.validation import assert_list
 from pants.build_graph.target import Target
 from pants.util.memo import memoized_property
-from pants.util.objects import datatype
 
 
 # TODO: generalize this to a DatatypeSetField subclass in payload_field.py!
@@ -19,12 +20,8 @@ class ConanRequirementSetField(tuple, PayloadField):
     return stable_json_sha1(tuple(hash(req) for req in self))
 
 
-class ConanRequirement(datatype([
-    ('pkg_spec', str),
-    ('include_relpath', str),
-    ('lib_relpath', str),
-    ('lib_names', tuple),
-])):
+@dataclass(unsafe_hash=True)
+class ConanRequirement:
   """A specification for a conan package to be resolved against a remote repository.
 
   Example `pkg_spec`: 'lzo/2.10@twitter/stable'
@@ -33,29 +30,37 @@ class ConanRequirement(datatype([
   be overridden for the specific package to be resolved. See
   https://docs.conan.io/en/latest/using_packages/conanfile_txt.html#imports for more info.
   """
+  pkg_spec: str
+  include_relpath: str
+  lib_relpath: str
+  lib_names: Tuple[str, ...]
+
+  def __init__(
+    self,
+    pkg_spec: str,
+    include_relpath: Optional[str] = None,
+    lib_relpath: Optional[str] = None,
+    lib_names: Optional[Sequence[str]] = None,
+  ) -> None:
+    """
+    :param pkg_spec: A string specifying a conan package at a specific version, as per
+                     https://docs.conan.io/en/latest/using_packages/conanfile_txt.html#requires
+    :param include_relpath: The relative path from the package root directory to where C/C++
+                            headers are located.
+    :param lib_relpath: The relative path from the package root directory to where native
+                        libraries are located.
+    :param lib_names: Strings containing the libraries to add to the linker command
+                      line. Collected into the `native_lib_names` field of a
+                      `packaged_native_library()` target.
+    """
+    self.pkg_spec = pkg_spec
+    self.include_relpath = include_relpath or "include"
+    self.lib_relpath = lib_relpath or "lib"
+    self.lib_names = tuple(lib_names or ())
 
   @classmethod
   def alias(cls):
     return 'conan_requirement'
-
-  def __new__(cls, pkg_spec, include_relpath=None, lib_relpath=None, lib_names=None):
-    """
-    :param str pkg_spec: A string specifying a conan package at a specific version, as per
-                         https://docs.conan.io/en/latest/using_packages/conanfile_txt.html#requires
-    :param str include_relpath: The relative path from the package root directory to where C/C++
-                                headers are located.
-    :param str lib_relpath: The relative path from the package root directory to where native
-                            libraries are located.
-    :param list lib_names: Strings containing the libraries to add to the linker command
-                           line. Collected into the `native_lib_names` field of a
-                           `packaged_native_library()` target.
-    """
-    return super().__new__(
-      cls,
-      pkg_spec,
-      include_relpath=include_relpath or 'include',
-      lib_relpath=lib_relpath or 'lib',
-      lib_names=tuple(lib_names or ()))
 
   def parse_conan_stdout_for_pkg_sha(self, stdout):
     # TODO(#6168): Add a JSON output mode in upstream Conan instead of parsing this.

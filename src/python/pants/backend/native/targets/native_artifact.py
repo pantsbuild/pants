@@ -1,14 +1,16 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from dataclasses import dataclass
 from hashlib import sha1
 
 from pants.base.payload_field import PayloadField
-from pants.util.objects import datatype
 
 
-class NativeArtifact(datatype(['lib_name']), PayloadField):
+@dataclass(frozen=True)
+class NativeArtifact(PayloadField):
   """A BUILD file object declaring a target can be exported to other languages with a native ABI."""
+  lib_name: str
 
   # TODO: This should probably be made into an @classproperty (see PR #5901).
   @classmethod
