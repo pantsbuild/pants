@@ -22,6 +22,7 @@ from pants.engine.goal import Goal
 from pants.engine.selectors import Get
 from pants.util.collections import assert_single_element
 from pants.util.memo import memoized
+from pants.util.meta import frozen_after_init
 
 
 logger = logging.getLogger(__name__)
@@ -465,6 +466,7 @@ class Rule(ABC):
     return ()
 
 
+@frozen_after_init
 @dataclass(unsafe_hash=True)
 class TaskRule(Rule):
   """A Rule that runs a task function when all of its input selectors are satisfied.
@@ -520,6 +522,7 @@ class TaskRule(Rule):
     return self._dependency_optionables
 
 
+@frozen_after_init
 @dataclass(unsafe_hash=True)
 class RootRule(Rule):
   """Represents a root input to an execution of a rule graph.

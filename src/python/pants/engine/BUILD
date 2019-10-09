@@ -169,6 +169,8 @@ python_library(
     ':selectors',
     'src/python/pants/base:specs',
     'src/python/pants/util:collections',
+    'src/python/pants/util:memo',
+    'src/python/pants/util:meta',
   ]
 )
 

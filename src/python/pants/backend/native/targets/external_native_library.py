@@ -11,6 +11,7 @@ from pants.base.payload_field import PayloadField
 from pants.base.validation import assert_list
 from pants.build_graph.target import Target
 from pants.util.memo import memoized_property
+from pants.util.meta import frozen_after_init
 
 
 # TODO: generalize this to a DatatypeSetField subclass in payload_field.py!
@@ -20,6 +21,7 @@ class ConanRequirementSetField(tuple, PayloadField):
     return stable_json_sha1(tuple(hash(req) for req in self))
 
 
+@frozen_after_init
 @dataclass(unsafe_hash=True)
 class ConanRequirement:
   """A specification for a conan package to be resolved against a remote repository.

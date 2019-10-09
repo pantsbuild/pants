@@ -11,6 +11,7 @@ from pants.util.collections import assert_single_element
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
 from pants.util.filtering import create_filters, wrap_filters
 from pants.util.memo import memoized_property
+from pants.util.meta import frozen_after_init
 
 
 class Spec(ABC):
@@ -210,6 +211,7 @@ def more_specific(spec1: Spec, spec2: Spec) -> Spec:
   return spec1 if _specificity[type(spec1)] < _specificity[type(spec2)] else spec2
 
 
+@frozen_after_init
 @dataclass(unsafe_hash=True)
 class SpecsMatcher:
   """Contains filters for the output of a Specs match.
@@ -249,6 +251,7 @@ class SpecsMatcher:
     return self._target_tag_matches(target) and not self._excluded_by_pattern(address)
 
 
+@frozen_after_init
 @dataclass(unsafe_hash=True)
 class Specs:
   """A collection of Specs representing Spec subclasses, and a SpecsMatcher to filter results."""
