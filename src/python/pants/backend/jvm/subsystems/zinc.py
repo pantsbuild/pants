@@ -75,6 +75,10 @@ class Zinc:
           Shader.exclude_package('xsbti', recursive=True),
           # Unfortunately, is loaded reflectively by the compiler.
           Shader.exclude_package('org.apache.logging.log4j', recursive=True),
+          # We can't shade the Nailgun package, otherwise Nailgun won't recognize the
+          # signatures of the nailMain methods in our custom nails:
+          # http://www.martiansoftware.com/nailgun/quickstart.html#nails
+          Shader.exclude_package('com.martiansoftware.nailgun', recursive=True),
         ]
 
       cls.register_jvm_tool(register,

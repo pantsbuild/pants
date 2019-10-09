@@ -612,13 +612,18 @@ pub extern "C" fn session_create(
   should_record_zipkin_spans: bool,
   should_render_ui: bool,
   ui_worker_count: u64,
+  build_id: Buffer,
 ) -> *const Session {
+  let build_id = build_id
+    .to_string()
+    .expect("build_id was not a valid UTF-8 string");
   with_scheduler(scheduler_ptr, |scheduler| {
     Box::into_raw(Box::new(Session::new(
       scheduler,
       should_record_zipkin_spans,
       should_render_ui,
       ui_worker_count as usize,
+      build_id,
     )))
   })
 }

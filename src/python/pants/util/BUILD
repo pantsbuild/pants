@@ -15,6 +15,7 @@ python_library(
     ':dirutil',
     ':tarutil',
   ],
+  tags = {'type_checked'},
 )
 
 python_library(
@@ -50,6 +51,7 @@ python_library(
 python_library(
   name = 'eval',
   sources = ['eval.py'],
+  tags = {'type_checked'},
 )
 
 python_library(
@@ -58,6 +60,7 @@ python_library(
   dependencies = [
     ':contextutil',
   ],
+  tags = {'type_checked'},
 )
 
 python_library(

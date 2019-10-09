@@ -9,6 +9,7 @@ import threading
 
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.engine.fs import PathGlobs, Snapshot
+from pants.goal.run_tracker import RunTracker
 from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.pantsd.service.pants_service import PantsService
 
@@ -47,7 +48,12 @@ class SchedulerService(PantsService):
     self._pantsd_pidfile = pantsd_pidfile
 
     self._scheduler = legacy_graph_scheduler.scheduler
-    self._scheduler_session = self._scheduler.new_session(False)
+    # This session is only used for checking whether any invalidation globs have been invalidated.
+    # It is not involved with a build itself; just with deciding when we should restart pantsd.
+    self._scheduler_session = self._scheduler.new_session(
+      zipkin_trace_v2=False,
+      build_id="background_pantsd_session",
+    )
     self._logger = logging.getLogger(__name__)
     self._event_queue = queue.Queue(maxsize=self.QUEUE_SIZE)
     self._watchman_is_running = threading.Event()
@@ -175,9 +181,10 @@ class SchedulerService(PantsService):
     if graph_len > 0:
       self._logger.debug('graph len was {}, waiting for initial watchman event'.format(graph_len))
       self._watchman_is_running.wait()
+    build_id = RunTracker.global_instance().run_id
     v2_ui = options.for_global_scope().v2_ui
     zipkin_trace_v2 = options.for_scope('reporting').zipkin_trace_v2
-    session = self._graph_helper.new_session(zipkin_trace_v2, v2_ui)
+    session = self._graph_helper.new_session(zipkin_trace_v2, build_id, v2_ui)
 
     if options.for_global_scope().loop:
       fn = self._loop

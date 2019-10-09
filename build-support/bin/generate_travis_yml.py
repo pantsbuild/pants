@@ -456,11 +456,8 @@ def unit_tests(python_version: PythonVersion) -> Dict:
     **linux_shard(python_version=python_version),
     "name": f"Unit tests (Python {python_version.decimal})",
     "script": [
-      (
-        "travis_wait 65 ./build-support/bin/ci.py --unit-tests --remote-execution-enabled "
-        f"--python-version {python_version.decimal}"
-      ),
-      f"./build-support/bin/ci.py --plugin-tests --python-version {python_version.decimal}",
+      "travis_wait 65 ./build-support/bin/ci.py --unit-tests --plugin-tests "
+      f"--remote-execution-enabled --python-version {python_version.decimal}"
     ],
   }
   shard["env"] = shard.get("env", []) + [f"CACHE_NAME=unit_tests.py{python_version.number}"]

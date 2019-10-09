@@ -28,6 +28,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:contextutil',
   ],
+  tags = {'type_checked'},
 )
 
 python_tests(
@@ -48,6 +49,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:eval',
   ],
+  tags = {'type_checked'},
 )
 
 python_tests(
@@ -57,6 +59,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:fileutil',
   ],
+  tags = {'type_checked'},
 )
 
 python_tests(

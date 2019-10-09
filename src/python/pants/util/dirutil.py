@@ -193,7 +193,7 @@ def read_file(filename: str, binary_mode: bool = False) -> Union[bytes, str]:
     return content
 
 
-def safe_walk(path: str, **kwargs: Any) -> Iterator[Tuple[str, List[str], List[str]]]:
+def safe_walk(path: Union[bytes, str], **kwargs: Any) -> Iterator[Tuple[str, List[str], List[str]]]:
   """Just like os.walk, but ensures that the returned values are unicode objects.
 
     This isn't strictly safe, in that it is possible that some paths

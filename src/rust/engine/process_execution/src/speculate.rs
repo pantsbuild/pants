@@ -1,5 +1,5 @@
-use super::{
-  CommandRunner, ExecuteProcessRequest, FallibleExecuteProcessResult,
+use crate::{
+  CommandRunner, Context, ExecuteProcessRequest, FallibleExecuteProcessResult,
   MultiPlatformExecuteProcessRequest,
 };
 use boxfuture::{BoxFuture, Boxable};
@@ -7,7 +7,6 @@ use futures::future::{err, ok, Future};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio_timer::Delay;
-use workunit_store::WorkUnitStore;
 
 #[derive(Clone)]
 pub struct SpeculatingCommandRunner {
@@ -32,16 +31,15 @@ impl SpeculatingCommandRunner {
   fn speculate(
     &self,
     req: MultiPlatformExecuteProcessRequest,
-    workunit_store: WorkUnitStore,
+    context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let command_runner = self.clone();
-    let workunit_store_clone = workunit_store.clone();
     let req_2 = req.clone();
     let delay = Delay::new(Instant::now() + self.speculation_timeout);
     self
       .primary
-      .run(req, workunit_store)
-      .select(delay.then(move |_| command_runner.secondary.run(req_2, workunit_store_clone)))
+      .run(req, context.clone())
+      .select(delay.then(move |_| command_runner.secondary.run(req_2, context)))
       .then(|raced_result| match raced_result {
         Ok((successful_res, _outstanding_req)) => {
           ok::<FallibleExecuteProcessResult, String>(successful_res).to_boxed()
@@ -72,15 +70,15 @@ impl CommandRunner for SpeculatingCommandRunner {
   fn run(
     &self,
     req: MultiPlatformExecuteProcessRequest,
-    workunit_store: WorkUnitStore,
+    context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     match (
       self.primary.extract_compatible_request(&req),
       self.secondary.extract_compatible_request(&req),
     ) {
-      (Some(_), Some(_)) => self.speculate(req, workunit_store),
-      (Some(_), None) => self.primary.run(req, workunit_store),
-      (None, Some(_)) => self.secondary.run(req, workunit_store),
+      (Some(_), Some(_)) => self.speculate(req, context),
+      (Some(_), None) => self.primary.run(req, context),
+      (None, Some(_)) => self.secondary.run(req, context),
       (None, None) => err(format!(
         "No compatible requests found for available platforms in {:?}",
         req
@@ -101,10 +99,9 @@ mod tests {
   use std::time::{Duration, Instant};
   use tokio;
   use tokio_timer::Delay;
-  use workunit_store::WorkUnitStore;
 
   use super::{
-    CommandRunner, ExecuteProcessRequest, FallibleExecuteProcessResult,
+    CommandRunner, Context, ExecuteProcessRequest, FallibleExecuteProcessResult,
     MultiPlatformExecuteProcessRequest, SpeculatingCommandRunner,
   };
   use crate::Platform;
@@ -207,7 +204,7 @@ mod tests {
     let execute_request = echo_foo_request();
     let msg1: String = "m1".into();
     let msg2: String = "m2".into();
-    let workunit_store = WorkUnitStore::new();
+    let context = Context::default();
     let call_counter = Arc::new(Mutex::new(0));
     let finished_counter = Arc::new(Mutex::new(0));
     let runner = SpeculatingCommandRunner::new(
@@ -230,7 +227,7 @@ mod tests {
       Duration::from_millis(speculation_delay_ms),
     );
     (
-      runtime.block_on_all(runner.run(execute_request, workunit_store)),
+      runtime.block_on_all(runner.run(execute_request, context)),
       call_counter,
       finished_counter,
     )
@@ -303,7 +300,7 @@ mod tests {
     fn run(
       &self,
       _req: MultiPlatformExecuteProcessRequest,
-      _workunit_store: WorkUnitStore,
+      _context: Context,
     ) -> BoxFuture<FallibleExecuteProcessResult, String> {
       let delay = Delay::new(Instant::now() + self.delay);
       let exec_result = self.result.clone();

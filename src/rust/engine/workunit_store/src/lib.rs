@@ -42,7 +42,7 @@ pub struct WorkUnit {
   pub parent_id: Option<String>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct WorkUnitStore {
   workunits: Arc<Mutex<HashSet<WorkUnit>>>,
 }

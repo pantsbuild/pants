@@ -114,6 +114,13 @@ class RunTracker(Subsystem):
     self._sorted_goal_infos = tuple()
     self._v2_console_rule_names = tuple()
 
+    self.run_uuid = uuid.uuid4().hex
+    # Select a globally unique ID for the run, that sorts by time.
+    millis = int((self._run_timestamp * 1000) % 1000)
+    # run_uuid is used as a part of run_id and also as a trace_id for Zipkin tracing
+    str_time = time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self._run_timestamp))
+    self.run_id = f'pants_run_{str_time}_{millis}_{self.run_uuid}'
+
     # Initialized in `initialize()`.
     self.run_info_dir = None
     self.run_info = None
@@ -207,17 +214,10 @@ class RunTracker(Subsystem):
 
     # Initialize the run.
 
-    # Select a globally unique ID for the run, that sorts by time.
-    millis = int((self._run_timestamp * 1000) % 1000)
-    # run_uuid is used as a part of run_id and also as a trace_id for Zipkin tracing
-    run_uuid = uuid.uuid4().hex
-    str_time = time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self._run_timestamp))
-    run_id = f'pants_run_{str_time}_{millis}_{run_uuid}'
-
     info_dir = os.path.join(self.get_options().pants_workdir, self.options_scope)
-    self.run_info_dir = os.path.join(info_dir, run_id)
+    self.run_info_dir = os.path.join(info_dir, self.run_id)
     self.run_info = RunInfo(os.path.join(self.run_info_dir, 'info'))
-    self.run_info.add_basic_info(run_id, self._run_timestamp)
+    self.run_info.add_basic_info(self.run_id, self._run_timestamp)
     self.run_info.add_info('cmd_line', self._cmd_line)
 
     # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
@@ -241,7 +241,7 @@ class RunTracker(Subsystem):
 
     self._all_options = all_options
 
-    return (run_id, run_uuid)
+    return (self.run_id, self.run_uuid)
 
   def start(self, report, run_start_time=None):
     """Start tracking this pants run using the given Report.

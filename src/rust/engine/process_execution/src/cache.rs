@@ -1,5 +1,5 @@
 use crate::{
-  ExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecuteProcessResult,
+  Context, ExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecuteProcessResult,
   MultiPlatformExecuteProcessRequest,
 };
 use boxfuture::{BoxFuture, Boxable};
@@ -13,7 +13,6 @@ use sha2::Sha256;
 use sharded_lmdb::ShardedLmdb;
 use std::sync::Arc;
 use store::Store;
-use workunit_store::WorkUnitStore;
 
 #[derive(Clone)]
 pub struct CommandRunner {
@@ -35,14 +34,14 @@ impl crate::CommandRunner for CommandRunner {
   fn run(
     &self,
     req: MultiPlatformExecuteProcessRequest,
-    workunit_store: WorkUnitStore,
+    context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let digest = self.digest(req.clone());
     let key = digest.0;
 
     let command_runner = self.clone();
     self
-      .lookup(key, workunit_store.clone())
+      .lookup(key, context.clone())
       .then(move |maybe_result| {
         match maybe_result {
           Ok(Some(result)) => return futures::future::ok(result).to_boxed(),
@@ -56,7 +55,7 @@ impl crate::CommandRunner for CommandRunner {
         }
         command_runner
           .underlying
-          .run(req, workunit_store)
+          .run(req, context)
           .and_then(move |result| {
             if result.exit_code == 0 {
               command_runner
@@ -72,6 +71,7 @@ impl crate::CommandRunner for CommandRunner {
             }
           })
           .to_boxed()
+
       })
       .to_boxed()
   }
@@ -110,7 +110,7 @@ impl CommandRunner {
   fn lookup(
     &self,
     fingerprint: Fingerprint,
-    workunit_store: WorkUnitStore,
+    context: Context,
   ) -> impl Future<Item = Option<FallibleExecuteProcessResult>, Error = String> {
     let file_store = self.file_store.clone();
     self
@@ -128,7 +128,7 @@ impl CommandRunner {
             file_store,
             execute_response,
             vec![],
-            workunit_store,
+            context.workunit_store,
           )
           .map(Some)
           .to_boxed()
@@ -181,7 +181,7 @@ impl CommandRunner {
 #[cfg(test)]
 mod test {
   use crate::{
-    CommandRunner as CommandRunnerTrait, ExecuteProcessRequestMetadata,
+    CommandRunner as CommandRunnerTrait, Context, ExecuteProcessRequestMetadata,
     FallibleExecuteProcessResult,
   };
   use crate::{ExecuteProcessRequest, Platform};
@@ -195,7 +195,6 @@ mod test {
   use store::Store;
   use tempfile::TempDir;
   use testutil::data::TestData;
-  use workunit_store::WorkUnitStore;
 
   struct RoundtripResults {
     uncached: Result<FallibleExecuteProcessResult, String>,
@@ -244,7 +243,7 @@ mod test {
       target_platform: Platform::None,
     };
 
-    let local_result = runtime.block_on(local.run(request.clone().into(), WorkUnitStore::new()));
+    let local_result = runtime.block_on(local.run(request.clone().into(), Context::default()));
 
     let cache_dir = TempDir::new().unwrap();
     let caching = crate::cache::CommandRunner {
@@ -263,8 +262,7 @@ mod test {
       },
     };
 
-    let uncached_result =
-      runtime.block_on(caching.run(request.clone().into(), WorkUnitStore::new()));
+    let uncached_result = runtime.block_on(caching.run(request.clone().into(), Context::default()));
 
     assert_eq!(local_result, uncached_result);
 
@@ -272,7 +270,7 @@ mod test {
     // fail due to a FileNotFound error. So, If the second run succeeds, that implies that the
     // cache was successfully used.
     std::fs::remove_file(&script_path).unwrap();
-    let maybe_cached_result = runtime.block_on(caching.run(request.into(), WorkUnitStore::new()));
+    let maybe_cached_result = runtime.block_on(caching.run(request.into(), Context::default()));
 
     RoundtripResults {
       uncached: uncached_result,

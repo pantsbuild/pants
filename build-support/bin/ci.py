@@ -10,7 +10,7 @@ import tempfile
 from contextlib import contextmanager
 from enum import Enum, auto
 from pathlib import Path
-from typing import Iterator, List, NamedTuple, Optional, Set
+from typing import Iterable, Iterator, List, NamedTuple, Optional, Set, Union
 
 from common import banner, die, green, travis_section
 
@@ -52,7 +52,7 @@ def main() -> None:
     if args.integration_tests_v2:
       run_integration_tests_v2(oauth_token_path=remote_execution_oauth_token_path)
     if args.plugin_tests:
-      run_plugin_tests()
+      run_plugin_tests(oauth_token_path=remote_execution_oauth_token_path)
     if args.platform_specific_tests:
       run_platform_specific_tests()
 
@@ -195,6 +195,7 @@ def maybe_get_remote_execution_oauth_token_path(
 # -------------------------------------------------------------------------
 
 Target = str
+Glob = str
 TargetSet = Set[Target]
 
 
@@ -205,14 +206,18 @@ class TestStrategy(Enum):
   v2_remote = auto()
 
   def pants_command(
-    self, *, targets: TargetSet, shard: Optional[str] = None, oauth_token_path: Optional[str] = None
+    self,
+    *,
+    targets: Iterable[Union[Target, Glob]],
+    shard: Optional[str] = None,
+    oauth_token_path: Optional[str] = None
   ) -> List[str]:
     if self == self.v2_remote and oauth_token_path is None:  # type: ignore
       raise ValueError("Must specify oauth_token_path.")
     result: List[str] = {  # type: ignore
-      self.v1_no_chroot: ["./pants.pex", "test"] + sorted(targets) + PYTEST_PASSTHRU_ARGS,
-      self.v1_chroot: ["./pants.pex", "--test-pytest-chroot", "test"] + sorted(targets) + PYTEST_PASSTHRU_ARGS,
-      self.v2_local: ["./pants.pex", "--no-v1", "--v2", "test"] + sorted(targets),
+      self.v1_no_chroot: ["./pants.pex", "test", *sorted(targets), *PYTEST_PASSTHRU_ARGS],
+      self.v1_chroot: ["./pants.pex", "--test-pytest-chroot", "test", *sorted(targets), *PYTEST_PASSTHRU_ARGS],
+      self.v2_local: ["./pants.pex", "--no-v1", "--v2", "test", *sorted(targets)],
       self.v2_remote: [
                         "./pants.pex",
                         "--no-v1",
@@ -222,8 +227,9 @@ class TestStrategy(Enum):
                         # passes either locally or remotely and fails in the other environment.
                         "--process-execution-speculation-strategy=none",
                         f"--remote-oauth-bearer-token-path={oauth_token_path}",
-                        "test"
-                      ] + sorted(targets),
+                        "test",
+                        *sorted(targets),
+                      ],
     }[self]
     if shard is not None and self in [self.v1_no_chroot, self.v1_chroot]:  # type: ignore
       result.insert(1, f"--test-pytest-test-shard={shard}")
@@ -343,7 +349,7 @@ def run_sanity_checks() -> None:
     print(f"* Executing `./pants.pex {' '.join(command)}` as a sanity check")
     try:
       subprocess.run(
-        ["./pants.pex"] + command,
+        ["./pants.pex", *command],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.STDOUT,
         check=True
@@ -369,7 +375,7 @@ def run_sanity_checks() -> None:
 def run_lint() -> None:
   targets = ["contrib::", "examples::", "src::", "tests::", "zinc::"]
   _run_command(
-    ["./pants.pex", "--tag=-nolint", "lint"] + targets,
+    ["./pants.pex", "--tag=-nolint", "lint", *targets],
     slug="Lint",
     start_message="Running lint checks",
     die_message="Lint check failure."
@@ -482,7 +488,7 @@ def run_rust_tests() -> None:
 def run_jvm_tests() -> None:
   targets = ["src/java::", "src/scala::", "tests/java::", "tests/scala::", "zinc::"]
   _run_command(
-    ["./pants.pex", "doc", "test"] + targets,
+    ["./pants.pex", "doc", "test", *targets],
     slug="CoreJVM",
     start_message="Running JVM tests",
     die_message="JVM test failure."
@@ -531,13 +537,12 @@ def run_integration_tests_v2(*, oauth_token_path: Optional[str] = None) -> None:
     )
 
 
-def run_plugin_tests() -> None:
+def run_plugin_tests(*, oauth_token_path: Optional[str] = None) -> None:
   _run_command(
-    ["./pants.pex",
-     "test.pytest",
-     "pants-plugins/src/python::",
-     "pants-plugins/tests/python::",
-     ] + PYTEST_PASSTHRU_ARGS,
+    TestStrategy.v2_remote.pants_command(
+      targets={"pants-plugins/src/python::", "pants-plugins/tests/python::"},
+      oauth_token_path=oauth_token_path,
+    ),
     slug="BackendTests",
     start_message="Running internal backend Python tests",
     die_message="Internal backend Python test failure."
@@ -549,8 +554,10 @@ def run_platform_specific_tests() -> None:
   _run_command(
     ["./pants.pex",
      "--tag=+platform_specific_behavior",
-     "test"
-     ] + targets + PYTEST_PASSTHRU_ARGS,
+     "test",
+     *targets,
+     *PYTEST_PASSTHRU_ARGS,
+     ],
     slug="PlatformSpecificTests",
     start_message=f"Running platform-specific tests on platform {platform.system()}",
     die_message="Pants platform-specific test failure."
