@@ -147,6 +147,13 @@ fn main() {
         .multiple(true)
         .help("Extra platform properties to set on the execution request."),
     )
+      .arg(
+        Arg::with_name("header")
+            .long("header")
+            .takes_value(true)
+            .multiple(true)
+            .help("Extra headers to pass on remote execution request."),
+      )
     .arg(
       Arg::with_name("env")
         .long("env")
@@ -241,6 +248,10 @@ fn main() {
   } else {
     BTreeSet::new()
   };
+  let headers = args
+    .values_of("headers")
+    .map(collection_from_keyvalues::<_, BTreeMap<_, _>>)
+    .unwrap_or_default();
 
   let executor = task_executor::Executor::new();
 
@@ -333,6 +344,7 @@ fn main() {
         },
         root_ca_certs,
         oauth_bearer_token,
+        headers,
         store.clone(),
         Platform::Linux,
         executor.clone(),

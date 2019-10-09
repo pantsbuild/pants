@@ -14,6 +14,7 @@ use crate::handles::{DroppingHandle, Handle};
 use crate::interning::Interns;
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
+use std::collections::BTreeMap;
 
 /// Return the Python value None.
 pub fn none() -> Handle {
@@ -712,6 +713,28 @@ impl BufferBuffer {
       .to_bytes_vecs()
       .into_iter()
       .map(String::from_utf8)
+      .collect()
+  }
+
+  pub fn to_map(&self, name: &'static str) -> Result<BTreeMap<String, String>, String> {
+    self
+      .to_strings()
+      .map_err(|err| format!("Error decoding UTF8 from {}: {}", name, err))?
+      .into_iter()
+      .map(|s| {
+        let mut parts: Vec<_> = s.splitn(2, '=').collect();
+        if parts.len() != 2 {
+          return Err(format!(
+            "Got invalid {} - must be of format key=value but got {}",
+            name, s
+          ));
+        }
+        let (value, key) = (
+          parts.pop().unwrap().to_owned(),
+          parts.pop().unwrap().to_owned(),
+        );
+        Ok((key, value))
+      })
       .collect()
   }
 }

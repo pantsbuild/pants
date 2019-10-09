@@ -892,6 +892,7 @@ class Native(metaclass=SingletonMetaclass):
         execution_options.process_execution_speculation_delay,
         self.context.utf8_buf(execution_options.process_execution_speculation_strategy),
         execution_options.process_execution_use_local_cache,
+        self.context.utf8_buf_buf(execution_options.remote_execution_headers),
       )
     if scheduler_result.is_throw:
       value = self.context.from_value(scheduler_result.throw_handle)

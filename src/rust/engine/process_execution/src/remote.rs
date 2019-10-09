@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::mem::drop;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -103,7 +103,7 @@ enum OperationOrStatus {
 #[derive(Clone)]
 pub struct CommandRunner {
   metadata: ExecuteProcessRequestMetadata,
-  authorization_header: Option<String>,
+  headers: BTreeMap<String, String>,
   channel: grpcio::Channel,
   env: Arc<grpcio::Environment>,
   execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
@@ -457,6 +457,7 @@ impl CommandRunner {
     metadata: ExecuteProcessRequestMetadata,
     root_ca_certs: Option<Vec<u8>>,
     oauth_bearer_token: Option<String>,
+    headers: BTreeMap<String, String>,
     store: Store,
     platform: Platform,
     executor: task_executor::Executor,
@@ -482,9 +483,17 @@ impl CommandRunner {
       channel.clone(),
     ));
 
+    let mut headers = headers;
+    if let Some(oauth_bearer_token) = oauth_bearer_token {
+      headers.insert(
+        String::from("authorization"),
+        format!("Bearer {}", oauth_bearer_token),
+      );
+    }
+
     CommandRunner {
       metadata,
-      authorization_header: oauth_bearer_token.map(|t| format!("Bearer {}", t)),
+      headers,
       channel,
       env,
       execution_client,
@@ -498,31 +507,27 @@ impl CommandRunner {
   }
 
   fn call_option(&self, build_id: String) -> Result<grpcio::CallOption, String> {
-    let mut builder = grpcio::MetadataBuilder::with_capacity(2);
-    if let Some(ref authorization_header) = self.authorization_header {
-      builder
-        .add_str("authorization", &authorization_header)
-        .unwrap();
+    let mut builder = grpcio::MetadataBuilder::with_capacity(self.headers.len() + 1);
+    for (header_name, header_value) in &self.headers {
+      builder.add_str(header_name, header_value).unwrap();
     }
-    {
-      let mut metadata = bazel_protos::remote_execution::RequestMetadata::new();
-      metadata.set_tool_details({
-        let mut tool_details = bazel_protos::remote_execution::ToolDetails::new();
-        tool_details.set_tool_name(String::from("pants"));
-        tool_details
-      });
-      metadata.set_tool_invocation_id(build_id);
-      // TODO: Maybe set action_id too
-      let bytes = metadata
-        .write_to_bytes()
-        .map_err(|err| format!("Error serializing request metadata proto bytes: {}", err))?;
-      builder
-        .add_bytes(
-          "google.devtools.remoteexecution.v1test.requestmetadata-bin",
-          &bytes,
-        )
-        .map_err(|err| format!("Error setting request metadata header: {}", err))?;
-    }
+    let mut metadata = bazel_protos::remote_execution::RequestMetadata::new();
+    metadata.set_tool_details({
+      let mut tool_details = bazel_protos::remote_execution::ToolDetails::new();
+      tool_details.set_tool_name(String::from("pants"));
+      tool_details
+    });
+    metadata.set_tool_invocation_id(build_id);
+    // TODO: Maybe set action_id too
+    let bytes = metadata
+      .write_to_bytes()
+      .map_err(|err| format!("Error serializing request metadata proto bytes: {}", err))?;
+    builder
+      .add_bytes(
+        "google.devtools.remoteexecution.v1test.requestmetadata-bin",
+        &bytes,
+      )
+      .map_err(|err| format!("Error setting request metadata header: {}", err))?;
     Ok(grpcio::CallOption::default().headers(builder.build()))
   }
 
@@ -1248,7 +1253,7 @@ pub mod tests {
     ExecutionHistory, FallibleExecuteProcessResult, MultiPlatformExecuteProcessRequest,
   };
   use crate::{CommandRunner as CommandRunnerTrait, Context, Platform};
-  use maplit::hashset;
+  use maplit::{btreemap, hashset};
   use mock::execution_server::MockOperation;
   use protobuf::well_known_types::Timestamp;
   use spectral::prelude::*;
@@ -1932,7 +1937,7 @@ pub mod tests {
   }
 
   #[test]
-  pub fn sends_metadata_header() {
+  pub fn sends_headers() {
     let execute_request = echo_foo_request();
     let op_name = "gimme-foo".to_string();
 
@@ -1960,18 +1965,44 @@ pub mod tests {
       )
     };
     let cas = mock::StubCAS::empty();
-    let command_runner = create_command_runner(
-      mock_server.address(),
-      &cas,
+    let runtime = task_executor::Executor::new();
+    let store_dir = TempDir::new().unwrap();
+    let store = Store::with_remote(
+      runtime.clone(),
+      store_dir,
+      vec![cas.address()],
+      None,
+      None,
+      None,
+      1,
+      10 * 1024 * 1024,
+      Duration::from_secs(1),
+      store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+      1,
+      1,
+    )
+    .expect("Failed to make store");
+
+    let command_runner = CommandRunner::new(
+      &mock_server.address(),
+      empty_request_metadata(),
+      None,
+      Some(String::from("catnip-will-get-you-anywhere")),
+      btreemap! {
+        String::from("cat") => String::from("roland"),
+      },
+      store,
+      Platform::Linux,
+      runtime.clone(),
       Duration::from_millis(0),
       Duration::from_secs(0),
     );
-    let mut runtime = tokio::runtime::Runtime::new().unwrap();
     let context = Context {
       workunit_store: WorkUnitStore::default(),
       build_id: String::from("marmosets"),
     };
-    runtime
+    tokio::runtime::Runtime::new()
+      .unwrap()
       .block_on(command_runner.run(execute_request, context))
       .expect("Execution failed");
 
@@ -1982,14 +2013,26 @@ pub mod tests {
       .collect();
     assert_that!(message_headers).has_length(2);
     for headers in message_headers {
-      let want_key = String::from("google.devtools.remoteexecution.v1test.requestmetadata-bin");
-      assert_that!(headers).contains_key(&want_key);
-      let mut proto = bazel_protos::remote_execution::RequestMetadata::new();
-      proto
-        .merge_from_bytes(&headers[&want_key])
-        .expect("Failed to parse metadata proto");
-      assert_eq!(proto.get_tool_details().get_tool_name(), "pants");
-      assert_eq!(proto.get_tool_invocation_id(), "marmosets");
+      {
+        let want_key = String::from("google.devtools.remoteexecution.v1test.requestmetadata-bin");
+        assert_that!(headers).contains_key(&want_key);
+        let mut proto = bazel_protos::remote_execution::RequestMetadata::new();
+        proto
+          .merge_from_bytes(&headers[&want_key])
+          .expect("Failed to parse metadata proto");
+        assert_eq!(proto.get_tool_details().get_tool_name(), "pants");
+        assert_eq!(proto.get_tool_invocation_id(), "marmosets");
+      }
+      {
+        let want_key = String::from("cat");
+        assert_that!(headers).contains_key(&want_key);
+        assert_eq!(headers[&want_key], "roland".as_bytes());
+      }
+      {
+        let want_key = String::from("authorization");
+        assert_that!(headers).contains_key(&want_key);
+        assert_eq!(headers[&want_key], "Bearer catnip-will-get-you-anywhere".as_bytes());
+      }
     }
   }
 
@@ -2106,6 +2149,7 @@ pub mod tests {
       empty_request_metadata(),
       None,
       None,
+      BTreeMap::new(),
       store,
       Platform::Linux,
       runtime.clone(),
@@ -2634,6 +2678,7 @@ pub mod tests {
       empty_request_metadata(),
       None,
       None,
+      BTreeMap::new(),
       store,
       Platform::Linux,
       runtime.clone(),
@@ -2738,6 +2783,7 @@ pub mod tests {
       empty_request_metadata(),
       None,
       None,
+      BTreeMap::new(),
       store,
       Platform::Linux,
       runtime.clone(),
@@ -2815,6 +2861,7 @@ pub mod tests {
       empty_request_metadata(),
       None,
       None,
+      BTreeMap::new(),
       store,
       Platform::Linux,
       runtime.clone(),
@@ -3645,6 +3692,7 @@ pub mod tests {
       empty_request_metadata(),
       None,
       None,
+      BTreeMap::new(),
       store,
       Platform::Linux,
       runtime.clone(),

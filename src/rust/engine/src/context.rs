@@ -27,6 +27,7 @@ use rand::seq::SliceRandom;
 use reqwest;
 use rule_graph::RuleGraph;
 use sharded_lmdb::ShardedLmdb;
+use std::collections::BTreeMap;
 use store::Store;
 
 const GIGABYTES: usize = 1024 * 1024 * 1024;
@@ -79,6 +80,7 @@ impl Core {
     process_execution_speculation_delay: Duration,
     process_execution_speculation_strategy: String,
     process_execution_use_local_cache: bool,
+    remote_execution_headers: BTreeMap<String, String>,
   ) -> Result<Core, String> {
     // Randomize CAS address order to avoid thundering herds from common config.
     let mut remote_store_servers = remote_store_servers;
@@ -159,6 +161,7 @@ impl Core {
             process_execution_metadata.clone(),
             root_ca_certs.clone(),
             oauth_bearer_token.clone(),
+            remote_execution_headers,
             store.clone(),
             // TODO if we ever want to configure the remote platform to be something else we
             // need to take an option all the way down here and into the remote::CommandRunner struct.
