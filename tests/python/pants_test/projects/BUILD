@@ -30,5 +30,5 @@ python_tests(
     'testprojects/tests/scala/org/pantsbuild/testproject:all_directories',
   ],
   tags = {'integration'},
-  timeout=950,
+  timeout=1400,
 )

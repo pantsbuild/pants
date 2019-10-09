@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import math
+from typing import List
 
 from pants.util.memo import memoized_property
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -14,10 +15,8 @@ class TestProjectsIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator
   # on), we shard all of the targets under `testprojects` into _SHARDS test methods.
   _SHARDS = 256
 
-  @memoized_property
-  def targets(self):
-    """A sequence of target name strings."""
-
+  @property
+  def skipped_targets(self) -> List[str]:
     # Targets that fail but shouldn't
     known_failing_targets = [
       # The following two targets lose out due to a resource collision, because `example_b` happens
@@ -84,7 +83,7 @@ class TestProjectsIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator
     # Interpreter will not resolve correctly when Pants is constrained to Python 3
     python2_only = [
       # tested in test_antlr_py_gen_integration.py
-      'testprojects/src/python/antlr'
+      'testprojects/src/python/antlr',
     ]
 
     # Targets for testing timeouts. These should only be run during specific integration tests,
@@ -102,47 +101,85 @@ class TestProjectsIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator
     ]
 
     simply_skip = [
-      # Already tested at pants_test.backend.jvm.targets.test_jar_dependency_integration.JarDependencyIntegrationTest
+      # Already tested at
+      # pants_test.backend.jvm.targets.test_jar_dependency_integration.JarDependencyIntegrationTest
       'testprojects/3rdparty/org/pantsbuild/testprojects:testprojects',
       # Already tested in 'PantsRequirementIntegrationTest' and 'SetupPyIntegrationTest'.
       'testprojects/pants-plugins/*',
       'testprojects/src/python/python_distribution/ctypes:ctypes_test',
       'testprojects/src/python/python_distribution/ctypes_with_third_party:ctypes_test',
       'testprojects/src/python/python_distribution/ctypes_with_extra_compiler_flags:bin',
-      # Requires non-standard settings, and already tested by `ProtobufIntegrationTest.test_import_from_buildroot`
+      # Requires non-standard settings, and already tested by
+      # `ProtobufIntegrationTest.test_import_from_buildroot`
       'testprojects/src/protobuf/org/pantsbuild/testproject/import_from_buildroot.*',
     ]
 
-    targets_to_exclude = (known_failing_targets + negative_test_targets + need_java_8 + python2_only +
-                          timeout_targets + deliberately_conflicting_targets + simply_skip)
-    exclude_opts = ['--exclude-target-regexp={}'.format(target) for target in targets_to_exclude]
+    return [
+      *known_failing_targets,
+      *negative_test_targets,
+      *need_java_8,
+      *python2_only,
+      *timeout_targets,
+      *deliberately_conflicting_targets,
+      *simply_skip,
+    ]
 
-    # Run list with exclude options, then parse and sort output.
-    pants_run = self.run_pants(['list', 'testprojects::', 'examples::'] + exclude_opts)
+  @property
+  def skipped_target_types(self) -> List[str]:
+    """We don't want to run over every single target, e.g. files() are only used for us to depend
+    on in ITs and it doesn't make sense to run `./pants test` against them."""
+    return [
+      # resources / loose files
+      "files",
+      "resources",
+      "page",
+      # 3rd-party dependencies
+      "jar_library",
+      "python_requirement_library",
+    ]
+
+  @memoized_property
+  def targets(self) -> List[str]:
+    """A sequence of target name strings."""
+
+    exclude_opts = [f'--exclude-target-regexp={target}' for target in self.skipped_targets]
+    skipped_targets_opt = f"--filter-type=-{','.join(self.skipped_target_types)}"
+
+    pants_run = self.run_pants([
+      'filter',
+      skipped_targets_opt,
+      'testprojects::',
+      'examples::',
+      *exclude_opts
+    ])
     self.assert_success(pants_run)
-    return sorted(pants_run.stdout_data.split())
+    return list(sorted(pants_run.stdout_data.split()))
 
   def targets_for_shard(self, shard):
     if shard < 0 or shard >= self._SHARDS:
-      raise Exception('Invalid shard: {} / {}'.format(shard, self._SHARDS))
+      raise Exception(f'Invalid shard: {shard} / {self._SHARDS}')
 
     per_shard = int(math.ceil(len(self.targets) / self._SHARDS))
-    offset = (per_shard * shard)
+    offset = per_shard * shard
     return self.targets[offset:offset + per_shard]
 
   def run_shard(self, shard):
     targets = self.targets_for_shard(shard)
-    pants_run = self.run_pants(['test'] + targets + ['--jvm-platform-default-platform=java7'])
+    pants_run = self.run_pants([
+      'compile', 'lint', 'test', *targets, '--jvm-platform-default-platform=java7'
+    ])
     self.assert_success(pants_run)
 
   def test_self(self):
-    self.assertEqual([t for s in range(0, self._SHARDS)
-                       for t in self.targets_for_shard(s)],
-                      self.targets)
+    self.assertEqual(
+      [t for s in range(0, self._SHARDS) for t in self.targets_for_shard(s)],
+      self.targets
+    )
 
   @classmethod
   def generate_tests(cls):
     for shardid in range(0, cls._SHARDS):
       cls.add_test(f'test_shard_{shardid}', lambda this: this.run_shard(shardid))
+
 
 TestProjectsIntegrationTest.generate_tests()
