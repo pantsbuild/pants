@@ -4,12 +4,12 @@
 import logging
 import os
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 from pathspec.pathspec import PathSpec
 from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 
 from pants.util.dirutil import fast_relpath
-from pants.util.objects import datatype
 
 
 logger = logging.getLogger(__name__)
@@ -193,35 +193,29 @@ class ProjectTree(ABC):
     return relpath
 
 
+@dataclass(init=False, frozen=True)
 class Stat(ABC):
   """An existing filesystem path with a known type, relative to the ProjectTree's buildroot.
 
-  Note that in order to preserve these invariants, end-user functions should never directly
-  instantiate Stat instances.
+  Note that in order to preserve these invariants, end-user functions are not able to instantiate
+  this base class (init=False).
   """
-
-  @property
-  @abstractmethod
-  def path(self):
-    """:returns: The string path for this Stat."""
+  path: str
 
 
-class File(datatype(['path']), Stat):
+@dataclass(frozen=True)
+class File(Stat):
   """A file."""
-
-  def __new__(cls, path):
-    return super().__new__(cls, path)
+  path: str
 
 
-class Dir(datatype(['path']), Stat):
+@dataclass(frozen=True)
+class Dir(Stat):
   """A directory."""
-
-  def __new__(cls, path):
-    return super().__new__(cls, path)
+  path: str
 
 
-class Link(datatype(['path']), Stat):
+@dataclass(frozen=True)
+class Link(Stat):
   """A symbolic link."""
-
-  def __new__(cls, path):
-    return super().__new__(cls, path)
+  path: str
