@@ -342,13 +342,10 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         classpath_paths = []
 
         def _get_zinc_compiler_snapshot():
-          all_snap = []
           # Security manager is baked into the shaded zinc compiler jar.
-          # zinc_compiler_classpath = super(RscCompile, self).get_zinc_compiler_classpath()
-          rel_compiler_jar_paths = [fast_relpath(cp, get_buildroot()) for cp in super(RscCompile, self).get_zinc_compiler_classpath()]
           compiler_jar_snapshot, = self.context._scheduler.capture_snapshots([
             PathGlobsAndRoot(
-              PathGlobs(rel_compiler_jar_paths),
+              PathGlobs(fast_relpath_collection(super(RscCompile, self).get_zinc_compiler_classpath())),
               get_buildroot(),
             ),
           ])
