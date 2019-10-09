@@ -22,11 +22,6 @@ files(
 )
 
 files(
-  name = 'jetty_directory',
-  sources = rglobs('jetty/*'),
-)
-
-files(
   name = 'managed_directory',
   sources = rglobs('managed/*'),
 )

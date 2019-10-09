@@ -5,13 +5,3 @@ files(
   name = 'hello_directory',
   sources = rglobs('hello/*'),
 )
-
-files(
-  name = 'jaxb_directory',
-  sources = rglobs('jaxb/*'),
-)
-
-files(
-  name = 'names_directory',
-  sources = rglobs('names/*'),
-)
