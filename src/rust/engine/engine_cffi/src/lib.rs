@@ -392,7 +392,7 @@ fn make_core(
   let remote_instance_name_string = remote_instance_name
     .to_string()
     .map_err(|err| format!("remote_instance_name was not valid UTF8: {}", err))?;
-  let remote_execution_extra_platform_properties_list: Result<Vec<_>, _> = remote_execution_extra_platform_properties_buf
+  let remote_execution_extra_platform_properties_list = remote_execution_extra_platform_properties_buf
       .to_strings()
       .map_err(|err| format!("Failed to decode remote_execution_extra_platform_properties: {}", err))?
       .into_iter()
@@ -403,7 +403,7 @@ fn make_core(
         }
         let (value, key) = (parts.pop().unwrap().to_owned(), parts.pop().unwrap().to_owned());
         Ok((key, value))
-      }).collect();
+      }).collect::<Result<Vec<_>, _>>()?;
   let remote_root_ca_certs_path = {
     let path = remote_root_ca_certs_path_buffer.to_os_string();
     if path.is_empty() {
@@ -462,7 +462,7 @@ fn make_core(
     Duration::from_secs(remote_store_chunk_upload_timeout_seconds),
     remote_store_rpc_retries as usize,
     remote_store_connection_limit as usize,
-    remote_execution_extra_platform_properties_list?,
+    remote_execution_extra_platform_properties_list,
     process_execution_local_parallelism as usize,
     process_execution_remote_parallelism as usize,
     process_execution_cleanup_local_dirs,
