@@ -12,7 +12,7 @@ from collections import OrderedDict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Any, Callable, Dict, Type, cast
+from typing import Any, Callable, Dict, Optional, Tuple, Type, cast
 
 import asttokens
 from twitter.common.collections import OrderedSet
@@ -22,13 +22,9 @@ from pants.engine.goal import Goal
 from pants.engine.selectors import Get
 from pants.util.collections import assert_single_element
 from pants.util.memo import memoized
-from pants.util.objects import SubclassesOf, TypedCollection, datatype
 
 
 logger = logging.getLogger(__name__)
-
-
-_type_field = SubclassesOf(type)
 
 
 class _RuleVisitor(ast.NodeVisitor):
@@ -469,42 +465,39 @@ class Rule(ABC):
     return ()
 
 
-class TaskRule(datatype([
-  ('output_type', _type_field),
-  ('input_selectors', TypedCollection(SubclassesOf(type))),
-  ('input_gets', tuple),
-  'func',
-  ('dependency_rules', tuple),
-  ('dependency_optionables', tuple),
-  ('cacheable', bool),
-]), Rule):
+@dataclass(unsafe_hash=True)
+class TaskRule(Rule):
   """A Rule that runs a task function when all of its input selectors are satisfied.
 
   NB: This API is experimental, and not meant for direct consumption. To create a `TaskRule` you
   should always prefer the `@rule` constructor, and in cases where that is too constraining
   (likely due to #4535) please bump or open a ticket to explain the usecase.
   """
+  _output_type: Type
+  input_selectors: Tuple[Type, ...]
+  input_gets: Tuple
+  func: Callable
+  _dependency_rules: Tuple
+  _dependency_optionables: Tuple
+  cacheable: bool
 
-  def __new__(cls,
-              output_type,
-              input_selectors,
-              func,
-              input_gets,
-              dependency_optionables=None,
-              dependency_rules=None,
-              cacheable=True):
-
-    # Create.
-    return super().__new__(
-        cls,
-        output_type,
-        input_selectors,
-        input_gets,
-        func,
-        dependency_rules or tuple(),
-        dependency_optionables or tuple(),
-        cacheable,
-      )
+  def __init__(
+    self,
+    output_type: Type,
+    input_selectors: Tuple[Type, ...],
+    func: Callable,
+    input_gets: Tuple,
+    dependency_rules: Optional[Tuple] = None,
+    dependency_optionables: Optional[Tuple] = None,
+    cacheable: bool = True,
+  ):
+    self._output_type = output_type
+    self.input_selectors = input_selectors
+    self.input_gets = input_gets
+    self.func = func
+    self._dependency_rules = dependency_rules or ()
+    self._dependency_optionables = dependency_optionables or ()
+    self.cacheable = cacheable
 
   def __str__(self):
     return ('({}, {!r}, {}, gets={}, opts={})'
@@ -514,14 +507,35 @@ class TaskRule(datatype([
                     self.input_gets,
                     self.dependency_optionables))
 
+  @property
+  def output_type(self):
+      return self._output_type
 
-class RootRule(datatype([('output_type', _type_field)]), Rule):
+  @property
+  def dependency_rules(self):
+    return self._dependency_rules
+
+  @property
+  def dependency_optionables(self):
+    return self._dependency_optionables
+
+
+@dataclass(unsafe_hash=True)
+class RootRule(Rule):
   """Represents a root input to an execution of a rule graph.
 
   Roots act roughly like parameters, in that in some cases the only source of a
   particular type might be when a value is provided as a root subject at the beginning
   of an execution.
   """
+  _output_type: Type
+
+  def __init__(self, output_type: Type) -> None:
+    self._output_type = output_type
+
+  @property
+  def output_type(self):
+    return self._output_type
 
   @property
   def dependency_rules(self):
