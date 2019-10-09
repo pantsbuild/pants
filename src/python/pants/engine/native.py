@@ -9,6 +9,7 @@ import sys
 import sysconfig
 import traceback
 from contextlib import closing
+from typing import Any, NamedTuple, Tuple, Type
 
 import cffi
 import pkg_resources
@@ -19,7 +20,6 @@ from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import read_file, safe_mkdir, safe_mkdtemp
 from pants.util.memo import memoized_classproperty, memoized_property
 from pants.util.meta import SingletonMetaclass
-from pants.util.objects import SubclassesOf, datatype
 
 
 logger = logging.getLogger(__name__)
@@ -187,12 +187,11 @@ def _replace_file(path, content):
     f.write(content)
 
 
-class _ExternSignature(datatype([
-    ('return_type', str),
-    ('method_name', str),
-    ('arg_types', tuple),
-])):
+class _ExternSignature(NamedTuple):
   """A type signature for a python-defined FFI function."""
+  return_type: str
+  method_name: str
+  arg_types: Tuple[str, ...]
 
   def pretty_print(self):
     return '  {ret}\t{name}({args});'.format(
@@ -502,24 +501,33 @@ class _FFISpecification(object):
     return self.call(c, runnable, args)
 
 
-class Key(datatype(['tup_0', 'type_id'])):
+class TypeId(NamedTuple):
   """Corresponds to the native object of the same name."""
+  tup_0: Any
 
 
-class Function(datatype(['key'])):
+class Key(NamedTuple):
   """Corresponds to the native object of the same name."""
+  tup_0: Any
+  type_id: TypeId
 
 
-class TypeId(datatype(['tup_0'])):
+class Function(NamedTuple):
   """Corresponds to the native object of the same name."""
+  key: Key
 
 
-class PyResult(datatype(['is_throw', 'handle'])):
+class PyResult(NamedTuple):
   """Corresponds to the native object of the same name."""
+  is_throw: bool
+  handle: Any
 
 
-class RawResult(datatype(['is_throw', 'throw_handle', 'raw_pointer'])):
+class RawResult(NamedTuple):
   """Corresponds to the native object of the same name."""
+  is_throw: bool
+  handle: Any
+  raw_pointer: Any
 
 
 class ExternContext:
@@ -623,13 +631,7 @@ class Native(metaclass=SingletonMetaclass):
 
   _errors_during_execution = None
 
-  class CFFIExternMethodRuntimeErrorInfo(datatype([
-      ('exc_type', type),
-      # See https://docs.python.org/3.6/library/exceptions.html#BaseException -- this is the base
-      # exception type for all built-in exceptions, including `Exception`.
-      ('exc_value', SubclassesOf(BaseException)),
-      'traceback',
-  ])):
+  class CFFIExternMethodRuntimeErrorInfo(NamedTuple):
     """Encapsulates an exception raised when a CFFI extern is called so that it can be displayed.
 
     When an exception is raised in the body of a CFFI extern, the `onerror` handler is used to
@@ -642,6 +644,9 @@ class Native(metaclass=SingletonMetaclass):
     Some ways that exceptions in CFFI extern methods can be handled are described in
     https://cffi.readthedocs.io/en/latest/using.html#extern-python-reference.
     """
+    exc_type: Type
+    exc_value: BaseException
+    traceback: Any
 
   def reset_cffi_extern_method_runtime_exceptions(self):
     self._errors_during_execution = []
