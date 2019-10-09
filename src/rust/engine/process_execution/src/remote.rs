@@ -375,8 +375,9 @@ impl super::CommandRunner for CommandRunner {
 
                             // take the grpc result and cancel the op if too much time has passed.
                             let elapsed = start_time.elapsed();
+                            let queue_buffer_time = std::time::Duration::from_secs(45);
 
-                            if elapsed > timeout {
+                            if elapsed > timeout + queue_buffer_time {
                               let ExecutionHistory {
                                 mut attempts,
                                 mut current_attempt,
