@@ -114,6 +114,12 @@ class TestProjectsIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator
       'testprojects/src/protobuf/org/pantsbuild/testproject/import_from_buildroot.*',
     ]
 
+    # E.g. tests depend on src/python or tests/python. This is only meant to be a temporary
+    # workaround to unblock remoting integration tests.
+    chroot_problems = [
+      'examples/src/python/example/pants_publish_plugin:pants-publish-plugin',
+    ]
+
     return [
       *known_failing_targets,
       *negative_test_targets,
@@ -122,6 +128,7 @@ class TestProjectsIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator
       *timeout_targets,
       *deliberately_conflicting_targets,
       *simply_skip,
+      *chroot_problems,
     ]
 
   @property

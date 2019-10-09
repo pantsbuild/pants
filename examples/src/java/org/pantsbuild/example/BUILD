@@ -15,6 +15,8 @@ target(
     ':make_it_rain_directory',
     ':protobuf_directory',
     ':wire_directory',
+    # NB: See `:java_sources_directory` for why we must declare this dependency here.
+    'examples/src/scala/org/pantsbuild/example:scala_with_java_sources_directory'
   ],
 )
 
@@ -105,6 +107,10 @@ files(
   ],
 )
 
+# NB: This has an undeclared dependency on
+# `examples/src/scala/org/pantsbuild/example:scala_with_java_sources_directory`. We do not declare
+# it here because it would cause a dep cycle. Instead, we hack around this by declaring the
+# dependency in `all_targets` to get this working with the testprojects integration test.
 files(
   name = 'java_sources_directory',
   sources = rglobs('java_sources/*'),

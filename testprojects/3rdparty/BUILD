@@ -35,3 +35,8 @@ files(
   name = 'org_directory',
   sources = rglobs('org/*'),
 )
+
+files(
+  name = 'python_directory',
+  sources = rglobs('python/*'),
+)

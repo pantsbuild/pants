@@ -77,6 +77,9 @@ files(
 files(
   name = 'python_distribution_directory',
   sources = rglobs('python_distribution/*'),
+  dependencies = [
+    'testprojects/3rdparty:python_directory',
+  ],
 )
 
 
