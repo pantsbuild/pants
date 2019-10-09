@@ -216,7 +216,7 @@ class TestStrategy(Enum):
       raise ValueError("Must specify oauth_token_path.")
     result: List[str] = {  # type: ignore
       self.v1_no_chroot: ["./pants.pex", "test.pytest", "--no-chroot", *sorted(targets), *PYTEST_PASSTHRU_ARGS],
-      self.v1_chroot: ["./pants.pex", "test", *sorted(targets), *PYTEST_PASSTHRU_ARGS],
+      self.v1_chroot: ["./pants.pex", "test.pytest", *sorted(targets), *PYTEST_PASSTHRU_ARGS],
       self.v2_local: ["./pants.pex", "--no-v1", "--v2", "test", *sorted(targets)],
       self.v2_remote: [
                         "./pants.pex",
@@ -232,7 +232,7 @@ class TestStrategy(Enum):
                       ],
     }[self]
     if shard is not None and self in [self.v1_no_chroot, self.v1_chroot]:  # type: ignore
-      result.insert(2, f"--test-shard={shard}")
+      result.insert(2, f"--test-pytest-test-shard={shard}")
     return result
 
 
