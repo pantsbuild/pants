@@ -1,19 +1,12 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import math
 from typing import List
 
-from pants.util.memo import memoized_property
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.test_base import AbstractTestGenerator
 
 
-class TestProjectsIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
-  # To avoid having a single test method which covers all of `testprojects` (which
-  # would run for a very long time with no output, and be more difficult to iterate
-  # on), we shard all of the targets under `testprojects` into _SHARDS test methods.
-  _SHARDS = 256
+class ProjectsTestBase(PantsRunIntegrationTest):
 
   @property
   def skipped_targets(self) -> List[str]:
@@ -145,48 +138,25 @@ class TestProjectsIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator
       "python_requirement_library",
     ]
 
-  @memoized_property
-  def targets(self) -> List[str]:
+  def targets_for_globs(self, *globs: str) -> List[str]:
     """A sequence of target name strings."""
-
     exclude_opts = [f'--exclude-target-regexp={target}' for target in self.skipped_targets]
     skipped_targets_opt = f"--filter-type=-{','.join(self.skipped_target_types)}"
-
     pants_run = self.run_pants([
       'filter',
       skipped_targets_opt,
-      'testprojects::',
-      'examples::',
+      *globs,
       *exclude_opts
     ])
     self.assert_success(pants_run)
     return list(sorted(pants_run.stdout_data.split()))
 
-  def targets_for_shard(self, shard):
-    if shard < 0 or shard >= self._SHARDS:
-      raise Exception(f'Invalid shard: {shard} / {self._SHARDS}')
-
-    per_shard = int(math.ceil(len(self.targets) / self._SHARDS))
-    offset = per_shard * shard
-    return self.targets[offset:offset + per_shard]
-
-  def run_shard(self, shard):
-    targets = self.targets_for_shard(shard)
+  def assert_valid_projects(self, *globs: str) -> None:
     pants_run = self.run_pants([
-      'compile', 'lint', 'test', *targets, '--jvm-platform-default-platform=java7'
+      'compile',
+      'lint',
+      'test',
+      *self.targets_for_globs(*globs),
+      '--jvm-platform-default-platform=java7'
     ])
     self.assert_success(pants_run)
-
-  def test_self(self):
-    self.assertEqual(
-      [t for s in range(0, self._SHARDS) for t in self.targets_for_shard(s)],
-      self.targets
-    )
-
-  @classmethod
-  def generate_tests(cls):
-    for shardid in range(0, cls._SHARDS):
-      cls.add_test(f'test_shard_{shardid}', lambda this: this.run_shard(shardid))
-
-
-TestProjectsIntegrationTest.generate_tests()
