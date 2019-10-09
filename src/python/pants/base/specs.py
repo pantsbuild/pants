@@ -5,13 +5,12 @@ import os
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional, Tuple
 
 from pants.util.collections import assert_single_element
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
 from pants.util.filtering import create_filters, wrap_filters
 from pants.util.memo import memoized_property
-from pants.util.objects import datatype
 
 
 class Spec(ABC):
@@ -211,7 +210,8 @@ def more_specific(spec1: Spec, spec2: Spec) -> Spec:
   return spec1 if _specificity[type(spec1)] < _specificity[type(spec2)] else spec2
 
 
-class SpecsMatcher(datatype([('tags', tuple), ('exclude_patterns', tuple)])):
+@dataclass(unsafe_hash=True)
+class SpecsMatcher:
   """Contains filters for the output of a Specs match.
 
   This class is separated out from `Specs` to allow for both stuctural equality of the `tags` and
@@ -219,12 +219,12 @@ class SpecsMatcher(datatype([('tags', tuple), ('exclude_patterns', tuple)])):
   the hash of the class instance in its key, and results in a very large key when used with `Specs`
   directly).
   """
+  tags: Tuple
+  exclude_patterns: Tuple
 
-  def __new__(cls, tags=None, exclude_patterns=tuple()):
-    return super().__new__(
-      cls,
-      tags=tuple(tags or []),
-      exclude_patterns=tuple(exclude_patterns))
+  def __init__(self, tags: Optional[Tuple] = None, exclude_patterns: Tuple = ()) -> None:
+    self.tags = tuple(tags or [])
+    self.exclude_patterns = tuple(exclude_patterns)
 
   @memoized_property
   def _exclude_compiled_regexps(self):
@@ -249,18 +249,17 @@ class SpecsMatcher(datatype([('tags', tuple), ('exclude_patterns', tuple)])):
     return self._target_tag_matches(target) and not self._excluded_by_pattern(address)
 
 
-# TODO: we can't yet express a type in terms of itself, because datatype field types are evaluated
-# eagerly (so we can't yet type-check the individual items of a tuple provided as the `dependencies`
-# field).
-class Specs(datatype([('dependencies', tuple), ('matcher', SpecsMatcher)])):
+@dataclass(unsafe_hash=True)
+class Specs:
   """A collection of Specs representing Spec subclasses, and a SpecsMatcher to filter results."""
+  dependencies: Tuple
+  matcher: SpecsMatcher
 
-  def __new__(cls, dependencies, tags=None, exclude_patterns=tuple()):
-    return super().__new__(
-      cls,
-      dependencies=tuple(dependencies),
-      matcher=SpecsMatcher(tags=tags, exclude_patterns=exclude_patterns),
-    )
+  def __init__(
+    self, dependencies: Tuple, tags: Optional[Tuple] = None, exclude_patterns: Tuple = ()
+  ) -> None:
+    self.dependencies = tuple(dependencies)
+    self.matcher = SpecsMatcher(tags=tags, exclude_patterns=exclude_patterns)
 
   def __iter__(self):
     return iter(self.dependencies)
