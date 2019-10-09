@@ -5,11 +5,11 @@ import os
 from contextlib import contextmanager
 from pathlib import Path
 
-from pants.util.meta import Singleton
+from pants.util.meta import SingletonMetaclass
 
 
 # TODO: Even this should probably just be a new-style option?
-class BuildRoot(Singleton):
+class BuildRoot(metaclass=SingletonMetaclass):
   """Represents the global workspace build root.
 
   By default a Pants workspace is defined by a root directory where one of multiple sentinel files
