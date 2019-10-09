@@ -1,9 +1,11 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import unittest
 from abc import ABC, abstractmethod
+from dataclasses import FrozenInstanceError, dataclass
 
-from pants.util.meta import SingletonMetaclass, classproperty, staticproperty
+from pants.util.meta import SingletonMetaclass, classproperty, freeze_after_init, staticproperty
 from pants_test.test_base import TestBase
 
 
@@ -242,3 +244,63 @@ with an @classproperty decorator."""):
       def f(cls):
         return 'hello'
     self.assertEqual(Concrete2.f, 'hello')
+
+
+class FreezeAfterInitTest(unittest.TestCase):
+
+  def test_no_init(self) -> None:
+    @freeze_after_init
+    class Test:
+      pass
+
+    with self.assertRaises(FrozenInstanceError):
+      test = Test()
+      test.x = 1
+
+  def test_init_still_works(self):
+    @freeze_after_init
+    class Test:
+
+      def __init__(self, x: int) -> None:
+        self.x = x
+        self.y = "abc"
+
+    test = Test(x=0)
+    self.assertEqual(test.x, 0)
+    self.assertEqual(test.y, "abc")
+
+  def test_modify_preexisting_field_after_init(self) -> None:
+    @freeze_after_init
+    class Test:
+
+      def __init__(self, x: int) -> None:
+        self.x = x
+
+    with self.assertRaises(FrozenInstanceError):
+      test = Test(0)
+      test.x = 1
+
+  def test_add_new_field_after_init(self) -> None:
+    @freeze_after_init
+    class Test:
+
+      def __init__(self, x: int) -> None:
+        self.x: x
+
+    with self.assertRaises(FrozenInstanceError):
+      test = Test(0)
+      test.y = "abc"
+
+  def test_works_with_dataclass(self) -> None:
+    @freeze_after_init
+    @dataclass
+    class Test:
+      x: int
+
+      def __init__(self, x: int):
+        self.x = x
+        self.y = "abc"
+
+    test = Test(x=0)
+    with self.assertRaises(FrozenInstanceError):
+      test.x = 1
