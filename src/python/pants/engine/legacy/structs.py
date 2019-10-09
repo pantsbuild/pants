@@ -5,6 +5,8 @@ import logging
 import os.path
 from abc import ABCMeta, abstractmethod
 from collections.abc import MutableSequence, MutableSet
+from dataclasses import dataclass
+from typing import Any, Callable
 
 from pants.build_graph.target import Target
 from pants.engine.addressable import addressable_list
@@ -15,7 +17,7 @@ from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
 from pants.util.contextutil import exception_logging
 from pants.util.meta import classproperty
-from pants.util.objects import Exactly, SubclassesOf, datatype
+from pants.util.objects import Exactly
 
 
 logger = logging.getLogger(__name__)
@@ -125,9 +127,8 @@ class HydrateableField:
   """A marker for Target(Adaptor) fields for which the engine might perform extra construction."""
 
 
-class SourcesField(
-  datatype(['address', 'arg', 'filespecs', 'base_globs', 'path_globs', 'validate_fn'])
-):
+@dataclass(frozen=True)
+class SourcesField:
   """Represents the `sources` argument for a particular Target.
 
   Sources are currently eagerly computed in-engine in order to provide the `BuildGraph`
@@ -143,14 +144,17 @@ class SourcesField(
   :param validate_fn: A function which takes an EagerFilesetWithSpec and throws if it's not
     acceptable. This API will almost certainly change in the near future.
   """
+  address: Any
+  arg: Any
+  filespecs: Any
+  base_globs: Any
+  path_globs: PathGlobs
+  validate_fn: Callable
 
   def __hash__(self):
     return hash((self.address, self.arg))
 
   def __repr__(self):
-    return str(self)
-
-  def __str__(self):
     return '{}(address={}, input_globs={}, arg={}, filespecs={!r})'.format(
       type(self).__name__, self.address, self.base_globs, self.arg, self.filespecs)
 
@@ -178,8 +182,13 @@ class PageAdaptor(TargetAdaptor):
       )
 
 
-class BundlesField(datatype(['address', 'bundles', 'filespecs_list', 'path_globs_list'])):
+@dataclass(frozen=True)
+class BundlesField:
   """Represents the `bundles` argument, each of which has a PathGlobs to represent its `fileset`."""
+  address: Any
+  bundles: Any
+  filespecs_list: Any
+  path_globs_list: Any
 
   def __hash__(self):
     return hash(self.address)
@@ -416,10 +425,10 @@ class ZGlobs(BaseGlobs):
   legacy_globs_class = wrapped_globs.ZGlobs
 
 
-class GlobsWithConjunction(datatype([
-    ('non_path_globs', SubclassesOf(BaseGlobs)),
-    ('conjunction', GlobExpansionConjunction),
-])):
+@dataclass(frozen=True)
+class GlobsWithConjunction:
+  non_path_globs: BaseGlobs
+  conjunction: GlobExpansionConjunction
 
   @classmethod
   def for_literal_files(cls, file_paths, spec_path):
