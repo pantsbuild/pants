@@ -1,6 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
+
 
 class ClasspathEntry:
   """Represents a java classpath entry.
@@ -24,7 +26,9 @@ class ClasspathEntry:
     """
     return self._path
 
-  def set_directory_digest(self, directory_digest):
+  def hydrate_missing_directory_digest(self, directory_digest):
+    assert os.path.isfile(self.path), f'Classpath entry {self} with digest to be mutated should point to an existing file!'
+    assert self.directory_digest is None, f'Classpath entry {self} with digest to be mutated is expected to *not* have a digest set!'
     self._directory_digest = directory_digest
 
   @property

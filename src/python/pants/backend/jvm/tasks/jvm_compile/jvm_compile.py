@@ -943,8 +943,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     if self.check_cache(vts):
       self.context.log.debug(f'Snapshotting results for {vts.target.address.spec}')
       classpath_entry = self._classpath_for_context(zinc_compile_context)
-      assert classpath_entry.directory_digest is None, f'Classpath entry {classpath_entry} from a double-check is expected to *not* have a digest set!'
-      assert os.path.isfile(classpath_entry.path), f'Classpath entry {classpath_entry} from a double-check should point to an existing file!'
       relpath = fast_relpath(classpath_entry.path, get_buildroot())
       classes_dir_snapshot, = self.context._scheduler.capture_snapshots([
         PathGlobsAndRoot(
@@ -952,7 +950,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
           get_buildroot(),
         ),
       ])
-      classpath_entry.set_directory_digest(classes_dir_snapshot.directory_digest)
+      classpath_entry.hydrate_missing_directory_digest(classes_dir_snapshot.directory_digest)
       # Re-validate the vts!
       vts.update()
 
