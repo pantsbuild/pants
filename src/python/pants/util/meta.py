@@ -128,7 +128,7 @@ def freeze_after_init(cls: Type[T]) -> Type[T]:
     self._is_frozen = True
 
   @wraps(prev_setattr)
-  def new_setattr(self, key: Any, value: Any) -> None:
+  def new_setattr(self, key: str, value: Any) -> None:
     if getattr(self, "_is_frozen", False):
       raise FrozenInstanceError(
         f"Attempting to modify the attribute {key} after the object {self} was created."

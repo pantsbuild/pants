@@ -291,13 +291,25 @@ class FreezeAfterInitTest(unittest.TestCase):
     with self.assertRaises(FrozenInstanceError):
       test.y = "abc"
 
+  def test_explicitly_call_setattr_after_init(self) -> None:
+    @freeze_after_init
+    class Test:
+
+      def __init__(self, x: int) -> None:
+        self.x: x
+
+    test = Test(x=0)
+    with self.assertRaises(FrozenInstanceError):
+      setattr(test, "x", 1)
+
   def test_works_with_dataclass(self) -> None:
     @freeze_after_init
     @dataclass(frozen=False)
     class Test:
       x: int
+      y: str
 
-      def __init__(self, x: int):
+      def __init__(self, x: int) -> None:
         self.x = x
         self.y = "abc"
 
