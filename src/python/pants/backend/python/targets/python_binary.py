@@ -116,7 +116,7 @@ class PythonBinary(PythonTarget):
     if sources and sources.files and entry_point:
       entry_point_module = entry_point.split(':', 1)[0]
       entry_source = list(self.sources_relative_to_source_root())[0]
-      source_entry_point = self._translate_to_entry_point(entry_source)
+      source_entry_point = self.translate_source_path_to_py_module_specifier(entry_source)
       if entry_point_module != source_entry_point:
         raise TargetDefinitionException(self,
             'Specified both source and entry_point but they do not agree: {} vs {}'.format(
@@ -136,7 +136,8 @@ class PythonBinary(PythonTarget):
   def indices(self):
     return self.payload.indices
 
-  def _translate_to_entry_point(self, source):
+  @classmethod
+  def translate_source_path_to_py_module_specifier(self, source: str) -> str:
     source_base, _ = os.path.splitext(source)
     return source_base.replace(os.path.sep, '.')
 
@@ -147,7 +148,7 @@ class PythonBinary(PythonTarget):
     elif self.payload.sources.source_paths:
       assert len(self.payload.sources.source_paths) == 1
       entry_source = list(self.sources_relative_to_source_root())[0]
-      return self._translate_to_entry_point(entry_source)
+      return self.translate_source_path_to_py_module_specifier(entry_source)
     else:
       return None
 
