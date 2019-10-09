@@ -5,7 +5,7 @@ import unittest
 from abc import ABC, abstractmethod
 from dataclasses import FrozenInstanceError, dataclass
 
-from pants.util.meta import SingletonMetaclass, classproperty, freeze_after_init, staticproperty
+from pants.util.meta import SingletonMetaclass, classproperty, frozen_after_init, staticproperty
 from pants_test.test_base import TestBase
 
 
@@ -246,10 +246,10 @@ with an @classproperty decorator."""):
     self.assertEqual(Concrete2.f, 'hello')
 
 
-class FreezeAfterInitTest(unittest.TestCase):
+class FrozenAfterInitTest(unittest.TestCase):
 
   def test_no_init(self) -> None:
-    @freeze_after_init
+    @frozen_after_init
     class Test:
       pass
 
@@ -258,7 +258,7 @@ class FreezeAfterInitTest(unittest.TestCase):
       test.x = 1
 
   def test_init_still_works(self):
-    @freeze_after_init
+    @frozen_after_init
     class Test:
 
       def __init__(self, x: int) -> None:
@@ -270,7 +270,7 @@ class FreezeAfterInitTest(unittest.TestCase):
     self.assertEqual(test.y, "abc")
 
   def test_modify_preexisting_field_after_init(self) -> None:
-    @freeze_after_init
+    @frozen_after_init
     class Test:
 
       def __init__(self, x: int) -> None:
@@ -281,7 +281,7 @@ class FreezeAfterInitTest(unittest.TestCase):
       test.x = 1
 
   def test_add_new_field_after_init(self) -> None:
-    @freeze_after_init
+    @frozen_after_init
     class Test:
 
       def __init__(self, x: int) -> None:
@@ -292,7 +292,7 @@ class FreezeAfterInitTest(unittest.TestCase):
       test.y = "abc"
 
   def test_explicitly_call_setattr_after_init(self) -> None:
-    @freeze_after_init
+    @frozen_after_init
     class Test:
 
       def __init__(self, x: int) -> None:
@@ -303,7 +303,7 @@ class FreezeAfterInitTest(unittest.TestCase):
       setattr(test, "x", 1)
 
   def test_works_with_dataclass(self) -> None:
-    @freeze_after_init
+    @frozen_after_init
     @dataclass(frozen=False)
     class Test:
       x: int

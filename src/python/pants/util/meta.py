@@ -111,7 +111,7 @@ def staticproperty(func: Union[staticmethod, Callable]) -> ClassPropertyDescript
   return ClassPropertyDescriptor(func, doc)
 
 
-def freeze_after_init(cls: Type[T]) -> Type[T]:
+def frozen_after_init(cls: Type[T]) -> Type[T]:
   """Class decorator to freeze any modifications to the object after __init__() is done.
 
   The primary use case is for @dataclasses who cannot use frozen=True due to the need for a custom
