@@ -226,7 +226,7 @@ class TestStrategy(Enum):
                         f"--remote-oauth-bearer-token-path={oauth_token_path}",
                         "test",
                         *sorted(targets),
-                      ] + ["--", "-s"],
+                      ]
     }[self]
     if shard is not None and self in [self.v1_no_chroot, self.v1_chroot]:  # type: ignore
       result.insert(2, f"--test-pytest-test-shard={shard}")
@@ -424,7 +424,6 @@ def run_unit_tests(*, oauth_token_path: Optional[str] = None) -> None:
   target_sets = TestTargetSets.calculate(
     test_type=TestType.unit, remote_execution_enabled=oauth_token_path is not None
   )
-  import multiprocessing; print("MULTIPROC CPU count: {}".format(multiprocessing.cpu_count()))
   if target_sets.v2_remote:
     _run_command(
       command=TestStrategy.v2_remote.pants_command(
