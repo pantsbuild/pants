@@ -8,6 +8,7 @@ from typing import Optional
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import BuildFileAddresses
+from pants.engine.build_files import AddressProvenanceMap
 from pants.engine.console import Console
 from pants.engine.goal import Goal
 from pants.engine.legacy.graph import HydratedTarget
@@ -77,11 +78,13 @@ def fast_test(console: Console, addresses: BuildFileAddresses) -> Test:
 
 @rule
 def coordinator_of_tests(target: HydratedTarget,
-                         union_membership: UnionMembership) -> AddressAndTestResult:
+                         union_membership: UnionMembership,
+                         provenance_map: AddressProvenanceMap) -> AddressAndTestResult:
   # TODO(#6004): when streaming to live TTY, rely on V2 UI for this information. When not a
   # live TTY, periodically dump heavy hitters to stderr. See
   # https://github.com/pantsbuild/pants/issues/6004#issuecomment-492699898.
-  if union_membership.is_member(TestTarget, target.adaptor):
+  if (provenance_map.is_single_address(target.address) or
+      union_membership.is_member(TestTarget, target.adaptor)):
     logger.info("Starting tests: {}".format(target.address.reference()))
     # NB: This has the effect of "casting" a TargetAdaptor to a member of the TestTarget union.
     # The adaptor will always be a member because of the union membership check above, but if
