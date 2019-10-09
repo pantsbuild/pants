@@ -1,6 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from dataclasses import FrozenInstanceError
+from functools import wraps
 from typing import Any, Callable, Optional, Type, TypeVar, Union
 
 
@@ -107,3 +109,32 @@ def staticproperty(func: Union[staticmethod, Callable]) -> ClassPropertyDescript
     func = staticmethod(func)
 
   return ClassPropertyDescriptor(func, doc)
+
+
+def frozen_after_init(cls: Type[T]) -> Type[T]:
+  """Class decorator to freeze any modifications to the object after __init__() is done.
+
+  The primary use case is for @dataclasses who cannot use frozen=True due to the need for a custom
+  __init__(), but who still want to remain as immutable as possible (e.g. for safety with the V2
+  engine). When using with dataclasses, this should be the first decorator applied, i.e. be used
+  before @dataclass."""
+
+  prev_init = cls.__init__
+  prev_setattr = cls.__setattr__
+
+  @wraps(prev_init)
+  def new_init(self, *args: Any, **kwargs: Any) -> None:
+    prev_init(self, *args, **kwargs)  # type: ignore
+    self._is_frozen = True
+
+  @wraps(prev_setattr)
+  def new_setattr(self, key: str, value: Any) -> None:
+    if getattr(self, "_is_frozen", False):
+      raise FrozenInstanceError(
+        f"Attempting to modify the attribute {key} after the object {self} was created."
+      )
+    prev_setattr(self, key, value)
+
+  cls.__init__ = new_init  # type: ignore
+  cls.__setattr__ = new_setattr  # type: ignore
+  return cls

@@ -72,13 +72,16 @@ python_library(
   name = 'memo',
   sources = ['memo.py'],
   dependencies = [
-      ':meta'
+    ':meta'
   ],
 )
 
 python_library(
   name = 'meta',
   sources = ['meta.py'],
+  dependencies = [
+    '3rdparty/python:dataclasses'
+  ],
   tags = {'type_checked'},
 )
 
