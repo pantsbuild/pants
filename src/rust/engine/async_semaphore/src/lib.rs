@@ -267,11 +267,14 @@ mod tests {
     let sema = AsyncSemaphore::new(1);
     let handle1 = sema.clone();
     let handle2 = sema.clone();
+    let handle3 = sema.clone();
 
     let (tx_thread1, acquired_thread1) = mpsc::channel();
     let (unblock_thread1, rx_thread1) = mpsc::channel();
+    let (tx_inqueue_thread3, queued_thread3) = mpsc::channel();
+    let (tx_thread3, acquired_thread3) = mpsc::channel();
+    let (unblock_thread3, rx_thread3) = mpsc::channel();
     let (tx_thread2_attempt_1, did_not_acquire_thread2_attempt_1) = mpsc::channel();
-    let (tx_thread2_attempt_2, acquired_thread2_attempt_2) = mpsc::channel();
 
     runtime.spawn(handle1.with_acquired(move || {
       // Indicate that we've acquired, and then wait to be signaled to exit.
@@ -289,26 +292,32 @@ mod tests {
     runtime.spawn(future::lazy(move || {
       let permit_future = handle2.acquire();
       let delay_future = Delay::new(Instant::now() + Duration::from_millis(10));
-      permit_future
-        .select2(delay_future)
+      delay_future
+        .select2(permit_future)
         .map(move |raced_result| {
           // We expect to have timed out, because the other Future will not resolve until asked.
           match raced_result {
-            future::Either::A(_) => panic!("Expected to time out."),
-            future::Either::B(_) => {}
+            future::Either::B(_) => panic!("Expected to time out."),
+            future::Either::A(_) => {}
           };
           tx_thread2_attempt_1.send(()).unwrap();
         })
         .map_err(|_| panic!("Permit or duration failed."))
-        .and_then(move |()| {
-          // Attempt again to acquire.
-          handle2.acquire()
-        })
-        .map(move |_permit| {
-          // Confirm that we did.
-          tx_thread2_attempt_2.send(()).unwrap()
-        })
     }));
+
+    runtime.spawn(future::lazy(move || {
+      tx_inqueue_thread3.send(()).unwrap();
+      handle3.with_acquired(move || {
+        // Indicate that we've acquired, and then wait to be signaled to exit.
+        tx_thread3.send(()).unwrap();
+        rx_thread3.recv().unwrap();
+        future::ok::<_, ()>(())
+      })
+    }));
+
+    queued_thread3
+      .recv_timeout(Duration::from_secs(5))
+      .expect("thread3 didn't ever queue up.");
 
     // thread2 should signal that it did not successfully acquire for the first attempt.
     did_not_acquire_thread2_attempt_1
@@ -317,9 +326,10 @@ mod tests {
 
     // Unblock thread1 and confirm that thread2 acquires.
     unblock_thread1.send(()).unwrap();
-    acquired_thread2_attempt_2
+    acquired_thread3
       .recv_timeout(Duration::from_secs(5))
-      .expect("thread2 didn't acquire.");
+      .expect("thread3 didn't acquire.");
+    unblock_thread3.send(()).unwrap();
   }
 
   #[test]
