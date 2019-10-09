@@ -48,8 +48,8 @@ class PathGlobs:
   NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
   be aware of any changes to this object's definition.
   """
-  include: Tuple[str]
-  exclude: Tuple[str]
+  include: Tuple[str, ...]
+  exclude: Tuple[str, ...]
   glob_match_error_behavior: GlobMatchErrorBehavior
   conjunction: GlobExpansionConjunction
 
@@ -138,8 +138,8 @@ class Snapshot:
   sandboxes.
   """
   directory_digest: Digest
-  files: Tuple[str]
-  dirs: Tuple[str]
+  files: Tuple[str, ...]
+  dirs: Tuple[str, ...]
 
   @property
   def is_empty(self):

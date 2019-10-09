@@ -103,7 +103,7 @@ class Params:
 
   Distinct types are enforced at consumption time by the rust type of the same name.
   """
-  params: Tuple[Any]
+  params: Tuple[Any, ...]
 
   def __init__(self, *args: Any) -> None:
     self.params = tuple(args)

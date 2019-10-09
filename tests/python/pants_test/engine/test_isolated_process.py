@@ -138,7 +138,7 @@ class JavacSources:
   See CatExecutionRequest and rules above for an example of using PathGlobs
   which does not introduce this additional layer of indirection.
   """
-  java_files: Tuple[str]
+  java_files: Tuple[str, ...]
 
 
 @dataclass(frozen=True)
