@@ -1,23 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name = 'all_directories',
-  dependencies = [
-    ':annotation_directory',
-    ':antlr3_directory',
-    ':antlr4_directory',
-    ':autovalue_directory',
-    ':hello_directory',
-    ':java_sources_directory',
-    ':javac_directory',
-    ':jaxb_directory',
-    ':make_it_rain_directory',
-    ':protobuf_directory',
-    ':wire_directory',
-  ],
-)
-
 page(
   name='readme',
   source='README.md',
@@ -69,14 +52,6 @@ page(
 )
 
 files(
-  name = 'annotation_directory',
-  sources = rglobs('annotation/*'),
-  dependencies = [
-    'examples/src/antlr/org/pantsbuild/example:exp_directory',
-  ],
-)
-
-files(
   name = 'antlr3_directory',
   sources = rglobs('antlr3/*'),
   dependencies = [
@@ -113,23 +88,6 @@ files(
 files(
   name = 'javac_directory',
   sources = rglobs('javac/*'),
-)
-
-files(
-  name = 'jaxb_directory',
-  sources = rglobs('jaxb/*'),
-  dependencies = [
-    'examples/src/resources/org/pantsbuild/example:jaxb_directory',
-  ],
-)
-
-files(
-  name = 'make_it_rain_directory',
-  sources = rglobs('make_it_rain/*'),
-  dependencies = [
-    'examples/src/thrift/org/pantsbuild/example:distance_directory',
-    'examples/src/thrift/org/pantsbuild/example:precipitation_directory',
-  ],
 )
 
 files(

@@ -12,16 +12,6 @@ files(
 )
 
 files(
-  name='ideacodeandresources_directory',
-  sources=rglobs('ideacodeandresources/*'),
-)
-
-files(
-  name='idearesourcesonly_directory',
-  sources=rglobs('idearesourcesonly/*'),
-)
-
-files(
   name='ivyclassifier_directory',
   sources=rglobs('ivyclassifier/*'),
 )
