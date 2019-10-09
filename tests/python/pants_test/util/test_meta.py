@@ -253,8 +253,8 @@ class FreezeAfterInitTest(unittest.TestCase):
     class Test:
       pass
 
+    test = Test()
     with self.assertRaises(FrozenInstanceError):
-      test = Test()
       test.x = 1
 
   def test_init_still_works(self):
@@ -276,8 +276,8 @@ class FreezeAfterInitTest(unittest.TestCase):
       def __init__(self, x: int) -> None:
         self.x = x
 
+    test = Test(x=0)
     with self.assertRaises(FrozenInstanceError):
-      test = Test(0)
       test.x = 1
 
   def test_add_new_field_after_init(self) -> None:
@@ -287,8 +287,8 @@ class FreezeAfterInitTest(unittest.TestCase):
       def __init__(self, x: int) -> None:
         self.x: x
 
+    test = Test(x=0)
     with self.assertRaises(FrozenInstanceError):
-      test = Test(0)
       test.y = "abc"
 
   def test_works_with_dataclass(self) -> None:
