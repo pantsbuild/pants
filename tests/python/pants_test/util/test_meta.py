@@ -293,7 +293,7 @@ class FreezeAfterInitTest(unittest.TestCase):
 
   def test_works_with_dataclass(self) -> None:
     @freeze_after_init
-    @dataclass
+    @dataclass(frozen=False)
     class Test:
       x: int
 
