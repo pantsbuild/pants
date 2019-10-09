@@ -8,6 +8,7 @@ from typing import Dict, Optional, Tuple, Union
 from pants.engine.fs import EMPTY_DIRECTORY_DIGEST, Digest
 from pants.engine.platform import PlatformConstraint
 from pants.engine.rules import RootRule, rule
+from pants.util.meta import frozen_after_init
 
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,7 @@ class ProductDescription:
   value: str
 
 
+@frozen_after_init
 @dataclass(unsafe_hash=True)
 class ExecuteProcessRequest:
   """Request for execution with args and snapshots to extract."""
@@ -60,6 +62,7 @@ class ExecuteProcessRequest:
     self.jdk_home = jdk_home
 
 
+@frozen_after_init
 @dataclass(unsafe_hash=True)
 class MultiPlatformExecuteProcessRequest:
   # args collects a set of tuples representing platform constraints mapped to a req,

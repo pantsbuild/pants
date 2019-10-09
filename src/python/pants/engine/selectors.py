@@ -6,9 +6,11 @@ from dataclasses import dataclass
 from textwrap import dedent
 from typing import Any, Tuple, Type
 
+from pants.util.meta import frozen_after_init
 from pants.util.objects import TypeConstraint
 
 
+@frozen_after_init
 @dataclass(unsafe_hash=True)
 class Get:
   """Experimental synchronous generator API.
@@ -94,6 +96,7 @@ class Get:
     return cls(product_type, subject_type, None)
 
 
+@frozen_after_init
 @dataclass(unsafe_hash=True)
 class Params:
   """A set of values with distinct types.

@@ -16,6 +16,7 @@ from pants.option.parser import Parser
 from pants.option.parser_hierarchy import ParserHierarchy, all_enclosing_scopes, enclosing_scope
 from pants.option.scope import ScopeInfo
 from pants.util.memo import memoized_method, memoized_property
+from pants.util.meta import frozen_after_init
 
 
 def make_flag_regex(long_name, short_name=None):
@@ -365,6 +366,7 @@ class Options:
             hint='Use scope {} instead (options: {})'.format(scope, ', '.join(explicit_keys))
           )
 
+  @frozen_after_init
   @dataclass(unsafe_hash=True)
   class _ScopedFlagNameForFuzzyMatching:
     """Specify how a registered option would look like on the command line.

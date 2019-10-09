@@ -10,6 +10,7 @@ from pants.engine.rules import RootRule
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.dirutil import maybe_read_file, safe_delete, safe_file_dump
+from pants.util.meta import frozen_after_init
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,7 @@ class InputFilesContent(FilesContent):
   """
 
 
+@frozen_after_init
 @dataclass(unsafe_hash=True)
 class PathGlobs:
   """A wrapper around sets of filespecs to include and exclude.

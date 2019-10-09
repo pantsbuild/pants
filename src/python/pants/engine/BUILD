@@ -52,6 +52,7 @@ python_library(
     ':selectors',
     'src/python/pants/base:project_tree',
     'src/python/pants/option',
+    'src/python/pants/util:meta',
   ]
 )
 
@@ -95,6 +96,7 @@ python_library(
     ':parser',
     'src/python/pants/build_graph',
     'src/python/pants/util:memo',
+    'src/python/pants/util:meta',
   ]
 )
 
@@ -107,6 +109,7 @@ python_library(
     ':rules',
     ':selectors',
     ':platform',
+    'src/python/pants/util:meta',
   ]
 )
 
@@ -175,6 +178,7 @@ python_library(
   sources=['selectors.py'],
   dependencies=[
     '3rdparty/python:dataclasses',
+    'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ]
 )

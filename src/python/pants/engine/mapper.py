@@ -10,6 +10,7 @@ from pants.build_graph.address import BuildFileAddress
 from pants.engine.objects import Serializable
 from pants.engine.parser import Parser
 from pants.util.memo import memoized_property
+from pants.util.meta import frozen_after_init
 
 
 class MappingError(Exception):
@@ -155,6 +156,7 @@ class ResolveError(MappingError):
   """Indicates an error resolving targets."""
 
 
+@frozen_after_init
 @dataclass(unsafe_hash=True)
 class AddressMapper:
   """Configuration to parse build files matching a filename pattern."""

@@ -45,6 +45,7 @@ from pants.option.errors import (
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
+from pants.util.meta import frozen_after_init
 
 
 class Parser:
@@ -141,6 +142,7 @@ class Parser:
     for child in self._child_parsers:
       child.walk(callback)
 
+  @frozen_after_init
   @dataclass(unsafe_hash=True)
   class ParseArgsRequest:
     flag_value_map: Dict
