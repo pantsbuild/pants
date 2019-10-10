@@ -3,6 +3,7 @@
 
 import re
 from abc import abstractmethod
+from enum import Enum
 
 from pants.backend.native.register import rules as native_backend_rules
 from pants.backend.native.subsystems.libc_dev import LibcDev
@@ -15,7 +16,6 @@ from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.util.collections import assert_single_element
 from pants.util.meta import classproperty
-from pants.util.objects import enum
 from pants_test.backend.python.tasks.python_task_test_base import (
   PythonTaskTestBase,
   name_and_platform,
@@ -99,8 +99,10 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskT
 
     return context, synthetic_target, snapshot_version
 
-  class ExpectedPlatformType(enum(['any', 'current'])):
+  class ExpectedPlatformType(Enum):
     """Whether to check that the produced wheel has the 'any' platform, or the current one."""
+    any = "any"
+    current = "current"
 
   def _assert_dist_and_wheel_identity(self, expected_name, expected_version, expected_platform,
                                       dist_target, **kwargs):
@@ -118,8 +120,8 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskT
     self.assertEquals(dist, expected_name)
     self.assertEquals(version, expected_snapshot_version)
 
-    expected_platform = expected_platform.resolve_for_enum_variant({
-      'any': 'any',
-      'current': normalized_current_platform(),
-    })
+    expected_platform = {
+      BuildLocalPythonDistributionsTestBase.ExpectedPlatformType.any: "any",
+      BuildLocalPythonDistributionsTestBase.ExpectedPlatformType.current: normalized_current_platform(),
+    }[expected_platform]
     self.assertEquals(platform, expected_platform)
