@@ -279,7 +279,7 @@ class PantsDaemon(FingerprintedProcessManager):
     """Gracefully terminate all services and kill the main PantsDaemon loop."""
     with self._services.lifecycle_lock:
       for service, service_thread in service_thread_map.items():
-        self._logger.info('terminating pantsd service: {}'.format(service))
+        self._logger.info(f'terminating pantsd service: {service}')
         service.terminate()
         service_thread.join(self.JOIN_TIMEOUT_SECONDS)
       self._logger.info('terminating pantsd')
@@ -307,7 +307,7 @@ class PantsDaemon(FingerprintedProcessManager):
       try:
         os.fdopen(fd)
         raise AssertionError(
-            'pantsd logging cannot initialize while stdio is open: {}'.format(fd))
+            f'pantsd logging cannot initialize while stdio is open: {fd}')
       except OSError:
         pass
 
@@ -330,12 +330,12 @@ class PantsDaemon(FingerprintedProcessManager):
 
   def _setup_services(self, pants_services):
     for service in pants_services.services:
-      self._logger.info('setting up service {}'.format(service))
+      self._logger.info(f'setting up service {service}')
       service.setup(self._services)
 
   @staticmethod
   def _make_thread(service):
-    name = "{}Thread".format(service.__class__.__name__)
+    name = f"{service.__class__.__name__}Thread"
 
     def target():
       Native().override_thread_logging_destination_to_just_pantsd()
@@ -356,12 +356,12 @@ class PantsDaemon(FingerprintedProcessManager):
 
     # Start services.
     for service, service_thread in service_thread_map.items():
-      self._logger.info('starting service {}'.format(service))
+      self._logger.info(f'starting service {service}')
       try:
         service_thread.start()
       except (RuntimeError, FSEventService.ServiceError):
         self.shutdown(service_thread_map)
-        raise PantsDaemon.StartupFailure('service {} failed to start, shutting down!'.format(service))
+        raise PantsDaemon.StartupFailure(f'service {service} failed to start, shutting down!')
 
     # Once all services are started, write our pid.
     self.write_pid()
@@ -372,7 +372,7 @@ class PantsDaemon(FingerprintedProcessManager):
       for service, service_thread in service_thread_map.items():
         if not service_thread.is_alive():
           self.shutdown(service_thread_map)
-          raise PantsDaemon.RuntimeFailure('service failure for {}, shutting down!'.format(service))
+          raise PantsDaemon.RuntimeFailure(f'service failure for {service}, shutting down!')
         else:
           # Avoid excessive CPU utilization.
           service_thread.join(self.JOIN_TIMEOUT_SECONDS)
@@ -414,7 +414,7 @@ class PantsDaemon(FingerprintedProcessManager):
       self._native.set_panic_handler()
 
       # Set the process name in ps output to 'pantsd' vs './pants compile src/etc:: -ldebug'.
-      set_process_title('pantsd [{}]'.format(self._build_root))
+      set_process_title(f'pantsd [{self._build_root}]')
 
       # Write service socket information to .pids.
       self._write_named_sockets(self._services.port_map)
@@ -451,8 +451,7 @@ class PantsDaemon(FingerprintedProcessManager):
     :rtype: bool
     """
     new_fingerprint = self.options_fingerprint
-    self._logger.debug('pantsd: is_alive={} new_fingerprint={} current_fingerprint={}'
-                       .format(self.is_alive(), new_fingerprint, self.fingerprint))
+    self._logger.debug('pantsd: is_alive={self.is_alive()} new_fingerprint={new_fingerprint} current_fingerprint={self.fingerprint}')
     return self.needs_restart(new_fingerprint)
 
   def launch(self):
@@ -470,8 +469,7 @@ class PantsDaemon(FingerprintedProcessManager):
     # Wait up to 60 seconds for pantsd to write its pidfile.
     pantsd_pid = self.await_pid(60)
     listening_port = self.read_named_socket('pailgun', int)
-    self._logger.debug('pantsd is running at pid {}, pailgun port is {}'
-                       .format(self.pid, listening_port))
+    self._logger.debug(f'pantsd is running at pid {self.pid}, pailgun port is {listening_port}')
     return self.Handle(pantsd_pid, listening_port, self._metadata_base_dir)
 
   def terminate(self, include_watchman=True):
