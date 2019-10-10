@@ -1,20 +1,30 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from dataclasses import dataclass
+from dataclasses import dataclass, FrozenInstanceError
 from hashlib import sha1
+from typing import Any
 
 from pants.base.payload_field import PayloadField
 
 
-# NB: We do not decorate this with @frozen_after_init because PayloadField must still mutate
-# _fingerprint_memo. Even though PayloadField will change the value of _fingerprint_memo, the hash
-# is still stable for NativeArtifact because unsafe_hash=True will only calculate it based on the
-# `lib` attribute defined here. This works, so long as someone doesn't change the lib attribute.
-@dataclass(unsafe_hash=True)
+# NB: We manually implement __hash__(), rather than using unsafe_hash=True, because PayloadField
+# will mutate _fingerprint_memo and we must ensure that mutation does not affect the hash. For
+# extra safety, we override __setattr__() to ensure that the hash can never be accidentally changed.
+@dataclass
 class NativeArtifact(PayloadField):
   """A BUILD file object declaring a target can be exported to other languages with a native ABI."""
   lib_name: str
+
+  def __hash__(self) -> int:
+    return hash(self.lib_name)
+
+  def __setattr__(self, key: str, value: Any) -> None:
+    if key == "lib_name":
+      raise FrozenInstanceError(
+        f"Attempting to modify the attribute {key} with value {value} on {self}."
+      )
+    super().__setattr__(key, value)
 
   # TODO: This should probably be made into an @classproperty (see PR #5901).
   @classmethod
