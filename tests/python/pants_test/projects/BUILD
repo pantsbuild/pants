@@ -53,7 +53,7 @@ python_tests(
     'testprojects/maven_layout:all_directories',
   ],
   tags = {'integration'},
-  timeout - 300,
+  timeout = 300,
 )
 
 python_tests(
