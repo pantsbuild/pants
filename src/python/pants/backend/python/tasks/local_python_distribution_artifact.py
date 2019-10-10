@@ -36,7 +36,7 @@ class LocalPythonDistributionArtifact(Task):
       for output_dir, base_names in target_local_wheels.items():
         for base_name in base_names:
           wheel_output = os.path.join(output_dir, base_name)
-          self.context.log.debug('found local built wheels {}'.format(wheel_output))
+          self.context.log.debug(f'found local built wheels {wheel_output}')
           # Create a copy for wheel in dist dir.
           wheel_copy = os.path.join(self.dist_dir, base_name)
           atomic_copy(wheel_output, wheel_copy)

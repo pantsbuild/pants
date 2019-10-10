@@ -93,12 +93,12 @@ class PythonBinaryCreate(Task):
       python_deployable_archive = self.context.products.get('deployable_archives')
       python_pex_product = self.context.products.get('pex_archives')
       for vt in invalidation_check.all_vts:
-        pex_path = os.path.join(vt.results_dir, '{}.pex'.format(vt.target.name))
+        pex_path = os.path.join(vt.results_dir, f'{vt.target.name}.pex')
         if not vt.valid:
-          self.context.log.debug('cache for {} is invalid, rebuilding'.format(vt.target))
+          self.context.log.debug(f'cache for {vt.target} is invalid, rebuilding')
           self._create_binary(vt.target, vt.results_dir)
         else:
-          self.context.log.debug('using cache for {}'.format(vt.target))
+          self.context.log.debug(f'using cache for {vt.target}')
 
         basename = os.path.basename(pex_path)
         python_pex_product.add(vt.target, os.path.dirname(pex_path)).append(basename)
@@ -136,7 +136,7 @@ class PythonBinaryCreate(Task):
           .format(binary_tgt.name, binary_tgt.shebang))
         pex_builder.set_shebang(binary_tgt.shebang)
       else:
-        self.context.log.debug('No customized shebang found for {}'.format(binary_tgt.name))
+        self.context.log.debug(f'No customized shebang found for {binary_tgt.name}')
 
       # Find which targets provide sources and which specify requirements.
       source_tgts = []
@@ -166,6 +166,6 @@ class PythonBinaryCreate(Task):
       pex_builder.add_requirement_libs_from(req_tgts, platforms=binary_tgt.platforms)
 
       # Build the .pex file.
-      pex_path = os.path.join(results_dir, '{}.pex'.format(binary_tgt.name))
+      pex_path = os.path.join(results_dir, f'{binary_tgt.name}.pex')
       pex_builder.build(pex_path)
       return pex_path
