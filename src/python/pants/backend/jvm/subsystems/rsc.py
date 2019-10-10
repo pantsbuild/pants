@@ -19,7 +19,7 @@ class Rsc(NativeTool):
     register('--native-image', fingerprint=True, type=bool,
              help='Use a pre-compiled native-image for rsc. Requires running in hermetic mode')
     register('--jvm-options', type=list, metavar='<option>...',
-      help='Run the RSC with these jvm options.')
+      help='Run RSC with these jvm options.')
 
   @property
   def use_native_image(self):
