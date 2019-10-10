@@ -94,7 +94,7 @@ class RscCompileIntegration(BaseCompileIT, AbstractTestGenerator):
       config=config)
 
   def test_rsc_hermetic_jvm_options(self):
-    pants_run = self.do_command('compile', 'examples/src/scala/org/pantsbuild/example/hello/exe',
+    pants_run = self.run_pants(['compile', 'examples/src/scala/org/pantsbuild/example/hello/exe'],
       config={
         'cache.compile.rsc': {'ignore': True},
         'jvm-platform': {'compiler': 'rsc'},
@@ -106,7 +106,7 @@ class RscCompileIntegration(BaseCompileIT, AbstractTestGenerator):
           'jvm_options': [
             '-Djava.security.manager=org.pantsbuild.DefinitelyNonExistentSecurityManagerClass']
         }
-      }, success=False)
+      })
     self.assert_failure(pants_run)
     self.assertIn(
       'Could not create SecurityManager: org.pantsbuild.DefinitelyNonExistentSecurityManagerClass',
