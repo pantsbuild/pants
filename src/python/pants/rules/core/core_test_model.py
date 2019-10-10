@@ -2,12 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from enum import Enum
 
 from pants.engine.rules import union
-from pants.util.objects import enum
 
 
-class Status(enum(['SUCCESS', 'FAILURE'])): pass
+class Status(Enum):
+  SUCCESS = "SUCCESS"
+  FAILURE = "FAILURE"
 
 
 @dataclass(frozen=True)
