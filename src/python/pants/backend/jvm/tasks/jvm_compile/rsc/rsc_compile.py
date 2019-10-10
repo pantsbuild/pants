@@ -675,7 +675,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
     res.output_directory_digest.dump(ctx.rsc_jar_file.path)
 
-    ctx.rsc_jar_file = ClasspathEntry(ctx.rsc_jar_file.path, res.output_directory_digest)
+    ctx.rsc_jar_file._directory_digest = res.output_directory_digest
 
     self.context._scheduler.materialize_directories((
       DirectoryToMaterialize(
