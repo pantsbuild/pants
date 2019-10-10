@@ -365,23 +365,10 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
           def hermetic_digest_classpath():
             jdk_libs_rel, jdk_libs_digest = self._jdk_libs_paths_and_digest(distribution)
 
-            def _get_zinc_compiler_snapshot():
-              # Security manager is baked into the shaded zinc compiler jar.
-              compiler_jar_snapshot, = self.context._scheduler.capture_snapshots([
-                PathGlobsAndRoot(
-                  PathGlobs(fast_relpath_collection(super(RscCompile, self).get_zinc_compiler_classpath())),
-                  get_buildroot(),
-                ),
-              ])
-              return compiler_jar_snapshot
-
-            zinc_compiler_snapshot = _get_zinc_compiler_snapshot()
             merged_sources_and_jdk_digest = self.context._scheduler.merge_directories(
-              (jdk_libs_digest, sources_snapshot.directory_digest) + tuple(classpath_directory_digests)
-              + (zinc_compiler_snapshot.directory_digest,))
+              (jdk_libs_digest, sources_snapshot.directory_digest) + tuple(classpath_directory_digests))
             classpath_rel_jdk = classpath_paths + jdk_libs_rel
             return (merged_sources_and_jdk_digest, classpath_rel_jdk)
-
           def nonhermetic_digest_classpath():
             classpath_abs_jdk = classpath_paths + self._jdk_libs_abs(distribution)
             return ((EMPTY_DIRECTORY_DIGEST), classpath_abs_jdk)
@@ -616,12 +603,13 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       ))
 
   def _runtool_hermetic(self, main, tool_name, distribution, input_digest, ctx):
-    tool_classpath_abs = self._rsc_classpath + super(RscCompile, self).get_zinc_compiler_classpath()
+    tool_classpath_abs = self._rsc_classpath
     tool_classpath = fast_relpath_collection(tool_classpath_abs)
 
     jvm_options = self._jvm_options
 
     if self._rsc.use_native_image:
+      #jvm_options = []
       if jvm_options:
         raise ValueError(
           "`{}` got non-empty jvm_options when running with a graal native-image, but this is "
