@@ -10,7 +10,6 @@ python_library(
     'src/python/pants/rules/core',
     'src/python/pants/subsystem',
     'src/python/pants/util:memo',
-    'src/python/pants/util:objects',
   ],
 )
 
