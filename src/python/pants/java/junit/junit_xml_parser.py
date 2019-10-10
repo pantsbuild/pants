@@ -4,20 +4,27 @@
 import fnmatch
 import os
 from collections import defaultdict
+from dataclasses import dataclass
+from typing import Optional
 
 from twitter.common.collections import OrderedSet
 
 from pants.util.dirutil import safe_walk
-from pants.util.objects import datatype
+from pants.util.meta import frozen_after_init
 from pants.util.xml_parser import XmlParser
 
 
-class Test(datatype(['classname', 'methodname'])):
+@frozen_after_init
+@dataclass(unsafe_hash=True, order=True)
+class Test:
   """Describes a junit-style test or collection of tests."""
+  classname: str
+  methodname: Optional[str]
 
-  def __new__(cls, classname, methodname=None):
+  def __init__(self, classname: str, methodname: Optional[str] = None) -> None:
+    self.classname = classname
     # We deliberately normalize an empty methodname ('') to None.
-    return super().__new__(cls, classname, methodname or None)
+    self.methodname = methodname or None
 
   def enclosing(self):
     """Return a test representing all the tests in this test's enclosing class.
