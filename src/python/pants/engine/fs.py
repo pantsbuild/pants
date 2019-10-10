@@ -3,18 +3,22 @@
 
 import os
 from dataclasses import dataclass
-from typing import Any, Tuple
+from typing import Any, Iterable, Optional, Tuple
 
 from pants.engine.objects import Collection
 from pants.engine.rules import RootRule
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.dirutil import maybe_read_file, safe_delete, safe_file_dump
-from pants.util.objects import Exactly, datatype, string_list
+from pants.util.meta import frozen_after_init
 
 
-class FileContent(datatype([('path', str), ('content', bytes), ('is_executable', bool)])):
+@dataclass(frozen=True)
+class FileContent:
   """The content of a file."""
+  path: str
+  content: bytes
+  is_executable: bool
 
   def __repr__(self):
     return 'FileContent(path={}, content=(len:{}), is_executable={})'.format(
@@ -22,9 +26,6 @@ class FileContent(datatype([('path', str), ('content', bytes), ('is_executable',
       len(self.content),
       self.is_executable,
     )
-
-  def __str__(self):
-    return repr(self)
 
 
 FilesContent = Collection.of(FileContent)
@@ -37,12 +38,9 @@ class InputFilesContent(FilesContent):
   """
 
 
-class PathGlobs(datatype([
-    'include',
-    'exclude',
-    ('glob_match_error_behavior', GlobMatchErrorBehavior),
-    ('conjunction', GlobExpansionConjunction),
-])):
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class PathGlobs:
   """A wrapper around sets of filespecs to include and exclude.
 
   The syntax supported is roughly git's glob syntax.
@@ -50,27 +48,26 @@ class PathGlobs(datatype([
   NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
   be aware of any changes to this object's definition.
   """
+  include: Tuple[str, ...]
+  exclude: Tuple[str, ...]
+  glob_match_error_behavior: GlobMatchErrorBehavior
+  conjunction: GlobExpansionConjunction
 
-  def __new__(cls, include, exclude=(), glob_match_error_behavior=None, conjunction=None):
-    """Given various file patterns create a PathGlobs object (without using filesystem operations).
-
-    :param include: A list of filespecs to include.
-    :param exclude: A list of filespecs to exclude.
-    :param GlobMatchErrorBehavior glob_match_error_behavior: How to respond to globs matching no
-                                                             files.
-    :param GlobExpansionConjunction conjunction: Whether all globs are expected to match at least
-                                                 one file, or if any glob matching is ok.
-    :rtype: :class:`PathGlobs`
-    """
-    return super().__new__(
-      cls,
-      include=tuple(include),
-      exclude=tuple(exclude),
-      glob_match_error_behavior=(glob_match_error_behavior or GlobMatchErrorBehavior.ignore),
-      conjunction=(conjunction or GlobExpansionConjunction.any_match))
+  def __init__(
+    self,
+    include: Iterable[str],
+    exclude: Iterable[str] = (),
+    glob_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.ignore,
+    conjunction: GlobExpansionConjunction = GlobExpansionConjunction.any_match
+  ) -> None:
+    self.include = tuple(include)
+    self.exclude = tuple(exclude)
+    self.glob_match_error_behavior = glob_match_error_behavior
+    self.conjunction = conjunction
 
 
-class Digest(datatype([('fingerprint', str), ('serialized_bytes_length', int)])):
+@dataclass(frozen=True)
+class Digest:
   """A Digest is a content-digest fingerprint, and a length of underlying content.
 
   These are used both to reference digests of strings/bytes/content, and as an opaque handle to a
@@ -87,6 +84,8 @@ class Digest(datatype([('fingerprint', str), ('serialized_bytes_length', int)]))
   relies on the latter existing. This can be resolved when ordering is removed from Snapshots. See
   https://github.com/pantsbuild/pants/issues/5802
   """
+  fingerprint: str
+  serialized_bytes_length: int
 
   @classmethod
   def _path(cls, digested_path):
@@ -115,21 +114,9 @@ class Digest(datatype([('fingerprint', str), ('serialized_bytes_length', int)]))
     payload = '{}:{}'.format(self.fingerprint, self.serialized_bytes_length)
     safe_file_dump(self._path(digested_path), payload=payload)
 
-  def __repr__(self):
-    return '''Digest(fingerprint={}, serialized_bytes_length={})'''.format(
-      self.fingerprint,
-      self.serialized_bytes_length
-    )
 
-  def __str__(self):
-    return repr(self)
-
-
-class PathGlobsAndRoot(datatype([
-    ('path_globs', PathGlobs),
-    ('root', str),
-    ('digest_hint', Exactly(Digest, type(None))),
-])):
+@dataclass(frozen=True)
+class PathGlobsAndRoot:
   """A set of PathGlobs to capture relative to some root (which may exist outside of the buildroot).
 
   If the `digest_hint` is set, it must be the Digest that we would expect to get if we were to
@@ -137,30 +124,37 @@ class PathGlobsAndRoot(datatype([
   operations in cases where the expected Digest is known, and the content for the Digest is already
   stored.
   """
+  path_globs: PathGlobs
+  root: str
+  digest_hint: Optional[Digest] = None
 
-  def __new__(cls, path_globs, root, digest_hint=None):
-    return super().__new__(cls, path_globs, root, digest_hint)
 
-
-class Snapshot(datatype([('directory_digest', Digest), ('files', tuple), ('dirs', tuple)])):
+@dataclass(frozen=True)
+class Snapshot:
   """A Snapshot is a collection of file paths and dir paths fingerprinted by their names/content.
 
   Snapshots are used to make it easier to isolate process execution by fixing the contents
   of the files being operated on and easing their movement to and from isolated execution
   sandboxes.
   """
+  directory_digest: Digest
+  files: Tuple[str, ...]
+  dirs: Tuple[str, ...]
 
   @property
   def is_empty(self):
     return self == EMPTY_SNAPSHOT
 
 
-class DirectoriesToMerge(datatype([('directories', tuple)])):
-  pass
+@dataclass(frozen=True)
+class DirectoriesToMerge:
+  directories: Tuple
 
 
-class DirectoryWithPrefixToStrip(datatype([('directory_digest', Digest), ('prefix', str)])):
-  pass
+@dataclass(frozen=True)
+class DirectoryWithPrefixToStrip:
+  directory_digest: Digest
+  prefix: str
 
 
 @dataclass(frozen=True)
@@ -169,22 +163,29 @@ class DirectoryWithPrefixToAdd:
   prefix: str
 
 
-class DirectoryToMaterialize(datatype([('path', str), ('directory_digest', Digest)])):
+@dataclass(frozen=True)
+class DirectoryToMaterialize:
   """A request to materialize the contents of a directory digest at the provided path."""
+  path: str
+  directory_digest: Digest
 
 
 DirectoriesToMaterialize = Collection.of(DirectoryToMaterialize)
 
 
-class MaterializeDirectoryResult(datatype([('output_paths', string_list)])):
+@dataclass(frozen=True)
+class MaterializeDirectoryResult:
   """Result of materializing a directory, contains the full output paths."""
+  output_paths: Tuple[str, ...]
 
 
 MaterializeDirectoriesResult = Collection.of(MaterializeDirectoryResult)
 
 
-class UrlToFetch(datatype([('url', str), ('digest', Digest)])):
-  pass
+@dataclass(frozen=True)
+class UrlToFetch:
+  url: str
+  digest: Digest
 
 
 @dataclass(frozen=True)

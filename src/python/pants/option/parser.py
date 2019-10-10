@@ -7,6 +7,8 @@ import os
 import re
 import traceback
 from collections import defaultdict
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, Iterable
 
 import Levenshtein
 import yaml
@@ -43,7 +45,7 @@ from pants.option.errors import (
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
-from pants.util.objects import SubclassesOf, datatype
+from pants.util.meta import frozen_after_init
 
 
 class Parser:
@@ -140,12 +142,36 @@ class Parser:
     for child in self._child_parsers:
       child.walk(callback)
 
-  class ParseArgsRequest(datatype([
-      ('flag_value_map', SubclassesOf(dict)),
-      'namespace',
-      'get_all_scoped_flag_names',
-      ('levenshtein_max_distance', int),
-  ])):
+  @frozen_after_init
+  @dataclass(unsafe_hash=True)
+  class ParseArgsRequest:
+    flag_value_map: Dict
+    namespace: Any
+    get_all_scoped_flag_names: Callable[[], Iterable]
+    levenshtein_max_distance: int
+
+    def __init__(
+      self,
+      flags_in_scope: Iterable[str],
+      namespace,
+      get_all_scoped_flag_names: Callable[[], Iterable],
+      levenshtein_max_distance: int
+    ) -> None:
+      """
+      :param flags_in_scope: Iterable of arg strings to parse into flag values.
+      :param namespace: The object to register the flag values on
+      :param get_all_scoped_flag_names: A 0-argument function which returns an iterable of
+                                        all registered option names in all their scopes. This
+                                        is used to create an error message with suggestions
+                                        when raising a `ParseError`.
+      :param levenshtein_max_distance: The maximum Levenshtein edit distance between option names
+                                       to determine similarly named options when an option name
+                                       hasn't been registered.
+      """
+      self.flag_value_map = self._create_flag_value_map(flags_in_scope)
+      self.namespace = namespace
+      self.get_all_scoped_flag_names = get_all_scoped_flag_names
+      self.levenshtein_max_distance = levenshtein_max_distance
 
     @staticmethod
     def _create_flag_value_map(flags):
@@ -169,25 +195,6 @@ class Parser:
             flag_val = None
         flag_value_map[key].append(flag_val)
       return flag_value_map
-
-    def __new__(cls, flags_in_scope, namespace,
-                get_all_scoped_flag_names,
-                levenshtein_max_distance):
-      """
-      :param Iterable flags_in_scope: Iterable of arg strings to parse into flag values.
-      :param namespace: The object to register the flag values on
-      :param function get_all_scoped_flag_names: A 0-argument function which returns an iterable of
-                                                 all registered option names in all their scopes. This
-                                                 is used to create an error message with suggestions
-                                                 when raising a `ParseError`.
-      :param int levenshtein_max_distance: The maximum Levenshtein edit distance between option names
-                                           to determine similarly named options when an option name
-                                           hasn't been registered.
-      """
-      flag_value_map = cls._create_flag_value_map(flags_in_scope)
-      return super(Parser.ParseArgsRequest, cls).__new__(cls, flag_value_map, namespace,
-                                                         get_all_scoped_flag_names,
-                                                         levenshtein_max_distance)
 
   def parse_args(self, parse_args_request):
     """Set values for this parser's options on the namespace object.

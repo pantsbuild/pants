@@ -2,42 +2,41 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from typing import Any, ClassVar, Optional
 
 from pants.option.option_value_container import OptionValueContainer
-from pants.util.objects import datatype
 
 
 GLOBAL_SCOPE = ''
 GLOBAL_SCOPE_CONFIG_SECTION = 'GLOBAL'
 
 
-class Scope(datatype([('scope', str)])):
+@dataclass(frozen=True)
+class Scope:
   """An options scope."""
+  scope: str
 
 
-class ScopeInfo(datatype([
-  'scope',
-  'category',
-  'optionable_cls',
+@dataclass(frozen=True, order=True)
+class ScopeInfo:
+  """Information about a scope."""
+  scope: Scope
+  category: Any
+  optionable_cls: Optional[Any] = None
   # A ScopeInfo may have a deprecated_scope (from its associated optionable_cls), which represents a
   # previous/deprecated name for a current/non-deprecated ScopeInfo. It may also be directly
   # deprecated via this `removal_version`, which allows for the deprecation of an entire scope,
   # including that of a SubsystemDependency (ie, deprecation of a dependency on a scoped Subsystem).
-  'removal_version',
-  'removal_hint',
-])):
-  """Information about a scope."""
+  removal_version: Optional[Any] = None
+  removal_hint: Optional[Any] = None
 
   # Symbolic constants for different categories of scope.
-  GLOBAL = 'GLOBAL'
-  GOAL = 'GOAL'
-  GOAL_V1 = 'GOAL_V1'
-  TASK = 'TASK'
-  SUBSYSTEM = 'SUBSYSTEM'
-  INTERMEDIATE = 'INTERMEDIATE'  # Scope added automatically to fill out the scope hierarchy.
-
-  def __new__(cls, scope, category, optionable_cls=None, removal_version=None, removal_hint=None):
-    return super().__new__(cls, scope, category, optionable_cls, removal_version, removal_hint)
+  GLOBAL: ClassVar[str] = 'GLOBAL'
+  GOAL: ClassVar[str] = 'GOAL'
+  GOAL_V1: ClassVar[str] = 'GOAL_V1'
+  TASK: ClassVar[str] = 'TASK'
+  SUBSYSTEM: ClassVar[str] = 'SUBSYSTEM'
+  INTERMEDIATE: ClassVar[str] = 'INTERMEDIATE'  # Scope added automatically to fill out the scope hierarchy.
 
   @property
   def description(self):

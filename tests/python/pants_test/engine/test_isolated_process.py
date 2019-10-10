@@ -3,6 +3,8 @@
 
 import os
 import unittest
+from dataclasses import dataclass
+from typing import ClassVar, Tuple
 
 from pants.engine.fs import (
   EMPTY_DIRECTORY_DIGEST,
@@ -23,28 +25,25 @@ from pants.engine.rules import RootRule, rule
 from pants.engine.scheduler import ExecutionError
 from pants.engine.selectors import Get
 from pants.util.contextutil import temporary_dir
-from pants.util.objects import TypeCheckError, datatype
 from pants_test.test_base import TestBase
 
 
-class Concatted(datatype([('value', str)])): pass
+@dataclass(frozen=True)
+class Concatted:
+  value: str
 
 
-class BinaryLocation(datatype([('bin_path', str)])):
+@dataclass(frozen=True)
+class BinaryLocation:
+  bin_path: str
 
-  def __new__(cls, bin_path):
-    this_object = super().__new__(cls, bin_path)
-
-    bin_path = this_object.bin_path
-
-    if os.path.isfile(bin_path) and os.access(bin_path, os.X_OK):
-      return this_object
-
-    raise cls.make_type_error("path {} does not name an existing executable file."
-                              .format(bin_path))
+  def __post_init__(self):
+    if not os.path.isfile(self.bin_path) or not os.access(self.bin_path, os.X_OK):
+      raise ValueError(f"path {self.bin_path} does not name an existing executable file.")
 
 
-class ShellCat(datatype([('binary_location', BinaryLocation)])):
+@dataclass(frozen=True)
+class ShellCat:
   """Wrapper class to show an example of using an auxiliary class (which wraps
   an executable) to generate an argv instead of doing it all in
   CatExecutionRequest. This can be used to encapsulate operations such as
@@ -52,6 +51,7 @@ class ShellCat(datatype([('binary_location', BinaryLocation)])):
   can reduce boilerplate for generating ExecuteProcessRequest instances if the
   executable is used in different ways across multiple different types of
   process execution requests."""
+  binary_location: BinaryLocation
 
   @property
   def bin_path(self):
@@ -71,7 +71,10 @@ class ShellCat(datatype([('binary_location', BinaryLocation)])):
     return (self.bin_path, "/dev/null") + tuple(cat_file_paths)
 
 
-class CatExecutionRequest(datatype([('shell_cat', ShellCat), ('path_globs', PathGlobs)])): pass
+@dataclass(frozen=True)
+class CatExecutionRequest:
+  shell_cat: ShellCat
+  path_globs: PathGlobs
 
 
 @rule
@@ -94,9 +97,10 @@ def create_cat_stdout_rules():
   ]
 
 
-class JavacVersionExecutionRequest(datatype([('binary_location', BinaryLocation)])):
-
-  description = 'obtaining javac version'
+@dataclass(frozen=True)
+class JavacVersionExecutionRequest:
+  binary_location: BinaryLocation
+  description: ClassVar[str] = 'obtaining javac version'
 
   @property
   def bin_path(self):
@@ -106,7 +110,9 @@ class JavacVersionExecutionRequest(datatype([('binary_location', BinaryLocation)
     return (self.bin_path, '-version',)
 
 
-class JavacVersionOutput(datatype([('value', str)])): pass
+@dataclass(frozen=True)
+class JavacVersionOutput:
+  value: str
 
 
 @rule
@@ -122,7 +128,8 @@ def get_javac_version_output(javac_version_command: JavacVersionExecutionRequest
   yield JavacVersionOutput(javac_version_proc_result.stderr.decode())
 
 
-class JavacSources(datatype([('java_files', tuple)])):
+@dataclass(frozen=True)
+class JavacSources:
   """Wrapper for the paths to include for Java source files.
 
   This shows an example of making a custom type to wrap generic types such as str to add usage
@@ -131,12 +138,13 @@ class JavacSources(datatype([('java_files', tuple)])):
   See CatExecutionRequest and rules above for an example of using PathGlobs
   which does not introduce this additional layer of indirection.
   """
+  java_files: Tuple[str, ...]
 
 
-class JavacCompileRequest(datatype([
-    ('binary_location', BinaryLocation),
-    ('javac_sources', JavacSources),
-])):
+@dataclass(frozen=True)
+class JavacCompileRequest:
+  binary_location: BinaryLocation
+  javac_sources: JavacSources
 
   @property
   def bin_path(self):
@@ -146,11 +154,11 @@ class JavacCompileRequest(datatype([
     return (self.bin_path,) + snapshot.files
 
 
-class JavacCompileResult(datatype([
-  ('stdout', str),
-  ('stderr', str),
-  ('directory_digest', Digest),
-])): pass
+@dataclass(frozen=True)
+class JavacCompileResult:
+  stdout: str
+  stderr: str
+  directory_digest: Digest
 
 
 # Note that this rule assumes that no additional classes are generated other than one for each
@@ -190,69 +198,6 @@ def create_javac_compile_rules():
 
 
 class ExecuteProcessRequestTest(unittest.TestCase):
-  def _default_args_execute_process_request(self, argv=tuple(), env=None):
-    env = env or dict()
-    return ExecuteProcessRequest(
-      argv=argv,
-      description='',
-      env=env,
-      input_files=EMPTY_DIRECTORY_DIGEST,
-      output_files=(),
-    )
-
-  def test_blows_up_on_invalid_args(self):
-    try:
-      self._default_args_execute_process_request()
-    except ValueError:
-      self.assertTrue(False, "should be able to construct without error")
-
-    with self.assertRaises(TypeCheckError):
-      self._default_args_execute_process_request(argv=1)
-    with self.assertRaises(TypeCheckError):
-      self._default_args_execute_process_request(argv='1')
-    with self.assertRaises(TypeCheckError):
-      self._default_args_execute_process_request(argv=('1',), env='foo=bar')
-
-
-    with self.assertRaisesRegexp(TypeCheckError, "env"):
-      ExecuteProcessRequest(
-        argv=('1',),
-        env=(),
-        input_files='',
-        output_files=(),
-        output_directories=(),
-        timeout_seconds=0.1,
-        description=''
-      )
-    with self.assertRaisesRegexp(TypeCheckError, "input_files"):
-      ExecuteProcessRequest(argv=('1',),
-        env=dict(),
-        input_files=3,
-        output_files=(),
-        output_directories=(),
-        timeout_seconds=0.1,
-        description=''
-      )
-    with self.assertRaisesRegexp(TypeCheckError, "output_files"):
-      ExecuteProcessRequest(
-        argv=('1',),
-        env=dict(),
-        input_files=EMPTY_DIRECTORY_DIGEST,
-        output_files=("blah"),
-        output_directories=(),
-        timeout_seconds=0.1,
-        description=''
-      )
-    with self.assertRaisesRegexp(TypeCheckError, "timeout"):
-      ExecuteProcessRequest(
-        argv=('1',),
-        env=dict(),
-        input_files=EMPTY_DIRECTORY_DIGEST,
-        output_files=("blah"),
-        output_directories=(),
-        timeout_seconds=None,
-        description=''
-      )
 
   def test_create_from_snapshot_with_env(self):
     req = ExecuteProcessRequest(

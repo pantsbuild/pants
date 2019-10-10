@@ -416,22 +416,23 @@ def union(cls):
   })
 
 
-class UnionRule(datatype([
-    ('union_base', _type_field),
-    ('union_member', _type_field),
-])):
+@dataclass(frozen=True)
+class UnionRule:
   """Specify that an instance of `union_member` can be substituted wherever `union_base` is used."""
+  union_base: Type
+  union_member: Type
 
-  def __new__(cls, union_base, union_member):
-    if not getattr(union_base, '_is_union', False):
-      raise cls.make_type_error('union_base must be a type annotated with @union: was {} (type {})'
-                                .format(union_base, type(union_base).__name__))
-    return super().__new__(cls, union_base, union_member)
+  def __post_init__(self) -> None:
+    if not getattr(self.union_base, '_is_union', False):
+      raise ValueError(
+        f'union_base must be a type annotated with @union: was {self.union_base} '
+        f'(type {type(self.union_base).__name__})'
+      )
 
 
 @dataclass(frozen=True)
 class UnionMembership:
-  union_rules: Dict[type, typing.Iterable[type]]
+  union_rules: Dict[Type, typing.Iterable[type]]
 
   def is_member(self, union_type, putative_member):
     members = self.union_rules.get(union_type)
@@ -531,9 +532,13 @@ class RootRule(datatype([('output_type', _type_field)]), Rule):
     return tuple()
 
 
-# TODO: add typechecking here -- would need to have a TypedCollection for dicts for `union_rules`.
-class RuleIndex(datatype(['rules', 'roots', 'union_rules'])):
+# TODO: add typechecking here -- use dicts for `union_rules`.
+@dataclass(frozen=True)
+class RuleIndex:
   """Holds a normalized index of Rules used to instantiate Nodes."""
+  rules: Any
+  roots: Any
+  union_rules: Any
 
   @classmethod
   def create(cls, rule_entries, union_rules=None):
@@ -586,7 +591,10 @@ functions decorated with @rule.""".format(entry, type(entry)))
 
     return cls(serializable_rules, serializable_roots, union_rules)
 
-  class NormalizedRules(datatype(['rules', 'union_rules'])): pass
+  @dataclass(frozen=True)
+  class NormalizedRules:
+    rules: Any
+    union_rules: Any
 
   def normalized_rules(self):
     rules = OrderedSet(rule

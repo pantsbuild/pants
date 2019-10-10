@@ -1,6 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import dataclasses
 import logging
 from collections import defaultdict, deque
 from contextlib import contextmanager
@@ -530,7 +531,9 @@ def hydrate_sources(
   """
   # TODO(#5864): merge the target's selection of --glob-expansion-failure (which doesn't exist yet)
   # with the global default!
-  path_globs = sources_field.path_globs.copy(glob_match_error_behavior=glob_match_error_behavior)
+  path_globs = dataclasses.replace(
+    sources_field.path_globs, glob_match_error_behavior=glob_match_error_behavior
+  )
   snapshot = yield Get(Snapshot, PathGlobs, path_globs)
   fileset_with_spec = _eager_fileset_with_spec(
     sources_field.address.spec_path,
@@ -546,7 +549,7 @@ def hydrate_bundles(
 ) -> HydratedField:
   """Given a BundlesField, request Snapshots for each of its filesets and create BundleAdaptors."""
   path_globs_with_match_errors = [
-    pg.copy(glob_match_error_behavior=glob_match_error_behavior)
+    dataclasses.replace(pg, glob_match_error_behavior=glob_match_error_behavior)
     for pg in bundles_field.path_globs_list
   ]
   snapshot_list = yield [Get(Snapshot, PathGlobs, pg) for pg in path_globs_with_match_errors]
