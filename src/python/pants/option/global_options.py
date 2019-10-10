@@ -105,7 +105,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_ca_certs_path=None,
     remote_oauth_bearer_token_path=None,
     remote_execution_extra_platform_properties=[],
-    remote_execution_headers=[],
+    remote_execution_headers={},
   )
 
 
@@ -406,7 +406,7 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
     register('--remote-execution-headers', advanced=True,
              help='Headers to set on remote execution requests. '
                   'Format: header=value. Pants itself may add additional headers.',
-             type=list, default=[])
+             type=dict, default={})
     register('--process-execution-local-parallelism', type=int, default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_parallelism,
              advanced=True,
              help='Number of concurrent processes that may be executed locally.')

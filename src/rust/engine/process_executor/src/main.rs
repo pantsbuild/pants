@@ -152,7 +152,7 @@ fn main() {
             .long("header")
             .takes_value(true)
             .multiple(true)
-            .help("Extra headers to pass on remote execution request."),
+            .help("Extra header to pass on remote execution request."),
       )
     .arg(
       Arg::with_name("env")

@@ -509,7 +509,9 @@ impl CommandRunner {
   fn call_option(&self, build_id: String) -> Result<grpcio::CallOption, String> {
     let mut builder = grpcio::MetadataBuilder::with_capacity(self.headers.len() + 1);
     for (header_name, header_value) in &self.headers {
-      builder.add_str(header_name, header_value).unwrap();
+      builder
+        .add_str(header_name, header_value)
+        .map_err(|err| format!("Error setting header {}: {}", header_name, err))?;
     }
     let mut metadata = bazel_protos::remote_execution::RequestMetadata::new();
     metadata.set_tool_details({
@@ -2031,7 +2033,10 @@ pub mod tests {
       {
         let want_key = String::from("authorization");
         assert_that!(headers).contains_key(&want_key);
-        assert_eq!(headers[&want_key], "Bearer catnip-will-get-you-anywhere".as_bytes());
+        assert_eq!(
+          headers[&want_key],
+          "Bearer catnip-will-get-you-anywhere".as_bytes()
+        );
       }
     }
   }

@@ -12,6 +12,7 @@ use std::string::FromUtf8Error;
 use crate::core::{Failure, Function, Key, TypeId, Value};
 use crate::handles::{DroppingHandle, Handle};
 use crate::interning::Interns;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
@@ -717,25 +718,15 @@ impl BufferBuffer {
   }
 
   pub fn to_map(&self, name: &'static str) -> Result<BTreeMap<String, String>, String> {
-    self
+    let strings = self
       .to_strings()
-      .map_err(|err| format!("Error decoding UTF8 from {}: {}", name, err))?
-      .into_iter()
-      .map(|s| {
-        let mut parts: Vec<_> = s.splitn(2, '=').collect();
-        if parts.len() != 2 {
-          return Err(format!(
-            "Got invalid {} - must be of format key=value but got {}",
-            name, s
-          ));
-        }
-        let (value, key) = (
-          parts.pop().unwrap().to_owned(),
-          parts.pop().unwrap().to_owned(),
-        );
-        Ok((key, value))
-      })
-      .collect()
+      .map_err(|err| format!("Error decoding UTF8 from {}: {}", name, err))?;
+
+    if strings.len() % 2 != 0 {
+      return Err(format!("Map for {} had an odd number of elements", name));
+    }
+
+    Ok(strings.into_iter().tuple_windows::<(_, _)>().collect())
   }
 }
 
