@@ -13,6 +13,7 @@ from pants.backend.python.rules import (
   python_fmt,
   python_test_runner,
 )
+from pants.backend.python.subsystems.grey import rules as grey_rules
 from pants.backend.python.subsystems.python_native_code import PythonNativeCode
 from pants.backend.python.subsystems.python_native_code import rules as python_native_code_rules
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
@@ -100,6 +101,7 @@ def rules():
   return (
     download_pex_bin.rules() +
     inject_init.rules() +
+    grey_rules() +
     python_fmt.rules() +
     python_test_runner.rules() +
     python_create_binary.rules() +

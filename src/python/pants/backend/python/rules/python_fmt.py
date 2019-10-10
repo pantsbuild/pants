@@ -8,6 +8,8 @@ from typing import Any, Set
 
 from pants.backend.python.rules.pex import CreatePex, Pex, PexInterpreterContraints, PexRequirements
 from pants.backend.python.subsystems.black import Black
+from pants.backend.python.subsystems.grey import Grey, GreyPatchDigest
+from pants.backend.python.subsystems.python_formatter import PythonFormatter, PythonFormattingTool
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.engine.fs import Digest, DirectoriesToMerge, PathGlobs, Snapshot
@@ -20,7 +22,8 @@ from pants.engine.legacy.structs import (
   PythonTestsAdaptor,
 )
 from pants.engine.rules import UnionRule, optionable_rule, rule
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, Params
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.rules.core.fmt import FmtResult, FmtTarget
 
 
@@ -35,19 +38,32 @@ class FormattablePythonTarget:
 @rule
 def run_black(
   wrapped_target: FormattablePythonTarget,
-  black: Black,
+  grey_patch: GreyPatchDigest,
+  python_formatter: PythonFormatter,
+  options_bootstrapper: OptionsBootstrapper,
   python_setup: PythonSetup,
   subprocess_encoding_environment: SubprocessEncodingEnvironment,
   ) -> FmtResult:
-  config_path = black.get_options().config
+  tool = python_formatter.get_options().tool
+  if tool == PythonFormattingTool.black:
+    formatter = yield Get(Black, OptionsBootstrapper, options_bootstrapper)
+    entry_point = formatter.get_entry_point()
+    patch_digest = None
+  elif tool == PythonFormattingTool.black_with_two_spaces_indent:
+    formatter = yield Get(Grey, OptionsBootstrapper, options_bootstrapper)
+    entry_point = grey_patch.entry_point
+    patch_digest = grey_patch.digest
+
+  config_path = formatter.get_options().config
   config_snapshot = yield Get(Snapshot, PathGlobs(include=(config_path,)))
 
   resolved_requirements_pex = yield Get(
     Pex, CreatePex(
-      output_filename="black.pex",
-      requirements=PexRequirements(requirements=tuple(black.get_requirement_specs())),
-      interpreter_constraints=PexInterpreterContraints(constraint_set=frozenset(black.default_interpreter_constraints)),
-      entry_point=black.get_entry_point(),
+      output_filename="python_formatter.pex",
+      requirements=PexRequirements(requirements=tuple(formatter.get_requirement_specs())),
+      interpreter_constraints=PexInterpreterContraints(constraint_set=frozenset(formatter.default_interpreter_constraints)),
+      entry_point=entry_point,
+      input_files_digest=patch_digest,
     )
   )
   target = wrapped_target.target
@@ -78,7 +94,7 @@ def run_black(
   request = resolved_requirements_pex.create_execute_request(
     python_setup=python_setup,
     subprocess_encoding_environment=subprocess_encoding_environment,
-    pex_path="./black.pex",
+    pex_path="./python_formatter.pex",
     pex_args=pex_args,
     input_files=merged_input_files,
     output_files=target.sources.snapshot.files,
@@ -136,6 +152,8 @@ def rules():
     UnionRule(FmtTarget, PythonBinaryAdaptor),
     UnionRule(FmtTarget, PythonTestsAdaptor),
     UnionRule(FmtTarget, PantsPluginAdaptor),
+    optionable_rule(PythonFormatter),
     optionable_rule(Black),
+    optionable_rule(Grey),
     optionable_rule(PythonSetup),
   ]
