@@ -1,6 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import dataclasses
 import os
 from dataclasses import dataclass
 from typing import Optional, Sequence, Tuple
@@ -163,13 +164,12 @@ class JarDependency:
   def copy(self, **replacements):
     """Returns a clone of this JarDependency with the given replacements kwargs overlaid."""
     cls = type(self)
-    kwargs = self._asdict()
-    for key, val in replacements.items():
-      if key == 'excludes':
-        val = JarDependency._prepare_excludes(val)
-      kwargs[key] = val
+    kwargs = dataclasses.asdict(self)
+    kwargs.update(replacements)
     org = kwargs.pop('org')
     base_name = kwargs.pop('base_name')
+    # NB: This calls __init__() so will set things up properly for us, such as calling
+    # _prepare_excludes.
     return cls(org, base_name, **kwargs)
 
   @memoized_property
