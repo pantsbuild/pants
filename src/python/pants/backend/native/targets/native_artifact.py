@@ -7,7 +7,11 @@ from hashlib import sha1
 from pants.base.payload_field import PayloadField
 
 
-@dataclass(frozen=True)
+# NB: We do not decorate this with @frozen_after_init because PayloadField must still mutate
+# _fingerprint_memo. Even though PayloadField will change the value of _fingerprint_memo, the hash
+# is still stable for NativeArtifact because unsafe_hash=True will only calculate it based on the
+# `lib` attribute defined here. This works, so long as someone doesn't change the lib attribute.
+@dataclass(unsafe_hash=True)
 class NativeArtifact(PayloadField):
   """A BUILD file object declaring a target can be exported to other languages with a native ABI."""
   lib_name: str
