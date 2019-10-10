@@ -4,29 +4,10 @@
 import threading
 import time
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any, Dict, Optional, Tuple
 
-from pants.util.objects import datatype
-
-
-class PantsServices(datatype([
-  # A tuple of instantiated PantsService instances.
-  ('services', tuple),
-  # A dict of (port_name -> port_info) for named ports hosted by the services.
-  ('port_map', dict),
-  # A lock to guard lifecycle changes for the services. This can be used by individual services
-  # to safeguard daemon-synchronous sections that should be protected from abrupt teardown.
-  # Notably, this lock is currently acquired for an entire pailgun request (by PailgunServer).
-  # NB: This is a `threading.RLock` instance, but the constructor for RLock is an alias for a
-  # native function, rather than an actual type.
-  'lifecycle_lock',
-])):
-  """A registry of PantsServices instances"""
-
-  def __new__(cls, services=None, port_map=None, lifecycle_lock=None):
-    services = services or tuple()
-    port_map = port_map or dict()
-    lifecycle_lock = lifecycle_lock or threading.RLock()
-    return super().__new__(cls, services, port_map, lifecycle_lock)
+from pants.util.meta import frozen_after_init
 
 
 class PantsService(ABC):
@@ -205,3 +186,28 @@ class _ServiceState(object):
     """
     with self._lock:
       return self._state == self._TERMINATING
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class PantsServices:
+  """A registry of PantsServices instances"""
+  services: Tuple[PantsService, ...]
+  port_map: Dict
+  lifecycle_lock: Any
+
+  def __init__(
+    self,
+    services: Optional[Tuple[PantsService, ...]] = None,
+    # A dict of (port_name -> port_info) for named ports hosted by the services.
+    port_map: Optional[Dict] = None,
+    # A lock to guard lifecycle changes for the services. This can be used by individual services
+    # to safeguard daemon-synchronous sections that should be protected from abrupt teardown.
+    # Notably, this lock is currently acquired for an entire pailgun request (by PailgunServer).
+    # NB: This is a `threading.RLock` instance, but the constructor for RLock is an alias for a
+    # native function, rather than an actual type.
+    lifecycle_lock: Optional = None
+  ) -> None:
+    self.services = services or tuple()
+    self.port_map = port_map or dict()
+    self.lifecycle_lock = lifecycle_lock or threading.RLock()
