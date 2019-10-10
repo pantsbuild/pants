@@ -225,10 +225,125 @@ pub extern "C" fn scheduler_create(
   process_execution_speculation_strategy_buf: Buffer,
   process_execution_use_local_cache: bool,
 ) -> RawResult {
+  match make_core(
+    tasks_ptr,
+    construct_directory_digest,
+    construct_snapshot,
+    construct_file_content,
+    construct_files_content,
+    construct_process_result,
+    construct_materialize_directory_result,
+    construct_materialize_directories_results,
+    type_address,
+    type_path_globs,
+    type_directory_digest,
+    type_snapshot,
+    type_merge_directories_request,
+    type_directory_with_prefix_to_strip,
+    type_directory_with_prefix_to_add,
+    type_files_content,
+    type_input_files_content,
+    type_dir,
+    type_file,
+    type_link,
+    type_multi_platform_process_request,
+    type_process_result,
+    type_generator,
+    type_url_to_fetch,
+    type_string,
+    type_bytes,
+    build_root_buf,
+    local_store_dir_buf,
+    ignore_patterns_buf,
+    root_type_ids,
+    remote_execution,
+    remote_store_servers_buf,
+    remote_execution_server,
+    remote_execution_process_cache_namespace,
+    remote_instance_name,
+    remote_root_ca_certs_path_buffer,
+    remote_oauth_bearer_token_path_buffer,
+    remote_store_thread_count,
+    remote_store_chunk_bytes,
+    remote_store_connection_limit,
+    remote_store_chunk_upload_timeout_seconds,
+    remote_store_rpc_retries,
+    remote_execution_extra_platform_properties_buf,
+    process_execution_local_parallelism,
+    process_execution_remote_parallelism,
+    process_execution_cleanup_local_dirs,
+    process_execution_speculation_delay,
+    process_execution_speculation_strategy_buf,
+    process_execution_use_local_cache,
+  ) {
+    Ok(core) => RawResult {
+      is_throw: false,
+      raw_pointer: Box::into_raw(Box::new(Scheduler::new(core))) as *const raw::c_void,
+      throw_handle: Handle(std::ptr::null()),
+    },
+    Err(err) => RawResult {
+      is_throw: true,
+      throw_handle: externs::create_exception(&err).into(),
+      raw_pointer: std::ptr::null(),
+    },
+  }
+}
+
+fn make_core(
+  tasks_ptr: *mut Tasks,
+  construct_directory_digest: Function,
+  construct_snapshot: Function,
+  construct_file_content: Function,
+  construct_files_content: Function,
+  construct_process_result: Function,
+  construct_materialize_directory_result: Function,
+  construct_materialize_directories_results: Function,
+  type_address: TypeId,
+  type_path_globs: TypeId,
+  type_directory_digest: TypeId,
+  type_snapshot: TypeId,
+  type_merge_directories_request: TypeId,
+  type_directory_with_prefix_to_strip: TypeId,
+  type_directory_with_prefix_to_add: TypeId,
+  type_files_content: TypeId,
+  type_input_files_content: TypeId,
+  type_dir: TypeId,
+  type_file: TypeId,
+  type_link: TypeId,
+  type_multi_platform_process_request: TypeId,
+  type_process_result: TypeId,
+  type_generator: TypeId,
+  type_url_to_fetch: TypeId,
+  type_string: TypeId,
+  type_bytes: TypeId,
+  build_root_buf: Buffer,
+  local_store_dir_buf: Buffer,
+  ignore_patterns_buf: BufferBuffer,
+  root_type_ids: TypeIdBuffer,
+  remote_execution: bool,
+  remote_store_servers_buf: BufferBuffer,
+  remote_execution_server: Buffer,
+  remote_execution_process_cache_namespace: Buffer,
+  remote_instance_name: Buffer,
+  remote_root_ca_certs_path_buffer: Buffer,
+  remote_oauth_bearer_token_path_buffer: Buffer,
+  remote_store_thread_count: u64,
+  remote_store_chunk_bytes: u64,
+  remote_store_connection_limit: u64,
+  remote_store_chunk_upload_timeout_seconds: u64,
+  remote_store_rpc_retries: u64,
+  remote_execution_extra_platform_properties_buf: BufferBuffer,
+  process_execution_local_parallelism: u64,
+  process_execution_remote_parallelism: u64,
+  process_execution_cleanup_local_dirs: bool,
+  process_execution_speculation_delay: f64,
+  process_execution_speculation_strategy_buf: Buffer,
+  process_execution_use_local_cache: bool,
+) -> Result<Core, String> {
   let root_type_ids = root_type_ids.to_vec();
   let ignore_patterns = ignore_patterns_buf
     .to_strings()
-    .unwrap_or_else(|e| panic!("Failed to decode ignore patterns as UTF8: {:?}", e));
+    .map_err(|err| format!("Failed to decode ignore patterns as UTF8: {:?}", err))?;
   let types = Types {
     construct_directory_digest: construct_directory_digest,
     construct_snapshot: construct_snapshot,
@@ -262,26 +377,33 @@ pub extern "C" fn scheduler_create(
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   let remote_store_servers_vec = remote_store_servers_buf
     .to_strings()
-    .expect("Failed to decode remote_store_servers");
+    .map_err(|err| format!("Failed to decode remote_store_servers: {}", err))?;
   let remote_execution_server_string = remote_execution_server
     .to_string()
-    .expect("remote_execution_server was not valid UTF8");
+    .map_err(|err| format!("remote_execution_server was not valid UTF8: {}", err))?;
   let remote_execution_process_cache_namespace_string = remote_execution_process_cache_namespace
     .to_string()
-    .expect("remote_execution_process_cache_namespace was not valid UTF8");
+    .map_err(|err| {
+      format!(
+        "remote_execution_process_cache_namespace was not valid UTF8: {}",
+        err
+      )
+    })?;
   let remote_instance_name_string = remote_instance_name
     .to_string()
-    .expect("remote_instance_name was not valid UTF8");
-  let remote_execution_extra_platform_properties_list: Vec<_> = remote_execution_extra_platform_properties_buf
-        .to_strings()
-        .expect("Failed to decode remote_execution_extra_platform_properties")
-        .into_iter()
-        .map(|s| {
-            let mut parts: Vec<_> = s.splitn(2, '=').collect();
-            assert_eq!(parts.len(), 2, "Got invalid remote_execution_extra_platform_properties - must be of format key=value but got {}", s);
-            let (value, key) = (parts.pop().unwrap().to_owned(), parts.pop().unwrap().to_owned());
-            (key, value)
-        }).collect();
+    .map_err(|err| format!("remote_instance_name was not valid UTF8: {}", err))?;
+  let remote_execution_extra_platform_properties_list = remote_execution_extra_platform_properties_buf
+      .to_strings()
+      .map_err(|err| format!("Failed to decode remote_execution_extra_platform_properties: {}", err))?
+      .into_iter()
+      .map(|s| {
+        let mut parts: Vec<_> = s.splitn(2, '=').collect();
+        if parts.len() != 2 {
+          return Err(format!("Got invalid remote_execution_extra_platform_properties - must be of format key=value but got {}", s));
+        }
+        let (value, key) = (parts.pop().unwrap().to_owned(), parts.pop().unwrap().to_owned());
+        Ok((key, value))
+      }).collect::<Result<Vec<_>, _>>()?;
   let remote_root_ca_certs_path = {
     let path = remote_root_ca_certs_path_buffer.to_os_string();
     if path.is_empty() {
@@ -302,8 +424,14 @@ pub extern "C" fn scheduler_create(
 
   let process_execution_speculation_strategy = process_execution_speculation_strategy_buf
     .to_string()
-    .expect("process_execution_speculation_strategy was not valid UTF8");
-  let core = Core::new(
+    .map_err(|err| {
+      format!(
+        "process_execution_speculation_strategy was not valid UTF8: {}",
+        err
+      )
+    })?;
+
+  Core::new(
     root_type_ids.clone(),
     tasks,
     types,
@@ -343,20 +471,7 @@ pub extern "C" fn scheduler_create(
     Duration::from_millis((process_execution_speculation_delay * 1000.0).round() as u64),
     process_execution_speculation_strategy,
     process_execution_use_local_cache,
-  );
-
-  match core {
-    Ok(core) => RawResult {
-      is_throw: false,
-      raw_pointer: Box::into_raw(Box::new(Scheduler::new(core))) as *const raw::c_void,
-      throw_handle: Handle(std::ptr::null()),
-    },
-    Err(err) => RawResult {
-      is_throw: true,
-      throw_handle: externs::create_exception(&err).into(),
-      raw_pointer: std::ptr::null(),
-    },
-  }
+  )
 }
 
 ///
