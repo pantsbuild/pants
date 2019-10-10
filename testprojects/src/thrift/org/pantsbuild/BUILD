@@ -13,14 +13,23 @@ target(
 files(
   name='constants_only_directory',
   sources=rglobs('constants_only/*'),
+  dependencies = [
+    'examples/3rdparty:python_directory',
+  ],
 )
 
 files(
   name='testproject_directory',
   sources=rglobs('testproject/*'),
+  dependencies = [
+    'examples/3rdparty:python_directory',
+  ],
 )
 
 files(
   name='thrift_exports_directory',
   sources=rglobs('thrift_exports/*'),
+  dependencies = [
+    'examples/3rdparty:python_directory',
+  ],
 )

@@ -54,6 +54,8 @@ target(
     ':typeparameters_directory',
     ':unicode_directory',
     ':utf8proto_directory',
+    # NB: See `:javasources_directory` for why this must be declared here.
+    'testprojects/src/scala/org/pantsbuild/testproject:javasources_directory',
   ],
 )
 
@@ -187,6 +189,9 @@ files(
   ],
 )
 
+# NB: This has a circular dependency on
+# 'testprojects/src/scala/org/pantsbuild/testproject:javasources_directory', which we cannot declare
+# here. Instead, we declare this in `:all_targets`.
 files(
   name = 'javasources_directory',
   sources = rglobs('javasources/*'),

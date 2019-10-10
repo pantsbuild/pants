@@ -19,6 +19,9 @@ page(
 files(
   name = 'distance_directory',
   sources = rglobs('distance/*'),
+  dependencies = [
+    'examples/3rdparty:python_directory',
+  ],
 )
 
 files(
@@ -26,5 +29,6 @@ files(
   sources = rglobs('precipitation/*'),
   dependencies = [
     ':distance_directory',
+    'examples/3rdparty:python_directory',
   ],
 )
