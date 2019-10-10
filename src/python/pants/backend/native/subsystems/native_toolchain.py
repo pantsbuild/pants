@@ -329,31 +329,31 @@ class ToolchainVariantRequest:
 
 @rule
 def select_c_toolchain(toolchain_variant_request: ToolchainVariantRequest) -> CToolchain:
-  native_toolchain = toolchain_variant_request.toolchain
-  # TODO(#5933): make an enum exhaustiveness checking method that works with `yield Get(...)`!
-  use_gcc = toolchain_variant_request.variant.resolve_for_enum_variant({
-    'gnu': True,
-    'llvm': False,
-  })
+  use_gcc = {
+    ToolchainVariant.gnu: True,
+    ToolchainVariant.llvm: False,
+  }[toolchain_variant_request.variant]
   if use_gcc:
-    toolchain_resolved = yield Get(GCCCToolchain, NativeToolchain, native_toolchain)
+    toolchain_resolved = yield Get(GCCCToolchain, NativeToolchain, toolchain_variant_request.toolchain)
   else:
-    toolchain_resolved = yield Get(LLVMCToolchain, NativeToolchain, native_toolchain)
+    toolchain_resolved = yield Get(LLVMCToolchain, NativeToolchain, toolchain_variant_request.toolchain)
   yield toolchain_resolved.c_toolchain
 
 
 @rule
 def select_cpp_toolchain(toolchain_variant_request: ToolchainVariantRequest) -> CppToolchain:
-  native_toolchain = toolchain_variant_request.toolchain
-  # TODO(#5933): make an enum exhaustiveness checking method that works with `yield Get(...)`!
-  use_gcc = toolchain_variant_request.variant.resolve_for_enum_variant({
-    'gnu': True,
-    'llvm': False,
-  })
+  use_gcc = {
+    ToolchainVariant.gnu: True,
+    ToolchainVariant.llvm: False,
+  }[toolchain_variant_request.variant]
   if use_gcc:
-    toolchain_resolved = yield Get(GCCCppToolchain, NativeToolchain, native_toolchain)
+    toolchain_resolved = yield Get(
+      GCCCppToolchain, NativeToolchain, toolchain_variant_request.toolchain
+    )
   else:
-    toolchain_resolved = yield Get(LLVMCppToolchain, NativeToolchain, native_toolchain)
+    toolchain_resolved = yield Get(
+      LLVMCppToolchain, NativeToolchain, toolchain_variant_request.toolchain
+    )
   yield toolchain_resolved.cpp_toolchain
 
 

@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from abc import abstractmethod
+from enum import Enum
 
 from pants.backend.native.config.environment import Platform
 from pants.build_graph.mirrored_target_option_mixin import MirroredTargetOptionMixin
@@ -9,10 +10,11 @@ from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 from pants.util.meta import classproperty
-from pants.util.objects import enum
 
 
-class ToolchainVariant(enum(['gnu', 'llvm'])): pass
+class ToolchainVariant(Enum):
+  gnu = "gnu"
+  llvm = "llvm"
 
 
 class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsystem):
