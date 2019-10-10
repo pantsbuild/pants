@@ -941,17 +941,6 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
   def _default_double_check_cache_for_vts(self, vts):
     # Double check the cache before beginning compilation
     if self.check_cache(vts):
-      self.context.log.debug(f'Snapshotting results for {vts.target.address.spec}')
-      classpath_entry = self._classpath_for_context(zinc_compile_context)
-      relpath = fast_relpath(classpath_entry.path, get_buildroot())
-      classes_dir_snapshot, = self.context._scheduler.capture_snapshots([
-        PathGlobsAndRoot(
-          PathGlobs([relpath]),
-          get_buildroot(),
-        ),
-      ])
-      classpath_entry.hydrate_missing_directory_digest(classes_dir_snapshot.directory_digest)
-      # Re-validate the vts!
       vts.update()
 
   def _default_work_for_vts(self, vts, ctx, input_classpath_product_key, counter, all_compile_contexts, output_classpath_product):

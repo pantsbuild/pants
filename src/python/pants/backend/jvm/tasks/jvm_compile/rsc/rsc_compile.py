@@ -428,8 +428,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       # depends on. It depends on completion of the same dependencies as the rsc job in order to run
       # as late as possible, while still running before rsc or zinc.
       return Job(cache_doublecheck_key,
-                 functools.partial(self._default_double_check_cache_for_vts, ivts,
-                                   zinc_compile_context),
+                 functools.partial(self._double_check_cache_for_vts, ivts, zinc_compile_context),
                  dependencies=list(dep_keys))
 
     def make_rsc_job(target, dep_targets):
@@ -736,3 +735,21 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   @memoized_method
   def _jdk_libs_abs(self, nonhermetic_dist):
     return nonhermetic_dist.find_libs(self._JDK_LIB_NAMES)
+
+  def _double_check_cache_for_vts(self, vts, zinc_compile_context):
+    # Double check the cache before beginning compilation
+    if self.check_cache(vts):
+      self.context.log.debug(f'Snapshotting results for {vts.target.address.spec}')
+      classpath_entry = self._classpath_for_context(zinc_compile_context)
+      assert classpath_entry.directory_digest is None, f'Classpath entry {classpath_entry} from a double-check is expected to *not* have a digest set!'
+      assert os.path.isfile(classpath_entry.path), f'Classpath entry {classpath_entry} from a double-check should point to an existing file!'
+      relpath = fast_relpath(classpath_entry.path, get_buildroot())
+      classes_dir_snapshot, = self.context._scheduler.capture_snapshots([
+        PathGlobsAndRoot(
+          PathGlobs([relpath]),
+          get_buildroot(),
+        ),
+      ])
+      classpath_entry.set_directory_digest(classes_dir_snapshot.directory_digest)
+      # Re-validate the vts!
+      vts.update()
