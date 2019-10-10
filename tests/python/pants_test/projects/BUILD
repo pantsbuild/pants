@@ -18,6 +18,7 @@ python_tests(
     'testprojects/src/antlr/python:all_directories',
   ],
   tags = {'integration'},
+  timeout = 200,
 )
 
 python_tests(
@@ -29,7 +30,7 @@ python_tests(
     'examples/tests/java/org/pantsbuild/example:all_directories',
   ],
   tags = {'integration'},
-  timeout = 300,
+  timeout = 360,
 )
 
 python_tests(
@@ -41,7 +42,7 @@ python_tests(
     'testprojects/tests/java/org/pantsbuild:all_directories',
   ],
   tags = {'integration'},
-  timeout = 300,
+  timeout = 400,
 )
 
 python_tests(
@@ -52,6 +53,7 @@ python_tests(
     'testprojects/maven_layout:all_directories',
   ],
   tags = {'integration'},
+  timeout - 300,
 )
 
 python_tests(
@@ -63,27 +65,7 @@ python_tests(
     'testprojects/src/protobuf/org/pantsbuild/testproject:all_directories',
   ],
   tags = {'integration'},
-)
-
-python_tests(
-  name = "thrift_projects_integration",
-  source = "test_thrift_projects_integration.py",
-  dependencies = [
-    ':projects_test_base',
-    'examples/src/thrift/org/pantsbuild/example:all_directories',
-    'testprojects/src/thrift/org/pantsbuild:all_directories',
-  ],
-  tags = {'integration'},
-)
-
-python_tests(
-  name = "wire_projects_integration",
-  source = "test_wire_projects_integration.py",
-  dependencies = [
-    ':projects_test_base',
-    'examples/src/wire/org/pantsbuild/example:all_directories',
-  ],
-  tags = {'integration'},
+  timeout = 200,
 )
 
 python_tests(
@@ -95,7 +77,6 @@ python_tests(
     'examples/tests/python/example_test:all_directories',
   ],
   tags = {'integration'},
-  timeout = 300,
 )
 
 python_tests(
@@ -107,7 +88,7 @@ python_tests(
     'testprojects/tests/python:all_directories',
   ],
   tags = {'integration'},
-  timeout = 300,
+  timeout = 120,
 )
 
 python_tests(
@@ -131,5 +112,28 @@ python_tests(
     'testprojects/tests/scala/org/pantsbuild/testproject:all_directories',
   ],
   tags = {'integration'},
+  timeout = 330,
+)
+
+python_tests(
+  name = "thrift_projects_integration",
+  source = "test_thrift_projects_integration.py",
+  dependencies = [
+    ':projects_test_base',
+    'examples/src/thrift/org/pantsbuild/example:all_directories',
+    'testprojects/src/thrift/org/pantsbuild:all_directories',
+  ],
+  tags = {'integration'},
   timeout = 300,
+)
+
+python_tests(
+  name = "wire_projects_integration",
+  source = "test_wire_projects_integration.py",
+  dependencies = [
+    ':projects_test_base',
+    'examples/src/wire/org/pantsbuild/example:all_directories',
+  ],
+  tags = {'integration'},
+  timeout = 220,
 )
