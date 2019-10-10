@@ -373,7 +373,11 @@ impl super::CommandRunner for CommandRunner {
                               (1 + iter_num) * command_runner.backoff_incremental_wait,
                             );
 
-                            // take the grpc result and cancel the op if too much time has passed.
+                            // Take the grpc result and cancel the op if too much time has passed.
+                            // This timeout is here to make sure that if something goes wrong, e.g.
+                            // the connection hangs, we don't poll forever. We add a buffer time
+                            // for queuing the process so that the requested timeout more accurately
+                            // reflects how long the caller intended the process to last.
                             let elapsed = start_time.elapsed();
                             let queue_buffer_time = std::time::Duration::from_secs(45);
 
