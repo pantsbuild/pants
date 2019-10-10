@@ -225,19 +225,21 @@ class Platform(Enum):
     return str(self.value)
 
 
-def _linux_before_install(include_test_config: bool = True, travis_wait: bool = False) -> List[str]:
+def _linux_before_install(include_test_config: bool = True, install_travis_wait: bool = False) -> List[str]:
   commands = [
     "./build-support/bin/install_aws_cli_for_ci.sh",
     # TODO(John Sirois): Get rid of this in favor of explicitly adding pyenv versions to the PATH:
     #   https://github.com/pantsbuild/pants/issues/7601
     "pyenv global 2.7.15 3.6.7 3.7.1",
   ]
-  if travis_wait:
-    commands += [
-      'wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2'
-      '.1_linux_x86_64.tar.gz" | tar -zxvf - travis-wait-enhanced',
+  if install_travis_wait:
+    commands.extend([
+      (
+        'wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download/v0.2.1/travis-wait-enhanced_0.2'
+        '.1_linux_x86_64.tar.gz" | tar -zxvf - travis-wait-enhanced'
+      ),
       "mv travis-wait-enhanced /home/travis/bin/",
-    ]
+    ])
 
   if include_test_config:
     return [
@@ -253,7 +255,7 @@ def linux_shard(
   load_test_config: bool = True,
   python_version: PythonVersion = PythonVersion.py36,
   use_docker: bool = False,
-  travis_wait: bool = False,
+  install_travis_wait: bool = False,
 ) -> Dict:
   if load_test_config and python_version is None:
     raise ValueError("Must provide the Python version if using a test config.")
@@ -275,7 +277,7 @@ def linux_shard(
       "shellcheck",
     ]}},
     "language": "python",
-    "before_install": _linux_before_install(include_test_config=load_test_config, travis_wait=travis_wait),
+    "before_install": _linux_before_install(include_test_config=load_test_config, install_travis_wait=install_travis_wait),
     "after_failure": ["./build-support/bin/ci-failure.sh"],
     "stage": python_version.default_stage().value,
     "env": [],
@@ -461,7 +463,7 @@ def cargo_audit() -> Dict:
 
 def unit_tests(python_version: PythonVersion) -> Dict:
   shard = {
-    **linux_shard(python_version=python_version, travis_wait=True),
+    **linux_shard(python_version=python_version, install_travis_wait=True),
     "name": f"Unit tests (Python {python_version.decimal})",
     "script": [
       "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py --unit-tests --plugin-tests "
@@ -547,7 +549,7 @@ def integration_tests_v1(python_version: PythonVersion, *, use_pantsd: bool = Fa
 
 def integration_tests_v2(python_version: PythonVersion) -> Dict:
   shard = {
-    **linux_shard(python_version=python_version, travis_wait=True),
+    **linux_shard(python_version=python_version, install_travis_wait=True),
     "name": f"Integration tests - V2 (Python {python_version.decimal})",
     "script": [
       (
