@@ -5,6 +5,7 @@ import multiprocessing
 import os
 import sys
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any
 
 from pants.base.build_environment import (
@@ -20,15 +21,17 @@ from pants.option.errors import OptionsError
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
-from pants.util.objects import enum
 
 
-class GlobMatchErrorBehavior(enum(['ignore', 'warn', 'error'])):
+class GlobMatchErrorBehavior(Enum):
   """Describe the action to perform when matching globs in BUILD files to source files.
 
   NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
   be aware of any changes to this object's definition.
   """
+  ignore = "ignore"
+  warn = "warn"
+  error = "error"
 
 
 @dataclass(frozen=True)
