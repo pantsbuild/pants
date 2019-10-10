@@ -26,7 +26,7 @@ def invoke_pex_for_output(pex_file_to_run):
 def _toolchain_variants(func):
   @wraps(func)
   def wrapper(*args, **kwargs):
-    for variant in ToolchainVariant.all_variants:
+    for variant in ToolchainVariant:
       func(*args, toolchain_variant=variant, **kwargs)
   return wrapper
 
@@ -73,20 +73,20 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
       # for both C and C++ compilation.
       # TODO(#6866): don't parse info logs for testing! There is a TODO in test_cpp_compile.py
       # in the native backend testing to traverse the PATH to find the selected compiler.
-      compiler_names_to_check = toolchain_variant.resolve_for_enum_variant({
-        'gnu': ['gcc', 'g++'],
-        'llvm': ['clang', 'clang++'],
-      })
+      compiler_names_to_check = {
+        ToolchainVariant.gnu: ['gcc', 'g++'],
+        ToolchainVariant.llvm: ['clang', 'clang++'],
+      }[toolchain_variant]
       for compiler_name in compiler_names_to_check:
         self.assertIn("selected compiler exe name: '{}'".format(compiler_name),
                       pants_run.stdout_data)
 
       # All of our toolchains currently use the C++ compiler's filename as argv[0] for the linker,
       # so there is only one name to check.
-      linker_names_to_check = toolchain_variant.resolve_for_enum_variant({
-        'gnu': ['g++'],
-        'llvm': ['clang++'],
-      })
+      linker_names_to_check = {
+        ToolchainVariant.gnu: ['g++'],
+        ToolchainVariant.llvm: ['clang++'],
+      }[toolchain_variant]
       for linker_name in linker_names_to_check:
         self.assertIn("selected linker exe name: '{}'".format(linker_name),
                       pants_run.stdout_data)
@@ -103,10 +103,10 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
       dist_name, dist_version, wheel_platform = name_and_platform(wheel_dist)
       self.assertEqual(dist_name, 'ctypes_test')
-      contains_current_platform = Platform.current.resolve_for_enum_variant({
-        'darwin': wheel_platform.startswith('macosx'),
-        'linux': wheel_platform.startswith('linux'),
-      })
+      contains_current_platform = {
+        Platform.darwin: wheel_platform.startswith('macosx'),
+        Platform.linux: wheel_platform.startswith('linux'),
+      }[Platform.current]
       self.assertTrue(contains_current_platform)
 
       # Verify that the wheel contains our shared libraries.
@@ -152,18 +152,17 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
         workdir=os.path.join(buildroot.new_buildroot, '.pants.d'),
       )
       self.assert_failure(pants_binary_strict_deps_failure)
-      self.assertIn(toolchain_variant.resolve_for_enum_variant({
-        'gnu': "fatal error: some_math.h: No such file or directory",
-        'llvm': "fatal error: 'some_math.h' file not found",
-      }),
-                    pants_binary_strict_deps_failure.stdout_data)
+      self.assertIn({
+        ToolchainVariant.gnu: "fatal error: some_math.h: No such file or directory",
+        ToolchainVariant.llvm: "fatal error: 'some_math.h' file not found"
+      }[toolchain_variant], pants_binary_strict_deps_failure.stdout_data)
 
     # TODO(#6848): we need to provide the libstdc++.so.6.dylib which comes with gcc on osx in the
     # DYLD_LIBRARY_PATH during the 'run' goal somehow.
-    attempt_pants_run = Platform.current.resolve_for_enum_variant({
-      'darwin': toolchain_variant == ToolchainVariant.llvm,
-      'linux': True,
-    })
+    attempt_pants_run = {
+      Platform.darwin: toolchain_variant == ToolchainVariant.llvm,
+      Platform.linux: True,
+    }[Platform.current]
     if attempt_pants_run:
       pants_run_interop = self.run_pants(['-q', 'run', self._binary_target_with_interop], config={
         'native-build-step': {
@@ -188,10 +187,10 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
     # TODO(#6848): this fails when run with gcc on osx as it requires gcc's libstdc++.so.6.dylib to
     # be available on the runtime library path.
-    attempt_pants_run = Platform.current.resolve_for_enum_variant({
-      'darwin': toolchain_variant == ToolchainVariant.llvm,
-      'linux': True,
-    })
+    attempt_pants_run = {
+      Platform.darwin: toolchain_variant == ToolchainVariant.llvm,
+      Platform.linux: True,
+    }[Platform.current]
     if attempt_pants_run:
       pants_run = self.run_pants(['-q', 'run', self._binary_target_with_third_party], config={
         'native-build-step': {
@@ -234,10 +233,10 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     """
     # TODO(#6848): this fails when run with gcc on osx as it requires gcc's libstdc++.so.6.dylib to
     # be available on the runtime library path.
-    attempt_pants_run = Platform.current.resolve_for_enum_variant({
-      'darwin': toolchain_variant == ToolchainVariant.llvm,
-      'linux': True,
-    })
+    attempt_pants_run = {
+      Platform.darwin: toolchain_variant == ToolchainVariant.llvm,
+      Platform.linux: True,
+    }[Platform.current]
     if not attempt_pants_run:
       return
 
