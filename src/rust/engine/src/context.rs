@@ -169,7 +169,7 @@ impl Core {
             executor.clone(),
             std::time::Duration::from_millis(500),
             std::time::Duration::from_secs(5),
-          )),
+          )?),
           process_execution_remote_parallelism,
         ));
       command_runner = match process_execution_speculation_strategy.as_ref() {

@@ -463,7 +463,7 @@ impl CommandRunner {
     executor: task_executor::Executor,
     backoff_incremental_wait: Duration,
     backoff_max_wait: Duration,
-  ) -> CommandRunner {
+  ) -> Result<CommandRunner, String> {
     let env = Arc::new(grpcio::EnvBuilder::new().build());
     let channel = {
       let builder = grpcio::ChannelBuilder::new(env.clone());
@@ -491,7 +491,7 @@ impl CommandRunner {
       );
     }
 
-    CommandRunner {
+    let command_runner = CommandRunner {
       metadata,
       headers,
       channel,
@@ -503,7 +503,12 @@ impl CommandRunner {
       executor,
       backoff_incremental_wait,
       backoff_max_wait,
-    }
+    };
+
+    // Validate that any configured static headers are valid.
+    command_runner.call_option(String::new())?;
+
+    Ok(command_runner)
   }
 
   fn call_option(&self, build_id: String) -> Result<grpcio::CallOption, String> {
@@ -1998,7 +2003,8 @@ pub mod tests {
       runtime.clone(),
       Duration::from_millis(0),
       Duration::from_secs(0),
-    );
+    )
+    .unwrap();
     let context = Context {
       workunit_store: WorkUnitStore::default(),
       build_id: String::from("marmosets"),
@@ -2160,7 +2166,8 @@ pub mod tests {
       runtime.clone(),
       Duration::from_millis(0),
       Duration::from_secs(0),
-    );
+    )
+    .unwrap();
     let result = runtime
       .block_on(cmd_runner.run(echo_roland_request(), Context::default()))
       .unwrap();
@@ -2689,7 +2696,8 @@ pub mod tests {
       runtime.clone(),
       Duration::from_millis(0),
       Duration::from_secs(0),
-    );
+    )
+    .unwrap();
 
     let result = runtime
       .block_on(command_runner.run(cat_roland_request(), Context::default()))
@@ -2795,6 +2803,7 @@ pub mod tests {
       Duration::from_millis(0),
       Duration::from_secs(0),
     )
+    .unwrap()
     .run(cat_roland_request(), Context::default())
     .wait();
     assert_eq!(
@@ -2872,7 +2881,8 @@ pub mod tests {
       runtime.clone(),
       Duration::from_millis(0),
       Duration::from_secs(0),
-    );
+    )
+    .unwrap();
 
     let error = runtime
       .block_on(runner.run(cat_roland_request(), Context::default()))
@@ -3704,6 +3714,7 @@ pub mod tests {
       backoff_incremental_wait,
       backoff_max_wait,
     )
+    .expect("Failed to make command runner")
   }
 
   fn extract_execute_response(
