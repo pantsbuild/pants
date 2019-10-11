@@ -263,10 +263,6 @@ pub trait CommandRunner: Send + Sync {
     &self,
     req: &MultiPlatformExecuteProcessRequest,
   ) -> Option<ExecuteProcessRequest>;
-
-  fn num_waiters(&self) -> usize {
-    panic!("This method is abstract and not implemented for this type")
-  }
 }
 
 ///
@@ -286,10 +282,6 @@ impl BoundedCommandRunner {
 }
 
 impl CommandRunner for BoundedCommandRunner {
-  fn num_waiters(&self) -> usize {
-    self.inner.1.num_waiters()
-  }
-
   fn run(
     &self,
     req: MultiPlatformExecuteProcessRequest,

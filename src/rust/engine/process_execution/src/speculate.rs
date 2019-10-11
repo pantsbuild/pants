@@ -59,15 +59,13 @@ impl SpeculatingCommandRunner {
         Err(Either::B((_failed_secondary_res, outstanding_primary_request))) => {
           debug!("secondary request FAILED, waiting for primary!");
           outstanding_primary_request
-            .then(|primary_result| match primary_result {
-              Ok(primary_success) => {
+            .then(|primary_result| {
+              if primary_result.is_ok() {
                 debug!("primary request eventually SUCCEEDED after secondary failed");
-                ok::<FallibleExecuteProcessResult, String>(primary_success).to_boxed()
-              }
-              Err(primary_failure) => {
+              } else {
                 debug!("primary request eventually FAILED after secondary failed");
-                err::<FallibleExecuteProcessResult, String>(primary_failure).to_boxed()
               }
+              primary_result
             })
             .to_boxed()
         }

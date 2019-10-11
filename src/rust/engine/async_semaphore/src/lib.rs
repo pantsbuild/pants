@@ -34,22 +34,18 @@ use futures::task::{self, Task};
 use futures::{Async, Poll};
 use log::trace;
 use parking_lot::Mutex;
-use rand;
 
 struct UniqueTask {
-  id: u64,
+  id: usize,
   task: Task,
-}
-
-impl PartialEq<u64> for UniqueTask {
-  fn eq(&self, other: &u64) -> bool {
-    *other == self.id
-  }
 }
 
 struct Inner {
   waiters: VecDeque<UniqueTask>,
   available_permits: usize,
+  // Used as the source of task_id in UniqueTask's because
+  // it is monotonically increasing, and only incremented under the mutex lock.
+  task_id: usize,
 }
 
 #[derive(Clone)]
@@ -63,6 +59,7 @@ impl AsyncSemaphore {
       inner: Arc::new(Mutex::new(Inner {
         waiters: VecDeque::new(),
         available_permits: permits,
+        task_id: 0,
       })),
     }
   }
@@ -127,15 +124,13 @@ impl Drop for Permit {
 #[derive(Clone)]
 pub struct PermitFuture {
   inner: Option<Arc<Mutex<Inner>>>,
-  task_id: Option<u64>,
+  task_id: Option<usize>,
 }
 
 impl Drop for PermitFuture {
   fn drop(&mut self) {
     // if task_id is Some then this PermitFuture was added to the waiters queue.
-    // if inner is still Some then this task hasn't been popped and run yet.
-    if self.task_id.is_some() {
-      let task_id = self.task_id.unwrap();
+    if let Some(task_id) = self.task_id {
       let inner = self.inner.take().unwrap();
       let mut inner = inner.lock();
       if let Some(task_index) = inner.waiters.iter().position(|task| task_id == task.id) {
@@ -155,12 +150,13 @@ impl Future for PermitFuture {
       let mut inner = inner.lock();
       if inner.available_permits == 0 {
         if self.task_id.is_none() {
-          let task_id = rand::random::<u64>();
+          let task_id = inner.task_id;
           let this_task = UniqueTask {
-            id: task_id,
+            id: inner.task_id,
             task: task::current(),
           };
           self.task_id = Some(task_id);
+          inner.task_id += 1;
           inner.waiters.push_back(this_task);
           trace!(
             "Added a task to the queue number of waiters is {:?}.",
@@ -170,7 +166,7 @@ impl Future for PermitFuture {
         false
       } else {
         if let Some(front_task) = inner.waiters.front() {
-          // This task is the one we notified so remove it. Otherwise keep it on the
+          // This task is the one we notified, so remove it. Otherwise keep it on the
           // waiters queue so that it doesn't get forgotten.
           if front_task.task.will_notify_current() {
             inner.waiters.pop_front();
@@ -261,6 +257,24 @@ mod tests {
 
   #[test]
   fn drop_while_waiting() {
+    // This tests that a task in the waiters queue of the semaphore is removed
+    // from the queue when the future that is was polling gets dropped.
+    //
+    // First we acquire the semaphore with a "process" which hangs until we send
+    // it a signal via the unblock_thread1 channel. This means that any futures that
+    // try to acquire the semaphore will be queued up until we unblock thread .
+    //
+    // Next we spawn a future on a second thread that tries to acquire the semaphore,
+    // and get added to the waiters queue, we drop that future after a Delay timer
+    // completes. The drop should cause the task to be removed from the waiters queue.
+    //
+    // Then we spawn a 3rd future that tries to acquire the semaphore but cannot
+    // because thread1 still has the only permit. After this future is added to the waiters
+    // we unblock thread1 and wait for a signal from the thread3 that it acquires.
+    //
+    // If the SECOND future was not removed from the waiters queue we would not get a signal
+    // that thread3 acquired the lock because the 2nd task would be blocking the queue trying to
+    // poll a non existant future.
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
     let sema = AsyncSemaphore::new(1);
     let handle1 = sema.clone();
@@ -322,7 +336,7 @@ mod tests {
       .recv_timeout(Duration::from_secs(5))
       .expect("thread2 should have failed to acquire by now.");
 
-    // Unblock thread1 and confirm that thread2 acquires.
+    // Unblock thread1 and confirm that thread3 acquires.
     unblock_thread1.send(()).unwrap();
     acquired_thread3
       .recv_timeout(Duration::from_secs(5))
@@ -357,8 +371,11 @@ mod tests {
     runtime.spawn(future::ok::<_, ()>(()).select(waiter).then(move |res| {
       let mut waiter_fute = match res {
         Ok((_, fute)) => fute,
-        Err(_) => panic!("future delay should not panic"),
+        Err(_) => panic!("future::ok is infallible"),
       };
+      // We explicitly poll the future here because the select call resolves
+      // immediately when called on a future::ok result, and the second future
+      // is never polled.
       let _waiter_res = waiter_fute.poll();
       tx_thread2.send(()).unwrap();
       rx_thread2.recv().unwrap();
