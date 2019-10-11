@@ -198,7 +198,7 @@ class Stat(ABC):
   """An existing filesystem path with a known type, relative to the ProjectTree's buildroot.
 
   Note that in order to preserve these invariants, end-user functions are not able to instantiate
-  this base class (init=False).
+  this base class (via the `init=False` argument to the dataclass decorator).
   """
   path: str
 
