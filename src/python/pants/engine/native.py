@@ -32,6 +32,7 @@ from pants.engine.fs import (
   Snapshot,
   UrlToFetch,
 )
+from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveProcessResult
 from pants.engine.isolated_process import (
   FallibleExecuteProcessResult,
   MultiPlatformExecuteProcessRequest,
@@ -570,6 +571,9 @@ class EngineTypes(NamedTuple):
   url_to_fetch: TypeId
   string: TypeId
   bytes: TypeId
+  construct_interactive_process_result: Function
+  interactive_process_request: TypeId
+  interactive_process_result: TypeId
 
 
 class PyResult(NamedTuple):
@@ -914,7 +918,10 @@ class Native(metaclass=SingletonMetaclass):
         url_to_fetch=ti(UrlToFetch),
         string=ti(str),
         bytes=ti(bytes),
-      )
+        construct_interactive_process_result=func(InteractiveProcessResult),
+        interactive_process_request=ti(InteractiveProcessRequest),
+        interactive_process_result=ti(InteractiveProcessResult),
+    )
 
     scheduler_result = self.lib.scheduler_create(
         tasks,

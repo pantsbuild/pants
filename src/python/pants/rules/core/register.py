@@ -8,6 +8,7 @@ from pants.rules.core import (
   lint,
   list_roots,
   list_targets,
+  run,
   strip_source_root,
   test,
 )
@@ -21,6 +22,7 @@ def rules():
     *list_roots.rules(),
     *list_targets.rules(),
     *filedeps.rules(),
+    *run.rules(),
     *strip_source_root.rules(),
     *test.rules()
   ]

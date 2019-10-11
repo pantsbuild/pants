@@ -182,6 +182,24 @@ pub fn project_multi_strs(item: &Value, field: &str) -> Vec<String> {
     .collect()
 }
 
+// This is intended for projecting environment variable maps - i.e. Python Dict[str, str] that are
+// encoded as a Tuple of an (even) number of str's. It could be made more general if we need
+// similar functionality for something else.
+pub fn project_tuple_encoded_map(value: &Value, field: &str) -> Result<BTreeMap<String, String>, String> {
+  let mut map: BTreeMap<String, String> = BTreeMap::new();
+  let parts = project_multi_strs(&value, field);
+  if parts.len() % 2 != 0 {
+    return Err("Error parsing env: odd number of parts".to_owned());
+  }
+  for i in 0..(parts.len() / 2) {
+    map.insert(
+      parts[2 * i].clone(),
+      parts[2 * i + 1].clone(),
+    );
+  }
+  Ok(map)
+}
+
 pub fn project_str(value: &Value, field: &str) -> String {
   let name_val = with_externs(|e| {
     (e.project_ignoring_type)(

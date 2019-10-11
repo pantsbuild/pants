@@ -13,6 +13,7 @@ from typing import Any
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE
 from pants.engine.fs import Digest, DirectoryToMaterialize, PathGlobsAndRoot
+from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveProcessResult
 from pants.engine.native import Function, TypeId
 from pants.engine.nodes import Return, Throw
 from pants.engine.objects import Collection
@@ -538,6 +539,17 @@ class SchedulerSession:
       self._scheduler._to_value(_DirectoryDigests(directory_digests)),
     )
     return self._scheduler._raise_or_return(result)
+
+  def run_local_interactive_process(self, request: InteractiveProcessRequest) -> InteractiveProcessResult:
+    sched_pointer = self._scheduler._scheduler
+
+    result  = self._scheduler._native.lib.run_local_interactive_process(
+      sched_pointer,
+      self._scheduler._to_value(request)
+    )
+    return self._scheduler._raise_or_return(result)
+
+
 
   def materialize_directories(self, directories_paths_and_digests):
     """Creates the specified directories on the file system.
