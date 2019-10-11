@@ -14,7 +14,7 @@ class Platform(Enum):
 
   # TODO: try to turn all of these accesses into v2 dependency injections!
   @memoized_classproperty
-  def current(cls):
+  def current(cls) -> 'Platform':
     return cls(get_normalized_os_name())
 
   @memoized_property
