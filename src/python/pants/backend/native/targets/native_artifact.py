@@ -16,11 +16,15 @@ class NativeArtifact(PayloadField):
   """A BUILD file object declaring a target can be exported to other languages with a native ABI."""
   lib_name: str
 
+  def __init__(self, lib_name: str) -> None:
+    self.lib_name = lib_name
+    self._is_frozen = True
+
   def __hash__(self) -> int:
     return hash(self.lib_name)
 
   def __setattr__(self, key: str, value: Any) -> None:
-    if key == "lib_name":
+    if hasattr(self, "_is_frozen") and key == "lib_name":
       raise FrozenInstanceError(
         f"Attempting to modify the attribute {key} with value {value} on {self}."
       )
