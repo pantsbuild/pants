@@ -6,8 +6,8 @@ from typing import List
 
 from pants.util.collections import (
   Enum,
-  InexhaustivePatternsError,
-  UnrecognizedPatternError,
+  InexhaustiveMatchError,
+  UnrecognizedMatchError,
   assert_single_element,
   factory_dict,
   recursively_update,
@@ -104,25 +104,25 @@ class EnumTest(unittest.TestCase):
     cat = 1
     pig = 2
 
-  def test_valid_patterns(self) -> None:
-    pattern_mapping = {
+  def test_valid_match(self) -> None:
+    match_mapping = {
       EnumTest.Test.dog: "woof",
       EnumTest.Test.cat: "meow",
       EnumTest.Test.pig: "oink",
     }
-    self.assertEqual("woof", EnumTest.Test.dog.pattern_match(pattern_mapping))
-    self.assertEqual("meow", EnumTest.Test.cat.pattern_match(pattern_mapping))
-    self.assertEqual("oink", EnumTest.Test.pig.pattern_match(pattern_mapping))
+    self.assertEqual("woof", EnumTest.Test.dog.match(match_mapping))
+    self.assertEqual("meow", EnumTest.Test.cat.match(match_mapping))
+    self.assertEqual("oink", EnumTest.Test.pig.match(match_mapping))
 
-  def test_incomplete_patterns(self) -> None:
-    with self.assertRaises(InexhaustivePatternsError):
-      EnumTest.Test.pig.pattern_match({
+  def test_inexhaustive_match(self) -> None:
+    with self.assertRaises(InexhaustiveMatchError):
+      EnumTest.Test.pig.match({
         EnumTest.Test.pig: "oink",
       })
 
-  def test_unrecognized_patterns(self) -> None:
-    with self.assertRaises(UnrecognizedPatternError):
-      EnumTest.Test.pig.pattern_match({  # type: ignore
+  def test_unrecognized_match(self) -> None:
+    with self.assertRaises(UnrecognizedMatchError):
+      EnumTest.Test.pig.match({  # type: ignore
         EnumTest.Test.dog: "woof",
         EnumTest.Test.cat: "meow",
         EnumTest.Test.pig: "oink",
