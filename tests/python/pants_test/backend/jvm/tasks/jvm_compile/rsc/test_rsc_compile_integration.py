@@ -104,15 +104,15 @@ class RscCompileIntegration(BaseCompileIT, AbstractTestGenerator):
         },
         'rsc': {
           'jvm_options': [
-            # '-Djava.security.manager=org.pantsbuild.DefinitelyNonExistentSecurityManagerClass'
+            '-Djava.security.manager=java.util.Optional'
           ]
         }
       })
     self.assert_failure(pants_run)
     self.assertIn(
-      'Could not create SecurityManager: org.pantsbuild.DefinitelyNonExistentSecurityManagerClass',
+      'Could not create SecurityManager: java.util.Optional',
       pants_run.stdout_data,
-      'Pants run is expected to fail and contain error about loading the non existent security '
+      'Pants run is expected to fail and contain error about loading an invalid security '
       'manager class, but it did not.')
 
 
