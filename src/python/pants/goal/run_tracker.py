@@ -462,7 +462,7 @@ class RunTracker(Subsystem):
         'critical_path_timings': self.get_critical_path_timings().get_all(),        
         'outcomes': self.outcomes,
       })
-      return stats
+    return stats
 
   def store_stats(self):
     """Store stats about this run in local and optionally remote stats dbs."""
