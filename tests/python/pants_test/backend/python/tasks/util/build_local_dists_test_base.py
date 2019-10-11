@@ -119,8 +119,8 @@ class BuildLocalPythonDistributionsTestBase(PythonTaskTestBase, DeclarativeTaskT
     self.assertEquals(dist, expected_name)
     self.assertEquals(version, expected_snapshot_version)
 
-    expected_platform = {
+    expected_platform = expected_platform.match({
       BuildLocalPythonDistributionsTestBase.ExpectedPlatformType.any: "any",
       BuildLocalPythonDistributionsTestBase.ExpectedPlatformType.current: normalized_current_platform(),
-    }[expected_platform]
+    })
     self.assertEquals(platform, expected_platform)

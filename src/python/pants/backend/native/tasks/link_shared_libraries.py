@@ -166,7 +166,9 @@ class LinkSharedLibraries(NativeTask):
     # We are executing in the results_dir, so get absolute paths for everything.
     cmd = (
       [linker.exe_filename] +
-      {Platform.darwin: ['-Wl,-dylib'], Platform.linux: ['-shared']}[self.platform] +
+      self.platform.match(
+        {Platform.darwin: ['-Wl,-dylib'], Platform.linux: ['-shared']}
+      ) +
       linker.extra_args +
       ['-o', os.path.abspath(resulting_shared_lib_path)] +
       ['-L{}'.format(lib_dir) for lib_dir in link_request.external_lib_dirs] +

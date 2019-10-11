@@ -18,10 +18,10 @@ class Platform(Enum):
 
   @memoized_property
   def runtime_lib_path_env_var(self):
-    return {
+    return self.match({
       self.darwin: "DYLD_LIBRARY_PATH",
       self.linux: "LD_LIBRARY_PATH",
-    }[self]
+    })
 
 
 class PlatformConstraint(Enum):

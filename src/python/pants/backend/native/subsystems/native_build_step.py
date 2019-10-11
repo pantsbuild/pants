@@ -37,10 +37,10 @@ class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsys
                   'for targets of this language.')
 
     register('--toolchain-variant', advanced=True,
-             default={
+             default=Platform.current.match({
                Platform.darwin: ToolchainVariant.llvm,
                Platform.linux: ToolchainVariant.gnu,
-             }[Platform.current],
+             }),
              type=ToolchainVariant,
              help="Whether to use gcc (gnu) or clang (llvm) to compile C and C++. Note that "
                   "currently, despite the choice of toolchain, all linking is done with binutils "

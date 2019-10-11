@@ -79,10 +79,10 @@ class LLVM(NativeTool):
   def linker(self, platform):
     return Linker(
       path_entries=self.path_entries,
-      exe_filename={
+      exe_filename=platform.match({
         Platform.darwin: "ld64.lld",
         Platform.linux: "lld",
-      }[platform],
+      }),
       library_dirs=[],
       linking_library_dirs=[],
       extra_args=[],

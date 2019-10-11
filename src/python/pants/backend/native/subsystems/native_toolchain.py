@@ -119,10 +119,10 @@ class LLVMCppToolchain:
 @rule
 def select_libc_objects(platform: Platform, native_toolchain: NativeToolchain) -> LibcObjects:
   # We use lambdas here to avoid searching for libc on osx, where it will fail.
-  paths = {
+  paths = platform.match({
     Platform.darwin: lambda: [],
     Platform.linux: lambda: native_toolchain._libc_dev.get_libc_objects(),
-  }[platform]()
+  })()
   yield LibcObjects(paths)
 
 
@@ -329,10 +329,7 @@ class ToolchainVariantRequest:
 
 @rule
 def select_c_toolchain(toolchain_variant_request: ToolchainVariantRequest) -> CToolchain:
-  use_gcc = {
-    ToolchainVariant.gnu: True,
-    ToolchainVariant.llvm: False,
-  }[toolchain_variant_request.variant]
+  use_gcc = toolchain_variant_request.variant == ToolchainVariant.gnu
   if use_gcc:
     toolchain_resolved = yield Get(GCCCToolchain, NativeToolchain, toolchain_variant_request.toolchain)
   else:
@@ -342,10 +339,7 @@ def select_c_toolchain(toolchain_variant_request: ToolchainVariantRequest) -> CT
 
 @rule
 def select_cpp_toolchain(toolchain_variant_request: ToolchainVariantRequest) -> CppToolchain:
-  use_gcc = {
-    ToolchainVariant.gnu: True,
-    ToolchainVariant.llvm: False,
-  }[toolchain_variant_request.variant]
+  use_gcc = toolchain_variant_request.variant == ToolchainVariant.gnu
   if use_gcc:
     toolchain_resolved = yield Get(
       GCCCppToolchain, NativeToolchain, toolchain_variant_request.toolchain

@@ -40,10 +40,10 @@ class GCC(NativeTool):
 
   @memoized_method
   def _common_lib_dirs(self, platform):
-    lib64_tuples = {
+    lib64_tuples = platform.match({
       Platform.darwin: [],
       Platform.linux: [('lib64',)]
-    }[platform]
+    })
     return self._filemap(lib64_tuples + [
       ('lib',),
       ('lib/gcc',),

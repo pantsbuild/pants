@@ -38,10 +38,10 @@ class NativeArtifact(PayloadField):
 
   def as_shared_lib(self, platform):
     # TODO: check that the name conforms to some format in the constructor (e.g. no dots?).
-    return {
+    return platform.match({
       Platform.darwin: f"lib{self.lib_name}.dylib",
       Platform.linux: f"lib{self.lib_name}.so",
-    }[platform]
+    })
 
   def _compute_fingerprint(self):
     # TODO: This fingerprint computation boilerplate is error-prone and could probably be
