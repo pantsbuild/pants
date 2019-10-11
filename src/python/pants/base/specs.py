@@ -192,6 +192,25 @@ class AscendantAddresses(Spec):
     ]
 
 
+_specificity = {
+  SingleAddress: 0,
+  SiblingAddresses: 1,
+  AscendantAddresses: 2,
+  DescendantAddresses: 3,
+  type(None): 99
+}
+
+
+def more_specific(spec1: Spec, spec2: Spec) -> Spec:
+  """Returns which of the two specs is more specific.
+
+  This is useful when a target matches multiple specs, and we want to associate it with
+  the "most specific" one, which will make the most intuitive sense to the user.
+  """
+  # Note that if either of spec1 or spec2 is None, the other will be returned.
+  return spec1 if _specificity[type(spec1)] < _specificity[type(spec2)] else spec2
+
+
 class SpecsMatcher(datatype([('tags', tuple), ('exclude_patterns', tuple)])):
   """Contains filters for the output of a Specs match.
 

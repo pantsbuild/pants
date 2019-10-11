@@ -6,6 +6,8 @@ import logging
 import os
 import stat
 import sys
+from dataclasses import dataclass
+from typing import Tuple
 
 from pants.base.build_environment import get_default_pants_config_file
 from pants.engine.fs import FileContent
@@ -16,20 +18,20 @@ from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options import Options
 from pants.util.dirutil import read_file
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.objects import SubclassesOf, datatype
 from pants.util.strutil import ensure_text
 
 
 logger = logging.getLogger(__name__)
 
 
-class OptionsBootstrapper(datatype([
-  ('env_tuples', tuple),
-  ('bootstrap_args', tuple),
-  ('args', tuple),
-  ('config', SubclassesOf(Config)),
-])):
-  """Holds the result of the first stage of options parsing, and assists with parsing full options."""
+@dataclass(frozen=True)
+class OptionsBootstrapper:
+  """Holds the result of the first stage of options parsing, and assists with parsing full
+  options."""
+  env_tuples: Tuple
+  bootstrap_args: Tuple
+  args: Tuple
+  config: Config
 
   @staticmethod
   def get_config_file_paths(env, args):

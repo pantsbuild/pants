@@ -97,10 +97,13 @@ python_library(
   name = 'task_test_base',
   sources = ['task_test_base.py'],
   dependencies = [
+    '3rdparty/python:dataclasses',
     'src/python/pants/goal:context',
     'src/python/pants/ivy',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:memo',
+    'src/python/pants/util:meta',
     'tests/python/pants_test:test_base',
   ]
 )

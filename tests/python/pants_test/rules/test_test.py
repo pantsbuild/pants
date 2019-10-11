@@ -4,9 +4,11 @@
 import logging
 from textwrap import dedent
 
+from pants.base.specs import DescendantAddresses, SingleAddress
 from pants.build_graph.address import Address, BuildFileAddress
+from pants.engine.build_files import AddressProvenanceMap
 from pants.engine.legacy.graph import HydratedTarget
-from pants.engine.legacy.structs import PythonTestsAdaptor
+from pants.engine.legacy.structs import PythonBinaryAdaptor, PythonTestsAdaptor
 from pants.engine.rules import UnionMembership
 from pants.rules.core.core_test_model import TestTarget
 from pants.rules.core.test import (
@@ -115,6 +117,7 @@ class TestTest(TestBase):
         coordinator_of_tests,
         HydratedTarget(addr, target_adaptor, ()),
         UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
+        AddressProvenanceMap(bfaddr_to_spec={}),
         {
           (TestResult, PythonTestsAdaptor):
             lambda _: TestResult(status=Status.FAILURE, stdout='foo', stderr=''),
@@ -124,3 +127,66 @@ class TestTest(TestBase):
       result,
       AddressAndTestResult(addr, TestResult(status=Status.FAILURE, stdout='foo', stderr=''))
     )
+
+  def test_globbed_test_target(self):
+    bfaddr = BuildFileAddress(None, 'tests', 'some/dir')
+    target_adaptor = PythonTestsAdaptor(type_alias='python_tests')
+    with self.captured_logging(logging.INFO):
+      result = run_rule(
+        coordinator_of_tests,
+        HydratedTarget(bfaddr.to_address(), target_adaptor, ()),
+        UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
+        AddressProvenanceMap(bfaddr_to_spec={
+          bfaddr: DescendantAddresses(directory='some/dir')
+        }),
+        {
+          (TestResult, PythonTestsAdaptor):
+            lambda _: TestResult(status=Status.SUCCESS, stdout='foo', stderr=''),
+        })
+
+      self.assertEqual(
+        result,
+        AddressAndTestResult(bfaddr.to_address(),
+                             TestResult(status=Status.SUCCESS, stdout='foo', stderr=''))
+      )
+
+  def test_globbed_non_test_target(self):
+    bfaddr = BuildFileAddress(None, 'bin', 'some/dir')
+    target_adaptor = PythonBinaryAdaptor(type_alias='python_binary')
+    with self.captured_logging(logging.INFO):
+      result = run_rule(
+        coordinator_of_tests,
+        HydratedTarget(bfaddr.to_address(), target_adaptor, ()),
+        UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
+        AddressProvenanceMap(bfaddr_to_spec={
+          bfaddr: DescendantAddresses(directory='some/dir')
+        }),
+        {
+          (TestResult, PythonTestsAdaptor):
+            lambda _: TestResult(status=Status.SUCCESS, stdout='foo', stderr=''),
+        })
+
+      self.assertEqual(
+        result,
+        AddressAndTestResult(bfaddr.to_address(), None)
+      )
+
+  def test_single_non_test_target(self):
+    bfaddr = BuildFileAddress(None, 'bin', 'some/dir')
+    target_adaptor = PythonBinaryAdaptor(type_alias='python_binary')
+    with self.captured_logging(logging.INFO):
+      # Note that this is not the same error message the end user will see, as we're resolving
+      # union Get requests in run_rule, not the real engine.  But this test still asserts that
+      # we error when we expect to error.
+      with self.assertRaisesRegex(AssertionError, r'Rule requested: .* which cannot be satisfied.'):
+        run_rule(
+          coordinator_of_tests,
+          HydratedTarget(bfaddr.to_address(), target_adaptor, ()),
+          UnionMembership(union_rules={TestTarget: [PythonTestsAdaptor]}),
+          AddressProvenanceMap(bfaddr_to_spec={
+            bfaddr: SingleAddress(directory='some/dir', name='bin')
+          }),
+          {
+            (TestResult, TestTarget):
+              lambda _: TestResult(status=Status.SUCCESS, stdout='foo', stderr=''),
+          })

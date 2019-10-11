@@ -52,7 +52,7 @@ python_library(
     ':selectors',
     'src/python/pants/base:project_tree',
     'src/python/pants/option',
-    'src/python/pants/util:objects',
+    'src/python/pants/util:meta',
   ]
 )
 
@@ -95,8 +95,8 @@ python_library(
     ':objects',
     ':parser',
     'src/python/pants/build_graph',
-    'src/python/pants/util:objects',
     'src/python/pants/util:memo',
+    'src/python/pants/util:meta',
   ]
 )
 
@@ -104,11 +104,12 @@ python_library(
   name='isolated_process',
   sources=['isolated_process.py'],
   dependencies=[
+    '3rdparty/python:dataclasses',
     ':fs',
     ':rules',
     ':selectors',
     ':platform',
-    'src/python/pants/util:objects',
+    'src/python/pants/util:meta',
   ]
 )
 
@@ -176,6 +177,8 @@ python_library(
   name='selectors',
   sources=['selectors.py'],
   dependencies=[
+    '3rdparty/python:dataclasses',
+    'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ]
 )

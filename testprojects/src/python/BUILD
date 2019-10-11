@@ -1,6 +1,26 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+target(
+  name = 'all_directories',
+  dependencies = [
+    ':antlr_directory',
+    ':bad_requirements_directory',
+    ':build_file_imports_function_directory',
+    ':build_file_imports_module_directory',
+    ':coordinated_runs_directory',
+    ':interpreter_selection_directory',
+    ':nested_runs_directory',
+    ':no_build_file_directory',
+    ':plugins_directory',
+    ':print_env_directory',
+    ':python_distribution_directory',
+    ':python_targets_directory',
+    ':sources_directory',
+    ':unicode_directory',
+  ],
+)
+
 files(
   name = 'antlr_directory',
   sources = rglobs('antlr/*'),
@@ -57,15 +77,15 @@ files(
 files(
   name = 'python_distribution_directory',
   sources = rglobs('python_distribution/*'),
+  dependencies = [
+    'testprojects/3rdparty:python_directory',
+  ],
 )
 
 
 files(
   name = 'python_targets_directory',
   sources = rglobs('python_targets/*'),
-  dependencies = [
-    'testprojects/src/python/python_targets:test',
-  ],
 )
 
 files(

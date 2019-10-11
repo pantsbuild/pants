@@ -1,12 +1,14 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import dataclasses
 import os
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractproperty
+from dataclasses import dataclass
+from typing import Tuple
 
 from pants.engine.platform import Platform
 from pants.util.memo import memoized_classproperty
-from pants.util.objects import datatype
 from pants.util.strutil import create_path_env_var
 
 
@@ -14,15 +16,6 @@ class _list_field(property):
   """A decorator for methods corresponding to list-valued fields of an `ExtensibleAlgebraic`."""
   __isabstractmethod__ = True
   _field_type = 'list'
-
-
-def _algebraic_data(metaclass):
-  """A class decorator to pull out `_list_fields` from a mixin class for use with a `datatype`."""
-  def wrapper(cls):
-    cls.__bases__ += (metaclass,)
-    cls._list_fields = metaclass._list_fields
-    return cls
-  return wrapper
 
 
 # NB: prototypal inheritance seems *deeply* linked with the idea here!
@@ -105,6 +98,33 @@ class _ExtensibleAlgebraic(ABC):
     return self.copy(**overwrite_kwargs)
 
 
+class _AlgebraicDataclass:
+
+  def copy(self, **kwargs):
+    assert dataclasses.is_dataclass(self)
+    return dataclasses.replace(self, **kwargs)
+
+
+def _hydrate_dataclass_properties(cls):
+  assert dataclasses.is_dataclass(cls)
+  # Ensure that the `_list_fields` classproperty is converted into a simple attribute in the
+  # resulting class.
+  list_fields = cls._list_fields
+  cls._list_fields = list_fields
+  # NB: Delete the `abstractmethod`s defined in superclasses. `dataclass`es do *not* have any
+  # class-level `property` or anything defined for their fields, which appear to only get set when
+  # an instance of the `dataclass` object is created! In order to avoid errors saying that
+  # `abstractproperty`s haven't been resolved, we have to *both* set them to None and remove them
+  # from the `__abstractmethods__` dict.
+  for name in cls.__dataclass_fields__.keys():
+    prev_field_value = getattr(cls, name)
+    assert isinstance(prev_field_value, (_list_field, abstractproperty))
+    setattr(cls, name, None)
+    assert name in cls.__abstractmethods__
+    cls.__abstractmethods__ = cls.__abstractmethods__ - frozenset([name])
+  return cls
+
+
 class _Executable(_ExtensibleAlgebraic):
 
   @_list_field
@@ -116,8 +136,7 @@ class _Executable(_ExtensibleAlgebraic):
     :rtype: list of str
     """
 
-  @property
-  @abstractmethod
+  @abstractproperty
   def exe_filename(self):
     """The "entry point" -- which file to invoke when PATH is set to `path_entries()`.
 
@@ -160,13 +179,15 @@ class _Executable(_ExtensibleAlgebraic):
     }
 
 
-@_algebraic_data(_Executable)
-class Assembler(datatype([
-    'path_entries',
-    'exe_filename',
-    'runtime_library_dirs',
-    'extra_args',
-])): pass
+# TODO: use `pathlib.Path` to avoid using `str` for strings, and file paths, and directory paths!!!
+# Differentiate files and directories!!!
+@_hydrate_dataclass_properties
+@dataclass(frozen=True)
+class Assembler(_AlgebraicDataclass, _Executable):
+  path_entries: Tuple[str, ...]
+  exe_filename: str
+  runtime_library_dirs: Tuple[str, ...]
+  extra_args: Tuple[str]
 
 
 class _LinkerMixin(_Executable):
@@ -203,15 +224,15 @@ class _LinkerMixin(_Executable):
     return ret
 
 
-@_algebraic_data(_LinkerMixin)
-class Linker(datatype([
-    'path_entries',
-    'exe_filename',
-    'runtime_library_dirs',
-    'linking_library_dirs',
-    'extra_args',
-    'extra_object_files',
-])): pass
+@_hydrate_dataclass_properties
+@dataclass(frozen=True)
+class Linker(_AlgebraicDataclass, _LinkerMixin):
+  path_entries: Tuple[str, ...]
+  exe_filename: str
+  runtime_library_dirs: Tuple[str, ...]
+  linking_library_dirs: Tuple[str, ...]
+  extra_args: Tuple[str, ...]
+  extra_object_files: Tuple[str, ...]
 
 
 class _CompilerMixin(_Executable):
@@ -233,14 +254,14 @@ class _CompilerMixin(_Executable):
     return ret
 
 
-@_algebraic_data(_CompilerMixin)
-class CCompiler(datatype([
-    'path_entries',
-    'exe_filename',
-    'runtime_library_dirs',
-    'include_dirs',
-    'extra_args',
-])):
+@_hydrate_dataclass_properties
+@dataclass(frozen=True)
+class CCompiler(_AlgebraicDataclass, _CompilerMixin):
+  path_entries: Tuple[str, ...]
+  exe_filename: str
+  runtime_library_dirs: Tuple[str, ...]
+  include_dirs: Tuple[str, ...]
+  extra_args: Tuple[str, ...]
 
   @property
   def invocation_environment_dict(self):
@@ -251,14 +272,14 @@ class CCompiler(datatype([
     return ret
 
 
-@_algebraic_data(_CompilerMixin)
-class CppCompiler(datatype([
-    'path_entries',
-    'exe_filename',
-    'runtime_library_dirs',
-    'include_dirs',
-    'extra_args',
-])):
+@_hydrate_dataclass_properties
+@dataclass(frozen=True)
+class CppCompiler(_AlgebraicDataclass, _CompilerMixin):
+  path_entries: Tuple[str, ...]
+  exe_filename: str
+  runtime_library_dirs: Tuple[str, ...]
+  include_dirs: Tuple[str, ...]
+  extra_args: Tuple[str, ...]
 
   @property
   def invocation_environment_dict(self):
@@ -269,12 +290,21 @@ class CppCompiler(datatype([
     return ret
 
 
-class CToolchain(datatype([('c_compiler', CCompiler), ('c_linker', Linker)])): pass
+@dataclass(frozen=True)
+class CToolchain:
+  c_compiler: CCompiler
+  c_linker: Linker
 
 
-class CppToolchain(datatype([('cpp_compiler', CppCompiler), ('cpp_linker', Linker)])): pass
+@dataclass(frozen=True)
+class CppToolchain:
+  cpp_compiler: CppCompiler
+  cpp_linker: Linker
 
 
 # TODO: make this an @rule, after we can automatically produce LibcDev and other subsystems in the
 # v2 engine (see #5788).
-class HostLibcDev(datatype(['crti_object', 'fingerprint'])): pass
+@dataclass(frozen=True)
+class HostLibcDev:
+  crti_object: str
+  fingerprint: str

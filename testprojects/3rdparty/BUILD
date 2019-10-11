@@ -22,6 +22,11 @@ files(
 )
 
 files(
+  name = 'jetty_directory',
+  sources = rglobs('jetty/*'),
+)
+
+files(
   name = 'managed_directory',
   sources = rglobs('managed/*'),
 )
@@ -29,4 +34,9 @@ files(
 files(
   name = 'org_directory',
   sources = rglobs('org/*'),
+)
+
+files(
+  name = 'python_directory',
+  sources = rglobs('python/*'),
 )

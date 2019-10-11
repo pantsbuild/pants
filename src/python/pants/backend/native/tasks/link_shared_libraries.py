@@ -128,7 +128,11 @@ class LinkSharedLibraries(NativeTask):
     for ext_dep in self.packaged_native_deps(vt.target):
       external_lib_dirs.append(
         os.path.join(get_buildroot(), ext_dep._sources_field.rel_path, ext_dep.lib_relpath))
-      external_lib_names.extend(ext_dep.native_lib_names)
+
+      native_lib_names = ext_dep.native_lib_names
+      if isinstance(ext_dep.native_lib_names, dict):
+        native_lib_names = self.platform.resolve_for_enum_variant(native_lib_names)
+      external_lib_names.extend(native_lib_names)
 
     link_request = LinkSharedLibraryRequest(
       linker=self.linker(vt.target),

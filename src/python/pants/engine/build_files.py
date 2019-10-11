@@ -3,15 +3,22 @@
 
 import logging
 from collections.abc import MutableMapping, MutableSequence
+from dataclasses import dataclass
 from os.path import dirname, join
+from typing import Dict
 
 from twitter.common.collections import OrderedSet
 
 from pants.base.project_tree import Dir
-from pants.base.specs import SingleAddress, Spec, Specs
+from pants.base.specs import SingleAddress, Spec, Specs, more_specific
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants.engine.addressable import AddressableDescriptor, BuildFileAddresses
+from pants.engine.addressable import (
+  AddressableDescriptor,
+  BuildFileAddresses,
+  ProvenancedBuildFileAddress,
+  ProvenancedBuildFileAddresses,
+)
 from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
@@ -41,28 +48,32 @@ def parse_address_family(address_mapper: AddressMapper, directory: Dir) -> Addre
   The AddressFamily may be empty, but it will not be None.
   """
   patterns = tuple(join(directory.path, p) for p in address_mapper.build_patterns)
-  path_globs = PathGlobs(include=patterns,
-                         exclude=address_mapper.build_ignore_patterns)
+  path_globs = PathGlobs(include=patterns, exclude=address_mapper.build_ignore_patterns)
   snapshot = yield Get(Snapshot, PathGlobs, path_globs)
   files_content = yield Get(FilesContent, Digest, snapshot.directory_digest)
 
   if not files_content:
-    raise ResolveError('Directory "{}" does not contain any BUILD files.'.format(directory.path))
+    raise ResolveError(
+      'Directory "{}" does not contain any BUILD files.'.format(directory.path)
+    )
   address_maps = []
   for filecontent_product in files_content:
-    address_maps.append(AddressMap.parse(filecontent_product.path,
-                                         filecontent_product.content,
-                                         address_mapper.parser))
+    address_maps.append(
+      AddressMap.parse(
+        filecontent_product.path, filecontent_product.content, address_mapper.parser
+      )
+    )
   yield AddressFamily.create(directory.path, address_maps)
 
 
 def _raise_did_you_mean(address_family, name, source=None):
   names = [a.target_name for a in address_family.addressables]
-  possibilities = '\n  '.join(':{}'.format(target_name) for target_name in sorted(names))
+  possibilities = "\n  ".join(":{}".format(target_name) for target_name in sorted(names))
 
-  resolve_error = ResolveError('"{}" was not found in namespace "{}". '
-                               'Did you mean one of:\n  {}'
-                               .format(name, address_family.namespace, possibilities))
+  resolve_error = ResolveError(
+    '"{}" was not found in namespace "{}". '
+    "Did you mean one of:\n  {}".format(name, address_family.namespace, possibilities)
+  )
 
   if source:
     raise resolve_error from source
@@ -89,12 +100,17 @@ def hydrate_struct(address_mapper: AddressMapper, address: Address) -> HydratedS
   address = next(build_address for build_address in addresses if build_address == address)
 
   inline_dependencies = []
+
   def maybe_append(outer_key, value):
     if isinstance(value, str):
-      if outer_key != 'dependencies':
-        inline_dependencies.append(Address.parse(value,
-                                          relative_to=address.spec_path,
-                                          subproject_roots=address_mapper.subproject_roots))
+      if outer_key != "dependencies":
+        inline_dependencies.append(
+          Address.parse(
+            value,
+            relative_to=address.spec_path,
+            subproject_roots=address_mapper.subproject_roots,
+          )
+        )
     elif isinstance(value, Struct):
       collect_inline_dependencies(value)
 
@@ -115,24 +131,29 @@ def hydrate_struct(address_mapper: AddressMapper, address: Address) -> HydratedS
   collect_inline_dependencies(struct)
 
   # And then hydrate the inline dependencies.
-  hydrated_inline_dependencies = yield [Get(HydratedStruct, Address, a) for a in inline_dependencies]
+  hydrated_inline_dependencies = yield [
+    Get(HydratedStruct, Address, a) for a in inline_dependencies
+  ]
   dependencies = [d.value for d in hydrated_inline_dependencies]
 
   def maybe_consume(outer_key, value):
     if isinstance(value, str):
-      if outer_key == 'dependencies':
+      if outer_key == "dependencies":
         # Don't recurse into the dependencies field of a Struct, since those will be explicitly
         # requested by tasks. But do ensure that their addresses are absolute, since we're
         # about to lose the context in which they were declared.
-        value = Address.parse(value,
-                              relative_to=address.spec_path,
-                              subproject_roots=address_mapper.subproject_roots)
+        value = Address.parse(
+          value,
+          relative_to=address.spec_path,
+          subproject_roots=address_mapper.subproject_roots,
+        )
       else:
         value = dependencies[maybe_consume.idx]
         maybe_consume.idx += 1
     elif isinstance(value, Struct):
       value = consume_dependencies(value)
     return value
+
   # NB: Some pythons throw an UnboundLocalError for `idx` if it is a simple local variable.
   maybe_consume.idx = 0
 
@@ -146,8 +167,9 @@ def hydrate_struct(address_mapper: AddressMapper, address: Address) -> HydratedS
 
       if isinstance(value, MutableMapping):
         container_type = type(value)
-        hydrated_args[key] = container_type((k, maybe_consume(key, v))
-                                            for k, v in sorted(value.items(), key=_key_func))
+        hydrated_args[key] = container_type(
+          (k, maybe_consume(key, v)) for k, v in sorted(value.items(), key=_key_func)
+        )
       elif isinstance(value, MutableSequence):
         container_type = type(value)
         hydrated_args[key] = container_type(maybe_consume(key, v) for v in value)
@@ -155,13 +177,13 @@ def hydrate_struct(address_mapper: AddressMapper, address: Address) -> HydratedS
         hydrated_args[key] = maybe_consume(key, value)
     return _hydrate(type(item), address.spec_path, **hydrated_args)
 
-  yield HydratedStruct(consume_dependencies(struct, args={'address': address}))
+  yield HydratedStruct(consume_dependencies(struct, args={"address": address}))
 
 
 def _hydrate(item_type, spec_path, **kwargs):
   # If the item will be Locatable, inject the spec_path.
   if issubclass(item_type, Locatable):
-    kwargs['spec_path'] = spec_path
+    kwargs["spec_path"] = spec_path
 
   try:
     item = item_type(**kwargs)
@@ -180,16 +202,16 @@ def _hydrate(item_type, spec_path, **kwargs):
 
 
 @rule
-def addresses_from_address_families(
-  address_mapper: AddressMapper, specs: Specs
-) -> BuildFileAddresses:
-  """Given an AddressMapper and list of Specs, return matching BuildFileAddresses.
+def provenanced_addresses_from_address_families(
+    address_mapper: AddressMapper, specs: Specs
+) -> ProvenancedBuildFileAddresses:
+  """Given an AddressMapper and list of Specs, return matching ProvenancedBuildFileAddresses.
 
-  :raises: :class:`ResolveError` if:
-     - there were no matching AddressFamilies, or
-     - the Spec matches no addresses for SingleAddresses.
-  :raises: :class:`AddressLookupError` if no targets are matched for non-SingleAddress specs.
-  """
+:raises: :class:`ResolveError` if:
+   - there were no matching AddressFamilies, or
+   - the Spec matches no addresses for SingleAddresses.
+:raises: :class:`AddressLookupError` if no targets are matched for non-SingleAddress specs.
+"""
   # Capture a Snapshot covering all paths for these Specs, then group by directory.
   snapshot = yield Get(Snapshot, PathGlobs, _spec_to_globs(address_mapper, specs))
   dirnames = {dirname(f) for f in snapshot.files}
@@ -197,6 +219,8 @@ def addresses_from_address_families(
   address_family_by_directory = {af.namespace: af for af in address_families}
 
   matched_addresses = OrderedSet()
+  addr_to_provenance: Dict[BuildFileAddress, Spec] = {}
+
   for spec in specs:
     # NB: if a spec is provided which expands to some number of targets, but those targets match
     # --exclude-target-regexp, we do NOT fail! This is why we wait to apply the tag and exclude
@@ -207,19 +231,52 @@ def addresses_from_address_families(
       raise ResolveError(e) from e
 
     try:
-      all_addr_tgt_pairs = spec.address_target_pairs_from_address_families(addr_families_for_spec)
+      all_addr_tgt_pairs = spec.address_target_pairs_from_address_families(
+        addr_families_for_spec
+      )
+      for addr, _ in all_addr_tgt_pairs:
+        # A target might be covered by multiple specs, so we take the most specific one.
+        addr_to_provenance[addr] = more_specific(addr_to_provenance.get(addr), spec)
     except Spec.AddressResolutionError as e:
       raise AddressLookupError(e) from e
     except SingleAddress._SingleAddressResolutionError as e:
       _raise_did_you_mean(e.single_address_family, e.name, source=e)
 
     matched_addresses.update(
-      addr for (addr, tgt) in all_addr_tgt_pairs
+      addr
+      for (addr, tgt) in all_addr_tgt_pairs
       if specs.matcher.matches_target_address_pair(addr, tgt)
     )
 
   # NB: This may be empty, as the result of filtering by tag and exclude patterns!
-  yield BuildFileAddresses(tuple(matched_addresses))
+  yield ProvenancedBuildFileAddresses(
+    tuple(
+      ProvenancedBuildFileAddress(
+        build_file_address=addr, provenance=addr_to_provenance.get(addr)
+      )
+      for addr in matched_addresses
+    )
+  )
+
+
+@rule
+def remove_provenance(pbfas: ProvenancedBuildFileAddresses) -> BuildFileAddresses:
+  yield BuildFileAddresses(tuple(pbfa.build_file_address for pbfa in pbfas))
+
+
+@dataclass(frozen=True)
+class AddressProvenanceMap:
+  bfaddr_to_spec: Dict[BuildFileAddress, Spec]
+
+  def is_single_address(self, address: BuildFileAddress):
+    return isinstance(self.bfaddr_to_spec.get(address), SingleAddress)
+
+
+@rule
+def address_provenance_map(pbfas: ProvenancedBuildFileAddresses) -> AddressProvenanceMap:
+  return AddressProvenanceMap(
+    bfaddr_to_spec={pbfa.build_file_address: pbfa.provenance for pbfa in pbfas.dependencies}
+  )
 
 
 def _spec_to_globs(address_mapper, specs):
@@ -233,9 +290,9 @@ def _spec_to_globs(address_mapper, specs):
 def create_graph_rules(address_mapper):
   """Creates tasks used to parse Structs from BUILD files.
 
-  :param address_mapper_key: The subject key for an AddressMapper instance.
-  :param symbol_table: A SymbolTable instance to provide symbols for Address lookups.
-  """
+:param address_mapper_key: The subject key for an AddressMapper instance.
+:param symbol_table: A SymbolTable instance to provide symbols for Address lookups.
+"""
 
   @rule
   def address_mapper_singleton() -> AddressMapper:
@@ -248,7 +305,9 @@ def create_graph_rules(address_mapper):
     parse_address_family,
     # Spec handling: locate directories that contain build files, and request
     # AddressFamilies for each of them.
-    addresses_from_address_families,
+    provenanced_addresses_from_address_families,
+    remove_provenance,
+    address_provenance_map,
     # Root rules representing parameters that might be provided via root subjects.
     RootRule(Address),
     RootRule(BuildFileAddress),

@@ -6,7 +6,9 @@ import os
 import subprocess
 from abc import abstractmethod
 from contextlib import closing, contextmanager
+from dataclasses import dataclass
 from io import BytesIO
+from typing import Any, Tuple
 
 from pants.goal.goal import Goal
 from pants.ivy.bootstrapper import Bootstrapper
@@ -15,7 +17,6 @@ from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
 from pants.util.memo import memoized_method
 from pants.util.meta import classproperty
-from pants.util.objects import SubclassesOf, TypedCollection, datatype
 from pants_test.test_base import TestBase
 
 
@@ -327,14 +328,14 @@ class DeclarativeTaskTestMixin:
     """Helper method to instantiate tasks besides self._testing_task_type in the test workdir."""
     return task_type(context, self.test_workdir)
 
-  class TaskInvocationResult(datatype([
-      'context',
-      ('before_tasks', TypedCollection(SubclassesOf(Task))),
-      ('this_task', SubclassesOf(Task)),
-      ('after_tasks', TypedCollection(SubclassesOf(Task))),
-  ])): pass
+  @dataclass(frozen=True)
+  class TaskInvocationResult:
+    context: Any
+    before_tasks: Tuple[Task, ...]
+    this_task: Task
+    after_tasks: Tuple[Task, ...]
 
-  def invoke_tasks(self, target_closure=None, **context_kwargs):
+  def invoke_tasks(self, target_closure=None, **context_kwargs) -> TaskInvocationResult:
     """Create and execute the declaratively specified tasks in order.
 
     Create instances of and execute task types in `self.run_before_task_types()`, then
@@ -345,7 +346,6 @@ class DeclarativeTaskTestMixin:
     :param **context_kwargs: kwargs passed to `self.context()`. Note that this method already sets
                                     `for_task_types`.
     :return: A datatype containing the created context and the task instances which were executed.
-    :rtype: :class:`DeclarativeTaskTestMixin.TaskInvocationResult`
     :raises: If any exception is raised during task execution, the context will be attached to the
              exception object as the attribute '_context' with setattr() before re-raising.
     """
@@ -385,6 +385,7 @@ class DeclarativeTaskTestMixin:
 
     return self.TaskInvocationResult(
       context=context,
-      before_tasks=run_before_task_instances,
+      before_tasks=tuple(run_before_task_instances),
       this_task=current_task_instance,
-      after_tasks=run_after_task_instances)
+      after_tasks=tuple(run_after_task_instances),
+    )

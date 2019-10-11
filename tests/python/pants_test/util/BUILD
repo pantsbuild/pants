@@ -83,6 +83,7 @@ python_tests(
   name = 'meta',
   sources = ['test_meta.py'],
   dependencies = [
+    '3rdparty/python:dataclasses',
     'src/python/pants/util:meta',
     'tests/python/pants_test:test_base',
   ],
