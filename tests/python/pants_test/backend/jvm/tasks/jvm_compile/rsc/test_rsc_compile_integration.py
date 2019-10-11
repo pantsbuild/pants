@@ -93,20 +93,5 @@ class RscCompileIntegration(BaseCompileIT, AbstractTestGenerator):
       'compile', 'testprojects/src/scala/org/pantsbuild/testproject/javasources',
       config=config)
 
-  def test_rsc_zinc_hermetic_integration(self):
-    pants_run = self.run_pants(
-      ['compile', 'examples/src/scala/org/pantsbuild/example/hello/exe'],
-      config={
-        'compile.rsc': {
-          'execution_strategy': 'hermetic',
-          'incremental': False,
-          'workflow': 'rsc-and-zinc'
-        },
-        'cache': {
-          'ignore': True
-        }
-      })
-    self.assert_success(pants_run)
-
 
 RscCompileIntegration.generate_tests()

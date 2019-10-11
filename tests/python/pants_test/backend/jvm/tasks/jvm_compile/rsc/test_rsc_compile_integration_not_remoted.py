@@ -27,3 +27,18 @@ class RscCompileIntegrationNotRemoted(BaseCompileIT):
       pants_run.stdout_data,
       'Pants run is expected to fail and contain error about loading an invalid security '
       'manager class, but it did not.')
+
+  def test_rsc_zinc_hermetic_integration(self):
+    pants_run = self.run_pants(
+      ['compile', 'examples/src/scala/org/pantsbuild/example/hello/exe'],
+      config={
+        'compile.rsc': {
+          'execution_strategy': 'hermetic',
+          'incremental': False,
+          'workflow': 'rsc-and-zinc'
+        },
+        'cache': {
+          'ignore': True
+        }
+      })
+    self.assert_success(pants_run)
