@@ -102,11 +102,11 @@ class RscCompileIntegration(BaseCompileIT, AbstractTestGenerator):
           'workflow': 'rsc-and-zinc',
           'execution_strategy': 'hermetic',
         },
-        'rsc': {
-          'jvm_options': [
-            '-Djava.security.manager=java.util.Optional'
-          ]
-        }
+        # 'rsc': {
+        #   'jvm_options': [
+        #     '-Djava.security.manager=java.util.Optional'
+        #   ]
+        # }
       })
     self.assert_failure(pants_run)
     self.assertIn(
