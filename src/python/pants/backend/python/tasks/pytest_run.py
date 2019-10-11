@@ -475,7 +475,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
       profile = self.get_options().profile
       if profile:
-        env['PEX_PROFILE_FILENAME'] = '{}.subprocess.{:.6f}'.format(profile, time.time())
+        env['PEX_PROFILE_FILENAME'] = f'{profile}.subprocess.{time.time():.6f}'.
 
       with self.context.new_workunit(name='run',
                                      cmd=safe_shlex_join(pex.cmdline(args)),
