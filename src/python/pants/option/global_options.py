@@ -5,7 +5,6 @@ import multiprocessing
 import os
 import sys
 from dataclasses import dataclass
-from enum import Enum
 from typing import Any
 
 from pants.base.build_environment import (
@@ -21,6 +20,7 @@ from pants.option.errors import OptionsError
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
+from pants.util.collections import Enum
 
 
 class GlobMatchErrorBehavior(Enum):

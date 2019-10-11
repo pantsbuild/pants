@@ -9,6 +9,7 @@ python_library(
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/rules/core',
     'src/python/pants/subsystem',
+    'src/python/pants/util:collections',
     'src/python/pants/util:memo',
   ],
 )

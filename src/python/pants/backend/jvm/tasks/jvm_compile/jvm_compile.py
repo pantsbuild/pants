@@ -3,7 +3,6 @@
 
 import functools
 import os
-from enum import Enum
 from multiprocessing import cpu_count
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext

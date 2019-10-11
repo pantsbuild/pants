@@ -13,6 +13,7 @@ python_library(
     'src/python/pants/base:deprecated',
     'src/python/pants/base:hash_utils',
     'src/python/pants/engine:selectors',
+    'src/python/pants/util:collections',
     'src/python/pants/util:eval',
     'src/python/pants/util:meta',
     'src/python/pants/util:memo',

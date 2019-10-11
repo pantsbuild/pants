@@ -4,7 +4,6 @@
 import itertools
 import re
 from dataclasses import dataclass
-from enum import Enum
 from typing import Tuple
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
@@ -16,6 +15,7 @@ from pants.engine.objects import Collection
 from pants.engine.rules import console_rule, optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.subsystem.subsystem import Subsystem
+from pants.util.collections import Enum
 from pants.util.memo import memoized_method
 
 

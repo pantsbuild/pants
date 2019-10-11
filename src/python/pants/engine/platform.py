@@ -1,9 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from enum import Enum
-
 from pants.engine.rules import rule
+from pants.util.collections import Enum
 from pants.util.memo import memoized_classproperty, memoized_property
 from pants.util.osutil import get_normalized_os_name
 
