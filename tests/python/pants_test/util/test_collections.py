@@ -4,7 +4,14 @@
 import unittest
 from typing import List
 
-from pants.util.collections import assert_single_element, factory_dict, recursively_update
+from pants.util.collections import (
+  Enum,
+  InexhaustivePatternsError,
+  UnrecognizedPatternError,
+  assert_single_element,
+  factory_dict,
+  recursively_update,
+)
 
 
 class TestCollections(unittest.TestCase):
@@ -88,3 +95,36 @@ class TestCollections(unittest.TestCase):
       assert_single_element(too_many_elements)
     expected_msg = "iterable [1, 2] has more than one element."
     self.assertEqual(expected_msg, str(cm.exception))
+
+
+class EnumTest(unittest.TestCase):
+
+  class Test(Enum):
+    dog = 0
+    cat = 1
+    pig = 2
+
+  def test_valid_patterns(self) -> None:
+    pattern_mapping = {
+      EnumTest.Test.dog: "woof",
+      EnumTest.Test.cat: "meow",
+      EnumTest.Test.pig: "oink",
+    }
+    self.assertEqual("woof", EnumTest.Test.dog.pattern_match(pattern_mapping))
+    self.assertEqual("meow", EnumTest.Test.cat.pattern_match(pattern_mapping))
+    self.assertEqual("oink", EnumTest.Test.pig.pattern_match(pattern_mapping))
+
+  def test_incomplete_patterns(self) -> None:
+    with self.assertRaises(InexhaustivePatternsError):
+      EnumTest.Test.pig.pattern_match({
+        EnumTest.Test.pig: "oink",
+      })
+
+  def test_unrecognized_patterns(self) -> None:
+    with self.assertRaises(UnrecognizedPatternError):
+      EnumTest.Test.pig.pattern_match({  # type: ignore
+        EnumTest.Test.dog: "woof",
+        EnumTest.Test.cat: "meow",
+        EnumTest.Test.pig: "oink",
+        "horse": "neigh",
+      })

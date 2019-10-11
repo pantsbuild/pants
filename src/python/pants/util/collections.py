@@ -2,7 +2,17 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import collections
-from typing import Callable, DefaultDict, Iterable, MutableMapping, TypeVar
+from enum import Enum as StdLibEnum
+from typing import (
+  Callable,
+  DefaultDict,
+  Iterable,
+  Mapping,
+  MutableMapping,
+  TypeVar,
+  ValuesView,
+  cast,
+)
 
 
 K = TypeVar('K')
@@ -63,3 +73,42 @@ def assert_single_element(iterable: Iterable[T]) -> T:
     return first_item
 
   raise ValueError(f"iterable {iterable!r} has more than one element.")
+
+
+E = TypeVar('E', bound='Enum')
+
+
+class PatternMatchError(ValueError):
+  """Issue when using pattern_match() on an enum."""
+
+
+class InexhaustivePatternsError(PatternMatchError):
+  """Not all values of the enum specified in the pattern match."""
+
+
+class UnrecognizedPatternError(PatternMatchError):
+  """A value is used that is not a part of the enum."""
+
+
+class Enum(StdLibEnum):
+
+  def all_values(self) -> ValuesView['Enum']:
+    return self.__class__.__members__.values()
+
+  def pattern_match(self, enum_values_to_results: Mapping[E, V]) -> V:
+    unrecognized_values = [
+      value for value in enum_values_to_results if value not in self.all_values()
+    ]
+    missing_values = [
+      value for value in self.all_values() if value not in enum_values_to_results
+    ]
+    if unrecognized_values:
+      raise UnrecognizedPatternError(
+        f"Pattern match includes values not defined in the enum. Unrecognized: {unrecognized_values}"
+      )
+    if missing_values:
+      raise InexhaustivePatternsError(
+        f"All enum values must be covered by the pattern match. Missing: {missing_values}"
+      )
+    typed_self = cast(E, self)
+    return enum_values_to_results[typed_self]
