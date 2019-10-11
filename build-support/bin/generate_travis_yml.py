@@ -595,7 +595,16 @@ def rust_tests_osx() -> Dict:
     "osx_image": "xcode8.3",
     "before_install": [
       './build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"',
+      # We don't use the standard travis "addons" section here because it will either silently
+      # fail (on older images) or cause a multi-minute `brew update` (on newer images), neither of
+      # which we want. This doesn't happen if we just manually run `brew cask install`.
+      #
+      # Also, you will notice in the travis log that it says that OSX needs to be rebooted before
+      # this install will work. This is a lie.
       "brew cask install osxfuse",
+      # We don't need to install openssl because it already happens to be installed on this image.
+      # This is good, because `brew install openssl` would trigger the same issues as noted on why
+      # we don't use the `addons` section.
     ],
     "env": _osx_env_with_pyenv(python_version=PythonVersion.py36) + [
       "CACHE_NAME=rust_tests.osx"
