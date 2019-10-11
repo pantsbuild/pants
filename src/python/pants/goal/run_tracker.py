@@ -451,16 +451,16 @@ class RunTracker(Subsystem):
       'run_info': self.run_information(),
       'artifact_cache_stats': self.artifact_cache_stats.get_all(),
       'pantsd_stats': self.pantsd_stats.get_all(),
+      'cumulative_timings': self.cumulative_timings.get_all(),
+      'recorded_options': self._get_options_to_record(),
     }
     if self._stats_version == 2:
       stats['workunits'] = self.json_reporter.results
     else:
       stats.update({
-        'cumulative_timings': self.cumulative_timings.get_all(),
         'self_timings': self.self_timings.get_all(),
         'critical_path_timings': self.get_critical_path_timings().get_all(),        
         'outcomes': self.outcomes,
-        'recorded_options': self._get_options_to_record(),
       })
       return stats
 
