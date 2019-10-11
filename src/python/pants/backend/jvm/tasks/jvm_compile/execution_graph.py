@@ -20,7 +20,7 @@ class Job:
   """
 
   def __init__(self, key, fn, dependencies, size=0, on_success=None, on_failure=None,
-    run_asap=False, duration=None):
+    run_asap=False, duration=None, options_scope=None, target=None):
     """
 
     :param key: Key used to reference and look up jobs
@@ -40,6 +40,8 @@ class Job:
     self.on_failure = on_failure
     self.run_asap = run_asap
     self.duration = duration
+    self.options_scope = options_scope
+    self.target = target
 
   def __call__(self):
     self.fn()

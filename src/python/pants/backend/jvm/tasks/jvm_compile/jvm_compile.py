@@ -774,27 +774,33 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     # The cache checking job doesn't technically have any dependencies, but we want to delay it
     # until immediately before we would otherwise try compiling, so we indicate that it depends on
     # all compile dependencies.
-    double_check_cache_job = Job(self.exec_graph_double_check_cache_key_for_target(compile_target),
-              functools.partial(self._default_double_check_cache_for_vts, ivts),
-              compile_deps)
+    double_check_cache_job = Job(
+      key=self.exec_graph_double_check_cache_key_for_target(compile_target),
+      fn=functools.partial(self._default_double_check_cache_for_vts, ivts),
+      dependencies=compile_deps,
+      options_scope=self.options_scope,
+      target=compile_target)
     # The compile job depends on the cache check job. This decomposition is necessary in order to
     # support more complex situations where compilation runs multiple jobs in parallel, and wants to
     # double check the cache before starting any of them.
-    compile_job = Job(self.exec_graph_key_for_target(compile_target),
-              functools.partial(
-                self._default_work_for_vts,
-                ivts,
-                compile_context,
-                'runtime_classpath',
-                counter,
-                all_compile_contexts,
-                classpath_product),
-              [double_check_cache_job.key] + compile_deps,
-              self._size_estimator(compile_context.sources),
-              # If compilation and analysis work succeeds, validate the vts.
-              # Otherwise, fail it.
-              on_success=ivts.update,
-              on_failure=ivts.force_invalidate)
+    compile_job = Job(
+      key=self.exec_graph_key_for_target(compile_target),
+      fn=functools.partial(
+        self._default_work_for_vts,
+        ivts,
+        compile_context,
+        'runtime_classpath',
+        counter,
+        all_compile_contexts,
+        classpath_product),
+      dependencies=[double_check_cache_job.key] + compile_deps,
+      size=self._size_estimator(compile_context.sources),
+      # If compilation and analysis work succeeds, validate the vts.
+      # Otherwise, fail it.
+      on_success=ivts.update,
+      on_failure=ivts.force_invalidate,
+      options_scope=self.options_scope,
+      target=compile_target)
     return ([double_check_cache_job, compile_job], 1)
 
   def check_cache(self, vts):
@@ -833,6 +839,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     # that, though (as well as the source files?).
     def record(k, v):
       self.context.run_tracker.report_target_info(self.options_scope, target, [stats_key, k], v)
+    self.context.log.debug("self.options_scope:{}, target:{}, stats_key:{}".format(self.options_scope, target, stats_key))
     self.context.log.debug(
       '[Timing({})] {}: {} sec; {} sources; {} classpath elements'
       .format(stats_key, target.address.spec, compiletime, sources_len, classpath_len))

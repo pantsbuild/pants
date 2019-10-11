@@ -428,9 +428,10 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       # As in JvmCompile.create_compile_jobs, we create a cache-double-check job that all "real" work
       # depends on. It depends on completion of the same dependencies as the rsc job in order to run
       # as late as possible, while still running before rsc or zinc.
-      return Job(cache_doublecheck_key,
-                 functools.partial(self._double_check_cache_for_vts, ivts, zinc_compile_context),
-                 dependencies=list(dep_keys))
+      return Job(key=cache_doublecheck_key,
+        fn=functools.partial(self._default_double_check_cache_for_vts, ivts),
+        dependencies=list(dep_keys),
+        options_scope=self.options_scope)
 
     def make_rsc_job(target, dep_targets):
       return Job(
@@ -446,6 +447,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         # processed by rsc.
         dependencies=[cache_doublecheck_key] + list(all_zinc_rsc_invalid_dep_keys(dep_targets)),
         size=self._size_estimator(rsc_compile_context.sources),
+        options_scope=self.options_scope,
+        target=target
       )
 
     def only_zinc_invalid_dep_keys(invalid_deps):
@@ -467,6 +470,8 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
           CompositeProductAdder(*output_products)),
         dependencies=[cache_doublecheck_key] + list(dep_keys),
         size=self._size_estimator(zinc_compile_context.sources),
+        options_scope=self.options_scope,
+        target=target
       )
 
     workflow = rsc_compile_context.workflow
@@ -553,7 +558,9 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         fn=ivts.update,
         dependencies=[job.key for job in compile_jobs],
         run_asap=True,
-        on_failure=ivts.force_invalidate)
+        on_failure=ivts.force_invalidate,
+        options_scope=self.options_scope,
+        target=compile_target)
 
     all_jobs = cache_doublecheck_jobs + rsc_jobs + zinc_jobs + [write_to_cache_job]
     return (all_jobs, len(compile_jobs))
