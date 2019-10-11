@@ -589,16 +589,13 @@ def rust_tests_osx() -> Dict:
     **_RUST_TESTS_BASE,
     "name": "Rust tests - OSX",
     "os": "osx",
-    "osx_image": "xcode11",
-    # We cannot currently run fuse tests in CI, as the osx_image doesn't support it.
-    # Until that changes, no need to install osxfuse.
-    # "addons": {
-    #   "homebrew": {
-    #     "casks": ["osxfuse"]
-    #   }
-    # },
+    # We need to use xcode8.3 because newer versions of OSX won't let new kexts be installed
+    # without travis taking some action, and we need the osxfuse kext.
+    # See https://github.com/travis-ci/travis-ci/issues/10017
+    "osx_image": "xcode8.3",
     "before_install": [
       './build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"',
+      "brew cask install osxfuse",
     ],
     "env": _osx_env_with_pyenv(python_version=PythonVersion.py36) + [
       "CACHE_NAME=rust_tests.osx"
