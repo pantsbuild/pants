@@ -104,7 +104,8 @@ class RscCompileIntegration(BaseCompileIT, AbstractTestGenerator):
         },
         'rsc': {
           'jvm_options': [
-            '-Djava.security.manager=org.pantsbuild.DefinitelyNonExistentSecurityManagerClass']
+            # '-Djava.security.manager=org.pantsbuild.DefinitelyNonExistentSecurityManagerClass'
+          ]
         }
       })
     self.assert_failure(pants_run)
