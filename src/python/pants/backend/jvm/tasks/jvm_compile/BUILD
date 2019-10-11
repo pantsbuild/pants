@@ -70,6 +70,7 @@ python_library(
   sources = ['execution_graph.py'],
   dependencies = [
     'src/python/pants/base:worker_pool',
+    'src/python/pants/util:contextutil',
   ],
 )
 

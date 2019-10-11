@@ -306,10 +306,9 @@ class ExecutionGraph:
 
       while not status_table.are_all_done():
         try:
-          finished_key, result_status, value, duration = finished_queue.get(timeout=10)
+          (finished_key, result_status, value, duration) = finished_queue.get(timeout=10)
         except queue.Empty:
           self.log_progress(log, status_table)
-
           try_to_submit_jobs_from_heap()
           continue
 
@@ -344,7 +343,7 @@ class ExecutionGraph:
           for dependee in direct_dependees:
             if status_table.is_unstarted(dependee):
               status_table.mark_queued(dependee)
-              finished_queue.put((dependee, CANCELED, None))
+              finished_queue.put((dependee, CANCELED, None, 0))
 
         # Log success or failure for this job.
         if result_status is FAILED:
