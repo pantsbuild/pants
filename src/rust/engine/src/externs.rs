@@ -12,8 +12,10 @@ use std::string::FromUtf8Error;
 use crate::core::{Failure, Function, Key, TypeId, Value};
 use crate::handles::{DroppingHandle, Handle};
 use crate::interning::Interns;
+use itertools::Itertools;
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
+use std::collections::BTreeMap;
 
 /// Return the Python value None.
 pub fn none() -> Handle {
@@ -713,6 +715,18 @@ impl BufferBuffer {
       .into_iter()
       .map(String::from_utf8)
       .collect()
+  }
+
+  pub fn to_map(&self, name: &'static str) -> Result<BTreeMap<String, String>, String> {
+    let strings = self
+      .to_strings()
+      .map_err(|err| format!("Error decoding UTF8 from {}: {}", name, err))?;
+
+    if strings.len() % 2 != 0 {
+      return Err(format!("Map for {} had an odd number of elements", name));
+    }
+
+    Ok(strings.into_iter().tuples::<(_, _)>().collect())
   }
 }
 
