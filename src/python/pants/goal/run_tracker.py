@@ -447,24 +447,22 @@ class RunTracker(Subsystem):
     return run_information
 
   def _stats(self):
+    stats = {
+      'run_info': self.run_information(),
+      'artifact_cache_stats': self.artifact_cache_stats.get_all(),
+      'pantsd_stats': self.pantsd_stats.get_all(),
+    }
     if self._stats_version == 2:
-      return {
-        'run_info': self.run_information(),
-        'artifact_cache_stats': self.artifact_cache_stats.get_all(),
-        'pantsd_stats': self.pantsd_stats.get_all(),
-        'workunits': self.json_reporter.results,
-      }
+      stats['workunits'] = self.json_reporter.results
     else:
-      return {
-        'run_info': self.run_information(),
+      stats.update({
         'cumulative_timings': self.cumulative_timings.get_all(),
         'self_timings': self.self_timings.get_all(),
-        'critical_path_timings': self.get_critical_path_timings().get_all(),
-        'artifact_cache_stats': self.artifact_cache_stats.get_all(),
-        'pantsd_stats': self.pantsd_stats.get_all(),
+        'critical_path_timings': self.get_critical_path_timings().get_all(),        
         'outcomes': self.outcomes,
         'recorded_options': self._get_options_to_record(),
-      }
+      })
+      return stats
 
   def store_stats(self):
     """Store stats about this run in local and optionally remote stats dbs."""
