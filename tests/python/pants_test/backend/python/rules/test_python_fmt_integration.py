@@ -52,6 +52,20 @@ class PythonFmtIntegrationTest(PantsRunIntegrationTest):
     self.assertNotIn("reformatted", pants_run.stderr_data)
     self.assertIn("1 file left unchanged", pants_run.stderr_data)
 
+  def test_black_lint_given_formatted_file(self):
+    with build_directory() as root_dir:
+      code = write_consistently_formatted_file(root_dir, "hello.py")
+      command = [
+        'lint-v2',
+        f'{root_dir}'
+      ]
+      pants_run = self.run_pants(command=command)
+      self.assert_success(pants_run)
+      after_formatting = code.read_text()
+      self.assertEqual(CONSISTENTLY_FORMATTED_HELLO, after_formatting)
+    self.assertNotIn("reformatted", pants_run.stderr_data)
+    self.assertIn("1 file would be left unchanged", pants_run.stderr_data)
+
   def test_black_two_python_sources_should_leave_two_files_unchanged(self):
     with build_directory() as root_dir:
       foo = write_consistently_formatted_file(root_dir, "foo.py")
@@ -108,4 +122,52 @@ class PythonFmtIntegrationTest(PantsRunIntegrationTest):
       after_formatting = code.read_text()
       self.assertEqual(CONSISTENTLY_FORMATTED_HELLO, after_formatting)
     self.assertIn("1 file reformatted", pants_run.stderr_data)
+    self.assertNotIn("unchanged", pants_run.stderr_data)
+
+  def test_black_lint_should_fail_but_not_format_python_code(self):
+    with build_directory() as root_dir:
+      code = write_inconsistently_formatted_file(root_dir, "hello.py")
+      command = [
+        'lint-v2',
+        f'{root_dir}'
+      ]
+      pants_run = self.run_pants(command=command)
+      self.assert_failure(pants_run)
+      after_formatting = code.read_text()
+      self.assertEqual(INCONSISTENTLY_FORMATTED_HELLO, after_formatting)
+    self.assertIn("1 file would be reformatted", pants_run.stderr_data)
+    self.assertNotIn("1 file reformatted", pants_run.stderr_data)
+    self.assertNotIn("unchanged", pants_run.stderr_data)
+
+  def test_black_lint_given_multiple_files(self):
+    with build_directory() as root_dir:
+      write_inconsistently_formatted_file(root_dir, "incorrect.py")
+      write_inconsistently_formatted_file(root_dir, "broken.py")
+      write_consistently_formatted_file(root_dir, "pristine.py")
+      command = [
+        'lint-v2',
+        f'{root_dir}'
+      ]
+      pants_run = self.run_pants(command=command)
+      self.assert_failure(pants_run)
+    self.assertIn("2 files would be reformatted", pants_run.stderr_data)
+    self.assertNotIn("2 files reformatted", pants_run.stderr_data)
+    self.assertIn("1 file would be left unchanged", pants_run.stderr_data)
+    self.assertNotIn("1 file left unchanged", pants_run.stderr_data)
+
+  def test_black_lint_given_multiple_targets(self):
+    with build_directory() as a_dir:
+      with build_directory() as another_dir:
+        write_inconsistently_formatted_file(a_dir, "incorrect.py")
+        write_inconsistently_formatted_file(another_dir, "broken.py")
+        write_inconsistently_formatted_file(another_dir, "messed_up.py")
+        command = [
+          'lint-v2',
+          f'{a_dir}',
+          f'{another_dir}'
+        ]
+        pants_run = self.run_pants(command=command)
+        self.assert_failure(pants_run)
+    self.assertIn("1 file would be reformatted", pants_run.stderr_data)
+    self.assertIn("2 files would be reformatted", pants_run.stderr_data)
     self.assertNotIn("unchanged", pants_run.stderr_data)
