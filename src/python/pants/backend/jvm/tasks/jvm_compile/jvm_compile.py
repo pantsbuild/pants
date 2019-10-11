@@ -1,7 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import enum
 import functools
 import os
 from multiprocessing import cpu_count
@@ -39,6 +38,7 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.option.ranked_value import RankedValue
 from pants.reporting.reporting_utils import items_to_report_element
+from pants.util.collections import Enum
 from pants.util.contextutil import Timer, temporary_dir
 from pants.util.dirutil import (
   fast_relpath,
@@ -68,7 +68,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   size_estimators = create_size_estimators()
 
-  class Compiler(enum.Enum):
+  class Compiler(Enum):
     ZINC = 'zinc'
     RSC = 'rsc'
     JAVAC = 'javac'
