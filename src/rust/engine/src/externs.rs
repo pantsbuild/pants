@@ -726,7 +726,7 @@ impl BufferBuffer {
       return Err(format!("Map for {} had an odd number of elements", name));
     }
 
-    Ok(strings.into_iter().tuple_windows::<(_, _)>().collect())
+    Ok(strings.into_iter().tuples::<(_, _)>().collect())
   }
 }
 
