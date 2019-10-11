@@ -4,7 +4,6 @@
 import os
 from pathlib import Path
 from setuptools import find_packages, setup
-from textwrap import dedent
 
 # NB: In this example project, we import a module added via `setup_requires` in our BUILD file, and
 # make some modifications to the `setup.py` project. These get picked up and tested in
@@ -15,10 +14,9 @@ this_dir_hash = dirhash('.', 'sha256')
 
 checksum_module_dir = Path('checksum')
 checksum_module_dir.mkdir()
-with (checksum_module_dir / '__init__.py').open(mode='w') as f:
-  f.write(dedent(f"""\
-  checksum = '{this_dir_hash}'
-  """))
+checksum_module_dir.joinpath('__init__.py').write_text(f"""\
+checksum = '{this_dir_hash}'
+""")
 
 setup(
   name='checksummed_version_dist',
