@@ -105,6 +105,7 @@ python_library(
   name = 'hash_utils',
   sources = ['hash_utils.py'],
   dependencies = [
+    '3rdparty/python:dataclasses',
     '3rdparty/python:typing-extensions',
     'src/python/pants/util:strutil',
     'src/python/pants/util:ordered_set',

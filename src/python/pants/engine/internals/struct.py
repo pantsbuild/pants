@@ -4,6 +4,7 @@
 from collections.abc import MutableMapping, MutableSequence
 from typing import Any, Dict, Iterable, Optional, cast
 
+from pants.base.hash_utils import stable_json_sha1
 from pants.build_graph.address import Address
 from pants.engine.internals.addressable import addressable, addressable_sequence
 from pants.engine.internals.objects import (
@@ -12,6 +13,7 @@ from pants.engine.internals.objects import (
     Validatable,
     ValidationError,
 )
+from pants.util.memo import memoized_property
 from pants.util.objects import SubclassesOf, SuperclassesOf
 
 
@@ -255,7 +257,11 @@ class Struct(Serializable, SerializableFactory, Validatable):
         #      Without it, AttributeErrors inside @property methods will be misattributed.
         return object.__getattribute__(self, item)
 
-    def _key(self):
+    @classmethod
+    def _hash_key_predicate(cls, key):
+        return key not in cls._INHERITANCE_FIELDS
+
+    def _compute_key(self, key_predicate):
         def hashable(value):
             if isinstance(value, dict):
                 return tuple(sorted((k, hashable(v)) for k, v in value.items()))
@@ -270,9 +276,12 @@ class Struct(Serializable, SerializableFactory, Validatable):
             sorted(
                 (k, hashable(v))
                 for k, v in self._kwargs.items()
-                if k not in self._INHERITANCE_FIELDS
+                if key_predicate(k)
             )
         )
+
+    def _key(self):
+        return self._compute_key(self._hash_key_predicate)
 
     def __hash__(self):
         return hash(self._key())
@@ -315,3 +324,25 @@ class StructWithDeps(Struct):
 
         :rtype: tuple
         """
+
+    def _coerce_key_values(self, key, value):
+        """Convert `value` into an object which doesn't produce a cyclic reference error."""
+        if key == "address":
+            return (key, value.spec)
+        return (key, value)
+
+    def _intransitive_predicate(self, key):
+        return self._hash_key_predicate(key) and key != "dependencies"
+
+    @memoized_property
+    def intransitive_fingerprint(self):
+        key = tuple(
+            self._coerce_key_values(k, v)
+            for k, v in self._compute_key(self._intransitive_predicate)
+        )
+        try:
+            return stable_json_sha1(key)
+        except ValueError as e:
+            raise ValueError(
+                f"Failed json hash -- object type was: {type(self)}, key was: {key}."
+            ) from e

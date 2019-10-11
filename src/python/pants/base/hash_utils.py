@@ -1,6 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import dataclasses
 import hashlib
 import json
 import logging
@@ -140,6 +141,9 @@ class CoercingEncoder(json.JSONEncoder):
                 )
             # Set order is arbitrary in python 3.6 and 3.7, so we need to keep this sorted() call.
             return sorted(self.default(i) for i in o)
+        if dataclasses.is_dataclass(o):
+            # `@dataclass` objects will fail with a cyclic reference error unless we stringify them here.
+            return self.default(repr(o))
         if isinstance(o, Iterable) and not isinstance(o, (bytes, list, str)):
             return list(self.default(i) for i in o)
         logger.debug(

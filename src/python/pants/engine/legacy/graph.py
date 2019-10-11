@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Iterator, List, Set, Tuple, Type, cast
 
 from pants.base.exceptions import TargetDefinitionException
+from pants.base.hash_utils import stable_json_sha1
 from pants.base.parse_context import ParseContext
 from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress
 from pants.build_graph.address import Address, BuildFileAddress
@@ -33,6 +34,7 @@ from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
+from pants.util.memo import memoized_classmethod
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
@@ -421,6 +423,27 @@ class LegacyTransitiveHydratedTargets:
     closure: FrozenOrderedSet[LegacyHydratedTarget]
 
 
+@dataclass(frozen=True)
+class TransitiveFingerprintedTarget:
+    """A dataclass containing memoized fingerprint information for some TransitiveHydratedTarget."""
+
+    was_root: bool
+    address: Address
+    type_alias: str
+    intransitive_fingerprint_arg: str
+    transitive_fingerprint_arg: str
+
+    @memoized_classmethod
+    def calculate_intransitive_fingerprint_for_target_adaptor(cls, adaptor):
+        sources = getattr(adaptor, "sources", None)
+        sources_snapshot = sources.snapshot if sources else None
+        return stable_json_sha1([adaptor.intransitive_fingerprint, sources_snapshot,])
+
+
+class FingerprintedTargetCollection(Collection[TransitiveFingerprintedTarget]):
+    """A collection of fingerprint information for a set of `TransitiveHydratedTarget`s."""
+
+
 @rule
 async def transitive_hydrated_targets(addresses: Addresses) -> TransitiveHydratedTargets:
     """Given Addresses, kicks off recursion on expansion of TransitiveHydratedTargets.
@@ -500,6 +523,44 @@ async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
     for field in hydrated_fields:
         kwargs[field.name] = field.value
     return HydratedTarget(adaptor=type(target_adaptor)(**kwargs))
+
+
+@rule
+async def transitive_fingerprinted_targets(addresses: Addresses) -> FingerprintedTargetCollection:
+    """Traverse BuildFileAddresses to obtain fingerprint information for the target set."""
+
+    root_transitive_hydrated_targets = await MultiGet(
+        Get[TransitiveHydratedTarget](Address, a) for a in addresses
+    )
+    transitive_hydrated_targets = tuple(
+        (tht, True) for tht in root_transitive_hydrated_targets
+    ) + tuple(
+        (dep, False)
+        for tht in root_transitive_hydrated_targets
+        for dep in tht.dependencies
+        if dep not in root_transitive_hydrated_targets
+    )
+
+    def lookup_fingerprint(tht):
+        return TransitiveFingerprintedTarget.calculate_intransitive_fingerprint_for_target_adaptor(
+            tht.root.adaptor
+        )
+
+    fingerprinted_targets = [
+        TransitiveFingerprintedTarget(
+            was_root=was_root,
+            address=tht.root.adaptor.address,
+            type_alias=tht.root.adaptor.type_alias,
+            intransitive_fingerprint_arg=lookup_fingerprint(tht),
+            transitive_fingerprint_arg=stable_json_sha1(
+                (lookup_fingerprint(tht),)
+                + tuple(lookup_fingerprint(dep) for dep in tht.dependencies)
+            ),
+        )
+        for tht, was_root in transitive_hydrated_targets
+    ]
+
+    return FingerprintedTargetCollection(tuple(fingerprinted_targets))
 
 
 @rule
@@ -595,11 +656,12 @@ async def hydrate_bundles(
 def create_legacy_graph_tasks():
     """Create tasks to recursively parse the legacy graph."""
     return [
-        transitive_hydrated_target,
-        transitive_hydrated_targets,
-        legacy_transitive_hydrated_targets,
+        hydrate_bundles,
+        hydrate_sources,
         hydrate_target,
         hydrated_targets,
-        hydrate_sources,
-        hydrate_bundles,
+        legacy_transitive_hydrated_targets,
+        transitive_fingerprinted_targets,
+        transitive_hydrated_target,
+        transitive_hydrated_targets,
     ]

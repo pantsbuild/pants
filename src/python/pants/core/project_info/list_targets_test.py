@@ -2,12 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from textwrap import dedent
-from typing import List, Optional, Tuple, cast
+from typing import Dict, List, Optional, Tuple, cast
 
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
 from pants.core.project_info.list_targets import ListOptions, list_targets
 from pants.engine.addresses import Address, Addresses
+from pants.engine.legacy.graph import FingerprintedTargetCollection, TransitiveFingerprintedTarget
 from pants.engine.target import DescriptionField, ProvidesField, Target, Targets
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 
@@ -20,6 +21,7 @@ class MockTarget(Target):
 def run_goal(
     targets: List[MockTarget],
     *,
+    target_fingerprints: Dict[Address, TransitiveFingerprintedTarget] = {},
     show_documented: bool = False,
     show_provides: bool = False,
     provides_columns: Optional[str] = None,
@@ -39,7 +41,12 @@ def run_goal(
             ),
             console,
         ],
-        mock_gets=[MockGet(product_type=Targets, subject_type=Addresses, mock=lambda _: targets)],
+        mock_gets=[
+            MockGet(product_type=Targets, subject_type=Addresses, mock=lambda _: targets),
+            MockGet(product_type=FingerprintedTargetCollection, subject_type=Addresses,
+                    mock=lambda addresses: FingerprintedTargetCollection(target_fingerprints[addr]
+                                                                         for addr in addresses))
+        ],
     )
     return cast(str, console.stdout.getvalue()), cast(str, console.stderr.getvalue())
 

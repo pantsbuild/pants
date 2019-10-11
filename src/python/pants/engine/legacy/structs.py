@@ -123,6 +123,18 @@ class TargetAdaptor(StructWithDeps):
     def default_sources_exclude_globs(cls):
         return None
 
+    def _coerce_key_values(self, key, value):
+        # TODO: This method is overridden from `StructWithDeps` to remove elements which cause
+        # `stable_json_sha1()` to fail with a cycle detection. Since some python targets are only
+        # mapped to `TargetAdaptor` (and not `PythonTargetAdaptor`), we check every single target
+        # for a `requirements` kwarg, which is fine for now.
+        key, value = super()._coerce_key_values(key, value)
+        if key == "requirements":
+            return (key, tuple(str(req) for req in value))
+        if key == "provides":
+            return (key, repr(value))
+        return (key, value)
+
     def validate_sources(self, sources):
         """" Validate that the sources argument is allowed.
 
