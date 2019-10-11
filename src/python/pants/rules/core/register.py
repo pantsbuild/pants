@@ -5,6 +5,7 @@ from pants.rules.core import (
   binary,
   filedeps,
   fmt,
+  lint,
   list_roots,
   list_targets,
   strip_source_root,
@@ -16,6 +17,7 @@ def rules():
   return [
     *binary.rules(),
     *fmt.rules(),
+    *lint.rules(),
     *list_roots.rules(),
     *list_targets.rules(),
     *filedeps.rules(),
