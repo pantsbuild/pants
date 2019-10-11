@@ -104,6 +104,11 @@ class EnumTest(unittest.TestCase):
     cat = 1
     pig = 2
 
+  def test_all_values(self) -> None:
+    self.assertEqual(
+      {EnumTest.Test.dog, EnumTest.Test.cat, EnumTest.Test.pig}, set(EnumTest.Test.all_values())
+    )
+
   def test_valid_match(self) -> None:
     match_mapping = {
       EnumTest.Test.dog: "woof",

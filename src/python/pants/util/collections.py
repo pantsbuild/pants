@@ -92,8 +92,9 @@ class UnrecognizedMatchError(EnumMatchError):
 
 class Enum(StdLibEnum):
 
-  def all_values(self) -> ValuesView['Enum']:
-    return self.__class__.__members__.values()
+  @classmethod
+  def all_values(cls) -> ValuesView['Enum']:
+    return cls.__members__.values()
 
   def match(self, enum_values_to_results: Mapping[E, V]) -> V:
     unrecognized_values = [
