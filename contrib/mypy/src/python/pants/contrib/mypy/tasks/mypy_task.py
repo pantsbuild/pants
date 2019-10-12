@@ -57,7 +57,10 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
 
   @classmethod
   def register_options(cls, register):
-    register('--mypy-version', default='0.720', help='The version of mypy to use.')
+    register('--mypy-version', default='0.720', help='The version of mypy to use.',
+             removal_version=cls.deprecated_options_scope_removal_version,
+             removal_hint='Use --version instead.')
+    register('--version', default='0.720', help='The version of mypy to use.')
     register('--include-requirements', type=bool, default=False,
              help='Whether to include the transitive requirements of targets being checked. This is'
                   'useful if those targets depend on mypy plugins or distributions that provide '
@@ -153,7 +156,8 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
     return PythonInterpreterCache.global_instance()
 
   def _get_mypy_pex(self, py3_interpreter: PythonInterpreter, *extra_pexes: PEX) -> PEX:
-    mypy_version = self.get_options().mypy_version
+    options = self.get_options()
+    mypy_version = options.mypy_version if options.is_flagged('mypy_version') else options.version
     extras_hash = hash_utils.hash_all(hash_utils.hash_dir(Path(extra_pex.path()))
                                       for extra_pex in extra_pexes)
 
