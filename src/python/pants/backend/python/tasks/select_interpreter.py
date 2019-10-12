@@ -86,7 +86,7 @@ class SelectInterpreter(Task):
     interpreter = self._interpreter_cache.select_interpreter_for_targets(targets)
     safe_mkdir_for(interpreter_path_file)
     with open(interpreter_path_file, 'w') as outfile:
-      outfile.write('{}\n'.format(interpreter.binary))
+      outfile.write(f'{interpreter.binary}\n')
     return interpreter
 
   def _interpreter_path_file(self, target_set_id):

@@ -124,7 +124,7 @@ class BuildLocalPythonDistributions(Task):
         local_wheel_products = self.context.products.get('local_wheels')
         for vt in invalidation_check.all_vts:
           dist = self._get_whl_from_dir(vt.results_dir)
-          req_lib_addr = Address.parse('{}__req_lib'.format(vt.target.address.spec))
+          req_lib_addr = Address.parse(f'{vt.target.address.spec}__req_lib')
           self._inject_synthetic_dist_requirements(dist, req_lib_addr)
           # Make any target that depends on the dist depend on the synthetic req_lib,
           # for downstream consumption.
@@ -210,7 +210,7 @@ class BuildLocalPythonDistributions(Task):
 
     setup_reqs_pex_path = os.path.join(
       setup_requires_dir,
-      'setup-requires-{}.pex'.format(versioned_target_fingerprint))
+      f'setup-requires-{versioned_target_fingerprint}.pex')
     setup_requires_pex = self._build_setup_requires_pex_settings.bootstrap(
       interpreter, setup_reqs_pex_path, extra_reqs=setup_reqs_to_resolve)
     self.context.log.debug('Using pex file as setup.py interpreter: {}'
@@ -234,7 +234,7 @@ class BuildLocalPythonDistributions(Task):
 
     NB: adds a '+' before the fingerprint to the build tag!
     """
-    egg_info_snapshot_tag_args = ['egg_info', '--tag-build=+{}'.format(snapshot_fingerprint)]
+    egg_info_snapshot_tag_args = ['egg_info', f'--tag-build=+{snapshot_fingerprint}']
     bdist_whl_args = ['bdist_wheel']
     if is_platform_specific:
       platform_args = ['--plat-name', pep425tags.get_platform()]

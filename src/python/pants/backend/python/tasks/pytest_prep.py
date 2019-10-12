@@ -81,7 +81,7 @@ class PytestPrep(PythonExecutionTaskBase):
 
   @classmethod
   def _module_resource(cls, module_name, resource_relpath):
-    return cls.ExtraFile(path='{}.py'.format(module_name),
+    return cls.ExtraFile(path=f'{module_name}.py',
                          content=pkg_resources.resource_string(__name__, resource_relpath))
 
   def extra_files(self):

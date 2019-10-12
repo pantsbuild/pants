@@ -47,7 +47,7 @@ class PythonRun(PythonExecutionTaskBase):
         try:
           result = po.wait()
           if result != 0:
-            msg = '{cmdline} ... exited non-zero ({code})'.format(cmdline=cmdline, code=result)
+            msg = f'{cmdline} ... exited non-zero ({result})'
             raise TaskError(msg, exit_code=result)
         except KeyboardInterrupt:
           # The process may still have exited, even if we were interrupted.

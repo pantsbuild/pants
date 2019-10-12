@@ -251,7 +251,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     cov_env_vars = {k: v for k, v in os.environ.items() if self._is_coverage_env_var(k)}
     if cov_env_vars:
       self.context.log.warn('Scrubbing coverage environment variables\n\t{}'
-                            .format('\n\t'.join(sorted('{}={}'.format(k, v)
+                            .format('\n\t'.join(sorted(f'{k}={v}'
                                                        for k, v in cov_env_vars.items()))))
       with environment_as(**{k: None for k in cov_env_vars}):
         yield
@@ -354,7 +354,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
               # ... and we end up appending <pex_src_root>/foo/bar to the coverage_sources.
               break
           if not found_target_base:
-            self.context.log.warn('Coverage path {} is not in any target. Skipping.'.format(morf))
+            self.context.log.warn(f'Coverage path {morf} is not in any target. Skipping.')
         else:
           # The source is to be interpreted as a package name.
           coverage_morfs.append(morf)
@@ -371,7 +371,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
         }
         def coverage_run(subcommand, arguments):
           return self._pex_run(pex,
-                               workunit_name='coverage-{}'.format(subcommand),
+                               workunit_name=f'coverage-{subcommand}',
                                args=[subcommand] + arguments,
                                env=env)
 
@@ -398,8 +398,8 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     try:
       sharder = Sharder(shard_spec)
       return [
-        '--pants-shard', '{}'.format(sharder.shard),
-        '--pants-num-shards', '{}'.format(sharder.nshards)
+        '--pants-shard', f'{sharder.shard}',
+        '--pants-num-shards', f'{sharder.nshards}'
       ]
     except Sharder.InvalidShardSpec as e:
       raise self.InvalidShardSpecification(e)
@@ -475,7 +475,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
       profile = self.get_options().profile
       if profile:
-        env['PEX_PROFILE_FILENAME'] = '{0}.subprocess.{1:.6f}'.format(profile, time.time())
+        env['PEX_PROFILE_FILENAME'] = f'{profile}.subprocess.{time.time():.6f}'
 
       with self.context.new_workunit(name='run',
                                      cmd=safe_shlex_join(pex.cmdline(args)),
@@ -535,7 +535,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
               # in targets as the failed target
               failed_targets.add(targets[0])
     except (XmlParser.XmlError, ValueError) as e:
-      raise TaskError('Error parsing xml file at {}: {}'.format(junitxml, e))
+      raise TaskError(f'Error parsing xml file at {junitxml}: {e!r}')
 
     return failed_targets
 
@@ -637,7 +637,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       # with those we must set ourselves.
       for arg in self.get_passthru_args():
         if arg.startswith('--junitxml') or arg.startswith('--confcutdir'):
-          raise TaskError('Cannot pass this arg through to pytest: {}'.format(arg))
+          raise TaskError(f'Cannot pass this arg through to pytest: {arg}')
 
       junitxml_path = workdirs.junitxml_path(*test_targets)
 

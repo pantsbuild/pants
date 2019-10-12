@@ -125,7 +125,7 @@ class PythonToolPrepBase(Task):
       'python',
       str(interpreter.identity),
       self.fingerprint,
-      '{}-{}.pex'.format(tool_subsystem.options_scope, specs_fingerprint),
+      f'{tool_subsystem.options_scope}-{specs_fingerprint}.pex',
     )
 
   def will_be_invoked(self):
@@ -148,7 +148,7 @@ class PythonToolPrepBase(Task):
 
     pex_path = self._generate_fingerprinted_pex_path(tool_subsystem, interpreter)
     if not os.path.exists(pex_path):
-      with self.context.new_workunit(name='create-{}-pex'.format(tool_subsystem.options_scope),
+      with self.context.new_workunit(name=f'create-{tool_subsystem.options_scope}-pex',
                                      labels=[WorkUnitLabel.PREP]):
         self._build_tool_pex(tool_subsystem=tool_subsystem,
                              interpreter=interpreter,

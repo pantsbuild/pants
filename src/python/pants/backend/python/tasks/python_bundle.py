@@ -30,7 +30,7 @@ class PythonBundle(BundleMixin, Task):
   @staticmethod
   def _get_archive_path(vt, archive_format):
     ext = archive.archive_extensions.get(archive_format, archive_format)
-    filename = '{}.{}'.format(vt.target.id, ext)
+    filename = f'{vt.target.id}.{ext}'
     return os.path.join(vt.results_dir, filename) if archive_format else ''
 
   @property
