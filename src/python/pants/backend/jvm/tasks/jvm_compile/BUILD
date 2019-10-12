@@ -57,8 +57,11 @@ python_library(
     'src/python/pants/goal:products',
     'src/python/pants/option',
     'src/python/pants/reporting',
+    'src/python/pants/util:collections',
+    'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:fileutil',
+    'src/python/pants/util:memo',
   ],
 )
 
