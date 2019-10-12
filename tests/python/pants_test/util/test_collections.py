@@ -4,7 +4,14 @@
 import unittest
 from typing import List
 
-from pants.util.collections import assert_single_element, factory_dict, recursively_update
+from pants.util.collections import (
+  Enum,
+  InexhaustiveMatchError,
+  UnrecognizedMatchError,
+  assert_single_element,
+  factory_dict,
+  recursively_update,
+)
 
 
 class TestCollections(unittest.TestCase):
@@ -88,3 +95,41 @@ class TestCollections(unittest.TestCase):
       assert_single_element(too_many_elements)
     expected_msg = "iterable [1, 2] has more than one element."
     self.assertEqual(expected_msg, str(cm.exception))
+
+
+class EnumTest(unittest.TestCase):
+
+  class Test(Enum):
+    dog = 0
+    cat = 1
+    pig = 2
+
+  def test_all_values(self) -> None:
+    self.assertEqual(
+      {EnumTest.Test.dog, EnumTest.Test.cat, EnumTest.Test.pig}, set(EnumTest.Test.all_values())
+    )
+
+  def test_valid_match(self) -> None:
+    match_mapping = {
+      EnumTest.Test.dog: "woof",
+      EnumTest.Test.cat: "meow",
+      EnumTest.Test.pig: "oink",
+    }
+    self.assertEqual("woof", EnumTest.Test.dog.match(match_mapping))
+    self.assertEqual("meow", EnumTest.Test.cat.match(match_mapping))
+    self.assertEqual("oink", EnumTest.Test.pig.match(match_mapping))
+
+  def test_inexhaustive_match(self) -> None:
+    with self.assertRaises(InexhaustiveMatchError):
+      EnumTest.Test.pig.match({
+        EnumTest.Test.pig: "oink",
+      })
+
+  def test_unrecognized_match(self) -> None:
+    with self.assertRaises(UnrecognizedMatchError):
+      EnumTest.Test.pig.match({  # type: ignore
+        EnumTest.Test.dog: "woof",
+        EnumTest.Test.cat: "meow",
+        EnumTest.Test.pig: "oink",
+        "horse": "neigh",
+      })

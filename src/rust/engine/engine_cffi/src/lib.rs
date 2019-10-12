@@ -224,6 +224,7 @@ pub extern "C" fn scheduler_create(
   process_execution_speculation_delay: f64,
   process_execution_speculation_strategy_buf: Buffer,
   process_execution_use_local_cache: bool,
+  remote_execution_headers_buf: BufferBuffer,
 ) -> RawResult {
   match make_core(
     tasks_ptr,
@@ -275,6 +276,7 @@ pub extern "C" fn scheduler_create(
     process_execution_speculation_delay,
     process_execution_speculation_strategy_buf,
     process_execution_use_local_cache,
+    remote_execution_headers_buf,
   ) {
     Ok(core) => RawResult {
       is_throw: false,
@@ -339,6 +341,7 @@ fn make_core(
   process_execution_speculation_delay: f64,
   process_execution_speculation_strategy_buf: Buffer,
   process_execution_use_local_cache: bool,
+  remote_execution_headers_buf: BufferBuffer,
 ) -> Result<Core, String> {
   let root_type_ids = root_type_ids.to_vec();
   let ignore_patterns = ignore_patterns_buf
@@ -431,6 +434,7 @@ fn make_core(
       )
     })?;
 
+  let remote_execution_headers = remote_execution_headers_buf.to_map("remote-execution-headers")?;
   Core::new(
     root_type_ids.clone(),
     tasks,
@@ -471,6 +475,7 @@ fn make_core(
     Duration::from_millis((process_execution_speculation_delay * 1000.0).round() as u64),
     process_execution_speculation_strategy,
     process_execution_use_local_cache,
+    remote_execution_headers,
   )
 }
 

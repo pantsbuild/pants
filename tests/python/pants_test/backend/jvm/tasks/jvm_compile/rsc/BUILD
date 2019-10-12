@@ -18,8 +18,8 @@ python_tests(
 )
 
 python_tests(
-  name='rsc_compile_integration_not_remoted',
-  sources=['test_rsc_compile_integration_not_remoted.py'],
+  name='rsc_compile_integration_manual',
+  sources=['test_rsc_compile_integration_manual.py'],
   dependencies=[
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',

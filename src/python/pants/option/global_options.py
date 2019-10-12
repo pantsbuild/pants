@@ -57,6 +57,7 @@ class ExecutionOptions:
   remote_ca_certs_path: Any
   remote_oauth_bearer_token_path: Any
   remote_execution_extra_platform_properties: Any
+  remote_execution_headers: Any
 
   @classmethod
   def from_bootstrap_options(cls, bootstrap_options):
@@ -80,6 +81,7 @@ class ExecutionOptions:
       remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
       remote_oauth_bearer_token_path=bootstrap_options.remote_oauth_bearer_token_path,
       remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
+      remote_execution_headers=bootstrap_options.remote_execution_headers,
     )
 
 
@@ -103,6 +105,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_ca_certs_path=None,
     remote_oauth_bearer_token_path=None,
     remote_execution_extra_platform_properties=[],
+    remote_execution_headers={},
   )
 
 
@@ -400,6 +403,10 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
                   'Format: property=value. Multiple values should be specified as multiple '
                   'occurrences of this flag. Pants itself may add additional platform properties.',
                    type=list, default=[])
+    register('--remote-execution-headers', advanced=True,
+             help='Headers to set on remote execution requests. '
+                  'Format: header=value. Pants itself may add additional headers.',
+             type=dict, default={})
     register('--process-execution-local-parallelism', type=int, default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_parallelism,
              advanced=True,
              help='Number of concurrent processes that may be executed locally.')

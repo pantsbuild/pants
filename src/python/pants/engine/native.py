@@ -558,6 +558,12 @@ class ExternContext:
     buf_buf = self._ffi.new('Buffer[]', bufs)
     return (buf_buf, len(bufs), self.to_value(buf_buf))
 
+  def utf8_dict(self, d):
+    """Stores the dict as a list of interleaved keys and values, as utf8 strings."""
+    bufs = [self.utf8_buf(item) for keyvalue in d.items() for item in keyvalue]
+    buf_buf = self._ffi.new('Buffer[]', bufs)
+    return (buf_buf, len(bufs), self.to_value(buf_buf))
+
   def vals_buf(self, vals):
     buf = self._ffi.new('Handle[]', vals)
     return (buf, len(vals), self.to_value(buf))
@@ -892,6 +898,7 @@ class Native(metaclass=SingletonMetaclass):
         execution_options.process_execution_speculation_delay,
         self.context.utf8_buf(execution_options.process_execution_speculation_strategy),
         execution_options.process_execution_use_local_cache,
+        self.context.utf8_dict(execution_options.remote_execution_headers),
       )
     if scheduler_result.is_throw:
       value = self.context.from_value(scheduler_result.throw_handle)
