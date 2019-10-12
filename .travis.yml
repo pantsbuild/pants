@@ -2083,6 +2083,7 @@ matrix:
     - find build-support -name "*.py[co]" -delete
     before_install:
     - ./build-support/bin/install_python_for_ci.sh "${PYENV_PY36_VERSION}"
+    - brew cask install osxfuse
     before_script:
     - ulimit -c unlimited
     - ulimit -n 8192
@@ -2103,7 +2104,7 @@ matrix:
     - CACHE_NAME=rust_tests.osx
     name: Rust tests - OSX
     os: osx
-    osx_image: xcode11
+    osx_image: xcode8.3
     script:
     - ./build-support/bin/ci.py --rust-tests
     stage: Test Pants

@@ -465,8 +465,7 @@ def run_rust_tests() -> None:
   command = [
     "build-support/bin/native/cargo",
     "test",
-    # Until we can run fuse tests on macos travis images, we omit --all on them.
-    *([] if is_macos else ["--all"]),
+    "--all",
     # We pass --tests to skip doc tests, because our generated protos contain invalid doc tests in
     # their comments.
     "--tests",
