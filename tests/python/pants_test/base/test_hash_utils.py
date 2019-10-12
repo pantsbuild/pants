@@ -7,6 +7,7 @@ import math
 import re
 import unittest
 from collections import OrderedDict
+from enum import Enum
 from pathlib import Path
 
 from twitter.common.collections import OrderedSet
@@ -179,6 +180,12 @@ class CoercingJsonEncodingTest(unittest.TestCase):
     self.assertEqual(self._coercing_json_encode([('b', 4), ('a', 3)]), '[["b", 4], ["a", 3]]')
     self.assertEqual(self._coercing_json_encode([{'b': 4, 'a': 3}]), '[{"b": 4, "a": 3}]')
 
+  def test_enum(self) -> None:
+    class Test(Enum):
+      dog = 0
+      cat = 1
+      pig = 2
+    self.assertEqual(self._coercing_json_encode([Test.dog, Test.cat, Test.pig]), '[0, 1, 2]')
 
 class JsonHashingTest(unittest.TestCase):
 

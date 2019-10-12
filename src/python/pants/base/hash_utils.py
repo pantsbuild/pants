@@ -7,6 +7,7 @@ import logging
 import typing
 from collections import OrderedDict
 from collections.abc import Iterable, Mapping, Set
+from enum import Enum
 from pathlib import Path
 from typing import Any, Optional, Type, Union
 
@@ -79,7 +80,7 @@ def hash_dir(path: Path, *, digest: Optional[Digest] = None) -> str:
 class CoercingEncoder(json.JSONEncoder):
   """An encoder which performs coercions in order to serialize many otherwise illegal objects.
 
-  The python documentation (https://docs.python.org/2/library/json.html#json.dumps) states that
+  The python documentation (https://docs.python.org/3/library/json.html#json.dumps) states that
   dict keys are coerced to strings in json.dumps, but this appears to be incorrect -- it throws a
   TypeError on things we might to throw at it, like a set, or a dict with tuple keys.
   """
@@ -107,6 +108,8 @@ class CoercingEncoder(json.JSONEncoder):
       # we call this function very often.
       # TODO(#7658) Figure out why we call this function so often.
       return o
+    if isinstance(o, Enum):
+      return o.value
     if isinstance(o, Mapping):
       # Preserve order to avoid collisions for OrderedDict inputs to json.dumps(). We don't do this
       # for general mappings because dicts have an arbitrary key ordering in some versions of python
