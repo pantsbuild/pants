@@ -10,7 +10,8 @@ from pants_test.subsystem.subsystem_util import init_subsystem
 
 class RscCompileIntegrationManual(BaseCompileIT):
 
-  def test_rsc_hermetic_jvm_options(self):
+  def setUp(self):
+    super().setUp()
     # Remove all the symlinks under jdk in travis: https://github.com/pantsbuild/pants/issues/8460
     # Otherwise globbing from jdk home would error out.
     if os.environ.get('TRAVIS') == 'true':
@@ -20,6 +21,7 @@ class RscCompileIntegrationManual(BaseCompileIT):
       for s in symlinks:
         os.remove(s)
 
+  def test_rsc_hermetic_jvm_options(self):
     pants_run = self.run_pants(['compile', 'examples/src/scala/org/pantsbuild/example/hello/exe'],
       config={
         'cache.compile.rsc': {'ignore': True},
@@ -40,3 +42,18 @@ class RscCompileIntegrationManual(BaseCompileIT):
       pants_run.stdout_data,
       'Pants run is expected to fail and contain error about loading an invalid security '
       'manager class, but it did not.')
+
+  def test_rsc_zinc_hermetic_integration(self):
+    pants_run = self.run_pants(
+      ['compile', 'examples/src/scala/org/pantsbuild/example/hello/exe'],
+      config={
+        'compile.rsc': {
+          'execution_strategy': 'hermetic',
+          'incremental': False,
+          'workflow': 'rsc-and-zinc'
+        },
+        'cache': {
+          'ignore': True
+        }
+      })
+    self.assert_success(pants_run)
