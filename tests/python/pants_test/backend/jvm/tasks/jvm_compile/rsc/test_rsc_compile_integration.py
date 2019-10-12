@@ -25,7 +25,7 @@ class RscCompileIntegration(BaseCompileIT, AbstractTestGenerator):
 
     for worker_count in [1, 2]:
       for resolver in JvmResolveSubsystem.CHOICES:
-        for execution_strategy in RscCompile.ExecutionStrategy.all_variants:
+        for execution_strategy in RscCompile.ExecutionStrategy.all_values():
           with temporary_dir() as cache_dir:
             config = {
               'cache.compile.rsc': {'write_to': [cache_dir]},

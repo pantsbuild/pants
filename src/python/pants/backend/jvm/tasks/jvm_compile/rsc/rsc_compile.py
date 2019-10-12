@@ -157,7 +157,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       '{prefix}:{workflow_name}'.format(
         prefix=self.get_options().force_compiler_tag_prefix,
         workflow_name=workflow.value): workflow
-      for workflow in self.JvmCompileWorkflowType.all_variants
+      for workflow in self.JvmCompileWorkflowType.all_values()
     }
 
   @classmethod
