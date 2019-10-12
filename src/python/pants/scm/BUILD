@@ -6,6 +6,7 @@ python_library(
   dependencies = [
     'src/python/pants/util:contextutil',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -17,4 +18,5 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:strutil',
   ],
+  tags = {'partially_type_checked'},
 )

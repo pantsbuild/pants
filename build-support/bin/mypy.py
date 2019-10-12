@@ -13,11 +13,14 @@ def main() -> None:
   try:
     subprocess.run([
       "./pants",
-      "--tag=type_checked",
+      # We run MyPy against targets with either the tag `type_checked` or `partially_type_checked`.
+      # `partially_type_checked` means that the target is still missing type hints, but that we
+      # still want to run MyPy against it so that we can enforce the type hints that may be there
+      # already and we can make sure that we don't revert in adding code that MyPy flags as an
+      # error.
+      "--tag=type_checked,partially_type_checked",
       "--backend-packages=pants.contrib.mypy",
       "lint",
-      "--lint-mypy-verbose",
-      "--lint-mypy-whitelist-tag-name=type_checked",
       "--lint-mypy-config-file=build-support/mypy/mypy.ini",
       *globs,
     ], check=True)
