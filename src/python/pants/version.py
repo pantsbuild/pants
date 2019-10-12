@@ -11,8 +11,10 @@ from packaging.version import Version
 _PANTS_VERSION_OVERRIDE = '_PANTS_VERSION_OVERRIDE'
 
 
-VERSION = (os.environ.get(_PANTS_VERSION_OVERRIDE) or
-           pkgutil.get_data(__name__, 'VERSION').strip().decode())
+VERSION: str = (
+  os.environ.get(_PANTS_VERSION_OVERRIDE) or
+  pkgutil.get_data(__name__, 'VERSION').decode().strip()  # type: ignore
+)
 
 
 PANTS_SEMVER = Version(VERSION)

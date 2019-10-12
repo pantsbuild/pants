@@ -10,6 +10,7 @@ python_library(
     'src/python/pants/scm:git',
     'src/python/pants:version',
   ],
+  tags = {"type_checked"},
 )
 
 python_library(
@@ -21,7 +22,8 @@ python_library(
     ':build_environment',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -32,7 +34,7 @@ python_library(
     '3rdparty/python:pathspec',
     'src/python/pants/util:dirutil',
     ':project_tree',
-  ]
+  ],
 )
 
 python_library(
@@ -47,6 +49,7 @@ python_library(
   dependencies = [
     'src/python/pants/util:meta',
   ],
+  tags = {"type_checked"},
 )
 
 python_library(
@@ -56,7 +59,8 @@ python_library(
     ':revision',
     'src/python/pants:version',
     'src/python/pants/util:memo',
-  ]
+  ],
+  tags = {"type_checked"},
 )
 
 python_library(
@@ -76,14 +80,13 @@ python_library(
   dependencies = [
     ':exiter',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
   name = 'fingerprint_strategy',
   sources = ['fingerprint_strategy.py'],
-  dependencies = [
-    ':deprecated',
-  ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -101,9 +104,9 @@ python_library(
   sources = ['hash_utils.py'],
   dependencies = [
     '3rdparty/python:typing-extensions',
-    ':deprecated',
     'src/python/pants/util:objects',
-  ]
+    'src/python/pants/util:strutil',
+  ],
 )
 
 python_library(
@@ -132,7 +135,6 @@ python_library(
   sources = ['payload_field.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':deprecated',
     ':hash_utils',
   ]
 )
@@ -165,6 +167,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants:version',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -194,6 +197,7 @@ python_library(
     ':workunit',
     'src/python/pants/reporting:report', # TODO(pl): Bust this out
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -231,5 +235,6 @@ python_tests(
   name='tests',
   dependencies=[
     ':specs'
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )

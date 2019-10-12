@@ -30,7 +30,7 @@ class Scm(ABC):
 
   @property
   @abstractmethod
-  def current_rev_identifier(self):
+  def current_rev_identifier(self) -> str:
     """Identifier for the tip/head of the current branch eg. "HEAD" in git.
 
     :API: public
@@ -38,7 +38,7 @@ class Scm(ABC):
 
   @property
   @abstractmethod
-  def commit_id(self):
+  def commit_id(self) -> str:
     """Returns the id of the current commit.
 
     :API: public
@@ -46,12 +46,12 @@ class Scm(ABC):
 
   @property
   @abstractmethod
-  def server_url(self):
+  def server_url(self) -> str:
     """Returns the url of the (default) remote server."""
 
   @property
   @abstractmethod
-  def tag_name(self):
+  def tag_name(self) -> str:
     """Returns the name of the current tag if any.
 
     :API: public
@@ -59,7 +59,7 @@ class Scm(ABC):
 
   @property
   @abstractmethod
-  def branch_name(self):
+  def branch_name(self) -> str:
     """Returns the name of the current branch if any.
 
     :API: public

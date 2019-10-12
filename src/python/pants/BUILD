@@ -47,7 +47,8 @@ python_library(
   dependencies = [
     '3rdparty/python:packaging',
     ':version-resource',
-  ]
+  ],
+  tags = {"type_checked"},
 )
 
 resources(
