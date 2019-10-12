@@ -13,7 +13,20 @@ python_tests(
     'testprojects/src/scala/org/pantsbuild/testproject:javasources_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:mutual_directory',
   ],
-  timeout = 600,
+  timeout = 800,
+  tags = {'integration'},
+)
+
+python_tests(
+  name='rsc_compile_integration_manual',
+  sources=['test_rsc_compile_integration_manual.py'],
+  dependencies=[
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
+    'tests/python/pants_test:test_base',
+    'examples/src/scala/org/pantsbuild/example:hello_directory',
+  ],
+  timeout = 800,
   tags = {'integration'},
 )
 
