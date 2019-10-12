@@ -16,11 +16,11 @@ python_library(
   name = 'project_tree',
   sources = ['file_system_project_tree.py', 'project_tree.py', 'project_tree_factory.py'],
   dependencies = [
+    '3rdparty/python:dataclasses',
     '3rdparty/python:pathspec',
     ':build_environment',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
-    'src/python/pants/util:objects',
   ]
 )
 
@@ -141,7 +141,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:filtering',
     'src/python/pants/util:memo',
-    'src/python/pants/util:objects',
+    'src/python/pants/util:meta',
   ],
 )
 

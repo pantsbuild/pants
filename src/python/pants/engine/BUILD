@@ -169,7 +169,8 @@ python_library(
     ':selectors',
     'src/python/pants/base:specs',
     'src/python/pants/util:collections',
-    'src/python/pants/util:objects',
+    'src/python/pants/util:memo',
+    'src/python/pants/util:meta',
   ]
 )
 
@@ -213,7 +214,6 @@ python_library(
     'src/python/pants/binaries',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
-    'src/python/pants/util:objects'
   ],
 )
 

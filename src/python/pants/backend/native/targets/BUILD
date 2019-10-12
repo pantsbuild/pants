@@ -4,12 +4,12 @@
 
 python_library(
   dependencies=[
+    '3rdparty/python:dataclasses',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
-    'src/python/pants/util:objects',
     'src/python/pants/util:memo',
   ],
 )

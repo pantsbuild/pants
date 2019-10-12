@@ -7,12 +7,12 @@ import unittest.mock
 from contextlib import contextmanager
 from dataclasses import dataclass
 from textwrap import dedent
+from typing import List
 
 from pants.engine.native import Native
 from pants.engine.rules import RootRule, UnionRule, rule, union
 from pants.engine.scheduler import ExecutionError, SchedulerSession
 from pants.engine.selectors import Get, Params
-from pants.util.objects import datatype
 from pants_test.engine.util import assert_equal_with_printing, remove_locations_from_traceback
 from pants_test.test_base import TestBase
 
@@ -145,12 +145,13 @@ def c_unhashable(_: TypeCheckFailWrapper) -> C:
   yield C()
 
 
-class CollectionType(datatype(['items'])):
-  pass
+@dataclass(frozen=True)
+class CollectionType:
+  items: List[int]
 
 
 @rule
-def c_unhashable_datatype(_: CollectionType) -> C:
+def c_unhashable_dataclass(_: CollectionType) -> C:
   # This `yield` would use the `nested_raise` rule, but it won't get to the point of raising since
   # the hashability check will fail.
   _ = yield Get(A, B, list()) # noqa: F841
@@ -254,7 +255,7 @@ class SchedulerWithNestedRaiseTest(TestBase):
       RootRule(CollectionType),
       a_typecheck_fail_test,
       c_unhashable,
-      c_unhashable_datatype,
+      c_unhashable_dataclass,
       nested_raise,
     ]
 
@@ -283,9 +284,8 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
             return c.identify(obj)
           File LOCATION-INFO, in identify
             hash_ = hash(obj)
-          File LOCATION-INFO, in __hash__
-            .format(self, type(self).__name__, field_name, e))
-        TypeError: For datatype object CollectionType(items=[1, 2, 3]) (type 'CollectionType'): in field 'items': unhashable type: 'list'
+          File "<string>", line 2, in __hash__
+        TypeError: unhashable type: 'list'
         """), exc_str, "exc_str was: {}".format(exc_str))
 
     resulting_engine_error = dedent("""\

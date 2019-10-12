@@ -3,6 +3,7 @@
 
 from abc import ABC, abstractmethod
 from hashlib import sha1
+from typing import ClassVar, Optional
 
 from twitter.common.collections import OrderedSet
 
@@ -24,7 +25,7 @@ class PayloadField(ABC):
 
   :API: public
   """
-  _fingerprint_memo = None
+  _fingerprint_memo: ClassVar[Optional[str]] = None
 
   def fingerprint(self):
     """A memoized sha1 hexdigest hashing the contents of this PayloadField
