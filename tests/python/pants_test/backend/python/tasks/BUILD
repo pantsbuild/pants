@@ -31,9 +31,11 @@ python_tests(
     'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
+    'testprojects/src/python:python_distribution_directory',
+    'testprojects/tests/python:example_test_directory',
   ],
   tags = {'integration'},
-  timeout=450
+  timeout = 180,
 )
 
 python_tests(

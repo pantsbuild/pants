@@ -19,7 +19,6 @@ class BuildLocalPythonDistributionsIntegrationTest(PantsRunIntegrationTest):
     return False
 
   hello_install_requires_dir = 'testprojects/src/python/python_distribution/hello_with_install_requires'
-  hello_setup_requires = 'examples/src/python/example/python_distribution/hello/setup_requires'
   py_dist_test = 'testprojects/tests/python/example_test/python_distribution'
 
   def _assert_nation_and_greeting(self, output, punctuation='!'):
