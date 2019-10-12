@@ -116,7 +116,7 @@ class JavacCompile(JvmCompile):
         '-target', str(settings.target_level),
       ])
 
-    if self.execution_strategy == self.HERMETIC:
+    if self.execution_strategy_enum == self.ExecutionStrategy.hermetic:
       javac_args.extend([
         # We need to strip the source root from our output files. Outputting to a directory, and
         # capturing that directory, does the job.
@@ -157,7 +157,7 @@ class JavacCompile(JvmCompile):
       javac_cmd.extend(j_args)
       javac_cmd.extend(batched_args)
 
-      if self.execution_strategy == self.HERMETIC:
+      if self.execution_strategy_enum == self.ExecutionStrategy.hermetic:
         self._execute_hermetic_compile(javac_cmd, ctx)
       else:
         with self.context.new_workunit(name='javac',

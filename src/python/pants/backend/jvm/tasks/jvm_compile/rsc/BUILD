@@ -18,8 +18,10 @@ python_library(
     'src/python/pants/java/distribution',
     'src/python/pants/java/jar',
     'src/python/pants/option',
+    'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
+    'src/python/pants/util:strutil',
   ],
 )

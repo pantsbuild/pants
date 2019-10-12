@@ -12,17 +12,16 @@ from pants.java.jar.jar_dependency import JarDependency
 from pants.java.nailgun_executor import NailgunExecutor, NailgunProcessGroup
 from pants.process.subprocess import Subprocess
 from pants.task.task import Task, TaskBase
-from pants.util.objects import enum
+from pants.util.collections import Enum
 
 
 class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   ID_PREFIX = 'ng'
-  # Possible execution strategies:
-  NAILGUN = 'nailgun'
-  SUBPROCESS = 'subprocess'
-  HERMETIC = 'hermetic'
 
-  class ExecutionStrategy(enum([NAILGUN, SUBPROCESS, HERMETIC])): pass
+  class ExecutionStrategy(Enum):
+    nailgun = 'nailgun'
+    subprocess = 'subprocess'
+    hermetic = 'hermetic'
 
   @classmethod
   def register_options(cls, register):
@@ -66,18 +65,13 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     self._executor_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir,
                                           *id_tuple)
 
-  # TODO: eventually deprecate this when we can move all subclasses to use the enum!
-  @property
-  def execution_strategy(self):
-    return self.execution_strategy_enum.value
-
   def create_java_executor(self, dist=None):
     """Create java executor that uses this task's ng daemon, if allowed.
 
     Call only in execute() or later. TODO: Enforce this.
     """
     dist = dist or self.dist
-    if self.execution_strategy == self.NAILGUN:
+    if self.execution_strategy_enum == self.ExecutionStrategy.nailgun:
       classpath = os.pathsep.join(self.tool_classpath('nailgun-server'))
       return NailgunExecutor(self._identity,
                              self._executor_workdir,
@@ -104,7 +98,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     # Creating synthetic jar to work around system arg length limit is not necessary
     # when `NailgunExecutor` is used because args are passed through socket, therefore turning off
     # creating synthetic jar if nailgun is used.
-    create_synthetic_jar = self.execution_strategy != self.NAILGUN
+    create_synthetic_jar = self.execution_strategy_enum != self.ExecutionStrategy.nailgun
     try:
       return util.execute_java(classpath=classpath,
                                main=main,
