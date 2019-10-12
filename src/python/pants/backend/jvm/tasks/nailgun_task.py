@@ -46,7 +46,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
                           ])
 
   @property
-  def execution_strategy_enum(self):
+  def execution_strategy(self):
     return self.get_options().execution_strategy
 
   @classmethod
@@ -71,7 +71,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     Call only in execute() or later. TODO: Enforce this.
     """
     dist = dist or self.dist
-    if self.execution_strategy_enum == self.ExecutionStrategy.nailgun:
+    if self.execution_strategy == self.ExecutionStrategy.nailgun:
       classpath = os.pathsep.join(self.tool_classpath('nailgun-server'))
       return NailgunExecutor(self._identity,
                              self._executor_workdir,
@@ -98,7 +98,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     # Creating synthetic jar to work around system arg length limit is not necessary
     # when `NailgunExecutor` is used because args are passed through socket, therefore turning off
     # creating synthetic jar if nailgun is used.
-    create_synthetic_jar = self.execution_strategy_enum != self.ExecutionStrategy.nailgun
+    create_synthetic_jar = self.execution_strategy != self.ExecutionStrategy.nailgun
     try:
       return util.execute_java(classpath=classpath,
                                main=main,

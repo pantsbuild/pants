@@ -216,7 +216,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
   # Overrides the normal zinc compiler classpath, which only contains zinc.
   def get_zinc_compiler_classpath(self):
-    return self.execution_strategy_enum.match({
+    return self.execution_strategy.match({
       # NB: We must use the verbose version of super() here, possibly because of the lambda.
       self.ExecutionStrategy.hermetic: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
       self.ExecutionStrategy.subprocess: lambda: super(RscCompile, self).get_zinc_compiler_classpath(),
@@ -347,7 +347,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         classpath_entries = classpath_product.get_classpath_entries_for_targets(dependencies_for_target)
         for _conf, classpath_entry in classpath_entries:
           classpath_paths.append(fast_relpath(classpath_entry.path, get_buildroot()))
-          if self.execution_strategy_enum == self.ExecutionStrategy.hermetic and not classpath_entry.directory_digest:
+          if self.execution_strategy == self.ExecutionStrategy.hermetic and not classpath_entry.directory_digest:
             raise AssertionError(
               "ClasspathEntry {} didn't have a Digest, so won't be present for hermetic "
               "execution of rsc".format(classpath_entry)
@@ -376,7 +376,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
             classpath_abs_jdk = classpath_paths + self._jdk_libs_abs(distribution)
             return ((EMPTY_DIRECTORY_DIGEST), classpath_abs_jdk)
 
-          (input_digest, classpath_entry_paths) = self.execution_strategy_enum.match({
+          (input_digest, classpath_entry_paths) = self.execution_strategy.match({
             self.ExecutionStrategy.hermetic: hermetic_digest_classpath,
             self.ExecutionStrategy.subprocess: nonhermetic_digest_classpath,
             self.ExecutionStrategy.nailgun: nonhermetic_digest_classpath,
@@ -482,7 +482,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
         v
       )
     record('workflow', workflow.value)
-    record('execution_strategy', self.execution_strategy_enum.value)
+    record('execution_strategy', self.execution_strategy.value)
 
     # Create the cache doublecheck job.
     workflow.match({
@@ -717,7 +717,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     main = 'rsc.cli.Main'
     tool_name = 'rsc'
     with self.context.new_workunit(tool_name) as wu:
-      return self.execution_strategy_enum.match({
+      return self.execution_strategy.match({
         self.ExecutionStrategy.hermetic: lambda: self._runtool_hermetic(
           main, tool_name, distribution, input_digest, ctx),
         self.ExecutionStrategy.subprocess: lambda: self._runtool_nonhermetic(

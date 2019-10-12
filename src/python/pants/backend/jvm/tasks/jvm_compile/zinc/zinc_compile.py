@@ -177,7 +177,7 @@ class BaseZincCompile(JvmCompile):
 
   @memoized_property
   def _zinc(self):
-    return Zinc.Factory.global_instance().create(self.context.products, self.execution_strategy_enum)
+    return Zinc.Factory.global_instance().create(self.context.products, self.execution_strategy)
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
@@ -187,7 +187,7 @@ class BaseZincCompile(JvmCompile):
     # Validate zinc options.
     ZincCompile.validate_arguments(self.context.log, self.get_options().whitelisted_args,
                                    self._args)
-    if self.execution_strategy_enum == self.ExecutionStrategy.hermetic:
+    if self.execution_strategy == self.ExecutionStrategy.hermetic:
       try:
         fast_relpath(self.get_options().pants_workdir, get_buildroot())
       except ValueError:
@@ -263,7 +263,7 @@ class BaseZincCompile(JvmCompile):
 
     self._verify_zinc_classpath(
       absolute_classpath,
-      allow_dist=(self.execution_strategy_enum != self.ExecutionStrategy.hermetic)
+      allow_dist=(self.execution_strategy != self.ExecutionStrategy.hermetic)
     )
     # TODO: Investigate upstream_analysis for hermetic compiles
     self._verify_zinc_classpath(upstream_analysis.keys())
@@ -363,7 +363,7 @@ class BaseZincCompile(JvmCompile):
     self.log_zinc_file(ctx.analysis_file)
     self.write_argsfile(ctx, zinc_args)
 
-    return self.execution_strategy_enum.match({
+    return self.execution_strategy.match({
       self.ExecutionStrategy.hermetic: lambda: self._compile_hermetic(
         jvm_options, ctx, classes_dir, jar_file, compiler_bridge_classpath_entry,
         dependency_classpath, scalac_classpath_entries),

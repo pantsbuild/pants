@@ -218,7 +218,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
 
   @memoized_property
   def _zinc(self):
-    return Zinc.Factory.global_instance().create(self.context.products, self.execution_strategy_enum)
+    return Zinc.Factory.global_instance().create(self.context.products, self.execution_strategy)
 
   def _zinc_tool_classpath(self, toolname):
     return self._zinc.tool_classpath_from_products(self.context.products,
@@ -476,7 +476,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
     valid_targets = [vt.target for vt in invalidation_check.all_vts if vt.valid]
 
-    if self.execution_strategy_enum == self.ExecutionStrategy.hermetic:
+    if self.execution_strategy == self.ExecutionStrategy.hermetic:
       self._set_directory_digests_for_valid_target_classpath_directories(valid_targets, compile_contexts)
 
     for valid_target in valid_targets:
@@ -932,7 +932,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     # See: https://github.com/pantsbuild/pants/issues/6416 for covering using
     #      different jdks in remote builds.
     local_distribution = self._local_jvm_distribution()
-    return self.execution_strategy_enum.match({
+    return self.execution_strategy.match({
       self.ExecutionStrategy.subprocess: lambda: local_distribution,
       self.ExecutionStrategy.nailgun: lambda: local_distribution,
       self.ExecutionStrategy.hermetic: lambda: self._HermeticDistribution('.jdk', local_distribution),

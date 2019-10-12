@@ -56,7 +56,7 @@ class AnalysisExtraction(NailgunTask):
   @memoized_property
   def _zinc(self):
     return Zinc.Factory.global_instance().create(
-      self.context.products, self.execution_strategy_enum
+      self.context.products, self.execution_strategy
     )
 
   def _jdeps_output_json(self, vt):
