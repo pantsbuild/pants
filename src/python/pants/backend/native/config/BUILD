@@ -5,7 +5,6 @@ python_library(
   dependencies=[
     'src/python/pants/engine:rules',
     'src/python/pants/engine:platform',
-    'src/python/pants/util:objects',
     'src/python/pants/util:osutil',
   ],
 )

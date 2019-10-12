@@ -178,7 +178,6 @@ python_tests(
     'src/python/pants/engine:console',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
-    'src/python/pants/util:objects',
     'tests/python/pants_test/engine/examples:parsers',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:test_base',

@@ -8,7 +8,7 @@ python_library(
     'src/python/pants/backend/native/subsystems/utils',
     'src/python/pants/binaries',
     'src/python/pants/engine:rules',
-    'src/python/pants/engine:selectors',
-    'src/python/pants/util:objects',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
   ],
 )
