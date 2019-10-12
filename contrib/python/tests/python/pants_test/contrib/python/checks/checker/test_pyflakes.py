@@ -28,3 +28,7 @@ class PyflakesCheckerTest(CheckstylePluginTestBase):
   def test_pyflakes_ignore(self):
     plugin = self.get_plugin('import os', ignore=['F401'])
     self.assertEqual([], list(plugin.nits()))
+
+  def test_pyflakes_ignore(self):
+    plugin = self.get_plugin('import os', ignore=['UnusedImport'])
+    self.assertEqual([], list(plugin.nits()))
