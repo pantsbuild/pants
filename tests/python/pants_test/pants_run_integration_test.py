@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from operator import eq, ne
 from threading import Lock
-from typing import Any, List, Optional, Union
+from typing import Any, Callable, List, Optional, Union
 
 from colors import strip_color
 
@@ -586,23 +586,25 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
     @dataclass(frozen=True)
     class Manager:
-      write_file: Any
+      write_file: Callable[[str, str], None]
       pushd: Any
-      new_buildroot: Any
+      new_buildroot: str
 
     # N.B. BUILD.tools, contrib, 3rdparty needs to be copied vs symlinked to avoid
     # symlink prefix check error in v1 and v2 engine.
     files_to_copy = ('BUILD.tools',)
-    files_to_link = ('.pants.d',
-                     'build-support',
-                     'pants',
-                     'pants.pex',
-                     'pants-plugins',
-                     'pants.ini',
-                     'pants.travis-ci.ini',
-                     'pyproject.toml',
-                     'rust-toolchain',
-                     'src')
+    files_to_link = (
+      '.pants.d',
+      'build-support',
+      'pants',
+      'pants.pex',
+      'pants-plugins',
+      'pants.ini',
+      'pants.travis-ci.ini',
+      'pyproject.toml',
+      'rust-toolchain',
+      'src',
+    )
     dirs_to_copy = ('3rdparty', 'contrib') + tuple(dirs_to_copy or [])
 
     with self.temporary_workdir() as tmp_dir:

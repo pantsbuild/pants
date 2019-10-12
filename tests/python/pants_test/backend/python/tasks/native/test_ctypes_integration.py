@@ -126,7 +126,8 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
     # TODO: consider making this mock_buildroot/run_pants_with_workdir into a
     # PantsRunIntegrationTest method!
     with self.mock_buildroot(
-        dirs_to_copy=[self._binary_interop_target_dir]) as buildroot, buildroot.pushd():
+        dirs_to_copy=[self._binary_interop_target_dir]
+    ) as buildroot, buildroot.pushd():
 
       # Replace strict_deps=False with nothing so we can override it (because target values for this
       # option take precedence over subsystem options).
@@ -149,7 +150,7 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
           },
         },
         workdir=os.path.join(buildroot.new_buildroot, '.pants.d'),
-        build_root=buildroot.new_buildroot)
+      )
       self.assert_failure(pants_binary_strict_deps_failure)
       self.assertIn(toolchain_variant.resolve_for_enum_variant({
         'gnu': "fatal error: some_math.h: No such file or directory",
