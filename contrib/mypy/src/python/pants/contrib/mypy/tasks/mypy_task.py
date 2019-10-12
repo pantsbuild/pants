@@ -58,8 +58,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
   @classmethod
   def register_options(cls, register):
     register('--mypy-version', default='0.720', help='The version of mypy to use.',
-             removal_version=cls.deprecated_options_scope_removal_version,
-             removal_hint='Use --version instead.')
+             removal_version='1.24.0.dev1', removal_hint='Use --version instead.')
     register('--version', default='0.720', help='The version of mypy to use.')
     register('--include-requirements', type=bool, default=False,
              help='Whether to include the transitive requirements of targets being checked. This is'
