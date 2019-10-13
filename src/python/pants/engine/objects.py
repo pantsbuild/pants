@@ -3,8 +3,10 @@
 
 import inspect
 import sys
+import typing
 from abc import ABC, abstractmethod
-from collections import namedtuple
+from collections import Iterable, namedtuple
+from typing import Generic, Iterator, TypeVar
 
 from pants.util.memo import memoized_classmethod
 from pants.util.objects import Exactly, TypedCollection, datatype
@@ -146,6 +148,27 @@ class Validatable(ABC):
 
     :raises: :class:`ValidationError` if this object is invalid.
     """
+
+
+_C = TypeVar("_C")
+
+class CollectionMypy(Generic[_C], Iterable):
+  """Constructs classes representing collections of objects of a particular type.
+
+  The produced class will expose its values under a field named dependencies - this is a stable API
+  which may be consumed e.g. over FFI from the engine.
+
+  Python consumers of a Collection should prefer to use its standard iteration API.
+  """
+
+  def __init__(self, dependencies: typing.Iterable[_C]) -> None:
+    self.dependencies = tuple(dependencies)
+
+  def __iter__(self) -> Iterator[_C]:
+    return iter(self.dependencies)
+
+  def __bool__(self) -> bool:
+    return bool(self.dependencies)
 
 
 class Collection:

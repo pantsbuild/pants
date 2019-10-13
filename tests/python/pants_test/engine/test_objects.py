@@ -2,13 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
+import unittest
 
-from pants.engine.objects import Collection
+from pants.engine.objects import Collection, CollectionMypy
 from pants.util.objects import TypeCheckError
-from pants_test.test_base import TestBase
 
 
-class CollectionTest(TestBase):
+class CollectionTest(unittest.TestCase):
+
   def test_collection_iteration(self):
     self.assertEqual([1, 2], [x for x in Collection.of(int)([1, 2])])
 
@@ -22,7 +23,7 @@ class CollectionTest(TestBase):
 
     IntOrStringColl = Collection.of(int, str)
     self.assertEqual([3, "hello"], [x for x in IntOrStringColl([3, "hello"])])
-    with self.assertRaisesRegexp(TypeCheckError, re.escape(
+    with self.assertRaisesRegex(TypeCheckError, re.escape(
       "field 'dependencies' was invalid: in wrapped constraint TypedCollection(Exactly(int or "
       "str)) matching iterable object [()]: value () (with type 'tuple') must satisfy this type "
       "constraint: Exactly(int or str).""")):
@@ -31,3 +32,13 @@ class CollectionTest(TestBase):
   def test_collection_bool(self):
     self.assertTrue(bool(Collection.of(int)([0])))
     self.assertFalse(bool(Collection.of(int)([])))
+
+
+class CollectionMypyTest(unittest.TestCase):
+
+  def test_collection_iteration(self) -> None:
+    self.assertEqual([1, 2], [x for x in CollectionMypy([1, 2])])
+
+  def test_collection_bool(self) -> None:
+    self.assertTrue(bool(CollectionMypy([0])))
+    self.assertFalse(bool(CollectionMypy([])))

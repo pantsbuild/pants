@@ -123,7 +123,8 @@ for arg in "$@"; do
   fi
 done
 if [[ "${test_goal_used}" == 'true' && "${TRAVIS}" != 'true' ]]; then
-  "$HERE/build-support/bin/bootstrap_pants_pex.sh"
+  #"$HERE/build-support/bin/bootstrap_pants_pex.sh"
+  :
 fi
 
 exec_pants_bare "$@"
