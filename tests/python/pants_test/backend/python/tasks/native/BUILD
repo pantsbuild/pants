@@ -47,5 +47,5 @@ python_tests(
     'testprojects/src/python:python_distribution_directory',
   ],
   tags={'platform_specific_behavior', 'integration'},
-  timeout=2400,
+  timeout=240,
 )
