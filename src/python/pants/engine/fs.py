@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass
 from typing import Any, Iterable, Optional, Tuple
 
-from pants.engine.objects import Collection
+from pants.engine.objects import CollectionMypy as Collection
 from pants.engine.rules import RootRule
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
@@ -28,7 +28,7 @@ class FileContent:
     )
 
 
-FilesContent = Collection.of(FileContent)
+FilesContent = Collection[FileContent]
 
 
 class InputFilesContent(FilesContent):
@@ -170,7 +170,7 @@ class DirectoryToMaterialize:
   directory_digest: Digest
 
 
-DirectoriesToMaterialize = Collection.of(DirectoryToMaterialize)
+DirectoriesToMaterialize = Collection[DirectoryToMaterialize]
 
 
 @dataclass(frozen=True)
@@ -179,7 +179,7 @@ class MaterializeDirectoryResult:
   output_paths: Tuple[str, ...]
 
 
-MaterializeDirectoriesResult = Collection.of(MaterializeDirectoryResult)
+MaterializeDirectoriesResult = Collection[MaterializeDirectoryResult]
 
 
 @dataclass(frozen=True)

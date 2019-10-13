@@ -11,7 +11,7 @@ from pants.engine.console import Console
 from pants.engine.fs import Digest, FilesContent
 from pants.engine.goal import Goal
 from pants.engine.legacy.graph import HydratedTarget, HydratedTargets
-from pants.engine.objects import Collection
+from pants.engine.objects import CollectionMypy as Collection
 from pants.engine.rules import console_rule, optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.subsystem.subsystem import Subsystem
@@ -90,7 +90,7 @@ class RegexMatchResult:
   nonmatching: Tuple
 
 
-RegexMatchResults = Collection.of(RegexMatchResult)
+RegexMatchResults = Collection[RegexMatchResult]
 
 
 class Matcher:

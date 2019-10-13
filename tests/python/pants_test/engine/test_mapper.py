@@ -19,7 +19,7 @@ from pants.engine.mapper import (
   DuplicateNameError,
   UnaddressableObjectError,
 )
-from pants.engine.objects import Collection
+from pants.engine.objects import CollectionMypy as Collection
 from pants.engine.parser import HydratedStruct, SymbolTable
 from pants.engine.rules import rule
 from pants.engine.selectors import Get
@@ -132,7 +132,7 @@ class AddressFamilyTest(unittest.TestCase):
                                        {'one': Thing(name='one', age=37)})])
 
 
-HydratedStructs = Collection.of(HydratedStruct)
+HydratedStructs = Collection[HydratedStruct]
 
 
 @rule

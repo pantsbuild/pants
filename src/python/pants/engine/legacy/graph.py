@@ -25,7 +25,7 @@ from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, HydrateableField, SourcesField
 from pants.engine.mapper import AddressMapper
-from pants.engine.objects import Collection
+from pants.engine.objects import CollectionMypy as Collection
 from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
@@ -378,7 +378,7 @@ class TransitiveHydratedTargets:
   closure: Any
 
 
-class HydratedTargets(Collection.of(HydratedTarget)):
+class HydratedTargets(Collection[HydratedTarget]):
   """An intransitive set of HydratedTarget objects."""
 
 

@@ -8,11 +8,12 @@ from functools import update_wrapper
 
 from pants.base.specs import Spec
 from pants.build_graph.address import Address, BuildFileAddress
-from pants.engine.objects import Collection, Resolvable, Serializable
+from pants.engine.objects import CollectionMypy as Collection
+from pants.engine.objects import Resolvable, Serializable
 from pants.util.objects import TypeConstraintError
 
 
-Addresses = Collection.of(Address)
+Addresses = Collection[Address]
 
 
 @dataclass(frozen=True)
@@ -22,14 +23,14 @@ class ProvenancedBuildFileAddress:
   provenance: Spec
 
 
-class BuildFileAddresses(Collection.of(BuildFileAddress)):
+class BuildFileAddresses(Collection[BuildFileAddress]):
   @property
   def addresses(self):
     """Converts the BuildFileAddress objects in this collection to Address objects."""
     return [bfa.to_address() for bfa in self]
 
 
-ProvenancedBuildFileAddresses = Collection.of(ProvenancedBuildFileAddress)
+ProvenancedBuildFileAddresses = Collection[ProvenancedBuildFileAddress]
 
 
 class NotSerializableError(TypeError):
