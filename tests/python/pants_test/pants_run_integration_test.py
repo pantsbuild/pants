@@ -594,8 +594,11 @@ class PantsRunIntegrationTest(unittest.TestCase):
     # symlink prefix check error in v1 and v2 engine.
     files_to_copy = ('BUILD.tools',)
     files_to_link = (
+      'BUILD_ROOT',
       '.pants.d',
       'build-support',
+      # NB: when running with --chroot or the V2 engine, `pants` refers to the source root-stripped
+      # directory src/python/pants, not the script `./pants`.
       'pants',
       'pants.pex',
       'pants-plugins',
