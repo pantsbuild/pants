@@ -379,7 +379,12 @@ impl super::CommandRunner for CommandRunner {
                             // for queuing the process so that the requested timeout more accurately
                             // reflects how long the caller intended the process to last.
                             let elapsed = start_time.elapsed();
-                            let queue_buffer_time = std::time::Duration::from_secs(45);
+                            let queue_buffer_time = Duration::from_secs(
+                              match std::env::var_os("OVERRIDE_QUEUE_TIMEOUT_FOR_TESTING") {
+                                // We use a low number for tests so that they do not take long to execute.
+                                Some(_) => 1,
+                                None => 45,
+                            });
 
                             if elapsed > timeout + queue_buffer_time {
                               let ExecutionHistory {
