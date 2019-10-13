@@ -39,7 +39,7 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
-from pants.util.collections import assert_single_element
+from pants.util.collections import Enum, assert_single_element
 from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdtemp
 from pants.util.objects import enum
@@ -105,6 +105,10 @@ class OptionsTest(TestBase):
                         task('separate-enum-opt-scope')]
 
   class SomeEnumOption(enum(['a-value', 'another-value'])): pass
+
+  class AnotherEnumOption(Enum):
+    a_value = "a-value"
+    another_value = "another-value"
 
   def _register(self, options):
     def register_global(*args, **kwargs):
@@ -213,11 +217,13 @@ class OptionsTest(TestBase):
     options.register('fingerprinting', '--definitely-not-fingerprinted', fingerprint=False)
 
     # For enum tests
-    options.register('enum-opt', '--some-enum',
-                     type=self.SomeEnumOption)
+    options.register('enum-opt', '--some-enum', type=self.SomeEnumOption)
+    options.register('enum-opt', '--another-enum', type=self.AnotherEnumOption)
     # For testing the default value
     options.register('separate-enum-opt-scope', '--some-enum-with-default',
                      default=self.SomeEnumOption.a_value, type=self.SomeEnumOption)
+    options.register('separate-enum-opt-scope', '--another-enum-with-default',
+                     default=self.AnotherEnumOption.a_value, type=self.AnotherEnumOption)
 
   def test_env_type_int(self):
     options = Options.create(env={'PANTS_FOO_BAR': "['123','456']"},
@@ -803,10 +809,10 @@ class OptionsTest(TestBase):
 
   def test_drop_flag_values(self):
     options = self._parse(
-      './pants --bar-baz=fred -n33 --pants-foo=red enum-opt --some-enum=another-value simple -n1',
+      './pants --bar-baz=fred -n33 --pants-foo=red enum-opt --some-enum=another-value --another-enum=another-value simple -n1',
       env={'PANTS_FOO': 'BAR'},
       config={'simple': {'num': 42},
-              'enum-opt': {'some-enum': 'a-value'}})
+              'enum-opt': {'some-enum': 'a-value', 'another-enum': 'a-value'}})
     defaulted_only_options = options.drop_flag_values()
 
     # No option value supplied in any form.
@@ -827,11 +833,17 @@ class OptionsTest(TestBase):
 
     # Overriding an enum option value.
     self.assertEqual(self.SomeEnumOption.another_value, options.for_scope('enum-opt').some_enum)
+    self.assertEqual(self.AnotherEnumOption.another_value, options.for_scope('enum-opt').another_enum)
 
     # Getting the default value for an enum option.
     self.assertEqual(
       self.SomeEnumOption.a_value,
-      defaulted_only_options.for_scope('separate-enum-opt-scope').some_enum_with_default)
+      defaulted_only_options.for_scope('separate-enum-opt-scope').some_enum_with_default
+    )
+    self.assertEqual(
+      self.AnotherEnumOption.a_value,
+      defaulted_only_options.for_scope('separate-enum-opt-scope').another_enum_with_default
+    )
 
   def test_enum_option_type_parse_error(self):
     self.maxDiff = None
@@ -840,6 +852,11 @@ class OptionsTest(TestBase):
         "Error applying type 'SomeEnumOption' to option value 'invalid-value', for option '--some_enum' in scope 'enum-opt'"):
       options = self._parse('./pants enum-opt --some-enum=invalid-value')
       options.for_scope('enum-opt').some_enum
+    with self.assertRaisesWithMessageContaining(
+      ParseError,
+      "Error applying type 'AnotherEnumOption' to option value 'invalid-value', for option '--another_enum' in scope 'enum-opt'"):
+      options = self._parse('./pants enum-opt --another-enum=invalid-value')
+      options.for_scope('enum-opt').another_enum
 
   def test_deprecated_option_past_removal(self):
     """Ensure that expired options raise CodeRemovedError on attempted use."""

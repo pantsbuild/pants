@@ -16,7 +16,12 @@ def main() -> None:
   )
 
   check_banned_import(
-    python_files - {"src/python/pants/util/collections.py"},
+    python_files - {
+      "src/python/pants/base/hash_utils.py",
+      "src/python/pants/option/parser.py",
+      "src/python/pants/util/collections.py",
+      "tests/python/pants_test/base/test_hash_utils.py",
+    },
     bad_import_regex=r"^from enum import.*Enum|^import enum$",
     correct_import_message="from pants.util.collections import Enum",
   )

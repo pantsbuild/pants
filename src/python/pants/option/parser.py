@@ -2,12 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import copy
+import inspect
 import json
 import os
 import re
 import traceback
 from collections import defaultdict
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Callable, Dict, Iterable
 
 import Levenshtein
@@ -569,16 +571,16 @@ class Parser:
     def to_value_type(val_str):
       if val_str is None:
         return None
-      elif kwargs.get('type') == bool:
+      if kwargs.get('type') == bool:
         return self._ensure_bool(val_str)
-      else:
-        type_arg = kwargs.get('type', str)
-        try:
-          return self._wrap_type(type_arg)(val_str)
-        except TypeError as e:
-          raise ParseError(
-            "Error applying type '{}' to option value '{}', for option '--{}' in {}: {}"
-            .format(type_arg.__name__, val_str, dest, self._scope_str(), e))
+      type_arg = kwargs.get('type', str)
+      try:
+        return self._wrap_type(type_arg)(val_str)
+      except (TypeError, ValueError) as e:
+        raise ParseError(
+          f"Error applying type '{type_arg.__name__}' to option value '{val_str}', for option "
+          f"'--{dest}' in {self._scope_str()}: {e}"
+        )
 
     # Helper function to expand a fromfile=True value string, if needed.
     # May return a string or a dict/list decoded from a json/yaml file.
@@ -700,6 +702,8 @@ class Parser:
         # which are functions to have an implicit fallback `choices` set as well.
         if choices is None and 'type' in kwargs:
           type_arg = kwargs.get('type')
+          if inspect.isclass(type_arg) and issubclass(type_arg, Enum):
+            choices = list(type_arg)
           if hasattr(type_arg, 'all_variants'):
             choices = list(type_arg.all_variants)
         # TODO: convert this into an enum() pattern match!
