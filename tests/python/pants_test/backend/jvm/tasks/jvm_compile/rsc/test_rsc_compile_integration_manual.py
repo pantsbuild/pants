@@ -13,9 +13,9 @@ class RscCompileIntegrationManual(BaseCompileIT):
   def test_rsc_hermetic_jvm_options(self):
     # Remove all the symlinks under jdk in travis: https://github.com/pantsbuild/pants/issues/8460
     # Otherwise globbing from jdk home would error out.
-    if os.environ.get('TRAVIS') == 'true':
+    jdk_home = DistributionLocator.global_instance().cached().home
+    if os.path.exists(jdk_home):
       init_subsystem(DistributionLocator)
-      jdk_home = DistributionLocator.global_instance().cached().home
       symlinks = [f for f in os.listdir(jdk_home) if os.path.islink(f)]
       for s in symlinks:
         os.remove(s)
