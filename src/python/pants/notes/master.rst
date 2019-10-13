@@ -19,9 +19,6 @@ API Changes
 * Error out if the user explicitly tries to test a non-test tgt. (#8402)
   `PR #8402 <https://github.com/pantsbuild/pants/pull/8402>`_
 
-* Revert "Format our python code with Black (#8391)" (#8409)
-  `PR #8391 <https://github.com/pantsbuild/pants/pull/8391>`_
-  `PR #8409 <https://github.com/pantsbuild/pants/pull/8409>`_
 
 New Features
 ~~~~~~~~~~~~
@@ -42,9 +39,6 @@ Bugfixes
 * Send cumulative_timings & recorded_options in stats v2 too. (#8456)
   `PR #8456 <https://github.com/pantsbuild/pants/pull/8456>`_
 
-* remove @_algebraic_data decorator to support @dataclass and mypy (#8437)
-  `PR #8437 <https://github.com/pantsbuild/pants/pull/8437>`_
-
 * Fix double check cache digest (#8416)
   `PR #8416 <https://github.com/pantsbuild/pants/pull/8416>`_
 
@@ -62,6 +56,7 @@ Bugfixes
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 * Improve support for `Enum`s as option types (#8458)
   `PR #8458 <https://github.com/pantsbuild/pants/pull/8458>`_
   `Comment #8451 <https://github.com/pantsbuild/pants/pull/8451#discussion_r334075761>`
@@ -81,14 +76,12 @@ Refactoring, Improvements, and Tooling
 
 * Replace majority of remaining `datatype()`s with `@dataclass` (#8435)
   `PR #8435 <https://github.com/pantsbuild/pants/pull/8435>`_
-  `PR #8423 <https://github.com/pantsbuild/pants/pull/8423>`_
 
 * Use f-strings in pants daemon (#8448)
   `PR #8448 <https://github.com/pantsbuild/pants/pull/8448>`_
 
 * Add collections.Enum class that extends stdlib Enum with ~pattern matching (#8451)
   `PR #8451 <https://github.com/pantsbuild/pants/pull/8451>`_
-  `PR #8443 <https://github.com/pantsbuild/pants/pull/8443>`_
 
 * use travis wait enhanced in shards with remoting enabled (#8446)
   `PR #8446 <https://github.com/pantsbuild/pants/pull/8446>`_
@@ -96,24 +89,20 @@ Refactoring, Improvements, and Tooling
 * Add file to allow a clean looking git blame (#8404)
   `PR #8404 <https://github.com/pantsbuild/pants/pull/8404>`_
 
+* remove @_algebraic_data decorator to support @dataclass and mypy (#8437)
+  `PR #8437 <https://github.com/pantsbuild/pants/pull/8437>`_
+
 * Run testprojects integration tests with V2 test runner (#8426)
   `PR #8426 <https://github.com/pantsbuild/pants/pull/8426>`_
-  `PR #8439 <https://github.com/pantsbuild/pants/pull/8439>`_
 
 * Restore running `test_testprojects_integration.py` with chroot (#8433)
   `PR #8433 <https://github.com/pantsbuild/pants/pull/8433>`_
-  `PR #8429 <https://github.com/pantsbuild/pants/pull/8429>`_
 
 * Replace more `datatype()` instances with `@dataclass` (#8423)
   `PR #8423 <https://github.com/pantsbuild/pants/pull/8423>`_
-  `PR #8362, <https://github.com/pantsbuild/pants/pull/8362,>`_
-  `PR #8431 <https://github.com/pantsbuild/pants/pull/8431>`_
 
 * Add `@frozen_after_init` decorator to make some @dataclass uses safer with V2 (#8431)
   `PR #8431 <https://github.com/pantsbuild/pants/pull/8431>`_
-  `PR #8423#issue-325939000, <https://github.com/pantsbuild/pants/pull/8423#issue-325939000,>`_
-  `PR #8423#issuecomment-539810058, <https://github.com/pantsbuild/pants/pull/8423#issuecomment-539810058,>`_
-  `PR #8181 <https://github.com/pantsbuild/pants/pull/8181>`_
 
 * Type check `meta.py` and replace `Singleton` with `SingletonMetaclass` (#8424)
   `PR #8424 <https://github.com/pantsbuild/pants/pull/8424>`_
@@ -132,6 +121,9 @@ Refactoring, Improvements, and Tooling
 
 * Add type hints to `contextutil.py`, `fileutil.py`, and `eval.py` (#8401)
   `PR #8401 <https://github.com/pantsbuild/pants/pull/8401>`_
+
+* Revert "Format our python code with Black (#8391)" (#8409)
+  `PR #8409 <https://github.com/pantsbuild/pants/pull/8409>`_
 
 
 1.22.0.dev1 (10/04/2019)
