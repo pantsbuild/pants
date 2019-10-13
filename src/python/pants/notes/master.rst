@@ -4,6 +4,136 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.22.0.dev2 (10/13/2019)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+* Deprecate mypy-version flag and add new version flag (#8463)
+  `Issue #7627 <https://github.com/pantsbuild/pants/issues/7627>`_
+  `PR #8463 <https://github.com/pantsbuild/pants/pull/8463>`_
+
+* Fix tensorflow==1.14 globbing with platform-specific native_lib_names (#8378)
+  `PR #8378 <https://github.com/pantsbuild/pants/pull/8378>`_
+
+* Error out if the user explicitly tries to test a non-test tgt. (#8402)
+  `PR #8402 <https://github.com/pantsbuild/pants/pull/8402>`_
+
+* Revert "Format our python code with Black (#8391)" (#8409)
+  `PR #8391 <https://github.com/pantsbuild/pants/pull/8391>`_
+  `PR #8409 <https://github.com/pantsbuild/pants/pull/8409>`_
+
+New Features
+~~~~~~~~~~~~
+* Allow ignoring flake errors by name in addition to code. (#8444)
+  `PR #8444 <https://github.com/pantsbuild/pants/pull/8444>`_
+
+* Allow extra remote execution headers to be set (#8430)
+  `PR #8430 <https://github.com/pantsbuild/pants/pull/8430>`_
+
+* Start creating `binary` goal with support for python (#8399)
+  `PR #8399 <https://github.com/pantsbuild/pants/pull/8399>`_
+
+* Add support for running Pants with Python 3.8 (#8415)
+  `PR #8415 <https://github.com/pantsbuild/pants/pull/8415>`_
+
+Bugfixes
+~~~~~~~~
+* Send cumulative_timings & recorded_options in stats v2 too. (#8456)
+  `PR #8456 <https://github.com/pantsbuild/pants/pull/8456>`_
+
+* remove @_algebraic_data decorator to support @dataclass and mypy (#8437)
+  `PR #8437 <https://github.com/pantsbuild/pants/pull/8437>`_
+
+* Fix double check cache digest (#8416)
+  `PR #8416 <https://github.com/pantsbuild/pants/pull/8416>`_
+
+* Don't panic in create_scheduler (#8428)
+  `PR #8428 <https://github.com/pantsbuild/pants/pull/8428>`_
+
+* [junit-run] apply platform args to junit run java exec (#8421)
+  `PR #8421 <https://github.com/pantsbuild/pants/pull/8421>`_
+
+* Don't shade the nailgun package (#8418)
+  `PR #8418 <https://github.com/pantsbuild/pants/pull/8418>`_
+
+* Make subsystem dep explicit for RSC compile (#8406)
+  `PR #8406 <https://github.com/pantsbuild/pants/pull/8406>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Improve support for `Enum`s as option types (#8458)
+  `PR #8458 <https://github.com/pantsbuild/pants/pull/8458>`_
+  `Comment #8451 <https://github.com/pantsbuild/pants/pull/8451#discussion_r334075761>`
+
+* Port `test_pytest_run_integration.py` to V2 (#8466)
+  `PR #8466 <https://github.com/pantsbuild/pants/pull/8466>`_
+
+* Fix `PantsRunIntegrationTest.mock_buildroot()` to work with `--chroot` (#8465)
+  `PR #8465 <https://github.com/pantsbuild/pants/pull/8465>`_
+
+* Use f-strings in python tasks. (#8449)
+  `PR #8449 <https://github.com/pantsbuild/pants/pull/8449>`_
+
+* Run fuse tests on OSX again (#8453)
+  `PR #8453 <https://github.com/pantsbuild/pants/pull/8453>`_
+  `Issue #10017 <https://github.com/travis-ci/travis-ci/issues/10017>`_
+
+* Replace majority of remaining `datatype()`s with `@dataclass` (#8435)
+  `PR #8435 <https://github.com/pantsbuild/pants/pull/8435>`_
+  `PR #8423 <https://github.com/pantsbuild/pants/pull/8423>`_
+
+* Use f-strings in pants daemon (#8448)
+  `PR #8448 <https://github.com/pantsbuild/pants/pull/8448>`_
+
+* Add collections.Enum class that extends stdlib Enum with ~pattern matching (#8451)
+  `PR #8451 <https://github.com/pantsbuild/pants/pull/8451>`_
+  `PR #8443 <https://github.com/pantsbuild/pants/pull/8443>`_
+
+* use travis wait enhanced in shards with remoting enabled (#8446)
+  `PR #8446 <https://github.com/pantsbuild/pants/pull/8446>`_
+
+* Add file to allow a clean looking git blame (#8404)
+  `PR #8404 <https://github.com/pantsbuild/pants/pull/8404>`_
+
+* Run testprojects integration tests with V2 test runner (#8426)
+  `PR #8426 <https://github.com/pantsbuild/pants/pull/8426>`_
+  `PR #8439 <https://github.com/pantsbuild/pants/pull/8439>`_
+
+* Restore running `test_testprojects_integration.py` with chroot (#8433)
+  `PR #8433 <https://github.com/pantsbuild/pants/pull/8433>`_
+  `PR #8429 <https://github.com/pantsbuild/pants/pull/8429>`_
+
+* Replace more `datatype()` instances with `@dataclass` (#8423)
+  `PR #8423 <https://github.com/pantsbuild/pants/pull/8423>`_
+  `PR #8362, <https://github.com/pantsbuild/pants/pull/8362,>`_
+  `PR #8431 <https://github.com/pantsbuild/pants/pull/8431>`_
+
+* Add `@frozen_after_init` decorator to make some @dataclass uses safer with V2 (#8431)
+  `PR #8431 <https://github.com/pantsbuild/pants/pull/8431>`_
+  `PR #8423#issue-325939000, <https://github.com/pantsbuild/pants/pull/8423#issue-325939000,>`_
+  `PR #8423#issuecomment-539810058, <https://github.com/pantsbuild/pants/pull/8423#issuecomment-539810058,>`_
+  `PR #8181 <https://github.com/pantsbuild/pants/pull/8181>`_
+
+* Type check `meta.py` and replace `Singleton` with `SingletonMetaclass` (#8424)
+  `PR #8424 <https://github.com/pantsbuild/pants/pull/8424>`_
+
+* Set internal `pants.ini` to use chroot for V1 Pytest runner (#8425)
+  `PR #8425 <https://github.com/pantsbuild/pants/pull/8425>`_
+
+* Make test discovery for `test_testprojects.py` IT more precise (#8395)
+  `PR #8395 <https://github.com/pantsbuild/pants/pull/8395>`_
+
+* Remote execution: Set RequestMetadata proto header (#8373)
+  `PR #8373 <https://github.com/pantsbuild/pants/pull/8373>`_
+
+* Run pants-plugin tests with V2 remote execution (#8413)
+  `PR #8413 <https://github.com/pantsbuild/pants/pull/8413>`_
+
+* Add type hints to `contextutil.py`, `fileutil.py`, and `eval.py` (#8401)
+  `PR #8401 <https://github.com/pantsbuild/pants/pull/8401>`_
+
+
 1.22.0.dev1 (10/04/2019)
 ------------------------
 

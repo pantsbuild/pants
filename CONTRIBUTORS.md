@@ -49,6 +49,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Dorothy Ordogh
 + Drew Rothstein
 + Dumitru Daniliuc
++ Dylan Herman
 + Ebube Chuba
 + Eitan Adler
 + Ekaterina Tyurina
