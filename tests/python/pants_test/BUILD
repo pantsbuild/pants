@@ -2,6 +2,31 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
+  name='test_infra',
+  dependencies=[
+    ':int-test-for-export',
+    ':test_base',
+    'tests/python/pants_test/jvm:jar_task_test_base',
+    'tests/python/pants_test/jvm:nailgun_task_test_base',
+    'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+    'tests/python/pants_test/engine:engine_test_base',
+    'tests/python/pants_test/subsystem:subsystem_utils',
+    'tests/python/pants_test/base:context_utils',
+    'tests/python/pants_test/engine:util',
+    'tests/python/pants_test/option/util',
+    'tests/python/pants_test/testutils:file_test_util',
+  ],
+  provides=pants_setup_py(
+    name='pantsbuild.pants.testinfra',
+    description='Test support for writing pants plugins.',
+    namespace_packages=['pants.testinfra', 'pants_test'],
+    additional_classifiers=[
+      'Topic :: Software Development :: Testing',
+    ],
+  ),
+)
+
+python_library(
   name = 'int-test-for-export',
   sources = ['pants_run_integration_test.py'],
   dependencies = [
