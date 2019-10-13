@@ -8,8 +8,7 @@ from functools import update_wrapper
 
 from pants.base.specs import Spec
 from pants.build_graph.address import Address, BuildFileAddress
-from pants.engine.objects import CollectionMypy as Collection
-from pants.engine.objects import Resolvable, Serializable
+from pants.engine.objects import Collection, Resolvable, Serializable
 from pants.util.objects import TypeConstraintError
 
 

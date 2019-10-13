@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Optional, Sequence, Set
 
 from pants.base.project_tree_factory import get_project_tree
-from pants.engine.objects import CollectionMypy as Collection
+from pants.engine.objects import Collection
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
 

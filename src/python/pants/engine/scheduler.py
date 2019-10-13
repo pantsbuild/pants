@@ -37,7 +37,7 @@ from pants.engine.isolated_process import (
 )
 from pants.engine.native import Function, TypeId
 from pants.engine.nodes import Return, Throw
-from pants.engine.objects import CollectionMypy as Collection
+from pants.engine.objects import Collection
 from pants.engine.rules import RuleIndex, TaskRule
 from pants.engine.selectors import Params
 from pants.util.contextutil import temporary_file_path

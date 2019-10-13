@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass
 from typing import Any, Iterable, Optional, Tuple
 
-from pants.engine.objects import CollectionMypy as Collection
+from pants.engine.objects import Collection
 from pants.engine.rules import RootRule
 from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior

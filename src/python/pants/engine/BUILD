@@ -130,10 +130,6 @@ python_library(
 python_library(
   name='objects',
   sources=['objects.py'],
-  dependencies=[
-    'src/python/pants/util:memo',
-    'src/python/pants/util:objects',
-  ]
 )
 
 python_library(

@@ -229,6 +229,5 @@ python_tests(
   sources=['test_objects.py'],
   dependencies=[
     'src/python/pants/engine:objects',
-    'src/python/pants/util:objects',
   ],
 )
