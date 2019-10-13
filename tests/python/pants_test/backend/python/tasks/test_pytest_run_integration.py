@@ -110,8 +110,8 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir() as coverage_dir:
       pants_run = self.run_pants(['clean-all',
                                   'test.pytest',
-                                  '--coverage=pants',
-                                  '--test-pytest-coverage-output-dir={}'.format(coverage_dir),
+                                  '--coverage=pants.constants_only',
+                                  f'--test-pytest-coverage-output-dir={coverage_dir}',
                                   'testprojects/tests/python/pants/constants_only'])
       self.assert_success(pants_run)
       self.assertTrue(os.path.exists(os.path.join(coverage_dir, 'coverage.xml')))
