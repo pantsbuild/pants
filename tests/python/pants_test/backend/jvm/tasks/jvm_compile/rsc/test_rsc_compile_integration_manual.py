@@ -10,7 +10,9 @@ from pants_test.subsystem.subsystem_util import init_subsystem
 
 class RscCompileIntegrationManual(BaseCompileIT):
 
-  def test_rsc_hermetic_jvm_options(self):
+  def setUp(self):
+    super().setUp()
+    init_subsystem(DistributionLocator)
     # Remove all the symlinks under jdk in travis: https://github.com/pantsbuild/pants/issues/8460
     # Otherwise globbing from jdk home would error out.
     jdk_home = DistributionLocator.global_instance().cached().home
@@ -20,6 +22,7 @@ class RscCompileIntegrationManual(BaseCompileIT):
       for s in symlinks:
         os.remove(s)
 
+  def test_rsc_hermetic_jvm_options(self):
     pants_run = self.run_pants(['compile', 'examples/src/scala/org/pantsbuild/example/hello/exe'],
       config={
         'cache.compile.rsc': {'ignore': True},
