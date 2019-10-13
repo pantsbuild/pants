@@ -17,7 +17,6 @@ class RscCompileIntegrationManual(BaseCompileIT):
     # Otherwise globbing from jdk home would error out.
     jdk_home = DistributionLocator.global_instance().cached().home
     if os.path.exists(jdk_home):
-      init_subsystem(DistributionLocator)
       symlinks = [f for f in os.listdir(jdk_home) if os.path.islink(f)]
       for s in symlinks:
         os.remove(s)
