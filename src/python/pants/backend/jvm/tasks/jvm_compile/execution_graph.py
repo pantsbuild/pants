@@ -9,6 +9,7 @@ from collections import defaultdict, deque
 from heapq import heappop, heappush
 
 from pants.base.worker_pool import Work
+from pants.util.contextutil import Timer
 
 
 class Job:
@@ -18,7 +19,8 @@ class Job:
   keys of its dependent jobs.
   """
 
-  def __init__(self, key, fn, dependencies, size=0, on_success=None, on_failure=None, run_asap=False):
+  def __init__(self, key, fn, dependencies, size=0, on_success=None, on_failure=None,
+    run_asap=False, duration=None, options_scope=None, target=None):
     """
 
     :param key: Key used to reference and look up jobs
@@ -37,6 +39,9 @@ class Job:
     self.on_success = on_success
     self.on_failure = on_failure
     self.run_asap = run_asap
+    self.duration = duration
+    self.options_scope = options_scope
+    self.target = target
 
   def __call__(self):
     self.fn()
@@ -278,11 +283,12 @@ class ExecutionGraph:
       def worker(worker_key, work):
         status_table.mark_as(RUNNING, worker_key)
         try:
-          work()
-          result = (worker_key, SUCCESSFUL, None)
+          with Timer() as timer:
+            work()
+          result = (worker_key, SUCCESSFUL, None, timer.elapsed)
         except BaseException:
           _, exc_value, exc_traceback = sys.exc_info()
-          result = (worker_key, FAILED, (exc_value, traceback.format_tb(exc_traceback)))
+          result = (worker_key, FAILED, (exc_value, traceback.format_tb(exc_traceback)), timer.elapsed)
         finished_queue.put(result)
         jobs_in_flight.decrement()
 
@@ -300,14 +306,14 @@ class ExecutionGraph:
 
       while not status_table.are_all_done():
         try:
-          finished_key, result_status, value = finished_queue.get(timeout=10)
+          (finished_key, result_status, value, duration) = finished_queue.get(timeout=10)
         except queue.Empty:
           self.log_progress(log, status_table)
-
           try_to_submit_jobs_from_heap()
           continue
 
         finished_job = self._jobs[finished_key]
+        finished_job.duration = duration
         direct_dependees = self._dependees[finished_key]
         status_table.mark_as(result_status, finished_key)
 
@@ -337,16 +343,17 @@ class ExecutionGraph:
           for dependee in direct_dependees:
             if status_table.is_unstarted(dependee):
               status_table.mark_queued(dependee)
-              finished_queue.put((dependee, CANCELED, None))
+              finished_queue.put((dependee, CANCELED, None, 0))
 
         # Log success or failure for this job.
         if result_status is FAILED:
           exception, tb = value
-          log.error("{} failed: {}".format(finished_key, exception))
+          log.error("{} failed: {} in {}".format(finished_key, exception, finished_job.duration))
           if self._print_stack_trace:
             log.error('Traceback:\n{}'.format('\n'.join(tb)))
         else:
-          log.debug("{} finished with status {}".format(finished_key, result_status))
+          log.debug("{} finished with status {} and in {}".format(finished_key, result_status,
+            finished_job.duration))
     except ExecutionFailure:
       raise
     except Exception as e:

@@ -313,9 +313,10 @@ class ExecutionGraphTest(unittest.TestCase):
       graph.execute(ImmediatelyExecutingPool(), capturing_logger)
     error_logs = capturing_logger.log_entries['error']
     self.assertEqual(2, len(error_logs), msg=f'Wanted one error log, got: {error_logs}')
-    self.assertEqual("A failed: I'm an error", error_logs[0])
+    regex = re.compile("A failed: I'm an error.*")
+    self.assertRegex(error_logs[0], regex)
     regex = re.compile(
-      "Traceback:.*in raising_wrapper.*raise Exception\\(\"I'm an error\"\\)",
+      "Traceback:.*in raising_wrapper.*raise Exception\\(\"I'm an error.*\"\\)",
       re.DOTALL,
     )
     self.assertRegex(error_logs[1], regex)
