@@ -15,7 +15,7 @@ class RscCompileIntegrationManual(BaseCompileIT):
     init_subsystem(DistributionLocator)
     # Remove all the symlinks under jdk in travis: https://github.com/pantsbuild/pants/issues/8460
     # Otherwise globbing from jdk home would error out.
-    jdk_home = DistributionLocator.global_instance().cached().home
+    jdk_home = '/usr/lib/jvm/java-8-openjdk-amd64'
     if os.path.exists(jdk_home):
       symlinks = [f for f in os.listdir(jdk_home) if os.path.islink(f)]
       for s in symlinks:
