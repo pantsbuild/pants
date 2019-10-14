@@ -3,16 +3,13 @@
 
 import os
 
-from pants.java.distribution.distribution import DistributionLocator
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
-from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 class RscCompileIntegrationManual(BaseCompileIT):
 
   def setUp(self):
     super().setUp()
-    init_subsystem(DistributionLocator)
     # Remove all the symlinks under jdk in travis: https://github.com/pantsbuild/pants/issues/8460
     # Otherwise globbing from jdk home would error out.
     jdk_home = '/usr/lib/jvm/java-8-openjdk-amd64'
