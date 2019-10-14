@@ -17,6 +17,7 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
+from pants.backend.jvm.tasks.classpath_entry import ClasspathEntry
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.base.build_environment import get_buildroot
@@ -29,6 +30,9 @@ from pants.engine.fs import (
   PathGlobs,
   PathGlobsAndRoot,
 )
+from pants.binaries.binary_tool import NativeTool, Script
+from pants.binaries.binary_util import BinaryToolUrlGenerator
+from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath
@@ -43,6 +47,16 @@ _SCALAC_PLUGIN_INFO_FILE = 'scalac-plugin.xml'
 
 logger = logging.getLogger(__name__)
 
+class NailgunClientBinary(Script):
+  options_scope = 'nailgun-client'
+  name = 'ng'
+  default_version = '1.0.0'
+
+  def get_external_url_generator(self):
+    class NailgunClientBinaryUrlGenerator(BinaryToolUrlGenerator):
+      def generate_urls(self, version, host_platform):
+        return ["https://github.com/facebook/nailgun/releases/download/nailgun-all-v1.0.0/ng.py"]
+    return NailgunClientBinaryUrlGenerator()
 
 class BaseZincCompile(JvmCompile):
   """An abstract base class for zinc compilation tasks."""
@@ -154,7 +168,7 @@ class BaseZincCompile(JvmCompile):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super().subsystem_dependencies() + (Zinc.Factory, JvmPlatform,)
+    return super().subsystem_dependencies() + (Zinc.Factory, JvmPlatform, NailgunClientBinary,)
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -391,6 +405,16 @@ class BaseZincCompile(JvmCompile):
     if exit_code != 0:
       raise self.ZincCompileError('Zinc compile failed.', exit_code=exit_code)
 
+  # Snapshot the nailgun-server jar, to use it to start nailguns in the hermetic case.
+  def _nailgun_server_classpath_entry(self):
+    nailgun_jar = self.tool_jar('nailgun-server')
+    nailgun_jar_snapshot = self.context._scheduler.capture_snapshots((PathGlobsAndRoot(
+      PathGlobs((fast_relpath(nailgun_jar, get_buildroot()),)),
+      get_buildroot()
+    ),))[0]
+    nailgun_jar_digest = nailgun_jar_snapshot.directory_digest
+    return ClasspathEntry(nailgun_jar, nailgun_jar_digest)
+
   def _compile_hermetic(self, jvm_options, ctx, classes_dir, jar_file,
                         compiler_bridge_classpath_entry, dependency_classpath,
                         scalac_classpath_entries):
@@ -411,7 +435,9 @@ class BaseZincCompile(JvmCompile):
     snapshots.extend(java_sources_snapshots)
 
     # Ensure the dependencies and compiler bridge jars are available in the execution sandbox.
-    relevant_classpath_entries = dependency_classpath + [compiler_bridge_classpath_entry]
+    relevant_classpath_entries = dependency_classpath + \
+                                 [compiler_bridge_classpath_entry] + \
+                                 [self._nailgun_server_classpath_entry()] # We include nailgun-server, to use it to start servers when needed from the hermetic execution case.
     directory_digests = [
       entry.directory_digest for entry in relevant_classpath_entries if entry.directory_digest
     ]
@@ -425,6 +451,9 @@ class BaseZincCompile(JvmCompile):
     directory_digests.extend(
       classpath_entry.directory_digest for classpath_entry in scalac_classpath_entries
     )
+
+    _, nailgun_client_snapshot = NailgunClientBinary.global_instance().hackily_snapshot(self.context)
+    directory_digests.append(nailgun_client_snapshot.directory_digest)
 
     if self._zinc.use_native_image:
       if jvm_options:
