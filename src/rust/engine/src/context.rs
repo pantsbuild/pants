@@ -81,6 +81,7 @@ impl Core {
     process_execution_speculation_strategy: String,
     process_execution_use_local_cache: bool,
     remote_execution_headers: BTreeMap<String, String>,
+    local_python_distribution_absolute_path: PathBuf,
   ) -> Result<Core, String> {
     // Randomize CAS address order to avoid thundering herds from common config.
     let mut remote_store_servers = remote_store_servers;
