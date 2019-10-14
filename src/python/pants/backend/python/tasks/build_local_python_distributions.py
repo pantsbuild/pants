@@ -93,9 +93,10 @@ class BuildLocalPythonDistributions(Task):
     reqs_to_resolve = set()
 
     for setup_req_lib_addr in dist_target.setup_requires:
-      for req_lib in self.context.build_graph.resolve(setup_req_lib_addr):
-        for req in req_lib.requirements:
-          reqs_to_resolve.add(req)
+      for maybe_req_lib in self.context.build_graph.resolve(setup_req_lib_addr):
+        if isinstance(maybe_req_lib, PythonRequirementLibrary):
+          for req in maybe_req_lib.requirements:
+            reqs_to_resolve.add(req)
 
     if not reqs_to_resolve:
       return None
