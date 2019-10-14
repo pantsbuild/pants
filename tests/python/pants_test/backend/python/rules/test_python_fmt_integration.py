@@ -1,35 +1,33 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
 from contextlib import contextmanager
 from os.path import relpath
 from pathlib import Path
 
 from pants.util.contextutil import temporary_dir, temporary_file_path
+from pants.util.dirutil import safe_file_dump
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 def write_build_file(root_dir):
-  build = Path(root_dir, "BUILD")
-  build.touch
-  build.write_text("python_library()")
+  safe_file_dump(os.path.join(root_dir, "BUILD"), "python_library()")
 
 INCONSISTENTLY_FORMATTED_HELLO: str = "def hello():x=42"
 CONSISTENTLY_FORMATTED_HELLO: str = "def hello():\n    x = 42\n"
 
 
 def write_inconsistently_formatted_file(root_dir, filename) -> Path:
-  code = Path(root_dir, filename)
-  code.touch()
-  code.write_text(INCONSISTENTLY_FORMATTED_HELLO)
-  return code
+  filepath = os.path.join(root_dir, filename)
+  safe_file_dump(filepath, INCONSISTENTLY_FORMATTED_HELLO)
+  return Path(filepath)
 
 
 def write_consistently_formatted_file(root_dir, filename) -> Path:
-  code = Path(root_dir, filename)
-  code.touch()
-  code.write_text(CONSISTENTLY_FORMATTED_HELLO)
-  return code
+  filepath = os.path.join(root_dir, filename)
+  safe_file_dump(filepath, CONSISTENTLY_FORMATTED_HELLO)
+  return Path(filepath)
 
 
 @contextmanager
