@@ -607,14 +607,13 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     tool_classpath_abs = self._rsc_classpath
     tool_classpath = fast_relpath_collection(tool_classpath_abs)
 
-    jvm_options = self._jvm_options
+    rsc_jvm_options = Rsc.global_instance().get_options().jvm_options
 
     if self._rsc.use_native_image:
-      #jvm_options = []
-      if jvm_options:
+      if rsc_jvm_options:
         raise ValueError(
           "`{}` got non-empty jvm_options when running with a graal native-image, but this is "
-          "unsupported. jvm_options received: {}".format(self.options_scope, safe_shlex_join(jvm_options))
+          "unsupported. jvm_options received: {}".format(self.options_scope, safe_shlex_join(rsc_jvm_options))
         )
       native_image_path, native_image_snapshot = self._rsc.native_image(self.context)
       additional_snapshots = [native_image_snapshot]
@@ -623,7 +622,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
       additional_snapshots = []
       initial_args = [
         distribution.java,
-      ] + self.get_options().jvm_options + [
+      ] + rsc_jvm_options + [
         '-cp', os.pathsep.join(tool_classpath),
         main,
       ]
