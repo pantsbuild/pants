@@ -158,6 +158,8 @@ pub struct ExecuteProcessRequest {
   ///
   pub jdk_home: Option<PathBuf>,
   pub target_platform: Platform,
+
+  pub is_nailgunnable: bool,
 }
 
 impl TryFrom<MultiPlatformExecuteProcessRequest> for ExecuteProcessRequest {

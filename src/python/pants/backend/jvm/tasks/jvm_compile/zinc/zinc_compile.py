@@ -493,6 +493,7 @@ class BaseZincCompile(JvmCompile):
       description="zinc compile for {}".format(ctx.target.address.spec),
       unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule=merged_local_only_scratch_inputs,
       jdk_home=self._zinc.underlying_dist.home,
+      nailgunnable=True,
     )
     res = self.context.execute_process_synchronously_or_raise(
       req, self.name(), [WorkUnitLabel.COMPILER])
