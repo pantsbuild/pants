@@ -7,6 +7,6 @@ from example.hello.greet.greet import greet
 
 
 if __name__ == "__main__":
-    greetees = sys.argv[1:] or ["world"]
-    for greetee in greetees:
-        print(greet(greetee))
+  greetees = sys.argv[1:] or ["world"]
+  for greetee in greetees:
+    print(greet(greetee))
