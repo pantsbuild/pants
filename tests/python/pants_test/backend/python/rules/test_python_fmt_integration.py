@@ -5,7 +5,7 @@ from os.path import relpath
 from pathlib import Path
 
 from pants.util.contextutil import temporary_file, temporary_file_path
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class PythonFmtIntegrationTest(PantsRunIntegrationTest):
@@ -19,7 +19,6 @@ class PythonFmtIntegrationTest(PantsRunIntegrationTest):
     self.assertNotIn("reformatted", pants_run.stderr_data)
     self.assertIn("1 file left unchanged", pants_run.stderr_data)
 
-
   def test_black_two_python_sources_should_leave_two_files_unchanged(self):
     command = [
       'fmt-v2',
@@ -29,7 +28,6 @@ class PythonFmtIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
     self.assertNotIn("reformatted", pants_run.stderr_data)
     self.assertIn("2 files left unchanged", pants_run.stderr_data)
-
 
   def test_black_should_pickup_default_config(self):
     # If the default config (pyproject.toml is picked up, the compilation_failure target will be skipped
@@ -42,7 +40,6 @@ class PythonFmtIntegrationTest(PantsRunIntegrationTest):
     self.assertNotIn("reformatted", pants_run.stderr_data)
     self.assertNotIn("unchanged", pants_run.stderr_data)
     self.assertIn("Nothing to do", pants_run.stderr_data)
-
 
   def test_black_should_pickup_non_default_config(self):
     # If a valid toml file without a black configuration section is picked up,
@@ -58,7 +55,6 @@ class PythonFmtIntegrationTest(PantsRunIntegrationTest):
     self.assertNotIn("reformatted", pants_run.stderr_data)
     self.assertNotIn("unchanged", pants_run.stderr_data)
     self.assertIn("1 file failed to reformat", pants_run.stderr_data)
-
 
   def test_black_should_format_python_code(self):
     # Open file in the greet target as the BUILD file globs python files from there
