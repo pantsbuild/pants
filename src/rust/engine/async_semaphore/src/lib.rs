@@ -161,6 +161,7 @@ impl Future for PermitFuture {
             self.task_id = None;
           }
         }
+        inner.available_permits -= 1;
         true
       }
     };
