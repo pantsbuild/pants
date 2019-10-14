@@ -4,7 +4,7 @@ use crate::{
 };
 use boxfuture::{BoxFuture, Boxable};
 use futures::future::{err, ok, Either, Future};
-use log::debug;
+use log::{debug, trace};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio_timer::Delay;
@@ -36,16 +36,26 @@ impl SpeculatingCommandRunner {
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
     let delay = Delay::new(Instant::now() + self.speculation_timeout);
     let req2 = req.clone();
+    trace!(
+      "Primary command runner queue length: {:?}",
+      self.primary.num_waiters()
+    );
     self
       .primary
       .run(req, context.clone())
       .select2({
         let command_runner = self.clone();
-        delay.then(move |_| command_runner.secondary.run(req2, context))
+        delay.then(move |_| {
+          trace!(
+            "Secondary command runner queue length: {:?}",
+            command_runner.secondary.num_waiters()
+          );
+          command_runner.secondary.run(req2, context)
+        })
       })
       .then(|raced_result| match raced_result {
         Ok(either_success) => {
-          // split take out the homogeneous success type for either primary or
+          // .split() takes out the homogeneous success type for either primary or
           // secondary successes.
           ok::<FallibleExecuteProcessResult, String>(either_success.split().0).to_boxed()
         }

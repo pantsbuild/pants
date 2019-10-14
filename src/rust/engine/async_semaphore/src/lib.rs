@@ -32,7 +32,6 @@ use std::sync::Arc;
 use futures::future::Future;
 use futures::task::{self, Task};
 use futures::{Async, Poll};
-use log::trace;
 use parking_lot::Mutex;
 
 struct UniqueTask {
@@ -45,7 +44,7 @@ struct Inner {
   available_permits: usize,
   // Used as the source of task_id in UniqueTask's because
   // it is monotonically increasing, and only incremented under the mutex lock.
-  task_id: usize,
+  next_task_id: usize,
 }
 
 #[derive(Clone)]
@@ -59,7 +58,7 @@ impl AsyncSemaphore {
       inner: Arc::new(Mutex::new(Inner {
         waiters: VecDeque::new(),
         available_permits: permits,
-        task_id: 0,
+        next_task_id: 0,
       })),
     }
   }
@@ -92,7 +91,7 @@ impl AsyncSemaphore {
 
   fn acquire(&self) -> PermitFuture {
     PermitFuture {
-      inner: Some(self.inner.clone()),
+      inner: self.inner.clone(),
       task_id: None,
     }
   }
@@ -104,26 +103,17 @@ pub struct Permit {
 
 impl Drop for Permit {
   fn drop(&mut self) {
-    let task = {
-      let mut inner = self.inner.lock();
-      inner.available_permits += 1;
-      if let Some(unique_task) = inner.waiters.front() {
-        trace!(
-          "Finished a task. Current length of waiters Queue is {:?}",
-          inner.waiters.len()
-        );
-        unique_task.task.clone()
-      } else {
-        return;
-      }
-    };
-    task.notify();
+    let mut inner = self.inner.lock();
+    inner.available_permits += 1;
+    if let Some(unique_task) = inner.waiters.front() {
+      unique_task.task.notify()
+    }
   }
 }
 
 #[derive(Clone)]
 pub struct PermitFuture {
-  inner: Option<Arc<Mutex<Inner>>>,
+  inner: Arc<Mutex<Inner>>,
   task_id: Option<usize>,
 }
 
@@ -131,8 +121,7 @@ impl Drop for PermitFuture {
   fn drop(&mut self) {
     // if task_id is Some then this PermitFuture was added to the waiters queue.
     if let Some(task_id) = self.task_id {
-      let inner = self.inner.take().unwrap();
-      let mut inner = inner.lock();
+      let mut inner = self.inner.lock();
       if let Some(task_index) = inner.waiters.iter().position(|task| task_id == task.id) {
         inner.waiters.remove(task_index);
       }
@@ -145,23 +134,19 @@ impl Future for PermitFuture {
   type Error = ();
 
   fn poll(&mut self) -> Poll<Permit, ()> {
-    let inner = self.inner.clone().unwrap();
+    let inner = self.inner.clone();
     let acquired = {
       let mut inner = inner.lock();
       if inner.available_permits == 0 {
         if self.task_id.is_none() {
-          let task_id = inner.task_id;
+          let task_id = inner.next_task_id;
           let this_task = UniqueTask {
-            id: inner.task_id,
+            id: task_id,
             task: task::current(),
           };
           self.task_id = Some(task_id);
-          inner.task_id += 1;
+          inner.next_task_id += 1;
           inner.waiters.push_back(this_task);
-          trace!(
-            "Added a task to the queue number of waiters is {:?}.",
-            inner.waiters.len()
-          );
         }
         false
       } else {
@@ -170,9 +155,12 @@ impl Future for PermitFuture {
           // waiters queue so that it doesn't get forgotten.
           if front_task.task.will_notify_current() {
             inner.waiters.pop_front();
+            // Set the task_id none to indicate that the task is no longer in the
+            // queue, so we don't have to waste time searching for it in the Drop
+            // handler.
+            self.task_id = None;
           }
         }
-        inner.available_permits -= 1;
         true
       }
     };
@@ -387,12 +375,12 @@ mod tests {
     acquired_thread2
       .recv_timeout(Duration::from_secs(5))
       .expect("thread2 didn't acquire.");
-    assert_eq!(1, sema.clone().num_waiters());
+    assert_eq!(1, sema.num_waiters());
     unblock_thread2.send(()).unwrap();
     acquired_thread2
       .recv_timeout(Duration::from_secs(5))
       .expect("thread2 didn't drop future.");
-    assert_eq!(0, sema.clone().num_waiters());
+    assert_eq!(0, sema.num_waiters());
     unblock_thread2.send(()).unwrap();
     unblock_thread1.send(()).unwrap();
   }
