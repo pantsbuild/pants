@@ -697,15 +697,10 @@ class Parser:
     def check(val):
       if val is not None:
         choices = kwargs.get('choices')
-        # If the `type` argument has an `all_variants` attribute, use that as `choices` if not
-        # already set. Using an attribute instead of checking a subclass allows `type` arguments
-        # which are functions to have an implicit fallback `choices` set as well.
         if choices is None and 'type' in kwargs:
           type_arg = kwargs.get('type')
           if inspect.isclass(type_arg) and issubclass(type_arg, Enum):
             choices = list(type_arg)
-          if hasattr(type_arg, 'all_variants'):
-            choices = list(type_arg.all_variants)
         # TODO: convert this into an enum() pattern match!
         if choices is not None and val not in choices:
           raise ParseError('`{}` is not an allowed value for option {} in {}. '
