@@ -297,9 +297,16 @@ class Scheduler:
 
   def _run_and_return_roots(self, session, execution_request):
     raw_roots = self._native.lib.scheduler_execute(self._scheduler, session, execution_request)
+    remaining_runtime_exceptions_to_capture = deque(self._native.cffi_extern_method_runtime_exceptions())
+    self._native.reset_cffi_extern_method_runtime_exceptions()
     try:
       roots = []
       for raw_root in self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len):
+        # Check if there were any uncaught exceptions within rules that were executed.
+        remaining_runtime_exceptions_to_capture.extend(
+          self._native.cffi_extern_method_runtime_exceptions())
+        self._native.reset_cffi_extern_method_runtime_exceptions()
+
         if raw_root.is_throw:
           state = Throw(self._from_value(raw_root.handle))
         else:
