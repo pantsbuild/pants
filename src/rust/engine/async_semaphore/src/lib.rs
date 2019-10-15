@@ -34,17 +34,17 @@ use futures::task::{self, Task};
 use futures::{Async, Poll};
 use parking_lot::Mutex;
 
-struct UniqueTask {
+struct Waiter {
   id: usize,
   task: Task,
 }
 
 struct Inner {
-  waiters: VecDeque<UniqueTask>,
+  waiters: VecDeque<Waiter>,
   available_permits: usize,
-  // Used as the source of task_id in UniqueTask's because
+  // Used as the source of id in Waiters's because
   // it is monotonically increasing, and only incremented under the mutex lock.
-  next_task_id: usize,
+  next_waiter_id: usize,
 }
 
 #[derive(Clone)]
@@ -58,7 +58,7 @@ impl AsyncSemaphore {
       inner: Arc::new(Mutex::new(Inner {
         waiters: VecDeque::new(),
         available_permits: permits,
-        next_task_id: 0,
+        next_waiter_id: 0,
       })),
     }
   }
@@ -92,7 +92,7 @@ impl AsyncSemaphore {
   fn acquire(&self) -> PermitFuture {
     PermitFuture {
       inner: self.inner.clone(),
-      task_id: None,
+      waiter_id: None,
     }
   }
 }
@@ -105,8 +105,8 @@ impl Drop for Permit {
   fn drop(&mut self) {
     let mut inner = self.inner.lock();
     inner.available_permits += 1;
-    if let Some(unique_task) = inner.waiters.front() {
-      unique_task.task.notify()
+    if let Some(waiter) = inner.waiters.front() {
+      waiter.task.notify()
     }
   }
 }
@@ -114,16 +114,20 @@ impl Drop for Permit {
 #[derive(Clone)]
 pub struct PermitFuture {
   inner: Arc<Mutex<Inner>>,
-  task_id: Option<usize>,
+  waiter_id: Option<usize>,
 }
 
 impl Drop for PermitFuture {
   fn drop(&mut self) {
     // if task_id is Some then this PermitFuture was added to the waiters queue.
-    if let Some(task_id) = self.task_id {
+    if let Some(waiter_id) = self.waiter_id {
       let mut inner = self.inner.lock();
-      if let Some(task_index) = inner.waiters.iter().position(|task| task_id == task.id) {
-        inner.waiters.remove(task_index);
+      if let Some(waiter_index) = inner
+        .waiters
+        .iter()
+        .position(|waiter| waiter_id == waiter.id)
+      {
+        inner.waiters.remove(waiter_index);
       }
     }
   }
@@ -137,32 +141,43 @@ impl Future for PermitFuture {
     let inner = self.inner.clone();
     let acquired = {
       let mut inner = inner.lock();
+      if self.waiter_id.is_none() {
+        let waiter_id = inner.next_waiter_id;
+        let this_waiter = Waiter {
+          id: waiter_id,
+          task: task::current(),
+        };
+        self.waiter_id = Some(waiter_id);
+        inner.next_waiter_id += 1;
+        inner.waiters.push_back(this_waiter);
+      }
       if inner.available_permits == 0 {
-        if self.task_id.is_none() {
-          let task_id = inner.next_task_id;
-          let this_task = UniqueTask {
-            id: task_id,
-            task: task::current(),
-          };
-          self.task_id = Some(task_id);
-          inner.next_task_id += 1;
-          inner.waiters.push_back(this_task);
-        }
         false
       } else {
-        if let Some(front_task) = inner.waiters.front() {
-          // This task is the one we notified, so remove it. Otherwise keep it on the
-          // waiters queue so that it doesn't get forgotten.
-          if front_task.task.will_notify_current() {
-            inner.waiters.pop_front();
-            // Set the task_id none to indicate that the task is no longer in the
-            // queue, so we don't have to waste time searching for it in the Drop
-            // handler.
-            self.task_id = None;
+        let will_issue_permit = {
+          if let Some(front_waiter) = inner.waiters.front() {
+            // This task is the one we notified, so remove it. Otherwise keep it on the
+            // waiters queue so that it doesn't get forgotten.
+            if front_waiter.id == self.waiter_id.unwrap() {
+              inner.waiters.pop_front();
+              // Set the task_id none to indicate that the task is no longer in the
+              // queue, so we don't have to waste time searching for it in the Drop
+              // handler.
+              self.waiter_id = None;
+              true
+            } else {
+              // Don't issue a permit to this task if it isn't at the head of the line,
+              // we added it as a waiter above.
+              false
+            }
+          } else {
+            false
           }
+        };
+        if will_issue_permit {
+          inner.available_permits -= 1;
         }
-        inner.available_permits -= 1;
-        true
+        will_issue_permit
       }
     };
     if acquired {
