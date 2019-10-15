@@ -28,7 +28,7 @@ from pants.engine.fs import (
   DirectoryToMaterialize,
   PathGlobs,
   PathGlobsAndRoot,
-)
+  Digest)
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath
@@ -415,13 +415,26 @@ class BaseZincCompile(JvmCompile):
     directory_digests = [
       entry.directory_digest for entry in relevant_classpath_entries if entry.directory_digest
     ]
+
     if len(directory_digests) != len(relevant_classpath_entries):
       for dep in relevant_classpath_entries:
         if not dep.directory_digest:
-          raise AssertionError(
-            "ClasspathEntry {} didn't have a Digest, so won't be present for hermetic "
-            "execution of zinc".format(dep)
-          )
+          if not os.path.exists(dep.path):
+            raise AssertionError(
+              "ClasspathEntry {} didn't have a Digest, so won't be present for hermetic "
+              "execution of zinc".format(dep)
+            )
+          directory_digests.append(dep.directory_digest)
+          relpath = fast_relpath(dep.path, get_buildroot())
+          classes_dir_snapshot, = self.context._scheduler.capture_snapshots([
+            PathGlobsAndRoot(
+              PathGlobs([relpath]),
+              get_buildroot(),
+              Digest.load(relpath),
+            ),
+          ])
+          dep.hydrate_missing_directory_digest(classes_dir_snapshot.directory_digest)
+
     directory_digests.extend(
       classpath_entry.directory_digest for classpath_entry in scalac_classpath_entries
     )
