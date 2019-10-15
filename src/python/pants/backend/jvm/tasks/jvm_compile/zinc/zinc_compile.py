@@ -424,7 +424,6 @@ class BaseZincCompile(JvmCompile):
               "ClasspathEntry {} didn't have a Digest, so won't be present for hermetic "
               "execution of zinc".format(dep)
             )
-          directory_digests.append(dep.directory_digest)
           relpath = fast_relpath(dep.path, get_buildroot())
           classes_dir_snapshot, = self.context._scheduler.capture_snapshots([
             PathGlobsAndRoot(
@@ -434,6 +433,7 @@ class BaseZincCompile(JvmCompile):
             ),
           ])
           dep.hydrate_missing_directory_digest(classes_dir_snapshot.directory_digest)
+          directory_digests.append(dep.directory_digest)
 
     directory_digests.extend(
       classpath_entry.directory_digest for classpath_entry in scalac_classpath_entries
