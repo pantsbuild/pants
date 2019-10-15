@@ -62,7 +62,7 @@ impl TestData {
 }
 
 pub struct TestDirectory {
-  directory: bazel_protos::remote_execution::Directory,
+  pub directory: bazel_protos::remote_execution::Directory,
 }
 
 impl TestDirectory {
