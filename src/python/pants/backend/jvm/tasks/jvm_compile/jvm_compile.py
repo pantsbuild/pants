@@ -476,7 +476,7 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
     valid_targets = [vt.target for vt in invalidation_check.all_vts if vt.valid]
 
-    if self.execution_strategy == self.HERMETIC:
+    if self.execution_strategy == self.ExecutionStrategy.hermetic:
       self._set_directory_digests_for_valid_target_classpath_directories(valid_targets, compile_contexts)
 
     for valid_target in valid_targets:
@@ -939,10 +939,10 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
     # See: https://github.com/pantsbuild/pants/issues/6416 for covering using
     #      different jdks in remote builds.
     local_distribution = self._local_jvm_distribution()
-    return self.execution_strategy_enum.resolve_for_enum_variant({
-      self.SUBPROCESS: lambda: local_distribution,
-      self.NAILGUN: lambda: local_distribution,
-      self.HERMETIC: lambda: self._HermeticDistribution('.jdk', local_distribution),
+    return self.execution_strategy.match({
+      self.ExecutionStrategy.subprocess: lambda: local_distribution,
+      self.ExecutionStrategy.nailgun: lambda: local_distribution,
+      self.ExecutionStrategy.hermetic: lambda: self._HermeticDistribution('.jdk', local_distribution),
     })()
 
   def _default_double_check_cache_for_vts(self, vts):

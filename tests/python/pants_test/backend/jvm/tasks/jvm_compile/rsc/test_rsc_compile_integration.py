@@ -25,7 +25,7 @@ class RscCompileIntegration(BaseCompileIT, AbstractTestGenerator):
 
     for worker_count in [1, 2]:
       for resolver in JvmResolveSubsystem.CHOICES:
-        for execution_strategy in RscCompile.ExecutionStrategy.all_variants:
+        for execution_strategy in RscCompile.ExecutionStrategy.all_values():
           with temporary_dir() as cache_dir:
             config = {
               'cache.compile.rsc': {'write_to': [cache_dir]},
@@ -46,10 +46,10 @@ class RscCompileIntegration(BaseCompileIT, AbstractTestGenerator):
                 'use_classpath_jars': False,
               })
 
-            execution_strategy.resolve_for_enum_variant({
-              'nailgun': lambda: None,
-              'subprocess': lambda: None,
-              'hermetic': populate_necessary_hermetic_options,
+            execution_strategy.match({
+              RscCompile.ExecutionStrategy.nailgun: lambda: None,
+              RscCompile.ExecutionStrategy.subprocess: lambda: None,
+              RscCompile.ExecutionStrategy.hermetic: populate_necessary_hermetic_options,
             })()
 
             for name, test in tests_with_generated_config.items():

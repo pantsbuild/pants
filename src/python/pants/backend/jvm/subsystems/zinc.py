@@ -212,7 +212,7 @@ class Zinc:
   def dist(self) -> Distribution:
     """Return the `Distribution` selected for Zinc based on execution strategy."""
     underlying_dist = self.underlying_dist
-    if self._execution_strategy == NailgunTaskBase.HERMETIC:
+    if self._execution_strategy == NailgunTaskBase.ExecutionStrategy.hermetic:
       return underlying_dist
     # symlink .pants.d/.jdk -> /some/java/home/
     jdk_home_symlink = Path(

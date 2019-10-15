@@ -187,7 +187,7 @@ class BaseZincCompile(JvmCompile):
     # Validate zinc options.
     ZincCompile.validate_arguments(self.context.log, self.get_options().whitelisted_args,
                                    self._args)
-    if self.execution_strategy == self.HERMETIC:
+    if self.execution_strategy == self.ExecutionStrategy.hermetic:
       try:
         fast_relpath(self.get_options().pants_workdir, get_buildroot())
       except ValueError:
@@ -261,7 +261,10 @@ class BaseZincCompile(JvmCompile):
     if self.get_options().capture_classpath:
       self._record_compile_classpath(absolute_classpath, ctx.target, ctx.classes_dir.path)
 
-    self._verify_zinc_classpath(absolute_classpath, allow_dist=(self.execution_strategy != self.HERMETIC))
+    self._verify_zinc_classpath(
+      absolute_classpath,
+      allow_dist=(self.execution_strategy != self.ExecutionStrategy.hermetic)
+    )
     # TODO: Investigate upstream_analysis for hermetic compiles
     self._verify_zinc_classpath(upstream_analysis.keys())
 
@@ -360,12 +363,12 @@ class BaseZincCompile(JvmCompile):
     self.log_zinc_file(ctx.analysis_file)
     self.write_argsfile(ctx, zinc_args)
 
-    return self.execution_strategy_enum.resolve_for_enum_variant({
-      self.HERMETIC: lambda: self._compile_hermetic(
+    return self.execution_strategy.match({
+      self.ExecutionStrategy.hermetic: lambda: self._compile_hermetic(
         jvm_options, ctx, classes_dir, jar_file, compiler_bridge_classpath_entry,
         dependency_classpath, scalac_classpath_entries),
-      self.SUBPROCESS: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir),
-      self.NAILGUN: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir),
+      self.ExecutionStrategy.subprocess: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir),
+      self.ExecutionStrategy.nailgun: lambda: self._compile_nonhermetic(jvm_options, ctx, classes_dir),
     })()
 
   class ZincCompileError(TaskError):

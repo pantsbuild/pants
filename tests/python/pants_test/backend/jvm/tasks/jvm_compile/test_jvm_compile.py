@@ -65,12 +65,16 @@ class BaseZincCompileJDKTest(NailgunTaskTestBase):
 
   def test_subprocess_compile_jdk_being_symlink(self):
     context = self.context(target_roots=[])
-    zinc = Zinc.Factory.global_instance().create(context.products, NailgunTaskBase.SUBPROCESS)
+    zinc = Zinc.Factory.global_instance().create(
+      context.products, NailgunTaskBase.ExecutionStrategy.subprocess
+    )
     self.assertTrue(os.path.islink(zinc.dist.home))
 
   def test_hermetic_jdk_being_underlying_dist(self):
     context = self.context(target_roots=[])
-    zinc = Zinc.Factory.global_instance().create(context.products, NailgunTaskBase.HERMETIC)
+    zinc = Zinc.Factory.global_instance().create(
+      context.products, NailgunTaskBase.ExecutionStrategy.hermetic
+    )
     self.assertFalse(
       os.path.islink(zinc.dist.home),
       "Expected {} to not be a link, it was.".format(zinc.dist.home)
