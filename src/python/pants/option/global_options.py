@@ -61,6 +61,7 @@ class ExecutionOptions:
   remote_oauth_bearer_token_path: Any
   remote_execution_extra_platform_properties: Any
   remote_execution_headers: Any
+  process_execution_local_enable_nailgun: Any
 
   @classmethod
   def from_bootstrap_options(cls, bootstrap_options):
@@ -85,6 +86,7 @@ class ExecutionOptions:
       remote_oauth_bearer_token_path=bootstrap_options.remote_oauth_bearer_token_path,
       remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
       remote_execution_headers=bootstrap_options.remote_execution_headers,
+      process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
     )
 
 
@@ -109,6 +111,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_oauth_bearer_token_path=None,
     remote_execution_extra_platform_properties=[],
     remote_execution_headers={},
+    process_execution_local_enable_nailgun=False,
   )
 
 
@@ -435,6 +438,9 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              advanced=True)
     register('--process-execution-use-local-cache', type=bool, default=True, advanced=True,
              help='Whether to keep process executions in a local cache persisted to disk.')
+    register('--process-execution-local-enable-nailgun', type=bool, default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_enable_nailgun,
+             help='Whether or not to use nailgun to run the requests that are marked as nailgunnable.',
+             advanced=True)
 
   @classmethod
   def register_options(cls, register):

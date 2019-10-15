@@ -82,6 +82,7 @@ impl Core {
     process_execution_use_local_cache: bool,
     remote_execution_headers: BTreeMap<String, String>,
     local_python_distribution_absolute_path: PathBuf,
+    process_execution_local_enable_nailgun: bool,
   ) -> Result<Core, String> {
     // Randomize CAS address order to avoid thundering herds from common config.
     let mut remote_store_servers = remote_store_servers;
@@ -141,20 +142,29 @@ impl Core {
       platform_properties: remote_execution_extra_platform_properties.clone(),
     };
 
+    let local_command_runner = process_execution::local::CommandRunner::new(
+      store.clone(),
+      executor.clone(),
+      std::env::temp_dir(),
+      process_execution_cleanup_local_dirs,
+    );
+
+    let maybe_nailgunnable_local_command_runner: Box<dyn process_execution::CommandRunner> =
+        if process_execution_local_enable_nailgun {
+          Box::new(
+            process_execution::nailgun::NailgunCommandRunner::new(
+              local_command_runner,
+              process_execution_metadata.clone(),
+              local_python_distribution_absolute_path,
+            )
+          )
+        } else {
+          Box::new(local_command_runner)
+        };
+
     let mut command_runner: Box<dyn process_execution::CommandRunner> =
       Box::new(BoundedCommandRunner::new(
-        Box::new(
-          process_execution::nailgun::NailgunCommandRunner::new(
-            process_execution::local::CommandRunner::new(
-              store.clone(),
-              executor.clone(),
-              std::env::temp_dir(),
-              process_execution_cleanup_local_dirs,
-            ),
-            process_execution_metadata.clone(),
-            local_python_distribution_absolute_path,
-          )
-        ),
+        maybe_nailgunnable_local_command_runner,
         process_execution_local_parallelism,
       ));
 
