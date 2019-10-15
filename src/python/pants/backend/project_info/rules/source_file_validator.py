@@ -15,11 +15,11 @@ from pants.engine.objects import Collection
 from pants.engine.rules import console_rule, optionable_rule, rule
 from pants.engine.selectors import Get
 from pants.subsystem.subsystem import Subsystem
+from pants.util.collections import Enum
 from pants.util.memo import memoized_method
-from pants.util.objects import enum
 
 
-class DetailLevel(enum(['none', 'summary', 'nonmatching', 'all'])):
+class DetailLevel(Enum):
   """How much detail about validation to emit to the console.
 
   none: Emit nothing.
@@ -27,7 +27,10 @@ class DetailLevel(enum(['none', 'summary', 'nonmatching', 'all'])):
   nonmatching: Emit details for source files that failed to match at least one required pattern.
   all: Emit details for all source files.
   """
-  pass
+  none = "none"
+  summary = "summary"
+  nonmatching = "nonmatching"
+  all = "all"
 
 
 class Validate(Goal):

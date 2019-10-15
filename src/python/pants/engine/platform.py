@@ -2,27 +2,33 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.engine.rules import rule
+from pants.util.collections import Enum
 from pants.util.memo import memoized_classproperty, memoized_property
-from pants.util.objects import enum
-from pants.util.osutil import all_normalized_os_names, get_normalized_os_name
+from pants.util.osutil import get_normalized_os_name
 
 
-class Platform(enum(all_normalized_os_names())):
+class Platform(Enum):
+  darwin = "darwin"
+  linux = "linux"
 
   # TODO: try to turn all of these accesses into v2 dependency injections!
   @memoized_classproperty
-  def current(cls):
+  def current(cls) -> 'Platform':
     return cls(get_normalized_os_name())
 
   @memoized_property
   def runtime_lib_path_env_var(self):
-    return self.resolve_for_enum_variant({
-      'darwin': 'DYLD_LIBRARY_PATH',
-      'linux': 'LD_LIBRARY_PATH',
+    return self.match({
+      self.darwin: "DYLD_LIBRARY_PATH",
+      self.linux: "LD_LIBRARY_PATH",
     })
 
 
-class PlatformConstraint(enum(list(all_normalized_os_names()) + ['none'])):
+class PlatformConstraint(Enum):
+  darwin = "darwin"
+  linux = "linux"
+  none = "none"
+
   @memoized_classproperty
   def local_platform(cls):
     return cls(Platform.current.value)

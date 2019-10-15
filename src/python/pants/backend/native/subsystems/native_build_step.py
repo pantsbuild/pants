@@ -7,12 +7,14 @@ from pants.backend.native.config.environment import Platform
 from pants.build_graph.mirrored_target_option_mixin import MirroredTargetOptionMixin
 from pants.option.compiler_option_sets_mixin import CompilerOptionSetsMixin
 from pants.subsystem.subsystem import Subsystem
+from pants.util.collections import Enum
 from pants.util.memo import memoized_property
 from pants.util.meta import classproperty
-from pants.util.objects import enum
 
 
-class ToolchainVariant(enum(['gnu', 'llvm'])): pass
+class ToolchainVariant(Enum):
+  gnu = "gnu"
+  llvm = "llvm"
 
 
 class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsystem):
@@ -35,9 +37,9 @@ class NativeBuildStep(CompilerOptionSetsMixin, MirroredTargetOptionMixin, Subsys
                   'for targets of this language.')
 
     register('--toolchain-variant', advanced=True,
-             default=Platform.current.resolve_for_enum_variant({
-               'darwin': ToolchainVariant.llvm,
-               'linux': ToolchainVariant.gnu,
+             default=Platform.current.match({
+               Platform.darwin: ToolchainVariant.llvm,
+               Platform.linux: ToolchainVariant.gnu,
              }),
              type=ToolchainVariant,
              help="Whether to use gcc (gnu) or clang (llvm) to compile C and C++. Note that "

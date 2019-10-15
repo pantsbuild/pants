@@ -17,7 +17,6 @@ from pants.engine.legacy.structs import (
 )
 from pants.engine.rules import console_rule, union
 from pants.engine.selectors import Get
-from pants.util.objects import datatype
 
 
 @dataclass(frozen=True)

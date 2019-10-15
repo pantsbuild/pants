@@ -62,7 +62,7 @@ class LinkSharedLibraries(NativeTask):
     return self.get_cpp_toolchain_variant(native_library_target).cpp_linker
 
   @memoized_property
-  def platform(self):
+  def platform(self) -> Platform:
     # TODO: convert this to a v2 engine dependency injection.
     return Platform.current
 
@@ -130,8 +130,11 @@ class LinkSharedLibraries(NativeTask):
         os.path.join(get_buildroot(), ext_dep._sources_field.rel_path, ext_dep.lib_relpath))
 
       native_lib_names = ext_dep.native_lib_names
-      if isinstance(ext_dep.native_lib_names, dict):
-        native_lib_names = self.platform.resolve_for_enum_variant(native_lib_names)
+      if isinstance(native_lib_names, dict):
+        # `native_lib_names` is a dictionary mapping the string representation of the Platform
+        # ('darwin' vs. 'linux') to a list of strings. We use the Enum's `.value` to get the
+        # underlying string value to lookup the relevant key in the dictionary.
+        native_lib_names = native_lib_names[self.platform.value]
       external_lib_names.extend(native_lib_names)
 
     link_request = LinkSharedLibraryRequest(
@@ -161,16 +164,17 @@ class LinkSharedLibraries(NativeTask):
 
     self.context.log.debug("resulting_shared_lib_path: {}".format(resulting_shared_lib_path))
     # We are executing in the results_dir, so get absolute paths for everything.
-    cmd = ([linker.exe_filename] +
-           self.platform.resolve_for_enum_variant({
-             'darwin': ['-Wl,-dylib'],
-             'linux': ['-shared'],
-           }) +
-           linker.extra_args +
-           ['-o', os.path.abspath(resulting_shared_lib_path)] +
-           ['-L{}'.format(lib_dir) for lib_dir in link_request.external_lib_dirs] +
-           ['-l{}'.format(lib_name) for lib_name in link_request.external_lib_names] +
-           [os.path.abspath(obj) for obj in object_files])
+    cmd = (
+      [linker.exe_filename] +
+      self.platform.match(
+        {Platform.darwin: ['-Wl,-dylib'], Platform.linux: ['-shared']}
+      ) +
+      linker.extra_args +
+      ['-o', os.path.abspath(resulting_shared_lib_path)] +
+      ['-L{}'.format(lib_dir) for lib_dir in link_request.external_lib_dirs] +
+      ['-l{}'.format(lib_name) for lib_name in link_request.external_lib_names] +
+      [os.path.abspath(obj) for obj in object_files]
+    )
 
     self.context.log.info("selected linker exe name: '{}'".format(linker.exe_filename))
     self.context.log.debug("linker argv: {}".format(cmd))

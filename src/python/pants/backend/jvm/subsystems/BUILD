@@ -126,15 +126,13 @@ python_library(
   name = 'shader',
   sources = ['shader.py'],
   dependencies = [
-    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
     'src/python/pants/java/distribution',
     'src/python/pants/java:executor',
+    'src/python/pants/java/jar',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:memo',
-    'src/python/pants/util:objects',
   ]
 )
 

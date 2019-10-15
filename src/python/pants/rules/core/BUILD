@@ -11,6 +11,7 @@ python_library(
       'src/python/pants/engine/legacy:graph',
       'src/python/pants/goal',
       'src/python/pants/source',
+      'src/python/pants/util:collections',
     ]
 )
 

@@ -4,10 +4,12 @@
 from dataclasses import dataclass
 
 from pants.engine.rules import union
-from pants.util.objects import enum
+from pants.util.collections import Enum
 
 
-class Status(enum(['SUCCESS', 'FAILURE'])): pass
+class Status(Enum):
+  SUCCESS = "SUCCESS"
+  FAILURE = "FAILURE"
 
 
 @dataclass(frozen=True)

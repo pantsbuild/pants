@@ -5,9 +5,9 @@ import os
 import re
 
 from pants.option.errors import ParseError
+from pants.util.collections import Enum
 from pants.util.eval import parse_expression
 from pants.util.memo import memoized_method
-from pants.util.objects import enum
 
 
 class UnsetBool:
@@ -318,9 +318,11 @@ class DictValueComponent:
     return '{} {}'.format(self.action, self.val)
 
 
-class GlobExpansionConjunction(enum(['any_match', 'all_match'])):
+class GlobExpansionConjunction(Enum):
   """Describe whether to require that only some or all glob strings match in a target's sources.
 
   NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
   be aware of any changes to this object's definition.
   """
+  any_match = "any_match"
+  all_match = "all_match"

@@ -79,9 +79,9 @@ class LLVM(NativeTool):
   def linker(self, platform):
     return Linker(
       path_entries=self.path_entries,
-      exe_filename=platform.resolve_for_enum_variant({
-        'darwin': 'ld64.lld',
-        'linux': 'lld',
+      exe_filename=platform.match({
+        Platform.darwin: "ld64.lld",
+        Platform.linux: "lld",
       }),
       library_dirs=[],
       linking_library_dirs=[],

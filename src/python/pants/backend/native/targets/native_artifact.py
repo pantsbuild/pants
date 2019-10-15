@@ -6,6 +6,7 @@ from hashlib import sha1
 from typing import Any
 
 from pants.base.payload_field import PayloadField
+from pants.engine.platform import Platform
 
 
 # NB: We manually implement __hash__(), rather than using unsafe_hash=True, because PayloadField
@@ -37,9 +38,9 @@ class NativeArtifact(PayloadField):
 
   def as_shared_lib(self, platform):
     # TODO: check that the name conforms to some format in the constructor (e.g. no dots?).
-    return platform.resolve_for_enum_variant({
-      'darwin': 'lib{}.dylib'.format(self.lib_name),
-      'linux': 'lib{}.so'.format(self.lib_name),
+    return platform.match({
+      Platform.darwin: f"lib{self.lib_name}.dylib",
+      Platform.linux: f"lib{self.lib_name}.so",
     })
 
   def _compute_fingerprint(self):

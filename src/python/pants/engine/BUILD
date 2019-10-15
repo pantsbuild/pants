@@ -149,7 +149,7 @@ python_library(
   sources=['platform.py'],
   dependencies=[
       ':rules',
-      'src/python/pants/util:objects',
+      'src/python/pants/util:collections',
       'src/python/pants/util:memo',
       'src/python/pants/util:osutil',
   ]

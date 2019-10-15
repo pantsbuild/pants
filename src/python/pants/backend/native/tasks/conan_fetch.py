@@ -118,9 +118,9 @@ class ConanFetch(SimpleCodegenTask):
 
   @memoized_property
   def _conan_os_name(self):
-    return Platform.current.resolve_for_enum_variant({
-      'darwin': 'Macos',
-      'linux': 'Linux',
+    return Platform.current.match({
+      Platform.darwin: "Macos",
+      Platform.linux: "Linux",
     })
 
   @property
