@@ -12,9 +12,7 @@ python_library(
 python_tests(
   name = "tests",
   dependencies = [
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:test_base',
     'tests/python/pants_test:console_rule_test_base',
-    'tests/python/pants_test/engine:util',
+    'tests/python/pants_test/engine:util'
   ]
 )
