@@ -297,23 +297,32 @@ class Scheduler:
 
   def _run_and_return_roots(self, session, execution_request):
     raw_roots = self._native.lib.scheduler_execute(self._scheduler, session, execution_request)
-    remaining_runtime_exceptions_to_capture = deque(self._native.cffi_extern_method_runtime_exceptions())
-    self._native.reset_cffi_extern_method_runtime_exceptions()
+    remaining_runtime_exceptions_to_capture = deque(self._native.consume_cffi_extern_method_runtime_exceptions())
     try:
       roots = []
       for raw_root in self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len):
         # Check if there were any uncaught exceptions within rules that were executed.
-        remaining_runtime_exceptions_to_capture.extend(
-          self._native.cffi_extern_method_runtime_exceptions())
-        self._native.reset_cffi_extern_method_runtime_exceptions()
+        remaining_runtime_exceptions_to_capture.extend(self._native.consume_cffi_extern_method_runtime_exceptions())
 
         if raw_root.is_throw:
           state = Throw(self._from_value(raw_root.handle))
+        elif raw_root.handle == self._native.ffi.NULL:
+          # NB: We expect all NULL handles to correspond to uncaught exceptions which are collected
+          # in `self._native._peek_cffi_extern_method_runtime_exceptions()`!
+          if not remaining_runtime_exceptions_to_capture:
+            raise ExecutionError('Internal logic error in scheduler: expected more elements in '
+                                 '`self._native._peek_cffi_extern_method_runtime_exceptions()`.')
+          matching_runtime_exception = remaining_runtime_exceptions_to_capture.popleft()
+          state = Throw(matching_runtime_exception)
         else:
           state = Return(self._from_value(raw_root.handle))
         roots.append(state)
     finally:
       self._native.lib.nodes_destroy(raw_roots)
+
+    if remaining_runtime_exceptions_to_capture:
+      raise ExecutionError('Internal logic error in scheduler: expected elements in '
+                           '`self._native._peek_cffi_extern_method_runtime_exceptions()`.')
     return roots
 
   def lease_files_in_graph(self):
@@ -496,7 +505,7 @@ class SchedulerSession:
     except:                     # noqa: T803
       # If there are any exceptions during CFFI extern method calls, we want to return an error with
       # them and whatever failure results from it. This typically results from unhashable types.
-      if self._scheduler._native.cffi_extern_method_runtime_exceptions():
+      if self._scheduler._native._peek_cffi_extern_method_runtime_exceptions():
         raised_exception = sys.exc_info()[0:3]
       else:
         # Otherwise, this is likely an exception coming from somewhere else, and we don't want to
@@ -506,7 +515,7 @@ class SchedulerSession:
     # We still want to raise whenever there are any exceptions in any CFFI extern methods, even if
     # that didn't lead to an exception in generating the execution request for some reason, so we
     # check the extern exceptions list again.
-    internal_errors = self._scheduler._native.cffi_extern_method_runtime_exceptions()
+    internal_errors = self._scheduler._native.consume_cffi_extern_method_runtime_exceptions()
     if internal_errors:
       error_tracebacks = [
         ''.join(
@@ -524,10 +533,6 @@ class SchedulerSession:
           CFFI extern methods listed above, as CFFI externs return None upon error:
           {}
         """).format(''.join(traceback.format_exception(etype=exc_type, value=exc_value, tb=tb)))
-
-      # Zero out the errors raised in CFFI callbacks in case this one is caught and pants doesn't
-      # exit.
-      self._scheduler._native.reset_cffi_extern_method_runtime_exceptions()
 
       raise ExecutionError(dedent("""\
         {error_description} raised in CFFI extern methods:

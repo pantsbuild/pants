@@ -372,7 +372,7 @@ Exception: WithDeps(Inner(InnerEntry { params: {TypeCheckFailWrapper}, rule: Tas
     with self.assertRaises(ExecutionError) as cm:
       with unittest.mock.patch.object(SchedulerSession, 'execution_request',
                              **PATCH_OPTS) as mock_exe_request:
-        with unittest.mock.patch.object(Native, 'cffi_extern_method_runtime_exceptions',
+        with unittest.mock.patch.object(Native, '_peek_cffi_extern_method_runtime_exceptions',
                                **PATCH_OPTS) as mock_cffi_exceptions:
           mock_exe_request.return_value = None
           mock_cffi_exceptions.return_value = [create_cffi_exception()]

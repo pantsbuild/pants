@@ -338,7 +338,7 @@ class _FFISpecification(object):
     c = self._ffi.from_handle(context_handle)
     return c.utf8_buf(str(c.from_id(type_id.tup_0).__name__))
 
-  # If we try to pass a None to the CFFI layer, it will silently fail 
+  # If we try to pass a None to the CFFI layer, it will silently fail
   # in a weird way. So instead we use the empty string/bytestring as
   # a de-facto null value, in both `extern_val_to_str` and
   # `extern_val_to_bytes`.
@@ -637,9 +637,11 @@ class Native(metaclass=SingletonMetaclass):
     When an exception is raised in the body of a CFFI extern, the `onerror` handler is used to
     capture it, storing the exception info as an instance of `CFFIExternMethodRuntimeErrorInfo` with
     `.add_cffi_extern_method_runtime_exception()`. The scheduler will then check whether any
-    exceptions were stored by calling `.cffi_extern_method_runtime_exceptions()` after specific
-    calls to the native library which may raise. `.reset_cffi_extern_method_runtime_exceptions()`
-    should be called after the stored exception has been handled or before it is re-raised.
+    exceptions were stored by calling `.consume_cffi_extern_method_runtime_exceptions()` after
+    specific calls to the native library which may raise.
+
+    Note that `.consume_cffi_extern_method_runtime_exceptions()` will also clear out all stored
+    exceptions, so exceptions should be stored separately after consumption.
 
     Some ways that exceptions in CFFI extern methods can be handled are described in
     https://cffi.readthedocs.io/en/latest/using.html#extern-python-reference.
@@ -651,8 +653,13 @@ class Native(metaclass=SingletonMetaclass):
   def reset_cffi_extern_method_runtime_exceptions(self):
     self._errors_during_execution = []
 
-  def cffi_extern_method_runtime_exceptions(self):
+  def _peek_cffi_extern_method_runtime_exceptions(self):
     return self._errors_during_execution
+
+  def consume_cffi_extern_method_runtime_exceptions(self):
+    res = self._peek_cffi_extern_method_runtime_exceptions()
+    self.reset_cffi_extern_method_runtime_exceptions()
+    return res
 
   def add_cffi_extern_method_runtime_exception(self, error_info):
     assert isinstance(error_info, self.CFFIExternMethodRuntimeErrorInfo)
