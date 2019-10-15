@@ -1387,8 +1387,6 @@ class OptionsTest(TestBase):
     # We serialize options to JSON e.g., when uploading stats.
     # This test spot-checks that enum types can be serialized.
     options = self._parse('./pants enum-opt --some-enum=another-value')
-    # Note that for some reason CoercingEncoder doesn't do the right thing for enum-valued opts
-    # when wrapped in a list, as here.
     json.dumps({'foo': [options.for_scope('enum-opt').as_dict()]}, cls=CoercingEncoder)
 
   def test_scope_deprecation(self):
