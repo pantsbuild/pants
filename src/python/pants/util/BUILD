@@ -66,6 +66,7 @@ python_library(
 python_library(
   name = 'filtering',
   sources = ['filtering.py'],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -74,6 +75,7 @@ python_library(
   dependencies = [
     ':meta'
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -88,6 +90,7 @@ python_library(
 python_library(
   name = 'netrc',
   sources = ['netrc.py'],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -110,16 +113,19 @@ python_library(
 python_library(
   name = 'process_handler',
   sources = ['process_handler.py'],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
   name = 'retry',
   sources = ['retry.py'],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
   name = 'rwbuf',
   sources = ['rwbuf.py'],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -141,6 +147,7 @@ python_binary(
 python_library(
   name = 'socket',
   sources = ['socket.py'],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -158,4 +165,5 @@ python_library(
 python_library(
   name = 'xml_parser',
   sources = ['xml_parser.py'],
+  tags = {'partially_type_checked'},
 )

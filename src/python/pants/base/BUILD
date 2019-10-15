@@ -38,6 +38,7 @@ python_library(
 python_library(
   name = 'build_file_target_factory',
   sources = ['build_file_target_factory.py'],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -82,7 +83,7 @@ python_library(
   sources = ['fingerprint_strategy.py'],
   dependencies = [
     ':deprecated',
-  ]
+  ],
 )
 
 python_library(
@@ -91,7 +92,8 @@ python_library(
   dependencies = [
     ':mustache',
     '3rdparty/python:pystache',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -109,17 +111,20 @@ python_library(
   sources = ['mustache.py'],
   dependencies = [
     '3rdparty/python:pystache',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
   name = 'parse_context',
   sources = ['parse_context.py'],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
   name = 'payload',
   sources = ['payload.py'],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -143,11 +148,13 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
   name = 'revision',
   sources = ['revision.py'],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -177,6 +184,7 @@ python_library(
   dependencies = [
     '3rdparty/python:dataclasses',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -196,6 +204,7 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:rwbuf',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -205,6 +214,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
   ],
+  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -213,7 +223,8 @@ python_library(
   dependencies=[
     'src/python/pants/util:fileutil',
     'src/python/pants/util:strutil',
-  ]
+  ],
+  tags = {'partially_type_checked'},
 )
 
 python_tests(

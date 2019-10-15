@@ -10,5 +10,5 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/goal:workspace',
     'src/python/pants/subsystem',
-  ]
+  ],
 )
