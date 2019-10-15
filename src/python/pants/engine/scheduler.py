@@ -322,13 +322,13 @@ class Scheduler:
     )
 
 
-_PathGlobsAndRootCollection = Collection[PathGlobsAndRoot]
+_PathGlobsAndRootCollection = Collection.of(PathGlobsAndRoot)
 
 
-_DirectoryDigests = Collection[Digest]
+_DirectoryDigests = Collection.of(Digest)
 
 
-_DirectoriesToMaterialize = Collection[DirectoryToMaterialize]
+_DirectoriesToMaterialize = Collection.of(DirectoryToMaterialize)
 
 
 class SchedulerSession:

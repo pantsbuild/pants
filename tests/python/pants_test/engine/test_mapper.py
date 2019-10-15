@@ -132,7 +132,7 @@ class AddressFamilyTest(unittest.TestCase):
                                        {'one': Thing(name='one', age=37)})])
 
 
-HydratedStructs = Collection[HydratedStruct]
+HydratedStructs = Collection.of(HydratedStruct)
 
 
 @rule

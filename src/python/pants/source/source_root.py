@@ -26,7 +26,7 @@ class SourceRoot:
   category: str
 
 
-class AllSourceRoots(Collection[SourceRoot]):
+class AllSourceRoots(Collection.of(SourceRoot)):
   pass
 
 

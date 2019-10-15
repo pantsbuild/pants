@@ -93,7 +93,7 @@ class RegexMatchResult:
   nonmatching: Tuple
 
 
-RegexMatchResults = Collection[RegexMatchResult]
+RegexMatchResults = Collection.of(RegexMatchResult)
 
 
 class Matcher:
