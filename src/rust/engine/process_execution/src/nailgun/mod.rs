@@ -10,9 +10,8 @@ use log::{debug, trace};
 
 use boxfuture::{Boxable, BoxFuture, try_future};
 use hashing::Digest;
-use workunit_store::WorkUnitStore;
 
-use crate::{ExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecuteProcessResult, MultiPlatformExecuteProcessRequest, Platform};
+use crate::{ExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecuteProcessResult, MultiPlatformExecuteProcessRequest, Platform, Context};
 use crate::nailgun::nailgun_pool::NailgunProcessName;
 
 pub mod nailgun_pool;
@@ -95,11 +94,12 @@ fn get_nailgun_request(args: Vec<String>, _input_files: Digest, jdk: Option<Path
     ExecuteProcessRequest {
         argv: full_args,
         env: BTreeMap::new(),
-        input_files: Default::default(),
+        input_files: hashing::EMPTY_DIGEST,
         output_files: BTreeSet::new(),
         output_directories: BTreeSet::new(),
         timeout: Duration::new(1000, 0),
         description: String::from("ExecuteProcessRequest to start a nailgun"),
+        unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: hashing::EMPTY_DIGEST,
         jdk_home: jdk,
         target_platform: Platform::Darwin,
         is_nailgunnable: true,
@@ -156,13 +156,13 @@ impl super::CommandRunner for NailgunCommandRunner {
     fn run(
         &self,
         req: MultiPlatformExecuteProcessRequest,
-        workunit_store: WorkUnitStore) -> BoxFuture<FallibleExecuteProcessResult, String> {
+        context: Context) -> BoxFuture<FallibleExecuteProcessResult, String> {
 
         let mut client_req = self.extract_compatible_request(&req).unwrap();
 
         if !client_req.is_nailgunnable {
             trace!("The request is not nailgunnable! Short-circuiting to regular process execution");
-            return self.inner.run(req, workunit_store)
+            return self.inner.run(req, context)
         }
         debug!("Running request under nailgun:\n {:#?}", &client_req);
 
@@ -188,7 +188,7 @@ impl super::CommandRunner for NailgunCommandRunner {
         let materialize = self.inner
             .store
             // TODO This materializes the input files in the client req, which is a superset of the files we need (we only need the classpath, not the input files)
-            .materialize_directory(nailguns_workdir.clone(), client_req.input_files, workunit_store.clone())
+            .materialize_directory(nailguns_workdir.clone(), client_req.input_files, context.workunit_store.clone())
             .and_then(move |_metadata| {
                 maybe_jdk_home.map_or(Ok(()), |jdk_home_relpath| {
                     let jdk_home_in_workdir = workdir_path2.clone().join(".jdk");
@@ -236,7 +236,7 @@ impl super::CommandRunner for NailgunCommandRunner {
                         debug!("Running client request on nailgun {}", &nailgun_name2);
                         trace!("Client request: {:#?}", client_req);
                         inner
-                            .run(MultiPlatformExecuteProcessRequest::from(client_req), workunit_store)
+                            .run(MultiPlatformExecuteProcessRequest::from(client_req), context)
                     }
                     Err(e) => {
                         futures::future::err(e).to_boxed()
