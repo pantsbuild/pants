@@ -69,6 +69,8 @@ class BuildRoot(metaclass=SingletonMetaclass):
   @contextmanager
   def temporary(self, path: str) -> Iterator[None]:
     """Establishes a temporary build root, restoring the prior build root on exit."""
+    if path is None:
+      raise ValueError('Can only temporarily establish a build root given a path.')
     prior = self._root_dir
     self._root_dir = path
     try:
