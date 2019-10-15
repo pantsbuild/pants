@@ -13,6 +13,7 @@ import yaml
 from packaging.version import Version
 
 from pants.base.deprecated import CodeRemovedError
+from pants.base.hash_utils import CoercingEncoder
 from pants.engine.fs import FileContent
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.config import Config
@@ -1381,6 +1382,14 @@ class OptionsTest(TestBase):
                              args=shlex.split('./pants'))
     options.register(GLOBAL_SCOPE, '--foo-bar')
     self.assertRaises(OptionAlreadyRegistered, lambda: options.register(GLOBAL_SCOPE, '--foo-bar'))
+
+  def test_serializability(self):
+    # We serialize options to JSON e.g., when uploading stats.
+    # This test spot-checks that enum types can be serialized.
+    options = self._parse('./pants enum-opt --some-enum=another-value')
+    # Note that for some reason CoercingEncoder doesn't do the right thing for enum-valued opts
+    # when wrapped in a list, as here.
+    json.dumps({'foo': [options.for_scope('enum-opt').as_dict()]}, cls=CoercingEncoder)
 
   def test_scope_deprecation(self):
     # Note: This test demonstrates that two different new scopes can deprecate the same

@@ -6,6 +6,7 @@ python_tests(
   sources=globs('*.py', exclude=[globs('*_integration.py')]),
   dependencies=[
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:hash_utils',
     'src/python/pants/base:deprecated',
     'src/python/pants/option',
     'src/python/pants/util:contextutil',
