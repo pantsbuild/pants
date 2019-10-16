@@ -371,15 +371,13 @@ class ExceptionSink:
 
     NB: This method calls signal.signal(), which will crash if not called from the main thread!
     """
-    # NB: We set `previous_signal_handler` to None at the start of the method in case resetting the
-    # signal handler within the `try` raises an error for some reason.
-    previous_signal_handler = None
+    # NB: It's possible for the `.reset_signal_handler()` call to raise, but it's not yet clear when
+    # this happens.
+    previous_signal_handler = cls.reset_signal_handler(new_signal_handler)
     try:
-      previous_signal_handler = cls.reset_signal_handler(new_signal_handler)
       yield
     finally:
-      if previous_signal_handler:
-        cls.reset_signal_handler(previous_signal_handler)
+      cls.reset_signal_handler(previous_signal_handler)
 
   @classmethod
   @contextmanager
