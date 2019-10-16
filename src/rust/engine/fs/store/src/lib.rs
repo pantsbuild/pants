@@ -791,19 +791,26 @@ impl Store {
       .load_file_bytes_with(
         digest,
         move |bytes| {
-          OpenOptions::new()
-            .create(true)
-            .write(true)
-            .mode(if is_executable { 0o755 } else { 0o644 })
-            .open(&destination)
-            .and_then(|mut f| {
-              f.write_all(&bytes)?;
-              // See `materialize_directory`, but we fundamentally materialize files for other
-              // processes to read; as such, we must ensure data is flushed to disk and visible
-              // to them as opposed to just our process.
-              f.sync_all()
-            })
-            .map_err(|e| format!("Error writing file {:?}: {:?}", destination, e))
+          if destination.exists() {
+            std::fs::remove_file(&destination)
+          } else {
+            Ok(())
+          }
+          .and_then(|_| {
+            OpenOptions::new()
+              .create(true)
+              .write(true)
+              .mode(if is_executable { 0o755 } else { 0o644 })
+              .open(&destination)
+          })
+          .and_then(|mut f| {
+            f.write_all(&bytes)?;
+            // See `materialize_directory`, but we fundamentally materialize files for other
+            // processes to read; as such, we must ensure data is flushed to disk and visible
+            // to them as opposed to just our process.
+            f.sync_all()
+          })
+          .map_err(|e| format!("Error writing file {:?}: {:?}", destination, e))
         },
         workunit_store.clone(),
       )
@@ -2359,8 +2366,8 @@ mod tests {
 
   #[test]
   fn materialize_directory_metadata_mixed() {
-    let outer_dir = TestDirectory::double_nested();
-    let nested_dir = TestDirectory::nested();
+    let outer_dir = TestDirectory::double_nested(); // /pets/cats/roland
+    let nested_dir = TestDirectory::nested(); // /cats/roland
     let inner_dir = TestDirectory::containing_roland();
     let file = TestData::roland();
 
@@ -2407,5 +2414,52 @@ mod tests {
         .get("roland")
         .unwrap()
     );
+  }
+
+  #[test]
+  fn explicitly_overwrites_already_existing_file() {
+    fn test_file_with_arbitrary_content(filename: &str, content: &TestData) -> TestDirectory {
+      use bazel_protos;
+      let digest = content.digest();
+      let mut directory = bazel_protos::remote_execution::Directory::new();
+      directory.mut_files().push({
+        let mut file = bazel_protos::remote_execution::FileNode::new();
+        file.set_name(filename.to_owned());
+        file.set_digest((&digest).into());
+        file.set_is_executable(false);
+        file
+      });
+      TestDirectory { directory }
+    }
+
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+    let dir_to_write_to = tempfile::tempdir().unwrap();
+    let file_path: PathBuf = [dir_to_write_to.path(), Path::new("some_filename")]
+      .iter()
+      .collect();
+
+    std::fs::write(&file_path, "XXX").unwrap();
+
+    let file_contents = std::fs::read(&file_path).unwrap();
+    assert_eq!(file_contents, b"XXX".to_vec());
+
+    let cas_file = TestData::new("abc123");
+    let contents_dir = test_file_with_arbitrary_content("some_filename", &cas_file);
+    let cas = StubCAS::builder()
+      .directory(&contents_dir)
+      .file(&cas_file)
+      .build();
+    let store = new_store(tempfile::tempdir().unwrap(), cas.address());
+
+    let _ = runtime
+      .block_on(store.materialize_directory(
+        dir_to_write_to.path().to_owned(),
+        contents_dir.digest(),
+        WorkUnitStore::new(),
+      ))
+      .unwrap();
+
+    let file_contents = std::fs::read(&file_path).unwrap();
+    assert_eq!(file_contents, b"abc123".to_vec());
   }
 }
