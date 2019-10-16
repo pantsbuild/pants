@@ -44,7 +44,7 @@ class DatatypeMixin(ABC):
     return cls.type_check_error_type(cls.__name__, msg, *args, **kwargs)
 
 
-@deprecated('1.22.0.dev2', hint_message='Use @dataclass to declare typed named tuples instead!')
+@deprecated('1.24.0.dev2', hint_message='Use @dataclass to declare typed named tuples instead!')
 def datatype(field_decls, superclass_name=None, **kwargs):
   """A wrapper for `namedtuple` that accounts for the type of the object in equality.
 
