@@ -297,7 +297,7 @@ class Scheduler:
 
   def _run_and_return_roots(self, session, execution_request):
     raw_roots = self._native.lib.scheduler_execute(self._scheduler, session, execution_request)
-    remaining_runtime_exceptions_to_capture = deque(self._native.consume_cffi_extern_method_runtime_exceptions())
+    remaining_runtime_exceptions_to_capture = list(self._native.consume_cffi_extern_method_runtime_exceptions())
     try:
       roots = []
       for raw_root in self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len):
@@ -312,7 +312,7 @@ class Scheduler:
           if not remaining_runtime_exceptions_to_capture:
             raise ExecutionError('Internal logic error in scheduler: expected more elements in '
                                  '`self._native._peek_cffi_extern_method_runtime_exceptions()`.')
-          matching_runtime_exception = remaining_runtime_exceptions_to_capture.popleft()
+          matching_runtime_exception = remaining_runtime_exceptions_to_capture.pop(0)
           state = Throw(matching_runtime_exception)
         else:
           state = Return(self._from_value(raw_root.handle))
