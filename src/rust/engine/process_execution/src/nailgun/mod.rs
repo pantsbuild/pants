@@ -16,7 +16,7 @@ use crate::nailgun::nailgun_pool::NailgunProcessName;
 
 pub mod nailgun_pool;
 
-pub type NailgunPool = nailgun_pool::NailgunPool;
+pub use nailgun_pool::NailgunPool;
 
 // Hardcoded constants for connecting to nailgun
 static NAILGUN_MAIN_CLASS: &str = "com.martiansoftware.nailgun.NGServer";
@@ -26,7 +26,7 @@ static ARGS_TO_START_NAILGUN: [&str; 1] = [":0"];
 static NG_CLIENT_PATH: &str = "bin/ng/1.0.0/ng";
 
 /// Represents the result of parsing the args of a nailgunnable ExecuteProcessRequest
-/// TODO We may want to split the classpath by the ":", and store it as a Vec<String>
+/// TODO(8481) We may want to split the classpath by the ":", and store it as a Vec<String>
 ///         to allow for deep fingerprinting.
 struct ParsedArgLists {
     nailgun_args: Vec<String>,
@@ -86,7 +86,7 @@ fn split_args(args: &Vec<String>) -> ParsedArgLists {
 }
 
 // TODO(8481) The input_files arg should be calculated from deeply fingerprinting the classpath.
-fn get_nailgun_request(args: Vec<String>, _input_files: Digest, jdk: Option<PathBuf>) -> ExecuteProcessRequest {
+fn get_nailgun_request(args: Vec<String>, _input_files: Digest, jdk: Option<PathBuf>, platform: Platform) -> ExecuteProcessRequest {
     let mut full_args = args;
     full_args.push(NAILGUN_MAIN_CLASS.to_string());
     full_args.extend(ARGS_TO_START_NAILGUN.iter().map(|a| a.to_string()));
@@ -101,7 +101,7 @@ fn get_nailgun_request(args: Vec<String>, _input_files: Digest, jdk: Option<Path
         description: String::from("ExecuteProcessRequest to start a nailgun"),
         unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: hashing::EMPTY_DIGEST,
         jdk_home: jdk,
-        target_platform: Platform::Darwin,
+        target_platform: platform,
         is_nailgunnable: true,
     }
 }
@@ -168,7 +168,7 @@ impl super::CommandRunner for NailgunCommandRunner {
 
         // Separate argument lists, to form distinct EPRs for (1) starting the nailgun server and (2) running the client in it.
         let ParsedArgLists {nailgun_args, client_args } = split_args(&client_req.argv);
-        let nailgun_req = get_nailgun_request(nailgun_args, client_req.input_files, client_req.jdk_home.clone());
+        let nailgun_req = get_nailgun_request(nailgun_args, client_req.input_files, client_req.jdk_home.clone(), client_req.target_platform);
         trace!("Extracted nailgun request:\n {:#?}", &nailgun_req);
 
         let maybe_jdk_home = nailgun_req.jdk_home.clone();
@@ -187,7 +187,7 @@ impl super::CommandRunner for NailgunCommandRunner {
         let workdir_path4 = nailguns_workdir.clone();
         let materialize = self.inner
             .store
-            // TODO This materializes the input files in the client req, which is a superset of the files we need (we only need the classpath, not the input files)
+            // TODO(8481) This materializes the input files in the client req, which is a superset of the files we need (we only need the classpath, not the input files)
             .materialize_directory(nailguns_workdir.clone(), client_req.input_files, context.workunit_store.clone())
             .and_then(move |_metadata| {
                 maybe_jdk_home.map_or(Ok(()), |jdk_home_relpath| {

@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
 
-use log::{debug, trace};
+use log::{debug, info, trace};
 use parking_lot::Mutex;
 use regex::Regex;
 
@@ -91,7 +91,7 @@ impl NailgunPool {
                             debug!("Found nailgun process {}, with fingerprint {:?}",
                                    &name, process_fingerprint);
                             if nailgun_req_digest == process_fingerprint {
-                                debug!("The fingerprint of the running nailgun {:?} coincides with the requested fingerprint {:?}. Connecting to existing server.",
+                                debug!("The fingerprint of the running nailgun {:?} matches the requested fingerprint {:?}. Connecting to existing server.",
                                        nailgun_req_digest, process_fingerprint);
                                 Ok(process_port)
                             } else {
@@ -148,15 +148,6 @@ impl NailgunPool {
                 Ok(port)
             })
     }
-
-    pub fn print_stdout(&self, name: &NailgunProcessName) -> String {
-        self
-            .processes
-            .lock()
-            .get_mut(name)
-            .map(|process| process.print_stdout())
-            .unwrap()
-    }
 }
 
 /// Representation of a running nailgun server.
@@ -195,7 +186,9 @@ impl NailgunProcess {
         nailgun_req_digest: Digest,
     ) -> Result<NailgunProcess, String> {
         let cmd = startup_options.argv[0].clone();
-        debug!(
+        // TODO: This is an expensive operation, and thus we info! it.
+        //       If it becomes annoying, we can downgrade the logging to just debug!
+        info!(
             "Starting new nailgun server with cmd: {:?}, args {:?}, in cwd {:?}",
             cmd,
             &startup_options.argv[1..],
@@ -231,22 +224,6 @@ impl NailgunProcess {
                     handle: Arc::new(Mutex::new(child)),
                 })
             })
-    }
-
-    // TODO This is horribly broken, but I'm not sure we actually need it.
-    // The fundamental problem is that we don't want to kill the nailgun just yet, but read
-    // as much output as it has up to this point.
-    fn print_stdout(&mut self) -> String {
-        let mut handle = self.handle.lock();
-        let stdout = handle.stdout.as_mut().unwrap();
-
-        let mut buffer = [0; 10];
-        // read up to 10 bytes
-        let n = stdout.read(&mut buffer[..]).unwrap();
-
-        debug!("The bytes: {:?}", &buffer[..n]);
-
-        String::from(std::str::from_utf8(&buffer).unwrap())
     }
 }
 

@@ -407,6 +407,7 @@ class BaseZincCompile(JvmCompile):
   # Snapshot the nailgun-server jar, to use it to start nailguns in the hermetic case.
   # TODO(#8480): Make this jar natively accessible to the engine,
   #              because it will help when moving the JVM pipeline to v2.
+  @memoized_method
   def _nailgun_server_classpath_entry(self):
     nailgun_jar = self.tool_jar('nailgun-server')
     nailgun_jar_snapshot = self.context._scheduler.capture_snapshots((PathGlobsAndRoot(
