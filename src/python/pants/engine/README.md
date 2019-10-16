@@ -131,7 +131,7 @@ x = FormattedInt('a string')
 assert x == FormattedInt(content='a string')
 print(x.content)                # 'a string'
 
-# datatype objects can be easily inspected:
+# `@dataclass` objects can be easily inspected:
 print(x)                        # 'FormattedInt(content="a string")'
 
 # All mypy types, including parameterized types, may be used in field definitions.
