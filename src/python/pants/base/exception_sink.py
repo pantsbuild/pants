@@ -371,8 +371,6 @@ class ExceptionSink:
 
     NB: This method calls signal.signal(), which will crash if not called from the main thread!
     """
-    # NB: It's possible for the `.reset_signal_handler()` call to raise, but it's not yet clear when
-    # this happens.
     previous_signal_handler = cls.reset_signal_handler(new_signal_handler)
     try:
       yield
