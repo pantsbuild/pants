@@ -104,16 +104,27 @@ To use an instance of some class `C` as a `Param` to the engine:
 ```python
 from dataclasses import dataclass
 
+from pants.util.meta import frozen_after_init
 
-# NB: Pants currently requires that `frozen=True` must be set in the `@dataclass`
-# decorator!
+# Pants requires that engine Params have a stable hash. This can be accomplished with the
+# `frozen=True` argument set in the `@dataclass` decorator.
 @dataclass(frozen=True)
 class FormattedInt:
   content: str
 
+# `@frozen_after_init` can also be used with `unsafe_hash=True` to create engine Params which can
+# modify their fields within the `__init__()` method:
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class ValidatedInt:
+  x: int
+
+  def __init__(self, x):
+    self.x = x
+
 @rule
-def int_to_str(value: int) -> FormattedInt:
-  return FormattedInt('{}'.format(value))
+def int_to_str(value: ValidatedInt) -> FormattedInt:
+  return FormattedInt('{}'.format(value.x))
 
 # Instances can be constructed and accessed the same way as for normal `@dataclass`es.
 x = FormattedInt('a string')
