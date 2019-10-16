@@ -80,7 +80,7 @@ fail with a useful error message.
 
 In practical use, builtin types like `str` or `int` do not provide enough information to
 disambiguate between various types of data in `@rule` signatures, so declaring small, unique classes
-to encapsulate different states can help to make `@rule`sets with complex control flow between rules
+to encapsulate different states can help to make `@rule` sets with complex control flow between rules
 more declarative and self-documenting.
 
 #### Requirements for an Engine `Param`
@@ -94,12 +94,12 @@ To use an instance of some class `C` as a `Param` to the engine:
 [Python 3 `@dataclass`es](https://docs.python.org/3/library/dataclasses.html) satisfy the above requirements for engine `Param`s. Using `@dataclass` to declare engine `Param` types also provides additional benefits compared to alternatives:
 1. a compact and high-performance representation which can be stably shared across FFI boundaries,
 2. static type checking via [the `dataclasses` mypy plugin](https://github.com/python/mypy/blob/master/mypy/plugins/dataclasses.py),
-3. a concise, standard, and pythonic way to declare classes.
+3. a concise, standard, and Pythonic way to declare classes.
 
 
 #### Example Usage of `@dataclass` for Engine `Param`s
 
-*Note that the [3rdparty `dataclasses` library](https://github.com/ericvsmith/dataclasses) must be in your BUILD file and `import`ed in Python 3.6!*
+*Note that the [3rdparty `dataclasses` library](https://github.com/ericvsmith/dataclasses) must be in your BUILD file and `import`ed if you're running Pants with Python 3.6!*
 
 ```python
 from dataclasses import dataclass
