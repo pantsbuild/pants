@@ -24,7 +24,7 @@ lazy_static! {
 pub type NailgunProcessName = String;
 type NailgunProcessFingerprint = Digest;
 type NailgunProcessMap = HashMap<NailgunProcessName, NailgunProcess>;
-type Port = usize;
+pub type Port = usize;
 
 #[derive(Clone)]
 pub struct NailgunPool {
