@@ -913,10 +913,8 @@ class JvmCompile(CompilerOptionSetsMixin, NailgunTaskBase):
       # We have to move the jars to top level directory because globbing jdk home with symlinks
       # would cause failing to scan the directory. https://github.com/pantsbuild/pants/issues/8460
       for lib_abs in self._underlying.find_libs(names):
-        lib_path_rel_to_jdk_home = self._unroot_lib_path(lib_abs)
-        abs_path_lib = os.path.join(self._underlying.home, lib_path_rel_to_jdk_home)
-        root = os.path.dirname(abs_path_lib)
-        filename = os.path.basename(abs_path_lib)
+        root = os.path.dirname(lib_abs)
+        filename = os.path.basename(lib_abs)
         filenames.append(filename)
         path_globs.append(PathGlobsAndRoot(PathGlobs((filename,)), root))
       return (filenames, path_globs)
