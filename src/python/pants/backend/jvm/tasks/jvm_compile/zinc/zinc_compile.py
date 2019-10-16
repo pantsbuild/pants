@@ -24,15 +24,14 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
+from pants.binaries.binary_tool import NativeTool, Script
+from pants.binaries.binary_util import BinaryToolUrlGenerator
 from pants.engine.fs import (
   EMPTY_DIRECTORY_DIGEST,
   DirectoryToMaterialize,
   PathGlobs,
   PathGlobsAndRoot,
 )
-from pants.binaries.binary_tool import NativeTool, Script
-from pants.binaries.binary_util import BinaryToolUrlGenerator
-from pants.engine.fs import DirectoryToMaterialize, PathGlobs, PathGlobsAndRoot
 from pants.engine.isolated_process import ExecuteProcessRequest
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath
@@ -406,6 +405,8 @@ class BaseZincCompile(JvmCompile):
       raise self.ZincCompileError('Zinc compile failed.', exit_code=exit_code)
 
   # Snapshot the nailgun-server jar, to use it to start nailguns in the hermetic case.
+  # TODO(#8480): Make this jar natively accessible to the engine,
+  #              because it will help when moving the JVM pipeline to v2.
   def _nailgun_server_classpath_entry(self):
     nailgun_jar = self.tool_jar('nailgun-server')
     nailgun_jar_snapshot = self.context._scheduler.capture_snapshots((PathGlobsAndRoot(
