@@ -78,8 +78,8 @@ class ResultDataclass:
   something: str
 
 
-@rule(ResultDataclass, [FrozenFieldsDataclass])
-def dataclass_rule(obj):
+@rule
+def dataclass_rule(obj: FrozenFieldsDataclass) -> ResultDataclass:
   return ResultDataclass(something=f'x={obj.x}, y={obj.y}')
 
 
