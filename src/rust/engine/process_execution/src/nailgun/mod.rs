@@ -204,23 +204,19 @@ impl super::CommandRunner for NailgunCommandRunner {
             })
             .inspect(move |_| debug!("Materialized directory {:?} before connecting to nailgun server.", &workdir_path3));
 
-        // Connect to a running nailgun, starting one appropriate one up.
         let nailguns = self.nailguns.clone();
-        let nailgun = materialize
-            .map(move |_metadata| {
-                nailguns.connect(nailgun_name.clone(), nailgun_req, &nailguns_workdir, nailgun_req_digest)
-            })
-            .inspect(move |_| debug!("Connected to nailgun instance {}", &nailgun_name3));
-
-        // Run the client request in the nailgun we have active.
         let inner = self.inner.clone();
         let python_path = self.python_distribution_absolute_path
             .clone()
             .into_os_string()
             .into_string()
             .expect("The path of your python distribution is not UTF-8!");
-        let res = nailgun
-            .and_then(move |res| {
+        let res = materialize
+            .and_then(move |_metadata| {
+                // Connect to a running nailgun, starting one appropriate one up.
+                let res = nailguns.connect(nailgun_name.clone(), nailgun_req, &nailguns_workdir, nailgun_req_digest);
+
+                // Run the client request in the nailgun we have active.
                 match res {
                     Ok(port) => {
                         debug!("Got nailgun port {:#?}", port);
@@ -242,7 +238,8 @@ impl super::CommandRunner for NailgunCommandRunner {
                         futures::future::err(e).to_boxed()
                     }
                 }
-            });
+            })
+            .inspect(move |_| debug!("Connected to nailgun instance {}", &nailgun_name3));
 
         res.to_boxed()
     }

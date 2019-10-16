@@ -3,7 +3,7 @@
 
 use std::io;
 use std::collections::HashMap;
-use std::io::{BufRead, Read};
+use std::io::BufRead;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
@@ -54,64 +54,53 @@ impl NailgunPool {
     ) -> Result<Port, String> {
         trace!("Locking nailgun process pool so that only one can be connecting at a time.");
         let mut processes = self.processes.lock();
-        // If the process is in the map, check if it's alive using the handle.
-        let status = {
-            processes.get_mut(&name).map(|process| {
+
+        let maybe_process = processes.get_mut(&name);
+        let connection_result = if let Some(process) = maybe_process {
+            // Clone some fields that we need for later
+            let (process_name, process_fingerprint, process_port) =
+                (process.name.clone(), process.fingerprint.clone(), process.port);
+
+            debug!(
+                "Checking if nailgun server {} is still alive at port {}...",
+                &process_name, process_port
+            );
+
+            // If the process is in the map, check if it's alive using the handle.
+            let status = {
                 process
                     .handle
                     .lock()
                     .try_wait()
                     .map_err(|e| format!("Error getting the process status! {}", e))
                     .clone()
-            })
-        };
-        let connection_result = if let Some(status) = status {
-            let (process_name, process_fingerprint, process_port) = {
-                processes
-                    .get(&name)
-                    .map(|process| {
-                        (
-                            process.name.clone(),
-                            process.fingerprint.clone(),
-                            process.port,
-                        )
-                    })
-                    .unwrap()
             };
-            debug!(
-                "Checking if nailgun server {} is still alive at port {}...",
-                &process_name, process_port
-            );
-            status
-                .map_err(|e| format!("Error reading nailgun server status {}", e))
-                .and_then(|status| {
-                    match status {
-                        None => {
-                            // Process hasn't exited yet
-                            debug!("Found nailgun process {}, with fingerprint {:?}",
-                                   &name, process_fingerprint);
-                            if nailgun_req_digest == process_fingerprint {
-                                debug!("The fingerprint of the running nailgun {:?} matches the requested fingerprint {:?}. Connecting to existing server.",
-                                       nailgun_req_digest, process_fingerprint);
-                                Ok(process_port)
-                            } else {
-                                // The running process doesn't coincide with the options we want.
-                                // Restart it.
-                                debug!("The options for process {} are different to the startup_options! \n Startup Options: {:?}\n Process Cmd: {:?}",
-                                       &process_name, startup_options, process_fingerprint
-                                );
-                                // self.processes.remove(&name);
-                                self.start_new_nailgun(&mut *processes, name, startup_options, workdir_path, nailgun_req_digest)
-                            }
-                        }
-                        _ => {
-                            debug!("The requested nailgun server was not running anymore. Restarting process...");
-                            self.start_new_nailgun(&mut *processes, name, startup_options, workdir_path, nailgun_req_digest)
-                        }
+            match status {
+                Ok(None) => { // Process hasn't exited yet
+                    debug!("Found nailgun process {}, with fingerprint {:?}",
+                           &name, process_fingerprint);
+                    if nailgun_req_digest == process_fingerprint {
+                        debug!("The fingerprint of the running nailgun {:?} matches the requested fingerprint {:?}. Connecting to existing server.",
+                               nailgun_req_digest, process_fingerprint);
+                        Ok(process_port)
+                    } else {
+                        // The running process doesn't coincide with the options we want.
+                        // Restart it.
+                        debug!("The options for process {} are different to the startup_options! \n Startup Options: {:?}\n Process Cmd: {:?}",
+                               &process_name, startup_options, process_fingerprint
+                        );
+                        self.start_new_nailgun(&mut *processes, name, startup_options, workdir_path, nailgun_req_digest)
                     }
-                })
+                },
+                Ok(_) => { // The process has exited with some exit code
+                    debug!("The requested nailgun server was not running anymore. Restarting process...");
+                    self.start_new_nailgun(&mut *processes, name, startup_options, workdir_path, nailgun_req_digest)
+                }
+                Err(e) => Err(e)
+            }
         } else {
-            // We don't have a running nailgun
+            // We don't have a running nailgun registered in the map.
+            debug!("No nailgun server is running with name {}. Starting one...", &name);
             self.start_new_nailgun(
                 &mut *processes,
                 name,
