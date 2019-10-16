@@ -736,7 +736,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
   def _jdk_libs_paths_and_digest(self, hermetic_dist):
     jdk_libs_rel, jdk_libs_globs = hermetic_dist.find_libs_path_globs(self._JDK_LIB_NAMES)
     jdk_libs_digest = self.context._scheduler.merge_directories([
-      g.directory_digest for g in (self.context._scheduler.capture_snapshots(jdk_libs_globs))
+      snap.directory_digest for snap in (self.context._scheduler.capture_snapshots(jdk_libs_globs))
     ])
     return (jdk_libs_rel, jdk_libs_digest)
 
