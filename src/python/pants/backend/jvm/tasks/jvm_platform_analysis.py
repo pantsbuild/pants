@@ -265,6 +265,11 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
   Ranges = namedtuple('ranges', ['min_allowed_version', 'max_allowed_version',
                                  'target_dependencies', 'target_dependees'])
 
+  @classproperty
+  def _register_console_transitivity_option(cls):
+    """This class registers its own --transitive option, which acts differently."""
+    return False
+
   @classmethod
   def register_options(cls, register):
     super().register_options(register)
