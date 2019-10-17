@@ -232,8 +232,20 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     # Ensure that the jar/rsc jar is on the rsc_mixed_compile_classpath.
     for target in targets:
       merged_cc = compile_contexts[target]
-      rsc_cc = merged_cc.rsc_cc
       zinc_cc = merged_cc.zinc_cc
+      rsc_cc = merged_cc.rsc_cc
+      # Make sure m.jar is digested if it exists when the target is validated.
+      if rsc_cc.rsc_jar_file.directory_digest is None and os.path.exists(rsc_cc.rsc_jar_file.path):
+        relpath = fast_relpath(rsc_cc.rsc_jar_file.path, get_buildroot())
+        classes_dir_snapshot, = self.context._scheduler.capture_snapshots([
+          PathGlobsAndRoot(
+            PathGlobs([relpath]),
+            get_buildroot(),
+            Digest.load(relpath),
+          ),
+        ])
+        rsc_cc.rsc_jar_file.hydrate_missing_directory_digest(classes_dir_snapshot.directory_digest)
+
       if rsc_cc.workflow is not None:
         cp_entries = rsc_cc.workflow.match({
           self.JvmCompileWorkflowType.zinc_only: lambda: confify([self._classpath_for_context(zinc_cc)]),
