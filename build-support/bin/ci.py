@@ -328,8 +328,8 @@ def _run_command(
       check_pants_pex_exists()
     try:
       subprocess.run(command, check=True)
-    except subprocess.CalledProcessError:
-      die(die_message)
+    except subprocess.CalledProcessError as e:
+      die(die_message + '\n======== Details =========\n' + e.output)
 
 
 def run_githooks() -> None:
