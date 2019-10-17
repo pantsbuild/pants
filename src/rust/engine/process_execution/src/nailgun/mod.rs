@@ -29,9 +29,10 @@ static NG_CLIENT_PATH: &str = "bin/ng/1.0.0/ng";
 /// Represents the result of parsing the args of a nailgunnable ExecuteProcessRequest
 /// TODO(8481) We may want to split the classpath by the ":", and store it as a Vec<String>
 ///         to allow for deep fingerprinting.
-struct ParsedArgLists {
+struct ParsedJVMCommandLines {
     nailgun_args: Vec<String>,
     client_args: Vec<String>,
+    main_class: String,
 }
 
 ///
@@ -52,9 +53,10 @@ struct ParsedArgLists {
 ///
 /// We think these assumptions are valid as per: https://github.com/pantsbuild/pants/issues/8387
 ///
-fn split_args(args: &Vec<String>) -> ParsedArgLists {
+fn split_args(args: &Vec<String>) -> ParsedJVMCommandLines {
     let mut nailgun_args = vec![];
     let mut client_args = vec![];
+    let mut main_class = "".to_string();
     let mut have_seen_classpath = false;
     let mut have_processed_classpath = false;
     let mut have_seen_main_class = false;
@@ -73,16 +75,17 @@ fn split_args(args: &Vec<String>) -> ParsedArgLists {
         } else if have_processed_classpath && !arg.starts_with("-") {
             // Process the main class:
             // I have already seen the value of the -cp classpath, and this is not a flag.
-            client_args.push(arg.clone());
+            main_class = arg.clone();
             have_seen_main_class = true;
         } else {
             // Process the rest (jvm options to pass to nailgun)
             nailgun_args.push(arg.clone());
         }
     }
-    ParsedArgLists {
+    ParsedJVMCommandLines {
         nailgun_args: nailgun_args,
-        client_args: client_args
+        client_args: client_args,
+        main_class: main_class,
     }
 }
 
@@ -205,11 +208,10 @@ impl super::CommandRunner for NailgunCommandRunner {
         debug!("Running request under nailgun:\n {:#?}", &client_req);
 
         // Separate argument lists, to form distinct EPRs for (1) starting the nailgun server and (2) running the client in it.
-        let ParsedArgLists {nailgun_args, client_args } = split_args(&client_req.argv);
+        let ParsedJVMCommandLines {nailgun_args, client_args, main_class } = split_args(&client_req.argv);
         let nailgun_req = get_nailgun_request(nailgun_args, client_req.input_files, client_req.jdk_home.clone(), client_req.target_platform);
         trace!("Extracted nailgun request:\n {:#?}", &nailgun_req);
 
-        let main_class = client_args.iter().next().unwrap().clone(); // We assume the last one is the main class name
         let nailgun_req_digest = crate::digest(MultiPlatformExecuteProcessRequest::from(nailgun_req.clone()), &self.metadata);
 
         let nailgun_name = NailgunCommandRunner::calculate_nailgun_name(&main_class, &nailgun_req_digest);
@@ -238,6 +240,7 @@ impl super::CommandRunner for NailgunCommandRunner {
                             NG_CLIENT_PATH.to_string(),
                             "--".to_string(),
                         ];
+                        client_req.argv.push(main_class);
                         client_req.argv.extend(client_args);
                         client_req.jdk_home = None;
                         client_req.env.insert("NAILGUN_PORT".into(), nailgun_port.to_string());
