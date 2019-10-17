@@ -6,6 +6,7 @@ import re
 from contextlib import contextmanager
 
 from pants.backend.jvm.subsystems.jvm import JVM
+from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jvm_run import JvmRun
 from pants.util.contextutil import pushd, temporary_dir
@@ -18,14 +19,21 @@ class JvmRunTest(JvmTaskTestBase):
   def task_type(cls):
     return JvmRun
 
+  def setUp(self):
+    super().setUp()
+    self.set_options_for_scope(JvmPlatform.options_scope,
+      default_platform='java8',
+      platforms={
+        'java8': {'source': '8', 'target': '8', 'args': []},})
+
   @contextmanager
-  def setup_cmdline_run(self, extra_jvm_options=None, **options):
+  def setup_cmdline_run(self, extra_jvm_options=None, platform=None, **options):
     """Run the JvmRun task in command line only mode  with the specified extra options.
     :returns: the command line string
     """
     self.set_options(only_write_cmd_line='a', **options)
     jvm_binary = self.make_target('src/java/org/pantsbuild:binary', JvmBinary,
-      main='org.pantsbuild.Binary', extra_jvm_options=extra_jvm_options)
+      main='org.pantsbuild.Binary', extra_jvm_options=extra_jvm_options, platform=platform)
     context = self.context(target_roots=[jvm_binary])
     jvm_run = self.create_task(context)
     self._cmdline_classpath = [os.path.join(self.pants_workdir, c) for c in ['bob', 'fred']]
@@ -53,6 +61,20 @@ class JvmRunTest(JvmTaskTestBase):
   def test_extra_jvm_option(self):
     options = ['-Dexample.property1=1', '-Dexample.property2=1']
     with self.setup_cmdline_run(extra_jvm_options=options) as cmdline:
+      for option in options:
+        self.assertIn(option, cmdline)
+
+  def test_platform_options(self):
+    options = ['-Dexample.property=1']
+    self.set_options_for_scope(JvmPlatform.options_scope,
+      default_platform='java8',
+      platforms={
+        'java8': {'source': '8', 'target': '8', 'args': []},
+        'java8-extra': {
+          'source': '8',
+          'target': '8',
+          'args': options },})
+    with self.setup_cmdline_run(platform='java8-extra') as cmdline:
       for option in options:
         self.assertIn(option, cmdline)
 

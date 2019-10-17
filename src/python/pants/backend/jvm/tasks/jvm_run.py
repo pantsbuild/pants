@@ -3,6 +3,7 @@
 
 import logging
 
+from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jvm_task import JvmTask
@@ -87,7 +88,7 @@ class JvmRun(JvmTask):
     # python_binary, in which case we have to no-op and let python_run do its thing.
     # TODO(benjy): Some more elegant way to coordinate how tasks claim targets.
     if isinstance(binary, JvmBinary):
-      jvm = DistributionLocator.cached()
+      jvm = JvmPlatform.preferred_jvm_distribution([target.platform])
       executor = CommandLineGrabber(jvm) if self.only_write_cmd_line else None
       self.context.release_lock()
       with self.context.new_workunit(name='run', labels=[WorkUnitLabel.RUN]):
@@ -95,7 +96,7 @@ class JvmRun(JvmTask):
           classpath=self.classpath([target]),
           main=self.get_options().main or binary.main,
           executor=executor,
-          jvm_options=self.jvm_options + extra_jvm_options,
+          jvm_options=self.jvm_options + list(target.platform.args) + extra_jvm_options,
           args=self.args,
           cwd=working_dir,
           synthetic_jar_dir=self.workdir,
