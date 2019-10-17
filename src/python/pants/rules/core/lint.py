@@ -6,13 +6,7 @@ from dataclasses import dataclass
 from pants.engine.console import Console
 from pants.engine.goal import Goal
 from pants.engine.legacy.graph import HydratedTargets
-from pants.engine.legacy.structs import (
-  PythonAppAdaptor,
-  PythonBinaryAdaptor,
-  PythonTargetAdaptor,
-  PythonTestsAdaptor,
-)
-from pants.engine.rules import console_rule
+from pants.engine.rules import UnionMembership, console_rule
 from pants.engine.selectors import Get
 from pants.rules.core.fmt import TargetWithSources
 
@@ -33,17 +27,14 @@ class Lint(Goal):
 
 
 @console_rule
-def lint(console: Console, targets: HydratedTargets) -> Lint:
+def lint(console: Console, targets: HydratedTargets, union_membership: UnionMembership) -> Lint:
   results = yield [
           Get(LintResult, TargetWithSources, target.adaptor)
           for target in targets
-          # @union assumes that all targets passed implement the union, so we manually
-          # filter the targets we know do; this should probably no-op or log or something
-          # configurable for non-matching targets.
-          # We also would want to remove the workaround that filters adaptors which have a
-          # `sources` attribute.
-          # See https://github.com/pantsbuild/pants/issues/4535
-          if isinstance(target.adaptor, (PythonAppAdaptor, PythonTargetAdaptor, PythonTestsAdaptor, PythonBinaryAdaptor)) and hasattr(target.adaptor, "sources")
+           # We will want to remove the workaround that filters adaptors which have a `sources`
+           # attribute.
+           # See https://github.com/pantsbuild/pants/issues/4535
+          if union_membership.is_member(FmtTarget, target.adaptor) and hasattr(target.adaptor, "sources")
           ]
 
   exit_code = 0
