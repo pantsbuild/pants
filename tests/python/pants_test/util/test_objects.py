@@ -323,6 +323,7 @@ class ReturnsNotImplemented:
   def __eq__(self, other):
     return NotImplemented
 
+
 class DatatypeTest(TestBase):
 
   def test_eq_with_not_implemented_super(self):
