@@ -234,7 +234,8 @@ def deprecated(
   removal_version: str,
   hint_message: Optional[str] = None,
   subject: Optional[str] = None,
-  ensure_stderr: bool = False
+  ensure_stderr: bool = False,
+  stacklevel: int = 3
 ):
   """Marks a function or method as deprecated.
 
@@ -268,7 +269,8 @@ def deprecated(
     @wraps(func)
     def wrapper(*args, **kwargs):
       warn_or_error(removal_version, subject or func_full_name, hint_message,
-                    ensure_stderr=ensure_stderr)
+                    ensure_stderr=ensure_stderr,
+                    stacklevel=stacklevel)
       return func(*args, **kwargs)
     return wrapper
   return decorator
