@@ -15,9 +15,11 @@ use crate::{ExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecut
 use crate::nailgun::nailgun_pool::NailgunProcessName;
 
 pub mod nailgun_pool;
+mod parsed_jvm_command_lines;
 
 pub use nailgun_pool::NailgunPool;
 use workunit_store::WorkUnitStore;
+use parsed_jvm_command_lines::ParsedJVMCommandLines;
 
 // Hardcoded constants for connecting to nailgun
 static NAILGUN_MAIN_CLASS: &str = "com.martiansoftware.nailgun.NGServer";
@@ -25,69 +27,6 @@ static ARGS_TO_START_NAILGUN: [&str; 1] = [":0"];
 
 // We can hardcode this because we mix it into the digest in the EPR.
 static NG_CLIENT_PATH: &str = "bin/ng/1.0.0/ng";
-
-/// Represents the result of parsing the args of a nailgunnable ExecuteProcessRequest
-/// TODO(8481) We may want to split the classpath by the ":", and store it as a Vec<String>
-///         to allow for deep fingerprinting.
-struct ParsedJVMCommandLines {
-    nailgun_args: Vec<String>,
-    client_args: Vec<String>,
-    main_class: String,
-}
-
-///
-/// Given a list of args that one would likely pass to a java call,
-/// we automatically split it to generate two argument lists:
-///  - nailgun arguments: The list of arguments needed to start the nailgun server.
-///    These arguments include everything in the arg list up to (but not including) the main class.
-///    These arguments represent roughly JVM options (-Xmx...), and the classpath (-cp ...).
-///
-///  - client arguments: The list of arguments that will be used to run the jvm program under nailgun.
-///    These arguments can be thought of as "passthrough args" that are sent to the jvm via the nailgun client.
-///    These arguments include everything starting from the main class.
-///
-/// We assume that:
-///  - Every args list has a main class.
-///  - There is exactly one argument that doesn't begin with a `-` in the command line before the main class,
-///    and it's the value of the classpath (i.e. `-cp scala-library.jar`).
-///
-/// We think these assumptions are valid as per: https://github.com/pantsbuild/pants/issues/8387
-///
-fn split_args(args: &Vec<String>) -> ParsedJVMCommandLines {
-    let mut nailgun_args = vec![];
-    let mut client_args = vec![];
-    let mut main_class = "".to_string();
-    let mut have_seen_classpath = false;
-    let mut have_processed_classpath = false;
-    let mut have_seen_main_class = false;
-    for arg in args {
-        if have_seen_main_class {
-            // Arguments to pass to the client request
-            client_args.push(arg.clone());
-        } else if (arg == "-cp" || arg == "-classpath") && !have_seen_classpath {
-            // Process the -cp flag itself
-            have_seen_classpath = true;
-            nailgun_args.push(arg.clone());
-        } else if have_seen_classpath && !have_processed_classpath {
-            // Process the classpath string
-            nailgun_args.push(arg.clone());
-            have_processed_classpath = true;
-        } else if have_processed_classpath && !arg.starts_with("-") {
-            // Process the main class:
-            // I have already seen the value of the -cp classpath, and this is not a flag.
-            main_class = arg.clone();
-            have_seen_main_class = true;
-        } else {
-            // Process the rest (jvm options to pass to nailgun)
-            nailgun_args.push(arg.clone());
-        }
-    }
-    ParsedJVMCommandLines {
-        nailgun_args: nailgun_args,
-        client_args: client_args,
-        main_class: main_class,
-    }
-}
 
 // TODO(8481) The input_files arg should be calculated from deeply fingerprinting the classpath.
 fn get_nailgun_request(args: Vec<String>, _input_files: Digest, jdk: Option<PathBuf>, platform: Platform) -> ExecuteProcessRequest {
@@ -199,6 +138,10 @@ impl super::CommandRunner for NailgunCommandRunner {
         req: MultiPlatformExecuteProcessRequest,
         context: Context) -> BoxFuture<FallibleExecuteProcessResult, String> {
 
+        let nailgun_pool = self.nailgun_pool.clone();
+        let inner = self.inner.clone();
+        let python_distribution = self.get_python_distribution();
+
         let mut client_req = self.extract_compatible_request(&req).unwrap();
 
         if !client_req.is_nailgunnable {
@@ -208,18 +151,15 @@ impl super::CommandRunner for NailgunCommandRunner {
         debug!("Running request under nailgun:\n {:#?}", &client_req);
 
         // Separate argument lists, to form distinct EPRs for (1) starting the nailgun server and (2) running the client in it.
-        let ParsedJVMCommandLines {nailgun_args, client_args, main_class } = split_args(&client_req.argv);
+        let ParsedJVMCommandLines { nailgun_args, client_args, client_main_class } = ParsedJVMCommandLines::parse_command_lines(&client_req.argv).expect("Error parsing command lines!!");
         let nailgun_req = get_nailgun_request(nailgun_args, client_req.input_files, client_req.jdk_home.clone(), client_req.target_platform);
         trace!("Extracted nailgun request:\n {:#?}", &nailgun_req);
 
         let nailgun_req_digest = crate::digest(MultiPlatformExecuteProcessRequest::from(nailgun_req.clone()), &self.metadata);
 
-        let nailgun_name = NailgunCommandRunner::calculate_nailgun_name(&main_class, &nailgun_req_digest);
+        let nailgun_name = NailgunCommandRunner::calculate_nailgun_name(&client_main_class, &nailgun_req_digest);
         let nailgun_name2 = nailgun_name.clone();
         let nailgun_name3 = nailgun_name.clone();
-        let nailgun_pool = self.nailgun_pool.clone();
-        let inner = self.inner.clone();
-        let python_distribution = self.get_python_distribution();
 
         let workdir_for_this_nailgun = try_future!(self.get_nailguns_workdir(&nailgun_name));
         let workdir_for_this_nailgun1 = workdir_for_this_nailgun.clone();
@@ -240,7 +180,7 @@ impl super::CommandRunner for NailgunCommandRunner {
                             NG_CLIENT_PATH.to_string(),
                             "--".to_string(),
                         ];
-                        client_req.argv.push(main_class);
+                        client_req.argv.push(client_main_class);
                         client_req.argv.extend(client_args);
                         client_req.jdk_home = None;
                         client_req.env.insert("NAILGUN_PORT".into(), nailgun_port.to_string());
