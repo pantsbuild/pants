@@ -4,12 +4,14 @@
 import os
 from collections import defaultdict
 
-from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
+from pants.backend.jvm.tasks.classpath_products import ClasspathEntry, ClasspathProducts
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
+from pants.engine.fs import Digest, PathGlobs, PathGlobsAndRoot
 from pants.goal.products import MultipleRootedProducts
 from pants.util.contextutil import pushd
-from pants.util.dirutil import absolute_symlink
+from pants.util.dirutil import absolute_symlink, fast_relpath
 
 from pants.contrib.node.tasks.node_paths import NodePaths
 from pants.contrib.node.tasks.node_task import NodeTask
@@ -17,6 +19,17 @@ from pants.contrib.node.tasks.node_task import NodeTask
 
 class NodeBuild(NodeTask):
   """Create an archive bundle of NodeModule targets."""
+
+  def _snapshotted_classpath(self, results_dir):
+    relpath = fast_relpath(results_dir, get_buildroot())
+    classes_dir_snapshot, = self.context._scheduler.capture_snapshots([
+      PathGlobsAndRoot(
+        PathGlobs([relpath]),
+        get_buildroot(),
+        Digest.load(relpath),
+      ),
+    ])
+    return ClasspathEntry(relpath, classes_dir_snapshot.directory_digest)
 
   @classmethod
   def product_types(cls):
@@ -91,4 +104,7 @@ class NodeBuild(NodeTask):
                   target.address.reference(), target.payload.build_script, output_dir))
             absolute_symlink(output_dir, os.path.join(vt.results_dir, target.address.target_name))
             bundleable_js_product[target].add_abs_paths(output_dir, [output_dir])
-            runtime_classpath.add_for_target(target, [('default', vt.results_dir)])
+
+            runtime_classpath.add_for_target(
+              target,
+              [('default', self._snapshotted_classpath(vt.results_dir))])
