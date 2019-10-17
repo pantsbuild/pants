@@ -28,11 +28,6 @@ class ReverseDepmap(ConsoleTask):
 
     self._closed = self.get_options().closed
 
-  @classproperty
-  def _register_console_transitivity_option(cls):
-    """This class does not use the targets provided as input!"""
-    return False
-
   def console_output(self, _):
     dependees_by_target = defaultdict(set)
     for address in self.context.build_graph.inject_specs_closure([DescendantAddresses('')]):
