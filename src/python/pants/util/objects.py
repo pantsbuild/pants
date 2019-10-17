@@ -1,12 +1,9 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import re
 from abc import ABC, abstractmethod
 from collections import OrderedDict, namedtuple
 from collections.abc import Iterable
-
-from twitter.common.collections import OrderedSet
 
 from pants.util.memo import memoized_classproperty
 from pants.util.meta import classproperty

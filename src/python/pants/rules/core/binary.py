@@ -2,17 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Any
 
-from pants.backend.python.rules.pex import Pex
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, LineOriented
 from pants.engine.legacy.graph import HydratedTarget
-from pants.engine.legacy.structs import PythonBinaryAdaptor
-from pants.engine.rules import console_rule, optionable_rule, rule, union
+from pants.engine.rules import console_rule, rule, union
 from pants.engine.selectors import Get
 
 

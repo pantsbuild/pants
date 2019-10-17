@@ -29,7 +29,7 @@ from pants.rules.core.fmt import FmtResult, FmtTarget
 # containing python files so we can have one single type used as an input in the run_black rule.
 @dataclass(frozen=True)
 class FormattablePythonTarget:
-    target: Any
+  target: Any
 
 
 @rule
@@ -92,6 +92,7 @@ def run_black(
     stdout=result.stdout.decode(),
     stderr=result.stderr.decode(),
   )
+
 
 # TODO: remove this workaround once https://github.com/pantsbuild/pants/issues/8343 is addressed
 @rule
