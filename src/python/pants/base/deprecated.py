@@ -6,6 +6,7 @@ import sys
 import warnings
 from contextlib import contextmanager
 from functools import wraps
+from typing import Callable, Iterator, Optional
 
 from packaging.version import InvalidVersion, Version
 
@@ -47,21 +48,22 @@ class BadDecoratorNestingError(DeprecationApplicationError):
   """Indicates the @deprecated decorator was innermost in a sequence of layered decorators."""
 
 
-def get_deprecated_tense(removal_version, future_tense='will be', past_tense='was'):
+def get_deprecated_tense(
+  removal_version: str, future_tense: str = 'will be', past_tense: str = 'was'
+) -> str:
   """Provides the grammatical tense for a given deprecated version vs the current version."""
   return future_tense if (Version(removal_version) >= PANTS_SEMVER) else past_tense
 
 
 @memoized_method
-def validate_deprecation_semver(version_string, version_description):
+def validate_deprecation_semver(version_string: str, version_description: str) -> Version:
   """Validates that version_string is a valid semver.
 
   If so, returns that semver.  Raises an error otherwise.
 
-  :param str version_string: A pantsbuild.pants version which affects some deprecated entity.
-  :param str version_description: A string used in exception messages to describe what the
-                                  `version_string` represents.
-  :rtype: `packaging.version.Version`
+  :param version_string: A pantsbuild.pants version which affects some deprecated entity.
+  :param version_description: A string used in exception messages to describe what the
+                              `version_string` represents.
   :raises DeprecationApplicationError: if the version_string parameter is invalid.
   """
   if version_string is None:
@@ -85,7 +87,7 @@ def validate_deprecation_semver(version_string, version_description):
                                  '{}'.format(version_description, version_string, e))
 
 
-def _get_frame_info(stacklevel, context=1):
+def _get_frame_info(stacklevel: int, context: int = 1) -> inspect.FrameInfo:
   """Get a Traceback for the given `stacklevel`.
 
   For example:
@@ -102,7 +104,7 @@ def _get_frame_info(stacklevel, context=1):
 
 
 @contextmanager
-def _greater_warnings_context(context_lines_string):
+def _greater_warnings_context(context_lines_string: str) -> Iterator[None]:
   """Provide the `line` argument to warnings.showwarning().
 
   warnings.warn_explicit() doesn't use the `line` argument to showwarning(), but we want to
@@ -110,6 +112,7 @@ def _greater_warnings_context(context_lines_string):
   showwarning() method to pipe in the desired amount of context lines when using warn_explicit().
   """
   prev_showwarning = warnings.showwarning
+
   def wrapped(message, category, filename, lineno, file=None, line=None):
     return prev_showwarning(
       message=message,
@@ -124,29 +127,35 @@ def _greater_warnings_context(context_lines_string):
 
 
 # TODO: propagate `deprecation_start_version` to other methods in this file!
-def warn_or_error(removal_version, deprecated_entity_description, hint=None,
-                  deprecation_start_version=None,
-                  stacklevel=3, frame_info=None, context=1, ensure_stderr=False):
+def warn_or_error(
+  removal_version: str,
+  deprecated_entity_description: str,
+  hint: Optional[str] = None,
+  deprecation_start_version: Optional[str] = None,
+  stacklevel: int = 3,
+  frame_info: Optional[inspect.FrameInfo] = None,
+  context: int = 1,
+  ensure_stderr: bool = False
+) -> None:
   """Check the removal_version against the current pants version.
 
   Issues a warning if the removal version is > current pants version, or an error otherwise.
 
-  :param string removal_version: The pantsbuild.pants version at which the deprecated entity
-                                 will be/was removed.
-  :param string deprecated_entity_description: A short description of the deprecated entity, that
-                                            we can embed in warning/error messages.
-  :param string hint: A message describing how to migrate from the removed entity.
-  :param string deprecation_start_version: The pantsbuild.pants version at which the entity will
-                                           begin to display a deprecation warning. This must be less
-                                           than the `removal_version`. If not provided, the
-                                           deprecation warning is always displayed.
-  :param int stacklevel: The stacklevel to pass to warnings.warn.
-  :param FrameInfo frame_info: If provided, use this frame info instead of getting one from
-                               `stacklevel`.
-  :param int context: The number of lines of source code surrounding the selected frame to display
-                      in a warning message.
-  :param bool ensure_stderr: Whether use warnings.warn, or use warnings.showwarning to print
-                             directly to stderr.
+  :param removal_version: The pantsbuild.pants version at which the deprecated entity will
+                          be/was removed.
+  :param deprecated_entity_description: A short description of the deprecated entity, that
+                                        we can embed in warning/error messages.
+  :param hint: A message describing how to migrate from the removed entity.
+  :param deprecation_start_version: The pantsbuild.pants version at which the entity will
+                                    begin to display a deprecation warning. This must be less
+                                    than the `removal_version`. If not provided, the
+                                    deprecation warning is always displayed.
+  :param stacklevel: The stacklevel to pass to warnings.warn.
+  :param frame_info: If provided, use this frame info instead of getting one from `stacklevel`.
+  :param context: The number of lines of source code surrounding the selected frame to display
+                  in a warning message.
+  :param ensure_stderr: Whether use warnings.warn, or use warnings.showwarning to print
+                        directly to stderr.
   :raises DeprecationApplicationError: if the removal_version parameter is invalid.
   :raises CodeRemovedError: if the current version is later than the version marked for removal.
   """
@@ -192,26 +201,28 @@ def warn_or_error(removal_version, deprecated_entity_description, hint=None,
           category=DeprecationWarning,
           filename=filename,
           lineno=line_number)
-    return msg
+    return
   else:
     raise CodeRemovedError(msg)
 
 
-def deprecated_conditional(predicate,
-                           removal_version,
-                           entity_description,
-                           hint_message=None,
-                           stacklevel=4):
+def deprecated_conditional(
+  predicate: Callable[[], bool],
+  removal_version: str,
+  entity_description: str,
+  hint_message: Optional[str] = None,
+  stacklevel: int = 4
+) -> None:
   """Marks a certain configuration as deprecated.
 
   The predicate is used to determine if that configuration is deprecated. It is a function that
   will be called, if true, then the deprecation warning will issue.
 
-  :param () -> bool predicate: A function that returns True if the deprecation warning should be on.
-  :param string removal_version: The pants version which will remove the deprecated functionality.
-  :param string entity_description: A description of the deprecated entity.
-  :param string hint_message: An optional hint pointing to alternatives to the deprecation.
-  :param int stacklevel: How far up in the stack do we go to find the calling fn to report
+  :param predicate: A function that returns True if the deprecation warning should be on.
+  :param removal_version: The pants version which will remove the deprecated functionality.
+  :param entity_description: A description of the deprecated entity.
+  :param hint_message: An optional hint pointing to alternatives to the deprecation.
+  :param stacklevel: How far up in the stack do we go to find the calling fn to report
   :raises DeprecationApplicationError if the deprecation is applied improperly.
   """
   validate_deprecation_semver(removal_version, 'removal version')
@@ -219,7 +230,12 @@ def deprecated_conditional(predicate,
     warn_or_error(removal_version, entity_description, hint_message, stacklevel=stacklevel)
 
 
-def deprecated(removal_version, hint_message=None, subject=None, ensure_stderr=False):
+def deprecated(
+  removal_version: str,
+  hint_message: Optional[str] = None,
+  subject: Optional[str] = None,
+  ensure_stderr: bool = False
+):
   """Marks a function or method as deprecated.
 
   A removal version must be supplied and it must be greater than the current 'pantsbuild.pants'
@@ -232,15 +248,16 @@ def deprecated(removal_version, hint_message=None, subject=None, ensure_stderr=F
   effecting BUILD files), lean towards the next release version as the removal version; otherwise,
   consider initiating a discussion to win consensus on a reasonable removal version.
 
-  :param str removal_version: The pantsbuild.pants version which will remove the deprecated
+  :param removal_version: The pantsbuild.pants version which will remove the deprecated
                               function.
-  :param str hint_message: An optional hint pointing to alternatives to the deprecation.
-  :param str subject: The name of the subject that has been deprecated for logging clarity. Defaults
+  :param hint_message: An optional hint pointing to alternatives to the deprecation.
+  :param subject: The name of the subject that has been deprecated for logging clarity. Defaults
                       to the name of the decorated function/method.
-  :param bool ensure_stderr: Forwarded to `ensure_stderr` in warn_or_error().
+  :param ensure_stderr: Forwarded to `ensure_stderr` in warn_or_error().
   :raises DeprecationApplicationError if the @deprecation is applied improperly.
   """
   validate_deprecation_semver(removal_version, 'removal version')
+
   def decorator(func):
     if not inspect.isfunction(func):
       raise BadDecoratorNestingError('The @deprecated decorator must be applied innermost of all '
@@ -257,7 +274,7 @@ def deprecated(removal_version, hint_message=None, subject=None, ensure_stderr=F
   return decorator
 
 
-def deprecated_module(removal_version, hint_message=None):
+def deprecated_module(removal_version: str, hint_message: Optional[str] = None) -> None:
   """Marks an entire module as deprecated.
 
   Add a call to this at the top of the deprecated module, and it will print a warning message
