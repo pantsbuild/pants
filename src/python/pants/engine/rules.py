@@ -511,7 +511,7 @@ class TaskRule(Rule):
 
   @property
   def output_type(self):
-      return self._output_type
+    return self._output_type
 
   @property
   def dependency_rules(self):

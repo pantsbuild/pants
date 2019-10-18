@@ -4,11 +4,9 @@
 import copy
 import pickle
 from abc import abstractmethod
-from collections import OrderedDict
 from textwrap import dedent
 
 from pants.util.objects import (
-  EnumVariantSelectionError,
   Exactly,
   HashableTypedCollection,
   SubclassesOf,
@@ -18,7 +16,6 @@ from pants.util.objects import (
   TypedCollection,
   TypedDatatypeInstanceConstructionError,
   datatype,
-  enum,
 )
 from pants_test.test_base import TestBase
 
@@ -325,9 +322,6 @@ class CamelCaseWrapper(datatype([('nonneg_int', NonNegativeInt)])): pass
 class ReturnsNotImplemented:
   def __eq__(self, other):
     return NotImplemented
-
-
-class SomeEnum(enum([1, 2])): pass
 
 
 class DatatypeTest(TestBase):
@@ -652,92 +646,3 @@ field 'dependencies' was invalid: in wrapped constraint TypedCollection(Exactly(
 field 'elements' was invalid: value 3 (with type 'int') must satisfy this type constraint: Exactly(list).""")
     with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
       obj.copy(elements=3)
-
-  def test_enum_class_creation_errors(self):
-    expected_msg = (
-      "When converting all_values ([1, 2, 3, 1]) to a set, at least one duplicate "
-      "was detected. The unique elements of all_values were: [1, 2, 3].")
-    with self.assertRaisesWithMessage(ValueError, expected_msg):
-      class DuplicateAllowedValues(enum([1, 2, 3, 1])): pass
-
-  def test_enum_instance_creation(self):
-    self.assertEqual(2, SomeEnum(2).value)
-    self.assertEqual(SomeEnum(2), SomeEnum(value=2))
-
-    expected_msg = (
-      "type check error in class SomeEnum: Value 3 must be one of: [1, 2].")
-    with self.assertRaisesWithMessage(EnumVariantSelectionError, expected_msg):
-      SomeEnum(3)
-
-  def test_enum_generated_attrs(self):
-    class HasAttrs(enum(['a', 'b'])): pass
-    self.assertEqual(HasAttrs.a, HasAttrs('a'))
-    self.assertEqual(type(HasAttrs.a), HasAttrs)
-    self.assertEqual(HasAttrs.b, HasAttrs('b'))
-
-  def test_enum_comparison(self):
-    enum_instance = SomeEnum(1)
-    another_enum_instance = SomeEnum(2)
-    self.assertEqual(enum_instance, enum_instance)
-    self.assertNotEqual(enum_instance, another_enum_instance)
-
-    # Test that comparison fails against another type.
-    expected_msg = (
-      "type check error in class SomeEnum: when comparing SomeEnum(value=1) against 1 with type 'int': "
-      "enum equality is only defined for instances of the same enum class!")
-    with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
-      enum_instance == 1
-    with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
-      1 == enum_instance
-
-    class StrEnum(enum(['a'])): pass
-    enum_instance = StrEnum('a')
-    expected_msg = (
-      "type check error in class StrEnum: when comparing StrEnum(value='a') against 'a' with type 'str': "
-      "enum equality is only defined for instances of the same enum class!")
-    with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
-      enum_instance == 'a'
-    with self.assertRaisesWithMessage(TypeCheckError, expected_msg):
-      'a' == enum_instance
-
-  def test_enum_resolve_variant(self):
-    one_enum_instance = SomeEnum(1)
-    two_enum_instance = SomeEnum(2)
-    self.assertEqual(3, one_enum_instance.resolve_for_enum_variant({
-      1: 3,
-      2: 4,
-    }))
-    self.assertEqual(4, two_enum_instance.resolve_for_enum_variant({
-      1: 3,
-      2: 4,
-    }))
-
-    # Test that an unrecognized variant raises an error.
-    with self.assertRaisesWithMessage(EnumVariantSelectionError, """\
-type check error in class SomeEnum: pattern matching must have exactly the keys [1, 2] (was: [1, 2, 3])"""):
-      one_enum_instance.resolve_for_enum_variant({
-        1: 3,
-        2: 4,
-        3: 5,
-      })
-
-    # Test that not providing all the variants raises an error.
-    with self.assertRaisesWithMessage(EnumVariantSelectionError, """\
-type check error in class SomeEnum: pattern matching must have exactly the keys [1, 2] (was: [1])"""):
-      one_enum_instance.resolve_for_enum_variant({
-        1: 3,
-      })
-
-    # Test that the ordering of the values in the enum constructor is not relevant for testing
-    # whether all variants are provided.
-    class OutOfOrderEnum(enum([2, 1, 3])): pass
-    two_out_of_order_instance = OutOfOrderEnum(2)
-    # This OrderedDict mapping is in a different order than in the enum constructor. This test means
-    # we can rely on providing simply a literal dict to resolve_for_enum_variant() and not worry
-    # that the dict ordering will cause an error.
-    letter = two_out_of_order_instance.resolve_for_enum_variant(OrderedDict([
-      (1, 'b'),
-      (2, 'a'),
-      (3, 'c'),
-    ]))
-    self.assertEqual(letter, 'a')

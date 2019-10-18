@@ -12,18 +12,17 @@ from contextlib import contextmanager
 from pants.scm.scm import Scm
 from pants.util.contextutil import pushd
 from pants.util.memo import memoized_method
-from pants.util.strutil import ensure_binary, ensure_text
+from pants.util.strutil import ensure_text
 
 
 # 40 is Linux's hard-coded limit for total symlinks followed when resolving a path.
 MAX_SYMLINKS_IN_REALPATH = 40
 GIT_HASH_LENGTH = 20
-# Precompute these because ensure_binary is slow and we'll need them a lot
-SLASH = ensure_binary('/')
-NUL = ensure_binary('\0')
-SPACE = ensure_binary(' ')
-NEWLINE = ensure_binary('\n')
-EMPTY_STRING = ensure_binary("")
+
+NUL = b'\0'
+SPACE = b' '
+NEWLINE = b'\n'
+EMPTY_STRING = b""
 
 
 logger = logging.getLogger(__name__)

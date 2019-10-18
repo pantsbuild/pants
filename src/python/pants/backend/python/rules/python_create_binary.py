@@ -6,7 +6,6 @@ from pants.backend.python.rules.pex import CreatePex, Pex, PexInterpreterContrai
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.engine.fs import Digest, DirectoriesToMerge
-from pants.engine.isolated_process import ExecuteProcessRequest, FallibleExecuteProcessResult
 from pants.engine.legacy.graph import BuildFileAddresses, HydratedTarget, TransitiveHydratedTargets
 from pants.engine.legacy.structs import PythonBinaryAdaptor
 from pants.engine.rules import UnionRule, rule

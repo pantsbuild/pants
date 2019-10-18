@@ -13,12 +13,12 @@ from pants.version import VERSION as _VERSION
 logger = logging.getLogger(__name__)
 
 
-def pants_version():
+def pants_version() -> str:
   """Returns the pants semantic version number as a string: http://semver.org/"""
   return _VERSION
 
 
-def pants_release():
+def pants_release() -> str:
   """Returns a user-friendly release label."""
   return ('Pants {version} https://pypi.org/pypi/pantsbuild.pants/{version}'
           .format(version=pants_version()))
@@ -32,7 +32,7 @@ def get_buildroot() -> str:
   return BuildRoot().path
 
 
-def get_pants_cachedir():
+def get_pants_cachedir() -> str:
   """Return the pants global cache directory."""
   # Follow the unix XDB base spec: http://standards.freedesktop.org/basedir-spec/latest/index.html.
   cache_home = os.environ.get('XDG_CACHE_HOME')
@@ -41,7 +41,7 @@ def get_pants_cachedir():
   return os.path.expanduser(os.path.join(cache_home, 'pants'))
 
 
-def get_pants_configdir():
+def get_pants_configdir() -> str:
   """Return the pants global config directory."""
   # Follow the unix XDB base spec: http://standards.freedesktop.org/basedir-spec/latest/index.html.
   config_home = os.environ.get('XDG_CONFIG_HOME')

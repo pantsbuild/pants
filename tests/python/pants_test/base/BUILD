@@ -7,8 +7,8 @@ python_tests(
   dependencies = [
     'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:fileutil',
-  ]
+  ],
+  tags = {"type_checked"},
 )
 
 python_tests(
@@ -66,7 +66,7 @@ python_tests(
     'src/python/pants/util:collections',
     'src/python/pants:version',
     'tests/python/pants_test:test_base',
-  ]
+  ],
 )
 
 python_tests(

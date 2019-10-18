@@ -4,6 +4,7 @@
 import os
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator, Optional
 
 from pants.util.meta import SingletonMetaclass
 
@@ -36,10 +37,10 @@ class BuildRoot(metaclass=SingletonMetaclass):
     return str(buildroot)
 
   def __init__(self) -> None:
-    self._root_dir = None
+    self._root_dir: Optional[str] = None
 
   @property
-  def path(self):
+  def path(self) -> str:
     """Returns the build root for the current workspace."""
     if self._root_dir is None:
       # This env variable is for testing purpose.
@@ -51,22 +52,22 @@ class BuildRoot(metaclass=SingletonMetaclass):
     return self._root_dir
 
   @path.setter
-  def path(self, root_dir):
+  def path(self, root_dir: str) -> None:
     """Manually establishes the build root for the current workspace."""
     path = os.path.realpath(root_dir)
     if not os.path.exists(path):
       raise ValueError(f'Build root does not exist: {root_dir}')
     self._root_dir = path
 
-  def reset(self):
+  def reset(self) -> None:
     """Clears the last calculated build root for the current workspace."""
     self._root_dir = None
 
-  def __str__(self):
+  def __str__(self) -> str:
     return f'BuildRoot({self._root_dir})'
 
   @contextmanager
-  def temporary(self, path):
+  def temporary(self, path: str) -> Iterator[None]:
     """Establishes a temporary build root, restoring the prior build root on exit."""
     if path is None:
       raise ValueError('Can only temporarily establish a build root given a path.')

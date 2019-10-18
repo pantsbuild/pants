@@ -23,7 +23,7 @@ python_library(
     'src/python/pants/util:osutil',
     'src/python/pants/util:socket',
     'src/python/pants/util:strutil',
-  ]
+  ],
 )
 
 python_library(

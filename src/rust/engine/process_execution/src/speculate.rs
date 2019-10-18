@@ -3,7 +3,8 @@ use crate::{
   MultiPlatformExecuteProcessRequest,
 };
 use boxfuture::{BoxFuture, Boxable};
-use futures::future::{err, ok, Future};
+use futures::future::{err, ok, Either, Future};
+use log::{debug, trace};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio_timer::Delay;
@@ -33,19 +34,50 @@ impl SpeculatingCommandRunner {
     req: MultiPlatformExecuteProcessRequest,
     context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
-    let command_runner = self.clone();
-    let req_2 = req.clone();
     let delay = Delay::new(Instant::now() + self.speculation_timeout);
+    let req2 = req.clone();
+    trace!(
+      "Primary command runner queue length: {:?}",
+      self.primary.num_waiters()
+    );
     self
       .primary
       .run(req, context.clone())
-      .select(delay.then(move |_| command_runner.secondary.run(req_2, context)))
+      .select2({
+        let command_runner = self.clone();
+        delay.then(move |_| {
+          trace!(
+            "Secondary command runner queue length: {:?}",
+            command_runner.secondary.num_waiters()
+          );
+          command_runner.secondary.run(req2, context)
+        })
+      })
       .then(|raced_result| match raced_result {
-        Ok((successful_res, _outstanding_req)) => {
-          ok::<FallibleExecuteProcessResult, String>(successful_res).to_boxed()
+        Ok(either_success) => {
+          // .split() takes out the homogeneous success type for either primary or
+          // secondary successes.
+          ok::<FallibleExecuteProcessResult, String>(either_success.split().0).to_boxed()
         }
-        Err((failed_res, _outstanding_req)) => {
-          err::<FallibleExecuteProcessResult, String>(failed_res).to_boxed()
+        Err(Either::A((failed_primary_res, _))) => {
+          debug!("primary request FAILED, aborting");
+          err::<FallibleExecuteProcessResult, String>(failed_primary_res).to_boxed()
+        }
+        // We handle the case of the secondary failing specially. We only want to show
+        // a failure to the user if the primary execution source fails. This maintains
+        // feel between speculation on and off states.
+        Err(Either::B((_failed_secondary_res, outstanding_primary_request))) => {
+          debug!("secondary request FAILED, waiting for primary!");
+          outstanding_primary_request
+            .then(|primary_result| {
+              if primary_result.is_ok() {
+                debug!("primary request eventually SUCCEEDED after secondary failed");
+              } else {
+                debug!("primary request eventually FAILED after secondary failed");
+              }
+              primary_result
+            })
+            .to_boxed()
         }
       })
       .to_boxed()
@@ -152,12 +184,12 @@ mod tests {
   }
 
   #[test]
-  fn second_req_fast_fail() {
+  fn only_fail_on_primary_result() {
     let (result, call_counter, finished_counter) =
       run_speculation_test(1000, 0, 100, true, true, true, true);
     assert_eq![2, *call_counter.lock().unwrap()];
-    assert_eq![1, *finished_counter.lock().unwrap()];
-    assert_eq![result.unwrap_err(), Bytes::from("m2")]
+    assert_eq![2, *finished_counter.lock().unwrap()];
+    assert_eq![result.unwrap_err(), Bytes::from("m1")]
   }
 
   #[test]
