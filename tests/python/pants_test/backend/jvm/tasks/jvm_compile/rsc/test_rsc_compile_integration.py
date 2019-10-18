@@ -52,10 +52,15 @@ class RscCompileIntegration(BaseCompileIT):
   def test_java_sources(self):
     self.do_command('compile', 'testprojects/src/scala/org/pantsbuild/testproject/javasources')
 
-  @ensure_compile_rsc_execution_strategy
   def test_rsc_hermetic_jvm_options(self):
     pants_run = self.run_pants(['compile', 'examples/src/scala/org/pantsbuild/example/hello/exe'],
       config={
+        'cache.compile.rsc': {'ignore': True},
+        'jvm-platform': {'compiler': 'rsc'},
+        'compile.rsc': {
+          'workflow': 'rsc-and-zinc',
+          'execution_strategy': 'hermetic',
+        },
         'rsc': {
           'jvm_options': [
             '-Djava.security.manager=java.util.Optional'
