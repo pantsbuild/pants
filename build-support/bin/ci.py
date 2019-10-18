@@ -303,7 +303,7 @@ def bootstrap(*, clean: bool, python_version: PythonVersion) -> None:
     try:
       subprocess.run(["./build-support/bin/bootstrap_pants_pex.sh"], check=True)
     except subprocess.CalledProcessError as e:
-      die(elaborate_die_message("Failed to bootstrap Pants.", e)
+      die(elaborate_die_message("Failed to bootstrap Pants.", e))
 
 
 def check_pants_pex_exists() -> None:
@@ -320,7 +320,7 @@ def check_pants_pex_exists() -> None:
 PYTEST_PASSTHRU_ARGS = ["--", "-q", "-rfa"]
 
 
-def elaborate_die_message(die_message: str, e: subprocess.CalledProcessError):
+def elaborate_die_message(die_message: str, e: subprocess.CalledProcessError) -> str:
   return f'{die_message}\n======== Details =========\n{e.output}'
 
 
