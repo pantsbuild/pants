@@ -329,7 +329,7 @@ def _run_command(
     try:
       subprocess.run(command, check=True)
     except subprocess.CalledProcessError as e:
-      die(die_message + '\n======== Details =========\n' + e.output)
+      die(f'{die_message}\n======== Details =========\n{e.output}')
 
 
 def run_githooks() -> None:
