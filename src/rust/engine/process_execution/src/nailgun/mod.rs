@@ -12,7 +12,7 @@ use boxfuture::{Boxable, BoxFuture, try_future};
 use hashing::Digest;
 
 use crate::{ExecuteProcessRequest, ExecuteProcessRequestMetadata, FallibleExecuteProcessResult, MultiPlatformExecuteProcessRequest, Platform, Context};
-use crate::nailgun::nailgun_pool::NailgunProcessName;
+use crate::nailgun::nailgun_pool::{NailgunProcessName, Port};
 
 pub mod nailgun_pool;
 mod parsed_jvm_command_lines;
@@ -20,11 +20,13 @@ mod parsed_jvm_command_lines;
 pub use nailgun_pool::NailgunPool;
 use workunit_store::WorkUnitStore;
 use parsed_jvm_command_lines::ParsedJVMCommandLines;
-use std::fs::{read_link, remove_dir_all, remove_file};
+use std::fs::{read_link, remove_file};
 
 // Hardcoded constants for connecting to nailgun
 static NAILGUN_MAIN_CLASS: &str = "com.martiansoftware.nailgun.NGServer";
 static ARGS_TO_START_NAILGUN: [&str; 1] = [":0"];
+
+static NAILGUN_PORT_ENV_VAR_FOR_CLIENT: &str = "NAILGUN_PORT";
 
 // We can hardcode this because we mix it into the digest in the EPR.
 // TODO(8480) This can go away when we port the fetching of the clients and servers to the rust stack.
@@ -53,6 +55,26 @@ fn construct_nailgun_server_request(args: Vec<String>, jdk: Option<PathBuf>, pla
         target_platform: platform,
         is_nailgunnable: true,
     }
+}
+
+fn construct_nailgun_client_request(
+    original_req: ExecuteProcessRequest,
+    python_distribution: String,
+    client_main_class: String,
+    client_args: Vec<String>,
+    nailgun_port: Port
+) -> ExecuteProcessRequest {
+    let mut client_req = original_req;
+    client_req.argv = vec![
+        python_distribution,
+        NG_CLIENT_PATH.to_string(),
+        "--".to_string(),
+    ];
+    client_req.argv.push(client_main_class);
+    client_req.argv.extend(client_args);
+    client_req.jdk_home = None;
+    client_req.env.insert(NAILGUN_PORT_ENV_VAR_FOR_CLIENT.into(), nailgun_port.to_string());
+    client_req
 }
 
 ///
@@ -96,62 +118,63 @@ impl NailgunCommandRunner {
         }
     }
 
-    fn calculate_nailgun_name(main_class: &String, digest: &Digest) -> String {
-        format!("{}_{}", main_class, digest.0)
+    fn calculate_nailgun_name(main_class: &String) -> String {
+        format!("nailgun_server_{}", main_class)
     }
 
     // TODO(8481) When we correctly set the input_files field of the nailgun EPR, we won't need to pass it here as an argument.
     // TODO(8489) We should move this code to NailgunPool. This returns a Future, so this will involve making the struct Futures-aware.
     fn materialize_workdir_for_server(
         &self,
-        nailgun_workdir: &PathBuf,
-        nailgun_request: &ExecuteProcessRequest,
+        workdir_for_server: PathBuf,
+        requested_jdk_home: Option<PathBuf>,
         input_files: Digest,
         workunit_store: WorkUnitStore
     ) -> BoxFuture<(), String> {
-        let requested_jdk_home = nailgun_request.jdk_home
-            .clone()
-            .expect("No JDK home specified.");
+        if requested_jdk_home.is_none() {
+            return futures::future::err(format!("No JDK specified when materializing the server directory")).to_boxed();
+        }
+        let requested_jdk_home = requested_jdk_home.unwrap();
         // Materialize the directory for running the nailgun server, if we need to.
-        let nailgun_workdir_path2 = nailgun_workdir.clone();
-        let nailgun_workdir_path3 = nailgun_workdir.clone();
-        let nailgun_workdir_path4 = nailgun_workdir.clone();
+        let workdir_for_server2 = workdir_for_server.clone();
+        let workdir_for_server3 = workdir_for_server.clone();
+        let workdir_for_server4 = workdir_for_server.clone();
+
         self.inner
             .store
             // TODO(8481) This materializes the input files in the client req, which is a superset of the files we need (we only need the classpath, not the input files)
-            .materialize_directory(nailgun_workdir.clone(), input_files, workunit_store)
+            .materialize_directory(workdir_for_server.clone(), input_files, workunit_store)
             .and_then(move |_metadata| {
-                let jdk_home_in_workdir = nailgun_workdir_path2.clone().join(".jdk");
+                let jdk_home_in_workdir = workdir_for_server2.clone().join(".jdk");
                 let jdk_home_in_workdir2 = jdk_home_in_workdir.clone();
                 let jdk_home_in_workdir3 = jdk_home_in_workdir.clone();
-                let jdk_home_in_workdir4 = jdk_home_in_workdir.clone();
                 if !jdk_home_in_workdir.exists() {
                     futures::future::result(
                         symlink(requested_jdk_home, jdk_home_in_workdir)
-                            .map_err(|err| format!("Error making symlink for local execution in workdir {:?}: {:?}", &nailgun_workdir_path2, err))
+                            .map_err(|err| format!("Error making new symlink for local execution in workdir {:?}: {:?}", &workdir_for_server2, err))
                     )
                 } else {
                     let maybe_existing_jdk = read_link(jdk_home_in_workdir).map_err(|e| format!("{}", e));
                     let maybe_existing_jdk2 = maybe_existing_jdk.clone();
                     if maybe_existing_jdk.is_err() || (maybe_existing_jdk.is_ok() && maybe_existing_jdk.unwrap() != requested_jdk_home) {
                         let res = remove_file(jdk_home_in_workdir2)
-                            .map_err(|e| format!(
-                                "Error removing existing (but incorrect) jdk symlink. We wanted it to point to {:?}, but it pointed to {:?}",
-                                &requested_jdk_home, &maybe_existing_jdk2
+                            .map_err(|err| format!(
+                                "Error removing existing (but incorrect) jdk symlink. We wanted it to point to {:?}, but it pointed to {:?}. {}",
+                                &requested_jdk_home, &maybe_existing_jdk2, err
                             ))
                             .and_then(|_| {
-                                symlink(requested_jdk_home, jdk_home_in_workdir4)
-                                    .map_err(|err| format!("Error making symlink for local execution in workdir {:?}: {:?}", &nailgun_workdir_path2, err))
+                                symlink(requested_jdk_home, jdk_home_in_workdir3)
+                                    .map_err(|err| format!("Error overwriting symlink for local execution in workdir {:?}: {:?}", &workdir_for_server2, err))
                             });
                         futures::future::result(res)
                     } else {
-                        debug!("JDK home for Nailgun already exists in {:?}. Using that one.", &nailgun_workdir_path4);
+                        debug!("JDK home for Nailgun already exists in {:?}. Using that one.", &workdir_for_server4);
                         futures::future::ok(())
                     }
                 }
-            })
-            .inspect(move |_| debug!("Materialized directory {:?} before connecting to nailgun server.", &nailgun_workdir_path3))
-            .to_boxed()
+        })
+        .inspect(move |_| debug!("Materialized directory {:?} before connecting to nailgun server.", &workdir_for_server3))
+        .to_boxed()
     }
 
     fn get_python_distribution(&self) -> String {
@@ -169,7 +192,7 @@ impl super::CommandRunner for NailgunCommandRunner {
         let inner = self.inner.clone();
         let python_distribution = self.get_python_distribution();
 
-        let mut client_req = self.extract_compatible_request(&req).unwrap();
+        let client_req = self.extract_compatible_request(&req).unwrap();
 
         if !client_req.is_nailgunnable {
             trace!("The request is not nailgunnable! Short-circuiting to regular process execution");
@@ -184,14 +207,14 @@ impl super::CommandRunner for NailgunCommandRunner {
 
         let nailgun_req_digest = crate::digest(MultiPlatformExecuteProcessRequest::from(nailgun_req.clone()), &self.metadata);
 
-        let nailgun_name = NailgunCommandRunner::calculate_nailgun_name(&client_main_class, &nailgun_req_digest);
+        let nailgun_name = NailgunCommandRunner::calculate_nailgun_name(&client_main_class);
         let nailgun_name2 = nailgun_name.clone();
         let nailgun_name3 = nailgun_name.clone();
 
         let workdir_for_this_nailgun = try_future!(self.get_nailguns_workdir(&nailgun_name));
         let workdir_for_this_nailgun1 = workdir_for_this_nailgun.clone();
 
-        self.materialize_workdir_for_server(&workdir_for_this_nailgun, &nailgun_req, client_req.input_files, context.workunit_store.clone())
+        self.materialize_workdir_for_server(workdir_for_this_nailgun.clone(), nailgun_req.jdk_home.clone(), client_req.input_files, context.workunit_store.clone())
             .and_then(move |_metadata| {
                 // Connect to a running nailgun.
                 nailgun_pool.connect(nailgun_name.clone(), nailgun_req, &workdir_for_this_nailgun1, nailgun_req_digest)
@@ -201,18 +224,7 @@ impl super::CommandRunner for NailgunCommandRunner {
                 // Run the client request in the nailgun we have active.
                 debug!("Got nailgun port {:#?}", nailgun_port);
                 let full_client_req =
-                    {
-                        client_req.argv = vec![
-                            python_distribution,
-                            NG_CLIENT_PATH.to_string(),
-                            "--".to_string(),
-                        ];
-                        client_req.argv.push(client_main_class);
-                        client_req.argv.extend(client_args);
-                        client_req.jdk_home = None;
-                        client_req.env.insert("NAILGUN_PORT".into(), nailgun_port.to_string());
-                        client_req
-                    };
+                    construct_nailgun_client_request(client_req, python_distribution, client_main_class, client_args, nailgun_port);
                 debug!("Running client request on nailgun {}", &nailgun_name2);
                 trace!("Client request: {:#?}", full_client_req);
                 inner.run(MultiPlatformExecuteProcessRequest::from(full_client_req), context)
@@ -229,11 +241,15 @@ impl super::CommandRunner for NailgunCommandRunner {
 
 #[cfg(test)]
 mod tests {
-    use crate::nailgun::NailgunCommandRunner;
+    use crate::nailgun::{NailgunCommandRunner, NAILGUN_MAIN_CLASS, ARGS_TO_START_NAILGUN, NAILGUN_PORT_ENV_VAR_FOR_CLIENT};
     use store::Store;
-    use tempfile::TempDir;
-    use crate::ExecuteProcessRequestMetadata;
+    use tempfile::{TempDir, NamedTempFile};
+    use crate::{ExecuteProcessRequestMetadata, Platform, ExecuteProcessRequest};
     use std::path::PathBuf;
+    use hashing::EMPTY_DIGEST;
+    use workunit_store::WorkUnitStore;
+    use std::fs::read_link;
+    use std::os::unix::fs::symlink;
 
     fn mock_nailgun_runner(workdir_base: Option<PathBuf>) -> NailgunCommandRunner {
         let store_dir = TempDir::new().unwrap();
@@ -269,9 +285,25 @@ mod tests {
             .expect("Error making tempdir for local process execution: {:?}")
     }
 
+    fn mock_nailgunnable_request(jdk_home: Option<PathBuf>) -> ExecuteProcessRequest {
+        ExecuteProcessRequest {
+            argv: vec![],
+            env: Default::default(),
+            input_files: EMPTY_DIGEST,
+            output_files: Default::default(),
+            output_directories: Default::default(),
+            timeout: Default::default(),
+            description: "".to_string(),
+            unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
+            jdk_home: jdk_home,
+            target_platform: Platform::Darwin,
+            is_nailgunnable: true
+        }
+    }
+
     #[test]
     fn get_workdir_creates_directory_if_it_doesnt_exist() {
-        let mock_workdir_base = unique_temp_dir(std::env::temp_dir(), None).into_path();
+        let mock_workdir_base = unique_temp_dir(std::env::temp_dir(), None).path().to_owned();
         let mock_nailgun_name = "mock_non_existing_workdir".to_string();
         let runner = mock_nailgun_runner(Some(mock_workdir_base.clone()));
 
@@ -284,7 +316,7 @@ mod tests {
 
     #[test]
     fn get_workdir_returns_the_workdir_when_it_exists() {
-        let mock_workdir_base = unique_temp_dir(std::env::temp_dir(), None).into_path();
+        let mock_workdir_base = unique_temp_dir(std::env::temp_dir(), None).path().to_owned();
         let mock_nailgun_name = "mock_existing_workdir".to_string();
         let runner = mock_nailgun_runner(Some(mock_workdir_base.clone()));
 
@@ -297,5 +329,112 @@ mod tests {
         let res = runner.get_nailguns_workdir(&mock_nailgun_name);
         assert_eq!(res, Ok(target_workdir.clone()));
         assert!(target_workdir.exists());
+    }
+
+    #[test]
+    fn creating_nailgun_server_request_updates_the_cli() {
+        let req = super::construct_nailgun_server_request(
+            Vec::new(),
+            None,
+            Platform::None,
+        );
+        assert_eq!(req.argv[0], NAILGUN_MAIN_CLASS);
+        assert_eq!(req.argv[1..], ARGS_TO_START_NAILGUN);
+    }
+
+    #[test]
+    fn creating_nailgun_client_request_inserts_port_as_an_env_var() {
+        let original_req = mock_nailgunnable_request(None);
+        let req = super::construct_nailgun_client_request(
+            original_req, "".to_string(), "".to_string(), vec![], 1234
+        );
+        assert_eq!(
+            req.env.get(NAILGUN_PORT_ENV_VAR_FOR_CLIENT),
+            Some(&String::from("1234"))
+        );
+    }
+
+    #[test]
+    fn creating_nailgun_client_request_removes_jdk_home() {
+        let original_req = mock_nailgunnable_request(Some(PathBuf::from("some/path")));
+        let req = super::construct_nailgun_client_request(
+            original_req, "".to_string(), "".to_string(), vec![], 1234
+        );
+        assert_eq!(
+            req.jdk_home,
+            None
+        );
+    }
+
+    #[test]
+    fn nailgun_name_is_the_main_class() {
+        let main_class = "my.main.class".to_string();
+        let name = super::NailgunCommandRunner::calculate_nailgun_name(&main_class);
+        assert_eq!(name, format!("nailgun_server_{}", main_class));
+    }
+
+    fn materialize_with_jdk(runner: &NailgunCommandRunner, dir: PathBuf, jdk_path: PathBuf) -> Result<(), String> {
+        let executor = task_executor::Executor::new();
+        let materializer = runner.materialize_workdir_for_server(
+            dir,
+            Some(jdk_path),
+            EMPTY_DIGEST,
+            WorkUnitStore::new(),
+        );
+        executor.block_on(materializer)
+    }
+
+    #[test]
+    fn materializing_workdir_for_server_creates_a_link_for_the_jdk() {
+        let workdir_base_tempdir = unique_temp_dir(std::env::temp_dir(), None);
+        let workdir_base = workdir_base_tempdir.path().to_owned();
+        let mock_jdk_path = unique_temp_file().path().to_owned();
+        let runner = mock_nailgun_runner(Some(workdir_base));
+        let nailgun_name = "mock_server".to_string();
+
+        let workdir_for_server = runner.get_nailguns_workdir(&nailgun_name).expect("Error creating workdir for nailgun server");
+        println!("Workdir for server {:?}", &workdir_for_server);
+
+        // Assert that the materialization was successful
+        let materialization_result = materialize_with_jdk(&runner, workdir_for_server.clone(), mock_jdk_path.clone());
+        assert_eq!(materialization_result, Ok(()));
+
+        // Assert that the symlink points to the requested jdk
+        let materialized_jdk_path = workdir_for_server.join(".jdk");
+        let materialized_jdk = read_link(materialized_jdk_path);
+        assert!(materialized_jdk.is_ok());
+        assert_eq!(materialized_jdk.unwrap(), mock_jdk_path);
+    }
+
+    #[test]
+    fn materializing_workdir_for_server_replaces_jdk_link_if_a_different_one_is_requested() {
+        let workdir_base_tempdir = unique_temp_dir(std::env::temp_dir(), None);
+        let workdir_base = workdir_base_tempdir.path().to_owned();
+
+        let _ = workdir_base_tempdir.into_path();
+
+        let runner = mock_nailgun_runner(Some(workdir_base));
+        let nailgun_name = "mock_server".to_string();
+
+        let original_mock_jdk_dir = unique_temp_dir(std::env::temp_dir(), None);
+        let original_mock_jdk_path = original_mock_jdk_dir.path().to_owned();
+        let requested_mock_jdk_dir = unique_temp_dir(std::env::temp_dir(), None);
+        let requested_mock_jdk_path = requested_mock_jdk_dir.path().to_owned();
+
+        let workdir_for_server = runner.get_nailguns_workdir(&nailgun_name).expect("Error creating workdir for nailgun server");
+        let materialized_jdk_path = workdir_for_server.join(".jdk");
+
+        // Manually create a symlink to one of the jdk files
+        let symlink_res = symlink(original_mock_jdk_path, materialized_jdk_path.clone());
+        assert!(symlink_res.is_ok());
+
+        // Trigger materialization of the nailgun server workdir
+        let materialization_result = materialize_with_jdk(&runner, workdir_for_server, requested_mock_jdk_path.clone());
+        assert!(materialization_result.is_ok());
+
+        // Assert that the symlink points to the requested jdk, and not the original one
+        let materialized_jdk = read_link(materialized_jdk_path);
+        assert!(materialized_jdk.is_ok());
+        assert_eq!(materialized_jdk.unwrap(), requested_mock_jdk_path);
     }
 }
