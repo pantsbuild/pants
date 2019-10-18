@@ -8,16 +8,11 @@ from pants.util.contextutil import environment_as
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 
 
-def _for_all_supported_execution_environments(func):
-  func._with_run_config = True
-  return func
-
-
 def ensure_compile_rsc_execution_strategy(f):
   """A decorator for running an integration test with ivy and coursier as the resolver."""
 
   def wrapper(self, *args, **kwargs):
-    for strategy in RscCompile.ExecutionStrategy.all_variants:
+    for strategy in RscCompile.ExecutionStrategy.all_values():
       with environment_as(
         HERMETIC_ENV='PANTS_COMPILE_RSC_EXECUTION_STRATEGY',
         PANTS_COMPILE_RSC_EXECUTION_STRATEGY=strategy.value,
@@ -25,7 +20,7 @@ def ensure_compile_rsc_execution_strategy(f):
         PANTS_CACHE_COMPILE_RSC_IGNORE='True'):
         f(self, *args, **kwargs)
 
-    return wrapper
+  return wrapper
 
 
 class RscCompileIntegration(BaseCompileIT):
