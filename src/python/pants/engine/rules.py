@@ -574,10 +574,6 @@ class RootRule(Rule):
 @dataclass(frozen=True)
 class RuleIndex:
   """Holds a normalized index of Rules used to instantiate Nodes."""
-  rules: Any
-  roots: Any
-  union_rules: Any
-
   rules: Dict[Any, Any]
   roots: Set[Any]
   union_rules: Dict[Any, Any]
