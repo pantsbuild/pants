@@ -6,16 +6,22 @@ import os
 from contextlib import contextmanager
 
 from pants.base.exceptions import TaskError
+from pants.task.target_restriction_mixins import HasTransitiveOptionMixin
 from pants.task.task import QuietTaskMixin, Task
 from pants.util.dirutil import safe_open
 from pants.util.meta import classproperty
 
 
-class ConsoleTask(QuietTaskMixin, Task):
+class ConsoleTask(QuietTaskMixin, HasTransitiveOptionMixin, Task):
   """A task whose only job is to print information to the console.
 
   ConsoleTasks are not intended to modify build state.
   """
+
+  @classproperty
+  def _register_console_transitivity_option(cls):
+    """Some tasks register their own --transitive option, which act differently."""
+    return True
 
   @classmethod
   def register_options(cls, register):
@@ -24,6 +30,10 @@ class ConsoleTask(QuietTaskMixin, Task):
              help='String to use to separate results.')
     register('--output-file', metavar='<path>',
              help='Write the console output to this file instead.')
+
+    if cls._register_console_transitivity_option:
+      register('--transitive', type=bool, default=True, fingerprint=True,
+               help='If True, use all targets in the build graph, else use only target roots.')
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
