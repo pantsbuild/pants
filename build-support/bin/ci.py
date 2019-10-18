@@ -256,17 +256,20 @@ class TestTargetSets(NamedTuple):
         return set()
       return {line.strip() for line in list_path.read_text().splitlines()}
 
-    all_targets = set(subprocess.run(
-      [
-        "./pants.pex",
-        f"--tag={'-' if test_type == TestType.unit else '+'}integration",
-        "filter",
-        "--type=python_tests",
-        "src/python::",
-        "tests/python::",
-        "contrib::",
-      ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8", check=True
-    ).stdout.strip().split("\n"))
+    try:
+      all_targets = set(subprocess.run(
+        [
+          "./pants.pex",
+          f"--tag={'-' if test_type == TestType.unit else '+'}integration",
+          "filter",
+          "--type=python_tests",
+          "src/python::",
+          "tests/python::",
+          "contrib::",
+        ], stdout=subprocess.PIPE, encoding="utf-8", check=True
+      ).stdout.strip().split("\n"))
+    except subprocess.CalledProcessError as e:
+      die(elaborate_die_message("filter targets failed", e))
 
     blacklisted_chroot_targets = get_listed_targets(f"{test_type}_chroot_blacklist.txt")
     blacklisted_v2_targets = get_listed_targets(f"{test_type}_v2_blacklist.txt")
