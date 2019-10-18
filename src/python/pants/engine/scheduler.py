@@ -22,7 +22,7 @@ from pants.engine.fs import (
 )
 from pants.engine.native import Function, TypeId
 from pants.engine.nodes import Return, Throw
-from pants.engine.objects import Collection
+from pants.engine.objects import Collection, union
 from pants.engine.rules import RuleIndex, TaskRule
 from pants.engine.selectors import Params
 from pants.util.contextutil import temporary_file_path
@@ -187,7 +187,7 @@ class Scheduler:
       self._native.lib.tasks_add_get(self._tasks, self._to_type(product), self._to_type(subject))
 
     for the_get in rule.input_gets:
-      if getattr(the_get.subject_declared_type, '_is_union', False):
+      if union.is_instance(the_get.subject_declared_type):
         # If the registered subject type is a union, add Get edges to all registered union members.
         for union_member in union_rules.get(the_get.subject_declared_type, []):
           add_get_edge(the_get.product, union_member)

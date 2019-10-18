@@ -122,6 +122,30 @@ def staticproperty(func: Callable[..., T]) -> T:
   return ClassPropertyDescriptor(func, doc)  # type: ignore[arg-type, return-value]
 
 
+class ClassDecoratorWithSentinelAttribute(Protocol):
+  sentinel_attribute: str
+
+  def __call__(self, cls: Type[T]) -> Type[T]: ...
+
+  def define_instance_of(self, obj: Type[T], **kwargs) -> Type[T]: ...
+
+  def is_instance(self, obj: Any) -> bool: ...
+
+
+def sentinel_attribute(attribute_name: str) -> Callable[[Callable[[Type[T]], Type[T]]], ClassDecoratorWithSentinelAttribute]:
+  def wrapper(func: Callable[[Type[T]], Type[T]]) -> ClassDecoratorWithSentinelAttribute:
+    ret = cast(ClassDecoratorWithSentinelAttribute, func)
+    ret.sentinel_attribute = attribute_name
+    ret.is_instance = lambda obj: hasattr(obj, ret.sentinel_attribute) # type: ignore
+    ret.define_instance_of = lambda obj, **kwargs: type(obj.__name__, (obj,), { # type: ignore
+      ret.sentinel_attribute: True,
+      **kwargs
+    })
+    return ret
+  return wrapper
+
+
+@sentinel_attribute('_frozen_after_init')
 def frozen_after_init(cls: C) -> C:
   """Class decorator to freeze any modifications to the object after __init__() is done.
 
@@ -146,6 +170,7 @@ def frozen_after_init(cls: C) -> C:
       )
     prev_setattr(self, key, value)  # type: ignore[call-arg]
 
-  cls.__init__ = new_init
-  cls.__setattr__ = new_setattr
-  return cls
+  cls.__init__ = new_init  # type: ignore[assignment]
+  cls.__setattr__ = new_setattr  # type: ignore[assignment]
+
+  return frozen_after_init.define_instance_of(cls)
