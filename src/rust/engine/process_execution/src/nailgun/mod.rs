@@ -20,6 +20,7 @@ mod parsed_jvm_command_lines;
 pub use nailgun_pool::NailgunPool;
 use workunit_store::WorkUnitStore;
 use parsed_jvm_command_lines::ParsedJVMCommandLines;
+use std::fs::{read_link, remove_dir_all, remove_file};
 
 // Hardcoded constants for connecting to nailgun
 static NAILGUN_MAIN_CLASS: &str = "com.martiansoftware.nailgun.NGServer";
@@ -101,8 +102,16 @@ impl NailgunCommandRunner {
 
     // TODO(8481) When we correctly set the input_files field of the nailgun EPR, we won't need to pass it here as an argument.
     // TODO(8489) We should move this code to NailgunPool. This returns a Future, so this will involve making the struct Futures-aware.
-    fn materialize_workdir_for_server(&self, nailgun_workdir: &PathBuf, nailgun_request: &ExecuteProcessRequest, input_files: Digest, workunit_store: WorkUnitStore) -> BoxFuture<(), String> {
-        let maybe_jdk_home = nailgun_request.jdk_home.clone();
+    fn materialize_workdir_for_server(
+        &self,
+        nailgun_workdir: &PathBuf,
+        nailgun_request: &ExecuteProcessRequest,
+        input_files: Digest,
+        workunit_store: WorkUnitStore
+    ) -> BoxFuture<(), String> {
+        let requested_jdk_home = nailgun_request.jdk_home
+            .clone()
+            .expect("No JDK home specified.");
         // Materialize the directory for running the nailgun server, if we need to.
         let nailgun_workdir_path2 = nailgun_workdir.clone();
         let nailgun_workdir_path3 = nailgun_workdir.clone();
@@ -112,17 +121,34 @@ impl NailgunCommandRunner {
             // TODO(8481) This materializes the input files in the client req, which is a superset of the files we need (we only need the classpath, not the input files)
             .materialize_directory(nailgun_workdir.clone(), input_files, workunit_store)
             .and_then(move |_metadata| {
-                maybe_jdk_home.map_or(Ok(()), |jdk_home_relpath| {
-                    let jdk_home_in_workdir = nailgun_workdir_path2.clone().join(".jdk");
-                    if !jdk_home_in_workdir.exists() {
-                        symlink(jdk_home_relpath, jdk_home_in_workdir)
+                let jdk_home_in_workdir = nailgun_workdir_path2.clone().join(".jdk");
+                let jdk_home_in_workdir2 = jdk_home_in_workdir.clone();
+                let jdk_home_in_workdir3 = jdk_home_in_workdir.clone();
+                let jdk_home_in_workdir4 = jdk_home_in_workdir.clone();
+                if !jdk_home_in_workdir.exists() {
+                    futures::future::result(
+                        symlink(requested_jdk_home, jdk_home_in_workdir)
                             .map_err(|err| format!("Error making symlink for local execution in workdir {:?}: {:?}", &nailgun_workdir_path2, err))
+                    )
+                } else {
+                    let maybe_existing_jdk = read_link(jdk_home_in_workdir).map_err(|e| format!("{}", e));
+                    let maybe_existing_jdk2 = maybe_existing_jdk.clone();
+                    if maybe_existing_jdk.is_err() || (maybe_existing_jdk.is_ok() && maybe_existing_jdk.unwrap() != requested_jdk_home) {
+                        let res = remove_file(jdk_home_in_workdir2)
+                            .map_err(|e| format!(
+                                "Error removing existing (but incorrect) jdk symlink. We wanted it to point to {:?}, but it pointed to {:?}",
+                                &requested_jdk_home, &maybe_existing_jdk2
+                            ))
+                            .and_then(|_| {
+                                symlink(requested_jdk_home, jdk_home_in_workdir4)
+                                    .map_err(|err| format!("Error making symlink for local execution in workdir {:?}: {:?}", &nailgun_workdir_path2, err))
+                            });
+                        futures::future::result(res)
                     } else {
                         debug!("JDK home for Nailgun already exists in {:?}. Using that one.", &nailgun_workdir_path4);
-                        Ok(())
+                        futures::future::ok(())
                     }
-                })?;
-                Ok(())
+                }
             })
             .inspect(move |_| debug!("Materialized directory {:?} before connecting to nailgun server.", &nailgun_workdir_path3))
             .to_boxed()
@@ -210,7 +236,7 @@ mod tests {
     use crate::nailgun::NailgunCommandRunner;
     use store::Store;
     use tempfile::TempDir;
-    use crate::ExecuteProcessRequestMetadata    ;
+    use crate::ExecuteProcessRequestMetadata;
     use std::path::PathBuf;
 
     fn mock_nailgun_runner(workdir_base: Option<PathBuf>) -> NailgunCommandRunner {
