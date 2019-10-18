@@ -297,13 +297,13 @@ def bootstrap(*, clean: bool, python_version: PythonVersion) -> None:
     if clean:
       try:
         subprocess.run(["./build-support/python/clean.sh"], check=True)
-      except subprocess.CalledProcessError:
-        die("Failed to clean before bootstrapping Pants.")
 
+      except subprocess.CalledProcessError as e:
+        die(elaborate_die_message("Failed to clean before bootstrapping Pants.", e))
     try:
       subprocess.run(["./build-support/bin/bootstrap_pants_pex.sh"], check=True)
-    except subprocess.CalledProcessError:
-      die("Failed to bootstrap Pants.")
+    except subprocess.CalledProcessError as e:
+      die(elaborate_die_message("Failed to bootstrap Pants.", e)
 
 
 def check_pants_pex_exists() -> None:
@@ -320,6 +320,10 @@ def check_pants_pex_exists() -> None:
 PYTEST_PASSTHRU_ARGS = ["--", "-q", "-rfa"]
 
 
+def elaborate_die_message(die_message: str, e: subprocess.CalledProcessError):
+  return f'{die_message}\n======== Details =========\n{e.output}'
+
+
 def _run_command(
   command: List[str], *, slug: str, start_message: str, die_message: str, requires_pex: bool = True
 ) -> None:
@@ -329,7 +333,7 @@ def _run_command(
     try:
       subprocess.run(command, check=True)
     except subprocess.CalledProcessError as e:
-      die(f'{die_message}\n======== Details =========\n{e.output}')
+      die(elaborate_die_message(die_message, e))
 
 
 def run_githooks() -> None:
@@ -351,8 +355,8 @@ def run_sanity_checks() -> None:
         stderr=subprocess.STDOUT,
         check=True
       )
-    except subprocess.CalledProcessError:
-      die(f"Failed to execute `./pants {command}`.")
+    except subprocess.CalledProcessError as e:
+      die(elaborate_die_message(f"Failed to execute `./pants {command}`.", e))
 
   checks = [
     ["bash-completion"],
@@ -416,9 +420,8 @@ def run_cargo_audit() -> None:
         # See: https://github.com/pantsbuild/pants/issues/7760 for context.
         "--ignore", "RUSTSEC-2019-0003"
       ], check=True)
-    except subprocess.CalledProcessError:
-      die("Cargo audit failure")
-
+    except subprocess.CalledProcessError as e:
+      die(elaborate_die_message("Cargo audit failure", e))
 
 def run_unit_tests(*, oauth_token_path: Optional[str] = None) -> None:
   target_sets = TestTargetSets.calculate(
@@ -477,9 +480,8 @@ def run_rust_tests() -> None:
   with travis_section("RustTests", "Running Rust tests"):
     try:
       subprocess.run(command, env={**os.environ, "RUST_BACKTRACE": "all"}, check=True)
-    except subprocess.CalledProcessError:
-      die("Rust test failure.")
-
+    except subprocess.CalledProcessError as e:
+      die(elaborate_die_message("Rust test failure.", e))
 
 def run_jvm_tests() -> None:
   targets = ["src/java::", "src/scala::", "tests/java::", "tests/scala::", "zinc::"]
