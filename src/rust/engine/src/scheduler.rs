@@ -3,6 +3,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
+use std::fs::File;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Arc};
@@ -40,6 +41,7 @@ struct InnerSession {
   // A place to store info about workunits in rust part
   workunit_store: WorkUnitStore,
   build_id: String,
+  process_execution_stats_logfile: Option<Arc<Mutex<File>>>,
 }
 
 #[derive(Clone)]
@@ -52,7 +54,25 @@ impl Session {
     should_render_ui: bool,
     ui_worker_count: usize,
     build_id: String,
+    process_execution_stats_logfile_path: Option<PathBuf>,
   ) -> Session {
+    let process_execution_stats_logfile =
+      if let Some(process_execution_stats_logfile_path) = process_execution_stats_logfile_path {
+        if let Some(parent) = process_execution_stats_logfile_path.parent() {
+          fs::safe_create_dir_all(parent)
+            .expect("Error making directory for process execution stats logfile");
+        }
+        Some(
+          std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(process_execution_stats_logfile_path)
+            .expect("Failed to open process execution stats logfile"),
+        )
+      } else {
+        None
+      };
     let inner_session = InnerSession {
       preceding_graph_size: scheduler.core.graph.len(),
       roots: Mutex::new(HashSet::new()),
@@ -61,6 +81,8 @@ impl Session {
       should_record_zipkin_spans: should_record_zipkin_spans,
       workunit_store: WorkUnitStore::new(),
       build_id: build_id,
+      process_execution_stats_logfile: process_execution_stats_logfile
+        .map(|f| Arc::new(Mutex::new(f))),
     };
     Session(Arc::new(inner_session))
   }
@@ -93,6 +115,10 @@ impl Session {
 
   pub fn build_id(&self) -> &str {
     &self.0.build_id
+  }
+
+  pub fn process_execution_stats_logfile(&self) -> Option<Arc<Mutex<File>>> {
+    self.0.process_execution_stats_logfile.clone()
   }
 }
 

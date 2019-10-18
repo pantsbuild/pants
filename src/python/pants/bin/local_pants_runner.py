@@ -104,8 +104,14 @@ class LocalPantsRunner(ExceptionSink.AccessGlobalExiterMixin):
       )
 
       v2_ui = options.for_global_scope().v2_ui
+      process_execution_stats_logfile = options.for_global_scope().process_execution_stats_logfile
       zipkin_trace_v2 = options.for_scope('reporting').zipkin_trace_v2
-      graph_session = graph_scheduler_helper.new_session(zipkin_trace_v2, RunTracker.global_instance().run_id, v2_ui)
+      graph_session = graph_scheduler_helper.new_session(
+        zipkin_trace_v2,
+        RunTracker.global_instance().run_id,
+        process_execution_stats_logfile,
+        v2_ui,
+      )
     return graph_session, graph_session.scheduler_session
 
   @staticmethod

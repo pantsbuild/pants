@@ -55,6 +55,7 @@ class ExecutionOptions:
   process_execution_speculation_delay: Any
   process_execution_speculation_strategy: Any
   process_execution_use_local_cache: Any
+  process_execution_stats_logfile: Any
   remote_execution_process_cache_namespace: Any
   remote_instance_name: Any
   remote_ca_certs_path: Any
@@ -79,6 +80,7 @@ class ExecutionOptions:
       process_execution_speculation_delay=bootstrap_options.process_execution_speculation_delay,
       process_execution_speculation_strategy=bootstrap_options.process_execution_speculation_strategy,
       process_execution_use_local_cache=bootstrap_options.process_execution_use_local_cache,
+      process_execution_stats_logfile=bootstrap_options.process_execution_stats_logfile,
       remote_execution_process_cache_namespace=bootstrap_options.remote_execution_process_cache_namespace,
       remote_instance_name=bootstrap_options.remote_instance_name,
       remote_ca_certs_path=bootstrap_options.remote_ca_certs_path,
@@ -103,6 +105,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     process_execution_speculation_delay=1,
     process_execution_speculation_strategy='local_first',
     process_execution_use_local_cache=True,
+    process_execution_stats_logfile=None,
     remote_execution_process_cache_namespace=None,
     remote_instance_name=None,
     remote_ca_certs_path=None,
@@ -435,6 +438,8 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
              advanced=True)
     register('--process-execution-use-local-cache', type=bool, default=True, advanced=True,
              help='Whether to keep process executions in a local cache persisted to disk.')
+    register('--process-execution-stats-logfile', type=str, default=None, advanced=True,
+             help='Path to which to write stats about process executions.', daemon=False)
 
   @classmethod
   def register_options(cls, register):

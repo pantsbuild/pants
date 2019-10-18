@@ -53,6 +53,7 @@ class SchedulerService(PantsService):
     self._scheduler_session = self._scheduler.new_session(
       zipkin_trace_v2=False,
       build_id="background_pantsd_session",
+      process_execution_stats_logfile=None,
     )
     self._logger = logging.getLogger(__name__)
     self._event_queue = queue.Queue(maxsize=self.QUEUE_SIZE)
@@ -183,8 +184,9 @@ class SchedulerService(PantsService):
       self._watchman_is_running.wait()
     build_id = RunTracker.global_instance().run_id
     v2_ui = options.for_global_scope().v2_ui
+    process_execution_stats_logfile = options.for_global_scope().process_execution_stats_logfile
     zipkin_trace_v2 = options.for_scope('reporting').zipkin_trace_v2
-    session = self._graph_helper.new_session(zipkin_trace_v2, build_id, v2_ui)
+    session = self._graph_helper.new_session(zipkin_trace_v2, build_id, process_execution_stats_logfile, v2_ui)
 
     if options.for_global_scope().loop:
       fn = self._loop

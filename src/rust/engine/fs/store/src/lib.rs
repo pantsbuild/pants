@@ -40,7 +40,7 @@ use fs::FileContent;
 use futures::{future, Future};
 use hashing::Digest;
 use protobuf::Message;
-use serde_derive::Serialize;
+use serde_derive::{Deserialize, Serialize};
 pub use serverset::BackoffConfig;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::OpenOptions;
@@ -474,11 +474,74 @@ impl Store {
     let start_time = Instant::now();
 
     let remote = if let Some(ref remote) = self.remote {
-      remote
+      remote.clone()
     } else {
       return future::err("Cannot ensure remote has blobs without a remote".to_owned()).to_boxed();
     };
 
+    self
+      .expand_transitive_digests(digests, workunit_store.clone())
+      .and_then({
+        let remote = remote.clone();
+        let workunit_store = workunit_store.clone();
+        move |ingested_digests| {
+          if Store::upload_is_faster_than_checking_whether_to_upload(&ingested_digests) {
+            return future::ok((ingested_digests.keys().cloned().collect(), ingested_digests))
+              .to_boxed();
+          }
+          let request = remote.find_missing_blobs_request(ingested_digests.keys());
+          let f = remote.list_missing_digests(request, workunit_store.clone());
+          f.map(move |digests_to_upload| (digests_to_upload, ingested_digests))
+            .to_boxed()
+        }
+      })
+      .and_then({
+        let local = self.local.clone();
+        move |(digests_to_upload, ingested_digests)| {
+          future::join_all(
+            digests_to_upload
+              .into_iter()
+              .map({
+                |digest| {
+                  let entry_type = ingested_digests[&digest];
+                  let remote = remote.clone();
+                  let workunit_store = workunit_store.clone();
+                  local
+                    .load_bytes_with(entry_type, digest, move |bytes| {
+                      remote.store_bytes(bytes, workunit_store.clone())
+                    })
+                    .and_then(move |maybe_future| match maybe_future {
+                      Some(future) => Ok(future),
+                      None => Err(format!("Failed to upload digest {:?}: Not found", digest)),
+                    })
+                }
+              })
+              .collect::<Vec<_>>(),
+          )
+          .and_then(future::join_all)
+          .map(|uploaded_digests| (uploaded_digests, ingested_digests))
+        }
+      })
+      .map(move |(uploaded_digests, ingested_digests)| {
+        let ingested_file_sizes = ingested_digests.iter().map(|(digest, _)| digest.1);
+        let uploaded_file_sizes = uploaded_digests.iter().map(|digest| digest.1);
+
+        UploadSummary {
+          ingested_file_count: ingested_file_sizes.len(),
+          ingested_file_bytes: ingested_file_sizes.sum(),
+          uploaded_file_count: uploaded_file_sizes.len(),
+          uploaded_file_bytes: uploaded_file_sizes.sum(),
+          upload_wall_time: start_time.elapsed(),
+        }
+      })
+      .to_boxed()
+  }
+
+  pub fn expand_transitive_digests(
+    &self,
+    digests: Vec<Digest>,
+    workunit_store: WorkUnitStore,
+  ) -> BoxFuture<HashMap<Digest, EntryType>, String> {
     let mut expanding_futures = Vec::new();
 
     let mut expanded_digests = HashMap::new();
@@ -501,10 +564,6 @@ impl Store {
       };
     }
 
-    let local = self.local.clone();
-    let remote = remote.clone();
-    let remote2 = remote.clone();
-    let workunit_store2 = workunit_store.clone();
     future::join_all(expanding_futures)
       .map(move |futures| {
         for mut digests in futures {
@@ -513,50 +572,6 @@ impl Store {
           }
         }
         expanded_digests
-      })
-      .and_then(move |ingested_digests| {
-        if Store::upload_is_faster_than_checking_whether_to_upload(&ingested_digests) {
-          return future::ok((ingested_digests.keys().cloned().collect(), ingested_digests))
-            .to_boxed();
-        }
-        let request = remote.find_missing_blobs_request(ingested_digests.keys());
-        let f = remote.list_missing_digests(request, workunit_store.clone());
-        f.map(move |digests_to_upload| (digests_to_upload, ingested_digests))
-          .to_boxed()
-      })
-      .and_then(move |(digests_to_upload, ingested_digests)| {
-        future::join_all(
-          digests_to_upload
-            .into_iter()
-            .map(|digest| {
-              let entry_type = ingested_digests[&digest];
-              let remote = remote2.clone();
-              let workunit_store = workunit_store2.clone();
-              local
-                .load_bytes_with(entry_type, digest, move |bytes| {
-                  remote.store_bytes(bytes, workunit_store.clone())
-                })
-                .and_then(move |maybe_future| match maybe_future {
-                  Some(future) => Ok(future),
-                  None => Err(format!("Failed to upload digest {:?}: Not found", digest)),
-                })
-            })
-            .collect::<Vec<_>>(),
-        )
-        .and_then(future::join_all)
-        .map(|uploaded_digests| (uploaded_digests, ingested_digests))
-      })
-      .map(move |(uploaded_digests, ingested_digests)| {
-        let ingested_file_sizes = ingested_digests.iter().map(|(digest, _)| digest.1);
-        let uploaded_file_sizes = uploaded_digests.iter().map(|digest| digest.1);
-
-        UploadSummary {
-          ingested_file_count: ingested_file_sizes.len(),
-          ingested_file_bytes: ingested_file_sizes.sum(),
-          uploaded_file_count: uploaded_file_sizes.len(),
-          uploaded_file_bytes: uploaded_file_sizes.sum(),
-          upload_wall_time: start_time.elapsed(),
-        }
       })
       .to_boxed()
   }
@@ -984,8 +999,7 @@ impl Store {
   }
 }
 
-// Only public for testing.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Ord, PartialOrd)]
+#[derive(Copy, Clone, Debug, Deserialize, Eq, Hash, PartialEq, Ord, PartialOrd, Serialize)]
 pub enum EntryType {
   Directory,
   File,

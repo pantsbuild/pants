@@ -203,6 +203,11 @@ impl Core {
       })
     }
 
+    command_runner = Box::new(process_execution::logging::CommandRunner {
+      delegate: command_runner.into(),
+      store: store.clone(),
+    });
+
     let http_client = reqwest::r#async::Client::new();
     let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);
 

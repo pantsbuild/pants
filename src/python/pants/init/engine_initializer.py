@@ -166,8 +166,13 @@ class LegacyGraphScheduler:
   build_file_aliases: Any
   goal_map: Any
 
-  def new_session(self, zipkin_trace_v2, build_id, v2_ui=False):
-    session = self.scheduler.new_session(zipkin_trace_v2, build_id, v2_ui)
+  def new_session(self, zipkin_trace_v2, build_id, process_execution_stats_logfile, v2_ui=False):
+    session = self.scheduler.new_session(
+      zipkin_trace_v2,
+      build_id,
+      process_execution_stats_logfile,
+      v2_ui,
+    )
     return LegacyGraphSession(session, self.build_file_aliases, self.goal_map)
 
 

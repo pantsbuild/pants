@@ -31,6 +31,7 @@ extern crate derivative;
 
 use boxfuture::BoxFuture;
 use bytes::Bytes;
+use parking_lot::Mutex;
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
 use std::ops::AddAssign;
@@ -49,6 +50,10 @@ mod cache_tests;
 pub mod local;
 #[cfg(test)]
 mod local_tests;
+
+pub mod logging;
+#[cfg(test)]
+mod logging_tests;
 
 pub mod remote;
 #[cfg(test)]
@@ -251,6 +256,7 @@ impl AddAssign<UploadSummary> for ExecutionStats {
 pub struct Context {
   pub workunit_store: WorkUnitStore,
   pub build_id: String,
+  pub stats_logfile: Option<Arc<Mutex<std::fs::File>>>,
 }
 
 pub trait CommandRunner: Send + Sync {

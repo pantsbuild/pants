@@ -768,6 +768,7 @@ pub fn sends_headers() {
   let context = Context {
     workunit_store: WorkUnitStore::default(),
     build_id: String::from("marmosets"),
+    stats_logfile: None,
   };
   tokio::runtime::Runtime::new()
     .unwrap()

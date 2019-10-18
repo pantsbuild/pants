@@ -736,10 +736,21 @@ pub extern "C" fn session_create(
   should_render_ui: bool,
   ui_worker_count: u64,
   build_id: Buffer,
+  process_execution_execution_stats_logfile_buf: Buffer,
 ) -> *const Session {
   let build_id = build_id
     .to_string()
     .expect("build_id was not a valid UTF-8 string");
+  let process_execution_execution_stats_logfile_osstring =
+    process_execution_execution_stats_logfile_buf.to_os_string();
+  let process_execution_execution_stats_logfile_path =
+    if process_execution_execution_stats_logfile_osstring.is_empty() {
+      None
+    } else {
+      Some(PathBuf::from(
+        process_execution_execution_stats_logfile_osstring,
+      ))
+    };
   with_scheduler(scheduler_ptr, |scheduler| {
     Box::into_raw(Box::new(Session::new(
       scheduler,
@@ -747,6 +758,7 @@ pub extern "C" fn session_create(
       should_render_ui,
       ui_worker_count as usize,
       build_id,
+      process_execution_execution_stats_logfile_path,
     )))
   })
 }

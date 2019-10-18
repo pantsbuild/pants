@@ -183,6 +183,27 @@ impl TestDirectory {
 
   // Directory structure:
   //
+  // /cats/roland
+  // /roland2
+  pub fn nested_and_not() -> TestDirectory {
+    let mut directory = bazel_protos::remote_execution::Directory::new();
+    directory.mut_directories().push({
+      let mut subdir = bazel_protos::remote_execution::DirectoryNode::new();
+      subdir.set_name("cats".to_string());
+      subdir.set_digest((&TestDirectory::containing_roland().digest()).into());
+      subdir
+    });
+    directory.mut_files().push({
+      let mut file = bazel_protos::remote_execution::FileNode::new();
+      file.set_name("roland2".to_string());
+      file.set_digest((&TestData::roland().digest()).into());
+      file
+    });
+    TestDirectory { directory }
+  }
+
+  // Directory structure:
+  //
   // /pets/cats/roland
   pub fn double_nested() -> TestDirectory {
     let mut directory = bazel_protos::remote_execution::Directory::new();

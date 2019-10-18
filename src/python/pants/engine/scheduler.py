@@ -315,10 +315,10 @@ class Scheduler:
   def garbage_collect_store(self):
     self._native.lib.garbage_collect_store(self._scheduler)
 
-  def new_session(self, zipkin_trace_v2, build_id, v2_ui=False):
+  def new_session(self, zipkin_trace_v2, build_id, process_execution_stats_logfile, v2_ui=False):
     """Creates a new SchedulerSession for this Scheduler."""
     return SchedulerSession(self, self._native.new_session(
-      self._scheduler, zipkin_trace_v2, v2_ui, multiprocessing.cpu_count(), build_id)
+      self._scheduler, zipkin_trace_v2, v2_ui, multiprocessing.cpu_count(), build_id, process_execution_stats_logfile)
     )
 
 

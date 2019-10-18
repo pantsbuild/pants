@@ -89,6 +89,17 @@ python_tests(
 )
 
 python_tests(
+  name='isolated_process_integration',
+  sources=['test_isolated_process_integration.py'],
+  dependencies=[
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+    'examples/src/scala/org/pantsbuild/example:hello_directory',
+  ],
+  tags={'integration'},
+)
+
+python_tests(
   name='selectors',
   sources=['test_selectors.py'],
   dependencies=[
