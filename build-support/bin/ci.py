@@ -265,7 +265,7 @@ class TestTargetSets(NamedTuple):
         "src/python::",
         "tests/python::",
         "contrib::",
-      ], stdout=subprocess.PIPE, encoding="utf-8", check=True
+      ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8", check=True
     ).stdout.strip().split("\n"))
 
     blacklisted_chroot_targets = get_listed_targets(f"{test_type}_chroot_blacklist.txt")
