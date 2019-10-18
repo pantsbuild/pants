@@ -371,8 +371,8 @@ class ExceptionSink:
 
     NB: This method calls signal.signal(), which will crash if not called from the main thread!
     """
+    previous_signal_handler = cls.reset_signal_handler(new_signal_handler)
     try:
-      previous_signal_handler = cls.reset_signal_handler(new_signal_handler)
       yield
     finally:
       cls.reset_signal_handler(previous_signal_handler)
