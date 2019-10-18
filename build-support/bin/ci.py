@@ -266,7 +266,7 @@ class TestTargetSets(NamedTuple):
           "src/python::",
           "tests/python::",
           "contrib::",
-        ], stdout=subprocess.PIPE, encoding="utf-8", check=True
+        ], stdout=subprocess.PIPE, encoding="utf-8", check=True, env={'RUST_BACKTRACE': 'full'}
       ).stdout.strip().split("\n"))
     except subprocess.CalledProcessError as e:
       die(elaborate_die_message("filter targets failed", e))
@@ -426,6 +426,7 @@ def run_cargo_audit() -> None:
     except subprocess.CalledProcessError as e:
       die(elaborate_die_message("Cargo audit failure", e))
 
+
 def run_unit_tests(*, oauth_token_path: Optional[str] = None) -> None:
   target_sets = TestTargetSets.calculate(
     test_type=TestType.unit, remote_execution_enabled=oauth_token_path is not None
@@ -485,6 +486,7 @@ def run_rust_tests() -> None:
       subprocess.run(command, env={**os.environ, "RUST_BACKTRACE": "all"}, check=True)
     except subprocess.CalledProcessError as e:
       die(elaborate_die_message("Rust test failure.", e))
+
 
 def run_jvm_tests() -> None:
   targets = ["src/java::", "src/scala::", "tests/java::", "tests/scala::", "zinc::"]

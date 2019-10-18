@@ -37,17 +37,17 @@ MERGE_BASE="$(git_merge_base)"
 echo "* Checking packages"
 ./build-support/bin/check_packages.sh "${DIRS_TO_CHECK[@]}" || exit 1
 
-echo "* Checking headers"
-./build-support/bin/check_header.py "${DIRS_TO_CHECK[@]}" --files-added "${ADDED_FILES[@]}" || exit 1
+# echo "* Checking headers"
+# ./build-support/bin/check_header.py "${DIRS_TO_CHECK[@]}" --files-added "${ADDED_FILES[@]}" || exit 1
 
-echo "* Checking for banned imports"
-./build-support/bin/check_banned_imports.py || exit 1
+# echo "* Checking for banned imports"
+# ./build-support/bin/check_banned_imports.py || exit 1
 
-echo "* Checking shell scripts via shellcheck"
-./build-support/bin/shellcheck.py || exit 1
+# echo "* Checking shell scripts via shellcheck"
+# ./build-support/bin/shellcheck.py || exit 1
 
-echo "* Checking shell scripts via our custom linter"
-./build-support/bin/check_shell.sh || exit 1
+# echo "* Checking shell scripts via our custom linter"
+# ./build-support/bin/check_shell.sh || exit 1
 
 # When travis builds a tag, it does so in a shallow clone without master fetched, which
 # fails in pants changed.
@@ -62,8 +62,8 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
   echo "* Checking lint"
   ./pants --exclude-target-regexp='testprojects/.*' --changed-parent="${MERGE_BASE}" lint || exit 1
 
-  echo "* Checking types for targets marked \`type_checked\`"  
-  ./build-support/bin/mypy.py || exit 1
+  # echo "* Checking types for targets marked \`type_checked\`"  
+  # ./build-support/bin/mypy.py || exit 1
 
   if git diff "${MERGE_BASE}" --name-only | grep '\.rs$' > /dev/null; then
     echo "* Checking formatting of rust files"
