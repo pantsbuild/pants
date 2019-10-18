@@ -6,13 +6,12 @@ import os
 from contextlib import contextmanager
 
 from pants.base.exceptions import TaskError
-from pants.task.target_restriction_mixins import HasTransitiveOptionMixin
 from pants.task.task import QuietTaskMixin, Task
 from pants.util.dirutil import safe_open
 from pants.util.meta import classproperty
 
 
-class ConsoleTask(QuietTaskMixin, HasTransitiveOptionMixin, Task):
+class ConsoleTask(QuietTaskMixin, Task):
   """A task whose only job is to print information to the console.
 
   ConsoleTasks are not intended to modify build state.
